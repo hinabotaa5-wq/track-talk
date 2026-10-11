@@ -42,11 +42,6 @@ export function Header() {
             TRACK TALK
           </Link>
         )}
-        {!session ? (
-          <Link href="/login" className="text-sm text-blue-700 md:hidden">
-            ログイン
-          </Link>
-        ) : null}
         <nav className="hidden items-center gap-3 text-sm md:flex">
           <Link href={session ? "/competitions" : "/login"} className="hover:text-blue-700">
             大会
@@ -63,11 +58,7 @@ export function Header() {
                 ログアウト
               </button>
             </>
-          ) : (
-            <Link href="/login" className="hover:text-blue-700">
-              ログイン
-            </Link>
-          )}
+          ) : null}
         </nav>
       </div>
     </header>
