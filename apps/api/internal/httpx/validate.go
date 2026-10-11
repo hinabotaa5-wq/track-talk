@@ -104,6 +104,24 @@ func assetPublicID(v, message string) string {
 	return ""
 }
 
+func InquiryCategory(v string) string {
+	switch v {
+	case "bug", "account", "request", "other":
+		return ""
+	default:
+		return "種類が不正です"
+	}
+}
+
+func InquirySubject(v string) string {
+	v = strings.TrimSpace(v)
+	n := utf8.RuneCountInString(v)
+	if n < 1 || n > 80 {
+		return "1〜80文字で入力してください"
+	}
+	return ""
+}
+
 func ReportReason(v string) string {
 	switch v {
 	case "spam", "harassment", "misinfo", "other":

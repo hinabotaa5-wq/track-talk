@@ -127,6 +127,68 @@ WHERE id = $1
   AND deleted_at IS NULL
   AND hidden_at IS NULL;
 
+-- name: ListSavedPosts :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at,
+    pr.nickname AS author_nickname
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+JOIN profiles pr ON pr.id = p.author_id
+WHERE s.user_id = sqlc.arg('user_id')
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+  )
+ORDER BY s.created_at DESC, p.id DESC
+LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
+
+-- name: CountSavedPosts :one
+SELECT count(*)
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+WHERE s.user_id = sqlc.arg('user_id')
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+  );
+
+-- name: SavedByUser :one
+SELECT EXISTS(
+    SELECT 1 FROM post_saves WHERE post_id = $1 AND user_id = $2
+);
+
+-- name: ListSavedPostIDs :many
+SELECT post_id
+FROM post_saves
+WHERE user_id = $1
+  AND post_id = ANY(sqlc.arg('post_ids')::uuid[]);
+
+-- name: InsertSave :execrows
+INSERT INTO post_saves (post_id, user_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: DeleteSave :execrows
+DELETE FROM post_saves
+WHERE post_id = $1 AND user_id = $2;
+
 -- name: LikedByUser :one
 SELECT EXISTS(
     SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2

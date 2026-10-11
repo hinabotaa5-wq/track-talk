@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentSchema, postSchema, profileSchema } from "./validators";
+import { commentSchema, inquirySchema, postSchema, profileSchema } from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -18,5 +18,12 @@ describe("validators", () => {
   it("rejects long comments", () => {
     const r = commentSchema.safeParse({ body: "あ".repeat(2001) });
     expect(r.success).toBe(false);
+  });
+
+  it("accepts an inquiry and rejects a blank subject", () => {
+    expect(
+      inquirySchema.safeParse({ category: "bug", subject: "ログインできない", body: "再設定後も入れません" }).success,
+    ).toBe(true);
+    expect(inquirySchema.safeParse({ category: "bug", subject: "  ", body: "本文" }).success).toBe(false);
   });
 });

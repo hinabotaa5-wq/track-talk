@@ -197,10 +197,14 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			MapDBError(w, err)
 			return
 		}
-		liked := s.likedSet(r.Context(), idsFromPopular(rows))
+		ids := idsFromPopular(rows)
+		liked := s.likedSet(r.Context(), ids)
+		saved := s.savedSet(r.Context(), ids)
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			items = append(items, s.present(postFromPopular(row, liked[row.ID], true)))
+			item := s.present(postFromPopular(row, liked[row.ID], true))
+			item.SavedByMe = saved[row.ID]
+			items = append(items, item)
 		}
 	} else {
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
@@ -213,10 +217,14 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			MapDBError(w, err)
 			return
 		}
-		liked := s.likedSet(r.Context(), idsFromNew(rows))
+		ids := idsFromNew(rows)
+		liked := s.likedSet(r.Context(), ids)
+		saved := s.savedSet(r.Context(), ids)
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			items = append(items, s.present(postFromList(row, liked[row.ID], true)))
+			item := s.present(postFromList(row, liked[row.ID], true))
+			item.SavedByMe = saved[row.ID]
+			items = append(items, item)
 		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
@@ -254,6 +262,22 @@ func (s *Server) likedSet(ctx context.Context, ids []uuid.UUID) map[uuid.UUID]bo
 	return out
 }
 
+func (s *Server) savedSet(ctx context.Context, ids []uuid.UUID) map[uuid.UUID]bool {
+	out := map[uuid.UUID]bool{}
+	uid, ok := UserID(ctx)
+	if !ok || len(ids) == 0 {
+		return out
+	}
+	rows, err := s.q.ListSavedPostIDs(ctx, db.ListSavedPostIDsParams{UserID: uid, PostIds: ids})
+	if err != nil {
+		return out
+	}
+	for _, id := range rows {
+		out[id] = true
+	}
+	return out
+}
+
 func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
@@ -265,13 +289,20 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	liked := false
+	saved := false
 	if uid, ok := UserID(r.Context()); ok {
 		ok2, err := s.q.LikedByUser(r.Context(), db.LikedByUserParams{PostID: id, UserID: uid})
 		if err == nil {
 			liked = ok2
 		}
+		ok2, err = s.q.SavedByUser(r.Context(), db.SavedByUserParams{PostID: id, UserID: uid})
+		if err == nil {
+			saved = ok2
+		}
 	}
-	JSON(w, http.StatusOK, s.present(postFromGet(row, liked)))
+	item := s.present(postFromGet(row, liked))
+	item.SavedByMe = saved
+	JSON(w, http.StatusOK, item)
 }
 
 type postReq struct {
@@ -452,6 +483,92 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if n == 0 {
 		Error(w, http.StatusForbidden, "forbidden", "削除できません")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	page, per, offset := s.queryPage(r)
+	keyword := likeContains(r.URL.Query().Get("q"))
+	count, err := s.q.CountSavedPosts(r.Context(), db.CountSavedPostsParams{UserID: p.ID, Keyword: keyword})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	rows, err := s.q.ListSavedPosts(r.Context(), db.ListSavedPostsParams{
+		UserID:  p.ID,
+		Keyword: keyword,
+		LimitN:  per,
+		OffsetN: offset,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	liked := s.likedSet(r.Context(), ids)
+	items := make([]postDTO, 0, len(rows))
+	for _, row := range rows {
+		item := s.present(postFromList(db.ListPostsNewRow{
+			ID:                  row.ID,
+			AuthorID:            row.AuthorID,
+			Title:               row.Title,
+			Body:                row.Body,
+			Kind:                row.Kind,
+			YoutubeVideoID:      row.YoutubeVideoID,
+			YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
+			CloudinaryPublicID:  row.CloudinaryPublicID,
+			LikeCount:           row.LikeCount,
+			CommentCount:        row.CommentCount,
+			CreatedAt:           row.CreatedAt,
+			UpdatedAt:           row.UpdatedAt,
+			AuthorNickname:      row.AuthorNickname,
+		}, liked[row.ID], true))
+		item.SavedByMe = true
+		items = append(items, item)
+	}
+	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
+}
+
+func (s *Server) savePost(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, err := s.q.GetPost(r.Context(), id); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if _, err := s.q.InsertSave(r.Context(), db.InsertSaveParams{PostID: id, UserID: p.ID}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) unsavePost(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, err := s.q.DeleteSave(r.Context(), db.DeleteSaveParams{PostID: id, UserID: p.ID}); err != nil {
+		MapDBError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -729,6 +846,103 @@ func (s *Server) hidePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type inquiryReq struct {
+	Category string `json:"category"`
+	Subject  string `json:"subject"`
+	Body     string `json:"body"`
+}
+
+func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req inquiryReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	fields := map[string]string{}
+	if e := InquiryCategory(req.Category); e != "" {
+		fields["category"] = e
+	}
+	if e := InquirySubject(req.Subject); e != "" {
+		fields["subject"] = e
+	}
+	if e := Body(req.Body, 2000); e != "" {
+		fields["body"] = e
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	row, err := s.q.CreateInquiry(r.Context(), db.CreateInquiryParams{
+		ID:       uuid.New(),
+		UserID:   p.ID,
+		Category: req.Category,
+		Subject:  strings.TrimSpace(req.Subject),
+		Body:     strings.TrimSpace(req.Body),
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusCreated, row)
+}
+
+func (s *Server) listMyInquiries(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	page, per, offset := s.queryPage(r)
+	total, err := s.q.CountMyInquiries(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	rows, err := s.q.ListMyInquiries(r.Context(), db.ListMyInquiriesParams{
+		UserID: p.ID,
+		Limit:  per,
+		Offset: offset,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if rows == nil {
+		rows = []db.Inquiry{}
+	}
+	JSON(w, http.StatusOK, map[string]any{
+		"inquiries": rows,
+		"meta":      meta{Page: int(page), PerPage: int(per), Total: total},
+	})
+}
+
+func (s *Server) listInquiries(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	page, per, offset := s.queryPage(r)
+	total, err := s.q.CountInquiries(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	rows, err := s.q.ListInquiries(r.Context(), db.ListInquiriesParams{Limit: per, Offset: offset})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if rows == nil {
+		rows = []db.Inquiry{}
+	}
+	JSON(w, http.StatusOK, map[string]any{
+		"inquiries": rows,
+		"meta":      meta{Page: int(page), PerPage: int(per), Total: total},
+	})
 }
 
 func (s *Server) hideComment(w http.ResponseWriter, r *http.Request) {

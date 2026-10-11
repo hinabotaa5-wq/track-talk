@@ -67,6 +67,19 @@ export function PostDetail({ id }: { id: string }) {
     load();
   }
 
+  async function toggleSave() {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    if (current.saved_by_me) {
+      await apiFetch(`/v1/posts/${current.id}/saves`, { method: "DELETE", token });
+    } else {
+      await apiFetch(`/v1/posts/${current.id}/saves`, { method: "POST", token });
+    }
+    load();
+  }
+
   async function remove() {
     if (!confirm("この投稿を削除しますか？")) return;
     await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
@@ -149,7 +162,10 @@ export function PostDetail({ id }: { id: string }) {
         </Button>
         {mine ? (
           <>
-            <Link href={`/posts/${post.id}/edit`} className="rounded-md border px-4 py-2 text-sm">
+            <Link
+              href={`/posts/${post.id}/edit`}
+              className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
+            >
               編集
             </Link>
             <Button type="button" variant="danger" onClick={remove}>
@@ -161,6 +177,9 @@ export function PostDetail({ id }: { id: string }) {
             通報
           </Button>
         )}
+        <Button type="button" variant={post.saved_by_me ? "primary" : "secondary"} onClick={toggleSave}>
+          {post.saved_by_me ? "保存済み" : "保存"}
+        </Button>
       </div>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">コメント</h2>

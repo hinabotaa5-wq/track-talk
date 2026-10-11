@@ -116,15 +116,17 @@ func bearer(r *http.Request) string {
 }
 
 type RateLimiter struct {
-	mu      sync.Mutex
-	writes  map[string][]time.Time
-	reports map[string][]time.Time
+	mu        sync.Mutex
+	writes    map[string][]time.Time
+	reports   map[string][]time.Time
+	inquiries map[string][]time.Time
 }
 
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{
-		writes:  map[string][]time.Time{},
-		reports: map[string][]time.Time{},
+		writes:    map[string][]time.Time{},
+		reports:   map[string][]time.Time{},
+		inquiries: map[string][]time.Time{},
 	}
 }
 
@@ -145,6 +147,15 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 				return
 			}
 			l.reports[ip] = append(l.reports[ip], now)
+		}
+		if r.URL.Path == "/v1/me/inquiries" {
+			l.inquiries[ip] = prune(l.inquiries[ip], now.Add(-time.Hour))
+			if len(l.inquiries[ip]) >= 10 {
+				l.mu.Unlock()
+				Error(w, http.StatusTooManyRequests, "rate_limited", "お問い合わせの回数制限に達しました")
+				return
+			}
+			l.inquiries[ip] = append(l.inquiries[ip], now)
 		}
 		l.writes[ip] = prune(l.writes[ip], now.Add(-time.Minute))
 		if len(l.writes[ip]) >= 30 {

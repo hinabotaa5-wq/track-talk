@@ -37,6 +37,15 @@ type Competition struct {
 	LinkLabel    string     `json:"link_label"`
 }
 
+type Inquiry struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Post struct {
 	ID                  uuid.UUID  `json:"id"`
 	AuthorID            uuid.UUID  `json:"author_id"`
@@ -55,6 +64,12 @@ type Post struct {
 }
 
 type PostLike struct {
+	PostID    uuid.UUID `json:"post_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PostSafe struct {
 	PostID    uuid.UUID `json:"post_id"`
 	UserID    uuid.UUID `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`

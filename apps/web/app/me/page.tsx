@@ -43,6 +43,9 @@ export default function MePage() {
         <button type="button" onClick={logout} className="block text-sm text-zinc-500">
           ログアウト
         </button>
+        <Link href="/me/contact" className="block text-sm text-zinc-500">
+          お問い合わせ
+        </Link>
         <Link href="/about" className="block text-sm text-zinc-500">
           このアプリについて
         </Link>
@@ -60,6 +63,9 @@ export default function MePage() {
       <button type="button" onClick={logout} className="block text-sm text-zinc-500">
         ログアウト
       </button>
+      <Link href="/me/contact" className="block text-sm text-zinc-500">
+        お問い合わせ
+      </Link>
       <Link href="/about" className="block text-sm text-zinc-500">
         このアプリについて
       </Link>

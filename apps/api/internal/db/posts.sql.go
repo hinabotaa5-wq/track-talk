@@ -39,6 +39,32 @@ func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, 
 	return count, err
 }
 
+const countSavedPosts = `-- name: CountSavedPosts :one
+SELECT count(*)
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+WHERE s.user_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND (
+    $2::text IS NULL
+    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+  )
+`
+
+type CountSavedPostsParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Keyword *string   `json:"keyword"`
+}
+
+func (q *Queries) CountSavedPosts(ctx context.Context, arg CountSavedPostsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSavedPosts, arg.UserID, arg.Keyword)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
@@ -132,6 +158,24 @@ type DeleteLikeParams struct {
 
 func (q *Queries) DeleteLike(ctx context.Context, arg DeleteLikeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteLike, arg.PostID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSave = `-- name: DeleteSave :execrows
+DELETE FROM post_saves
+WHERE post_id = $1 AND user_id = $2
+`
+
+type DeleteSaveParams struct {
+	PostID uuid.UUID `json:"post_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteSave(ctx context.Context, arg DeleteSaveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSave, arg.PostID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -258,6 +302,25 @@ type InsertLikeParams struct {
 
 func (q *Queries) InsertLike(ctx context.Context, arg InsertLikeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertLike, arg.PostID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const insertSave = `-- name: InsertSave :execrows
+INSERT INTO post_saves (post_id, user_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type InsertSaveParams struct {
+	PostID uuid.UUID `json:"post_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) InsertSave(ctx context.Context, arg InsertSaveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertSave, arg.PostID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -495,6 +558,148 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const listSavedPostIDs = `-- name: ListSavedPostIDs :many
+SELECT post_id
+FROM post_saves
+WHERE user_id = $1
+  AND post_id = ANY($2::uuid[])
+`
+
+type ListSavedPostIDsParams struct {
+	UserID  uuid.UUID   `json:"user_id"`
+	PostIds []uuid.UUID `json:"post_ids"`
+}
+
+func (q *Queries) ListSavedPostIDs(ctx context.Context, arg ListSavedPostIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listSavedPostIDs, arg.UserID, arg.PostIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var post_id uuid.UUID
+		if err := rows.Scan(&post_id); err != nil {
+			return nil, err
+		}
+		items = append(items, post_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSavedPosts = `-- name: ListSavedPosts :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at,
+    pr.nickname AS author_nickname
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+JOIN profiles pr ON pr.id = p.author_id
+WHERE s.user_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND (
+    $2::text IS NULL
+    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+  )
+ORDER BY s.created_at DESC, p.id DESC
+LIMIT $4 OFFSET $3
+`
+
+type ListSavedPostsParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Keyword *string   `json:"keyword"`
+	OffsetN int32     `json:"offset_n"`
+	LimitN  int32     `json:"limit_n"`
+}
+
+type ListSavedPostsRow struct {
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	AuthorNickname      string    `json:"author_nickname"`
+}
+
+func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) ([]ListSavedPostsRow, error) {
+	rows, err := q.db.Query(ctx, listSavedPosts,
+		arg.UserID,
+		arg.Keyword,
+		arg.OffsetN,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSavedPostsRow
+	for rows.Next() {
+		var i ListSavedPostsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AuthorID,
+			&i.Title,
+			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.CloudinaryPublicID,
+			&i.LikeCount,
+			&i.CommentCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AuthorNickname,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const savedByUser = `-- name: SavedByUser :one
+SELECT EXISTS(
+    SELECT 1 FROM post_saves WHERE post_id = $1 AND user_id = $2
+)
+`
+
+type SavedByUserParams struct {
+	PostID uuid.UUID `json:"post_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) SavedByUser(ctx context.Context, arg SavedByUserParams) (bool, error) {
+	row := q.db.QueryRow(ctx, savedByUser, arg.PostID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const softDeletePost = `-- name: SoftDeletePost :execrows

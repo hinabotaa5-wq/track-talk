@@ -29,6 +29,7 @@ type postDTO struct {
 	LikeCount      int32     `json:"like_count"`
 	CommentCount   int32     `json:"comment_count"`
 	LikedByMe      bool      `json:"liked_by_me"`
+	SavedByMe      bool      `json:"saved_by_me"`
 	Kind           string    `json:"kind"`
 	ThumbnailURL   string    `json:"thumbnail_url,omitempty"`
 	YouTubeVideoID string    `json:"youtube_video_id,omitempty"`

@@ -31,6 +31,7 @@ export type Post = {
   like_count: number;
   comment_count: number;
   liked_by_me: boolean;
+  saved_by_me: boolean;
   kind: "text" | "youtube" | "video";
   thumbnail_url?: string;
   youtube_video_id?: string;
@@ -48,6 +49,14 @@ export type Comment = {
   author: Author;
   created_at: string;
   updated_at: string;
+};
+
+export type Inquiry = {
+  id: string;
+  category: "bug" | "account" | "request" | "other";
+  subject: string;
+  body: string;
+  created_at: string;
 };
 
 export type Profile = {

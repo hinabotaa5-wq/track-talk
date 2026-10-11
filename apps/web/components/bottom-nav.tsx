@@ -14,7 +14,7 @@ const tabs = [
 
 function hidesTabBar(pathname: string) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
-  if (pathname === "/me/edit") return true;
+  if (pathname === "/me/edit" || pathname === "/me/contact") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
 }

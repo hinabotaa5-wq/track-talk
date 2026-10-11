@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -44,7 +45,7 @@ func setup(t *testing.T) http.Handler {
 	if err := migrate.Up(dsn); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	_, _ = pool.Exec(ctx, `TRUNCATE reports, post_likes, comments, posts, profiles CASCADE`)
+	_, _ = pool.Exec(ctx, `TRUNCATE inquiries, reports, post_saves, post_likes, comments, posts, profiles CASCADE`)
 	v, err := auth.NewVerifier(secret, "", "authenticated")
 	if err != nil {
 		t.Fatal(err)
@@ -450,5 +451,181 @@ func TestValidation(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": strings.Repeat("あ", 121), "body": "本文"})
 	if rec.Code != 422 {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSaveAppearsOnlyForTheSaver(t *testing.T) {
+	h := setup(t)
+	a := uuid.New()
+	b := uuid.New()
+	ta, tb := token(t, a), token(t, b)
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "saver", "bio": ""})
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", tb, map[string]string{"nickname": "other", "bio": ""})
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/saves", "", nil)
+	if rec.Code != 401 {
+		t.Fatalf("anon %d", rec.Code)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "保存するレース", "body": "決勝"})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/saves", tb, nil)
+	if rec.Code != 204 {
+		t.Fatalf("save %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/saves", tb, nil)
+	if rec.Code != 204 {
+		t.Fatalf("save again %d", rec.Code)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, tb, nil)
+	if rec.Code != 200 {
+		t.Fatalf("get %d", rec.Code)
+	}
+	var got struct {
+		SavedByMe bool `json:"saved_by_me"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if !got.SavedByMe {
+		t.Fatal("expected saved")
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/saves?q="+url.QueryEscape("決勝"), tb, nil)
+	if rec.Code != 200 {
+		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
+	}
+	var list struct {
+		Posts []struct {
+			ID        string `json:"id"`
+			SavedByMe bool   `json:"saved_by_me"`
+		} `json:"posts"`
+		Meta struct {
+			Total int64 `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 1 || len(list.Posts) != 1 || list.Posts[0].ID != created.ID || !list.Posts[0].SavedByMe {
+		t.Fatalf("list %+v", list)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/saves", ta, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 0 {
+		t.Fatalf("author list %+v", list)
+	}
+
+	rec = doJSON(t, h, http.MethodDelete, "/v1/posts/"+created.ID+"/saves", tb, nil)
+	if rec.Code != 204 {
+		t.Fatalf("unsave %d", rec.Code)
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/saves", tb, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 0 {
+		t.Fatalf("after unsave %+v", list)
+	}
+}
+
+func TestInquiryStaysWithTheSender(t *testing.T) {
+	h := setup(t)
+	a := uuid.New()
+	b := uuid.New()
+	ta, tb := token(t, a), token(t, b)
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません",
+	})
+	if rec.Code != 409 {
+		t.Fatalf("no profile %d %s", rec.Code, rec.Body.String())
+	}
+
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "asker", "bio": ""})
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", tb, map[string]string{"nickname": "otherq", "bio": ""})
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", "", map[string]string{
+		"category": "bug", "subject": "件名", "body": "本文",
+	})
+	if rec.Code != 401 {
+		t.Fatalf("anon %d", rec.Code)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "nope", "subject": "", "body": "",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("invalid %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/inquiries", ta, nil)
+	if rec.Code != 200 {
+		t.Fatalf("mine %d %s", rec.Code, rec.Body.String())
+	}
+	var list struct {
+		Inquiries []struct {
+			Subject string `json:"subject"`
+			UserID  string `json:"user_id"`
+		} `json:"inquiries"`
+		Meta struct {
+			Total int64 `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].Subject != "ログインできない" || list.Inquiries[0].UserID != a.String() {
+		t.Fatalf("mine %+v", list)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/inquiries", tb, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 0 || len(list.Inquiries) != 0 {
+		t.Fatalf("other %+v", list)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/admin/inquiries", ta, nil)
+	if rec.Code != 403 {
+		t.Fatalf("admin forbidden %d %s", rec.Code, rec.Body.String())
+	}
+
+	setAdmin(t, a)
+	rec = doJSON(t, h, http.MethodGet, "/v1/admin/inquiries", ta, nil)
+	if rec.Code != 200 {
+		t.Fatalf("admin %d %s", rec.Code, rec.Body.String())
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].UserID != a.String() {
+		t.Fatalf("admin list %+v", list)
+	}
+}
+
+func setAdmin(t *testing.T, id uuid.UUID) {
+	t.Helper()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	tag, err := pool.Exec(ctx, `UPDATE profiles SET is_admin = true WHERE id = $1`, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tag.RowsAffected() != 1 {
+		t.Fatalf("admin rows %d", tag.RowsAffected())
 	}
 }
