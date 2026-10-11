@@ -51,6 +51,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me", s.me)
 			r.Put("/me/profile", s.upsertProfile)
 			r.Post("/posts", s.createPost)
+			r.Post("/posts/youtube", s.citeYouTube)
 			r.Patch("/posts/{id}", s.updatePost)
 			r.Delete("/posts/{id}", s.deletePost)
 			r.Post("/posts/{id}/likes", s.likePost)

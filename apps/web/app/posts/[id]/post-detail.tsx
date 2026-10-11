@@ -121,7 +121,15 @@ export function PostDetail({ id }: { id: string }) {
           </>
         ) : null}
       </p>
-      {post.thumbnail_url ? (
+      {post.kind === "youtube" && post.youtube_video_id ? (
+        <iframe
+          className="aspect-video w-full rounded-xl"
+          src={`https://www.youtube-nocookie.com/embed/${post.youtube_video_id}`}
+          title={feedTitle(post.title)}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      ) : post.thumbnail_url ? (
         <img src={post.thumbnail_url} alt="" className="aspect-video w-full rounded-xl object-cover" />
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>

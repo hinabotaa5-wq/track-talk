@@ -36,7 +36,7 @@ export function Header() {
           </Link>
           {session ? (
             <>
-              <Link href="/posts/new" className="hover:text-orange-700">
+              <Link href="/upload" className="hover:text-orange-700">
                 投稿する
               </Link>
               <Link href="/me" className="hover:text-orange-700">

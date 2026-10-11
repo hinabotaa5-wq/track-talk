@@ -257,6 +257,48 @@ func TestPostKindsShareOneList(t *testing.T) {
 	}
 }
 
+func TestCiteYouTubeOpensExistingThread(t *testing.T) {
+	h := setup(t)
+	a := uuid.New()
+	ta := token(t, a)
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "cite", "bio": ""})
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "公式", "body": "", "category_id": "general", "kind": "youtube",
+		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
+		"url": "https://youtu.be/abcdefghijk", "category_id": "race_impression",
+	})
+	if rec.Code != 200 {
+		t.Fatalf("cite %d %s", rec.Code, rec.Body.String())
+	}
+	var cited struct {
+		Existing bool `json:"existing"`
+		Post     struct {
+			ID string `json:"id"`
+		} `json:"post"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &cited)
+	if !cited.Existing || cited.Post.ID != created.ID {
+		t.Fatalf("cited %+v want %s", cited, created.ID)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
+		"url": "https://example.com/watch?v=abcdefghijk", "category_id": "general",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("bad url %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestValidation(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()

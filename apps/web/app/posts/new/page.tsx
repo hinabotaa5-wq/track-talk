@@ -34,8 +34,8 @@ export default function NewPostPage() {
         公式記録の転載ではなく、自分の視点での議論を書いてください。
       </p>
       <PostForm categories={categories} competitions={competitions} />
-      <Link href="/posts" className="text-sm text-zinc-500">
-        一覧に戻る
+      <Link href="/upload" className="text-sm text-zinc-500">
+        投稿の入口に戻る
       </Link>
     </div>
   );

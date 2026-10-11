@@ -86,6 +86,12 @@ WHERE p.deleted_at IS NULL
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
   );
 
+-- name: FindYouTubePostID :one
+SELECT id
+FROM posts
+WHERE youtube_video_id = $1
+  AND deleted_at IS NULL;
+
 -- name: GetPost :one
 SELECT
     p.id,

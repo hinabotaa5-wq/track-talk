@@ -7,7 +7,7 @@ import { useAuth } from "./auth-provider";
 
 const tabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
-  { id: "post", href: "/posts/new", label: "投稿", icon: Plus },
+  { id: "post", href: "/upload", label: "投稿", icon: Plus },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
@@ -21,6 +21,7 @@ function hidesTabBar(pathname: string) {
 
 function activeTab(pathname: string) {
   if (pathname === "/") return "home";
+  if (pathname === "/upload") return "post";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname === "/me") return "me";
   return "";

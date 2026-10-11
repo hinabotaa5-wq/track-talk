@@ -156,6 +156,20 @@ func (q *Queries) DeleteLike(ctx context.Context, arg DeleteLikeParams) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const findYouTubePostID = `-- name: FindYouTubePostID :one
+SELECT id
+FROM posts
+WHERE youtube_video_id = $1
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) FindYouTubePostID(ctx context.Context, youtubeVideoID *string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findYouTubePostID, youtubeVideoID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getPost = `-- name: GetPost :one
 SELECT
     p.id,
