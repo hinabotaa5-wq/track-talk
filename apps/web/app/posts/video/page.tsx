@@ -48,7 +48,7 @@ export default function OwnVideoPage() {
       setUpload({ loaded: 0, total: file.size, percent: 0 });
       const payload = await uploadToCloudinary("video", file, signed, setUpload);
       if (payload.public_id !== signed.public_id) {
-        throw new Error(payload.error?.message || "アップロードに失敗しました");
+        throw new Error("アップロードに失敗しました");
       }
       setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
       setUploadPhase("saving");

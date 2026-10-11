@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { commentSchema, inquirySchema, postSchema } from "./validators";
+import { authErrorMessage } from "./auth-errors";
+import { cloudinaryErrorMessage } from "./cloudinary-upload";
+import { commentSchema, inquirySchema, loginSchema, postSchema } from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -20,5 +22,25 @@ describe("validators", () => {
       inquirySchema.safeParse({ category: "bug", subject: "ログインできない", body: "再設定後も入れません" }).success,
     ).toBe(true);
     expect(inquirySchema.safeParse({ category: "bug", subject: "  ", body: "本文" }).success).toBe(false);
+  });
+
+  it("uses Japanese messages when a field is missing", () => {
+    const result = loginSchema.safeParse({ email: "a@b.co" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe("パスワードを入力してください");
+    }
+  });
+
+  it("translates auth and upload errors", () => {
+    expect(authErrorMessage({ code: "invalid_credentials", message: "Invalid login credentials" })).toBe(
+      "メールアドレスまたはパスワードが違います。",
+    );
+    expect(authErrorMessage({ message: "User already registered" })).toBe(
+      "このメールアドレスはすでに登録されています。",
+    );
+    expect(cloudinaryErrorMessage("File size too large. Got 20. Maximum is 10.")).toBe(
+      "ファイルサイズが大きすぎます",
+    );
   });
 });

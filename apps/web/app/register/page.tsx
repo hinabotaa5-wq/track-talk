@@ -1,5 +1,6 @@
 "use client";
 
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,7 +31,7 @@ export default function RegisterPage() {
       password: values.password,
     });
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err));
       return;
     }
     if (data.session) {

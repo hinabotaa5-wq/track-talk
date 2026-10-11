@@ -1,5 +1,6 @@
 "use client";
 
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { resetSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +22,7 @@ export default function ResetPasswordPage() {
     if (!supabase) return;
     const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/login`;
     const { error } = await supabase.auth.resetPasswordForEmail(values.email, { redirectTo });
-    setMessage(error ? error.message : "リセット用メールを送信しました。");
+    setMessage(error ? authErrorMessage(error) : "リセット用メールを送信しました。");
   }
 
   return (

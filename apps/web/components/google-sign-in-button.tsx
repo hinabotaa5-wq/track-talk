@@ -1,5 +1,6 @@
 "use client";
 
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -22,7 +23,7 @@ export function GoogleSignInButton() {
     });
     if (err) {
       setPending(false);
-      setError(err.message);
+      setError(authErrorMessage(err));
     }
   }
 

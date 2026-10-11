@@ -17,6 +17,19 @@ type CloudinaryUploadResult = {
   error?: { message?: string };
 };
 
+export function cloudinaryErrorMessage(message?: string): string {
+  const text = message?.toLowerCase() ?? "";
+  if (text.includes("file size") || text.includes("too large")) {
+    return "ファイルサイズが大きすぎます";
+  }
+  if (text.includes("image")) return "写真ファイルを確認してください";
+  if (text.includes("video") || text.includes("format")) return "対応していないファイル形式です";
+  if (text.includes("stale") || text.includes("signature") || text.includes("timestamp")) {
+    return "アップロードの期限が切れました。もう一度試してください";
+  }
+  return "アップロードに失敗しました";
+}
+
 export function uploadToCloudinary(
   resource: "image" | "video",
   file: File,
@@ -52,7 +65,7 @@ export function uploadToCloudinary(
         return;
       }
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(payload.error?.message || "アップロードに失敗しました"));
+        reject(new Error(cloudinaryErrorMessage(payload.error?.message)));
         return;
       }
       resolve(payload);

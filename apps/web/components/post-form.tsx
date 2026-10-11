@@ -65,7 +65,7 @@ export function PostForm({ initial }: { initial?: Post }) {
         setUpload({ loaded: 0, total: photo.size, percent: 0 });
         const result = await uploadToCloudinary("image", photo, signed, setUpload);
         if (result.public_id !== signed.public_id) {
-          throw new Error(result.error?.message || "写真のアップロードに失敗しました");
+          throw new Error("写真のアップロードに失敗しました");
         }
         payload.image_public_id = result.public_id;
         setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));

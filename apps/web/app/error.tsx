@@ -1,0 +1,18 @@
+"use client";
+
+import Link from "next/link";
+
+export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  return (
+    <div className="space-y-3">
+      <h1 className="text-2xl font-bold">ページを表示できません</h1>
+      <p className="text-sm text-zinc-600">しばらくしてからもう一度試してください。</p>
+      <button type="button" onClick={reset} className="text-blue-700">
+        再読み込み
+      </button>
+      <Link href="/" className="block text-blue-700">
+        トップへ戻る
+      </Link>
+    </div>
+  );
+}

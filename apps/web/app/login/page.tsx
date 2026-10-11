@@ -1,5 +1,6 @@
 "use client";
 
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +42,7 @@ export default function LoginPage() {
     }
     const { error: err } = await supabase.auth.signInWithPassword(values);
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err));
       return;
     }
     router.push("/");
