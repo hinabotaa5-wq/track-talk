@@ -79,7 +79,7 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 
 func extractionPrompt(page Page) string {
 	return fmt.Sprintf(`この陸上競技の大会一覧から、大会だけをJSONで返してください。形式は {"meets":[{"name":"","starts_on":"","ends_on":"","location":"","guidelines_url":"","district_url":""}]} です。
-競技年度は%d年です。4月から12月はその年、1月から3月は翌年です。日付はYYYY-MM-DDにしてください。終了日が開始日と同じ、または単日なら ends_on は空文字です。
+競技年度は%d年です。4月から12月はその年、1月から3月は翌年です。月と日が別の欄なら組み合わせ、日が範囲なら開始日と終了日にしてください。日付はYYYY-MM-DDにしてください。終了日が開始日と同じ、または単日なら ends_on は空文字です。大会名の括弧内が会場なら、そこを location にしてください。
 guidelines_url は「要項」欄にある要項のURLだけにしてください。申込、結果、タイムテーブル、注意事項、競技日程、エントリーは入れないでください。
 要項欄が陸協、スポ協、体連、大会公式ホームページへのリンクなら、そのURLは district_url に入れ、guidelines_url は空文字にしてください。
 ページに無いURLは空文字にしてください。会場が無ければ location は空文字です。日付が読めない行は返さないでください。

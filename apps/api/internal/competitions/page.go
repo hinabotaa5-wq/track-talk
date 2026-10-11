@@ -52,7 +52,7 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 	}
 	var rows []row
 	var links []LinkRef
-	for _, table := range scheduleTables(doc) {
+	for _, table := range scheduleTables(doc, year) {
 		headers, headerAt := tableHeaders(table)
 		if !isScheduleHeader(headers) {
 			continue
@@ -132,16 +132,22 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 	return 0, false
 }
 
-func scheduleTables(doc *html.Node) []*html.Node {
+var headingYearPattern = regexp.MustCompile(`(20\d{2})年度`)
+
+func scheduleTables(doc *html.Node, season int) []*html.Node {
 	var tables []*html.Node
+	section := 0
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "table" {
 			headers, _ := tableHeaders(n)
-			if isScheduleHeader(headers) {
+			if isScheduleHeader(headers) && (section == 0 || section == season) {
 				tables = append(tables, n)
-				return
 			}
+			return
+		}
+		if y, ok := headingSeason(n); ok {
+			section = y
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			walk(c)
@@ -149,6 +155,30 @@ func scheduleTables(doc *html.Node) []*html.Node {
 	}
 	walk(doc)
 	return tables
+}
+
+func headingSeason(n *html.Node) (int, bool) {
+	if n.Type != html.ElementNode {
+		return 0, false
+	}
+	switch n.Data {
+	case "h1", "h2", "h3", "h4", "h5", "h6", "p", "b", "strong", "span":
+	default:
+		return 0, false
+	}
+	text := strings.TrimSpace(normalizeDigits(cellText(n)))
+	if text == "" || len([]rune(text)) > 30 {
+		return 0, false
+	}
+	match := headingYearPattern.FindStringSubmatch(text)
+	if match == nil {
+		return 0, false
+	}
+	year, err := strconv.Atoi(match[1])
+	if err != nil || year < 1990 || year > 2100 {
+		return 0, false
+	}
+	return year, true
 }
 
 var (
@@ -218,7 +248,7 @@ func tableHeaders(table *html.Node) ([]string, int) {
 		}
 		headers := make([]string, len(cells))
 		for j, cell := range cells {
-			headers[j] = cellText(cell)
+			headers[j] = compactHeader(cellText(cell))
 		}
 		return headers, i
 	}
@@ -228,9 +258,13 @@ func tableHeaders(table *html.Node) ([]string, int) {
 	cells := elementChildren(rows[0], "td")
 	headers := make([]string, len(cells))
 	for i, cell := range cells {
-		headers[i] = cellText(cell)
+		headers[i] = compactHeader(cellText(cell))
 	}
 	return headers, 0
+}
+
+func compactHeader(header string) string {
+	return strings.Join(strings.Fields(header), "")
 }
 
 func directRows(table *html.Node) []*html.Node {

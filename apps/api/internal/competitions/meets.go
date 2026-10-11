@@ -117,7 +117,8 @@ func (page Page) destinationForName(name string) (string, string, bool) {
 	if want == "" {
 		return "", "", false
 	}
-	var partial []LinkRef
+	var partial row
+	var partialLinks []LinkRef
 	for _, row := range page.rows {
 		rowName := cleanText(nameCell(row))
 		links := guidelinesColumnLinks(row)
@@ -125,21 +126,26 @@ func (page Page) destinationForName(name string) (string, string, bool) {
 			continue
 		}
 		if rowName == want {
-			return chooseColumnLink(links)
+			return chooseColumnLink(row, links)
 		}
 		if strings.Contains(rowName, want) || strings.Contains(want, rowName) {
-			partial = links
+			partial = row
+			partialLinks = links
 		}
 	}
-	if len(partial) == 0 {
+	if len(partialLinks) == 0 {
 		return "", "", false
 	}
-	return chooseColumnLink(partial)
+	return chooseColumnLink(partial, partialLinks)
 }
 
 func nameCell(row row) string {
 	for _, cell := range row.Cells {
-		if strings.Contains(cell.Header, "競技会") || strings.Contains(cell.Header, "行事") {
+		header := cell.Header
+		if strings.Contains(header, "要項") {
+			continue
+		}
+		if strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") {
 			return cell.Text
 		}
 	}
@@ -159,7 +165,7 @@ func guidelinesColumnLinks(row row) []LinkRef {
 	return links
 }
 
-func chooseColumnLink(links []LinkRef) (string, string, bool) {
+func chooseColumnLink(row row, links []LinkRef) (string, string, bool) {
 	for _, link := range links {
 		if isGuidelines(link) {
 			return link.URL, "要項", true
@@ -170,7 +176,24 @@ func chooseColumnLink(links []LinkRef) (string, string, bool) {
 			return link.URL, districtLabel(link.Text), true
 		}
 	}
-	return "", "", false
+	if len(links) == 0 {
+		return "", "", false
+	}
+	return links[0].URL, organizerLabel(row), true
+}
+
+func organizerLabel(row row) string {
+	for _, cell := range row.Cells {
+		header := cell.Header
+		if strings.Contains(header, "要項") || strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") {
+			continue
+		}
+		text := strings.TrimSpace(cell.Text)
+		if isDistrictText(text) && len([]rune(text)) <= 24 {
+			return text
+		}
+	}
+	return "ホームページ"
 }
 
 func findLink(page Page, raw string, match func(LinkRef) bool) (LinkRef, bool) {

@@ -91,6 +91,33 @@ func TestParsePageScheduleList(t *testing.T) {
 	}
 }
 
+func TestParsePageKeepsCurrentSeasonTable(t *testing.T) {
+	html := `<html><body>
+<p><b><span>２０２６年度大会</span></b></p>
+<table><tr><th>月</th><th>日</th><th>大　会　名　（　実施場所　）</th><th>大会要項</th><th>申込締切</th></tr>
+<tr><td>4</td><td>5</td><td>第1回大分市陸上競技記録会（ジェイリーススタジアム）</td><td><a href="https://www.oita-city-riku.net/">○</a></td><td>大分市陸協</td></tr>
+<tr><td>4</td><td>11</td><td>第1回春季陸上競技大会（ジェイリーススタジアム）</td><td><a href="https://oita-rik.com/wp/a.pdf">○</a></td><td>4/3</td></tr>
+</table>
+<p>２０２５年度大会</p>
+<table><tr><th>月</th><th>日</th><th>大会名</th><th>要項</th></tr>
+<tr><td>4</td><td>12</td><td>昨年の大会</td><td><a href="https://example.com/old.pdf">〇</a></td></tr>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://oita-rik.com/schedule")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	if strings.Contains(page.Body, "昨年の大会") || !strings.Contains(page.Body, "第1回大分市陸上競技記録会") {
+		t.Fatalf("body %s", page.Body)
+	}
+	if !strings.Contains(page.Body, "大会名（実施場所）") {
+		t.Fatalf("header %s", page.Body)
+	}
+}
+
 func TestParsePageFullwidthYear(t *testing.T) {
 	html := `<html><body><h2>２０２６年度</h2><table><tr><th>開催日</th><th>競技会</th><th>要項</th></tr>
 <tr><td>4月25日</td><td>記録会</td><td><a href="https://example.com/a.pdf">要項</a></td></tr></table></body></html>`

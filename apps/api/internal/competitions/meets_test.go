@@ -79,6 +79,33 @@ func TestBuildMeetsUsesGuidelinesColumnWhenGeminiOmitsTheURL(t *testing.T) {
 	}
 }
 
+func TestBuildMeetsUsesMarkedGuidelinesColumn(t *testing.T) {
+	page := Page{
+		SeasonYear: 2026,
+		rows: []row{{
+			Cells: []cell{
+				{Header: "大会名（実施場所）", Text: "第1回大分市陸上競技記録会（ジェイリーススタジアム）"},
+				{Header: "大会要項", Links: []LinkRef{{
+					URL:    "https://www.oita-city-riku.net/",
+					Text:   "○",
+					Header: "大会要項",
+				}}},
+				{Header: "申込締切", Text: "大分市陸協"},
+			},
+		}},
+	}
+	source := "https://oita-rik.com/schedule"
+	meets, err := BuildMeets(page, []Draft{
+		{Name: "第1回大分市陸上競技記録会", StartsOn: "2026-04-05", Location: "ジェイリーススタジアム"},
+	}, "44", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meets[0].OrganizerURL != "https://www.oita-city-riku.net/" || meets[0].LinkLabel != "大分市陸協" {
+		t.Fatalf("row link: %+v", meets[0])
+	}
+}
+
 func TestBuildMeetsRejectsEmpty(t *testing.T) {
 	_, err := BuildMeets(Page{SeasonYear: 2026}, []Draft{{Name: "日付なし"}}, "47", "https://example.com/")
 	if err == nil {
