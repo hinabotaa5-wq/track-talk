@@ -118,6 +118,30 @@ func TestParsePageKeepsCurrentSeasonTable(t *testing.T) {
 	}
 }
 
+func TestParsePageUsesMonthHeading(t *testing.T) {
+	html := `<html><body><h2>2026年度福岡陸上競技日程</h2>
+<h3>2026年11月</h3>
+<table><tr><th>開催日</th><th>競技会・行事</th><th>会場</th><th>要項</th></tr>
+<tr><td>19(土）～21(月)</td><td>高校新人</td><td>博多の森</td><td><a href="https://www.fukuriku.com/a.pdf">要項</a></td></tr>
+<tr><td>31(土）～11/01(日)</td><td>秋季記録会</td><td>博多の森</td><td><a href="https://www.fukuriku.com/b.pdf">要項</a></td></tr>
+</table>
+<h3>2026年4月</h3>
+<table><tr><th>開催日</th><th>競技会</th><th>要項</th></tr>
+<tr><td>4月5日</td><td>月つき</td><td><a href="https://www.fukuriku.com/c.pdf">要項</a></td></tr>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://www.fukuriku.com/tournament/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(page.Body, "2026年11月 19(土）～21(月)") || !strings.Contains(page.Body, "2026年11月 31(土）～11/01(日)") {
+		t.Fatalf("month missing: %s", page.Body)
+	}
+	if strings.Contains(page.Body, "2026年4月 4月5日") {
+		t.Fatalf("month doubled: %s", page.Body)
+	}
+}
+
 func TestParsePageFullwidthYear(t *testing.T) {
 	html := `<html><body><h2>２０２６年度</h2><table><tr><th>開催日</th><th>競技会</th><th>要項</th></tr>
 <tr><td>4月25日</td><td>記録会</td><td><a href="https://example.com/a.pdf">要項</a></td></tr></table></body></html>`

@@ -53,11 +53,11 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 	var rows []row
 	var links []LinkRef
 	for _, table := range scheduleTables(doc, year) {
-		headers, headerAt := tableHeaders(table)
+		headers, headerAt := tableHeaders(table.node)
 		if !isScheduleHeader(headers) {
 			continue
 		}
-		for i, tr := range directRows(table) {
+		for i, tr := range directRows(table.node) {
 			if i <= headerAt {
 				continue
 			}
@@ -71,7 +71,7 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 				if j < len(headers) {
 					header = headers[j]
 				}
-				text := cellText(node)
+				text := withMonth(header, cellText(node), table.month)
 				cellLinks := cellLinks(node, base, header)
 				links = append(links, cellLinks...)
 				parsed.Cells = append(parsed.Cells, cell{
@@ -132,22 +132,35 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 	return 0, false
 }
 
-var headingYearPattern = regexp.MustCompile(`(20\d{2})年度`)
+var (
+	headingYearPattern  = regexp.MustCompile(`(20\d{2})年度`)
+	monthHeadingPattern = regexp.MustCompile(`(20\d{2})年(0?[1-9]|1[0-2])月`)
+	digitMonthPattern   = regexp.MustCompile(`\d月`)
+)
 
-func scheduleTables(doc *html.Node, season int) []*html.Node {
-	var tables []*html.Node
+type foundTable struct {
+	node  *html.Node
+	month string
+}
+
+func scheduleTables(doc *html.Node, season int) []foundTable {
+	var tables []foundTable
 	section := 0
+	month := ""
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "table" {
 			headers, _ := tableHeaders(n)
 			if isScheduleHeader(headers) && (section == 0 || section == season) {
-				tables = append(tables, n)
+				tables = append(tables, foundTable{node: n, month: month})
 			}
 			return
 		}
 		if y, ok := headingSeason(n); ok {
 			section = y
+		}
+		if label, ok := headingMonth(n); ok {
+			month = label
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			walk(c)
@@ -155,6 +168,37 @@ func scheduleTables(doc *html.Node, season int) []*html.Node {
 	}
 	walk(doc)
 	return tables
+}
+
+func headingMonth(n *html.Node) (string, bool) {
+	if n.Type != html.ElementNode {
+		return "", false
+	}
+	switch n.Data {
+	case "h1", "h2", "h3", "h4", "h5", "h6", "p", "b", "strong":
+	default:
+		return "", false
+	}
+	text := strings.TrimSpace(normalizeDigits(cellText(n)))
+	if text == "" || len([]rune(text)) > 20 {
+		return "", false
+	}
+	match := monthHeadingPattern.FindStringSubmatch(text)
+	if match == nil {
+		return "", false
+	}
+	return match[0], true
+}
+
+func withMonth(header, text, month string) string {
+	text = strings.TrimSpace(text)
+	if month == "" || text == "" || digitMonthPattern.MatchString(text) {
+		return text
+	}
+	if header != "日" && !strings.Contains(header, "開催日") {
+		return text
+	}
+	return month + " " + text
 }
 
 func headingSeason(n *html.Node) (int, bool) {
