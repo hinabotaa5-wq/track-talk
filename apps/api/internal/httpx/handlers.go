@@ -159,34 +159,6 @@ func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 	s.listPostsFiltered(w, r, "new", &id)
 }
 
-func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
-	page, per, offset := s.queryPage(r)
-	total, err := s.q.CountCompetitions(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	rows, err := s.q.ListCompetitions(r.Context(), db.ListCompetitionsParams{Limit: per, Offset: offset})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, map[string]any{"competitions": rows, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
-}
-
-func (s *Server) getCompetition(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	row, err := s.q.GetCompetition(r.Context(), id)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, row)
-}
-
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var author *uuid.UUID

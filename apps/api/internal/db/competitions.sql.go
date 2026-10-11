@@ -7,62 +7,29 @@ package db
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"time"
 )
 
-const countCompetitions = `-- name: CountCompetitions :one
-SELECT count(*) FROM competitions
-WHERE ends_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30
-   OR (ends_on IS NULL AND starts_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30)
-`
-
-func (q *Queries) CountCompetitions(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countCompetitions)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const getCompetition = `-- name: GetCompetition :one
-SELECT id, name, starts_on, ends_on, location, scope, summary, created_at, updated_at
-FROM competitions
-WHERE id = $1
-`
-
-func (q *Queries) GetCompetition(ctx context.Context, id uuid.UUID) (Competition, error) {
-	row := q.db.QueryRow(ctx, getCompetition, id)
-	var i Competition
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.StartsOn,
-		&i.EndsOn,
-		&i.Location,
-		&i.Scope,
-		&i.Summary,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const listCompetitions = `-- name: ListCompetitions :many
-SELECT id, name, starts_on, ends_on, location, scope, summary, created_at, updated_at
+SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url
 FROM competitions
-WHERE ends_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30
-   OR (ends_on IS NULL AND starts_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30)
-ORDER BY starts_on ASC
-LIMIT $1 OFFSET $2
+WHERE prefecture = $1
+  AND starts_on < $2::date
+  AND (
+    (ends_on IS NULL AND starts_on >= $3::date)
+    OR ends_on >= $3::date
+  )
+ORDER BY starts_on ASC, name ASC
 `
 
 type ListCompetitionsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Prefecture string    `json:"prefecture"`
+	MonthEnd   time.Time `json:"month_end"`
+	MonthStart time.Time `json:"month_start"`
 }
 
 func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsParams) ([]Competition, error) {
-	rows, err := q.db.Query(ctx, listCompetitions, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listCompetitions, arg.Prefecture, arg.MonthEnd, arg.MonthStart)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +43,12 @@ func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsPara
 			&i.StartsOn,
 			&i.EndsOn,
 			&i.Location,
-			&i.Scope,
-			&i.Summary,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Prefecture,
+			&i.SeasonYear,
+			&i.OrganizerUrl,
+			&i.SourceUrl,
 		); err != nil {
 			return nil, err
 		}
