@@ -7,8 +7,10 @@ import type { z } from "zod";
 import { TitleField } from "./composer-page";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
+import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { useAuth } from "./auth-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -17,19 +19,13 @@ type Values = z.infer<typeof postSchema>;
 
 const maxPhotoBytes = 10 * 1024 * 1024;
 
-type Signature = {
-  cloud_name: string;
-  api_key: string;
-  timestamp: number;
-  public_id: string;
-  signature: string;
-};
-
 export function PostForm({ initial }: { initial?: Post }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [photo, setPhoto] = useState<File | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(postSchema),
@@ -46,6 +42,7 @@ export function PostForm({ initial }: { initial?: Post }) {
     }
     setError("");
     setStatus("");
+    setUpload(null);
     const payload: { title: string; body: string; image_public_id?: string } = {
       title: values.title,
       body: values.body,
@@ -62,24 +59,18 @@ export function PostForm({ initial }: { initial?: Post }) {
           return;
         }
         setStatus("アップロードの準備をしています…");
-        const signed = await apiFetch<Signature>("/v1/uploads/image", { method: "POST", token });
-        setStatus("写真を送っています…");
-        const body = new FormData();
-        body.append("file", photo);
-        body.append("api_key", signed.api_key);
-        body.append("timestamp", String(signed.timestamp));
-        body.append("public_id", signed.public_id);
-        body.append("signature", signed.signature);
-        const uploaded = await fetch(`https://api.cloudinary.com/v1_1/${signed.cloud_name}/image/upload`, {
-          method: "POST",
-          body,
-        });
-        const result = (await uploaded.json()) as { public_id?: string; error?: { message?: string } };
-        if (!uploaded.ok || result.public_id !== signed.public_id) {
+        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
+        setStatus("");
+        setUploadPhase("upload");
+        setUpload({ loaded: 0, total: photo.size, percent: 0 });
+        const result = await uploadToCloudinary("image", photo, signed, setUpload);
+        if (result.public_id !== signed.public_id) {
           throw new Error(result.error?.message || "写真のアップロードに失敗しました");
         }
         payload.image_public_id = result.public_id;
-        setStatus("投稿を保存しています…");
+        setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
+        setUploadPhase("saving");
+        setStatus("");
       }
       const post = initial
         ? await apiFetch<Post>(`/v1/posts/${initial.id}`, {
@@ -101,6 +92,7 @@ export function PostForm({ initial }: { initial?: Post }) {
         setError(e instanceof Error ? e.message : "保存に失敗しました");
       }
       setStatus("");
+      setUpload(null);
     }
   }
 
@@ -125,11 +117,13 @@ export function PostForm({ initial }: { initial?: Post }) {
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            disabled={form.formState.isSubmitting}
           />
         </label>
       ) : initial.thumbnail_url ? (
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-zinc-100 object-contain" />
       ) : null}
+      {upload ? <UploadProgress noun="写真" phase={uploadPhase} progress={upload} /> : null}
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting}>

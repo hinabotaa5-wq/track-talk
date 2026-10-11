@@ -5,18 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { ComposerPage, TitleField } from "@/components/composer-page";
+import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
+import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import type { Post } from "@/lib/types";
 
 const maxBytes = 100 * 1024 * 1024;
-
-type Signature = {
-  cloud_name: string;
-  api_key: string;
-  timestamp: number;
-  public_id: string;
-  signature: string;
-};
 
 export default function OwnVideoPage() {
   const { session, token } = useAuth();
@@ -25,6 +19,8 @@ export default function OwnVideoPage() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
@@ -42,26 +38,21 @@ export default function OwnVideoPage() {
       return;
     }
     setError("");
+    setUpload(null);
     setSubmitting(true);
     try {
       setStatus("アップロードの準備をしています…");
-      const signed = await apiFetch<Signature>("/v1/uploads/video", { method: "POST", token });
-      setStatus("Cloudinaryへ送っています…");
-      const body = new FormData();
-      body.append("file", file);
-      body.append("api_key", signed.api_key);
-      body.append("timestamp", String(signed.timestamp));
-      body.append("public_id", signed.public_id);
-      body.append("signature", signed.signature);
-      const uploaded = await fetch(`https://api.cloudinary.com/v1_1/${signed.cloud_name}/video/upload`, {
-        method: "POST",
-        body,
-      });
-      const payload = (await uploaded.json()) as { public_id?: string; error?: { message?: string } };
-      if (!uploaded.ok || payload.public_id !== signed.public_id) {
+      const signed = await apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token });
+      setStatus("");
+      setUploadPhase("upload");
+      setUpload({ loaded: 0, total: file.size, percent: 0 });
+      const payload = await uploadToCloudinary("video", file, signed, setUpload);
+      if (payload.public_id !== signed.public_id) {
         throw new Error(payload.error?.message || "アップロードに失敗しました");
       }
-      setStatus("投稿を保存しています…");
+      setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
+      setUploadPhase("saving");
+      setStatus("");
       const post = await apiFetch<Post>("/v1/posts", {
         method: "POST",
         token,
@@ -81,6 +72,7 @@ export default function OwnVideoPage() {
         setError(err instanceof Error ? err.message : "保存に失敗しました");
       }
       setStatus("");
+      setUpload(null);
     } finally {
       setSubmitting(false);
     }
@@ -100,9 +92,11 @@ export default function OwnVideoPage() {
             type="file"
             accept="video/mp4,video/quicktime,video/webm"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            disabled={submitting}
             required
           />
         </label>
+        {upload ? <UploadProgress noun="動画" phase={uploadPhase} progress={upload} /> : null}
         {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full md:w-auto" disabled={submitting}>

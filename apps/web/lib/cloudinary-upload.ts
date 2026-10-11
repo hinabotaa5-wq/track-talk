@@ -1,0 +1,62 @@
+export type CloudinarySignature = {
+  cloud_name: string;
+  api_key: string;
+  timestamp: number;
+  public_id: string;
+  signature: string;
+};
+
+export type CloudinaryUploadProgress = {
+  loaded: number;
+  total: number;
+  percent: number;
+};
+
+type CloudinaryUploadResult = {
+  public_id?: string;
+  error?: { message?: string };
+};
+
+export function uploadToCloudinary(
+  resource: "image" | "video",
+  file: File,
+  signed: CloudinarySignature,
+  onProgress: (progress: CloudinaryUploadProgress) => void,
+): Promise<CloudinaryUploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("api_key", signed.api_key);
+  body.append("timestamp", String(signed.timestamp));
+  body.append("public_id", signed.public_id);
+  body.append("signature", signed.signature);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${signed.cloud_name}/${resource}/upload`);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || event.total <= 0) return;
+      onProgress({
+        loaded: event.loaded,
+        total: event.total,
+        percent: (event.loaded / event.total) * 100,
+      });
+    };
+    xhr.onerror = () => reject(new Error("アップロードに失敗しました"));
+    xhr.onabort = () => reject(new Error("アップロードに失敗しました"));
+    xhr.onload = () => {
+      let payload: CloudinaryUploadResult = {};
+      try {
+        payload = JSON.parse(xhr.responseText) as CloudinaryUploadResult;
+      } catch {
+        reject(new Error("アップロードに失敗しました"));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(payload.error?.message || "アップロードに失敗しました"));
+        return;
+      }
+      resolve(payload);
+    };
+    xhr.send(body);
+  });
+}
