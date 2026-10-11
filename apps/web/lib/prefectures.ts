@@ -48,9 +48,11 @@ export const PREFECTURES = [
   { code: "47", name: "沖縄県" },
 ] as const;
 
+export const INTERNATIONAL = "00";
+
 export function prefectureCode(raw: string | undefined) {
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > 47) return "";
+  if (!Number.isInteger(n) || n < 0 || n > 47) return "";
   return String(n).padStart(2, "0");
 }
 

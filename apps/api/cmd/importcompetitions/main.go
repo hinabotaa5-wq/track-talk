@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,16 +18,12 @@ import (
 )
 
 func main() {
-	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。空なら今日の7県まで")
+	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と今日の7県まで")
 	flag.Parse()
 
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
-	}
-	key := os.Getenv("GEMINI_API_KEY")
-	if key == "" {
-		log.Fatal("GEMINI_API_KEY is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
@@ -37,17 +34,49 @@ func main() {
 	}
 	defer pool.Close()
 
+	if isInternational(*prefecture) {
+		if err := importInternational(ctx, pool); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	var failed bool
+	importedInternational := false
+	if *prefecture == "" {
+		updated, err := importTimes(ctx, pool)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if internationalDue(updated, time.Now()) {
+			if err := importInternational(ctx, pool); err != nil {
+				log.Printf("%s: %v", competitions.InternationalPrefecture, err)
+				failed = true
+			} else {
+				importedInternational = true
+			}
+		}
+	}
+
 	targets, err := selectTargets(ctx, pool, *prefecture)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if len(targets) == 0 {
-		fmt.Fprintln(os.Stdout, "今日の取り込み対象はありません")
+		if failed {
+			os.Exit(1)
+		}
+		if *prefecture == "" && !importedInternational {
+			fmt.Fprintln(os.Stdout, "今日の取り込み対象はありません")
+		}
 		return
 	}
 
+	key := os.Getenv("GEMINI_API_KEY")
+	if key == "" {
+		log.Fatal("GEMINI_API_KEY is required")
+	}
 	client := competitions.Client{Key: key}
-	var failed bool
 	for i, source := range targets {
 		if i > 0 {
 			time.Sleep(15 * time.Second)
@@ -148,5 +177,63 @@ func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.C
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "imported %d competitions for prefecture %s season %d\n", len(meets), source.Prefecture, meets[0].SeasonYear)
+	return nil
+}
+
+func isInternational(prefecture string) bool {
+	switch strings.TrimSpace(prefecture) {
+	case "0", "00", "international":
+		return true
+	default:
+		return false
+	}
+}
+
+func internationalDue(updated map[string]time.Time, now time.Time) bool {
+	imported, ok := updated[competitions.InternationalPrefecture]
+	return !ok || imported.IsZero() || now.Sub(imported) >= competitions.RefreshAfter
+}
+
+func importInternational(ctx context.Context, pool *pgxpool.Pool) error {
+	now := time.Now()
+	meets, err := competitions.FetchInternational(ctx, now)
+	if err != nil {
+		return err
+	}
+	_, _, seasons := competitions.InternationalWindow(now)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	q := db.New(tx)
+	for _, season := range seasons {
+		if err := q.DeleteCompetitionsBySeason(ctx, db.DeleteCompetitionsBySeasonParams{
+			Prefecture: competitions.InternationalPrefecture,
+			SeasonYear: int32(season),
+		}); err != nil {
+			return err
+		}
+	}
+	for _, meet := range meets {
+		if err := q.UpsertCompetition(ctx, db.UpsertCompetitionParams{
+			ID:           uuid.New(),
+			Name:         meet.Name,
+			StartsOn:     meet.StartsOn,
+			EndsOn:       meet.EndsOn,
+			Location:     meet.Location,
+			Prefecture:   meet.Prefecture,
+			SeasonYear:   int32(meet.SeasonYear),
+			OrganizerUrl: meet.OrganizerURL,
+			SourceUrl:    meet.SourceURL,
+			LinkLabel:    meet.LinkLabel,
+		}); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "imported %d international competitions\n", len(meets))
 	return nil
 }

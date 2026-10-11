@@ -18,6 +18,14 @@ func TestParsePrefectureCode(t *testing.T) {
 	if !ok || code != "01" {
 		t.Fatalf("1: got %q %v", code, ok)
 	}
+	code, ok = parsePrefectureCode("00")
+	if !ok || code != "00" {
+		t.Fatalf("00: got %q %v", code, ok)
+	}
+	code, ok = parsePrefectureCode("0")
+	if !ok || code != "00" {
+		t.Fatalf("0: got %q %v", code, ok)
+	}
 	if _, ok := parsePrefectureCode(""); ok {
 		t.Fatal("empty should fail")
 	}

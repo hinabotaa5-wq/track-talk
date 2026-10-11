@@ -17,7 +17,7 @@ func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	fields := map[string]string{}
 	prefecture, ok := parsePrefectureCode(q.Get("prefecture"))
 	if !ok {
-		fields["prefecture"] = "都道府県を選んでください"
+		fields["prefecture"] = "地域を選んでください"
 	}
 	month, ok := parseMonth(q.Get("month"))
 	if !ok {
@@ -51,7 +51,7 @@ func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 
 func parsePrefectureCode(raw string) (string, bool) {
 	n, err := strconv.Atoi(strings.TrimSpace(raw))
-	if err != nil || n < 1 || n > 47 {
+	if err != nil || n < 0 || n > 47 {
 		return "", false
 	}
 	return fmt.Sprintf("%02d", n), true
