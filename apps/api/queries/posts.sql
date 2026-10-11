@@ -22,6 +22,11 @@ WHERE p.deleted_at IS NULL
   AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+  )
 ORDER BY p.created_at DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
 
@@ -46,10 +51,15 @@ JOIN post_categories cat ON cat.id = p.category_id
 LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND p.created_at >= now() - interval '30 days'
+  AND p.created_at >= now() - interval '14 days'
   AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+  )
 ORDER BY p.like_count DESC, p.created_at DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
 
@@ -61,7 +71,12 @@ WHERE p.deleted_at IS NULL
   AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
-  AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '30 days');
+  AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+  );
 
 -- name: GetPost :one
 SELECT

@@ -32,6 +32,22 @@ func boolPtr(v bool) *bool {
 	return &v
 }
 
+func likeContains(raw string) *string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var b strings.Builder
+	for _, r := range raw {
+		if r == '\\' || r == '%' || r == '_' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	s := b.String()
+	return &s
+}
+
 func parseUUIDParam(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(chi.URLParam(r, name))
 	if err != nil {
@@ -231,6 +247,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		CompetitionID: comp,
 		AuthorID:      author,
 		PopularWindow: boolPtr(popular),
+		Keyword:       likeContains(r.URL.Query().Get("q")),
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -242,6 +259,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			CategoryID:    textPtr(deref(cat)),
 			CompetitionID: comp,
 			AuthorID:      author,
+			Keyword:       likeContains(r.URL.Query().Get("q")),
 			LimitN:        per,
 			OffsetN:       offset,
 		})
@@ -259,6 +277,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			CategoryID:    textPtr(deref(cat)),
 			CompetitionID: comp,
 			AuthorID:      author,
+			Keyword:       likeContains(r.URL.Query().Get("q")),
 			LimitN:        per,
 			OffsetN:       offset,
 		})

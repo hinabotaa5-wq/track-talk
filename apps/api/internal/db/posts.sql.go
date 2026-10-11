@@ -20,7 +20,12 @@ WHERE p.deleted_at IS NULL
   AND ($1::text IS NULL OR p.category_id = $1)
   AND ($2::uuid IS NULL OR p.competition_id = $2)
   AND ($3::uuid IS NULL OR p.author_id = $3)
-  AND ($4::bool IS NOT TRUE OR p.created_at >= now() - interval '30 days')
+  AND ($4::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
+  AND (
+    $5::text IS NULL
+    OR p.title ILIKE '%' || $5 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $5 || '%' ESCAPE '\'
+  )
 `
 
 type CountPostsParams struct {
@@ -28,6 +33,7 @@ type CountPostsParams struct {
 	CompetitionID *uuid.UUID `json:"competition_id"`
 	AuthorID      *uuid.UUID `json:"author_id"`
 	PopularWindow *bool      `json:"popular_window"`
+	Keyword       *string    `json:"keyword"`
 }
 
 func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, error) {
@@ -36,6 +42,7 @@ func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, 
 		arg.CompetitionID,
 		arg.AuthorID,
 		arg.PopularWindow,
+		arg.Keyword,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -319,14 +326,20 @@ WHERE p.deleted_at IS NULL
   AND ($1::text IS NULL OR p.category_id = $1)
   AND ($2::uuid IS NULL OR p.competition_id = $2)
   AND ($3::uuid IS NULL OR p.author_id = $3)
+  AND (
+    $4::text IS NULL
+    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
+  )
 ORDER BY p.created_at DESC
-LIMIT $5 OFFSET $4
+LIMIT $6 OFFSET $5
 `
 
 type ListPostsNewParams struct {
 	CategoryID    *string    `json:"category_id"`
 	CompetitionID *uuid.UUID `json:"competition_id"`
 	AuthorID      *uuid.UUID `json:"author_id"`
+	Keyword       *string    `json:"keyword"`
 	OffsetN       int32      `json:"offset_n"`
 	LimitN        int32      `json:"limit_n"`
 }
@@ -352,6 +365,7 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 		arg.CategoryID,
 		arg.CompetitionID,
 		arg.AuthorID,
+		arg.Keyword,
 		arg.OffsetN,
 		arg.LimitN,
 	)
@@ -408,18 +422,24 @@ JOIN post_categories cat ON cat.id = p.category_id
 LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND p.created_at >= now() - interval '30 days'
+  AND p.created_at >= now() - interval '14 days'
   AND ($1::text IS NULL OR p.category_id = $1)
   AND ($2::uuid IS NULL OR p.competition_id = $2)
   AND ($3::uuid IS NULL OR p.author_id = $3)
+  AND (
+    $4::text IS NULL
+    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
+  )
 ORDER BY p.like_count DESC, p.created_at DESC
-LIMIT $5 OFFSET $4
+LIMIT $6 OFFSET $5
 `
 
 type ListPostsPopularParams struct {
 	CategoryID    *string    `json:"category_id"`
 	CompetitionID *uuid.UUID `json:"competition_id"`
 	AuthorID      *uuid.UUID `json:"author_id"`
+	Keyword       *string    `json:"keyword"`
 	OffsetN       int32      `json:"offset_n"`
 	LimitN        int32      `json:"limit_n"`
 }
@@ -445,6 +465,7 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 		arg.CategoryID,
 		arg.CompetitionID,
 		arg.AuthorID,
+		arg.Keyword,
 		arg.OffsetN,
 		arg.LimitN,
 	)

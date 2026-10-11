@@ -34,6 +34,8 @@ export default async function PostsPage({
     error = "投稿一覧を取得できませんでした。";
   }
 
+  const hasNext = meta.page * meta.per_page < meta.total;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -78,10 +80,13 @@ export default async function PostsPage({
           ))}
         </div>
       )}
-      {meta.total > meta.per_page ? (
-        <p className="text-sm text-zinc-500">
-          {meta.page} / {Math.ceil(meta.total / meta.per_page)} ページ
-        </p>
+      {hasNext ? (
+        <Link
+          href={`/posts?sort=${sort}${category ? `&category_id=${category}` : ""}&page=${meta.page + 1}`}
+          className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium"
+        >
+          次の投稿
+        </Link>
       ) : null}
     </div>
   );

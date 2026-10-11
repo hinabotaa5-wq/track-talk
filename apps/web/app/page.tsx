@@ -1,90 +1,114 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { PostCard } from "@/components/post-card";
+import { FeedCard } from "@/components/feed-card";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { formatDate, scopeLabel } from "@/lib/format";
-import type { Competition, Meta, Post } from "@/lib/types";
+import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  let latest: Post[] = [];
-  let popular: Post[] = [];
-  let competitions: Competition[] = [];
+function homeHref(sort: "popular" | "new", q: string, page?: number) {
+  const params = new URLSearchParams();
+  if (sort === "new") params.set("sort", "new");
+  if (q) params.set("q", q);
+  if (page && page > 1) params.set("page", String(page));
+  const s = params.toString();
+  return s ? `/?${s}` : "/";
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; q?: string; page?: string }>;
+}) {
+  const sp = await searchParams;
+  const sort = sp.sort === "new" ? "new" : "popular";
+  const q = (sp.q ?? "").trim();
+  const page = Math.max(1, Number(sp.page) || 1);
+  const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
+  if (q) qs.set("q", q);
+
+  let posts: Post[] = [];
+  let meta: Meta = { page: 1, per_page: 20, total: 0 };
   let error = "";
   try {
-    const [a, b, c] = await Promise.all([
-      apiFetch<{ posts: Post[]; meta: Meta }>("/v1/posts?sort=new&per_page=5"),
-      apiFetch<{ posts: Post[]; meta: Meta }>("/v1/posts?sort=popular&per_page=5"),
-      apiFetch<{ competitions: Competition[] }>("/v1/competitions?per_page=4"),
-    ]);
-    latest = a.posts ?? [];
-    popular = b.posts ?? [];
-    competitions = c.competitions ?? [];
+    const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`);
+    posts = data.posts ?? [];
+    meta = data.meta;
   } catch {
     error = "投稿の取得に失敗しました。APIの起動を確認してください。";
   }
 
+  const hasNext = meta.page * meta.per_page < meta.total;
+
   return (
-    <div className="space-y-10">
-      <section>
-        <p className="text-sm font-medium text-orange-700">陸上競技コミュニティ</p>
-        <h1 className="mt-1 text-3xl font-bold">TRACK TALK</h1>
-        <p className="mt-3 max-w-2xl text-zinc-600">
-          記録サイトではなく、レース展開や記録について語り合う場所です。観戦ファンも現役選手も歓迎します。
-        </p>
-        <div className="mt-4 flex gap-3">
+    <div className="-mx-4 -mt-6">
+      <h1 className="sr-only">ホーム</h1>
+      <form action="/" className="border-b border-zinc-200 bg-white px-4 py-3">
+        {sort === "new" ? <input type="hidden" name="sort" value="new" /> : null}
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400"
+            aria-hidden
+          />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="キーワード"
+            aria-label="キーワード"
+            className="h-11 w-full rounded-full border border-zinc-300 bg-white pr-4 pl-10 text-base outline-none focus:border-orange-500"
+          />
+        </div>
+      </form>
+      <div className="flex gap-2 px-4 py-3">
+        <Link
+          href={homeHref("popular", q)}
+          className={
+            sort === "popular"
+              ? "inline-flex min-h-11 items-center rounded-full bg-orange-600 px-4 text-sm font-medium text-white"
+              : "inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm text-zinc-700"
+          }
+          aria-current={sort === "popular" ? "page" : undefined}
+        >
+          人気
+        </Link>
+        <Link
+          href={homeHref("new", q)}
+          className={
+            sort === "new"
+              ? "inline-flex min-h-11 items-center rounded-full bg-orange-600 px-4 text-sm font-medium text-white"
+              : "inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm text-zinc-700"
+          }
+          aria-current={sort === "new" ? "page" : undefined}
+        >
+          新しい順
+        </Link>
+      </div>
+      <div className="space-y-4 px-4 pb-4">
+        {error ? <ErrorState message={error} /> : null}
+        {!error && posts.length === 0 ? (
+          <EmptyState
+            title={q ? "一致する投稿がありません" : "まだ投稿がありません"}
+            body={q ? "別の言葉で探してください。" : "最初のレース感想を書いてみましょう。"}
+          />
+        ) : null}
+        {posts.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
+            {posts.map((post) => (
+              <FeedCard key={post.id} post={post} />
+            ))}
+          </div>
+        ) : null}
+        {hasNext ? (
           <Link
-            href="/posts"
-            className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white"
+            href={homeHref(sort, q, meta.page + 1)}
+            className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium"
           >
-            投稿を見る
+            次の投稿
           </Link>
-          <Link href="/posts/new" className="rounded-md border px-4 py-2 text-sm">
-            議論を始める
-          </Link>
-        </div>
-      </section>
-      {error ? <ErrorState message={error} /> : null}
-      <section className="grid gap-8 md:grid-cols-2">
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">新着</h2>
-          {latest.length === 0 ? (
-            <EmptyState title="まだ投稿がありません" body="最初のレース感想を書いてみましょう。" />
-          ) : (
-            latest.map((p) => <PostCard key={p.id} post={p} />)
-          )}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">人気（直近30日）</h2>
-          {popular.length === 0 ? (
-            <EmptyState title="まだ人気投稿はありません" body="いいねで盛り上がりましょう。" />
-          ) : (
-            popular.map((p) => <PostCard key={p.id} post={p} />)
-          )}
-        </div>
-      </section>
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">大会</h2>
-          <Link href="/competitions" className="text-sm text-orange-700">
-            一覧へ
-          </Link>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {competitions.map((c) => (
-            <Link
-              key={c.id}
-              href={`/competitions/${c.id}`}
-              className="rounded-xl border bg-white p-4 hover:border-orange-300"
-            >
-              <p className="text-xs text-zinc-500">{scopeLabel(c.scope)}</p>
-              <h3 className="font-semibold">{c.name}</h3>
-              <p className="text-sm text-zinc-600">{formatDate(c.starts_on)}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+        ) : null}
+      </div>
     </div>
   );
 }
