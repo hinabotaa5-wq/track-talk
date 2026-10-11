@@ -60,7 +60,7 @@ export default function RegisterPage() {
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {message ? <p className="text-sm text-green-700">{message}</p> : null}
-        <Button type="submit">登録</Button>
+        <Button type="submit" className="w-full md:w-auto">登録</Button>
       </form>
     </div>
   );

@@ -7,11 +7,19 @@ import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase";
 
 export default function MePage() {
   const { session, profile, loading } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+
+  async function logout() {
+    const supabase = createClient();
+    await supabase?.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login");
@@ -32,6 +40,9 @@ export default function MePage() {
         <Link href="/me/edit" className="text-orange-700">
           プロフィールを作成
         </Link>
+        <button type="button" onClick={logout} className="block text-sm text-zinc-500">
+          ログアウト
+        </button>
       </div>
     );
   }
@@ -43,6 +54,9 @@ export default function MePage() {
       <Link href="/me/edit" className="text-sm text-orange-700">
         プロフィールを編集
       </Link>
+      <button type="button" onClick={logout} className="block text-sm text-zinc-500">
+        ログアウト
+      </button>
       <h2 className="text-xl font-semibold">自分の投稿</h2>
       {posts.map((p) => (
         <PostCard key={p.id} post={p} />

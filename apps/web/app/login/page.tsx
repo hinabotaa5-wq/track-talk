@@ -41,7 +41,7 @@ export default function LoginPage() {
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button type="submit">ログイン</Button>
+        <Button type="submit" className="w-full md:w-auto">ログイン</Button>
       </form>
       <p className="text-sm">
         アカウントがない場合は <Link href="/register" className="text-orange-700">登録</Link>

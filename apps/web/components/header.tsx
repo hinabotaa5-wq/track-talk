@@ -22,7 +22,12 @@ export function Header() {
         <Link href="/" className="text-lg font-bold tracking-tight text-orange-700">
           TRACK TALK
         </Link>
-        <nav className="flex items-center gap-3 text-sm">
+        {!session ? (
+          <Link href="/login" className="text-sm text-orange-700 md:hidden">
+            ログイン
+          </Link>
+        ) : null}
+        <nav className="hidden items-center gap-3 text-sm md:flex">
           <Link href="/posts" className="hover:text-orange-700">
             投稿
           </Link>

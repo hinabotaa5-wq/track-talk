@@ -110,7 +110,7 @@ export function PostDetail({ id }: { id: string }) {
   }
 
   return (
-    <article className="space-y-6">
+    <article className="space-y-6 pb-36 md:pb-0">
       <p className="text-sm text-zinc-500">
         <Link href="/posts">投稿</Link>
         {post.competition ? (
@@ -186,9 +186,16 @@ export function PostDetail({ id }: { id: string }) {
             )}
           </div>
         ))}
-        <form onSubmit={form.handleSubmit(onComment)} className="space-y-2">
-          <Textarea rows={3} placeholder="コメントを書く" {...form.register("body")} />
-          <Button type="submit">コメントする</Button>
+        <form
+          onSubmit={form.handleSubmit(onComment)}
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:p-0"
+        >
+          <div className="mx-auto flex w-full max-w-5xl items-end gap-2 md:flex-col md:items-stretch">
+            <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
+            <Button type="submit" className="shrink-0 md:w-auto">
+              コメントする
+            </Button>
+          </div>
         </form>
       </section>
     </article>

@@ -44,7 +44,7 @@ export default function EditProfilePage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input placeholder="ニックネーム" {...form.register("nickname")} />
         <Textarea rows={5} placeholder="自己紹介" {...form.register("bio")} />
-        <Button type="submit">保存</Button>
+        <Button type="submit" className="w-full md:w-auto">保存</Button>
       </form>
     </div>
   );

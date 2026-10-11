@@ -78,7 +78,7 @@ export function PostForm({
       ) : null}
       <label className="block text-sm font-medium">
         カテゴリ
-        <select className="mt-1 w-full rounded-md border px-3 py-2 text-sm" {...form.register("category_id")}>
+        <select className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base" {...form.register("category_id")}>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -89,7 +89,7 @@ export function PostForm({
       <label className="block text-sm font-medium">
         関連大会（任意）
         <select
-          className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base"
           {...form.register("competition_id")}
         >
           <option value="">なし</option>
@@ -108,7 +108,7 @@ export function PostForm({
         <p className="text-sm text-red-600">{form.formState.errors.body.message}</p>
       ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" disabled={form.formState.isSubmitting}>
+      <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting}>
         {initial ? "更新する" : "投稿する"}
       </Button>
     </form>
