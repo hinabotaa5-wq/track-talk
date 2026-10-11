@@ -19,7 +19,8 @@ import (
 var youtubeClient = &http.Client{Timeout: 8 * time.Second}
 
 type citeYouTubeReq struct {
-	URL string `json:"url"`
+	URL   string `json:"url"`
+	Title string `json:"title"`
 }
 
 type citeYouTubeResp struct {
@@ -132,6 +133,10 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		fields["url"] = msg
 	}
+	customTitle := strings.TrimSpace(req.Title)
+	if e := Title(customTitle); e != "" {
+		fields["title"] = e
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -143,6 +148,9 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "この動画の情報を取得できませんでした")
 		return
+	}
+	if customTitle != "" {
+		title = customTitle
 	}
 	created, err := s.q.CreatePost(r.Context(), db.CreatePostParams{
 		ID:                  uuid.New(),

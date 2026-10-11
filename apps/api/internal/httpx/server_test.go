@@ -369,9 +369,21 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
+		"url": "https://youtu.be/abcdefghijk", "title": "別の名前"})
+	if rec.Code != 200 {
+		t.Fatalf("cite with title %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
 		"url": "https://example.com/watch?v=abcdefghijk"})
 	if rec.Code != 422 {
 		t.Fatalf("bad url %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
+		"url": "https://youtu.be/zzzzzzzzzzz", "title": strings.Repeat("あ", 121)})
+	if rec.Code != 422 {
+		t.Fatalf("long title %d %s", rec.Code, rec.Body.String())
 	}
 }
 

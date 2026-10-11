@@ -13,6 +13,7 @@ export default function YouTubePostPage() {
   const { session, loading, token } = useAuth();
   const router = useRouter();
   const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,7 +33,7 @@ export default function YouTubePostPage() {
       const data = await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
         method: "POST",
         token,
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, title }),
       });
       router.push(`/posts/${data.post.id}`);
     } catch (err) {
@@ -53,9 +54,18 @@ export default function YouTubePostPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">YouTubeのURL</h1>
       <p className="text-sm text-zinc-600">
-        同じ動画のスレがあれば、それを開きます。新しい動画は、タイトルとサムネイルが取れてからホームに出ます。
+        同じ動画のスレがあれば、それを開きます。タイトルを空にすると動画のタイトルを使います。新しい動画は、サムネイルが取れてからホームに出ます。
       </p>
       <form onSubmit={onSubmit} className="space-y-4">
+        <label className="block text-sm font-medium">
+          タイトル（空なら動画のタイトル）
+          <Input
+            className="mt-1"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+          />
+        </label>
         <label className="block text-sm font-medium">
           URL
           <Input
