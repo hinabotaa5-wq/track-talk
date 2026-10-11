@@ -36,6 +36,10 @@ export type Post = {
   like_count: number;
   comment_count: number;
   liked_by_me: boolean;
+  kind: "text" | "youtube" | "video";
+  thumbnail_url?: string;
+  youtube_video_id?: string;
+  video_public_id?: string;
   created_at: string;
   updated_at: string;
 };

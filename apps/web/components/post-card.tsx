@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatDateTime } from "@/lib/format";
 import type { Post } from "@/lib/types";
 import { Card } from "./ui/card";
+import { feedTitle } from "./feed-card";
 
 export function PostCard({ post }: { post: Post }) {
   return (
@@ -11,7 +12,7 @@ export function PostCard({ post }: { post: Post }) {
           {post.category.name}
           {post.competition ? ` · ${post.competition.name}` : ""}
         </p>
-        <h2 className="mt-1 text-lg font-semibold">{post.title}</h2>
+        <h2 className="mt-1 text-lg font-semibold">{feedTitle(post.title)}</h2>
         <p className="mt-2 line-clamp-3 text-sm text-zinc-600">
           {post.body_preview ?? post.body}
         </p>

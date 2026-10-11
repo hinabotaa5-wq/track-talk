@@ -4,6 +4,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
+import { feedTitle } from "@/components/feed-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { commentSchema } from "@/lib/validators";
@@ -120,11 +121,16 @@ export function PostDetail({ id }: { id: string }) {
           </>
         ) : null}
       </p>
-      <h1 className="text-3xl font-bold">{post.title}</h1>
+      {post.thumbnail_url ? (
+        <img src={post.thumbnail_url} alt="" className="aspect-video w-full rounded-xl object-cover" />
+      ) : null}
+      <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       <p className="text-sm text-zinc-500">
         {post.category.name} · {post.author.nickname} · {formatDateTime(post.created_at)}
       </p>
-      <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
+      {post.body ? (
+        <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant={post.liked_by_me ? "primary" : "secondary"} onClick={toggleLike}>
           いいね {post.like_count}

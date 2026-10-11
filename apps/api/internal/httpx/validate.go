@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"net/url"
 	"strings"
 	"unicode/utf8"
 )
@@ -27,9 +28,8 @@ func Bio(v string) string {
 
 func Title(v string) string {
 	v = strings.TrimSpace(v)
-	n := utf8.RuneCountInString(v)
-	if n < 1 || n > 120 {
-		return "1〜120文字で入力してください"
+	if utf8.RuneCountInString(v) > 120 {
+		return "120文字以内で入力してください"
 	}
 	return ""
 }
@@ -39,6 +39,59 @@ func Body(v string, max int) string {
 	n := utf8.RuneCountInString(v)
 	if n < 1 || n > max {
 		return "入力文字数を確認してください"
+	}
+	return ""
+}
+
+func PostBody(v string) string {
+	v = strings.TrimSpace(v)
+	if utf8.RuneCountInString(v) > 10000 {
+		return "10000文字以内で入力してください"
+	}
+	return ""
+}
+
+func Kind(v string) string {
+	switch v {
+	case "text", "youtube", "video":
+		return ""
+	default:
+		return "種類が不正です"
+	}
+}
+
+func YouTubeVideoID(v string) string {
+	if len(v) != 11 {
+		return "動画IDが不正です"
+	}
+	for _, r := range v {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' && r != '-' {
+			return "動画IDが不正です"
+		}
+	}
+	return ""
+}
+
+func HTTPSURL(v string) string {
+	if len(v) == 0 || len(v) > 500 {
+		return "サムネイルのURLが不正です"
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return "サムネイルのURLが不正です"
+	}
+	return ""
+}
+
+func VideoPublicID(v string) string {
+	n := utf8.RuneCountInString(v)
+	if n < 1 || n > 255 || strings.Contains(v, "..") {
+		return "動画IDが不正です"
+	}
+	for _, r := range v {
+		if r == ' ' || r == '\n' || r == '\t' || r == '?' || r == '#' {
+			return "動画IDが不正です"
+		}
 	}
 	return ""
 }

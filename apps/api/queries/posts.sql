@@ -6,6 +6,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -38,6 +42,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -86,6 +94,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -102,9 +114,11 @@ WHERE p.id = $1
   AND p.hidden_at IS NULL;
 
 -- name: CreatePost :one
-INSERT INTO posts (id, author_id, category_id, competition_id, title, body)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, author_id, category_id, competition_id, title, body, like_count, comment_count, created_at, updated_at;
+INSERT INTO posts (
+    id, author_id, category_id, competition_id, title, body,
+    kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, author_id, category_id, competition_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at;
 
 -- name: UpdatePost :one
 UPDATE posts

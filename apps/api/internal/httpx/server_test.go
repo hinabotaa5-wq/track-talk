@@ -183,6 +183,80 @@ func TestPostLifecycleAndAuthz(t *testing.T) {
 	}
 }
 
+func TestPostKindsShareOneList(t *testing.T) {
+	h := setup(t)
+	a := uuid.New()
+	ta := token(t, a)
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "kinds", "bio": ""})
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "", "body": "", "category_id": "general",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("empty text %d %s", rec.Code, rec.Body.String())
+	}
+	var textPost struct {
+		Kind string `json:"kind"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &textPost)
+	if textPost.Kind != "text" {
+		t.Fatalf("kind %q", textPost.Kind)
+	}
+
+	yt := map[string]any{
+		"title": "公式", "body": "", "category_id": "general", "kind": "youtube",
+		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, yt)
+	if rec.Code != 201 {
+		t.Fatalf("youtube %d %s", rec.Code, rec.Body.String())
+	}
+	var ytPost struct {
+		Kind         string `json:"kind"`
+		ThumbnailURL string `json:"thumbnail_url"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &ytPost)
+	if ytPost.Kind != "youtube" || ytPost.ThumbnailURL == "" {
+		t.Fatalf("youtube dto %+v", ytPost)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, yt)
+	if rec.Code != 409 {
+		t.Fatalf("dup youtube %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "自分の動画", "body": "", "category_id": "general", "kind": "video",
+		"video_public_id": "tracktalk/sample",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("video %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	if rec.Code != 200 {
+		t.Fatalf("list %d", rec.Code)
+	}
+	var list struct {
+		Posts []struct {
+			Kind string `json:"kind"`
+		} `json:"posts"`
+		Meta struct {
+			Total int64 `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list.Meta.Total != 3 {
+		t.Fatalf("total %d", list.Meta.Total)
+	}
+	seen := map[string]bool{}
+	for _, p := range list.Posts {
+		seen[p.Kind] = true
+	}
+	if !seen["text"] || !seen["youtube"] || !seen["video"] {
+		t.Fatalf("kinds %#v", seen)
+	}
+}
+
 func TestValidation(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()

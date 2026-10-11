@@ -354,10 +354,14 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 }
 
 type postReq struct {
-	Title         string  `json:"title"`
-	Body          string  `json:"body"`
-	CategoryID    string  `json:"category_id"`
-	CompetitionID *string `json:"competition_id"`
+	Title               string  `json:"title"`
+	Body                string  `json:"body"`
+	CategoryID          string  `json:"category_id"`
+	CompetitionID       *string `json:"competition_id"`
+	Kind                string  `json:"kind"`
+	YouTubeVideoID      string  `json:"youtube_video_id"`
+	YouTubeThumbnailURL string  `json:"youtube_thumbnail_url"`
+	VideoPublicID       string  `json:"video_public_id"`
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.CreatePostParams, bool) {
@@ -370,11 +374,48 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 	if e := Title(req.Title); e != "" {
 		fields["title"] = e
 	}
-	if e := Body(req.Body, 10000); e != "" {
+	if e := PostBody(req.Body); e != "" {
 		fields["body"] = e
 	}
 	if e := Category(req.CategoryID); e != "" {
 		fields["category_id"] = e
+	}
+	kind := strings.TrimSpace(req.Kind)
+	if kind == "" {
+		kind = "text"
+	}
+	if e := Kind(kind); e != "" {
+		fields["kind"] = e
+	}
+	var youtubeID, youtubeThumb, publicID *string
+	switch kind {
+	case "text":
+		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
+			fields["kind"] = "文字の投稿に動画情報は付けられません"
+		}
+	case "youtube":
+		id := strings.TrimSpace(req.YouTubeVideoID)
+		thumb := strings.TrimSpace(req.YouTubeThumbnailURL)
+		if e := YouTubeVideoID(id); e != "" {
+			fields["youtube_video_id"] = e
+		}
+		if e := HTTPSURL(thumb); e != "" {
+			fields["youtube_thumbnail_url"] = e
+		}
+		if strings.TrimSpace(req.VideoPublicID) != "" {
+			fields["video_public_id"] = "自分の動画とは同時に指定できません"
+		}
+		youtubeID = &id
+		youtubeThumb = &thumb
+	case "video":
+		id := strings.TrimSpace(req.VideoPublicID)
+		if e := VideoPublicID(id); e != "" {
+			fields["video_public_id"] = e
+		}
+		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" {
+			fields["youtube_video_id"] = "YouTubeとは同時に指定できません"
+		}
+		publicID = &id
 	}
 	var comp *uuid.UUID
 	if req.CompetitionID != nil && strings.TrimSpace(*req.CompetitionID) != "" {
@@ -390,10 +431,14 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		return db.CreatePostParams{}, false
 	}
 	return db.CreatePostParams{
-		Title:         strings.TrimSpace(req.Title),
-		Body:          strings.TrimSpace(req.Body),
-		CategoryID:    req.CategoryID,
-		CompetitionID: comp,
+		Title:               strings.TrimSpace(req.Title),
+		Body:                strings.TrimSpace(req.Body),
+		CategoryID:          req.CategoryID,
+		CompetitionID:       comp,
+		Kind:                kind,
+		YoutubeVideoID:      youtubeID,
+		YoutubeThumbnailUrl: youtubeThumb,
+		CloudinaryPublicID:  publicID,
 	}, true
 }
 

@@ -50,31 +50,41 @@ func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, 
 }
 
 const createPost = `-- name: CreatePost :one
-INSERT INTO posts (id, author_id, category_id, competition_id, title, body)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, author_id, category_id, competition_id, title, body, like_count, comment_count, created_at, updated_at
+INSERT INTO posts (
+    id, author_id, category_id, competition_id, title, body,
+    kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, author_id, category_id, competition_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
-	ID            uuid.UUID  `json:"id"`
-	AuthorID      uuid.UUID  `json:"author_id"`
-	CategoryID    string     `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	Title         string     `json:"title"`
-	Body          string     `json:"body"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
 }
 
 type CreatePostRow struct {
-	ID            uuid.UUID  `json:"id"`
-	AuthorID      uuid.UUID  `json:"author_id"`
-	CategoryID    string     `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	Title         string     `json:"title"`
-	Body          string     `json:"body"`
-	LikeCount     int32      `json:"like_count"`
-	CommentCount  int32      `json:"comment_count"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	LikeCount           int32      `json:"like_count"`
+	CommentCount        int32      `json:"comment_count"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreatePostRow, error) {
@@ -85,6 +95,10 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.CompetitionID,
 		arg.Title,
 		arg.Body,
+		arg.Kind,
+		arg.YoutubeVideoID,
+		arg.YoutubeThumbnailUrl,
+		arg.CloudinaryPublicID,
 	)
 	var i CreatePostRow
 	err := row.Scan(
@@ -94,6 +108,10 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.CompetitionID,
 		&i.Title,
 		&i.Body,
+		&i.Kind,
+		&i.YoutubeVideoID,
+		&i.YoutubeThumbnailUrl,
+		&i.CloudinaryPublicID,
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.CreatedAt,
@@ -146,6 +164,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -163,19 +185,23 @@ WHERE p.id = $1
 `
 
 type GetPostRow struct {
-	ID              uuid.UUID  `json:"id"`
-	AuthorID        uuid.UUID  `json:"author_id"`
-	CategoryID      string     `json:"category_id"`
-	CompetitionID   *uuid.UUID `json:"competition_id"`
-	Title           string     `json:"title"`
-	Body            string     `json:"body"`
-	LikeCount       int32      `json:"like_count"`
-	CommentCount    int32      `json:"comment_count"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	AuthorNickname  string     `json:"author_nickname"`
-	CategoryName    string     `json:"category_name"`
-	CompetitionName *string    `json:"competition_name"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	LikeCount           int32      `json:"like_count"`
+	CommentCount        int32      `json:"comment_count"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	AuthorNickname      string     `json:"author_nickname"`
+	CategoryName        string     `json:"category_name"`
+	CompetitionName     *string    `json:"competition_name"`
 }
 
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
@@ -188,6 +214,10 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.CompetitionID,
 		&i.Title,
 		&i.Body,
+		&i.Kind,
+		&i.YoutubeVideoID,
+		&i.YoutubeThumbnailUrl,
+		&i.CloudinaryPublicID,
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.CreatedAt,
@@ -310,6 +340,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -345,19 +379,23 @@ type ListPostsNewParams struct {
 }
 
 type ListPostsNewRow struct {
-	ID              uuid.UUID  `json:"id"`
-	AuthorID        uuid.UUID  `json:"author_id"`
-	CategoryID      string     `json:"category_id"`
-	CompetitionID   *uuid.UUID `json:"competition_id"`
-	Title           string     `json:"title"`
-	Body            string     `json:"body"`
-	LikeCount       int32      `json:"like_count"`
-	CommentCount    int32      `json:"comment_count"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	AuthorNickname  string     `json:"author_nickname"`
-	CategoryName    string     `json:"category_name"`
-	CompetitionName *string    `json:"competition_name"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	LikeCount           int32      `json:"like_count"`
+	CommentCount        int32      `json:"comment_count"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	AuthorNickname      string     `json:"author_nickname"`
+	CategoryName        string     `json:"category_name"`
+	CompetitionName     *string    `json:"competition_name"`
 }
 
 func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]ListPostsNewRow, error) {
@@ -383,6 +421,10 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.CompetitionID,
 			&i.Title,
 			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.CloudinaryPublicID,
 			&i.LikeCount,
 			&i.CommentCount,
 			&i.CreatedAt,
@@ -409,6 +451,10 @@ SELECT
     p.competition_id,
     p.title,
     p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -445,19 +491,23 @@ type ListPostsPopularParams struct {
 }
 
 type ListPostsPopularRow struct {
-	ID              uuid.UUID  `json:"id"`
-	AuthorID        uuid.UUID  `json:"author_id"`
-	CategoryID      string     `json:"category_id"`
-	CompetitionID   *uuid.UUID `json:"competition_id"`
-	Title           string     `json:"title"`
-	Body            string     `json:"body"`
-	LikeCount       int32      `json:"like_count"`
-	CommentCount    int32      `json:"comment_count"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	AuthorNickname  string     `json:"author_nickname"`
-	CategoryName    string     `json:"category_name"`
-	CompetitionName *string    `json:"competition_name"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	LikeCount           int32      `json:"like_count"`
+	CommentCount        int32      `json:"comment_count"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	AuthorNickname      string     `json:"author_nickname"`
+	CategoryName        string     `json:"category_name"`
+	CompetitionName     *string    `json:"competition_name"`
 }
 
 func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularParams) ([]ListPostsPopularRow, error) {
@@ -483,6 +533,10 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.CompetitionID,
 			&i.Title,
 			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.CloudinaryPublicID,
 			&i.LikeCount,
 			&i.CommentCount,
 			&i.CreatedAt,

@@ -35,18 +35,22 @@ type Competition struct {
 }
 
 type Post struct {
-	ID            uuid.UUID  `json:"id"`
-	AuthorID      uuid.UUID  `json:"author_id"`
-	CategoryID    string     `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	Title         string     `json:"title"`
-	Body          string     `json:"body"`
-	LikeCount     int32      `json:"like_count"`
-	CommentCount  int32      `json:"comment_count"`
-	HiddenAt      *time.Time `json:"hidden_at"`
-	DeletedAt     *time.Time `json:"deleted_at"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	CategoryID          string     `json:"category_id"`
+	CompetitionID       *uuid.UUID `json:"competition_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	LikeCount           int32      `json:"like_count"`
+	CommentCount        int32      `json:"comment_count"`
+	HiddenAt            *time.Time `json:"hidden_at"`
+	DeletedAt           *time.Time `json:"deleted_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
 }
 
 type PostCategory struct {
