@@ -44,11 +44,16 @@ export default function LoginPage() {
         <Button type="submit" className="w-full md:w-auto">ログイン</Button>
       </form>
       <p className="text-sm">
-        アカウントがない場合は <Link href="/register" className="text-orange-700">登録</Link>
+        アカウントがない場合は <Link href="/register" className="text-blue-700">登録</Link>
       </p>
       <p className="text-sm">
-        <Link href="/reset-password" className="text-orange-700">
+        <Link href="/reset-password" className="text-blue-700">
           パスワードを忘れた
+        </Link>
+      </p>
+      <p className="text-sm">
+        <Link href="/about" className="text-zinc-500">
+          このアプリについて
         </Link>
       </p>
     </div>

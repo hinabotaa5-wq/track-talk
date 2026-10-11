@@ -3,7 +3,6 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
 import { BottomNav } from "@/components/bottom-nav";
 
 const geistSans = Geist({
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-          <Footer />
           <BottomNav />
         </AuthProvider>
       </body>

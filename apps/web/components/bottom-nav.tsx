@@ -23,7 +23,7 @@ function activeTab(pathname: string) {
   if (pathname === "/") return "home";
   if (pathname === "/upload") return "post";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
-  if (pathname === "/me") return "me";
+  if (pathname === "/me" || pathname === "/about") return "me";
   return "";
 }
 
@@ -52,7 +52,7 @@ export function BottomNav() {
                 <Link
                   href={href}
                   className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] ${
-                    active ? "font-semibold text-orange-700" : "text-zinc-500"
+                    active ? "font-semibold text-blue-700" : "text-zinc-500"
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
