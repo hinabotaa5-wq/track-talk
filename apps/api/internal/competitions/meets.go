@@ -54,13 +54,22 @@ func BuildMeets(page Page, drafts []Draft, prefecture, sourceURL string) ([]Meet
 
 var embeddedURL = regexp.MustCompile(`https?://\S+`)
 
+func isCompetitionName(name string) bool {
+	for _, word := range []string{"理事会", "講習会", "クリニック", "練習会"} {
+		if strings.Contains(name, word) {
+			return false
+		}
+	}
+	return true
+}
+
 func cleanText(raw string) string {
 	return strings.Join(strings.Fields(embeddedURL.ReplaceAllString(raw, " ")), " ")
 }
 
 func acceptDraft(page Page, draft Draft, prefecture, sourceURL string) (Meet, bool) {
 	name := cleanText(draft.Name)
-	if name == "" {
+	if name == "" || !isCompetitionName(name) {
 		return Meet{}, false
 	}
 	start, ok := parseDay(draft.StartsOn)
@@ -145,7 +154,7 @@ func nameCell(row row) string {
 		if strings.Contains(header, "要項") {
 			continue
 		}
-		if strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") {
+		if strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") || strings.Contains(header, "主催") {
 			return cell.Text
 		}
 	}

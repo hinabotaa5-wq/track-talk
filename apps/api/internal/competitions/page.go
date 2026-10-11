@@ -53,37 +53,9 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 	var rows []row
 	var links []LinkRef
 	for _, table := range scheduleTables(doc, year) {
-		headers, headerAt := tableHeaders(table.node)
-		if !isScheduleHeader(headers) {
-			continue
-		}
-		for i, tr := range directRows(table.node) {
-			if i <= headerAt {
-				continue
-			}
-			cells := elementChildren(tr, "td")
-			if len(cells) == 0 {
-				continue
-			}
-			var parsed row
-			for j, node := range cells {
-				header := ""
-				if j < len(headers) {
-					header = headers[j]
-				}
-				text := withMonth(header, cellText(node), table.month)
-				cellLinks := cellLinks(node, base, header)
-				links = append(links, cellLinks...)
-				parsed.Cells = append(parsed.Cells, cell{
-					Header: header,
-					Text:   text,
-					Links:  cellLinks,
-				})
-			}
-			if len(parsed.Cells) > 0 {
-				rows = append(rows, parsed)
-			}
-		}
+		parsed, parsedLinks := rowsFromTable(table.node, table.month, base)
+		rows = append(rows, parsed...)
+		links = append(links, parsedLinks...)
 	}
 	if len(rows) == 0 {
 		rows = scheduleListRows(doc)
@@ -273,10 +245,244 @@ func strongText(n *html.Node) string {
 	return ""
 }
 
+func rowsFromTable(table *html.Node, month string, base *url.URL) ([]row, []LinkRef) {
+	grid := layoutTable(table)
+	headers, headerAt := gridHeaders(grid)
+	if !isScheduleHeader(headers) {
+		return nil, nil
+	}
+	named := false
+	for _, header := range headers {
+		if isNameHeader(header) {
+			named = true
+			break
+		}
+	}
+	var rows []row
+	var links []LinkRef
+	for i := headerAt + 1; i < len(grid); i++ {
+		var ordered []placed
+		seen := map[*html.Node]bool{}
+		for col, node := range grid[i] {
+			if node == nil || node.Data == "th" || seen[node] {
+				continue
+			}
+			seen[node] = true
+			header := ""
+			if col < len(headers) {
+				header = headers[col]
+			}
+			text := cellText(node)
+			if isDateHeader(header) {
+				text = withMonth(header, normalizeDigits(text), month)
+			}
+			parsedLinks := cellLinks(node, base, header)
+			links = append(links, parsedLinks...)
+			ordered = append(ordered, placed{
+				cell: cell{Header: header, Text: text, Links: parsedLinks},
+				node: node,
+			})
+		}
+		if len(ordered) == 0 {
+			continue
+		}
+		if !named {
+			cells := make([]cell, len(ordered))
+			for j, item := range ordered {
+				cells[j] = item.cell
+			}
+			rows = append(rows, row{Cells: cells})
+			continue
+		}
+		var shared []cell
+		for _, item := range ordered {
+			if isNameHeader(item.cell.Header) {
+				continue
+			}
+			shared = append(shared, item.cell)
+		}
+		for _, item := range ordered {
+			if !isNameHeader(item.cell.Header) {
+				continue
+			}
+			lines := cellLines(item.node)
+			for _, line := range lines {
+				copied := append([]cell(nil), shared...)
+				name := item.cell
+				name.Text = line
+				if len(lines) > 1 {
+					name.Links = nil
+				}
+				copied = append(copied, name)
+				rows = append(rows, row{Cells: copied})
+			}
+		}
+	}
+	return rows, links
+}
+
+type placed struct {
+	cell cell
+	node *html.Node
+}
+
+func isDateHeader(header string) bool {
+	return header == "日" || header == "月" || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+}
+
+func isNameHeader(header string) bool {
+	if strings.Contains(header, "要項") {
+		return false
+	}
+	return strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") || strings.Contains(header, "主催")
+}
+
+func cellLines(n *html.Node) []string {
+	var lines []string
+	var b strings.Builder
+	flush := func() {
+		text := strings.Join(strings.Fields(b.String()), " ")
+		b.Reset()
+		if text != "" {
+			lines = append(lines, text)
+		}
+	}
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && isStruck(n) {
+			return
+		}
+		if n.Type == html.ElementNode && n.Data == "br" {
+			flush()
+			return
+		}
+		if n.Type == html.TextNode {
+			b.WriteString(n.Data)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	flush()
+	return lines
+}
+
+func layoutTable(table *html.Node) [][]*html.Node {
+	type pending struct {
+		node *html.Node
+		rows int
+	}
+	open := map[int]pending{}
+	var grid [][]*html.Node
+	width := 0
+	for _, tr := range directRows(table) {
+		row := []*html.Node{}
+		col := 0
+		ensure := func(c int) {
+			for len(row) <= c {
+				row = append(row, nil)
+			}
+		}
+		fillOpen := func() {
+			for {
+				item, ok := open[col]
+				if !ok {
+					return
+				}
+				ensure(col)
+				row[col] = item.node
+				item.rows--
+				if item.rows == 0 {
+					delete(open, col)
+				} else {
+					open[col] = item
+				}
+				col++
+			}
+		}
+		for _, cell := range rowCells(tr) {
+			fillOpen()
+			cols := spanAttr(cell, "colspan")
+			rows := spanAttr(cell, "rowspan")
+			for k := 0; k < cols; k++ {
+				ensure(col)
+				row[col] = cell
+				if rows > 1 {
+					open[col] = pending{node: cell, rows: rows - 1}
+				}
+				col++
+			}
+		}
+		fillOpen()
+		if col > width {
+			width = col
+		}
+		grid = append(grid, row)
+	}
+	for i := range grid {
+		for len(grid[i]) < width {
+			grid[i] = append(grid[i], nil)
+		}
+	}
+	return grid
+}
+
+func gridHeaders(grid [][]*html.Node) ([]string, int) {
+	for i, line := range grid {
+		labels := make([]string, len(line))
+		found := false
+		for col, node := range line {
+			if node == nil || node.Data != "th" {
+				continue
+			}
+			found = true
+			labels[col] = compactHeader(cellText(node))
+		}
+		if found {
+			return labels, i
+		}
+	}
+	if len(grid) == 0 {
+		return nil, 0
+	}
+	labels := make([]string, len(grid[0]))
+	for col, node := range grid[0] {
+		if node != nil {
+			labels[col] = compactHeader(cellText(node))
+		}
+	}
+	return labels, 0
+}
+
+func rowCells(tr *html.Node) []*html.Node {
+	var out []*html.Node
+	for c := tr.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && (c.Data == "td" || c.Data == "th") {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func spanAttr(n *html.Node, key string) int {
+	for _, attr := range n.Attr {
+		if !strings.EqualFold(attr.Key, key) {
+			continue
+		}
+		value, err := strconv.Atoi(strings.TrimSpace(attr.Val))
+		if err != nil || value < 1 {
+			return 1
+		}
+		return value
+	}
+	return 1
+}
+
 func isScheduleHeader(headers []string) bool {
 	for _, header := range headers {
 		header = strings.TrimSpace(header)
-		if header == "日" || strings.Contains(header, "開催日") || strings.Contains(header, "要項") {
+		if header == "日" || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
 			return true
 		}
 	}

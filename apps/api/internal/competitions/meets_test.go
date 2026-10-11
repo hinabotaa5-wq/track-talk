@@ -106,6 +106,24 @@ func TestBuildMeetsUsesMarkedGuidelinesColumn(t *testing.T) {
 	}
 }
 
+func TestBuildMeetsSkipsMeetingsAndClinics(t *testing.T) {
+	page := Page{SeasonYear: 2026}
+	source := "http://www.sagarikujyo.jp/schedule/schedule_new.html"
+	meets, err := BuildMeets(page, []Draft{
+		{Name: "佐賀陸協理事会", StartsOn: "2026-12-05"},
+		{Name: "審判講習会", StartsOn: "2027-03-14"},
+		{Name: "トラック＆フィールド陸上クリニック", StartsOn: "2026-12-12"},
+		{Name: "駅伝強化練習会", StartsOn: "2026-12-26"},
+		{Name: "秋季記録会", StartsOn: "2026-11-07", Location: "SAGAスタジアム"},
+	}, "41", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meets) != 1 || meets[0].Name != "秋季記録会" {
+		t.Fatalf("meets %+v", meets)
+	}
+}
+
 func TestBuildMeetsRejectsEmpty(t *testing.T) {
 	_, err := BuildMeets(Page{SeasonYear: 2026}, []Draft{{Name: "日付なし"}}, "47", "https://example.com/")
 	if err == nil {
