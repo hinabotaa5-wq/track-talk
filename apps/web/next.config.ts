@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       { source: "/guidelines", destination: "/about#guidelines", permanent: false },
       { source: "/terms", destination: "/about#terms", permanent: false },
       { source: "/privacy", destination: "/about#privacy", permanent: false },
+      { source: "/posts", destination: "/", permanent: false },
     ];
   },
   turbopack: {

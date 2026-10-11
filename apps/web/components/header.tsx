@@ -28,9 +28,6 @@ export function Header() {
           </Link>
         ) : null}
         <nav className="hidden items-center gap-3 text-sm md:flex">
-          <Link href="/posts" className="hover:text-blue-700">
-            投稿
-          </Link>
           <Link href="/competitions" className="hover:text-blue-700">
             大会
           </Link>

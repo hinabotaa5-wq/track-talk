@@ -70,7 +70,8 @@ export function PostDetail({ id }: { id: string }) {
   async function remove() {
     if (!confirm("この投稿を削除しますか？")) return;
     await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
-    router.push("/posts");
+    router.push("/");
+    router.refresh();
   }
 
   async function report(targetType: "post" | "comment", targetId: string) {
@@ -113,7 +114,7 @@ export function PostDetail({ id }: { id: string }) {
   return (
     <article className="space-y-6 pb-36 md:pb-0">
       <p className="text-sm text-zinc-500">
-        <Link href="/posts">投稿</Link>
+        <Link href="/">ホーム</Link>
       </p>
       {post.kind === "video" && post.playback_url ? (
         <video
