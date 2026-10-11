@@ -162,6 +162,34 @@ func TestParsePageSplitColumnsAndRowspan(t *testing.T) {
 	}
 }
 
+func TestParsePageMonthHeaderAndDateColumn(t *testing.T) {
+	html := `<html><body><h2>2026年度 日程表</h2><table>
+<tr><th>月</th><th>期日</th><th>大会名</th><th>会場</th></tr>
+<tr><th rowspan="2">4月</th>
+<td>5(日)14:00～</td><td>県陸協主催審判講習会</td><td>諫早
+<tr><td>18(土)</td><td>ながさきリレーカーニバル</td><td>諫早</td></tr>
+<tr><th>1月</th><td>23(土)</td><td>県高校新人駅伝</td><td>諫早</td></tr>
+</table></body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://jaaf-nagasaki.net/schedule/2026ken.htm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	for _, want := range []string{"月: 4月", "期日: 5(日)", "期日: 18(土)", "月: 1月", "県高校新人駅伝", "会場: 諫早"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+	if strings.Contains(page.Body, "14:00") {
+		t.Fatalf("clock left in date: %s", page.Body)
+	}
+	if strings.Count(page.Body, "月: 4月") != 2 {
+		t.Fatalf("month not repeated: %s", page.Body)
+	}
+}
+
 func TestParsePageFullwidthYear(t *testing.T) {
 	html := `<html><body><h2>２０２６年度</h2><table><tr><th>開催日</th><th>競技会</th><th>要項</th></tr>
 <tr><td>4月25日</td><td>記録会</td><td><a href="https://example.com/a.pdf">要項</a></td></tr></table></body></html>`

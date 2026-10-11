@@ -108,6 +108,7 @@ var (
 	headingYearPattern  = regexp.MustCompile(`(20\d{2})年度`)
 	monthHeadingPattern = regexp.MustCompile(`(20\d{2})年(0?[1-9]|1[0-2])月`)
 	digitMonthPattern   = regexp.MustCompile(`\d月`)
+	clockPattern        = regexp.MustCompile(`\d{1,2}:\d{2}\s*[～〜~]?`)
 )
 
 type foundTable struct {
@@ -264,7 +265,7 @@ func rowsFromTable(table *html.Node, month string, base *url.URL) ([]row, []Link
 		var ordered []placed
 		seen := map[*html.Node]bool{}
 		for col, node := range grid[i] {
-			if node == nil || node.Data == "th" || seen[node] {
+			if node == nil || seen[node] {
 				continue
 			}
 			seen[node] = true
@@ -272,9 +273,12 @@ func rowsFromTable(table *html.Node, month string, base *url.URL) ([]row, []Link
 			if col < len(headers) {
 				header = headers[col]
 			}
+			if node.Data == "th" && !isDateHeader(header) {
+				continue
+			}
 			text := cellText(node)
 			if isDateHeader(header) {
-				text = withMonth(header, normalizeDigits(text), month)
+				text = cleanDateText(withMonth(header, normalizeDigits(text), month))
 			}
 			parsedLinks := cellLinks(node, base, header)
 			links = append(links, parsedLinks...)
@@ -327,7 +331,11 @@ type placed struct {
 }
 
 func isDateHeader(header string) bool {
-	return header == "日" || header == "月" || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+	return header == "日" || header == "月" || header == "期日" || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+}
+
+func cleanDateText(text string) string {
+	return strings.TrimSpace(clockPattern.ReplaceAllString(text, ""))
 }
 
 func isNameHeader(header string) bool {
@@ -482,7 +490,7 @@ func spanAttr(n *html.Node, key string) int {
 func isScheduleHeader(headers []string) bool {
 	for _, header := range headers {
 		header = strings.TrimSpace(header)
-		if header == "日" || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
+		if header == "日" || header == "期日" || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
 			return true
 		}
 	}
