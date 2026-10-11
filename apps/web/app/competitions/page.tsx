@@ -33,7 +33,7 @@ export default async function CompetitionsPage() {
             <Link
               key={c.id}
               href={`/competitions/${c.id}`}
-              className="block rounded-xl border bg-white p-4 hover:border-orange-300"
+              className="block rounded-xl border bg-white p-4 hover:border-blue-300"
             >
               <p className="text-xs text-zinc-500">{scopeLabel(c.scope)}</p>
               <h2 className="text-lg font-semibold">{c.name}</h2>

@@ -174,7 +174,7 @@ export function PostDetail({ id }: { id: string }) {
               <div className="mt-1 flex gap-3">
                 <button
                   type="button"
-                  className="text-xs text-orange-700"
+                  className="text-xs text-blue-700"
                   onClick={async () => {
                     const body = window.prompt("コメントを編集", c.body);
                     if (!body) return;

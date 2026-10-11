@@ -36,16 +36,16 @@ export default async function PostsPage({
           <h1 className="text-2xl font-bold">投稿</h1>
           <p className="text-sm text-zinc-600">新着または人気順でレースの議論を探せます。</p>
         </div>
-        <Link href="/posts/new" className="rounded-md bg-orange-600 px-4 py-2 text-sm text-white">
+        <Link href="/posts/new" className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white">
           投稿する
         </Link>
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
-        <Link className={sort === "new" ? "font-semibold text-orange-700" : ""} href="/posts?sort=new">
+        <Link className={sort === "new" ? "font-semibold text-blue-700" : ""} href="/posts?sort=new">
           新着
         </Link>
         <Link
-          className={sort === "popular" ? "font-semibold text-orange-700" : ""}
+          className={sort === "popular" ? "font-semibold text-blue-700" : ""}
           href="/posts?sort=popular"
         >
           人気

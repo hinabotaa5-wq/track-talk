@@ -57,7 +57,7 @@ export default async function HomePage({
             defaultValue={q}
             placeholder="キーワード"
             aria-label="キーワード"
-            className="h-11 w-full rounded-full border border-zinc-300 bg-white pr-4 pl-10 text-base outline-none focus:border-orange-500"
+            className="h-11 w-full rounded-full border border-zinc-300 bg-white pr-4 pl-10 text-base outline-none focus:border-blue-500"
           />
         </div>
       </form>
@@ -66,7 +66,7 @@ export default async function HomePage({
           href={homeHref("popular", q)}
           className={
             sort === "popular"
-              ? "inline-flex min-h-11 items-center rounded-full bg-orange-600 px-4 text-sm font-medium text-white"
+              ? "inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4 text-sm font-medium text-white"
               : "inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm text-zinc-700"
           }
           aria-current={sort === "popular" ? "page" : undefined}
@@ -77,7 +77,7 @@ export default async function HomePage({
           href={homeHref("new", q)}
           className={
             sort === "new"
-              ? "inline-flex min-h-11 items-center rounded-full bg-orange-600 px-4 text-sm font-medium text-white"
+              ? "inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4 text-sm font-medium text-white"
               : "inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm text-zinc-700"
           }
           aria-current={sort === "new" ? "page" : undefined}
