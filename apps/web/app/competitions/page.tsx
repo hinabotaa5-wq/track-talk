@@ -46,7 +46,7 @@ export default async function CompetitionsPage({
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">大会</h1>
       <p className="text-sm text-zinc-600">
-        都道府県と月を選ぶと、その月の大会を日付の早い順に表示します。大会名から要項へ移動します。要項が未掲載のときは、その欄のホームページへ移動します。ホームページも無いときは、その県の競技会一覧へ移動します。
+        都道府県と月を選ぶと、その月の大会を日付の早い順に表示します。会場も表示します。要項があれば要項へ、無ければ地区のページへ、どちらも無ければその県の陸協ホームページへ移動します。
       </p>
       <CompetitionFilters month={month} prefecture={prefecture} />
       {!prefecture ? (
@@ -68,6 +68,7 @@ export default async function CompetitionsPage({
             >
               <p className="text-xs text-zinc-500">{competitionDates(c.starts_on, c.ends_on)}</p>
               <h2 className="text-lg font-semibold">{c.name}</h2>
+              {c.location ? <p className="mt-1 text-sm text-zinc-600">{c.location}</p> : null}
               <p className="text-sm text-blue-700">{destinationLabel(c, prefecture)}</p>
             </a>
           ))}
