@@ -5,10 +5,8 @@ SELECT
     c.author_id,
     c.body,
     c.created_at,
-    c.updated_at,
-    pr.nickname AS author_nickname
+    c.updated_at
 FROM comments c
-JOIN profiles pr ON pr.id = c.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL

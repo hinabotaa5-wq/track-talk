@@ -77,8 +77,6 @@ type PostSafe struct {
 
 type Profile struct {
 	ID        uuid.UUID `json:"id"`
-	Nickname  string    `json:"nickname"`
-	Bio       string    `json:"bio"`
 	IsAdmin   bool      `json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

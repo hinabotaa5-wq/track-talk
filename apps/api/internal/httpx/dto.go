@@ -15,17 +15,13 @@ type meta struct {
 	Total   int64 `json:"total"`
 }
 
-type authorDTO struct {
-	ID       uuid.UUID `json:"id"`
-	Nickname string    `json:"nickname"`
-}
-
 type postDTO struct {
 	ID             uuid.UUID `json:"id"`
 	Title          string    `json:"title"`
 	Body           string    `json:"body,omitempty"`
 	BodyPreview    string    `json:"body_preview,omitempty"`
-	Author         authorDTO `json:"author"`
+	authorID       uuid.UUID
+	Mine           bool      `json:"mine"`
 	LikeCount      int32     `json:"like_count"`
 	CommentCount   int32     `json:"comment_count"`
 	LikedByMe      bool      `json:"liked_by_me"`
@@ -72,7 +68,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	p := postDTO{
 		ID:           row.ID,
 		Title:        row.Title,
-		Author:       authorDTO{ID: row.AuthorID, Nickname: row.AuthorNickname},
+		authorID:     row.AuthorID,
 		LikeCount:    row.LikeCount,
 		CommentCount: row.CommentCount,
 		LikedByMe:    liked,
@@ -102,7 +98,6 @@ func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO 
 		CommentCount:        row.CommentCount,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
-		AuthorNickname:      row.AuthorNickname,
 	}, liked, list)
 }
 
@@ -120,6 +115,5 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		CommentCount:        row.CommentCount,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
-		AuthorNickname:      row.AuthorNickname,
 	}, liked, false)
 }

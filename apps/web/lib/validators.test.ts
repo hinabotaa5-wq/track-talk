@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentSchema, inquirySchema, postSchema, profileSchema } from "./validators";
+import { commentSchema, inquirySchema, postSchema } from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -8,11 +8,6 @@ describe("validators", () => {
       body: "展開が熱かった",
     });
     expect(parsed.title).toBe("100m決勝");
-  });
-
-  it("rejects empty nickname", () => {
-    const r = profileSchema.safeParse({ nickname: "a", bio: "" });
-    expect(r.success).toBe(false);
   });
 
   it("rejects long comments", () => {

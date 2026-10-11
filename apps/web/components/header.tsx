@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export function Header() {
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const router = useRouter();
 
   async function logout() {
@@ -37,7 +37,7 @@ export function Header() {
                 投稿する
               </Link>
               <Link href="/me" className="hover:text-blue-700">
-                {profile?.nickname ?? "マイページ"}
+                マイページ
               </Link>
               <button type="button" onClick={logout} className="text-zinc-500 hover:text-zinc-800">
                 ログアウト

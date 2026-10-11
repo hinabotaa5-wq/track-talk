@@ -9,7 +9,6 @@ import { formatDateTime } from "@/lib/format";
 import type { Inquiry, Meta } from "@/lib/types";
 import { inquiryCategories, inquiryCategoryLabels, inquirySchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,7 +17,7 @@ import type { z } from "zod";
 type Values = z.infer<typeof inquirySchema>;
 
 export default function ContactPage() {
-  const { session, profile, token, loading } = useAuth();
+  const { session, token, loading } = useAuth();
   const router = useRouter();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [error, setError] = useState("");
@@ -34,7 +33,7 @@ export default function ContactPage() {
   }, [loading, session, router]);
 
   useEffect(() => {
-    if (!token || !profile) return;
+    if (!token) return;
     let cancelled = false;
     apiFetch<{ inquiries: Inquiry[]; meta: Meta }>("/v1/me/inquiries", { token })
       .then((d) => {
@@ -48,7 +47,7 @@ export default function ContactPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, profile]);
+  }, [token]);
 
   async function onSubmit(values: Values) {
     setError("");
@@ -75,18 +74,6 @@ export default function ContactPage() {
 
   if (loading || !session) {
     return <p className="text-sm text-zinc-600">読み込み中...</p>;
-  }
-
-  if (!profile) {
-    return (
-      <div className="mx-auto max-w-md space-y-3">
-        <h1 className="text-2xl font-bold">お問い合わせ</h1>
-        <p>プロフィールを作成してから送信できます。</p>
-        <Link href="/me/edit" className="text-blue-700">
-          プロフィールを作成
-        </Link>
-      </div>
-    );
   }
 
   return (

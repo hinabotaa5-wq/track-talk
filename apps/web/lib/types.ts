@@ -4,11 +4,6 @@ export type Meta = {
   total: number;
 };
 
-export type Author = {
-  id: string;
-  nickname: string;
-};
-
 export type Competition = {
   id: string;
   name: string;
@@ -27,7 +22,7 @@ export type Post = {
   title: string;
   body?: string;
   body_preview?: string;
-  author: Author;
+  mine: boolean;
   like_count: number;
   comment_count: number;
   liked_by_me: boolean;
@@ -46,7 +41,7 @@ export type Comment = {
   id: string;
   post_id: string;
   body: string;
-  author: Author;
+  mine: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -61,8 +56,6 @@ export type Inquiry = {
 
 export type Profile = {
   id: string;
-  nickname: string;
-  bio: string;
   is_admin?: boolean;
   created_at: string;
   updated_at?: string;

@@ -9,7 +9,7 @@ import { useParams, useRouter } from "next/navigation";
 
 export default function EditPostPage() {
   const { id } = useParams<{ id: string }>();
-  const { session, profile, loading } = useAuth();
+  const { session, token, loading } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
 
@@ -18,11 +18,12 @@ export default function EditPostPage() {
   }, [loading, session, router]);
 
   useEffect(() => {
-    apiFetch<Post>(`/v1/posts/${id}`).then(setPost);
-  }, [id]);
+    if (!token) return;
+    apiFetch<Post>(`/v1/posts/${id}`, { token }).then(setPost);
+  }, [id, token]);
 
-  if (!post) return <p>読み込み中…</p>;
-  if (profile && profile.id !== post.author.id) {
+  if (loading || !post) return <p>読み込み中…</p>;
+  if (!post.mine) {
     return <p>この投稿を編集する権限がありません。</p>;
   }
 

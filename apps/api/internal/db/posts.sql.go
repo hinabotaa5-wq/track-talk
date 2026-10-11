@@ -209,10 +209,8 @@ SELECT
     p.like_count,
     p.comment_count,
     p.created_at,
-    p.updated_at,
-    pr.nickname AS author_nickname
+    p.updated_at
 FROM posts p
-JOIN profiles pr ON pr.id = p.author_id
 WHERE p.id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
@@ -231,7 +229,6 @@ type GetPostRow struct {
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
-	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
@@ -250,7 +247,6 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.CommentCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.AuthorNickname,
 	)
 	return i, err
 }
@@ -390,10 +386,8 @@ SELECT
     p.like_count,
     p.comment_count,
     p.created_at,
-    p.updated_at,
-    pr.nickname AS author_nickname
+    p.updated_at
 FROM posts p
-JOIN profiles pr ON pr.id = p.author_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND ($1::uuid IS NULL OR p.author_id = $1)
@@ -426,7 +420,6 @@ type ListPostsNewRow struct {
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
-	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]ListPostsNewRow, error) {
@@ -456,7 +449,6 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.CommentCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AuthorNickname,
 		); err != nil {
 			return nil, err
 		}
@@ -481,10 +473,8 @@ SELECT
     p.like_count,
     p.comment_count,
     p.created_at,
-    p.updated_at,
-    pr.nickname AS author_nickname
+    p.updated_at
 FROM posts p
-JOIN profiles pr ON pr.id = p.author_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
@@ -518,7 +508,6 @@ type ListPostsPopularRow struct {
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
-	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularParams) ([]ListPostsPopularRow, error) {
@@ -548,7 +537,6 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.CommentCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AuthorNickname,
 		); err != nil {
 			return nil, err
 		}
@@ -605,11 +593,9 @@ SELECT
     p.like_count,
     p.comment_count,
     p.created_at,
-    p.updated_at,
-    pr.nickname AS author_nickname
+    p.updated_at
 FROM post_saves s
 JOIN posts p ON p.id = s.post_id
-JOIN profiles pr ON pr.id = p.author_id
 WHERE s.user_id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
@@ -642,7 +628,6 @@ type ListSavedPostsRow struct {
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
-	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) ([]ListSavedPostsRow, error) {
@@ -672,7 +657,6 @@ func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) 
 			&i.CommentCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AuthorNickname,
 		); err != nil {
 			return nil, err
 		}

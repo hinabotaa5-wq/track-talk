@@ -15,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 export function PostDetail({ id }: { id: string }) {
-  const { session, profile, token } = useAuth();
+  const { session, token } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -27,7 +27,7 @@ export function PostDetail({ id }: { id: string }) {
     try {
       const [p, c] = await Promise.all([
         apiFetch<Post>(`/v1/posts/${id}`, { token }),
-        apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50`),
+        apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50`, { token }),
       ]);
       setPost(p);
       setComments(c.comments ?? []);
@@ -52,7 +52,7 @@ export function PostDetail({ id }: { id: string }) {
   if (error || !post) return <p className="text-red-700">{error || "エラー"}</p>;
 
   const current = post;
-  const mine = profile?.id === current.author.id;
+  const mine = current.mine;
 
   async function toggleLike() {
     if (!session) {
@@ -150,9 +150,7 @@ export function PostDetail({ id }: { id: string }) {
         <img src={post.thumbnail_url} alt="" className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain" />
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
-      <p className="text-sm text-zinc-500">
-        {post.author.nickname} · {formatDateTime(post.created_at)}
-      </p>
+      <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
       {post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
       ) : null}
@@ -187,10 +185,8 @@ export function PostDetail({ id }: { id: string }) {
         {comments.map((c) => (
           <div key={c.id} className="rounded-lg border bg-white p-3">
             <p className="whitespace-pre-wrap text-sm">{c.body}</p>
-            <p className="mt-2 text-xs text-zinc-500">
-              {c.author.nickname} · {formatDateTime(c.created_at)}
-            </p>
-            {profile?.id === c.author.id ? (
+            <p className="mt-2 text-xs text-zinc-500">{formatDateTime(c.created_at)}</p>
+            {c.mine ? (
               <div className="mt-1 flex gap-3">
                 <button
                   type="button"

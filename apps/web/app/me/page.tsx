@@ -10,9 +10,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 
 export default function MePage() {
-  const { session, profile, loading } = useAuth();
+  const { session, token, loading } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [postsError, setPostsError] = useState("");
 
   async function logout() {
     const supabase = createClient();
@@ -26,40 +27,22 @@ export default function MePage() {
   }, [loading, session, router]);
 
   useEffect(() => {
-    if (!profile) return;
-    apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/users/${profile.id}/posts`).then((d) =>
-      setPosts(d.posts ?? []),
-    );
-  }, [profile]);
+    if (!token) return;
+    apiFetch<{ posts: Post[]; meta: Meta }>("/v1/me/posts", { token })
+      .then((d) => {
+        setPosts(d.posts ?? []);
+        setPostsError("");
+      })
+      .catch(() => setPostsError("投稿の取得に失敗しました"));
+  }, [token]);
 
-  if (!profile) {
-    return (
-      <div className="space-y-3">
-        <h1 className="text-2xl font-bold">マイページ</h1>
-        <p>プロフィールが未作成です。</p>
-        <Link href="/me/edit" className="text-blue-700">
-          プロフィールを作成
-        </Link>
-        <button type="button" onClick={logout} className="block text-sm text-zinc-500">
-          ログアウト
-        </button>
-        <Link href="/me/contact" className="block text-sm text-zinc-500">
-          お問い合わせ
-        </Link>
-        <Link href="/about" className="block text-sm text-zinc-500">
-          このアプリについて
-        </Link>
-      </div>
-    );
+  if (loading || !session) {
+    return <p className="text-sm text-zinc-600">読み込み中...</p>;
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">{profile.nickname}</h1>
-      <p className="whitespace-pre-wrap text-zinc-700">{profile.bio || "自己紹介は未設定です。"}</p>
-      <Link href="/me/edit" className="text-sm text-blue-700">
-        プロフィールを編集
-      </Link>
+      <h1 className="text-2xl font-bold">マイページ</h1>
       <button type="button" onClick={logout} className="block text-sm text-zinc-500">
         ログアウト
       </button>
@@ -70,7 +53,9 @@ export default function MePage() {
         このアプリについて
       </Link>
       <h2 className="text-xl font-semibold">自分の投稿</h2>
-      {posts.length === 0 ? (
+      {postsError ? (
+        <p className="text-sm text-red-600">{postsError}</p>
+      ) : posts.length === 0 ? (
         <p className="text-sm text-zinc-600">まだ投稿がありません</p>
       ) : (
         <div className="grid grid-cols-2 gap-3">

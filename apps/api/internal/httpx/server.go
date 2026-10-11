@@ -54,16 +54,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts", s.listPosts)
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
-		r.Get("/users/{id}", s.getUser)
-		r.Get("/users/{id}/posts", s.listUserPosts)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
 			r.Get("/me", s.me)
+			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)
-			r.Put("/me/profile", s.upsertProfile)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/uploads/video", s.signVideoUpload)

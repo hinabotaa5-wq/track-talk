@@ -55,11 +55,7 @@ func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Prof
 		Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 		return db.Profile{}, false
 	}
-	p, err := s.q.GetProfile(r.Context(), uid)
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusConflict, "profile_required", "プロフィールを作成してください")
-		return db.Profile{}, false
-	}
+	p, err := s.q.EnsureProfile(r.Context(), uid)
 	if err != nil {
 		MapDBError(w, err)
 		return db.Profile{}, false
@@ -82,8 +78,6 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (db.Profil
 func profileJSON(p db.Profile) map[string]any {
 	return map[string]any{
 		"id":         p.ID,
-		"nickname":   p.Nickname,
-		"bio":        p.Bio,
 		"is_admin":   p.IsAdmin,
 		"created_at": p.CreatedAt,
 		"updated_at": p.UpdatedAt,
@@ -98,79 +92,22 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, profileJSON(p))
 }
 
-type profileReq struct {
-	Nickname string `json:"nickname"`
-	Bio      string `json:"bio"`
-}
-
-func (s *Server) upsertProfile(w http.ResponseWriter, r *http.Request) {
-	uid, _ := UserID(r.Context())
-	var req profileReq
-	if err := DecodeJSON(r, &req); err != nil {
-		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return
-	}
-	fields := map[string]string{}
-	if e := Nickname(req.Nickname); e != "" {
-		fields["nickname"] = e
-	}
-	if e := Bio(req.Bio); e != "" {
-		fields["bio"] = e
-	}
-	if len(fields) > 0 {
-		FieldError(w, fields)
-		return
-	}
-	p, err := s.q.UpsertProfile(r.Context(), db.UpsertProfileParams{
-		ID:       uid,
-		Nickname: strings.TrimSpace(req.Nickname),
-		Bio:      strings.TrimSpace(req.Bio),
-	})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, profileJSON(p))
-}
-
-func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseUUIDParam(w, r, "id")
+func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
 	if !ok {
 		return
 	}
-	p, err := s.q.GetProfile(r.Context(), id)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, map[string]any{
-		"id":         p.ID,
-		"nickname":   p.Nickname,
-		"bio":        p.Bio,
-		"created_at": p.CreatedAt,
-	})
-}
-
-func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	s.listPostsFiltered(w, r, "new", &id)
+	s.listPostsFiltered(w, r, "new", &p.ID)
 }
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	var author *uuid.UUID
-	if v := strings.TrimSpace(q.Get("author_id")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			Error(w, http.StatusUnprocessableEntity, "validation_error", "author_idが不正です")
-			return
-		}
-		author = &id
-	}
-	s.listPostsFiltered(w, r, q.Get("sort"), author)
+	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil)
+}
+
+func withMine(r *http.Request, p postDTO) postDTO {
+	uid, ok := UserID(r.Context())
+	p.Mine = ok && uid == p.authorID
+	return p
 }
 
 func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort string, author *uuid.UUID) {
@@ -202,7 +139,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		saved := s.savedSet(r.Context(), ids)
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			item := s.present(postFromPopular(row, liked[row.ID], true))
+			item := withMine(r, s.present(postFromPopular(row, liked[row.ID], true)))
 			item.SavedByMe = saved[row.ID]
 			items = append(items, item)
 		}
@@ -222,7 +159,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		saved := s.savedSet(r.Context(), ids)
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			item := s.present(postFromList(row, liked[row.ID], true))
+			item := withMine(r, s.present(postFromList(row, liked[row.ID], true)))
 			item.SavedByMe = saved[row.ID]
 			items = append(items, item)
 		}
@@ -300,7 +237,7 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 			saved = ok2
 		}
 	}
-	item := s.present(postFromGet(row, liked))
+	item := withMine(r, s.present(postFromGet(row, liked)))
 	item.SavedByMe = saved
 	JSON(w, http.StatusOK, item)
 }
@@ -429,7 +366,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, s.present(postFromGet(full, false)))
+	JSON(w, http.StatusCreated, withMine(r, s.present(postFromGet(full, false))))
 }
 
 func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
@@ -464,7 +401,7 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, s.present(postFromGet(full, false)))
+	JSON(w, http.StatusOK, withMine(r, s.present(postFromGet(full, false))))
 }
 
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
@@ -517,7 +454,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 	liked := s.likedSet(r.Context(), ids)
 	items := make([]postDTO, 0, len(rows))
 	for _, row := range rows {
-		item := s.present(postFromList(db.ListPostsNewRow{
+		item := withMine(r, s.present(postFromList(db.ListPostsNewRow{
 			ID:                  row.ID,
 			AuthorID:            row.AuthorID,
 			Title:               row.Title,
@@ -530,8 +467,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 			CommentCount:        row.CommentCount,
 			CreatedAt:           row.CreatedAt,
 			UpdatedAt:           row.UpdatedAt,
-			AuthorNickname:      row.AuthorNickname,
-		}, liked[row.ID], true))
+		}, liked[row.ID], true)))
 		item.SavedByMe = true
 		items = append(items, item)
 	}
@@ -618,12 +554,13 @@ func (s *Server) unlikePost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func commentJSON(id, postID, authorID uuid.UUID, body, nickname string, created, updated interface{}) map[string]any {
+func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, created, updated interface{}) map[string]any {
+	uid, ok := UserID(r.Context())
 	return map[string]any{
 		"id":         id,
 		"post_id":    postID,
 		"body":       body,
-		"author":     authorDTO{ID: authorID, Nickname: nickname},
+		"mine":       ok && uid == authorID,
 		"created_at": created,
 		"updated_at": updated,
 	}
@@ -647,14 +584,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, map[string]any{
-			"id":         row.ID,
-			"post_id":    row.PostID,
-			"body":       row.Body,
-			"author":     authorDTO{ID: row.AuthorID, Nickname: row.AuthorNickname},
-			"created_at": row.CreatedAt,
-			"updated_at": row.UpdatedAt,
-		})
+		out = append(out, commentJSON(r, row.ID, row.PostID, row.AuthorID, row.Body, row.CreatedAt, row.UpdatedAt))
 	}
 	JSON(w, http.StatusOK, map[string]any{"comments": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
@@ -696,7 +626,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.q.IncrementCommentCount(r.Context(), postID)
-	JSON(w, http.StatusCreated, commentJSON(c.ID, c.PostID, c.AuthorID, c.Body, p.Nickname, c.CreatedAt, c.UpdatedAt))
+	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
 }
 
 func (s *Server) updateComment(w http.ResponseWriter, r *http.Request) {
@@ -730,7 +660,7 @@ func (s *Server) updateComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, commentJSON(c.ID, c.PostID, c.AuthorID, c.Body, p.Nickname, c.CreatedAt, c.UpdatedAt))
+	JSON(w, http.StatusOK, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
 }
 
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
@@ -788,7 +718,7 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	if e := ReportReason(req.Reason); e != "" {
 		fields["reason"] = e
 	}
-	if e := Bio(req.Detail); e != "" {
+	if e := ReportDetail(req.Detail); e != "" {
 		fields["detail"] = e
 	}
 	if len(fields) > 0 {

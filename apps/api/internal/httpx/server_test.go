@@ -123,16 +123,7 @@ func TestPostLifecycleAndAuthz(t *testing.T) {
 	b := uuid.New()
 	ta, tb := token(t, a), token(t, b)
 
-	rec := doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "runnerA", "bio": "100m"})
-	if rec.Code != 200 {
-		t.Fatalf("profile a %d %s", rec.Code, rec.Body.String())
-	}
-	rec = doJSON(t, h, http.MethodPut, "/v1/me/profile", tb, map[string]string{"nickname": "runnerB", "bio": ""})
-	if rec.Code != 200 {
-		t.Fatalf("profile b %d %s", rec.Code, rec.Body.String())
-	}
-
-	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"title": "日本選手権 100m", "body": "決勝の展開が熱かった"})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -198,8 +189,6 @@ func TestPostKindsShareOneList(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "kinds", "bio": ""})
-
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"title": "", "body": ""})
 	if rec.Code != 201 {
@@ -290,8 +279,6 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "uploader", "bio": ""})
-
 	rec := doJSON(t, h, http.MethodPost, "/v1/uploads/video", ta, map[string]any{})
 	if rec.Code != 200 {
 		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
@@ -359,8 +346,6 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "photo", "bio": ""})
-
 	rec := doJSON(t, h, http.MethodPost, "/v1/uploads/image", ta, map[string]any{})
 	if rec.Code != 200 {
 		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
@@ -395,7 +380,6 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "cite", "bio": ""})
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"title": "公式", "body": "", "kind": "youtube",
 		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
@@ -447,7 +431,6 @@ func TestValidation(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "okname", "bio": ""})
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": strings.Repeat("あ", 121), "body": "本文"})
 	if rec.Code != 422 {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
@@ -459,9 +442,6 @@ func TestSaveAppearsOnlyForTheSaver(t *testing.T) {
 	a := uuid.New()
 	b := uuid.New()
 	ta, tb := token(t, a), token(t, b)
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "saver", "bio": ""})
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", tb, map[string]string{"nickname": "other", "bio": ""})
-
 	rec := doJSON(t, h, http.MethodGet, "/v1/me/saves", "", nil)
 	if rec.Code != 401 {
 		t.Fatalf("anon %d", rec.Code)
@@ -538,17 +518,7 @@ func TestInquiryStaysWithTheSender(t *testing.T) {
 	b := uuid.New()
 	ta, tb := token(t, a), token(t, b)
 
-	rec := doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
-		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません",
-	})
-	if rec.Code != 409 {
-		t.Fatalf("no profile %d %s", rec.Code, rec.Body.String())
-	}
-
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "asker", "bio": ""})
-	doJSON(t, h, http.MethodPut, "/v1/me/profile", tb, map[string]string{"nickname": "otherq", "bio": ""})
-
-	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", "", map[string]string{
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/inquiries", "", map[string]string{
 		"category": "bug", "subject": "件名", "body": "本文",
 	})
 	if rec.Code != 401 {

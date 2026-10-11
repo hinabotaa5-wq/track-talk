@@ -122,10 +122,8 @@ SELECT
     c.author_id,
     c.body,
     c.created_at,
-    c.updated_at,
-    pr.nickname AS author_nickname
+    c.updated_at
 FROM comments c
-JOIN profiles pr ON pr.id = c.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL
@@ -140,13 +138,12 @@ type ListCommentsParams struct {
 }
 
 type ListCommentsRow struct {
-	ID             uuid.UUID `json:"id"`
-	PostID         uuid.UUID `json:"post_id"`
-	AuthorID       uuid.UUID `json:"author_id"`
-	Body           string    `json:"body"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	AuthorNickname string    `json:"author_nickname"`
+	ID        uuid.UUID `json:"id"`
+	PostID    uuid.UUID `json:"post_id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
@@ -165,7 +162,6 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]L
 			&i.Body,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AuthorNickname,
 		); err != nil {
 			return nil, err
 		}
