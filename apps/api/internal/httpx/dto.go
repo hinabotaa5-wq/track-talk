@@ -33,6 +33,7 @@ type postDTO struct {
 	ThumbnailURL   string    `json:"thumbnail_url,omitempty"`
 	YouTubeVideoID string    `json:"youtube_video_id,omitempty"`
 	VideoPublicID  string    `json:"video_public_id,omitempty"`
+	ImagePublicID  string    `json:"image_public_id,omitempty"`
 	PlaybackURL    string    `json:"playback_url,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -46,8 +47,11 @@ func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) 
 	if youtubeID != nil {
 		p.YouTubeVideoID = *youtubeID
 	}
-	if publicID != nil {
+	if publicID != nil && kind == "video" {
 		p.VideoPublicID = *publicID
+	}
+	if publicID != nil && kind == "text" {
+		p.ImagePublicID = *publicID
 	}
 	if kind == "youtube" && thumbnail != nil {
 		p.ThumbnailURL = *thumbnail

@@ -281,6 +281,7 @@ type postReq struct {
 	YouTubeVideoID      string `json:"youtube_video_id"`
 	YouTubeThumbnailURL string `json:"youtube_thumbnail_url"`
 	VideoPublicID       string `json:"video_public_id"`
+	ImagePublicID       string `json:"image_public_id"`
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.CreatePostParams, bool) {
@@ -309,6 +310,13 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
 			fields["kind"] = "文字の投稿に動画情報は付けられません"
 		}
+		imageID := strings.TrimSpace(req.ImagePublicID)
+		if imageID != "" {
+			if e := ImagePublicID(imageID); e != "" {
+				fields["image_public_id"] = e
+			}
+			publicID = &imageID
+		}
 	case "youtube":
 		id := strings.TrimSpace(req.YouTubeVideoID)
 		thumb := strings.TrimSpace(req.YouTubeThumbnailURL)
@@ -321,6 +329,9 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		if strings.TrimSpace(req.VideoPublicID) != "" {
 			fields["video_public_id"] = "自分の動画とは同時に指定できません"
 		}
+		if strings.TrimSpace(req.ImagePublicID) != "" {
+			fields["image_public_id"] = "写真は文章の投稿に付けてください"
+		}
 		youtubeID = &id
 		youtubeThumb = &thumb
 	case "video":
@@ -330,6 +341,9 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		}
 		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" {
 			fields["youtube_video_id"] = "YouTubeとは同時に指定できません"
+		}
+		if strings.TrimSpace(req.ImagePublicID) != "" {
+			fields["image_public_id"] = "写真は文章の投稿に付けてください"
 		}
 		publicID = &id
 	}
@@ -365,6 +379,12 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.cloud.Ready(r.Context(), publicID); err != nil {
 			writeVideoReadyError(w, err)
+			return
+		}
+	}
+	if params.Kind == "text" && params.CloudinaryPublicID != nil {
+		if err := s.cloud.ImageReady(r.Context(), *params.CloudinaryPublicID); err != nil {
+			writeAssetReadyError(w, err, "写真")
 			return
 		}
 	}

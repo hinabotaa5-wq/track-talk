@@ -29,6 +29,15 @@ func TestVideoURLs(t *testing.T) {
 	}
 }
 
+func TestImageURL(t *testing.T) {
+	c := Client{Cloud: "demo"}
+	id := "track-talk/11111111-1111-4111-8111-111111111111"
+	got := c.ImageURL(id)
+	if !strings.Contains(got, "/demo/image/upload/c_limit,w_1600,q_auto,f_auto/track-talk/") {
+		t.Fatal(got)
+	}
+}
+
 func TestValidPublicID(t *testing.T) {
 	if !ValidPublicID("track-talk/11111111-1111-4111-8111-111111111111") {
 		t.Fatal("expected valid")

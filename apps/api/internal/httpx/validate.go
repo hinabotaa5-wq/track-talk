@@ -84,13 +84,21 @@ func HTTPSURL(v string) string {
 }
 
 func VideoPublicID(v string) string {
+	return assetPublicID(v, "動画IDが不正です")
+}
+
+func ImagePublicID(v string) string {
+	return assetPublicID(v, "写真IDが不正です")
+}
+
+func assetPublicID(v, message string) string {
 	n := utf8.RuneCountInString(v)
 	if n < 1 || n > 255 || strings.Contains(v, "..") {
-		return "動画IDが不正です"
+		return message
 	}
 	for _, r := range v {
 		if r == ' ' || r == '\n' || r == '\t' || r == '?' || r == '#' {
-			return "動画IDが不正です"
+			return message
 		}
 	}
 	return ""

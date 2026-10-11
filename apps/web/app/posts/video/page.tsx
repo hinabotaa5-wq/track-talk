@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { ComposerPage, TitleField } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { Post } from "@/lib/types";
 
 const maxBytes = 100 * 1024 * 1024;
@@ -20,17 +19,13 @@ type Signature = {
 };
 
 export default function OwnVideoPage() {
-  const { session, loading, token } = useAuth();
+  const { session, token } = useAuth();
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !session) router.replace("/login");
-  }, [loading, session, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -91,15 +86,13 @@ export default function OwnVideoPage() {
     }
   }
 
-  if (loading || !session) return <p>読み込み中…</p>;
-
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">自分の動画</h1>
-      <p className="text-sm text-zinc-600">
-        ファイルはCloudinaryに保存します。保存が終わってからホームに出ます。見るのにログインは要りません。
-      </p>
+    <ComposerPage
+      title="自分の動画"
+      lead="ファイルはCloudinaryに保存します。保存が終わってからホームに出ます。見るのにログインは要りません。"
+    >
       <form onSubmit={onSubmit} className="space-y-4">
+        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           動画ファイル
           <input
@@ -110,19 +103,12 @@ export default function OwnVideoPage() {
             required
           />
         </label>
-        <label className="block text-sm font-medium">
-          タイトル（空なら（質問なし））
-          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
-        </label>
         {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
           アップロードして投稿
         </Button>
       </form>
-      <Link href="/upload" className="text-sm text-zinc-500">
-        投稿の入口に戻る
-      </Link>
-    </div>
+    </ComposerPage>
   );
 }

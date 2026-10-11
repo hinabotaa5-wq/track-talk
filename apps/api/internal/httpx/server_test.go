@@ -335,6 +335,61 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	}
 }
 
+func TestSignedImageJoinsTheList(t *testing.T) {
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/image/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"resource_type":"image"}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	a := uuid.New()
+	ta := token(t, a)
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "photo", "bio": ""})
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/uploads/image", ta, map[string]any{})
+	if rec.Code != 200 {
+		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
+	}
+	var signed struct {
+		PublicID string `json:"public_id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &signed)
+	if !cloudinary.ValidPublicID(signed.PublicID) {
+		t.Fatalf("signed %+v", signed)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "スタート", "body": "写真つき", "image_public_id": signed.PublicID,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Kind          string `json:"kind"`
+		ThumbnailURL  string `json:"thumbnail_url"`
+		PlaybackURL   string `json:"playback_url"`
+		ImagePublicID string `json:"image_public_id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if created.Kind != "text" || created.ImagePublicID != signed.PublicID || created.PlaybackURL != "" || !strings.Contains(created.ThumbnailURL, "/image/upload/") {
+		t.Fatalf("created %+v", created)
+	}
+}
+
 func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	h := setup(t)
 	a := uuid.New()

@@ -134,7 +134,7 @@ export function PostDetail({ id }: { id: string }) {
           allowFullScreen
         />
       ) : post.thumbnail_url ? (
-        <img src={post.thumbnail_url} alt="" className="aspect-video w-full rounded-xl object-cover" />
+        <img src={post.thumbnail_url} alt="" className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain" />
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       <p className="text-sm text-zinc-500">

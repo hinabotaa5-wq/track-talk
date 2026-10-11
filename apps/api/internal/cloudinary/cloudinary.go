@@ -121,6 +121,13 @@ func (c Client) PlaybackURL(publicID string) string {
 	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/q_auto/" + deliveryPath(publicID) + ".mp4"
 }
 
+func (c Client) ImageURL(publicID string) string {
+	if c.Cloud == "" || publicID == "" {
+		return ""
+	}
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_1600,q_auto,f_auto/" + deliveryPath(publicID)
+}
+
 func deliveryPath(publicID string) string {
 	parts := strings.Split(publicID, "/")
 	for i, part := range parts {
@@ -130,13 +137,21 @@ func deliveryPath(publicID string) string {
 }
 
 func (c Client) Ready(ctx context.Context, publicID string) error {
+	return c.ready(ctx, "video", publicID)
+}
+
+func (c Client) ImageReady(ctx context.Context, publicID string) error {
+	return c.ready(ctx, "image", publicID)
+}
+
+func (c Client) ready(ctx context.Context, resource, publicID string) error {
 	if !ValidPublicID(publicID) {
 		return ErrInvalid
 	}
 	if !c.Configured() {
 		return ErrNotConfigured
 	}
-	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/video/upload/" + deliveryPath(publicID)
+	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/upload/" + deliveryPath(publicID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return ErrUnavailable
