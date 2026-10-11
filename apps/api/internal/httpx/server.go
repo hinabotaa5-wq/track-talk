@@ -50,10 +50,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
-		r.Get("/categories", s.listCategories)
 		r.Get("/competitions", s.listCompetitions)
 		r.Get("/competitions/{id}", s.getCompetition)
-		r.Get("/competitions/{id}/posts", s.listCompetitionPosts)
 		r.Get("/posts", s.listPosts)
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)

@@ -2,34 +2,27 @@ import { apiFetch } from "@/lib/api";
 import { PostCard } from "@/components/post-card";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import Link from "next/link";
-import type { Category, Meta, Post } from "@/lib/types";
+import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function PostsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; category_id?: string; page?: string }>;
+  searchParams: Promise<{ sort?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const sort = sp.sort === "popular" ? "popular" : "new";
   const page = sp.page ?? "1";
-  const category = sp.category_id ?? "";
   const qs = new URLSearchParams({ sort, page, per_page: "20" });
-  if (category) qs.set("category_id", category);
 
   let posts: Post[] = [];
-  let categories: Category[] = [];
   let meta: Meta = { page: 1, per_page: 20, total: 0 };
   let error = "";
   try {
-    const [list, cats] = await Promise.all([
-      apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`),
-      apiFetch<{ categories: Category[] }>("/v1/categories"),
-    ]);
+    const list = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`);
     posts = list.posts ?? [];
     meta = list.meta;
-    categories = cats.categories ?? [];
   } catch {
     error = "投稿一覧を取得できませんでした。";
   }
@@ -57,18 +50,6 @@ export default async function PostsPage({
         >
           人気
         </Link>
-        <Link href="/posts" className={!category ? "font-semibold" : ""}>
-          すべて
-        </Link>
-        {categories.map((c) => (
-          <Link
-            key={c.id}
-            href={`/posts?sort=${sort}&category_id=${c.id}`}
-            className={category === c.id ? "font-semibold text-orange-700" : ""}
-          >
-            {c.name}
-          </Link>
-        ))}
       </div>
       {error ? <ErrorState message={error} /> : null}
       {posts.length === 0 && !error ? (
@@ -82,7 +63,7 @@ export default async function PostsPage({
       )}
       {hasNext ? (
         <Link
-          href={`/posts?sort=${sort}${category ? `&category_id=${category}` : ""}&page=${meta.page + 1}`}
+          href={`/posts?sort=${sort}&page=${meta.page + 1}`}
           className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium"
         >
           次の投稿

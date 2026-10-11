@@ -132,8 +132,7 @@ func TestPostLifecycleAndAuthz(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "日本選手権 100m", "body": "決勝の展開が熱かった", "category_id": "race_impression",
-	})
+		"title": "日本選手権 100m", "body": "決勝の展開が熱かった"})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -143,8 +142,7 @@ func TestPostLifecycleAndAuthz(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 
 	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tb, map[string]any{
-		"title": "改ざん", "body": "だめ", "category_id": "general",
-	})
+		"title": "改ざん", "body": "だめ"})
 	if rec.Code != 403 {
 		t.Fatalf("other edit %d %s", rec.Code, rec.Body.String())
 	}
@@ -202,8 +200,7 @@ func TestPostKindsShareOneList(t *testing.T) {
 	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "kinds", "bio": ""})
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "", "body": "", "category_id": "general",
-	})
+		"title": "", "body": ""})
 	if rec.Code != 201 {
 		t.Fatalf("empty text %d %s", rec.Code, rec.Body.String())
 	}
@@ -216,7 +213,7 @@ func TestPostKindsShareOneList(t *testing.T) {
 	}
 
 	yt := map[string]any{
-		"title": "公式", "body": "", "category_id": "general", "kind": "youtube",
+		"title": "公式", "body": "", "kind": "youtube",
 		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, yt)
@@ -237,7 +234,7 @@ func TestPostKindsShareOneList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "自分の動画", "body": "", "category_id": "general", "kind": "video",
+		"title": "自分の動画", "body": "", "kind": "video",
 		"video_public_id": "tracktalk/sample",
 	})
 	if rec.Code != 422 {
@@ -321,7 +318,7 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "", "body": "", "category_id": "general", "kind": "video",
+		"title": "", "body": "", "kind": "video",
 		"video_public_id": signed.PublicID,
 	})
 	if rec.Code != 201 {
@@ -344,7 +341,7 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	ta := token(t, a)
 	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "cite", "bio": ""})
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "公式", "body": "", "category_id": "general", "kind": "youtube",
+		"title": "公式", "body": "", "kind": "youtube",
 		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
 	})
 	if rec.Code != 201 {
@@ -356,8 +353,7 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
-		"url": "https://youtu.be/abcdefghijk", "category_id": "race_impression",
-	})
+		"url": "https://youtu.be/abcdefghijk"})
 	if rec.Code != 200 {
 		t.Fatalf("cite %d %s", rec.Code, rec.Body.String())
 	}
@@ -373,8 +369,7 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
-		"url": "https://example.com/watch?v=abcdefghijk", "category_id": "general",
-	})
+		"url": "https://example.com/watch?v=abcdefghijk"})
 	if rec.Code != 422 {
 		t.Fatalf("bad url %d %s", rec.Code, rec.Body.String())
 	}
@@ -385,7 +380,7 @@ func TestValidation(t *testing.T) {
 	a := uuid.New()
 	ta := token(t, a)
 	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "okname", "bio": ""})
-	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "", "body": "", "category_id": "nope"})
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": strings.Repeat("あ", 121), "body": "本文"})
 	if rec.Code != 422 {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
 	}

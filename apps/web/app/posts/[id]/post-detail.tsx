@@ -114,12 +114,6 @@ export function PostDetail({ id }: { id: string }) {
     <article className="space-y-6 pb-36 md:pb-0">
       <p className="text-sm text-zinc-500">
         <Link href="/posts">投稿</Link>
-        {post.competition ? (
-          <>
-            {" · "}
-            <Link href={`/competitions/${post.competition.id}`}>{post.competition.name}</Link>
-          </>
-        ) : null}
       </p>
       {post.kind === "video" && post.playback_url ? (
         <video
@@ -143,7 +137,7 @@ export function PostDetail({ id }: { id: string }) {
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       <p className="text-sm text-zinc-500">
-        {post.category.name} · {post.author.nickname} · {formatDateTime(post.created_at)}
+        {post.author.nickname} · {formatDateTime(post.created_at)}
       </p>
       {post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>

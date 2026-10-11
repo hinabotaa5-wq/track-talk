@@ -1,8 +1,7 @@
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDate, scopeLabel } from "@/lib/format";
-import { PostCard } from "@/components/post-card";
-import { EmptyState, ErrorState } from "@/components/empty-state";
-import type { Competition, Meta, Post } from "@/lib/types";
+import { ErrorState } from "@/components/empty-state";
+import type { Competition } from "@/lib/types";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -14,15 +13,9 @@ export default async function CompetitionDetailPage({
 }) {
   const { id } = await params;
   let comp: Competition | null = null;
-  let related: Post[] = [];
   let failed = false;
   try {
-    const [c, posts] = await Promise.all([
-      apiFetch<Competition>(`/v1/competitions/${id}`),
-      apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/competitions/${id}/posts?per_page=20`),
-    ]);
-    comp = c;
-    related = posts.posts ?? [];
+    comp = await apiFetch<Competition>(`/v1/competitions/${id}`);
   } catch (e) {
     if (e instanceof ApiRequestError && e.status === 404) notFound();
     failed = true;
@@ -39,14 +32,6 @@ export default async function CompetitionDetailPage({
         {comp.ends_on ? ` 〜 ${formatDate(comp.ends_on)}` : ""} · {comp.location}
       </p>
       <p className="whitespace-pre-wrap text-zinc-700">{comp.summary}</p>
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">関連投稿</h2>
-        {related.length === 0 ? (
-          <EmptyState title="関連投稿はまだありません" body="この大会についての感想を投稿できます。" />
-        ) : (
-          related.map((p) => <PostCard key={p.id} post={p} />)
-        )}
-      </section>
     </div>
   );
 }

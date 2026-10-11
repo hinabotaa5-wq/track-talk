@@ -20,14 +20,6 @@ func (s *Server) queryPage(r *http.Request) (page, per, offset int32) {
 	return int32(p), int32(pp), int32((p - 1) * pp)
 }
 
-func textPtr(v string) *string {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
 func boolPtr(v bool) *bool {
 	return &v
 }
@@ -164,16 +156,7 @@ func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.listPostsFiltered(w, r, "new", nil, nil, &id)
-}
-
-func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.q.ListCategories(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, map[string]any{"categories": rows})
+	s.listPostsFiltered(w, r, "new", &id)
 }
 
 func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
@@ -204,29 +187,8 @@ func (s *Server) getCompetition(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, row)
 }
 
-func (s *Server) listCompetitionPosts(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil, &id, nil)
-}
-
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	var cat *string
-	if v := strings.TrimSpace(q.Get("category_id")); v != "" {
-		cat = &v
-	}
-	var comp *uuid.UUID
-	if v := strings.TrimSpace(q.Get("competition_id")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			Error(w, http.StatusUnprocessableEntity, "validation_error", "competition_idが不正です")
-			return
-		}
-		comp = &id
-	}
 	var author *uuid.UUID
 	if v := strings.TrimSpace(q.Get("author_id")); v != "" {
 		id, err := uuid.Parse(v)
@@ -236,15 +198,13 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		}
 		author = &id
 	}
-	s.listPostsFiltered(w, r, q.Get("sort"), cat, comp, author)
+	s.listPostsFiltered(w, r, q.Get("sort"), author)
 }
 
-func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort string, cat *string, comp, author *uuid.UUID) {
+func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort string, author *uuid.UUID) {
 	page, per, offset := s.queryPage(r)
 	popular := sort == "popular"
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
-		CategoryID:    textPtr(deref(cat)),
-		CompetitionID: comp,
 		AuthorID:      author,
 		PopularWindow: boolPtr(popular),
 		Keyword:       likeContains(r.URL.Query().Get("q")),
@@ -256,12 +216,10 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	var items []postDTO
 	if popular {
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
-			CategoryID:    textPtr(deref(cat)),
-			CompetitionID: comp,
-			AuthorID:      author,
-			Keyword:       likeContains(r.URL.Query().Get("q")),
-			LimitN:        per,
-			OffsetN:       offset,
+			AuthorID: author,
+			Keyword:  likeContains(r.URL.Query().Get("q")),
+			LimitN:   per,
+			OffsetN:  offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
@@ -274,12 +232,10 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		}
 	} else {
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
-			CategoryID:    textPtr(deref(cat)),
-			CompetitionID: comp,
-			AuthorID:      author,
-			Keyword:       likeContains(r.URL.Query().Get("q")),
-			LimitN:        per,
-			OffsetN:       offset,
+			AuthorID: author,
+			Keyword:  likeContains(r.URL.Query().Get("q")),
+			LimitN:   per,
+			OffsetN:  offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
@@ -292,13 +248,6 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
-}
-
-func deref(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
 }
 
 func idsFromNew(rows []db.ListPostsNewRow) []uuid.UUID {
@@ -354,14 +303,12 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 }
 
 type postReq struct {
-	Title               string  `json:"title"`
-	Body                string  `json:"body"`
-	CategoryID          string  `json:"category_id"`
-	CompetitionID       *string `json:"competition_id"`
-	Kind                string  `json:"kind"`
-	YouTubeVideoID      string  `json:"youtube_video_id"`
-	YouTubeThumbnailURL string  `json:"youtube_thumbnail_url"`
-	VideoPublicID       string  `json:"video_public_id"`
+	Title               string `json:"title"`
+	Body                string `json:"body"`
+	Kind                string `json:"kind"`
+	YouTubeVideoID      string `json:"youtube_video_id"`
+	YouTubeThumbnailURL string `json:"youtube_thumbnail_url"`
+	VideoPublicID       string `json:"video_public_id"`
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.CreatePostParams, bool) {
@@ -376,9 +323,6 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 	}
 	if e := PostBody(req.Body); e != "" {
 		fields["body"] = e
-	}
-	if e := Category(req.CategoryID); e != "" {
-		fields["category_id"] = e
 	}
 	kind := strings.TrimSpace(req.Kind)
 	if kind == "" {
@@ -417,15 +361,6 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		}
 		publicID = &id
 	}
-	var comp *uuid.UUID
-	if req.CompetitionID != nil && strings.TrimSpace(*req.CompetitionID) != "" {
-		id, err := uuid.Parse(strings.TrimSpace(*req.CompetitionID))
-		if err != nil {
-			fields["competition_id"] = "大会IDが不正です"
-		} else {
-			comp = &id
-		}
-	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return db.CreatePostParams{}, false
@@ -433,8 +368,6 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 	return db.CreatePostParams{
 		Title:               strings.TrimSpace(req.Title),
 		Body:                strings.TrimSpace(req.Body),
-		CategoryID:          req.CategoryID,
-		CompetitionID:       comp,
 		Kind:                kind,
 		YoutubeVideoID:      youtubeID,
 		YoutubeThumbnailUrl: youtubeThumb,
@@ -490,12 +423,10 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err := s.q.UpdatePost(r.Context(), db.UpdatePostParams{
-		ID:            id,
-		AuthorID:      p.ID,
-		CategoryID:    params.CategoryID,
-		CompetitionID: params.CompetitionID,
-		Title:         params.Title,
-		Body:          params.Body,
+		ID:       id,
+		AuthorID: p.ID,
+		Title:    params.Title,
+		Body:     params.Body,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusForbidden, "forbidden", "編集できません")

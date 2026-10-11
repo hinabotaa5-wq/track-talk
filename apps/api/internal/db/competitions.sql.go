@@ -47,32 +47,6 @@ func (q *Queries) GetCompetition(ctx context.Context, id uuid.UUID) (Competition
 	return i, err
 }
 
-const listCategories = `-- name: ListCategories :many
-SELECT id, name, sort_order
-FROM post_categories
-ORDER BY sort_order ASC
-`
-
-func (q *Queries) ListCategories(ctx context.Context) ([]PostCategory, error) {
-	rows, err := q.db.Query(ctx, listCategories)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []PostCategory
-	for rows.Next() {
-		var i PostCategory
-		if err := rows.Scan(&i.ID, &i.Name, &i.SortOrder); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listCompetitions = `-- name: ListCompetitions :many
 SELECT id, name, starts_on, ends_on, location, scope, summary, created_at, updated_at
 FROM competitions

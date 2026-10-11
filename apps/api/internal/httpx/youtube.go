@@ -19,9 +19,7 @@ import (
 var youtubeClient = &http.Client{Timeout: 8 * time.Second}
 
 type citeYouTubeReq struct {
-	URL           string  `json:"url"`
-	CategoryID    string  `json:"category_id"`
-	CompetitionID *string `json:"competition_id"`
+	URL string `json:"url"`
 }
 
 type citeYouTubeResp struct {
@@ -134,18 +132,6 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		fields["url"] = msg
 	}
-	if e := Category(req.CategoryID); e != "" {
-		fields["category_id"] = e
-	}
-	var comp *uuid.UUID
-	if req.CompetitionID != nil && strings.TrimSpace(*req.CompetitionID) != "" {
-		id, err := uuid.Parse(strings.TrimSpace(*req.CompetitionID))
-		if err != nil {
-			fields["competition_id"] = "大会IDが不正です"
-		} else {
-			comp = &id
-		}
-	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -161,8 +147,6 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	created, err := s.q.CreatePost(r.Context(), db.CreatePostParams{
 		ID:                  uuid.New(),
 		AuthorID:            profile.ID,
-		CategoryID:          req.CategoryID,
-		CompetitionID:       comp,
 		Title:               title,
 		Body:                "",
 		Kind:                "youtube",

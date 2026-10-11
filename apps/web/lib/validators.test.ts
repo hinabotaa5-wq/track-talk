@@ -6,7 +6,6 @@ describe("validators", () => {
     const parsed = postSchema.parse({
       title: "100m決勝",
       body: "展開が熱かった",
-      category_id: "race_impression",
     });
     expect(parsed.title).toBe("100m決勝");
   });

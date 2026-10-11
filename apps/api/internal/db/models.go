@@ -37,8 +37,6 @@ type Competition struct {
 type Post struct {
 	ID                  uuid.UUID  `json:"id"`
 	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
 	Title               string     `json:"title"`
 	Body                string     `json:"body"`
 	LikeCount           int32      `json:"like_count"`
@@ -51,12 +49,6 @@ type Post struct {
 	YoutubeVideoID      *string    `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
 	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
-}
-
-type PostCategory struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	SortOrder int32  `json:"sort_order"`
 }
 
 type PostLike struct {

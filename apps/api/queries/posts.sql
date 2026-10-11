@@ -2,8 +2,6 @@
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -14,17 +12,11 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
-  AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
     sqlc.narg('keyword')::text IS NULL
@@ -38,8 +30,6 @@ LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -50,18 +40,12 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
-  AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
-  AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
     sqlc.narg('keyword')::text IS NULL
@@ -76,8 +60,6 @@ SELECT count(*)
 FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND (sqlc.narg('category_id')::text IS NULL OR p.category_id = sqlc.narg('category_id'))
-  AND (sqlc.narg('competition_id')::uuid IS NULL OR p.competition_id = sqlc.narg('competition_id'))
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
@@ -96,8 +78,6 @@ WHERE youtube_video_id = $1
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -108,36 +88,30 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL;
 
 -- name: CreatePost :one
 INSERT INTO posts (
-    id, author_id, category_id, competition_id, title, body,
+    id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, author_id, category_id, competition_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at;
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at;
 
 -- name: UpdatePost :one
 UPDATE posts
-SET category_id = $3,
-    competition_id = $4,
-    title = $5,
-    body = $6,
+SET title = $3,
+    body = $4,
     updated_at = now()
 WHERE id = $1
   AND author_id = $2
   AND deleted_at IS NULL
   AND hidden_at IS NULL
-RETURNING id, author_id, category_id, competition_id, title, body, like_count, comment_count, created_at, updated_at;
+RETURNING id, author_id, title, body, like_count, comment_count, created_at, updated_at;
 
 -- name: SoftDeletePost :execrows
 UPDATE posts

@@ -9,12 +9,6 @@ export type Author = {
   nickname: string;
 };
 
-export type Category = {
-  id: string;
-  name: string;
-  sort_order?: number;
-};
-
 export type Competition = {
   id: string;
   name: string;
@@ -30,8 +24,6 @@ export type Post = {
   title: string;
   body?: string;
   body_preview?: string;
-  category: { id: string; name: string };
-  competition: { id: string; name: string } | null;
   author: Author;
   like_count: number;
   comment_count: number;

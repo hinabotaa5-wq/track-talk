@@ -7,31 +7,18 @@ import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Category, Competition, Post } from "@/lib/types";
+import type { Post } from "@/lib/types";
 
 export default function YouTubePostPage() {
   const { session, loading, token } = useAuth();
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [url, setUrl] = useState("");
-  const [categoryID, setCategoryID] = useState("race_impression");
-  const [competitionID, setCompetitionID] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login");
   }, [loading, session, router]);
-
-  useEffect(() => {
-    apiFetch<{ categories: Category[] }>("/v1/categories").then((d) =>
-      setCategories(d.categories ?? []),
-    );
-    apiFetch<{ competitions: Competition[] }>("/v1/competitions?per_page=50").then((d) =>
-      setCompetitions(d.competitions ?? []),
-    );
-  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -45,11 +32,7 @@ export default function YouTubePostPage() {
       const data = await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
         method: "POST",
         token,
-        body: JSON.stringify({
-          url,
-          category_id: categoryID,
-          competition_id: competitionID || null,
-        }),
+        body: JSON.stringify({ url }),
       });
       router.push(`/posts/${data.post.id}`);
     } catch (err) {
@@ -84,35 +67,6 @@ export default function YouTubePostPage() {
             onChange={(e) => setUrl(e.target.value)}
             required
           />
-        </label>
-        <label className="block text-sm font-medium">
-          カテゴリ
-          <select
-            className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base"
-            value={categoryID}
-            onChange={(e) => setCategoryID(e.target.value)}
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm font-medium">
-          関連大会（任意）
-          <select
-            className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base"
-            value={competitionID}
-            onChange={(e) => setCompetitionID(e.target.value)}
-          >
-            <option value="">なし</option>
-            {competitions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full md:w-auto" disabled={submitting}>

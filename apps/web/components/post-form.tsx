@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
-import type { Category, Competition, Post } from "@/lib/types";
+import type { Post } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "./auth-provider";
 import { useRouter } from "next/navigation";
@@ -15,15 +15,7 @@ import { useState } from "react";
 
 type Values = z.infer<typeof postSchema>;
 
-export function PostForm({
-  categories,
-  competitions,
-  initial,
-}: {
-  categories: Category[];
-  competitions: Competition[];
-  initial?: Post;
-}) {
+export function PostForm({ initial }: { initial?: Post }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
@@ -32,8 +24,6 @@ export function PostForm({
     defaultValues: {
       title: initial?.title ?? "",
       body: initial?.body ?? "",
-      category_id: (initial?.category.id as Values["category_id"]) ?? "race_impression",
-      competition_id: initial?.competition?.id ?? "",
     },
   });
 
@@ -46,8 +36,6 @@ export function PostForm({
     const payload = {
       title: values.title,
       body: values.body,
-      category_id: values.category_id,
-      competition_id: values.competition_id || null,
     };
     try {
       const post = initial
@@ -67,23 +55,6 @@ export function PostForm({
     }
   }
 
-  const linked = initial?.competition;
-  const options =
-    linked && !competitions.some((c) => c.id === linked.id)
-      ? [
-          {
-            id: linked.id,
-            name: linked.name,
-            starts_on: "",
-            ends_on: null,
-            location: "",
-            scope: "domestic" as const,
-            summary: "",
-          },
-          ...competitions,
-        ]
-      : competitions;
-
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <label className="block text-sm font-medium">
@@ -93,30 +64,6 @@ export function PostForm({
       {form.formState.errors.title ? (
         <p className="text-sm text-red-600">{form.formState.errors.title.message}</p>
       ) : null}
-      <label className="block text-sm font-medium">
-        カテゴリ
-        <select className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base" {...form.register("category_id")}>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-sm font-medium">
-        関連大会（任意）
-        <select
-          className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-base"
-          {...form.register("competition_id")}
-        >
-          <option value="">なし</option>
-          {options.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <label className="block text-sm font-medium">
         本文
         <Textarea rows={10} className="mt-1" {...form.register("body")} />

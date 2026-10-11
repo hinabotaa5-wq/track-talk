@@ -13,13 +13,6 @@ export const profileSchema = z.object({
 export const postSchema = z.object({
   title: z.string().trim().min(1, "タイトルを入力してください").max(120, "120文字以内"),
   body: z.string().trim().min(1, "本文を入力してください").max(10000, "10000文字以内"),
-  category_id: z.enum([
-    "race_impression",
-    "record_discussion",
-    "athlete_discussion",
-    "general",
-  ]),
-  competition_id: z.string().optional(),
 });
 
 export const commentSchema = z.object({

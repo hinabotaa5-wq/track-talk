@@ -15,8 +15,3 @@ WHERE ends_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30
 SELECT id, name, starts_on, ends_on, location, scope, summary, created_at, updated_at
 FROM competitions
 WHERE id = $1;
-
--- name: ListCategories :many
-SELECT id, name, sort_order
-FROM post_categories
-ORDER BY sort_order ASC;

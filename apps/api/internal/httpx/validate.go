@@ -96,15 +96,6 @@ func VideoPublicID(v string) string {
 	return ""
 }
 
-func Category(v string) string {
-	switch v {
-	case "race_impression", "record_discussion", "athlete_discussion", "general":
-		return ""
-	default:
-		return "カテゴリが不正です"
-	}
-}
-
 func ReportReason(v string) string {
 	switch v {
 	case "spam", "harassment", "misinfo", "other":

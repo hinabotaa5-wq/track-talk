@@ -17,33 +17,23 @@ SELECT count(*)
 FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND ($1::text IS NULL OR p.category_id = $1)
-  AND ($2::uuid IS NULL OR p.competition_id = $2)
-  AND ($3::uuid IS NULL OR p.author_id = $3)
-  AND ($4::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
+  AND ($1::uuid IS NULL OR p.author_id = $1)
+  AND ($2::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
-    $5::text IS NULL
-    OR p.title ILIKE '%' || $5 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $5 || '%' ESCAPE '\'
+    $3::text IS NULL
+    OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $3 || '%' ESCAPE '\'
   )
 `
 
 type CountPostsParams struct {
-	CategoryID    *string    `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
 	AuthorID      *uuid.UUID `json:"author_id"`
 	PopularWindow *bool      `json:"popular_window"`
 	Keyword       *string    `json:"keyword"`
 }
 
 func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPosts,
-		arg.CategoryID,
-		arg.CompetitionID,
-		arg.AuthorID,
-		arg.PopularWindow,
-		arg.Keyword,
-	)
+	row := q.db.QueryRow(ctx, countPosts, arg.AuthorID, arg.PopularWindow, arg.Keyword)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -51,48 +41,42 @@ func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, 
 
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
-    id, author_id, category_id, competition_id, title, body,
+    id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, author_id, category_id, competition_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
-	ID                  uuid.UUID  `json:"id"`
-	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Kind                string     `json:"kind"`
-	YoutubeVideoID      *string    `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
-	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 }
 
 type CreatePostRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Kind                string     `json:"kind"`
-	YoutubeVideoID      *string    `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
-	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
-	LikeCount           int32      `json:"like_count"`
-	CommentCount        int32      `json:"comment_count"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreatePostRow, error) {
 	row := q.db.QueryRow(ctx, createPost,
 		arg.ID,
 		arg.AuthorID,
-		arg.CategoryID,
-		arg.CompetitionID,
 		arg.Title,
 		arg.Body,
 		arg.Kind,
@@ -104,8 +88,6 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 	err := row.Scan(
 		&i.ID,
 		&i.AuthorID,
-		&i.CategoryID,
-		&i.CompetitionID,
 		&i.Title,
 		&i.Body,
 		&i.Kind,
@@ -174,8 +156,6 @@ const getPost = `-- name: GetPost :one
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -186,36 +166,28 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
 `
 
 type GetPostRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Kind                string     `json:"kind"`
-	YoutubeVideoID      *string    `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
-	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
-	LikeCount           int32      `json:"like_count"`
-	CommentCount        int32      `json:"comment_count"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	AuthorNickname      string     `json:"author_nickname"`
-	CategoryName        string     `json:"category_name"`
-	CompetitionName     *string    `json:"competition_name"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
@@ -224,8 +196,6 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 	err := row.Scan(
 		&i.ID,
 		&i.AuthorID,
-		&i.CategoryID,
-		&i.CompetitionID,
 		&i.Title,
 		&i.Body,
 		&i.Kind,
@@ -237,8 +207,6 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AuthorNickname,
-		&i.CategoryName,
-		&i.CompetitionName,
 	)
 	return i, err
 }
@@ -350,8 +318,6 @@ const listPostsNew = `-- name: ListPostsNew :many
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -362,60 +328,46 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND ($1::text IS NULL OR p.category_id = $1)
-  AND ($2::uuid IS NULL OR p.competition_id = $2)
-  AND ($3::uuid IS NULL OR p.author_id = $3)
+  AND ($1::uuid IS NULL OR p.author_id = $1)
   AND (
-    $4::text IS NULL
-    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
+    $2::text IS NULL
+    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
   )
 ORDER BY p.created_at DESC
-LIMIT $6 OFFSET $5
+LIMIT $4 OFFSET $3
 `
 
 type ListPostsNewParams struct {
-	CategoryID    *string    `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	AuthorID      *uuid.UUID `json:"author_id"`
-	Keyword       *string    `json:"keyword"`
-	OffsetN       int32      `json:"offset_n"`
-	LimitN        int32      `json:"limit_n"`
+	AuthorID *uuid.UUID `json:"author_id"`
+	Keyword  *string    `json:"keyword"`
+	OffsetN  int32      `json:"offset_n"`
+	LimitN   int32      `json:"limit_n"`
 }
 
 type ListPostsNewRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Kind                string     `json:"kind"`
-	YoutubeVideoID      *string    `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
-	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
-	LikeCount           int32      `json:"like_count"`
-	CommentCount        int32      `json:"comment_count"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	AuthorNickname      string     `json:"author_nickname"`
-	CategoryName        string     `json:"category_name"`
-	CompetitionName     *string    `json:"competition_name"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]ListPostsNewRow, error) {
 	rows, err := q.db.Query(ctx, listPostsNew,
-		arg.CategoryID,
-		arg.CompetitionID,
 		arg.AuthorID,
 		arg.Keyword,
 		arg.OffsetN,
@@ -431,8 +383,6 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 		if err := rows.Scan(
 			&i.ID,
 			&i.AuthorID,
-			&i.CategoryID,
-			&i.CompetitionID,
 			&i.Title,
 			&i.Body,
 			&i.Kind,
@@ -444,8 +394,6 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorNickname,
-			&i.CategoryName,
-			&i.CompetitionName,
 		); err != nil {
 			return nil, err
 		}
@@ -461,8 +409,6 @@ const listPostsPopular = `-- name: ListPostsPopular :many
 SELECT
     p.id,
     p.author_id,
-    p.category_id,
-    p.competition_id,
     p.title,
     p.body,
     p.kind,
@@ -473,61 +419,47 @@ SELECT
     p.comment_count,
     p.created_at,
     p.updated_at,
-    pr.nickname AS author_nickname,
-    cat.name AS category_name,
-    comp.name AS competition_name
+    pr.nickname AS author_nickname
 FROM posts p
 JOIN profiles pr ON pr.id = p.author_id
-JOIN post_categories cat ON cat.id = p.category_id
-LEFT JOIN competitions comp ON comp.id = p.competition_id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
-  AND ($1::text IS NULL OR p.category_id = $1)
-  AND ($2::uuid IS NULL OR p.competition_id = $2)
-  AND ($3::uuid IS NULL OR p.author_id = $3)
+  AND ($1::uuid IS NULL OR p.author_id = $1)
   AND (
-    $4::text IS NULL
-    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
+    $2::text IS NULL
+    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
   )
 ORDER BY p.like_count DESC, p.created_at DESC
-LIMIT $6 OFFSET $5
+LIMIT $4 OFFSET $3
 `
 
 type ListPostsPopularParams struct {
-	CategoryID    *string    `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	AuthorID      *uuid.UUID `json:"author_id"`
-	Keyword       *string    `json:"keyword"`
-	OffsetN       int32      `json:"offset_n"`
-	LimitN        int32      `json:"limit_n"`
+	AuthorID *uuid.UUID `json:"author_id"`
+	Keyword  *string    `json:"keyword"`
+	OffsetN  int32      `json:"offset_n"`
+	LimitN   int32      `json:"limit_n"`
 }
 
 type ListPostsPopularRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	AuthorID            uuid.UUID  `json:"author_id"`
-	CategoryID          string     `json:"category_id"`
-	CompetitionID       *uuid.UUID `json:"competition_id"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Kind                string     `json:"kind"`
-	YoutubeVideoID      *string    `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
-	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
-	LikeCount           int32      `json:"like_count"`
-	CommentCount        int32      `json:"comment_count"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	AuthorNickname      string     `json:"author_nickname"`
-	CategoryName        string     `json:"category_name"`
-	CompetitionName     *string    `json:"competition_name"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	AuthorNickname      string    `json:"author_nickname"`
 }
 
 func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularParams) ([]ListPostsPopularRow, error) {
 	rows, err := q.db.Query(ctx, listPostsPopular,
-		arg.CategoryID,
-		arg.CompetitionID,
 		arg.AuthorID,
 		arg.Keyword,
 		arg.OffsetN,
@@ -543,8 +475,6 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 		if err := rows.Scan(
 			&i.ID,
 			&i.AuthorID,
-			&i.CategoryID,
-			&i.CompetitionID,
 			&i.Title,
 			&i.Body,
 			&i.Kind,
@@ -556,8 +486,6 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorNickname,
-			&i.CategoryName,
-			&i.CompetitionName,
 		); err != nil {
 			return nil, err
 		}
@@ -592,46 +520,38 @@ func (q *Queries) SoftDeletePost(ctx context.Context, arg SoftDeletePostParams) 
 
 const updatePost = `-- name: UpdatePost :one
 UPDATE posts
-SET category_id = $3,
-    competition_id = $4,
-    title = $5,
-    body = $6,
+SET title = $3,
+    body = $4,
     updated_at = now()
 WHERE id = $1
   AND author_id = $2
   AND deleted_at IS NULL
   AND hidden_at IS NULL
-RETURNING id, author_id, category_id, competition_id, title, body, like_count, comment_count, created_at, updated_at
+RETURNING id, author_id, title, body, like_count, comment_count, created_at, updated_at
 `
 
 type UpdatePostParams struct {
-	ID            uuid.UUID  `json:"id"`
-	AuthorID      uuid.UUID  `json:"author_id"`
-	CategoryID    string     `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	Title         string     `json:"title"`
-	Body          string     `json:"body"`
+	ID       uuid.UUID `json:"id"`
+	AuthorID uuid.UUID `json:"author_id"`
+	Title    string    `json:"title"`
+	Body     string    `json:"body"`
 }
 
 type UpdatePostRow struct {
-	ID            uuid.UUID  `json:"id"`
-	AuthorID      uuid.UUID  `json:"author_id"`
-	CategoryID    string     `json:"category_id"`
-	CompetitionID *uuid.UUID `json:"competition_id"`
-	Title         string     `json:"title"`
-	Body          string     `json:"body"`
-	LikeCount     int32      `json:"like_count"`
-	CommentCount  int32      `json:"comment_count"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID           uuid.UUID `json:"id"`
+	AuthorID     uuid.UUID `json:"author_id"`
+	Title        string    `json:"title"`
+	Body         string    `json:"body"`
+	LikeCount    int32     `json:"like_count"`
+	CommentCount int32     `json:"comment_count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (UpdatePostRow, error) {
 	row := q.db.QueryRow(ctx, updatePost,
 		arg.ID,
 		arg.AuthorID,
-		arg.CategoryID,
-		arg.CompetitionID,
 		arg.Title,
 		arg.Body,
 	)
@@ -639,8 +559,6 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (UpdateP
 	err := row.Scan(
 		&i.ID,
 		&i.AuthorID,
-		&i.CategoryID,
-		&i.CompetitionID,
 		&i.Title,
 		&i.Body,
 		&i.LikeCount,
