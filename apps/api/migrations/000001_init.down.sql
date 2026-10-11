@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS reports;
+DROP TABLE IF EXISTS post_likes;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS competitions;
+DROP TABLE IF EXISTS post_categories;
+DROP TABLE IF EXISTS profiles;
