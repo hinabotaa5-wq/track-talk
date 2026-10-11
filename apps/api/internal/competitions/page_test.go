@@ -67,6 +67,30 @@ func TestParsePage(t *testing.T) {
 	}
 }
 
+func TestParsePageScheduleList(t *testing.T) {
+	html := `<html><body><h2>2026年度</h2><ul>
+<li><span><strong>第52回熊日学童オリンピック</strong><br>[ 開催予定 ] 開催:2026年10月17日（土） 会場:えがお健康スタジアム</span></li>
+<li><a href="http://kumariku.com/competition/?id=9599"><strong>Ｒ８年 第５１回甲佐１０マイルロードレース</strong><br>開催: 会場:甲佐コース</a></li>
+<li><a href="http://kumariku.com/competition/?id=9811"><strong>令和８年度秋季熊本陸協記録会</strong><br>開催:2026年10月24日 会場:えがお健康スタジアム</a></li>
+</ul></body></html>`
+	page, err := ParsePage(strings.NewReader(html), "http://kumariku.com/schedule/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	if strings.Contains(page.Body, "甲佐") {
+		t.Fatalf("undated meet should be omitted: %s", page.Body)
+	}
+	if !strings.Contains(page.Body, "第52回熊日学童オリンピック") || !strings.Contains(page.Body, "2026年10月24日") {
+		t.Fatalf("body %s", page.Body)
+	}
+	if len(page.Links) != 0 {
+		t.Fatalf("list items are not guidelines links: %+v", page.Links)
+	}
+}
+
 func TestParsePageFullwidthYear(t *testing.T) {
 	html := `<html><body><h2>２０２６年度</h2><table><tr><th>開催日</th><th>競技会</th><th>要項</th></tr>
 <tr><td>4月25日</td><td>記録会</td><td><a href="https://example.com/a.pdf">要項</a></td></tr></table></body></html>`

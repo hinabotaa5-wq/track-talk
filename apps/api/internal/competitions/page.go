@@ -86,6 +86,9 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 		}
 	}
 	if len(rows) == 0 {
+		rows = scheduleListRows(doc)
+	}
+	if len(rows) == 0 {
 		return Page{}, fmt.Errorf("競技日程の表が見つかりません")
 	}
 	return Page{SeasonYear: year, Body: renderRows(rows), Links: links, rows: rows}, nil
@@ -146,6 +149,54 @@ func scheduleTables(doc *html.Node) []*html.Node {
 	}
 	walk(doc)
 	return tables
+}
+
+var (
+	listHeldPattern  = regexp.MustCompile(`開催\s*[:：]\s*(\d{4}年\d{1,2}月\d{1,2}日)`)
+	listVenuePattern = regexp.MustCompile(`会場\s*[:：]\s*(\S+)`)
+)
+
+// scheduleListRows reads a homepage that lists meets as items instead of a table.
+// Only the name, date, and venue written on that page are kept.
+func scheduleListRows(doc *html.Node) []row {
+	var rows []row
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "li" {
+			text := normalizeDigits(cellText(n))
+			held := listHeldPattern.FindStringSubmatch(text)
+			name := strongText(n)
+			if held != nil && name != "" {
+				venue := ""
+				if match := listVenuePattern.FindStringSubmatch(text); match != nil {
+					venue = match[1]
+				}
+				rows = append(rows, row{Cells: []cell{
+					{Header: "開催日", Text: held[1]},
+					{Header: "競技会", Text: name},
+					{Header: "会場", Text: venue},
+				}})
+				return
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	return rows
+}
+
+func strongText(n *html.Node) string {
+	if n.Type == html.ElementNode && n.Data == "strong" {
+		return cellText(n)
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if text := strongText(c); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 func isScheduleHeader(headers []string) bool {
