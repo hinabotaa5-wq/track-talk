@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -49,6 +50,7 @@ export default function RegisterPage() {
         {message ? <p className="text-sm text-green-700">{message}</p> : null}
         <Button type="submit" className="w-full md:w-auto">登録</Button>
       </form>
+      <GoogleSignInButton />
     </div>
   );
 }

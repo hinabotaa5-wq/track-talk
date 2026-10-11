@@ -4,16 +4,30 @@ import { createClient } from "@/lib/supabase";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { z } from "zod";
+
+const callbackErrors: Record<string, string> = {
+  config: "Supabase の公開設定がありません。",
+  google: "Googleログインに失敗しました。",
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code && callbackErrors[code]) {
+      setError(callbackErrors[code]);
+    }
+  }, []);
+
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -43,6 +57,7 @@ export default function LoginPage() {
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full md:w-auto">ログイン</Button>
       </form>
+      <GoogleSignInButton />
       <p className="text-sm">
         アカウントがない場合は <Link href="/register" className="text-blue-700">登録</Link>
       </p>
