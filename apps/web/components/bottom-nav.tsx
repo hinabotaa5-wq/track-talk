@@ -46,7 +46,8 @@ export function BottomNav() {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = current === tab.id;
-            const href = tab.id === "post" && !session ? "/login" : tab.href;
+            const href =
+              (tab.id === "post" || tab.id === "competitions") && !session ? "/login" : tab.href;
             return (
               <li key={tab.id}>
                 <Link

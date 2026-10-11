@@ -48,7 +48,7 @@ export function Header() {
           </Link>
         ) : null}
         <nav className="hidden items-center gap-3 text-sm md:flex">
-          <Link href="/competitions" className="hover:text-blue-700">
+          <Link href={session ? "/competitions" : "/login"} className="hover:text-blue-700">
             大会
           </Link>
           {session ? (

@@ -18,3 +18,6 @@ apps/api/tmp/
 *.exe
 *.test
 .terraform/
+
+# Local Netlify folder
+.netlify
