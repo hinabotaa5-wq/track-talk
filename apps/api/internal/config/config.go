@@ -10,14 +10,18 @@ import (
 )
 
 type Config struct {
-	Addr              string
-	DatabaseURL       string
-	SupabaseURL       string
-	JWTSecret         string
-	JWTAUD            string
-	CORSOrigins       []string
-	LogLevel          string
-	ShutdownTimeout   time.Duration
+	Addr            string
+	DatabaseURL     string
+	SupabaseURL     string
+	JWTSecret       string
+	JWTAUD          string
+	CORSOrigins     []string
+	LogLevel        string
+	ShutdownTimeout time.Duration
+	CloudName       string
+	CloudAPIKey     string
+	CloudAPISecret  string
+	CloudAPIBase    string
 }
 
 func Load() (Config, error) {
@@ -32,6 +36,10 @@ func Load() (Config, error) {
 		JWTAUD:          env("SUPABASE_JWT_AUD", "authenticated"),
 		LogLevel:        env("LOG_LEVEL", "info"),
 		ShutdownTimeout: 10 * time.Second,
+		CloudName:       os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:     os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:  os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:    os.Getenv("CLOUDINARY_API_BASE"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

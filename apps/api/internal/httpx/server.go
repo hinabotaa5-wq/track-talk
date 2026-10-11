@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
+	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,10 +18,23 @@ type Server struct {
 	q     *db.Queries
 	auth  *auth.Verifier
 	limit *RateLimiter
+	cloud cloudinary.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
-	s := &Server{cfg: cfg, pool: pool, q: db.New(pool), auth: v, limit: NewRateLimiter()}
+	s := &Server{
+		cfg:   cfg,
+		pool:  pool,
+		q:     db.New(pool),
+		auth:  v,
+		limit: NewRateLimiter(),
+		cloud: cloudinary.Client{
+			Cloud:   cfg.CloudName,
+			Key:     cfg.CloudAPIKey,
+			Secret:  cfg.CloudAPISecret,
+			APIBase: cfg.CloudAPIBase,
+		},
+	}
 	r := chi.NewRouter()
 	r.Use(Recover)
 	r.Use(RequestLog)
@@ -52,6 +66,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Put("/me/profile", s.upsertProfile)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
+			r.Post("/uploads/video", s.signVideoUpload)
 			r.Patch("/posts/{id}", s.updatePost)
 			r.Delete("/posts/{id}", s.deletePost)
 			r.Post("/posts/{id}/likes", s.likePost)
@@ -66,6 +81,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		})
 	})
 	return r
+}
+
+func (s *Server) present(p postDTO) postDTO {
+	if p.Kind == "video" && p.VideoPublicID != "" {
+		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
+		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
+	}
+	return p
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {

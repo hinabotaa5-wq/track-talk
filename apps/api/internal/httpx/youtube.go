@@ -182,7 +182,7 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, citeYouTubeResp{Post: postFromGet(full, false), Existing: false})
+	JSON(w, http.StatusCreated, citeYouTubeResp{Post: s.present(postFromGet(full, false)), Existing: false})
 }
 
 func (s *Server) writeExistingYouTube(w http.ResponseWriter, r *http.Request, videoID string) bool {
@@ -203,6 +203,6 @@ func (s *Server) writeExistingYouTube(w http.ResponseWriter, r *http.Request, vi
 		MapDBError(w, err)
 		return true
 	}
-	JSON(w, http.StatusOK, citeYouTubeResp{Post: postFromGet(full, false), Existing: true})
+	JSON(w, http.StatusOK, citeYouTubeResp{Post: s.present(postFromGet(full, false)), Existing: true})
 	return true
 }

@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
+	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
@@ -46,7 +49,16 @@ func setup(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{CORSOrigins: []string{"http://localhost:3000"}, JWTSecret: secret, JWTAUD: "authenticated", DatabaseURL: dsn}
+	cfg := config.Config{
+		CORSOrigins:    []string{"http://localhost:3000"},
+		JWTSecret:      secret,
+		JWTAUD:         "authenticated",
+		DatabaseURL:    dsn,
+		CloudName:      os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:   os.Getenv("CLOUDINARY_API_BASE"),
+	}
 	return httpx.New(cfg, pool, v)
 }
 
@@ -228,7 +240,7 @@ func TestPostKindsShareOneList(t *testing.T) {
 		"title": "自分の動画", "body": "", "category_id": "general", "kind": "video",
 		"video_public_id": "tracktalk/sample",
 	})
-	if rec.Code != 201 {
+	if rec.Code != 422 {
 		t.Fatalf("video %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -245,15 +257,84 @@ func TestPostKindsShareOneList(t *testing.T) {
 		} `json:"meta"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if list.Meta.Total != 3 {
+	if list.Meta.Total != 2 {
 		t.Fatalf("total %d", list.Meta.Total)
 	}
 	seen := map[string]bool{}
 	for _, p := range list.Posts {
 		seen[p.Kind] = true
 	}
-	if !seen["text"] || !seen["youtube"] || !seen["video"] {
+	if !seen["text"] || !seen["youtube"] || seen["video"] {
 		t.Fatalf("kinds %#v", seen)
+	}
+}
+
+func TestSignedVideoJoinsTheList(t *testing.T) {
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/video/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"resource_type":"video"}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	a := uuid.New()
+	ta := token(t, a)
+	doJSON(t, h, http.MethodPut, "/v1/me/profile", ta, map[string]string{"nickname": "uploader", "bio": ""})
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/uploads/video", ta, map[string]any{})
+	if rec.Code != 200 {
+		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
+	}
+	var signed struct {
+		CloudName string `json:"cloud_name"`
+		APIKey    string `json:"api_key"`
+		PublicID  string `json:"public_id"`
+		Signature string `json:"signature"`
+		Timestamp int64  `json:"timestamp"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &signed)
+	if signed.CloudName != "demo" || signed.APIKey != "key" || !cloudinary.ValidPublicID(signed.PublicID) {
+		t.Fatalf("signed %+v", signed)
+	}
+	if bytes.Contains(rec.Body.Bytes(), []byte("secret")) {
+		t.Fatal("secret leaked")
+	}
+	want := cloudinary.Sign(map[string]string{
+		"public_id": signed.PublicID,
+		"timestamp": strconv.FormatInt(signed.Timestamp, 10),
+	}, "secret")
+	if signed.Signature != want {
+		t.Fatalf("signature %s want %s", signed.Signature, want)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "", "body": "", "category_id": "general", "kind": "video",
+		"video_public_id": signed.PublicID,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Kind         string `json:"kind"`
+		ThumbnailURL string `json:"thumbnail_url"`
+		PlaybackURL  string `json:"playback_url"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if created.Kind != "video" || created.ThumbnailURL == "" || created.PlaybackURL == "" {
+		t.Fatalf("created %+v", created)
 	}
 }
 

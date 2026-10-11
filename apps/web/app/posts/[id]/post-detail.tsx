@@ -121,7 +121,16 @@ export function PostDetail({ id }: { id: string }) {
           </>
         ) : null}
       </p>
-      {post.kind === "youtube" && post.youtube_video_id ? (
+      {post.kind === "video" && post.playback_url ? (
+        <video
+          className="aspect-video w-full rounded-xl bg-black"
+          src={post.playback_url}
+          poster={post.thumbnail_url}
+          controls
+          playsInline
+          preload="metadata"
+        />
+      ) : post.kind === "youtube" && post.youtube_video_id ? (
         <iframe
           className="aspect-video w-full rounded-xl"
           src={`https://www.youtube-nocookie.com/embed/${post.youtube_video_id}`}

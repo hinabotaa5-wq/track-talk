@@ -270,7 +270,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		liked := s.likedSet(r.Context(), idsFromPopular(rows))
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			items = append(items, postFromPopular(row, liked[row.ID], true))
+			items = append(items, s.present(postFromPopular(row, liked[row.ID], true)))
 		}
 	} else {
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
@@ -288,7 +288,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		liked := s.likedSet(r.Context(), idsFromNew(rows))
 		items = make([]postDTO, 0, len(rows))
 		for _, row := range rows {
-			items = append(items, postFromList(row, liked[row.ID], true))
+			items = append(items, s.present(postFromList(row, liked[row.ID], true)))
 		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
@@ -350,7 +350,7 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 			liked = ok2
 		}
 	}
-	JSON(w, http.StatusOK, postFromGet(row, liked))
+	JSON(w, http.StatusOK, s.present(postFromGet(row, liked)))
 }
 
 type postReq struct {
@@ -453,6 +453,16 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	params.ID = uuid.New()
 	params.AuthorID = p.ID
+	if params.Kind == "video" {
+		publicID := ""
+		if params.CloudinaryPublicID != nil {
+			publicID = *params.CloudinaryPublicID
+		}
+		if err := s.cloud.Ready(r.Context(), publicID); err != nil {
+			writeVideoReadyError(w, err)
+			return
+		}
+	}
 	row, err := s.q.CreatePost(r.Context(), params)
 	if err != nil {
 		MapDBError(w, err)
@@ -463,7 +473,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, postFromGet(full, false))
+	JSON(w, http.StatusCreated, s.present(postFromGet(full, false)))
 }
 
 func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
@@ -500,7 +510,7 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, postFromGet(full, false))
+	JSON(w, http.StatusOK, s.present(postFromGet(full, false)))
 }
 
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {

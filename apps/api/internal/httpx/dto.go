@@ -45,6 +45,7 @@ type postDTO struct {
 	ThumbnailURL   string          `json:"thumbnail_url,omitempty"`
 	YouTubeVideoID string          `json:"youtube_video_id,omitempty"`
 	VideoPublicID  string          `json:"video_public_id,omitempty"`
+	PlaybackURL    string          `json:"playback_url,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
