@@ -13,6 +13,8 @@ import (
 
 const countCompetitions = `-- name: CountCompetitions :one
 SELECT count(*) FROM competitions
+WHERE ends_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30
+   OR (ends_on IS NULL AND starts_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30)
 `
 
 func (q *Queries) CountCompetitions(ctx context.Context) (int64, error) {
@@ -74,7 +76,9 @@ func (q *Queries) ListCategories(ctx context.Context) ([]PostCategory, error) {
 const listCompetitions = `-- name: ListCompetitions :many
 SELECT id, name, starts_on, ends_on, location, scope, summary, created_at, updated_at
 FROM competitions
-ORDER BY starts_on DESC
+WHERE ends_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30
+   OR (ends_on IS NULL AND starts_on >= (now() AT TIME ZONE 'Asia/Tokyo')::date - 30)
+ORDER BY starts_on ASC
 LIMIT $1 OFFSET $2
 `
 

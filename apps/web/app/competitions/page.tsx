@@ -22,11 +22,11 @@ export default async function CompetitionsPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">大会</h1>
       <p className="text-sm text-zinc-600">
-        初期は主要な国内・国際大会を手動登録しています。公式記録の転載ではありません。
+        開催中、これから始まる大会、終了から30日以内の大会です。それより前に終わった大会は、投稿のリンクから開けます。
       </p>
       {error ? <ErrorState message={error} /> : null}
       {items.length === 0 && !error ? (
-        <EmptyState title="大会がありません" body="準備中です。" />
+        <EmptyState title="表示する大会はありません" body="終了から30日を過ぎた大会は、投稿のリンクから開けます。" />
       ) : (
         <div className="space-y-3">
           {items.map((c) => (

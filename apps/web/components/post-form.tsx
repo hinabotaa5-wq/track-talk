@@ -67,6 +67,23 @@ export function PostForm({
     }
   }
 
+  const linked = initial?.competition;
+  const options =
+    linked && !competitions.some((c) => c.id === linked.id)
+      ? [
+          {
+            id: linked.id,
+            name: linked.name,
+            starts_on: "",
+            ends_on: null,
+            location: "",
+            scope: "domestic" as const,
+            summary: "",
+          },
+          ...competitions,
+        ]
+      : competitions;
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <label className="block text-sm font-medium">
@@ -93,7 +110,7 @@ export function PostForm({
           {...form.register("competition_id")}
         >
           <option value="">なし</option>
-          {competitions.map((c) => (
+          {options.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
