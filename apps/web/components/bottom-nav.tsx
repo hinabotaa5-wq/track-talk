@@ -12,9 +12,9 @@ const tabs = [
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
-function hidesTabBar(pathname: string) {
+export function hidesTabBar(pathname: string) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
-  if (pathname === "/me/contact") return true;
+  if (pathname === "/me/contact" || pathname === "/about") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
 }
@@ -23,7 +23,7 @@ function activeTab(pathname: string) {
   if (pathname === "/") return "home";
   if (pathname === "/upload") return "post";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
-  if (pathname === "/me" || pathname === "/about") return "me";
+  if (pathname === "/me") return "me";
   return "";
 }
 

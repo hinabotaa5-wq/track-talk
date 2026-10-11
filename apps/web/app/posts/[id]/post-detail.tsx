@@ -126,9 +126,6 @@ export function PostDetail({ id }: { id: string }) {
 
   return (
     <article className="space-y-6 pb-36 md:pb-0">
-      <p className="text-sm text-zinc-500">
-        <Link href="/">ホーム</Link>
-      </p>
       {post.kind === "video" && post.playback_url ? (
         <video
           className="aspect-video w-full rounded-xl bg-black"
