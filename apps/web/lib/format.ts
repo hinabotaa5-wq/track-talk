@@ -18,7 +18,3 @@ export function formatDate(iso: string) {
     dateStyle: "medium",
   }).format(d);
 }
-
-export function scopeLabel(scope: string) {
-  return scope === "international" ? "国際大会" : "国内大会";
-}

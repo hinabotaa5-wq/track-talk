@@ -1,50 +1,72 @@
-import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { formatDate, scopeLabel } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
+import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import type { Competition, Meta } from "@/lib/types";
+import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompetitionsPage() {
+function competitionDates(startsOn: string, endsOn: string | null) {
+  const start = formatDate(startsOn);
+  if (!endsOn) return start;
+  const end = formatDate(endsOn);
+  return start === end ? start : `${start} 〜 ${end}`;
+}
+
+export default async function CompetitionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ prefecture?: string; month?: string }>;
+}) {
+  const sp = await searchParams;
+  const month = monthNumber(sp.month) || currentMonthInTokyo();
+  const prefecture = prefectureCode(sp.prefecture);
+
   let items: Competition[] = [];
   let error = "";
-  try {
-    const data = await apiFetch<{ competitions: Competition[]; meta: Meta }>(
-      "/v1/competitions?per_page=50",
-    );
-    items = data.competitions ?? [];
-  } catch {
-    error = "大会一覧を取得できませんでした。";
+  if (prefecture) {
+    try {
+      const data = await apiFetch<{ competitions: Competition[]; season_year: number; month: number }>(
+        `/v1/competitions?prefecture=${prefecture}&month=${month}`,
+      );
+      items = data.competitions ?? [];
+    } catch {
+      error = "大会一覧を取得できませんでした。";
+    }
   }
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">大会</h1>
       <p className="text-sm text-zinc-600">
-        開催中、これから始まる大会、終了から30日以内の大会です。それより前に終わった大会は、投稿のリンクから開けます。
+        都道府県と月を選ぶと、その月の大会を日付の早い順に表示します。大会名から主催のページへ移動します。
       </p>
+      <CompetitionFilters month={month} prefecture={prefecture} />
+      {!prefecture ? (
+        <EmptyState title="都道府県を選んでください" body="選んだ月の大会を表示します。" />
+      ) : null}
       {error ? <ErrorState message={error} /> : null}
-      {items.length === 0 && !error ? (
-        <EmptyState title="表示する大会はありません" body="終了から30日を過ぎた大会は、投稿のリンクから開けます。" />
-      ) : (
+      {prefecture && !error && items.length === 0 ? (
+        <EmptyState title="この月の大会はありません" body="別の月か都道府県を選んでください。" />
+      ) : null}
+      {items.length > 0 ? (
         <div className="space-y-3">
           {items.map((c) => (
-            <Link
+            <a
               key={c.id}
-              href={`/competitions/${c.id}`}
+              href={c.organizer_url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block rounded-xl border bg-white p-4 hover:border-blue-300"
             >
-              <p className="text-xs text-zinc-500">{scopeLabel(c.scope)}</p>
+              <p className="text-xs text-zinc-500">{competitionDates(c.starts_on, c.ends_on)}</p>
               <h2 className="text-lg font-semibold">{c.name}</h2>
-              <p className="text-sm text-zinc-600">
-                {formatDate(c.starts_on)}
-                {c.ends_on ? ` 〜 ${formatDate(c.ends_on)}` : ""} · {c.location}
-              </p>
-            </Link>
+              <p className="text-sm text-blue-700">主催のページ</p>
+            </a>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

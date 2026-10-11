@@ -15,8 +15,10 @@ export type Competition = {
   starts_on: string;
   ends_on: string | null;
   location: string;
-  scope: "domestic" | "international";
-  summary: string;
+  prefecture: string;
+  season_year: number;
+  organizer_url: string;
+  source_url: string;
 };
 
 export type Post = {
