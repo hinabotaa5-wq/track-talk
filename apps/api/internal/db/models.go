@@ -34,6 +34,7 @@ type Competition struct {
 	SeasonYear   int32      `json:"season_year"`
 	OrganizerUrl string     `json:"organizer_url"`
 	SourceUrl    string     `json:"source_url"`
+	LinkLabel    string     `json:"link_label"`
 }
 
 type Post struct {

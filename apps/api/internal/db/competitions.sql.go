@@ -8,10 +8,28 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
 )
 
+const deleteCompetitionsBySeason = `-- name: DeleteCompetitionsBySeason :exec
+DELETE FROM competitions
+WHERE prefecture = $1
+  AND season_year = $2
+`
+
+type DeleteCompetitionsBySeasonParams struct {
+	Prefecture string `json:"prefecture"`
+	SeasonYear int32  `json:"season_year"`
+}
+
+func (q *Queries) DeleteCompetitionsBySeason(ctx context.Context, arg DeleteCompetitionsBySeasonParams) error {
+	_, err := q.db.Exec(ctx, deleteCompetitionsBySeason, arg.Prefecture, arg.SeasonYear)
+	return err
+}
+
 const listCompetitions = `-- name: ListCompetitions :many
-SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url
+SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url, link_label
 FROM competitions
 WHERE prefecture = $1
   AND starts_on < $2::date
@@ -49,6 +67,7 @@ func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsPara
 			&i.SeasonYear,
 			&i.OrganizerUrl,
 			&i.SourceUrl,
+			&i.LinkLabel,
 		); err != nil {
 			return nil, err
 		}
@@ -58,4 +77,49 @@ func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertCompetition = `-- name: UpsertCompetition :exec
+INSERT INTO competitions (
+    id, name, starts_on, ends_on, location, prefecture, season_year, organizer_url, source_url, link_label
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10
+)
+ON CONFLICT (prefecture, season_year, name, starts_on) DO UPDATE
+SET ends_on = EXCLUDED.ends_on,
+    location = EXCLUDED.location,
+    organizer_url = EXCLUDED.organizer_url,
+    source_url = EXCLUDED.source_url,
+    link_label = EXCLUDED.link_label,
+    updated_at = now()
+`
+
+type UpsertCompetitionParams struct {
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	StartsOn     time.Time  `json:"starts_on"`
+	EndsOn       *time.Time `json:"ends_on"`
+	Location     string     `json:"location"`
+	Prefecture   string     `json:"prefecture"`
+	SeasonYear   int32      `json:"season_year"`
+	OrganizerUrl string     `json:"organizer_url"`
+	SourceUrl    string     `json:"source_url"`
+	LinkLabel    string     `json:"link_label"`
+}
+
+func (q *Queries) UpsertCompetition(ctx context.Context, arg UpsertCompetitionParams) error {
+	_, err := q.db.Exec(ctx, upsertCompetition,
+		arg.ID,
+		arg.Name,
+		arg.StartsOn,
+		arg.EndsOn,
+		arg.Location,
+		arg.Prefecture,
+		arg.SeasonYear,
+		arg.OrganizerUrl,
+		arg.SourceUrl,
+		arg.LinkLabel,
+	)
+	return err
 }

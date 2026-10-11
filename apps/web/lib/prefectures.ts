@@ -60,6 +60,12 @@ export function monthNumber(raw: string | undefined) {
   return n;
 }
 
+export function associationListLabel(code: string) {
+  const prefecture = PREFECTURES.find((item) => item.code === code);
+  const name = (prefecture?.name ?? "").replace(/[都府県]$/, "");
+  return `${name}陸協の競技会一覧`;
+}
+
 export function currentMonthInTokyo(now = new Date()) {
   return Number(
     new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(now),

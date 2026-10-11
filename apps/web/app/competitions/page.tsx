@@ -1,11 +1,17 @@
 import { apiFetch } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
+import { associationListLabel, currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function destinationLabel(competition: Competition, prefecture: string) {
+  if (competition.link_label) return competition.link_label;
+  if (competition.organizer_url === competition.source_url) return associationListLabel(prefecture);
+  return "要項";
+}
 
 function competitionDates(startsOn: string, endsOn: string | null) {
   const start = formatDate(startsOn);
@@ -40,7 +46,7 @@ export default async function CompetitionsPage({
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">大会</h1>
       <p className="text-sm text-zinc-600">
-        都道府県と月を選ぶと、その月の大会を日付の早い順に表示します。大会名から主催のページへ移動します。
+        都道府県と月を選ぶと、その月の大会を日付の早い順に表示します。大会名から要項へ移動します。要項が未掲載のときは、その欄のホームページへ移動します。ホームページも無いときは、その県の競技会一覧へ移動します。
       </p>
       <CompetitionFilters month={month} prefecture={prefecture} />
       {!prefecture ? (
@@ -62,7 +68,7 @@ export default async function CompetitionsPage({
             >
               <p className="text-xs text-zinc-500">{competitionDates(c.starts_on, c.ends_on)}</p>
               <h2 className="text-lg font-semibold">{c.name}</h2>
-              <p className="text-sm text-blue-700">主催のページ</p>
+              <p className="text-sm text-blue-700">{destinationLabel(c, prefecture)}</p>
             </a>
           ))}
         </div>

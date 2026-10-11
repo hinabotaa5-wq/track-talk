@@ -19,6 +19,7 @@ export type Competition = {
   season_year: number;
   organizer_url: string;
   source_url: string;
+  link_label: string;
 };
 
 export type Post = {
