@@ -22,11 +22,11 @@ const post = {
 } as Post;
 
 describe("HomeFeed", () => {
-  it("shows a loading message until a failed load can be retried", () => {
+  it("shows a loading frame until a failed load can be retried", () => {
     const html = renderToStaticMarkup(
       createElement(HomeFeed, { sort: "popular", q: "", page: 1, initial: null }),
     );
-    expect(html).toContain("読み込み中…");
+    expect(html).toContain("投稿を読み込んでいます");
     expect(html).not.toContain("投稿の取得に失敗しました");
   });
 
@@ -40,7 +40,7 @@ describe("HomeFeed", () => {
       }),
     );
     expect(html).toContain("いい感じ");
-    expect(html).not.toContain("読み込み中…");
+    expect(html).not.toContain("投稿を読み込んでいます");
   });
 
   it("shows club and practice posts with their labels", () => {

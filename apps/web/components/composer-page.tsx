@@ -3,6 +3,7 @@
 import { useEffect, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { FormLoadingFrame } from "@/components/loading-frame";
 import { Input } from "@/components/ui/input";
 
 export function ComposerPage({
@@ -19,12 +20,10 @@ export function ComposerPage({
     if (!loading && !session) router.replace("/login");
   }, [loading, session, router]);
 
-  if (loading || !session) return <p>読み込み中…</p>;
-
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">{title}</h1>
-      {children}
+      {loading || !session ? <FormLoadingFrame /> : children}
     </div>
   );
 }

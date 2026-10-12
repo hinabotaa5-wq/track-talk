@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
+import { DetailLoadingFrame } from "@/components/loading-frame";
 import { PracticeReputationSummary } from "@/components/practice-reputation";
 import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token]);
 
-  if (loading) return <p>読み込み中…</p>;
+  if (loading) return <DetailLoadingFrame />;
   if (error || !post) return <p className="text-red-700">{error || "エラー"}</p>;
 
   const current = post;

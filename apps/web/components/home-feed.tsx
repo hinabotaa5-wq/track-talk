@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
 
@@ -56,7 +57,7 @@ export function HomeFeed({
   }, [shouldRetry, sort, q, page, kind]);
 
   if (error) return <ErrorState message={error} />;
-  if (posts === null) return <p role="status">読み込み中…</p>;
+  if (posts === null) return <FeedLoadingFrame />;
 
   const hasNext = meta.page * meta.per_page < meta.total;
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
 
@@ -35,7 +36,7 @@ export function SavedFeed({ q, page }: { q: string; page: number }) {
       .finally(() => setReady(true));
   }, [token, q, page]);
 
-  if (loading || !session || !ready) return <p>読み込み中…</p>;
+  if (loading || !session || !ready) return <FeedLoadingFrame />;
 
   const hasNext = meta.page * meta.per_page < meta.total;
   const next = new URLSearchParams();
