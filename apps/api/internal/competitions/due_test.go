@@ -36,3 +36,14 @@ func TestDueSourcesCapsAtSevenAndSkipsFreshImports(t *testing.T) {
 		t.Fatalf("never imported comes before a week-old import, got %s", due[0].Prefecture)
 	}
 }
+
+func TestSourceURLs(t *testing.T) {
+	s1 := Source{Prefecture: "40", PageURL: "https://example.com/a"}
+	if urls := s1.URLs(); len(urls) != 1 || urls[0] != "https://example.com/a" {
+		t.Fatalf("expected single url, got %v", urls)
+	}
+	s2 := Source{Prefecture: "43", PageURL: "https://example.com/a", ExtraURLs: []string{"https://example.com/b"}}
+	if urls := s2.URLs(); len(urls) != 2 || urls[0] != "https://example.com/a" || urls[1] != "https://example.com/b" {
+		t.Fatalf("expected two urls, got %v", urls)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -147,15 +148,47 @@ func importTimes(ctx context.Context, pool *pgxpool.Pool) (map[string]time.Time,
 }
 
 func readMeets(ctx context.Context, client competitions.Client, source competitions.Source) ([]competitions.Meet, error) {
-	page, err := competitions.FetchPage(ctx, source.PageURL)
-	if err != nil {
-		return nil, err
+	urls := source.URLs()
+	if len(urls) == 0 {
+		return nil, errors.New("日程ページのURLがありません")
 	}
-	drafts, err := client.Extract(ctx, page)
-	if err != nil {
-		return nil, err
+	var allMeets []competitions.Meet
+	seen := map[string]bool{}
+	for i, u := range urls {
+		if i > 0 {
+			time.Sleep(5 * time.Second)
+		}
+		page, err := competitions.FetchPage(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		drafts, err := client.Extract(ctx, page)
+		if err != nil {
+			return nil, err
+		}
+		meets, err := competitions.BuildMeets(page, drafts, source.Prefecture, u)
+		if err != nil {
+			// If one of multiple URLs has no meets, continue to others unless all fail
+			if len(urls) > 1 && strings.Contains(err.Error(), "大会がありません") {
+				continue
+			}
+			return nil, err
+		}
+		for _, meet := range meets {
+			key := meet.Name + "|" + meet.StartsOn.Format("2006-01-02")
+			if !seen[key] {
+				seen[key] = true
+				allMeets = append(allMeets, meet)
+			}
+		}
 	}
-	return competitions.BuildMeets(page, drafts, source.Prefecture, source.PageURL)
+	if len(allMeets) == 0 {
+		return nil, fmt.Errorf("大会がありません")
+	}
+	sort.SliceStable(allMeets, func(i, j int) bool {
+		return allMeets[i].StartsOn.Before(allMeets[j].StartsOn)
+	})
+	return allMeets, nil
 }
 
 // runDryRun reads one prefecture page and prints what would be imported.
@@ -201,7 +234,7 @@ func runDryRun(prefecture, pageURL string) error {
 }
 
 func printMeets(w io.Writer, meets []competitions.Meet, source competitions.Source) {
-	fmt.Fprintf(w, "%d competitions for prefecture %s season %d (%s)\n", len(meets), source.Prefecture, meets[0].SeasonYear, source.PageURL)
+	fmt.Fprintf(w, "%d competitions for prefecture %s season %d (%s)\n", len(meets), source.Prefecture, meets[0].SeasonYear, strings.Join(source.URLs(), ", "))
 	withLink := 0
 	for _, meet := range meets {
 		date := meet.StartsOn.Format("2006-01-02")

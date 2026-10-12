@@ -19,7 +19,11 @@ var Sources = []Source{
 	{Prefecture: "40", PageURL: "https://www.fukuriku.com/tournament/"},
 	{Prefecture: "41", PageURL: "http://www.sagarikujyo.jp/schedule/schedule_new.html"},
 	{Prefecture: "42", PageURL: "https://jaaf-nagasaki.net/schedule/2026ken.htm"},
-	{Prefecture: "43", PageURL: "http://kumariku.com/schedule/"},
+	{
+		Prefecture: "43",
+		PageURL:    "http://kumariku.com/schedule/",
+		ExtraURLs:  []string{"http://kumariku.com/result/?y=2026"},
+	},
 	{Prefecture: "44", PageURL: "https://oita-rik.com/schedule"},
 	{Prefecture: "45", PageURL: "https://www.miyariku.org/maaf/2026/03/05/2026%E5%B9%B4%E5%BA%A6%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1/"},
 	{Prefecture: "46", PageURL: "https://kariku46.com/competition/"},
@@ -29,4 +33,16 @@ var Sources = []Source{
 type Source struct {
 	Prefecture string
 	PageURL    string
+	ExtraURLs  []string
+}
+
+func (s Source) URLs() []string {
+	if s.PageURL == "" && len(s.ExtraURLs) == 0 {
+		return nil
+	}
+	if len(s.ExtraURLs) == 0 {
+		return []string{s.PageURL}
+	}
+	urls := append([]string{s.PageURL}, s.ExtraURLs...)
+	return urls
 }
