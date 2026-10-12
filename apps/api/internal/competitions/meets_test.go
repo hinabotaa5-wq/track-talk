@@ -139,3 +139,27 @@ func TestInSeason(t *testing.T) {
 		t.Fatal("previous march is outside")
 	}
 }
+
+func TestCleanNameAndLocationForSpacedOkayamaCells(t *testing.T) {
+	cases := map[string]string{
+		"（６８）県実業団対抗陸上競技選手権大会": "県実業団対抗陸上競技選手権大会",
+		"（Ｒ８）県中学生陸上競技選手権大会":   "県中学生陸上競技選手権大会",
+		"(2) 県陸上競技記録会":        "県陸上競技記録会",
+		"男子（８９）女子（４２）県高校駅伝":   "男子（８９）女子（４２）県高校駅伝",
+		"（１０）": "（１０）",
+	}
+	for in, want := range cases {
+		if got := cleanName(in); got != want {
+			t.Errorf("cleanName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := cleanLocation("倉 敷"); got != "倉敷" {
+		t.Errorf("cleanLocation = %q", got)
+	}
+	if got := cleanLocation("ﾊﾟﾛﾏ瑞穂(愛知)"); got != "ﾊﾟﾛﾏ瑞穂(愛知)" {
+		t.Errorf("cleanLocation = %q", got)
+	}
+	if got := cleanLocation("Alpha Beta"); got != "Alpha Beta" {
+		t.Errorf("latin words keep their space: %q", got)
+	}
+}

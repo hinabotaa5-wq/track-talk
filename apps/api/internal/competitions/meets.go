@@ -55,7 +55,7 @@ func BuildMeets(page Page, drafts []Draft, prefecture, sourceURL string) ([]Meet
 var embeddedURL = regexp.MustCompile(`https?://\S+`)
 
 func isCompetitionName(name string) bool {
-	for _, word := range []string{"理事会", "講習会", "クリニック", "練習会"} {
+	for _, word := range []string{"理事会", "講習会", "クリニック", "練習会", "【中止】", "（中止）", "[中止]"} {
 		if strings.Contains(name, word) {
 			return false
 		}
@@ -67,8 +67,33 @@ func cleanText(raw string) string {
 	return strings.Join(strings.Fields(embeddedURL.ReplaceAllString(raw, " ")), " ")
 }
 
+// editionPrefix is a leading edition number such as （６８）or (R8) that some schedules put before the meet name.
+var editionPrefix = regexp.MustCompile(`^[（(]\s*[ＲR]?\s*[0-9０-９]+\s*[）)]\s*`)
+
+func cleanName(raw string) string {
+	name := cleanText(raw)
+	if rest := editionPrefix.ReplaceAllString(name, ""); rest != "" {
+		return rest
+	}
+	return name
+}
+
+var spaceBetweenWide = regexp.MustCompile(`([\p{Han}\p{Hiragana}\p{Katakana}])[ \t\x{3000}]+([\p{Han}\p{Hiragana}\p{Katakana}])`)
+
+// cleanLocation joins place names that a schedule spaces out to fill a narrow cell (倉 敷 -> 倉敷).
+func cleanLocation(raw string) string {
+	text := cleanText(raw)
+	for {
+		next := spaceBetweenWide.ReplaceAllString(text, "$1$2")
+		if next == text {
+			return text
+		}
+		text = next
+	}
+}
+
 func acceptDraft(page Page, draft Draft, prefecture, sourceURL string) (Meet, bool) {
-	name := cleanText(draft.Name)
+	name := cleanName(draft.Name)
 	if name == "" || !isCompetitionName(name) {
 		return Meet{}, false
 	}
@@ -96,7 +121,7 @@ func acceptDraft(page Page, draft Draft, prefecture, sourceURL string) (Meet, bo
 		Name:         name,
 		StartsOn:     start,
 		EndsOn:       end,
-		Location:     cleanText(draft.Location),
+		Location:     cleanLocation(draft.Location),
 		Prefecture:   prefecture,
 		SeasonYear:   page.SeasonYear,
 		OrganizerURL: organizer,

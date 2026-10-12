@@ -78,6 +78,19 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 }
 
 func extractionPrompt(page Page) string {
+	prompt := baseExtractionPrompt(page)
+	if page.plainText {
+		prompt += "\n\n" + plainTextNote
+	}
+	return prompt
+}
+
+// plainTextNote is added when the page is plain lines of text instead of table rows.
+const plainTextNote = `注意: 次の本文は表ではなく、ページの文字を行ごとに並べたものです。リンクは「文字 URL」の形です。大会名、日付、会場、要項のリンクは近い行にあります。
+会場の欄が無ければ location は空文字にし、大会名の括弧内の数字や語を会場にしないでください。
+中止、延期になった大会は返さないでください。大会以外のお知らせ、リンク集、過去の年度は返さないでください。`
+
+func baseExtractionPrompt(page Page) string {
 	return fmt.Sprintf(`この陸上競技の大会一覧から、大会だけをJSONで返してください。形式は {"meets":[{"name":"","starts_on":"","ends_on":"","location":"","guidelines_url":"","district_url":""}]} です。
 競技年度は%d年です。4月から12月はその年、1月から3月は翌年です。月と日が別の欄なら組み合わせてください。期日欄も日です。日が範囲なら開始日と終了日にしてください。日付はYYYY-MM-DDにしてください。終了日が開始日と同じ、または単日なら ends_on は空文字です。会場欄があれば、その文字を location にしてください。会場欄が無く、大会名の括弧内が会場なら、そこを location にしてください。
 guidelines_url は「要項」欄にある要項のURLだけにしてください。申込、結果、タイムテーブル、注意事項、競技日程、エントリーは入れないでください。

@@ -3,6 +3,9 @@ package competitions
 // Sources are the athletics association homepages to read.
 // Other prefectures are added here as their schedule page URL is known.
 var Sources = []Source{
+	{Prefecture: "31", PageURL: "https://jaaf-tottori.com/competition/"},
+	{Prefecture: "33", PageURL: "https://okariku33.com/?page_id=1291"},
+	{Prefecture: "35", PageURL: "https://yaaf.jp/kyougikai-top/schedule-all/"},
 	{Prefecture: "40", PageURL: "https://www.fukuriku.com/tournament/"},
 	{Prefecture: "41", PageURL: "http://www.sagarikujyo.jp/schedule/schedule_new.html"},
 	{Prefecture: "42", PageURL: "https://jaaf-nagasaki.net/schedule/2026ken.htm"},

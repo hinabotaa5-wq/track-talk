@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -15,11 +16,24 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と今日の7県まで")
+	dryRun := flag.Bool("dry-run", false, "DB に書かず、読み取れた大会を表示する。-prefecture が必要")
+	pageURL := flag.String("url", "", "-dry-run のとき、未登録の県でも試せる日程ページの URL")
 	flag.Parse()
+
+	if *dryRun {
+		if err := runDryRun(*prefecture, *pageURL); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *pageURL != "" {
+		log.Fatal("-url は -dry-run と一緒に使います")
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -132,16 +146,80 @@ func importTimes(ctx context.Context, pool *pgxpool.Pool) (map[string]time.Time,
 	return updated, rows.Err()
 }
 
-func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.Client, source competitions.Source) error {
+func readMeets(ctx context.Context, client competitions.Client, source competitions.Source) ([]competitions.Meet, error) {
 	page, err := competitions.FetchPage(ctx, source.PageURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	drafts, err := client.Extract(ctx, page)
 	if err != nil {
+		return nil, err
+	}
+	return competitions.BuildMeets(page, drafts, source.Prefecture, source.PageURL)
+}
+
+// runDryRun reads one prefecture page and prints what would be imported.
+// It never touches the database, so a new URL can be checked before it is registered.
+func runDryRun(prefecture, pageURL string) error {
+	code := strings.TrimSpace(prefecture)
+	if code == "" {
+		return errors.New("-dry-run には -prefecture が必要です")
+	}
+	if len(code) == 1 {
+		code = "0" + code
+	}
+	if isInternational(code) {
+		return errors.New("-dry-run は都道府県の日程ページだけに使えます")
+	}
+	source := competitions.Source{Prefecture: code, PageURL: pageURL}
+	if pageURL == "" {
+		found := false
+		for _, registered := range competitions.Sources {
+			if registered.Prefecture == code {
+				source, found = registered, true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("未登録の都道府県です。-url で日程ページを指定してください: %s", code)
+		}
+	}
+	_ = godotenv.Load()
+	_ = godotenv.Load("../../.env")
+	key := os.Getenv("GEMINI_API_KEY")
+	if key == "" {
+		return errors.New("GEMINI_API_KEY is required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	meets, err := readMeets(ctx, competitions.Client{Key: key}, source)
+	if err != nil {
 		return err
 	}
-	meets, err := competitions.BuildMeets(page, drafts, source.Prefecture, source.PageURL)
+	printMeets(os.Stdout, meets, source)
+	return nil
+}
+
+func printMeets(w io.Writer, meets []competitions.Meet, source competitions.Source) {
+	fmt.Fprintf(w, "%d competitions for prefecture %s season %d (%s)\n", len(meets), source.Prefecture, meets[0].SeasonYear, source.PageURL)
+	withLink := 0
+	for _, meet := range meets {
+		date := meet.StartsOn.Format("2006-01-02")
+		if meet.EndsOn != nil {
+			date += "~" + meet.EndsOn.Format("01-02")
+		}
+		link := "-"
+		if meet.OrganizerURL != meet.SourceURL {
+			withLink++
+			link = meet.LinkLabel
+		}
+		fmt.Fprintf(w, "  %s  %s  @%s  [%s]\n", date, meet.Name, meet.Location, link)
+	}
+	fmt.Fprintf(w, "%d of %d have their own guidelines/district link\n", withLink, len(meets))
+}
+
+func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.Client, source competitions.Source) error {
+	meets, err := readMeets(ctx, client, source)
 	if err != nil {
 		return err
 	}

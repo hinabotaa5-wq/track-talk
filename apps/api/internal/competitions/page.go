@@ -33,6 +33,7 @@ type Page struct {
 	Body       string
 	Links      []LinkRef
 	rows       []row
+	plainText  bool
 }
 
 var seasonYearPattern = regexp.MustCompile(`(20\d{2})年`)
@@ -46,7 +47,10 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 	if err != nil {
 		return Page{}, fmt.Errorf("parse html: %w", err)
 	}
-	year, ok := findSeasonYear(doc)
+	year, ok := yearFromURL(base)
+	if !ok {
+		year, ok = findSeasonYear(doc)
+	}
 	if !ok {
 		return Page{}, fmt.Errorf("競技年度が見つかりません")
 	}
@@ -61,7 +65,15 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 		rows = scheduleListRows(doc)
 	}
 	if len(rows) == 0 {
-		return Page{}, fmt.Errorf("競技日程の表が見つかりません")
+		body, textLinks := plainTextPage(doc, base)
+		if !looksLikeSchedule(body) {
+			return Page{}, fmt.Errorf("競技日程の表が見つかりません")
+		}
+		// Such pages often link to last season too, so take the newest season named.
+		if newest, ok := newestSeasonYear(doc); ok {
+			year = newest
+		}
+		return Page{SeasonYear: year, Body: body, Links: textLinks, plainText: true}, nil
 	}
 	return Page{SeasonYear: year, Body: renderRows(rows), Links: links, rows: rows}, nil
 }
@@ -84,7 +96,39 @@ func renderRows(rows []row) string {
 	return b.String()
 }
 
+var (
+	urlQueryYearPattern = regexp.MustCompile(`(?:^|[?&])(?:y|year)=(20\d{2})`)
+	urlPathYearPattern  = regexp.MustCompile(`(?:/|_|-)(20\d{2})(?:[a-zA-Z0-9_.-]*\.html?|/|$)`)
+)
+
+func yearFromURL(u *url.URL) (int, bool) {
+	if u == nil {
+		return 0, false
+	}
+	for _, key := range []string{"y", "year", "season"} {
+		if val := u.Query().Get(key); val != "" {
+			if y, err := strconv.Atoi(val); err == nil && y >= 2020 && y <= seasonYearCap() {
+				return y, true
+			}
+		}
+	}
+	if match := urlQueryYearPattern.FindStringSubmatch(u.RawQuery); match != nil {
+		if y, err := strconv.Atoi(match[1]); err == nil && y >= 2020 && y <= seasonYearCap() {
+			return y, true
+		}
+	}
+	if match := urlPathYearPattern.FindStringSubmatch(u.Path); match != nil {
+		if y, err := strconv.Atoi(match[1]); err == nil && y >= 2020 && y <= seasonYearCap() {
+			return y, true
+		}
+	}
+	return 0, false
+}
+
 func findSeasonYear(doc *html.Node) (int, bool) {
+	if newest, ok := newestSeasonYear(doc); ok {
+		return newest, true
+	}
 	text := normalizeDigits(nodeText(doc))
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`(20\d{2})年競技`),
@@ -97,7 +141,7 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 			continue
 		}
 		year, err := strconv.Atoi(match[1])
-		if err == nil && year >= 1990 && year <= 2100 {
+		if err == nil && year >= 1990 && year <= seasonYearCap() {
 			return year, true
 		}
 	}
@@ -123,6 +167,9 @@ func scheduleTables(doc *html.Node, season int) []foundTable {
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "table" {
+			if isCalendarWidget(n) {
+				return
+			}
 			headers, _ := tableHeaders(n)
 			if isScheduleHeader(headers) && (section == 0 || section == season) {
 				tables = append(tables, foundTable{node: n, month: month})
@@ -331,7 +378,12 @@ type placed struct {
 }
 
 func isDateHeader(header string) bool {
-	return header == "日" || header == "月" || header == "期日" || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+	return header == "日" || header == "月" || header == "月日" || header == "期日" || isDayWithWeekday(header) || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+}
+
+// isDayWithWeekday matches a column titled 日（曜）or 日(曜).
+func isDayWithWeekday(header string) bool {
+	return strings.HasPrefix(header, "日（") || strings.HasPrefix(header, "日(")
 }
 
 func cleanDateText(text string) string {
@@ -487,10 +539,36 @@ func spanAttr(n *html.Node, key string) int {
 	return 1
 }
 
+func isCalendarWidget(n *html.Node) bool {
+	for _, attr := range n.Attr {
+		if attr.Key == "id" && attr.Val == "wp-calendar" {
+			return true
+		}
+		if attr.Key == "class" && strings.Contains(attr.Val, "wp-calendar") {
+			return true
+		}
+	}
+	return false
+}
+
+func isDayOfWeekGrid(headers []string) bool {
+	days := map[string]bool{"月": true, "火": true, "水": true, "木": true, "金": true, "土": true, "日": true}
+	count := 0
+	for _, h := range headers {
+		if days[strings.TrimSpace(h)] {
+			count++
+		}
+	}
+	return count >= 5
+}
+
 func isScheduleHeader(headers []string) bool {
+	if isDayOfWeekGrid(headers) {
+		return false
+	}
 	for _, header := range headers {
 		header = strings.TrimSpace(header)
-		if header == "日" || header == "期日" || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
+		if header == "日" || header == "月日" || header == "期日" || isDayWithWeekday(header) || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
 			return true
 		}
 	}
