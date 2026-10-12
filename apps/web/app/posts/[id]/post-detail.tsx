@@ -10,6 +10,7 @@ import { PracticeReputationSummary } from "@/components/practice-reputation";
 import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { canCommentOnPost } from "@/lib/practice-comments";
 import { commentSchema } from "@/lib/validators";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -23,6 +24,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [error, setError] = useState("");
+  const [commentError, setCommentError] = useState("");
   const [loading, setLoading] = useState(true);
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
 
@@ -56,6 +58,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
 
   const current = post;
   const mine = current.mine;
+  const allowComment = canCommentOnPost(current);
 
   async function toggleLike() {
     if (!session) {
@@ -113,13 +116,19 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
-    await apiFetch(`/v1/posts/${current.id}/comments`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(values),
-    });
-    form.reset();
-    load();
+    setCommentError("");
+    try {
+      await apiFetch(`/v1/posts/${current.id}/comments`, {
+        method: "POST",
+        token,
+        body: JSON.stringify(values),
+      });
+      form.reset();
+      load();
+    } catch (e) {
+      setCommentError(e instanceof ApiRequestError ? e.message : "コメントできませんでした");
+      load();
+    }
   }
 
   async function deleteComment(cid: string) {
@@ -128,7 +137,9 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }
 
   return (
-    <article className="pb-36 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 lg:pb-0">
+    <article
+      className={`${allowComment ? "pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
+    >
       <div className="space-y-6">
       {post.kind === "recruitment" ? (
         <RecruitmentFacts post={post} />
@@ -233,17 +244,22 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             )}
           </div>
         ))}
-        <form
-          onSubmit={form.handleSubmit(onComment)}
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
-        >
-          <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
-            <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
-            <Button type="submit" className="shrink-0 lg:w-full">
-              コメントする
-            </Button>
-          </div>
-        </form>
+        {allowComment ? (
+          <form
+            onSubmit={form.handleSubmit(onComment)}
+            className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
+          >
+            <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
+              <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
+              <Button type="submit" className="shrink-0 lg:w-full">
+                コメントする
+              </Button>
+            </div>
+            {commentError ? <p className="mt-2 text-sm text-red-600">{commentError}</p> : null}
+          </form>
+        ) : (
+          <p className="rounded-lg border bg-white p-3 text-sm text-zinc-600">募集は終了しています。コメントは閲覧できます。</p>
+        )}
       </section>
     </article>
   );

@@ -1009,6 +1009,90 @@ func TestPracticeApplicationsFillAndClose(t *testing.T) {
 	}
 }
 
+func TestPracticeCommentsCloseWhenRecruitmentEnds(t *testing.T) {
+	h := setup(t)
+	hostID := uuid.New()
+	guestID := uuid.New()
+	strangerID := uuid.New()
+	host, guest, stranger := token(t, hostID), token(t, guestID), token(t, strangerID)
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	starts := time.Now().In(loc).Add(72 * time.Hour)
+	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
+		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場",
+		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/comments", stranger, map[string]string{"body": "場所を教えてください"})
+	if rec.Code != 201 {
+		t.Fatalf("comment while open %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications", guest, nil)
+	if rec.Code != 201 {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	var applied struct {
+		Practice struct {
+			MyApplicationID string `json:"my_application_id"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &applied)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applied.Practice.MyApplicationID+"/accept", host, nil)
+	if rec.Code != 200 {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/comments", stranger, map[string]string{"body": "まだ入れますか"})
+	if rec.Code != 403 {
+		t.Fatalf("stranger comment when full %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/comments", guest, map[string]string{"body": "少し遅れます"})
+	if rec.Code != 201 {
+		t.Fatalf("accepted comment when full %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/dissolve", host, nil)
+	if rec.Code != 200 {
+		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/comments", stranger, map[string]string{"body": "解散後も書きます"})
+	if rec.Code != 403 {
+		t.Fatalf("stranger comment after dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/comments", host, map[string]string{"body": "ありがとうございました"})
+	if rec.Code != 201 {
+		t.Fatalf("host comment after dissolve %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID+"/comments", "", nil)
+	if rec.Code != 200 {
+		t.Fatalf("list comments %d %s", rec.Code, rec.Body.String())
+	}
+	var listed struct {
+		Comments []struct {
+			Body string `json:"body"`
+		} `json:"comments"`
+		Meta struct {
+			Total int `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &listed)
+	if listed.Meta.Total != 3 || len(listed.Comments) != 3 {
+		t.Fatalf("comments stayed readable %+v", listed)
+	}
+}
+
 func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
 	h := setup(t)
 	hostID := uuid.New()

@@ -734,6 +734,15 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	allowed, err := s.practiceCommentAllowed(r.Context(), post, p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if !allowed {
+		Error(w, http.StatusForbidden, "forbidden", "募集が終了したためコメントできません")
+		return
+	}
 	var req commentReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")

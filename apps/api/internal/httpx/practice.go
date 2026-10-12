@@ -420,6 +420,39 @@ func practiceClosed(detail db.PracticeDetail) (int, string) {
 	return 0, ""
 }
 
+func (s *Server) practiceCommentAllowed(ctx context.Context, post db.GetPostRow, userID uuid.UUID) (bool, error) {
+	if post.Kind != "practice" {
+		return true, nil
+	}
+	detail, err := s.q.GetPracticeDetail(ctx, post.ID)
+	if err != nil {
+		return false, err
+	}
+	if detail.DissolvedAt == nil {
+		accepted, err := s.q.CountAcceptedApplications(ctx, post.ID)
+		if err != nil {
+			return false, err
+		}
+		if accepted < detail.Capacity {
+			return true, nil
+		}
+	}
+	if post.AuthorID == userID {
+		return true, nil
+	}
+	app, err := s.q.GetPracticeApplicationByUser(ctx, db.GetPracticeApplicationByUserParams{
+		PostID: post.ID,
+		UserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return app.Status == "accepted", nil
+}
+
 func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
