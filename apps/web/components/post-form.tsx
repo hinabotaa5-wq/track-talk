@@ -129,7 +129,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-        {initial ? "更新する" : "投稿する"}
+        {form.formState.isSubmitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
       </Button>
     </form>
   );

@@ -99,7 +99,7 @@ export default function OwnVideoPage() {
         {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting}>
-          アップロードして投稿
+          {submitting ? "送っています" : "アップロードして投稿"}
         </Button>
       </form>
     </ComposerPage>
