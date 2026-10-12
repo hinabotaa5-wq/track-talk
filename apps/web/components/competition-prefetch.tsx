@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { loadCompetitions } from "@/lib/competition-list";
+import { readSavedCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { currentMonthInTokyo, INTERNATIONAL } from "@/lib/prefectures";
 
 export function CompetitionPrefetch() {
@@ -10,7 +11,8 @@ export function CompetitionPrefetch() {
 
   useEffect(() => {
     if (loading || !session) return;
-    void loadCompetitions(INTERNATIONAL, currentMonthInTokyo());
+    const prefecture = readSavedCompetitionPrefecture() || INTERNATIONAL;
+    void loadCompetitions(prefecture, currentMonthInTokyo());
   }, [loading, session]);
 
   return null;

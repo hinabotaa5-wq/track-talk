@@ -4,13 +4,14 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { NotificationBell } from "./notification-bell";
-import { activeMainTab, hidesTabBar, mainTabHref, mainTabs } from "./bottom-nav";
+import { activeMainTab, hidesTabBar, mainTabHref, mainTabs, useRememberedCompetitionPrefecture } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
 
 export function Header() {
   const { session } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const competitionPrefecture = useRememberedCompetitionPrefecture();
   const showBack = hidesTabBar(pathname);
 
   function goBack() {
@@ -47,7 +48,7 @@ export function Header() {
               return (
                 <Link
                   key={tab.id}
-                  href={mainTabHref(tab.id, !!session)}
+                  href={mainTabHref(tab.id, !!session, competitionPrefecture)}
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm ${
                     active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-600 hover:bg-zinc-100"

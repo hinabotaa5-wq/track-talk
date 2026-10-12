@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { saveCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { INTERNATIONAL, PREFECTURES } from "@/lib/prefectures";
 
 export function CompetitionFilters({
@@ -13,9 +14,11 @@ export function CompetitionFilters({
   const router = useRouter();
 
   function apply(nextMonth: string, nextPrefecture: string) {
+    const code = nextPrefecture || INTERNATIONAL;
+    saveCompetitionPrefecture(code);
     const params = new URLSearchParams();
     params.set("month", nextMonth);
-    params.set("prefecture", nextPrefecture || INTERNATIONAL);
+    params.set("prefecture", code);
     router.push(`/competitions?${params.toString()}`);
   }
 

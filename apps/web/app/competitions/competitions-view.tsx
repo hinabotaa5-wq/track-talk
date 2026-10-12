@@ -8,6 +8,7 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { formatDate } from "@/lib/format";
 import { competitionCacheKey, loadCompetitions, readCompetitions } from "@/lib/competition-list";
+import { saveCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
 import type { Competition } from "@/lib/types";
 import { RequireSession } from "./require-session";
@@ -29,7 +30,8 @@ function competitionDates(startsOn: string, endsOn: string | null) {
 export function CompetitionsView() {
   const sp = useSearchParams();
   const month = monthNumber(sp.get("month") ?? undefined) || currentMonthInTokyo();
-  const prefecture = prefectureCode(sp.get("prefecture") ?? undefined) || INTERNATIONAL;
+  const fromUrl = prefectureCode(sp.get("prefecture") ?? undefined);
+  const prefecture = fromUrl || INTERNATIONAL;
   const key = competitionCacheKey(prefecture, month);
   const cached = readCompetitions(prefecture, month);
   const [loadedKey, setLoadedKey] = useState(cached ? key : "");
@@ -39,6 +41,10 @@ export function CompetitionsView() {
   const shownItems = ready ? items : (cached?.items ?? []);
   const shownError = ready ? error : (cached?.error ?? "");
   const loading = !ready && !cached;
+
+  useEffect(() => {
+    if (fromUrl) saveCompetitionPrefecture(fromUrl);
+  }, [fromUrl]);
 
   useEffect(() => {
     const known = readCompetitions(prefecture, month);

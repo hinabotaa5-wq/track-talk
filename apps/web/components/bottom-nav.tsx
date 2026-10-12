@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Plus, Trophy, UserRound } from "lucide-react";
+import { competitionPrefectureEvent, competitionsPath, readSavedCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { useAuth } from "./auth-provider";
 
 export const mainTabs = [
@@ -12,10 +14,34 @@ export const mainTabs = [
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
-export function mainTabHref(id: (typeof mainTabs)[number]["id"], signedIn: boolean) {
+export function useRememberedCompetitionPrefecture() {
+  const [code, setCode] = useState("");
+
+  useEffect(() => {
+    function sync() {
+      setCode(readSavedCompetitionPrefecture());
+    }
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(competitionPrefectureEvent, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(competitionPrefectureEvent, sync);
+    };
+  }, []);
+
+  return code;
+}
+
+export function mainTabHref(
+  id: (typeof mainTabs)[number]["id"],
+  signedIn: boolean,
+  competitionPrefecture = "",
+) {
   const tab = mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
   if ((id === "post" || id === "competitions") && !signedIn) return "/login";
+  if (id === "competitions") return competitionsPath(competitionPrefecture);
   return tab.href;
 }
 
@@ -38,6 +64,7 @@ export function hidesTabBar(pathname: string) {
 export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
+  const competitionPrefecture = useRememberedCompetitionPrefecture();
   if (hidesTabBar(pathname)) return null;
 
   const current = activeMainTab(pathname);
@@ -54,7 +81,7 @@ export function BottomNav() {
           {mainTabs.map((tab) => {
             const Icon = tab.icon;
             const active = current === tab.id;
-            const href = mainTabHref(tab.id, !!session);
+            const href = mainTabHref(tab.id, !!session, competitionPrefecture);
             return (
               <li key={tab.id}>
                 <Link
