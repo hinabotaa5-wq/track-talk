@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
@@ -29,9 +28,6 @@ export function ComposerPage({
       <h1 className="text-2xl font-bold">{title}</h1>
       <p className="text-sm text-zinc-600">{lead}</p>
       {children}
-      <Link href="/upload" className="text-sm text-zinc-500">
-        投稿の入口に戻る
-      </Link>
     </div>
   );
 }
