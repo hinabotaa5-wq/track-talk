@@ -366,17 +366,17 @@ func BuildInternationalMeets(events []waEvent, meetings []diamondMeeting, from, 
 			}
 		}
 		meet := Meet{
-			Name:         name,
+			Name:         localizeMeetName(name),
 			StartsOn:     start,
 			EndsOn:       end,
-			Location:     location,
+			Location:     localizeLocation(location),
 			Prefecture:   InternationalPrefecture,
 			SeasonYear:   SeasonYear(start),
 			OrganizerURL: organizer,
 			SourceURL:    source,
 			LinkLabel:    label,
 		}
-		identity := meet.Name + "|" + meet.StartsOn.Format("2006-01-02")
+		identity := name + "|" + meet.StartsOn.Format("2006-01-02")
 		if seen[identity] {
 			continue
 		}
@@ -391,17 +391,17 @@ func BuildInternationalMeets(events []waEvent, meetings []diamondMeeting, from, 
 				name += " " + city
 			}
 			meet := Meet{
-				Name:         name,
+				Name:         localizeMeetName(name),
 				StartsOn:     meeting.StartsOn,
 				EndsOn:       meeting.EndsOn,
-				Location:     meeting.Location,
+				Location:     localizeLocation(meeting.Location),
 				Prefecture:   InternationalPrefecture,
 				SeasonYear:   SeasonYear(meeting.StartsOn),
 				OrganizerURL: meeting.URL,
 				SourceURL:    diamondLeagueCalendar,
 				LinkLabel:    "公式サイト",
 			}
-			identity := meet.Name + "|" + meet.StartsOn.Format("2006-01-02")
+			identity := name + "|" + meet.StartsOn.Format("2006-01-02")
 			if seen[identity] {
 				continue
 			}
@@ -482,9 +482,14 @@ func foldCity(value string) string {
 	return strings.NewReplacer(
 		"ü", "u", "ö", "o", "ä", "a",
 		"é", "e", "è", "e", "ê", "e", "ë", "e",
-		"á", "a", "à", "a", "â", "a",
-		"í", "i", "ó", "o", "ú", "u",
-		"ñ", "n", "ç", "c", "ø", "o", "å", "a",
+		"á", "a", "à", "a", "â", "a", "ã", "a", "å", "a", "ą", "a", "æ", "a",
+		"í", "i", "ì", "i", "î", "i", "ï", "i", "ī", "i",
+		"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ø", "o", "œ", "o",
+		"ú", "u", "ù", "u", "û", "u", "ū", "u",
+		"ñ", "n", "ń", "n", "ç", "c", "č", "c",
+		"š", "s", "ś", "s", "ş", "s", "ß", "s",
+		"ž", "z", "ź", "z", "ż", "z",
+		"ř", "r", "ğ", "g", "ł", "l", "đ", "d", "ð", "d", "ţ", "t", "ý", "y", "ÿ", "y", "ę", "e", "ě", "e", "ő", "o", "ű", "u",
 	).Replace(value)
 }
 

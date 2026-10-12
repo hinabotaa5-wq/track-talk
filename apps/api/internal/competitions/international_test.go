@@ -89,19 +89,19 @@ func TestBuildInternationalMeetsUsesDiamondLeagueSiteAndKeepsSeries(t *testing.T
 	if len(byName) != 7 {
 		t.Fatalf("len %d %+v", len(meets), meets)
 	}
-	shanghai := byName["Wanda Diamond League Shanghai/Keqiao"]
+	shanghai := byName["ダイヤモンドリーグ・上海/柯橋"]
 	if shanghai.OrganizerURL != "https://shanghai.diamondleague.com/" || shanghai.LinkLabel != "公式サイト" || shanghai.SourceURL != diamondLeagueCalendar || shanghai.Prefecture != "00" || shanghai.SeasonYear != 2026 {
 		t.Fatalf("shanghai %+v", shanghai)
 	}
-	if shanghai.Location != "China Textile City Sports Centre, Shaoxing/Keqiao (CHN)" {
+	if shanghai.Location != "紹興/柯橋（中国）" {
 		t.Fatalf("venue %+v", shanghai)
 	}
-	xiamen := byName["Wanda Diamond League Xiamen"]
-	if xiamen.OrganizerURL != "https://worldathletics.org"+timetable || xiamen.LinkLabel != "大会ページ" {
+	xiamen := byName["ダイヤモンドリーグ・アモイ"]
+	if xiamen.OrganizerURL != "https://worldathletics.org"+timetable || xiamen.LinkLabel != "大会ページ" || xiamen.Location != "アモイ（中国）" {
 		t.Fatalf("xiamen keeps the world athletics page when the diamond league card is missing: %+v", xiamen)
 	}
-	relays := byName["World Athletics Relays"]
-	if relays.EndsOn == nil || relays.EndsOn.Day() != 3 || relays.OrganizerURL != "https://worldathletics.org"+calendar {
+	relays := byName["世界リレー"]
+	if relays.EndsOn == nil || relays.EndsOn.Day() != 3 || relays.OrganizerURL != "https://worldathletics.org"+calendar || relays.Location != "ハボローネ（ボツワナ）" {
 		t.Fatalf("relays %+v", relays)
 	}
 	if _, ok := byName["National Championships Window"]; ok {
@@ -110,23 +110,23 @@ func TestBuildInternationalMeetsUsesDiamondLeagueSiteAndKeepsSeries(t *testing.T
 	if _, ok := byName["Local Meeting"]; ok {
 		t.Fatal("domestic meeting should be dropped")
 	}
-	brussels := byName["Wanda Diamond League Brussels"]
-	if brussels.EndsOn == nil || brussels.EndsOn.Day() != 5 || brussels.OrganizerURL != "https://brussels.diamondleague.com/" {
+	brussels := byName["ダイヤモンドリーグ・ブリュッセル"]
+	if brussels.EndsOn == nil || brussels.EndsOn.Day() != 5 || brussels.OrganizerURL != "https://brussels.diamondleague.com/" || brussels.Location != "ブリュッセル（ベルギー）" {
 		t.Fatalf("brussels %+v", brussels)
 	}
 	chicago := byName["Bank of America Chicago Marathon"]
-	if chicago.LinkLabel != "世界陸連のカレンダー" || chicago.OrganizerURL != worldAthleticsCalendar || chicago.StartsOn.Month() != time.October {
+	if chicago.LinkLabel != "世界陸連のカレンダー" || chicago.OrganizerURL != worldAthleticsCalendar || chicago.StartsOn.Month() != time.October || chicago.Location != "シカゴ（アメリカ）" {
 		t.Fatalf("chicago %+v", chicago)
 	}
-	eugene := byName["Prefontaine Classic"]
-	if eugene.OrganizerURL != "https://eugene.diamondleague.com/" || eugene.StartsOn.Format("2006-01-02") != "2026-07-03" || eugene.EndsOn == nil || eugene.EndsOn.Format("2006-01-02") != "2026-07-04" {
+	eugene := byName["プレフォンテーンクラシック"]
+	if eugene.OrganizerURL != "https://eugene.diamondleague.com/" || eugene.StartsOn.Format("2006-01-02") != "2026-07-03" || eugene.EndsOn == nil || eugene.EndsOn.Format("2006-01-02") != "2026-07-04" || eugene.Location != "ユージーン（アメリカ）" {
 		t.Fatalf("eugene %+v", eugene)
 	}
-	zurich := byName["Weltklasse Zürich"]
-	if zurich.OrganizerURL != "https://zurich.diamondleague.com/" || zurich.StartsOn.Format("2006-01-02") != "2026-08-26" || zurich.EndsOn == nil || zurich.EndsOn.Day() != 27 {
+	zurich := byName["ヴェルトクラッセ・チューリッヒ"]
+	if zurich.OrganizerURL != "https://zurich.diamondleague.com/" || zurich.StartsOn.Format("2006-01-02") != "2026-08-26" || zurich.EndsOn == nil || zurich.EndsOn.Day() != 27 || zurich.Location != "チューリッヒ（スイス）" {
 		t.Fatalf("zurich %+v", zurich)
 	}
-	if _, ok := byName["Wanda Diamond League Eugene"]; ok {
+	if _, ok := byName["ダイヤモンドリーグ・ユージーン"]; ok {
 		t.Fatal("eugene should be merged")
 	}
 }
