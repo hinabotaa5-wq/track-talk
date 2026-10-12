@@ -43,7 +43,6 @@ export default function MePage() {
   return (
     <div className="space-y-4 md:grid md:grid-cols-[14rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold">マイページ</h1>
         <div className="flex flex-col gap-3 md:rounded-2xl md:border md:bg-white md:p-4">
           <button type="button" onClick={logout} className="block text-left text-sm text-zinc-500">
             ログアウト

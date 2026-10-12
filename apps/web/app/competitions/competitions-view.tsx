@@ -63,7 +63,6 @@ export function CompetitionsView() {
   return (
     <RequireSession>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">大会</h1>
         <MajorHostsPanel />
         <CompetitionFilters month={month} prefecture={prefecture} />
         {loading ? <CompetitionLoadingFrame /> : null}

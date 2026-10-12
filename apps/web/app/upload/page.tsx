@@ -25,7 +25,6 @@ export default function UploadPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">投稿</h1>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {doors.map((door) => (
           <Link
