@@ -68,6 +68,10 @@ export function associationListLabel(code: string) {
   return `${name}陸協の競技会一覧`;
 }
 
+export function prefectureName(code: string) {
+  return PREFECTURES.find((item) => item.code === code)?.name ?? code;
+}
+
 export function currentMonthInTokyo(now = new Date()) {
   return Number(
     new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(now),

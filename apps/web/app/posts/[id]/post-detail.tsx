@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
+import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { commentSchema } from "@/lib/validators";
@@ -126,7 +127,9 @@ export function PostDetail({ id }: { id: string }) {
 
   return (
     <article className="space-y-6 pb-36 md:pb-0">
-      {post.kind === "video" && post.playback_url ? (
+      {post.kind === "recruitment" ? (
+        <RecruitmentFacts post={post} />
+      ) : post.kind === "video" && post.playback_url ? (
         <video
           className="aspect-video w-full rounded-xl bg-black"
           src={post.playback_url}
@@ -148,7 +151,12 @@ export function PostDetail({ id }: { id: string }) {
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
-      {post.body ? (
+      {post.kind === "recruitment" && post.body ? (
+        <div>
+          <h2 className="mb-2 text-xl font-semibold">詳細</h2>
+          <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
+        </div>
+      ) : post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -229,5 +237,56 @@ export function PostDetail({ id }: { id: string }) {
         </form>
       </section>
     </article>
+  );
+}
+
+function RecruitmentFacts({ post }: { post: Post }) {
+  const info = post.recruitment;
+  if (!info) return null;
+  const place = info.prefectures.map((code) => prefectureName(code)).join("、");
+  const location = [place, info.venue].filter(Boolean).join(" ");
+  const rows = [
+    { label: "活動場所", value: location },
+    { label: "活動時間", value: info.schedule },
+    { label: "男女比", value: info.gender_ratio },
+    { label: "平均年齢", value: info.average_age },
+    { label: "募集年齢", value: info.recruit_age },
+  ].filter((row) => row.value);
+
+  return (
+    <div className="space-y-4">
+      {info.photos.length > 0 ? (
+        <div className="grid gap-2">
+          {info.photos.map((photo) => (
+            <img
+              key={photo.public_id}
+              src={photo.url}
+              alt=""
+              className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain"
+            />
+          ))}
+        </div>
+      ) : null}
+      <dl className="space-y-3 rounded-xl border bg-white p-4">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <dt className="text-sm text-zinc-500">{row.label}</dt>
+            <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
+          </div>
+        ))}
+        {info.links.length > 0 ? (
+          <div>
+            <dt className="text-sm text-zinc-500">SNS</dt>
+            <dd className="mt-1 space-y-1">
+              {info.links.map((link) => (
+                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-700">
+                  {link}
+                </a>
+              ))}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </div>
   );
 }

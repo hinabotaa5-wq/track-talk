@@ -21,19 +21,36 @@ type postDTO struct {
 	Body           string    `json:"body,omitempty"`
 	BodyPreview    string    `json:"body_preview,omitempty"`
 	authorID       uuid.UUID
-	Mine           bool      `json:"mine"`
-	LikeCount      int32     `json:"like_count"`
-	CommentCount   int32     `json:"comment_count"`
-	LikedByMe      bool      `json:"liked_by_me"`
-	SavedByMe      bool      `json:"saved_by_me"`
-	Kind           string    `json:"kind"`
-	ThumbnailURL   string    `json:"thumbnail_url,omitempty"`
-	YouTubeVideoID string    `json:"youtube_video_id,omitempty"`
-	VideoPublicID  string    `json:"video_public_id,omitempty"`
-	ImagePublicID  string    `json:"image_public_id,omitempty"`
-	PlaybackURL    string    `json:"playback_url,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Mine           bool            `json:"mine"`
+	LikeCount      int32           `json:"like_count"`
+	CommentCount   int32           `json:"comment_count"`
+	LikedByMe      bool            `json:"liked_by_me"`
+	SavedByMe      bool            `json:"saved_by_me"`
+	Kind           string          `json:"kind"`
+	ThumbnailURL   string          `json:"thumbnail_url,omitempty"`
+	YouTubeVideoID string          `json:"youtube_video_id,omitempty"`
+	VideoPublicID  string          `json:"video_public_id,omitempty"`
+	ImagePublicID  string          `json:"image_public_id,omitempty"`
+	PlaybackURL    string          `json:"playback_url,omitempty"`
+	Recruitment    *recruitmentDTO `json:"recruitment,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type recruitmentPhotoDTO struct {
+	PublicID string `json:"public_id"`
+	URL      string `json:"url"`
+}
+
+type recruitmentDTO struct {
+	Prefectures []string              `json:"prefectures"`
+	Venue       string                `json:"venue"`
+	Schedule    string                `json:"schedule"`
+	GenderRatio string                `json:"gender_ratio"`
+	AverageAge  string                `json:"average_age"`
+	RecruitAge  string                `json:"recruit_age"`
+	Links       []string              `json:"links"`
+	Photos      []recruitmentPhotoDTO `json:"photos"`
 }
 
 func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) {

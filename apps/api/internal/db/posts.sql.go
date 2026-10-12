@@ -18,22 +18,50 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND ($1::uuid IS NULL OR p.author_id = $1)
-  AND ($2::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
+  AND ($2::text IS NULL OR p.kind = $2)
+  AND ($3::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
-    $3::text IS NULL
-    OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $3 || '%' ESCAPE '\'
+    $4::text IS NULL
+    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $4 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($5::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($5::text[])
+      )
+    )
   )
 `
 
 type CountPostsParams struct {
-	AuthorID      *uuid.UUID `json:"author_id"`
-	PopularWindow *bool      `json:"popular_window"`
-	Keyword       *string    `json:"keyword"`
+	AuthorID        *uuid.UUID `json:"author_id"`
+	Kind            *string    `json:"kind"`
+	PopularWindow   *bool      `json:"popular_window"`
+	Keyword         *string    `json:"keyword"`
+	PrefectureCodes []string   `json:"prefecture_codes"`
 }
 
 func (q *Queries) CountPosts(ctx context.Context, arg CountPostsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPosts, arg.AuthorID, arg.PopularWindow, arg.Keyword)
+	row := q.db.QueryRow(ctx, countPosts,
+		arg.AuthorID,
+		arg.Kind,
+		arg.PopularWindow,
+		arg.Keyword,
+		arg.PrefectureCodes,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -50,16 +78,36 @@ WHERE s.user_id = $1
     $2::text IS NULL
     OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
     OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $2 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($3::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($3::text[])
+      )
+    )
   )
 `
 
 type CountSavedPostsParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	Keyword *string   `json:"keyword"`
+	UserID          uuid.UUID `json:"user_id"`
+	Keyword         *string   `json:"keyword"`
+	PrefectureCodes []string  `json:"prefecture_codes"`
 }
 
 func (q *Queries) CountSavedPosts(ctx context.Context, arg CountSavedPostsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSavedPosts, arg.UserID, arg.Keyword)
+	row := q.db.QueryRow(ctx, countSavedPosts, arg.UserID, arg.Keyword, arg.PrefectureCodes)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -391,20 +439,42 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND ($1::uuid IS NULL OR p.author_id = $1)
+  AND ($2::text IS NULL OR p.kind = $2)
   AND (
-    $2::text IS NULL
-    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+    $3::text IS NULL
+    OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $3 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $3 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($4::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($4::text[])
+      )
+    )
   )
 ORDER BY p.created_at DESC
-LIMIT $4 OFFSET $3
+LIMIT $6 OFFSET $5
 `
 
 type ListPostsNewParams struct {
-	AuthorID *uuid.UUID `json:"author_id"`
-	Keyword  *string    `json:"keyword"`
-	OffsetN  int32      `json:"offset_n"`
-	LimitN   int32      `json:"limit_n"`
+	AuthorID        *uuid.UUID `json:"author_id"`
+	Kind            *string    `json:"kind"`
+	Keyword         *string    `json:"keyword"`
+	PrefectureCodes []string   `json:"prefecture_codes"`
+	OffsetN         int32      `json:"offset_n"`
+	LimitN          int32      `json:"limit_n"`
 }
 
 type ListPostsNewRow struct {
@@ -425,7 +495,9 @@ type ListPostsNewRow struct {
 func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]ListPostsNewRow, error) {
 	rows, err := q.db.Query(ctx, listPostsNew,
 		arg.AuthorID,
+		arg.Kind,
 		arg.Keyword,
+		arg.PrefectureCodes,
 		arg.OffsetN,
 		arg.LimitN,
 	)
@@ -479,20 +551,42 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
   AND ($1::uuid IS NULL OR p.author_id = $1)
+  AND ($2::text IS NULL OR p.kind = $2)
   AND (
-    $2::text IS NULL
-    OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+    $3::text IS NULL
+    OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $3 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $3 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($4::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($4::text[])
+      )
+    )
   )
 ORDER BY p.like_count DESC, p.created_at DESC
-LIMIT $4 OFFSET $3
+LIMIT $6 OFFSET $5
 `
 
 type ListPostsPopularParams struct {
-	AuthorID *uuid.UUID `json:"author_id"`
-	Keyword  *string    `json:"keyword"`
-	OffsetN  int32      `json:"offset_n"`
-	LimitN   int32      `json:"limit_n"`
+	AuthorID        *uuid.UUID `json:"author_id"`
+	Kind            *string    `json:"kind"`
+	Keyword         *string    `json:"keyword"`
+	PrefectureCodes []string   `json:"prefecture_codes"`
+	OffsetN         int32      `json:"offset_n"`
+	LimitN          int32      `json:"limit_n"`
 }
 
 type ListPostsPopularRow struct {
@@ -513,7 +607,9 @@ type ListPostsPopularRow struct {
 func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularParams) ([]ListPostsPopularRow, error) {
 	rows, err := q.db.Query(ctx, listPostsPopular,
 		arg.AuthorID,
+		arg.Kind,
 		arg.Keyword,
+		arg.PrefectureCodes,
 		arg.OffsetN,
 		arg.LimitN,
 	)
@@ -603,16 +699,36 @@ WHERE s.user_id = $1
     $2::text IS NULL
     OR p.title ILIKE '%' || $2 || '%' ESCAPE '\'
     OR p.body ILIKE '%' || $2 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $2 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($3::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($3::text[])
+      )
+    )
   )
 ORDER BY s.created_at DESC, p.id DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListSavedPostsParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	Keyword *string   `json:"keyword"`
-	OffsetN int32     `json:"offset_n"`
-	LimitN  int32     `json:"limit_n"`
+	UserID          uuid.UUID `json:"user_id"`
+	Keyword         *string   `json:"keyword"`
+	PrefectureCodes []string  `json:"prefecture_codes"`
+	OffsetN         int32     `json:"offset_n"`
+	LimitN          int32     `json:"limit_n"`
 }
 
 type ListSavedPostsRow struct {
@@ -634,6 +750,7 @@ func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) 
 	rows, err := q.db.Query(ctx, listSavedPosts,
 		arg.UserID,
 		arg.Keyword,
+		arg.PrefectureCodes,
 		arg.OffsetN,
 		arg.LimitN,
 	)

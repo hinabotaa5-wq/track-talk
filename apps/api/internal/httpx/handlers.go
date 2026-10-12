@@ -97,11 +97,15 @@ func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.listPostsFiltered(w, r, "new", &p.ID)
+	s.listPostsFiltered(w, r, "new", &p.ID, nil)
 }
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
-	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil)
+	var kind *string
+	if value := strings.TrimSpace(r.URL.Query().Get("kind")); value == "recruitment" {
+		kind = &value
+	}
+	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil, kind)
 }
 
 func withMine(r *http.Request, p postDTO) postDTO {
@@ -110,13 +114,16 @@ func withMine(r *http.Request, p postDTO) postDTO {
 	return p
 }
 
-func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort string, author *uuid.UUID) {
+func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort string, author *uuid.UUID, kind *string) {
 	page, per, offset := s.queryPage(r)
 	popular := sort == "popular"
+	keyword, codes := searchArgs(r.URL.Query().Get("q"))
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
-		AuthorID:      author,
-		PopularWindow: boolPtr(popular),
-		Keyword:       likeContains(r.URL.Query().Get("q")),
+		AuthorID:        author,
+		Kind:            kind,
+		PopularWindow:   boolPtr(popular),
+		Keyword:         keyword,
+		PrefectureCodes: codes,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -125,10 +132,12 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	var items []postDTO
 	if popular {
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
-			AuthorID: author,
-			Keyword:  likeContains(r.URL.Query().Get("q")),
-			LimitN:   per,
-			OffsetN:  offset,
+			AuthorID:        author,
+			Kind:            kind,
+			Keyword:         keyword,
+			PrefectureCodes: codes,
+			LimitN:          per,
+			OffsetN:         offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
@@ -145,10 +154,12 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		}
 	} else {
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
-			AuthorID: author,
-			Keyword:  likeContains(r.URL.Query().Get("q")),
-			LimitN:   per,
-			OffsetN:  offset,
+			AuthorID:        author,
+			Kind:            kind,
+			Keyword:         keyword,
+			PrefectureCodes: codes,
+			LimitN:          per,
+			OffsetN:         offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
@@ -163,6 +174,10 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			item.SavedByMe = saved[row.ID]
 			items = append(items, item)
 		}
+	}
+	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
 }
@@ -238,25 +253,41 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	item := withMine(r, s.present(postFromGet(row, liked)))
+	item, err = s.attachRecruitment(r.Context(), item)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	item.SavedByMe = saved
 	JSON(w, http.StatusOK, item)
 }
 
 type postReq struct {
-	Title               string `json:"title"`
-	Body                string `json:"body"`
-	Kind                string `json:"kind"`
-	YouTubeVideoID      string `json:"youtube_video_id"`
-	YouTubeThumbnailURL string `json:"youtube_thumbnail_url"`
-	VideoPublicID       string `json:"video_public_id"`
-	ImagePublicID       string `json:"image_public_id"`
+	Title               string   `json:"title"`
+	Body                string   `json:"body"`
+	Kind                string   `json:"kind"`
+	YouTubeVideoID      string   `json:"youtube_video_id"`
+	YouTubeThumbnailURL string   `json:"youtube_thumbnail_url"`
+	VideoPublicID       string   `json:"video_public_id"`
+	ImagePublicID       string   `json:"image_public_id"`
+	Prefectures         []string `json:"prefectures"`
+	Venue               string   `json:"venue"`
+	Schedule            string   `json:"schedule"`
+	GenderRatio         string   `json:"gender_ratio"`
+	AverageAge          string   `json:"average_age"`
+	RecruitAge          string   `json:"recruit_age"`
+	Links               []string `json:"links"`
+	ImagePublicIDs      []string `json:"image_public_ids"`
 }
 
-func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.CreatePostParams, bool) {
+func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return db.CreatePostParams{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, false
+	}
+	if forceKind != "" {
+		req.Kind = forceKind
 	}
 	fields := map[string]string{}
 	if e := Title(req.Title); e != "" {
@@ -273,6 +304,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		fields["kind"] = e
 	}
 	var youtubeID, youtubeThumb, publicID *string
+	var recruitment recruitmentInput
 	switch kind {
 	case "text":
 		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
@@ -314,10 +346,28 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 			fields["image_public_id"] = "写真は文章の投稿に付けてください"
 		}
 		publicID = &id
+	case "recruitment":
+		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
+			fields["kind"] = "募集の投稿に動画情報は付けられません"
+		}
+		if strings.TrimSpace(req.ImagePublicID) != "" {
+			fields["image_public_id"] = "写真はまとめて指定してください"
+		}
+		if strings.TrimSpace(req.Title) == "" {
+			fields["title"] = "チーム名を入力してください"
+		}
+		if strings.TrimSpace(req.Body) == "" {
+			fields["body"] = "詳細を入力してください"
+		}
+		parsed, fieldErrs := normalizeRecruitment(req)
+		for key, value := range fieldErrs {
+			fields[key] = value
+		}
+		recruitment = parsed
 	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
-		return db.CreatePostParams{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, false
 	}
 	return db.CreatePostParams{
 		Title:               strings.TrimSpace(req.Title),
@@ -326,7 +376,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request) (db.Create
 		YoutubeVideoID:      youtubeID,
 		YoutubeThumbnailUrl: youtubeThumb,
 		CloudinaryPublicID:  publicID,
-	}, true
+	}, recruitment, true
 }
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
@@ -334,8 +384,12 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	params, ok := s.parsePostReq(w, r)
+	params, recruitment, ok := s.parsePostReq(w, r, "")
 	if !ok {
+		return
+	}
+	if params.Kind == "recruitment" {
+		s.createRecruitment(w, r, p, params, recruitment)
 		return
 	}
 	params.ID = uuid.New()
@@ -378,11 +432,20 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	params, ok := s.parsePostReq(w, r)
+	existing, err := s.q.GetPost(r.Context(), id)
+	if err == nil && existing.Kind == "recruitment" {
+		if existing.AuthorID != p.ID {
+			Error(w, http.StatusForbidden, "forbidden", "編集できません")
+			return
+		}
+		s.updateRecruitment(w, r, p, id)
+		return
+	}
+	params, _, ok := s.parsePostReq(w, r, "")
 	if !ok {
 		return
 	}
-	_, err := s.q.UpdatePost(r.Context(), db.UpdatePostParams{
+	_, err = s.q.UpdatePost(r.Context(), db.UpdatePostParams{
 		ID:       id,
 		AuthorID: p.ID,
 		Title:    params.Title,
@@ -431,17 +494,18 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, per, offset := s.queryPage(r)
-	keyword := likeContains(r.URL.Query().Get("q"))
-	count, err := s.q.CountSavedPosts(r.Context(), db.CountSavedPostsParams{UserID: p.ID, Keyword: keyword})
+	keyword, codes := searchArgs(r.URL.Query().Get("q"))
+	count, err := s.q.CountSavedPosts(r.Context(), db.CountSavedPostsParams{UserID: p.ID, Keyword: keyword, PrefectureCodes: codes})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	rows, err := s.q.ListSavedPosts(r.Context(), db.ListSavedPostsParams{
-		UserID:  p.ID,
-		Keyword: keyword,
-		LimitN:  per,
-		OffsetN: offset,
+		UserID:          p.ID,
+		Keyword:         keyword,
+		PrefectureCodes: codes,
+		LimitN:          per,
+		OffsetN:         offset,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -470,6 +534,10 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 		}, liked[row.ID], true)))
 		item.SavedByMe = true
 		items = append(items, item)
+	}
+	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
 }

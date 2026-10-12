@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { authErrorMessage } from "./auth-errors";
 import { cloudinaryErrorMessage } from "./cloudinary-upload";
-import { commentSchema, inquirySchema, loginSchema, postSchema } from "./validators";
+import { commentSchema, inquirySchema, loginSchema, postSchema, recruitmentSchema } from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -10,6 +10,35 @@ describe("validators", () => {
       body: "展開が熱かった",
     });
     expect(parsed.title).toBe("100m決勝");
+  });
+
+  it("accepts a club recruitment and rejects a missing prefecture", () => {
+    expect(
+      recruitmentSchema.safeParse({
+        title: "城南クラブ",
+        prefectures: ["13"],
+        venue: "駒沢競技場",
+        schedule: "毎週火曜 19:00-21:00",
+        gender_ratio: "",
+        average_age: "25歳",
+        recruit_age: "18〜30歳",
+        links: ["https://example.com/team"],
+        body: "初心者も歓迎です",
+      }).success,
+    ).toBe(true);
+    expect(
+      recruitmentSchema.safeParse({
+        title: "城南クラブ",
+        prefectures: [],
+        venue: "",
+        schedule: "毎週火曜",
+        gender_ratio: "",
+        average_age: "",
+        recruit_age: "",
+        links: [],
+        body: "詳細",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects long comments", () => {

@@ -7,6 +7,29 @@ export const postSchema = z.object({
   body: z.string("本文を入力してください").trim().min(1, "本文を入力してください").max(10000, "10000文字以内"),
 });
 
+function httpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+export const recruitmentSchema = z.object({
+  title: z.string("チーム名を入力してください").trim().min(1, "チーム名を入力してください").max(120, "120文字以内"),
+  prefectures: z.array(z.string()).min(1, "都道府県を1つ以上選んでください"),
+  venue: z.string().trim().max(80, "活動場所は80文字以内で入力してください"),
+  schedule: z.string("活動時間を入力してください").trim().min(1, "活動時間を入力してください").max(80, "活動時間は80文字以内で入力してください"),
+  gender_ratio: z.string().trim().max(80, "男女比は80文字以内で入力してください"),
+  average_age: z.string().trim().max(80, "平均年齢は80文字以内で入力してください"),
+  recruit_age: z.string().trim().max(80, "募集年齢は80文字以内で入力してください"),
+  links: z
+    .array(z.string().trim().refine(httpsUrl, "httpsのURLを入力してください"))
+    .max(4, "URLは4件までです"),
+  body: z.string("詳細を入力してください").trim().min(1, "詳細を入力してください").max(10000, "10000文字以内"),
+});
+
 export const commentSchema = z.object({
   body: z.string("コメントを入力してください").trim().min(1, "コメントを入力してください").max(2000, "2000文字以内"),
 });

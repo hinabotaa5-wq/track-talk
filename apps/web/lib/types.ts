@@ -27,14 +27,31 @@ export type Post = {
   comment_count: number;
   liked_by_me: boolean;
   saved_by_me: boolean;
-  kind: "text" | "youtube" | "video";
+  kind: "text" | "youtube" | "video" | "recruitment";
   thumbnail_url?: string;
   youtube_video_id?: string;
   video_public_id?: string;
   image_public_id?: string;
   playback_url?: string;
+  recruitment?: Recruitment;
   created_at: string;
   updated_at: string;
+};
+
+export type RecruitmentPhoto = {
+  public_id: string;
+  url: string;
+};
+
+export type Recruitment = {
+  prefectures: string[];
+  venue: string;
+  schedule: string;
+  gender_ratio: string;
+  average_age: string;
+  recruit_age: string;
+  links: string[];
+  photos: RecruitmentPhoto[];
 };
 
 export type Comment = {

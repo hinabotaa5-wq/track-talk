@@ -16,10 +16,30 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
+  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
   )
 ORDER BY p.created_at DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
@@ -43,10 +63,30 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
+  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
   )
 ORDER BY p.like_count DESC, p.created_at DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
@@ -57,11 +97,31 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
+  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
   AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
   );
 
 -- name: FindYouTubePostID :one
@@ -144,6 +204,25 @@ WHERE s.user_id = sqlc.arg('user_id')
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
   )
 ORDER BY s.created_at DESC, p.id DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
@@ -159,6 +238,25 @@ WHERE s.user_id = sqlc.arg('user_id')
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
     OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
   );
 
 -- name: SavedByUser :one

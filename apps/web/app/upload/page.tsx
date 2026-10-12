@@ -9,6 +9,7 @@ const doors = [
   { href: "/posts/new", title: "文章", body: "タイトルと本文でスレを立てます。" },
   { href: "/posts/youtube", title: "YouTubeのURL", body: "動画を引用して、そのスレに集まります。" },
   { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。" },
+  { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。" },
 ] as const;
 
 export default function UploadPage() {
@@ -24,7 +25,7 @@ export default function UploadPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">投稿</h1>
-      <p className="text-sm text-zinc-600">文章、YouTube、自分の動画から選べます。</p>
+      <p className="text-sm text-zinc-600">文章、YouTube、自分の動画、クラブチームの募集から選べます。</p>
       <div className="space-y-3">
         {doors.map((door) => (
           <Link

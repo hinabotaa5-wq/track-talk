@@ -90,7 +90,7 @@ func (s *Server) present(p postDTO) postDTO {
 		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}
-	if p.Kind == "text" && p.ImagePublicID != "" {
+	if (p.Kind == "text" || p.Kind == "recruitment") && p.ImagePublicID != "" {
 		p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
 	}
 	return p

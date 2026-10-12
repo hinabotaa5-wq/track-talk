@@ -579,6 +579,152 @@ func TestInquiryStaysWithTheSender(t *testing.T) {
 	}
 }
 
+func TestRecruitmentAppearsInTheFeed(t *testing.T) {
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/image/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"resource_type":"image"}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	a := uuid.New()
+	b := uuid.New()
+	ta, tb := token(t, a), token(t, b)
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "城南クラブ", "body": "初心者も歓迎です", "kind": "recruitment",
+		"schedule": "毎週火曜 19:00-21:00",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("missing prefecture %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/uploads/image", ta, map[string]any{})
+	if rec.Code != 200 {
+		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
+	}
+	var signed struct {
+		PublicID string `json:"public_id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &signed)
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "城南クラブ", "body": "初心者も歓迎です", "kind": "recruitment",
+		"prefectures": []string{"13", "14"}, "venue": "駒沢競技場",
+		"schedule": "毎週火曜 19:00-21:00", "gender_ratio": "男性7：女性3",
+		"average_age": "25歳", "recruit_age": "18〜30歳",
+		"links":            []string{"https://example.com/team"},
+		"image_public_ids": []string{signed.PublicID},
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID           string `json:"id"`
+		Kind         string `json:"kind"`
+		ThumbnailURL string `json:"thumbnail_url"`
+		Recruitment  struct {
+			Prefectures []string `json:"prefectures"`
+			Venue       string   `json:"venue"`
+			Links       []string `json:"links"`
+			Photos      []struct {
+				PublicID string `json:"public_id"`
+			} `json:"photos"`
+		} `json:"recruitment"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if created.Kind != "recruitment" || created.ThumbnailURL == "" || created.Recruitment.Venue != "駒沢競技場" || len(created.Recruitment.Photos) != 1 {
+		t.Fatalf("created %+v", created)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "文章", "body": "レースの話",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("text %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new&kind=recruitment", "", nil)
+	if rec.Code != 200 {
+		t.Fatalf("filter %d", rec.Code)
+	}
+	var filtered struct {
+		Posts []struct {
+			Kind         string `json:"kind"`
+			ThumbnailURL string `json:"thumbnail_url"`
+		} `json:"posts"`
+		Meta struct {
+			Total int64 `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &filtered)
+	if filtered.Meta.Total != 1 || filtered.Posts[0].Kind != "recruitment" || filtered.Posts[0].ThumbnailURL == "" {
+		t.Fatalf("filtered %+v", filtered)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	var mixed struct {
+		Meta struct {
+			Total int64 `json:"total"`
+		} `json:"meta"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &mixed)
+	if mixed.Meta.Total != 2 {
+		t.Fatalf("mixed %d", mixed.Meta.Total)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new&q="+url.QueryEscape("東京"), "", nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &filtered)
+	if filtered.Meta.Total != 1 {
+		t.Fatalf("prefecture search %+v", filtered)
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tb, map[string]any{
+		"title": "改ざん", "body": "だめ", "kind": "recruitment",
+		"prefectures": []string{"13"}, "schedule": "毎週火曜",
+	})
+	if rec.Code != 403 {
+		t.Fatalf("other edit %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
+		"title": "城南トラッククラブ", "body": "社会人も歓迎です", "kind": "recruitment",
+		"prefectures": []string{"13"}, "venue": "",
+		"schedule": "毎週土曜 9:00-12:00",
+		"links":    []string{"https://example.com/a", "https://example.com/b"},
+	})
+	if rec.Code != 200 {
+		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
+	}
+	var updated struct {
+		Title       string `json:"title"`
+		Recruitment struct {
+			Venue  string   `json:"venue"`
+			Links  []string `json:"links"`
+			Photos []struct {
+				PublicID string `json:"public_id"`
+			} `json:"photos"`
+		} `json:"recruitment"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &updated)
+	if updated.Title != "城南トラッククラブ" || updated.Recruitment.Venue != "" || len(updated.Recruitment.Links) != 2 || len(updated.Recruitment.Photos) != 0 {
+		t.Fatalf("updated %+v", updated)
+	}
+}
+
 func setAdmin(t *testing.T, id uuid.UUID) {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")

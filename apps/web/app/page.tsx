@@ -8,7 +8,7 @@ import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type HomeSort = "popular" | "new" | "saved";
+type HomeSort = "popular" | "new" | "recruitment" | "saved";
 
 function homeHref(sort: HomeSort, q: string, page?: number) {
   const params = new URLSearchParams();
@@ -31,11 +31,20 @@ export default async function HomePage({
   searchParams: Promise<{ sort?: string; q?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const sort: HomeSort = sp.sort === "new" ? "new" : sp.sort === "saved" ? "saved" : "popular";
+  const sort: HomeSort =
+    sp.sort === "new"
+      ? "new"
+      : sp.sort === "recruitment"
+        ? "recruitment"
+        : sp.sort === "saved"
+          ? "saved"
+          : "popular";
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, Number(sp.page) || 1);
-  const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
+  const listSort = sort === "recruitment" ? "new" : sort;
+  const qs = new URLSearchParams({ sort: listSort, page: String(page), per_page: "20" });
   if (q) qs.set("q", q);
+  if (sort === "recruitment") qs.set("kind", "recruitment");
 
   let initial: PostsPage | null = null;
   if (sort !== "saved") {
@@ -69,12 +78,15 @@ export default async function HomePage({
           />
         </div>
       </form>
-      <div className="flex gap-2 px-4 py-3">
+      <div className="flex flex-wrap gap-2 px-4 py-3">
         <Link href={homeHref("popular", q)} className={chipClass(sort === "popular")} aria-current={sort === "popular" ? "page" : undefined}>
           人気
         </Link>
         <Link href={homeHref("new", q)} className={chipClass(sort === "new")} aria-current={sort === "new" ? "page" : undefined}>
           新しい順
+        </Link>
+        <Link href={homeHref("recruitment", q)} className={chipClass(sort === "recruitment")} aria-current={sort === "recruitment" ? "page" : undefined}>
+          募集
         </Link>
         <Link href={homeHref("saved", q)} className={chipClass(sort === "saved")} aria-current={sort === "saved" ? "page" : undefined}>
           保存
@@ -84,7 +96,14 @@ export default async function HomePage({
         {sort === "saved" ? (
           <SavedFeed q={q} page={page} />
         ) : (
-          <HomeFeed key={`${sort}:${q}:${page}`} sort={sort} q={q} page={page} initial={initial} />
+          <HomeFeed
+            key={`${sort}:${q}:${page}`}
+            sort={sort === "recruitment" ? "new" : sort}
+            kind={sort === "recruitment" ? "recruitment" : undefined}
+            q={q}
+            page={page}
+            initial={initial}
+          />
         )}
       </div>
     </div>

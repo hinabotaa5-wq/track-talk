@@ -1,6 +1,7 @@
 "use client";
 
 import { PostForm } from "@/components/post-form";
+import { RecruitmentForm } from "@/components/recruitment-form";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import type { Post } from "@/lib/types";
@@ -27,10 +28,12 @@ export default function EditPostPage() {
     return <p>この投稿を編集する権限がありません。</p>;
   }
 
+  const recruitment = post.kind === "recruitment";
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">投稿を編集</h1>
-      <PostForm initial={post} />
+      <h1 className="text-2xl font-bold">{recruitment ? "募集を編集" : "投稿を編集"}</h1>
+      {recruitment ? <RecruitmentForm initial={post} /> : <PostForm initial={post} />}
     </div>
   );
 }

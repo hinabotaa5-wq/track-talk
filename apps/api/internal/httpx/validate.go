@@ -40,7 +40,7 @@ func PostBody(v string) string {
 
 func Kind(v string) string {
 	switch v {
-	case "text", "youtube", "video":
+	case "text", "youtube", "video", "recruitment":
 		return ""
 	default:
 		return "種類が不正です"

@@ -82,6 +82,33 @@ type Profile struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type RecruitmentDetail struct {
+	PostID      uuid.UUID `json:"post_id"`
+	Venue       string    `json:"venue"`
+	Schedule    string    `json:"schedule"`
+	GenderRatio string    `json:"gender_ratio"`
+	AverageAge  string    `json:"average_age"`
+	RecruitAge  string    `json:"recruit_age"`
+}
+
+type RecruitmentLink struct {
+	PostID   uuid.UUID `json:"post_id"`
+	Position int32     `json:"position"`
+	Url      string    `json:"url"`
+}
+
+type RecruitmentPhoto struct {
+	PostID             uuid.UUID `json:"post_id"`
+	Position           int32     `json:"position"`
+	CloudinaryPublicID string    `json:"cloudinary_public_id"`
+}
+
+type RecruitmentPrefecture struct {
+	PostID     uuid.UUID `json:"post_id"`
+	Position   int32     `json:"position"`
+	Prefecture string    `json:"prefecture"`
+}
+
 type Report struct {
 	ID         uuid.UUID `json:"id"`
 	ReporterID uuid.UUID `json:"reporter_id"`
