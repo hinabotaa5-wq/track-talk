@@ -4,6 +4,20 @@ export type Meta = {
   total: number;
 };
 
+export type MajorHost = {
+  kind: "worlds" | "olympics";
+  year: number;
+  name: string;
+  city: string;
+  country: string;
+  venue: string;
+  starts_on: string;
+  ends_on: string;
+  schedule_label: string;
+  image_url: string;
+  page_url: string;
+};
+
 export type Competition = {
   id: string;
   name: string;

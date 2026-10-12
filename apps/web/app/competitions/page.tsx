@@ -2,9 +2,10 @@ import { apiFetch } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
 import { CompetitionFilters } from "@/components/competition-filters";
+import { MajorHostsPanel } from "@/components/major-hosts-panel";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { RequireSession } from "./require-session";
-import type { Competition } from "@/lib/types";
+import type { Competition, MajorHost } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export default async function CompetitionsPage({
 
   let items: Competition[] = [];
   let error = "";
+  let hosts: MajorHost[] = [];
+  let hostsError = "";
   try {
     const data = await apiFetch<{ competitions: Competition[]; season_year: number; month: number }>(
       `/v1/competitions?prefecture=${prefecture}&month=${month}`,
@@ -40,6 +43,12 @@ export default async function CompetitionsPage({
     items = data.competitions ?? [];
   } catch {
     error = "大会一覧を取得できませんでした。";
+  }
+  try {
+    const data = await apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts");
+    hosts = data.hosts ?? [];
+  } catch {
+    hostsError = "開催地を取得できませんでした。";
   }
 
   return (
@@ -49,6 +58,7 @@ export default async function CompetitionsPage({
         <p className="text-sm text-zinc-600">
           月と地域を選ぶと、その月の大会を日付の早い順に表示します。最初は国際大会です。会場も表示します。国際大会は公式サイトか大会ページへ、国内大会は要項があれば要項へ、無ければ地区のページへ、どちらも無ければその県の陸協ホームページへ移動します。
         </p>
+        <MajorHostsPanel hosts={hosts} error={hostsError} />
         <CompetitionFilters month={month} prefecture={prefecture} />
         {error ? <ErrorState message={error} /> : null}
         {!error && items.length === 0 ? (

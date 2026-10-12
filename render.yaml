@@ -20,3 +20,13 @@ services:
         sync: false
       - key: LOG_LEVEL
         value: info
+  - type: cron
+    name: track-talk-major-hosts
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    schedule: "0 0 1 4,10 *"
+    dockerCommand: /app/importmajors
+    envVars:
+      - key: DATABASE_URL
+        sync: false

@@ -12,6 +12,20 @@ import (
 
 var tokyo = time.FixedZone("Asia/Tokyo", 9*60*60)
 
+func (s *Server) listMajorHosts(w http.ResponseWriter, r *http.Request) {
+	now := time.Now().In(tokyo)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	rows, err := s.q.ListUpcomingMajorHosts(r.Context(), today)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if rows == nil {
+		rows = []db.ListUpcomingMajorHostsRow{}
+	}
+	JSON(w, http.StatusOK, map[string]any{"hosts": rows})
+}
+
 func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	fields := map[string]string{}

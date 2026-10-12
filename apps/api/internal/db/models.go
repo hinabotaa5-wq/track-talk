@@ -46,6 +46,21 @@ type Inquiry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type MajorHost struct {
+	Kind          string    `json:"kind"`
+	Year          int32     `json:"year"`
+	Name          string    `json:"name"`
+	City          string    `json:"city"`
+	Country       string    `json:"country"`
+	Venue         string    `json:"venue"`
+	StartsOn      time.Time `json:"starts_on"`
+	EndsOn        time.Time `json:"ends_on"`
+	ScheduleLabel string    `json:"schedule_label"`
+	ImageUrl      string    `json:"image_url"`
+	PageUrl       string    `json:"page_url"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type Post struct {
 	ID                  uuid.UUID  `json:"id"`
 	AuthorID            uuid.UUID  `json:"author_id"`
