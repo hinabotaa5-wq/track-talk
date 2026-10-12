@@ -477,11 +477,16 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	applicationID := uuid.New()
 	if err := q.InsertPracticeApplication(r.Context(), db.InsertPracticeApplicationParams{
-		ID:     uuid.New(),
+		ID:     applicationID,
 		PostID: post.ID,
 		UserID: me.ID,
 	}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := insertNotification(r.Context(), q, post.AuthorID, "practice_application", post.ID, nil, &applicationID); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -533,10 +538,11 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		Error(w, code, "conflict", message)
 		return
 	}
-	if _, err := q.GetPracticeApplication(r.Context(), db.GetPracticeApplicationParams{
+	application, err := q.GetPracticeApplication(r.Context(), db.GetPracticeApplicationParams{
 		ID:     applicationID,
 		PostID: post.ID,
-	}); err != nil {
+	})
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -563,6 +569,12 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 	if n == 0 {
 		Error(w, http.StatusConflict, "conflict", "この申請は処理済みです")
 		return
+	}
+	if status == "accepted" {
+		if err := insertNotification(r.Context(), q, application.UserID, "practice_accepted", post.ID, nil, &application.ID); err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
@@ -603,6 +615,23 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 	if n == 0 {
 		Error(w, http.StatusConflict, "conflict", "解散した募集です")
 		return
+	}
+	accepted, err := q.ListAcceptedPracticeApplications(r.Context(), post.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if len(accepted) > 0 {
+		if err := insertNotification(r.Context(), q, post.AuthorID, "practice_rate", post.ID, nil, nil); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		for _, application := range accepted {
+			if err := insertNotification(r.Context(), q, application.UserID, "practice_rate", post.ID, nil, &application.ID); err != nil {
+				MapDBError(w, err)
+				return
+			}
+		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)

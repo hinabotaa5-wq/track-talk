@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { NotificationBell } from "./notification-bell";
 import { activeMainTab, hidesTabBar, mainTabHref, mainTabs } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -40,25 +41,28 @@ export function Header() {
             TRACK TALK
           </Link>
         </div>
-        <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
-          {mainTabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = current === tab.id;
-            return (
-              <Link
-                key={tab.id}
-                href={mainTabHref(tab.id, !!session)}
-                aria-current={active ? "page" : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm ${
-                  active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-600 hover:bg-zinc-100"
-                }`}
-              >
-                <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex shrink-0 items-center gap-1">
+          <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
+            {mainTabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = current === tab.id;
+              return (
+                <Link
+                  key={tab.id}
+                  href={mainTabHref(tab.id, !!session)}
+                  aria-current={active ? "page" : undefined}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm ${
+                    active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-600 hover:bg-zinc-100"
+                  }`}
+                >
+                  <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+          {session ? <NotificationBell /> : null}
+        </div>
       </div>
     </header>
   );

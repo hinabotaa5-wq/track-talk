@@ -13,20 +13,25 @@ import (
 )
 
 type Server struct {
-	cfg   config.Config
-	pool  *pgxpool.Pool
-	q     *db.Queries
-	auth  *auth.Verifier
-	limit *RateLimiter
-	cloud cloudinary.Client
+	cfg       config.Config
+	pool      *pgxpool.Pool
+	q         *db.Queries
+	auth      *auth.Verifier
+	authAdmin auth.Admin
+	limit     *RateLimiter
+	cloud     cloudinary.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	s := &Server{
-		cfg:   cfg,
-		pool:  pool,
-		q:     db.New(pool),
-		auth:  v,
+		cfg:  cfg,
+		pool: pool,
+		q:    db.New(pool),
+		auth: v,
+		authAdmin: auth.Admin{
+			BaseURL: cfg.SupabaseURL,
+			APIKey:  cfg.SupabaseServiceRoleKey,
+		},
 		limit: NewRateLimiter(),
 		cloud: cloudinary.Client{
 			Cloud:   cfg.CloudName,
@@ -59,11 +64,15 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
 			r.Get("/me", s.me)
+			r.Delete("/me", s.deleteAccount)
 			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)
+			r.Get("/me/notifications", s.listNotifications)
+			r.Post("/me/notifications/read", s.markAllNotificationsRead)
+			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/uploads/video", s.signVideoUpload)

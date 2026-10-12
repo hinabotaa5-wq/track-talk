@@ -115,6 +115,22 @@ export type Comment = {
   updated_at: string;
 };
 
+export type NotificationKind =
+  | "recruitment_post"
+  | "comment"
+  | "practice_application"
+  | "practice_accepted"
+  | "practice_rate";
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
+  post_id: string;
+  post_title: string;
+  read: boolean;
+  created_at: string;
+};
+
 export type Inquiry = {
   id: string;
   category: "bug" | "account" | "request" | "other";

@@ -10,18 +10,19 @@ import (
 )
 
 type Config struct {
-	Addr            string
-	DatabaseURL     string
-	SupabaseURL     string
-	JWTSecret       string
-	JWTAUD          string
-	CORSOrigins     []string
-	LogLevel        string
-	ShutdownTimeout time.Duration
-	CloudName       string
-	CloudAPIKey     string
-	CloudAPISecret  string
-	CloudAPIBase    string
+	Addr                   string
+	DatabaseURL            string
+	SupabaseURL            string
+	SupabaseServiceRoleKey string
+	JWTSecret              string
+	JWTAUD                 string
+	CORSOrigins            []string
+	LogLevel               string
+	ShutdownTimeout        time.Duration
+	CloudName              string
+	CloudAPIKey            string
+	CloudAPISecret         string
+	CloudAPIBase           string
 }
 
 func Load() (Config, error) {
@@ -29,17 +30,18 @@ func Load() (Config, error) {
 	_ = godotenv.Load("../../.env")
 
 	cfg := Config{
-		Addr:            env("API_ADDR", ":8080"),
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
-		SupabaseURL:     os.Getenv("SUPABASE_URL"),
-		JWTSecret:       os.Getenv("SUPABASE_JWT_SECRET"),
-		JWTAUD:          env("SUPABASE_JWT_AUD", "authenticated"),
-		LogLevel:        env("LOG_LEVEL", "info"),
-		ShutdownTimeout: 10 * time.Second,
-		CloudName:       os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:     os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:  os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:    os.Getenv("CLOUDINARY_API_BASE"),
+		Addr:                   env("API_ADDR", ":8080"),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		SupabaseURL:            os.Getenv("SUPABASE_URL"),
+		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		JWTSecret:              os.Getenv("SUPABASE_JWT_SECRET"),
+		JWTAUD:                 env("SUPABASE_JWT_AUD", "authenticated"),
+		LogLevel:               env("LOG_LEVEL", "info"),
+		ShutdownTimeout:        10 * time.Second,
+		CloudName:              os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:            os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:         os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:           os.Getenv("CLOUDINARY_API_BASE"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

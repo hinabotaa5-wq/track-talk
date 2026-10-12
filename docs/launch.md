@@ -8,13 +8,14 @@
 - JWT secret（Dashboard の JWT Settings）を Render の `SUPABASE_JWT_SECRET` に入れる
 - `DATABASE_URL` は Go API のみ。anon key 以外をフロントに置かない
 - 全テーブルで RLS 有効（マイグレーション済み）。PostgREST からの直接CRUDは許可しない
+- 退会時に Auth ユーザーを削除するため、service_role key を API の `SUPABASE_SERVICE_ROLE_KEY` に入れる。フロントエンドには置かない
 - 標準SMTPは低レートのため、公開前にカスタムSMTP（Resend 等）を設定する
 - 無料プランは非アクティブで一時停止する可能性がある
 
 ## Render（Go API）
 
 - `apps/api/Dockerfile` でデプロイ
-- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `CORS_ORIGINS`
+- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`
 - ヘルスチェック: `/health`
 - 無料Webサービスはスリープする場合がある
 

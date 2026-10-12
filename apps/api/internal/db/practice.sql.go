@@ -225,6 +225,39 @@ func (q *Queries) ListAcceptedCounts(ctx context.Context, postIds []uuid.UUID) (
 	return items, nil
 }
 
+const listAcceptedPracticeApplications = `-- name: ListAcceptedPracticeApplications :many
+SELECT id, user_id
+FROM practice_applications
+WHERE post_id = $1
+  AND status = 'accepted'
+ORDER BY created_at
+`
+
+type ListAcceptedPracticeApplicationsRow struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) ListAcceptedPracticeApplications(ctx context.Context, postID uuid.UUID) ([]ListAcceptedPracticeApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listAcceptedPracticeApplications, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAcceptedPracticeApplicationsRow
+	for rows.Next() {
+		var i ListAcceptedPracticeApplicationsRow
+		if err := rows.Scan(&i.ID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPracticeApplications = `-- name: ListPracticeApplications :many
 SELECT id, status, created_at
 FROM practice_applications

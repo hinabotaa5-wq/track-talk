@@ -62,6 +62,13 @@ FROM practice_applications
 WHERE post_id = $1
 ORDER BY created_at;
 
+-- name: ListAcceptedPracticeApplications :many
+SELECT id, user_id
+FROM practice_applications
+WHERE post_id = $1
+  AND status = 'accepted'
+ORDER BY created_at;
+
 -- name: InsertPracticeApplication :exec
 INSERT INTO practice_applications (id, post_id, user_id, status)
 VALUES ($1, $2, $3, 'pending');

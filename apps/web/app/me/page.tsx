@@ -54,6 +54,9 @@ export default function MePage() {
           <Link href="/about" className="block text-sm text-zinc-500">
             このアプリについて
           </Link>
+          <Link href="/me/delete" className="block text-sm text-red-700">
+            退会する
+          </Link>
         </div>
       </div>
       <div className="space-y-4">

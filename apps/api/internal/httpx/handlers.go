@@ -729,7 +729,8 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.q.GetPost(r.Context(), postID); err != nil {
+	post, err := s.q.GetPost(r.Context(), postID)
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -753,6 +754,12 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.q.IncrementCommentCount(r.Context(), postID)
+	if post.AuthorID != p.ID {
+		if err := insertNotification(r.Context(), s.q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
 	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
 }
 

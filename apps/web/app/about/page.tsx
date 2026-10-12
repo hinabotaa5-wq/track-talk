@@ -36,6 +36,7 @@ export default function AboutPage() {
           <li>認証は Supabase Auth、データベースは PostgreSQL（Supabase）を利用します。</li>
           <li>フロントエンドにデータベース接続情報や管理者用秘密鍵は置きません。</li>
           <li>問い合わせ: ログイン後、マイページの「お問い合わせ」から運営へ送れます。</li>
+          <li>退会: マイページの「退会する」から、投稿・コメント・練習の参加情報・お問い合わせとログイン用アカウントを削除できます。</li>
         </ul>
       </section>
     </div>

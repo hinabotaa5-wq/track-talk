@@ -61,6 +61,17 @@ type MajorHost struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type Notification struct {
+	ID            uuid.UUID  `json:"id"`
+	RecipientID   uuid.UUID  `json:"recipient_id"`
+	Kind          string     `json:"kind"`
+	PostID        uuid.UUID  `json:"post_id"`
+	CommentID     *uuid.UUID `json:"comment_id"`
+	ApplicationID *uuid.UUID `json:"application_id"`
+	ReadAt        *time.Time `json:"read_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
 type Post struct {
 	ID                  uuid.UUID  `json:"id"`
 	AuthorID            uuid.UUID  `json:"author_id"`

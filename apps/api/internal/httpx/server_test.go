@@ -24,6 +24,10 @@ import (
 )
 
 func setup(t *testing.T) http.Handler {
+	return setupConfig(t, nil)
+}
+
+func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -45,7 +49,7 @@ func setup(t *testing.T) http.Handler {
 	if err := migrate.Up(dsn); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	_, _ = pool.Exec(ctx, `TRUNCATE inquiries, reports, post_saves, post_likes, comments, practice_ratings, practice_applications, posts, profiles CASCADE`)
+	_, _ = pool.Exec(ctx, `TRUNCATE notifications, inquiries, reports, post_saves, post_likes, comments, practice_ratings, practice_applications, posts, profiles CASCADE`)
 	v, err := auth.NewVerifier(secret, "", "authenticated")
 	if err != nil {
 		t.Fatal(err)
@@ -59,6 +63,9 @@ func setup(t *testing.T) http.Handler {
 		CloudAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
 		CloudAPIBase:   os.Getenv("CLOUDINARY_API_BASE"),
+	}
+	if mutate != nil {
+		mutate(&cfg)
 	}
 	return httpx.New(cfg, pool, v)
 }
@@ -1174,5 +1181,278 @@ func setAdmin(t *testing.T, id uuid.UUID) {
 	}
 	if tag.RowsAffected() != 1 {
 		t.Fatalf("admin rows %d", tag.RowsAffected())
+	}
+}
+
+type noteItem struct {
+	ID        string `json:"id"`
+	Kind      string `json:"kind"`
+	PostID    string `json:"post_id"`
+	PostTitle string `json:"post_title"`
+	Read      bool   `json:"read"`
+}
+
+func listNotifications(t *testing.T, h http.Handler, tok string) ([]noteItem, int64) {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/notifications", tok, nil)
+	if rec.Code != 200 {
+		t.Fatalf("notifications %d %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Notifications []noteItem `json:"notifications"`
+		UnreadCount   int64      `json:"unread_count"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Notifications, body.UnreadCount
+}
+
+func notesFor(items []noteItem, postID, kind string) []noteItem {
+	var out []noteItem
+	for _, item := range items {
+		if item.PostID == postID && (kind == "" || item.Kind == kind) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func TestNotifications(t *testing.T) {
+	h := setup(t)
+	authorID := uuid.New()
+	viewerID := uuid.New()
+	lateID := uuid.New()
+	declinedID := uuid.New()
+	author := token(t, authorID)
+	viewer := token(t, viewerID)
+	late := token(t, lateID)
+	declined := token(t, declinedID)
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/notifications", "", nil)
+	if rec.Code != 401 {
+		t.Fatalf("anonymous %d", rec.Code)
+	}
+	if rec = doJSON(t, h, http.MethodGet, "/v1/me", author, nil); rec.Code != 200 {
+		t.Fatalf("author profile %d %s", rec.Code, rec.Body.String())
+	}
+	if rec = doJSON(t, h, http.MethodGet, "/v1/me", viewer, nil); rec.Code != 200 {
+		t.Fatalf("viewer profile %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
+		"title": "レース感想", "body": "楽しかったです",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("text %d %s", rec.Code, rec.Body.String())
+	}
+	var textPost struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &textPost)
+
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	starts := time.Now().In(loc).Add(72 * time.Hour)
+	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
+	practiceBody := map[string]any{
+		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場",
+		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2,
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, practiceBody)
+	if rec.Code != 201 {
+		t.Fatalf("practice %d %s", rec.Code, rec.Body.String())
+	}
+	var practicePost struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &practicePost)
+
+	if items, unread := listNotifications(t, h, viewer); len(items) != 0 || unread != 0 {
+		t.Fatalf("practice and text should not notify, items=%+v unread=%d", items, unread)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
+		"title": "城南クラブ", "body": "初心者も歓迎です", "kind": "recruitment",
+		"prefectures": []string{"13"}, "venue": "駒沢競技場",
+		"schedule": "毎週火曜 19:00-21:00", "gender_ratio": "男性7：女性3",
+		"average_age": "25歳", "recruit_age": "18〜30歳",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("recruitment %d %s", rec.Code, rec.Body.String())
+	}
+	var recruitmentPost struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &recruitmentPost)
+
+	authorNotes, _ := listNotifications(t, h, author)
+	if len(notesFor(authorNotes, recruitmentPost.ID, "recruitment_post")) != 0 {
+		t.Fatalf("author was notified of their own recruitment %+v", authorNotes)
+	}
+	viewerNotes, viewerUnread := listNotifications(t, h, viewer)
+	recruitmentNotes := notesFor(viewerNotes, recruitmentPost.ID, "recruitment_post")
+	if len(recruitmentNotes) != 1 || recruitmentNotes[0].PostTitle != "城南クラブ" || recruitmentNotes[0].Read || viewerUnread != 1 {
+		t.Fatalf("viewer recruitment %+v unread %d", viewerNotes, viewerUnread)
+	}
+	if len(notesFor(viewerNotes, practicePost.ID, "")) != 0 || len(notesFor(viewerNotes, textPost.ID, "")) != 0 {
+		t.Fatalf("unexpected post notifications %+v", viewerNotes)
+	}
+
+	if rec = doJSON(t, h, http.MethodGet, "/v1/me", late, nil); rec.Code != 200 {
+		t.Fatalf("late profile %d %s", rec.Code, rec.Body.String())
+	}
+	if items, _ := listNotifications(t, h, late); len(items) != 0 {
+		t.Fatalf("late user received past notifications %+v", items)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+textPost.ID+"/comments", viewer, map[string]any{"body": "同感です"})
+	if rec.Code != 201 {
+		t.Fatalf("comment %d %s", rec.Code, rec.Body.String())
+	}
+	var comment struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &comment)
+	authorNotes, authorUnread := listNotifications(t, h, author)
+	commentNotes := notesFor(authorNotes, textPost.ID, "comment")
+	if len(commentNotes) != 1 || commentNotes[0].PostTitle != "レース感想" || authorUnread != 1 {
+		t.Fatalf("comment notification %+v unread %d", authorNotes, authorUnread)
+	}
+	if viewerNotes, _ = listNotifications(t, h, viewer); len(notesFor(viewerNotes, textPost.ID, "comment")) != 0 {
+		t.Fatalf("commenter was notified %+v", viewerNotes)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+textPost.ID+"/comments", author, map[string]any{"body": "ありがとうございます"})
+	if rec.Code != 201 {
+		t.Fatalf("own comment %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, _ = listNotifications(t, h, author)
+	if len(notesFor(authorNotes, textPost.ID, "comment")) != 1 {
+		t.Fatalf("own comment created a notification %+v", authorNotes)
+	}
+
+	rec = doJSON(t, h, http.MethodDelete, "/v1/comments/"+comment.ID, viewer, nil)
+	if rec.Code != 204 {
+		t.Fatalf("delete comment %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, authorUnread = listNotifications(t, h, author)
+	if len(notesFor(authorNotes, textPost.ID, "comment")) != 0 || authorUnread != 0 {
+		t.Fatalf("deleted comment still listed %+v unread %d", authorNotes, authorUnread)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+textPost.ID+"/comments", viewer, map[string]any{"body": "もう一度"})
+	if rec.Code != 201 {
+		t.Fatalf("second comment %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, _ = listNotifications(t, h, author)
+	commentNotes = notesFor(authorNotes, textPost.ID, "comment")
+	if len(commentNotes) != 1 {
+		t.Fatalf("second comment %+v", authorNotes)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+commentNotes[0].ID+"/read", viewer, nil)
+	if rec.Code != 404 {
+		t.Fatalf("other user mark read %d", rec.Code)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+commentNotes[0].ID+"/read", author, nil)
+	if rec.Code != 204 {
+		t.Fatalf("mark read %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, authorUnread = listNotifications(t, h, author)
+	commentNotes = notesFor(authorNotes, textPost.ID, "comment")
+	if len(commentNotes) != 1 || !commentNotes[0].Read || authorUnread != 0 {
+		t.Fatalf("after read %+v unread %d", authorNotes, authorUnread)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/applications", viewer, nil)
+	if rec.Code != 201 {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	var viewerApplication struct {
+		Practice struct {
+			MyApplicationID string `json:"my_application_id"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &viewerApplication)
+	authorNotes, _ = listNotifications(t, h, author)
+	if len(notesFor(authorNotes, practicePost.ID, "practice_application")) != 1 {
+		t.Fatalf("application notification %+v", authorNotes)
+	}
+	viewerNotes, _ = listNotifications(t, h, viewer)
+	if len(notesFor(viewerNotes, practicePost.ID, "practice_application")) != 0 {
+		t.Fatalf("applicant notified themselves %+v", viewerNotes)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/applications", declined, nil)
+	if rec.Code != 201 {
+		t.Fatalf("second apply %d %s", rec.Code, rec.Body.String())
+	}
+	var declinedApplication struct {
+		Practice struct {
+			MyApplicationID string `json:"my_application_id"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &declinedApplication)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/applications/"+viewerApplication.Practice.MyApplicationID+"/accept", author, nil)
+	if rec.Code != 200 {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/applications/"+declinedApplication.Practice.MyApplicationID+"/decline", author, nil)
+	if rec.Code != 200 {
+		t.Fatalf("decline %d %s", rec.Code, rec.Body.String())
+	}
+	viewerNotes, _ = listNotifications(t, h, viewer)
+	if len(notesFor(viewerNotes, practicePost.ID, "practice_accepted")) != 1 {
+		t.Fatalf("accepted notification %+v", viewerNotes)
+	}
+	declinedNotes, _ := listNotifications(t, h, declined)
+	if len(notesFor(declinedNotes, practicePost.ID, "practice_accepted")) != 0 {
+		t.Fatalf("decline notified %+v", declinedNotes)
+	}
+
+	emptyPractice := practiceBody
+	emptyPractice["event"] = "200m"
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, emptyPractice)
+	if rec.Code != 201 {
+		t.Fatalf("empty practice %d %s", rec.Code, rec.Body.String())
+	}
+	var emptyPost struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &emptyPost)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+emptyPost.ID+"/practice/dissolve", author, nil)
+	if rec.Code != 200 {
+		t.Fatalf("empty dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, _ = listNotifications(t, h, author)
+	if len(notesFor(authorNotes, emptyPost.ID, "practice_rate")) != 0 {
+		t.Fatalf("rate notification without participants %+v", authorNotes)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/dissolve", author, nil)
+	if rec.Code != 200 {
+		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	authorNotes, authorUnread = listNotifications(t, h, author)
+	if len(notesFor(authorNotes, practicePost.ID, "practice_rate")) != 1 || authorUnread < 1 {
+		t.Fatalf("host rate notification %+v unread %d", authorNotes, authorUnread)
+	}
+	viewerNotes, viewerUnread = listNotifications(t, h, viewer)
+	if len(notesFor(viewerNotes, practicePost.ID, "practice_rate")) != 1 {
+		t.Fatalf("guest rate notification %+v", viewerNotes)
+	}
+	declinedNotes, _ = listNotifications(t, h, declined)
+	if len(notesFor(declinedNotes, practicePost.ID, "practice_rate")) != 0 {
+		t.Fatalf("declined user got a rate notification %+v", declinedNotes)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/notifications/read", author, nil)
+	if rec.Code != 204 {
+		t.Fatalf("mark all %d %s", rec.Code, rec.Body.String())
+	}
+	if _, authorUnread = listNotifications(t, h, author); authorUnread != 0 {
+		t.Fatalf("unread after mark all %d", authorUnread)
 	}
 }
