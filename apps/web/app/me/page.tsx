@@ -50,8 +50,14 @@ export default function MePage() {
           <Link href="/me/contact" className="block text-sm text-zinc-500">
             お問い合わせ
           </Link>
-          <Link href="/about" className="block text-sm text-zinc-500">
-            このアプリについて
+          <Link href="/guidelines" className="block text-sm text-zinc-500">
+            ガイドライン
+          </Link>
+          <Link href="/terms" className="block text-sm text-zinc-500">
+            利用規約
+          </Link>
+          <Link href="/privacy" className="block text-sm text-zinc-500">
+            プライバシーポリシー
           </Link>
           <Link href="/me/delete" className="block text-sm text-red-700">
             退会する

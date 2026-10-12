@@ -67,11 +67,6 @@ export default function LoginPage() {
           パスワードを忘れた
         </Link>
       </p>
-      <p className="text-sm">
-        <Link href="/about" className="text-zinc-500">
-          このアプリについて
-        </Link>
-      </p>
     </div>
   );
 }

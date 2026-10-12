@@ -29,7 +29,8 @@ export function activeMainTab(pathname: string) {
 
 export function hidesTabBar(pathname: string) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
-  if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/about") return true;
+  if (pathname === "/me/contact" || pathname === "/me/delete") return true;
+  if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
 }
