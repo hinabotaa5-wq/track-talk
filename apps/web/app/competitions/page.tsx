@@ -55,9 +55,6 @@ export default async function CompetitionsPage({
     <RequireSession>
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">大会</h1>
-        <p className="text-sm text-zinc-600">
-          月と地域を選ぶと、その月の大会を日付の早い順に表示します。最初は国際大会です。会場も表示します。国際大会は公式サイトか大会ページへ、国内大会は要項があれば要項へ、無ければ地区のページへ、どちらも無ければその県の陸協ホームページへ移動します。
-        </p>
         <MajorHostsPanel hosts={hosts} error={hostsError} />
         <CompetitionFilters month={month} prefecture={prefecture} />
         {error ? <ErrorState message={error} /> : null}
