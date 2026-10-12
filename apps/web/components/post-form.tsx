@@ -123,7 +123,9 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       ) : initial.thumbnail_url ? (
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-zinc-100 object-contain" />
       ) : null}
-      {upload ? <UploadProgress noun="写真" phase={uploadPhase} progress={upload} /> : null}
+      {upload ? (
+        <UploadProgress noun="写真" phase={uploadPhase} progress={upload} fileName={photo?.name} fileSize={photo?.size} />
+      ) : null}
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>

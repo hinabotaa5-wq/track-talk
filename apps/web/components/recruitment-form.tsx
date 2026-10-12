@@ -43,6 +43,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [submitting, setSubmitting] = useState(false);
   const filesRef = useRef(files);
@@ -82,6 +83,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
     setError("");
     setStatus("");
     setUpload(null);
+    setUploadFile(null);
     const parsed = recruitmentSchema.safeParse({
       title,
       prefectures,
@@ -119,6 +121,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         setStatus("");
         setUploadPhase("upload");
+        setUploadFile(item.file);
         setUpload({ loaded: 0, total: item.file.size, percent: 0 });
         const result = await uploadToCloudinary("image", item.file, signed, setUpload);
         if (result.public_id !== signed.public_id) {
@@ -150,6 +153,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       }
       setStatus("");
       setUpload(null);
+      setUploadFile(null);
     } finally {
       setSubmitting(false);
     }
@@ -319,7 +323,15 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           />
         ) : null}
       </div>
-      {upload ? <UploadProgress noun="写真" phase={uploadPhase} progress={upload} /> : null}
+      {upload ? (
+        <UploadProgress
+          noun="写真"
+          phase={uploadPhase}
+          progress={upload}
+          fileName={uploadFile?.name}
+          fileSize={uploadFile?.size}
+        />
+      ) : null}
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
