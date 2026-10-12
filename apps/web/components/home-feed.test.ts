@@ -57,6 +57,7 @@ describe("HomeFeed", () => {
         capacity: 3,
         accepted_count: 1,
         status: "open",
+        reputation: { good: 0, ok: 0, bad: 0 },
       },
     } as Post;
     const club = {
@@ -78,5 +79,6 @@ describe("HomeFeed", () => {
     expect(html).toContain("練習");
     expect(html).toContain("駒沢競技場");
     expect(html).toContain("募集 1/3人");
+    expect(html).toContain("まだ評価がありません");
   });
 });

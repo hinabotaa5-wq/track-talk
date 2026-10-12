@@ -59,6 +59,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
 			r.Get("/me", s.me)
+			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
@@ -77,6 +78,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts/{id}/practice/applications", s.applyPractice)
 			r.Post("/posts/{id}/practice/applications/{applicationID}/accept", s.acceptPractice)
 			r.Post("/posts/{id}/practice/applications/{applicationID}/decline", s.declinePractice)
+			r.Post("/posts/{id}/practice/applications/{applicationID}/rating", s.ratePractice)
 			r.Post("/posts/{id}/practice/dissolve", s.dissolvePractice)
 			r.Patch("/comments/{id}", s.updateComment)
 			r.Delete("/comments/{id}", s.deleteComment)

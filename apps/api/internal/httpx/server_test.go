@@ -45,7 +45,7 @@ func setup(t *testing.T) http.Handler {
 	if err := migrate.Up(dsn); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	_, _ = pool.Exec(ctx, `TRUNCATE inquiries, reports, post_saves, post_likes, comments, practice_applications, posts, profiles CASCADE`)
+	_, _ = pool.Exec(ctx, `TRUNCATE inquiries, reports, post_saves, post_likes, comments, practice_ratings, practice_applications, posts, profiles CASCADE`)
 	v, err := auth.NewVerifier(secret, "", "authenticated")
 	if err != nil {
 		t.Fatal(err)
@@ -999,6 +999,160 @@ func TestPracticeApplicationsFillAndClose(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications", token(t, uuid.New()), nil)
 	if rec.Code != 409 {
 		t.Fatalf("apply after dissolve %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
+	h := setup(t)
+	hostID := uuid.New()
+	guestID := uuid.New()
+	strangerID := uuid.New()
+	host, guest, stranger := token(t, hostID), token(t, guestID), token(t, strangerID)
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	starts := time.Now().In(loc).Add(72 * time.Hour)
+	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
+		"kind": "practice", "body": "流しをします", "venue": "〇〇競技場",
+		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications", guest, nil)
+	if rec.Code != 201 {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	var applied struct {
+		Practice struct {
+			MyApplicationID string `json:"my_application_id"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &applied)
+	applicationID := applied.Practice.MyApplicationID
+	if applicationID == "" {
+		t.Fatal("missing application id")
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, host, nil)
+	var hostView struct {
+		Practice struct {
+			Applications []struct {
+				ID string `json:"id"`
+			} `json:"applications"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &hostView)
+	if len(hostView.Practice.Applications) != 1 {
+		t.Fatalf("applications %+v", hostView.Practice.Applications)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/accept", host, nil)
+	if rec.Code != 200 {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+
+	rating := map[string]any{"score": "good", "comment": "時間通りでした"}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", guest, rating)
+	if rec.Code != 409 {
+		t.Fatalf("rate before dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/dissolve", host, nil)
+	if rec.Code != 200 {
+		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", stranger, rating)
+	if rec.Code != 403 {
+		t.Fatalf("stranger rate %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", guest, map[string]any{"score": "great"})
+	if rec.Code != 422 {
+		t.Fatalf("bad score %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", guest, rating)
+	if rec.Code != 201 {
+		t.Fatalf("guest rate %d %s", rec.Code, rec.Body.String())
+	}
+	var guestRated struct {
+		Practice struct {
+			RatedHost bool `json:"rated_host"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &guestRated)
+	if !guestRated.Practice.RatedHost {
+		t.Fatal("guest rating was not recorded")
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", guest, rating)
+	if rec.Code != 409 {
+		t.Fatalf("second rate %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applicationID+"/rating", host, map[string]any{"score": "ok", "comment": ""})
+	if rec.Code != 200 && rec.Code != 201 {
+		t.Fatalf("host rate %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/practice-reputation", host, nil)
+	var mine struct {
+		Good     int `json:"good"`
+		Ok       int `json:"ok"`
+		Bad      int `json:"bad"`
+		Comments []struct {
+			Comment string `json:"comment"`
+		} `json:"comments"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &mine)
+	if rec.Code != 200 || mine.Good != 1 || mine.Ok != 0 || len(mine.Comments) != 1 || mine.Comments[0].Comment != "時間通りでした" {
+		t.Fatalf("reputation %d %+v", rec.Code, mine)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
+		"kind": "practice", "body": "次の練習です", "venue": "別の競技場",
+		"starts_at": starts.Add(24 * time.Hour).Format(time.RFC3339), "event": "400m", "capacity": 2,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("next post %d %s", rec.Code, rec.Body.String())
+	}
+	var next struct {
+		Practice struct {
+			Reputation struct {
+				Good     int `json:"good"`
+				Comments []struct {
+					Comment string `json:"comment"`
+				} `json:"comments"`
+			} `json:"reputation"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &next)
+	if next.Practice.Reputation.Good != 1 || len(next.Practice.Reputation.Comments) != 1 {
+		t.Fatalf("next reputation %+v", next.Practice.Reputation)
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new&kind=recruitment", "", nil)
+	var listed struct {
+		Posts []struct {
+			Kind     string `json:"kind"`
+			Practice struct {
+				Reputation struct {
+					Good int `json:"good"`
+				} `json:"reputation"`
+			} `json:"practice"`
+		} `json:"posts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &listed)
+	var found bool
+	for _, post := range listed.Posts {
+		if post.Kind == "practice" && post.Practice.Reputation.Good == 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("list reputation %+v", listed.Posts)
 	}
 }
 

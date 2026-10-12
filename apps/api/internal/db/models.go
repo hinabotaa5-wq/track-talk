@@ -109,6 +109,17 @@ type PracticeDetail struct {
 	DissolvedAt *time.Time `json:"dissolved_at"`
 }
 
+type PracticeRating struct {
+	ID            uuid.UUID `json:"id"`
+	PostID        uuid.UUID `json:"post_id"`
+	ApplicationID uuid.UUID `json:"application_id"`
+	RaterID       uuid.UUID `json:"rater_id"`
+	RateeID       uuid.UUID `json:"ratee_id"`
+	Score         string    `json:"score"`
+	Comment       string    `json:"comment"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type Profile struct {
 	ID        uuid.UUID `json:"id"`
 	IsAdmin   bool      `json:"is_admin"`

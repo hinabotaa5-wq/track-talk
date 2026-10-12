@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
+import { PracticeReputationSummary } from "@/components/practice-reputation";
 import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -257,6 +258,53 @@ function applicationStatusLabel(status: "pending" | "accepted" | "declined") {
   return "申請中";
 }
 
+function RatingForm({
+  disabled,
+  onSubmit,
+}: {
+  disabled: boolean;
+  onSubmit: (score: string, comment: string) => void;
+}) {
+  const [score, setScore] = useState("");
+  const [comment, setComment] = useState("");
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!score) return;
+        if (!confirm("この評価は変更できません。送信しますか？")) return;
+        onSubmit(score, comment);
+      }}
+      className="mt-2 space-y-2"
+    >
+      <label className="block text-sm font-medium">
+        評価
+        <select
+          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base outline-none focus:border-blue-500"
+          value={score}
+          onChange={(event) => setScore(event.target.value)}
+        >
+          <option value="">選んでください</option>
+          <option value="good">良い</option>
+          <option value="ok">普通</option>
+          <option value="bad">悪い</option>
+        </select>
+      </label>
+      <Textarea
+        rows={2}
+        maxLength={200}
+        placeholder="ひとこと（任意）"
+        aria-label="評価コメント"
+        value={comment}
+        onChange={(event) => setComment(event.target.value)}
+      />
+      <Button type="submit" disabled={disabled || score === ""}>
+        評価を送る
+      </Button>
+    </form>
+  );
+}
+
 function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
   const { session, token } = useAuth();
   const router = useRouter();
@@ -283,6 +331,27 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
     }
   }
 
+  async function rate(applicationId: string, score: string, comment: string) {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    setPending(true);
+    setError("");
+    try {
+      await apiFetch(`/v1/posts/${post.id}/practice/applications/${applicationId}/rating`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ score, comment }),
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
+    } finally {
+      setPending(false);
+    }
+  }
+
   const mine = post.mine;
   const open = info.status === "open";
 
@@ -301,6 +370,16 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
         <Button type="button" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/applications`)}>
           参加したい
         </Button>
+      ) : null}
+      {!mine && info.status === "dissolved" && info.my_application === "accepted" && info.my_application_id ? (
+        info.rated_host ? (
+          <p className="text-sm">評価しました</p>
+        ) : (
+          <div>
+            <p className="text-sm font-medium">募集者を評価</p>
+            <RatingForm disabled={pending} onSubmit={(score, comment) => rate(info.my_application_id ?? "", score, comment)} />
+          </div>
+        )
       ) : null}
       {mine && info.applications && info.applications.length > 0 ? (
         <ul className="space-y-2">
@@ -332,6 +411,13 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
                   </Button>
                 </div>
               ) : null}
+              {application.status === "accepted" && info.status === "dissolved" ? (
+                application.rated ? (
+                  <p className="mt-2 text-sm">評価済み</p>
+                ) : (
+                  <RatingForm disabled={pending} onSubmit={(score, comment) => rate(application.id, score, comment)} />
+                )
+              ) : null}
             </li>
           ))}
         </ul>
@@ -352,14 +438,17 @@ function PracticeFacts({ post }: { post: Post }) {
     { label: "状態", value: practiceStatusLabel(info.status) },
   ];
   return (
-    <dl className="space-y-3 rounded-xl border bg-white p-4">
-      {rows.map((row) => (
-        <div key={row.label}>
-          <dt className="text-sm text-zinc-500">{row.label}</dt>
-          <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="space-y-4">
+      <dl className="space-y-3 rounded-xl border bg-white p-4">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <dt className="text-sm text-zinc-500">{row.label}</dt>
+            <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <PracticeReputationSummary reputation={info.reputation} heading="これまでの評価" />
+    </div>
   );
 }
 

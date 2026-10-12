@@ -128,6 +128,25 @@ func (q *Queries) GetPracticeDetail(ctx context.Context, postID uuid.UUID) (Prac
 	return i, err
 }
 
+const getPracticeRatingByRater = `-- name: GetPracticeRatingByRater :one
+SELECT id
+FROM practice_ratings
+WHERE application_id = $1
+  AND rater_id = $2
+`
+
+type GetPracticeRatingByRaterParams struct {
+	ApplicationID uuid.UUID `json:"application_id"`
+	RaterID       uuid.UUID `json:"rater_id"`
+}
+
+func (q *Queries) GetPracticeRatingByRater(ctx context.Context, arg GetPracticeRatingByRaterParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getPracticeRatingByRater, arg.ApplicationID, arg.RaterID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertPracticeApplication = `-- name: InsertPracticeApplication :exec
 INSERT INTO practice_applications (id, post_id, user_id, status)
 VALUES ($1, $2, $3, 'pending')
@@ -141,6 +160,35 @@ type InsertPracticeApplicationParams struct {
 
 func (q *Queries) InsertPracticeApplication(ctx context.Context, arg InsertPracticeApplicationParams) error {
 	_, err := q.db.Exec(ctx, insertPracticeApplication, arg.ID, arg.PostID, arg.UserID)
+	return err
+}
+
+const insertPracticeRating = `-- name: InsertPracticeRating :exec
+INSERT INTO practice_ratings (
+    id, post_id, application_id, rater_id, ratee_id, score, comment
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+type InsertPracticeRatingParams struct {
+	ID            uuid.UUID `json:"id"`
+	PostID        uuid.UUID `json:"post_id"`
+	ApplicationID uuid.UUID `json:"application_id"`
+	RaterID       uuid.UUID `json:"rater_id"`
+	RateeID       uuid.UUID `json:"ratee_id"`
+	Score         string    `json:"score"`
+	Comment       string    `json:"comment"`
+}
+
+func (q *Queries) InsertPracticeRating(ctx context.Context, arg InsertPracticeRatingParams) error {
+	_, err := q.db.Exec(ctx, insertPracticeRating,
+		arg.ID,
+		arg.PostID,
+		arg.ApplicationID,
+		arg.RaterID,
+		arg.RateeID,
+		arg.Score,
+		arg.Comment,
+	)
 	return err
 }
 
@@ -244,6 +292,116 @@ func (q *Queries) ListPracticeDetails(ctx context.Context, postIds []uuid.UUID) 
 	return items, nil
 }
 
+const listPracticeReputationComments = `-- name: ListPracticeReputationComments :many
+SELECT score, comment, created_at
+FROM practice_ratings
+WHERE ratee_id = $1
+  AND comment <> ''
+ORDER BY created_at DESC
+LIMIT 5
+`
+
+type ListPracticeReputationCommentsRow struct {
+	Score     string    `json:"score"`
+	Comment   string    `json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListPracticeReputationComments(ctx context.Context, rateeID uuid.UUID) ([]ListPracticeReputationCommentsRow, error) {
+	rows, err := q.db.Query(ctx, listPracticeReputationComments, rateeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPracticeReputationCommentsRow
+	for rows.Next() {
+		var i ListPracticeReputationCommentsRow
+		if err := rows.Scan(&i.Score, &i.Comment, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPracticeReputationCounts = `-- name: ListPracticeReputationCounts :many
+SELECT
+    ratee_id,
+    (count(*) FILTER (WHERE score = 'good'))::int AS good,
+    (count(*) FILTER (WHERE score = 'ok'))::int AS ok,
+    (count(*) FILTER (WHERE score = 'bad'))::int AS bad
+FROM practice_ratings
+WHERE ratee_id = ANY($1::uuid[])
+GROUP BY ratee_id
+`
+
+type ListPracticeReputationCountsRow struct {
+	RateeID uuid.UUID `json:"ratee_id"`
+	Good    int32     `json:"good"`
+	Ok      int32     `json:"ok"`
+	Bad     int32     `json:"bad"`
+}
+
+func (q *Queries) ListPracticeReputationCounts(ctx context.Context, userIds []uuid.UUID) ([]ListPracticeReputationCountsRow, error) {
+	rows, err := q.db.Query(ctx, listPracticeReputationCounts, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPracticeReputationCountsRow
+	for rows.Next() {
+		var i ListPracticeReputationCountsRow
+		if err := rows.Scan(
+			&i.RateeID,
+			&i.Good,
+			&i.Ok,
+			&i.Bad,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRatedApplicationIDs = `-- name: ListRatedApplicationIDs :many
+SELECT application_id
+FROM practice_ratings
+WHERE post_id = $1
+  AND rater_id = $2
+`
+
+type ListRatedApplicationIDsParams struct {
+	PostID  uuid.UUID `json:"post_id"`
+	RaterID uuid.UUID `json:"rater_id"`
+}
+
+func (q *Queries) ListRatedApplicationIDs(ctx context.Context, arg ListRatedApplicationIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listRatedApplicationIDs, arg.PostID, arg.RaterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var application_id uuid.UUID
+		if err := rows.Scan(&application_id); err != nil {
+			return nil, err
+		}
+		items = append(items, application_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPracticeDetail = `-- name: LockPracticeDetail :one
 SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
 FROM practice_details
@@ -263,6 +421,28 @@ func (q *Queries) LockPracticeDetail(ctx context.Context, postID uuid.UUID) (Pra
 		&i.Capacity,
 		&i.DissolvedAt,
 	)
+	return i, err
+}
+
+const practiceReputationCounts = `-- name: PracticeReputationCounts :one
+SELECT
+    (count(*) FILTER (WHERE score = 'good'))::int AS good,
+    (count(*) FILTER (WHERE score = 'ok'))::int AS ok,
+    (count(*) FILTER (WHERE score = 'bad'))::int AS bad
+FROM practice_ratings
+WHERE ratee_id = $1
+`
+
+type PracticeReputationCountsRow struct {
+	Good int32 `json:"good"`
+	Ok   int32 `json:"ok"`
+	Bad  int32 `json:"bad"`
+}
+
+func (q *Queries) PracticeReputationCounts(ctx context.Context, rateeID uuid.UUID) (PracticeReputationCountsRow, error) {
+	row := q.db.QueryRow(ctx, practiceReputationCounts, rateeID)
+	var i PracticeReputationCountsRow
+	err := row.Scan(&i.Good, &i.Ok, &i.Bad)
 	return i, err
 }
 

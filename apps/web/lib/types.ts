@@ -69,10 +69,24 @@ export type Recruitment = {
   photos: RecruitmentPhoto[];
 };
 
+export type PracticeReputationComment = {
+  score: "good" | "ok" | "bad";
+  comment: string;
+  created_at: string;
+};
+
+export type PracticeReputation = {
+  good: number;
+  ok: number;
+  bad: number;
+  comments?: PracticeReputationComment[];
+};
+
 export type PracticeApplication = {
   id: string;
   status: "pending" | "accepted" | "declined";
   created_at: string;
+  rated?: boolean;
 };
 
 export type Practice = {
@@ -86,7 +100,10 @@ export type Practice = {
   status: "open" | "full" | "dissolved";
   dissolved_at?: string;
   my_application?: PracticeApplication["status"];
+  my_application_id?: string;
+  rated_host?: boolean;
   applications?: PracticeApplication[];
+  reputation?: PracticeReputation;
 };
 
 export type Comment = {

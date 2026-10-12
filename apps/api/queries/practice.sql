@@ -73,3 +73,46 @@ SET status = $3,
 WHERE id = $1
   AND post_id = $2
   AND status = 'pending';
+
+-- name: GetPracticeRatingByRater :one
+SELECT id
+FROM practice_ratings
+WHERE application_id = $1
+  AND rater_id = $2;
+
+-- name: ListRatedApplicationIDs :many
+SELECT application_id
+FROM practice_ratings
+WHERE post_id = $1
+  AND rater_id = $2;
+
+-- name: InsertPracticeRating :exec
+INSERT INTO practice_ratings (
+    id, post_id, application_id, rater_id, ratee_id, score, comment
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: PracticeReputationCounts :one
+SELECT
+    (count(*) FILTER (WHERE score = 'good'))::int AS good,
+    (count(*) FILTER (WHERE score = 'ok'))::int AS ok,
+    (count(*) FILTER (WHERE score = 'bad'))::int AS bad
+FROM practice_ratings
+WHERE ratee_id = $1;
+
+-- name: ListPracticeReputationCounts :many
+SELECT
+    ratee_id,
+    (count(*) FILTER (WHERE score = 'good'))::int AS good,
+    (count(*) FILTER (WHERE score = 'ok'))::int AS ok,
+    (count(*) FILTER (WHERE score = 'bad'))::int AS bad
+FROM practice_ratings
+WHERE ratee_id = ANY(sqlc.arg('user_ids')::uuid[])
+GROUP BY ratee_id;
+
+-- name: ListPracticeReputationComments :many
+SELECT score, comment, created_at
+FROM practice_ratings
+WHERE ratee_id = $1
+  AND comment <> ''
+ORDER BY created_at DESC
+LIMIT 5;

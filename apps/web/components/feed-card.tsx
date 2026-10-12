@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Post } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
+import { practiceReputationLine } from "@/components/practice-reputation";
 
 export function feedTitle(title: string) {
   const trimmed = title.trim();
@@ -31,6 +32,9 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
                 募集 {info.accepted_count}/{info.capacity}人
                 {info.status === "full" ? "・満員" : info.status === "dissolved" ? "・解散" : ""}
               </p>
+              {practiceReputationLine(info.reputation) ? (
+                <p className="text-xs text-zinc-600">{practiceReputationLine(info.reputation)}</p>
+              ) : null}
             </div>
           ) : (
             <p className="line-clamp-4 text-sm font-semibold leading-snug">{title}</p>

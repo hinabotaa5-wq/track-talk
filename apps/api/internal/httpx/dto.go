@@ -55,22 +55,39 @@ type recruitmentDTO struct {
 }
 
 type practiceDTO struct {
-	Venue         string                   `json:"venue"`
-	StartsAt      time.Time                `json:"starts_at"`
-	Event         string                   `json:"event"`
-	EventOther    string                   `json:"event_other,omitempty"`
-	EventLabel    string                   `json:"event_label"`
-	Capacity      int32                    `json:"capacity"`
-	DissolvedAt   *time.Time               `json:"dissolved_at,omitempty"`
-	AcceptedCount int32                    `json:"accepted_count"`
-	Status        string                   `json:"status"`
-	MyApplication string                   `json:"my_application,omitempty"`
-	Applications  []practiceApplicationDTO `json:"applications,omitempty"`
+	Venue           string                   `json:"venue"`
+	StartsAt        time.Time                `json:"starts_at"`
+	Event           string                   `json:"event"`
+	EventOther      string                   `json:"event_other,omitempty"`
+	EventLabel      string                   `json:"event_label"`
+	Capacity        int32                    `json:"capacity"`
+	DissolvedAt     *time.Time               `json:"dissolved_at,omitempty"`
+	AcceptedCount   int32                    `json:"accepted_count"`
+	Status          string                   `json:"status"`
+	MyApplication   string                   `json:"my_application,omitempty"`
+	MyApplicationID *uuid.UUID               `json:"my_application_id,omitempty"`
+	RatedHost       bool                     `json:"rated_host,omitempty"`
+	Applications    []practiceApplicationDTO `json:"applications,omitempty"`
+	Reputation      *practiceReputationDTO   `json:"reputation,omitempty"`
 }
 
 type practiceApplicationDTO struct {
 	ID        uuid.UUID `json:"id"`
 	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	Rated     bool      `json:"rated,omitempty"`
+}
+
+type practiceReputationDTO struct {
+	Good     int32                          `json:"good"`
+	Ok       int32                          `json:"ok"`
+	Bad      int32                          `json:"bad"`
+	Comments []practiceReputationCommentDTO `json:"comments,omitempty"`
+}
+
+type practiceReputationCommentDTO struct {
+	Score     string    `json:"score"`
+	Comment   string    `json:"comment"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

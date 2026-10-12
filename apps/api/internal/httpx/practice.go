@@ -246,6 +246,11 @@ func (s *Server) attachPractice(ctx context.Context, item postDTO) (postDTO, err
 		return item, err
 	}
 	item.Practice = practiceFromDetail(detail, count)
+	reputation, err := s.reputationFor(ctx, item.authorID, true)
+	if err != nil {
+		return item, err
+	}
+	item.Practice.Reputation = &reputation
 	return item, nil
 }
 
@@ -282,7 +287,66 @@ func (s *Server) attachPracticeSummaries(ctx context.Context, items []postDTO) e
 		}
 		items[i].Practice = practiceFromDetail(row, accepted[row.PostID])
 	}
+	if err := s.attachPracticeReputationCounts(ctx, items); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *Server) attachPracticeReputationCounts(ctx context.Context, items []postDTO) error {
+	seen := map[uuid.UUID]bool{}
+	ids := make([]uuid.UUID, 0)
+	for _, item := range items {
+		if item.Kind != "practice" || item.Practice == nil || seen[item.authorID] {
+			continue
+		}
+		seen[item.authorID] = true
+		ids = append(ids, item.authorID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.q.ListPracticeReputationCounts(ctx, ids)
+	if err != nil {
+		return err
+	}
+	byUser := map[uuid.UUID]practiceReputationDTO{}
+	for _, row := range rows {
+		byUser[row.RateeID] = practiceReputationDTO{Good: row.Good, Ok: row.Ok, Bad: row.Bad}
+	}
+	for i := range items {
+		if items[i].Kind != "practice" || items[i].Practice == nil {
+			continue
+		}
+		reputation := byUser[items[i].authorID]
+		items[i].Practice.Reputation = &reputation
+	}
+	return nil
+}
+
+func (s *Server) reputationFor(ctx context.Context, userID uuid.UUID, withComments bool) (practiceReputationDTO, error) {
+	counts, err := s.q.PracticeReputationCounts(ctx, userID)
+	if err != nil {
+		return practiceReputationDTO{}, err
+	}
+	reputation := practiceReputationDTO{Good: counts.Good, Ok: counts.Ok, Bad: counts.Bad}
+	if !withComments {
+		return reputation, nil
+	}
+	rows, err := s.q.ListPracticeReputationComments(ctx, userID)
+	if err != nil {
+		return practiceReputationDTO{}, err
+	}
+	comments := make([]practiceReputationCommentDTO, 0, len(rows))
+	for _, row := range rows {
+		comments = append(comments, practiceReputationCommentDTO{
+			Score:     row.Score,
+			Comment:   row.Comment,
+			CreatedAt: row.CreatedAt,
+		})
+	}
+	reputation.Comments = comments
+	return reputation, nil
 }
 
 func (s *Server) loadPracticePost(w http.ResponseWriter, r *http.Request) (db.GetPostRow, bool) {
@@ -307,32 +371,45 @@ func (s *Server) attachPracticeViewer(r *http.Request, item postDTO) (postDTO, e
 		return item, nil
 	}
 	if uid, ok := UserID(r.Context()); ok {
+		ratedIDs, err := s.q.ListRatedApplicationIDs(r.Context(), db.ListRatedApplicationIDsParams{
+			PostID:  item.ID,
+			RaterID: uid,
+		})
+		if err != nil {
+			return item, err
+		}
+		rated := map[uuid.UUID]bool{}
+		for _, id := range ratedIDs {
+			rated[id] = true
+		}
 		app, err := s.q.GetPracticeApplicationByUser(r.Context(), db.GetPracticeApplicationByUserParams{
 			PostID: item.ID,
 			UserID: uid,
 		})
 		if err == nil {
 			item.Practice.MyApplication = app.Status
+			item.Practice.MyApplicationID = &app.ID
+			item.Practice.RatedHost = rated[app.ID]
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return item, err
 		}
+		if item.Mine {
+			rows, err := s.q.ListPracticeApplications(r.Context(), item.ID)
+			if err != nil {
+				return item, err
+			}
+			apps := make([]practiceApplicationDTO, 0, len(rows))
+			for _, row := range rows {
+				apps = append(apps, practiceApplicationDTO{
+					ID:        row.ID,
+					Status:    row.Status,
+					CreatedAt: row.CreatedAt,
+					Rated:     rated[row.ID],
+				})
+			}
+			item.Practice.Applications = apps
+		}
 	}
-	if !item.Mine {
-		return item, nil
-	}
-	rows, err := s.q.ListPracticeApplications(r.Context(), item.ID)
-	if err != nil {
-		return item, err
-	}
-	apps := make([]practiceApplicationDTO, 0, len(rows))
-	for _, row := range rows {
-		apps = append(apps, practiceApplicationDTO{
-			ID:        row.ID,
-			Status:    row.Status,
-			CreatedAt: row.CreatedAt,
-		})
-	}
-	item.Practice.Applications = apps
 	return item, nil
 }
 
@@ -532,4 +609,127 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writePost(w, r, post.ID, http.StatusOK)
+}
+
+type ratingReq struct {
+	Score   string `json:"score"`
+	Comment string `json:"comment"`
+}
+
+func normalizeRating(req ratingReq) (string, string, map[string]string) {
+	fields := map[string]string{}
+	score := strings.TrimSpace(req.Score)
+	switch score {
+	case "good", "ok", "bad":
+	default:
+		fields["score"] = "評価を選んでください"
+	}
+	comment, msg := textLimit(req.Comment, 200, "", "コメントは200文字以内で入力してください", false)
+	if msg != "" {
+		fields["comment"] = msg
+	}
+	return score, comment, fields
+}
+
+func (s *Server) practiceReputation(w http.ResponseWriter, r *http.Request) {
+	me, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	reputation, err := s.reputationFor(r.Context(), me.ID, true)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, reputation)
+}
+
+func (s *Server) ratePractice(w http.ResponseWriter, r *http.Request) {
+	me, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req ratingReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	score, comment, fields := normalizeRating(req)
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	post, ok := s.loadPracticePost(w, r)
+	if !ok {
+		return
+	}
+	applicationID, ok := parseUUIDParam(w, r, "applicationID")
+	if !ok {
+		return
+	}
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	detail, err := q.LockPracticeDetail(r.Context(), post.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if detail.DissolvedAt == nil {
+		Error(w, http.StatusConflict, "conflict", "解散後に評価できます")
+		return
+	}
+	application, err := q.GetPracticeApplication(r.Context(), db.GetPracticeApplicationParams{
+		ID:     applicationID,
+		PostID: post.ID,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if application.Status != "accepted" {
+		Error(w, http.StatusForbidden, "forbidden", "承認された相手だけ評価できます")
+		return
+	}
+	var ratee uuid.UUID
+	switch {
+	case me.ID == post.AuthorID:
+		ratee = application.UserID
+	case me.ID == application.UserID:
+		ratee = post.AuthorID
+	default:
+		Error(w, http.StatusForbidden, "forbidden", "この相手は評価できません")
+		return
+	}
+	if _, err := q.GetPracticeRatingByRater(r.Context(), db.GetPracticeRatingByRaterParams{
+		ApplicationID: application.ID,
+		RaterID:       me.ID,
+	}); err == nil {
+		Error(w, http.StatusConflict, "conflict", "すでに評価しています")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
+	if err := q.InsertPracticeRating(r.Context(), db.InsertPracticeRatingParams{
+		ID:            uuid.New(),
+		PostID:        post.ID,
+		ApplicationID: application.ID,
+		RaterID:       me.ID,
+		RateeID:       ratee,
+		Score:         score,
+		Comment:       comment,
+	}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	s.writePost(w, r, post.ID, http.StatusCreated)
 }
