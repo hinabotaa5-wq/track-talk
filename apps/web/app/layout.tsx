@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
+import { LegalFooter } from "@/components/legal-footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +30,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <CompetitionPrefetch />
           <Header />
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+            {children}
+            <LegalFooter />
+          </main>
           <BottomNav />
         </AuthProvider>
       </body>
