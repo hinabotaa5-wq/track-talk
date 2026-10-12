@@ -55,14 +55,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
-		r.Get("/competitions", s.listCompetitions)
-		r.Get("/major-hosts", s.listMajorHosts)
 		r.Get("/posts", s.listPosts)
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
+			r.Get("/competitions", s.listCompetitions)
+			r.Get("/major-hosts", s.listMajorHosts)
 			r.Get("/me", s.me)
 			r.Delete("/me", s.deleteAccount)
 			r.Get("/me/practice-reputation", s.practiceReputation)

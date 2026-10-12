@@ -2,6 +2,7 @@
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
+import { safeNextPath } from "@/lib/safe-next";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -45,7 +46,7 @@ export default function LoginPage() {
       setError(authErrorMessage(err));
       return;
     }
-    router.push("/");
+    router.push(safeNextPath(new URLSearchParams(window.location.search).get("next")));
     router.refresh();
   }
 

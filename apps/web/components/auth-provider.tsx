@@ -5,6 +5,8 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Profile } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
+import { clearCompetitions } from "@/lib/competition-list";
+import { clearMajorHosts } from "@/lib/major-hosts";
 
 type AuthState = {
   session: Session | null;
@@ -51,6 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const { data } = supabase.auth.onAuthStateChange((_e, next) => {
       setSession(next);
+      if (!next) {
+        clearCompetitions();
+        clearMajorHosts();
+      }
       loadProfile(next?.access_token ?? null);
     });
     return () => data.subscription.unsubscribe();

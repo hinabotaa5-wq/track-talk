@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { cityPhotoSrc, preloadCityPhotos } from "@/lib/city-photo";
@@ -8,14 +9,16 @@ import { loadMajorHosts, peekMajorHosts } from "@/lib/major-hosts";
 import type { MajorHost } from "@/lib/types";
 
 export function MajorHostsPanel() {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [hosts, setHosts] = useState<MajorHost[] | null>(peekMajorHosts);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(() => peekMajorHosts() === null);
 
   useEffect(() => {
+    if (!token) return;
     let active = true;
-    loadMajorHosts()
+    loadMajorHosts(token)
       .then((next) => {
         if (!active) return;
         preloadCityPhotos(next.map((host) => host.image_url), "high");
@@ -31,7 +34,7 @@ export function MajorHostsPanel() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [token]);
 
   return (
     <div className="space-y-3">

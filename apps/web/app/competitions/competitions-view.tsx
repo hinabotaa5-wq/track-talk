@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { MajorHostsPanel } from "@/components/major-hosts-panel";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -28,6 +29,7 @@ function competitionDates(startsOn: string, endsOn: string | null) {
 }
 
 export function CompetitionsView() {
+  const { token } = useAuth();
   const sp = useSearchParams();
   const month = monthNumber(sp.get("month") ?? undefined) || currentMonthInTokyo();
   const fromUrl = prefectureCode(sp.get("prefecture") ?? undefined);
@@ -54,8 +56,9 @@ export function CompetitionsView() {
       setLoadedKey(key);
     }
 
+    if (!token) return;
     let active = true;
-    loadCompetitions(prefecture, month).then((entry) => {
+    loadCompetitions(prefecture, month, token).then((entry) => {
       if (!active) return;
       setItems(entry.items);
       setError(entry.error);
@@ -64,7 +67,7 @@ export function CompetitionsView() {
     return () => {
       active = false;
     };
-  }, [prefecture, month, key]);
+  }, [prefecture, month, key, token]);
 
   return (
     <RequireSession>

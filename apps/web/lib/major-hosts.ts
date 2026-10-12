@@ -8,10 +8,15 @@ export function peekMajorHosts() {
   return cachedHosts;
 }
 
-export function loadMajorHosts() {
+export function clearMajorHosts() {
+  cachedHosts = null;
+  hostsRequest = null;
+}
+
+export function loadMajorHosts(token: string) {
   if (cachedHosts) return Promise.resolve(cachedHosts);
   if (!hostsRequest) {
-    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts")
+    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts", { token })
       .then((data) => {
         cachedHosts = data.hosts ?? [];
         return cachedHosts;

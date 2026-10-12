@@ -11,17 +11,17 @@ import { currentMonthInTokyo, INTERNATIONAL } from "@/lib/prefectures";
 
 export function CompetitionPrefetch() {
   const pathname = usePathname();
-  const { session, loading } = useAuth();
+  const { session, token, loading } = useAuth();
 
   useEffect(() => {
-    if (loading || !session) return;
+    if (loading || !session || !token) return;
     const prefecture = readSavedCompetitionPrefecture() || INTERNATIONAL;
-    void loadCompetitions(prefecture, currentMonthInTokyo());
+    void loadCompetitions(prefecture, currentMonthInTokyo(), token);
     if (pathname.startsWith("/competitions")) return;
-    void loadMajorHosts().then((hosts) => {
+    void loadMajorHosts(token).then((hosts) => {
       preloadCityPhotos(hosts.map((host) => host.image_url));
     });
-  }, [loading, session, pathname]);
+  }, [loading, session, token, pathname]);
 
   return null;
 }

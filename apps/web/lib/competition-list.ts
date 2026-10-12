@@ -21,7 +21,12 @@ export function readCompetitions(prefecture: string, month: number) {
   return cache.get(competitionCacheKey(prefecture, month));
 }
 
-export function loadCompetitions(prefecture: string, month: number) {
+export function clearCompetitions() {
+  cache.clear();
+  inflight.clear();
+}
+
+export function loadCompetitions(prefecture: string, month: number, token: string) {
   const key = competitionCacheKey(prefecture, month);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < freshForMs) return Promise.resolve(hit);
@@ -31,6 +36,7 @@ export function loadCompetitions(prefecture: string, month: number) {
 
   const request = apiFetch<{ competitions: Competition[] }>(
     `/v1/competitions?prefecture=${prefecture}&month=${month}`,
+    { token },
   )
     .then((data) => {
       const entry = { items: data.competitions ?? [], error: "", at: Date.now() };
