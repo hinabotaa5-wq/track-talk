@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
+import { CompetitionPrefetch } from "@/components/competition-prefetch";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <AuthProvider>
+          <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
           <BottomNav />

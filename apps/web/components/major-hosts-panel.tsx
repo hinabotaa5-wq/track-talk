@@ -1,18 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { apiFetch } from "@/lib/api";
 import type { MajorHost } from "@/lib/types";
 
-export function MajorHostsPanel({
-  hosts,
-  error,
-}: {
-  hosts: MajorHost[];
-  error: string;
-}) {
+let cachedHosts: MajorHost[] | null = null;
+let hostsRequest: Promise<MajorHost[]> | null = null;
+
+function loadMajorHosts() {
+  if (cachedHosts) return Promise.resolve(cachedHosts);
+  if (!hostsRequest) {
+    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts")
+      .then((data) => {
+        cachedHosts = data.hosts ?? [];
+        return cachedHosts;
+      })
+      .catch((err) => {
+        hostsRequest = null;
+        throw err;
+      });
+  }
+  return hostsRequest;
+}
+
+export function MajorHostsPanel() {
   const [open, setOpen] = useState(false);
+  const [hosts, setHosts] = useState<MajorHost[] | null>(cachedHosts);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || hosts) return;
+    let active = true;
+    setLoading(true);
+    loadMajorHosts()
+      .then((next) => {
+        if (!active) return;
+        setHosts(next);
+        setError("");
+      })
+      .catch(() => {
+        if (active) setError("開催地を取得できませんでした。");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, hosts]);
 
   return (
     <div className="space-y-3">
@@ -21,11 +59,15 @@ export function MajorHostsPanel({
         variant="secondary"
         className="h-11 w-full md:w-fit"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (!open && !hosts) setLoading(true);
+          setOpen((value) => !value);
+        }}
       >
         今後の世界陸上・オリンピック
       </Button>
-      {open ? <MajorHostList hosts={hosts} error={error} /> : null}
+      {open && loading ? <p className="text-sm text-zinc-600">読み込み中...</p> : null}
+      {open && !loading ? <MajorHostList hosts={hosts ?? []} error={error} /> : null}
     </div>
   );
 }
