@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 )
 
 func main() {
-	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と今日の7県まで")
+	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と、Gemini の1日の上限（GEMINI_DAILY_REQUESTS、既定15回）に収まる県まで")
 	dryRun := flag.Bool("dry-run", false, "DB に書かず、読み取れた大会を表示する。-prefecture が必要")
 	pageURL := flag.String("url", "", "-dry-run のとき、未登録の県でも試せる日程ページの URL")
 	flag.Parse()
@@ -126,7 +127,29 @@ func selectTargets(ctx context.Context, pool *pgxpool.Pool, prefecture string) (
 	if err != nil {
 		return nil, err
 	}
-	return competitions.DueSources(competitions.Sources, updated, time.Now()), nil
+	limit, err := dailyRequestLimit()
+	if err != nil {
+		return nil, err
+	}
+	for _, source := range competitions.Sources {
+		if source.Requests() > limit {
+			log.Printf("%s: Gemini を %d 回使うので、1日 %d 回の上限では取り込めません", source.Prefecture, source.Requests(), limit)
+		}
+	}
+	return competitions.DueSources(competitions.Sources, updated, time.Now(), limit), nil
+}
+
+// dailyRequestLimit lets GEMINI_DAILY_REQUESTS follow the project's requests-per-day shown in AI Studio.
+func dailyRequestLimit() (int, error) {
+	raw := strings.TrimSpace(os.Getenv("GEMINI_DAILY_REQUESTS"))
+	if raw == "" {
+		return competitions.DailyRequestLimit, nil
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit < 1 {
+		return 0, fmt.Errorf("GEMINI_DAILY_REQUESTS は1以上の整数にしてください: %q", raw)
+	}
+	return limit, nil
 }
 
 func importTimes(ctx context.Context, pool *pgxpool.Pool) (map[string]time.Time, error) {
@@ -317,7 +340,7 @@ func isInternational(prefecture string) bool {
 
 func internationalDue(updated map[string]time.Time, now time.Time) bool {
 	imported, ok := updated[competitions.InternationalPrefecture]
-	return !ok || imported.IsZero() || now.Sub(imported) >= competitions.RefreshAfter
+	return !ok || imported.IsZero() || now.Sub(imported) >= competitions.InternationalRefreshAfter
 }
 
 func importInternational(ctx context.Context, pool *pgxpool.Pool) error {
