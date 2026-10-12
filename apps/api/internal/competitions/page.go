@@ -173,9 +173,13 @@ func scheduleTables(doc *html.Node, season int) []foundTable {
 			if isCalendarWidget(n) {
 				return
 			}
-			headers, _ := tableHeaders(n)
+			headers, headerAt := tableHeaders(n)
 			if isScheduleHeader(headers) && (section == 0 || section == season) {
-				tables = append(tables, foundTable{node: n, month: month})
+				tblMonth := tableLeadingMonth(n, headerAt)
+				if tblMonth == "" {
+					tblMonth = month
+				}
+				tables = append(tables, foundTable{node: n, month: tblMonth})
 			}
 			return
 		}
@@ -191,6 +195,25 @@ func scheduleTables(doc *html.Node, season int) []foundTable {
 	}
 	walk(doc)
 	return tables
+}
+
+func tableLeadingMonth(table *html.Node, headerAt int) string {
+	if headerAt <= 0 {
+		return ""
+	}
+	rows := directRows(table)
+	for i := 0; i < headerAt && i < len(rows); i++ {
+		text := normalizeDigits(cellText(rows[i]))
+		monthMatch := monthHeadingPattern.FindStringSubmatch(text)
+		if monthMatch != nil {
+			yearMatch := headingYearPattern.FindStringSubmatch(text)
+			if monthMatch[1] == "" && yearMatch != nil {
+				return yearMatch[1] + "年" + monthMatch[2] + "月"
+			}
+			return monthMatch[0]
+		}
+	}
+	return ""
 }
 
 func headingMonth(n *html.Node) (string, bool) {
@@ -585,16 +608,32 @@ func gridHeaders(grid [][]*html.Node) ([]string, int) {
 	if len(grid) == 0 {
 		return nil, 0
 	}
-	firstLine := grid[0]
-	if len(firstLine) > 0 && firstLine[0] != nil {
-		second := ""
-		if len(firstLine) > 1 && firstLine[1] != nil {
-			second = cellText(firstLine[1])
+	limit := len(grid)
+	if limit > 4 {
+		limit = 4
+	}
+	for i := 0; i < limit; i++ {
+		line := grid[i]
+		if i == 0 && len(line) > 0 && line[0] != nil {
+			second := ""
+			if len(line) > 1 && line[1] != nil {
+				second = cellText(line[1])
+			}
+			if isHeadlessDataRow(cellText(line[0]), len(line)-1, second) {
+				return synthesizedHeaders(len(line)), -1
+			}
 		}
-		if isHeadlessDataRow(cellText(firstLine[0]), len(firstLine)-1, second) {
-			return synthesizedHeaders(len(firstLine)), -1
+		candidate := make([]string, len(line))
+		for col, node := range line {
+			if node != nil {
+				candidate[col] = compactHeader(cellText(node))
+			}
+		}
+		if isScheduleHeader(candidate) {
+			return candidate, i
 		}
 	}
+	firstLine := grid[0]
 	labels := make([]string, len(firstLine))
 	for col, node := range firstLine {
 		if node != nil {
@@ -711,16 +750,33 @@ func tableHeaders(table *html.Node) ([]string, int) {
 	if len(rows) == 0 {
 		return nil, 0
 	}
-	cells := elementChildren(rows[0], "td")
-	if len(cells) > 0 {
-		second := ""
-		if len(cells) > 1 {
-			second = cellText(cells[1])
+	limit := len(rows)
+	if limit > 4 {
+		limit = 4
+	}
+	for i := 0; i < limit; i++ {
+		cells := elementChildren(rows[i], "td")
+		if len(cells) == 0 {
+			continue
 		}
-		if isHeadlessDataRow(cellText(cells[0]), len(cells)-1, second) {
-			return synthesizedHeaders(len(cells)), -1
+		if i == 0 {
+			second := ""
+			if len(cells) > 1 {
+				second = cellText(cells[1])
+			}
+			if isHeadlessDataRow(cellText(cells[0]), len(cells)-1, second) {
+				return synthesizedHeaders(len(cells)), -1
+			}
+		}
+		candidate := make([]string, len(cells))
+		for j, cell := range cells {
+			candidate[j] = compactHeader(cellText(cell))
+		}
+		if isScheduleHeader(candidate) {
+			return candidate, i
 		}
 	}
+	cells := elementChildren(rows[0], "td")
 	headers := make([]string, len(cells))
 	for i, cell := range cells {
 		headers[i] = compactHeader(cellText(cell))

@@ -288,3 +288,34 @@ func TestParsePageYearHeader(t *testing.T) {
 	}
 }
 
+func TestParsePageTableLeadingMonthHeader(t *testing.T) {
+	html := `<html><body>
+<h1>2026年度愛知陸上競技日程</h1>
+<table>
+  <tr><td><strong>2026年度<br>4月</strong></td><td></td><td></td><td></td></tr>
+  <tr><td>日</td><td>競技会・行事</td><td>会場</td><td>要項</td></tr>
+  <tr><td>25（土）26（日）</td><td>国スポ選考春季選抜</td><td>パロマ瑞穂</td><td><a href="yoko.pdf">要項</a></td></tr>
+</table>
+<table>
+  <tr><td><strong>5月</strong></td><td></td><td></td><td></td></tr>
+  <tr><td>日</td><td>競技会・行事</td><td>会場</td><td>要項</td></tr>
+  <tr><td>10（日）</td><td>春日井スプリント</td><td>春日井</td><td><a href="yoko2.pdf">要項</a></td></tr>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "http://example.com/01nittei.htm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	for _, want := range []string{"2026年4月 25", "国スポ選考春季選抜", "パロマ瑞穂", "5月 10", "春日井スプリント", "春日井"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+	if len(page.Links) != 2 {
+		t.Fatalf("links count = %d, want 2", len(page.Links))
+	}
+}
+

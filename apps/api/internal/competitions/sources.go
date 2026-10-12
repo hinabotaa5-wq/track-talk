@@ -24,6 +24,15 @@ var Sources = []Source{
 	},
 	{Prefecture: "19", PageURL: "https://yamanashitf.com/2026nendo-taikai"},
 	{Prefecture: "20", PageURL: "https://nagano-rk.com/calendar/2026nrk_calendar-2-2-2-2-2/"},
+	{
+		Prefecture: "23",
+		PageURL:    "http://aichi-rk.jp/01nittei.htm",
+		ExtraURLs: []string{
+			"http://aichi-rk.jp/01_01nittei.htm",
+			"http://aichi-rk.jp/01_02nittei.htm",
+			"http://aichi-rk.jp/01_03nittei.htm",
+		},
+	},
 	{Prefecture: "24", PageURL: "https://mierk.jp/taikaiyoukou/"},
 	{Prefecture: "25", PageURL: "https://srkshiga.com/?page_id=874"},
 	{Prefecture: "27", PageURL: "https://www.oaaa.jp/competition/?y=2026"},
