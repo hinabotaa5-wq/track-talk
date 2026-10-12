@@ -131,6 +131,7 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 	}
 	text := normalizeDigits(nodeText(doc))
 	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?:R|令和)\s*\d{1,2}\s*[（(]\s*(20\d{2})\s*[）)]\s*年度`),
 		regexp.MustCompile(`(20\d{2})年競技`),
 		regexp.MustCompile(`(20\d{2})年度`),
 		seasonYearPattern,
@@ -173,15 +174,17 @@ func scheduleTables(doc *html.Node, season int) []foundTable {
 			if isCalendarWidget(n) {
 				return
 			}
-			headers, headerAt := tableHeaders(n)
-			if isScheduleHeader(headers) && (section == 0 || section == season) {
-				tblMonth := tableLeadingMonth(n, headerAt)
-				if tblMonth == "" {
-					tblMonth = month
+			if !hasNestedTable(n) {
+				headers, headerAt := tableHeaders(n)
+				if isScheduleHeader(headers) && (section == 0 || section == season) {
+					tblMonth := tableLeadingMonth(n, headerAt)
+					if tblMonth == "" {
+						tblMonth = month
+					}
+					tables = append(tables, foundTable{node: n, month: tblMonth})
+					return
 				}
-				tables = append(tables, foundTable{node: n, month: tblMonth})
 			}
-			return
 		}
 		if y, ok := headingSeason(n); ok {
 			section = y
@@ -195,6 +198,18 @@ func scheduleTables(doc *html.Node, season int) []foundTable {
 	}
 	walk(doc)
 	return tables
+}
+
+func hasNestedTable(n *html.Node) bool {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == "table" {
+			return true
+		}
+		if hasNestedTable(c) {
+			return true
+		}
+	}
+	return false
 }
 
 func tableLeadingMonth(table *html.Node, headerAt int) string {
@@ -694,11 +709,17 @@ func isDayOfWeekGrid(headers []string) bool {
 }
 
 func isScheduleHeader(headers []string) bool {
+	if len(headers) < 2 {
+		return false
+	}
 	if isDayOfWeekGrid(headers) {
 		return false
 	}
 	for _, header := range headers {
 		header = strings.TrimSpace(header)
+		if len([]rune(header)) > 25 {
+			continue
+		}
 		if isDateHeader(header) || strings.Contains(header, "要項") {
 			return true
 		}

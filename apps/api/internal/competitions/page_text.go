@@ -110,16 +110,20 @@ func looksLikeSchedule(body string) bool {
 	return len(scheduleDatePattern.FindAllStringIndex(normalizeDigits(body), -1)) >= 10
 }
 
-var seasonNamePattern = regexp.MustCompile(`(20\d{2})\s*(?:[（(][^）)]{0,8}[）)])?\s*(?:年度|年開催)`)
+var seasonNamePattern = regexp.MustCompile(`(?:(?:R|令和)\s*\d{1,2}\s*[（(]\s*(20\d{2})\s*[）)]|(20\d{2})\s*(?:[（(][^）)]{0,8}[）)])?)\s*(?:年度|年開催)`)
 
-// newestSeasonYear is the largest year written as 2026年度, 2026年開催 or 2026（令和8）年度,
+// newestSeasonYear is the largest year written as 2026年度, 2026年開催, 2026（令和8）年度, or R8（2026）年度,
 // capped at next season so navigation links to future years (or placeholders like 2029) are ignored.
 func newestSeasonYear(doc *html.Node) (int, bool) {
 	newest := 0
 	maxYear := seasonYearCap()
 	for _, match := range seasonNamePattern.FindAllStringSubmatch(normalizeDigits(nodeText(doc)), -1) {
+		yearStr := match[1]
+		if yearStr == "" {
+			yearStr = match[2]
+		}
 		year := 0
-		for _, r := range match[1] {
+		for _, r := range yearStr {
 			year = year*10 + int(r-'0')
 		}
 		if year > newest && year <= maxYear {

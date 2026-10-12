@@ -3,6 +3,24 @@ package competitions
 // Sources are the athletics association homepages to read.
 // Other prefectures are added here as their schedule page URL is known.
 var Sources = []Source{
+	{Prefecture: "08", PageURL: "http://ibariku.com/event/2026.html"},
+	{Prefecture: "09", PageURL: "https://www.jaaftochigi.jp/event2026/"},
+	{Prefecture: "10", PageURL: "http://gold.jaic.org/gunma/competitions.html"},
+	{
+		Prefecture: "11",
+		PageURL:    "http://sairiku.net/bace/Event/R08Event/EventR0804",
+		ExtraURLs: []string{
+			"http://sairiku.net/bace/Event/R08Event/EventR0805",
+			"http://sairiku.net/bace/Event/R08Event/EventR0806",
+			"http://sairiku.net/bace/Event/R08Event/EventR0807",
+			"http://sairiku.net/bace/Event/R08Event/EventR0808",
+			"http://sairiku.net/bace/Event/R08Event/EventR0809",
+			"http://sairiku.net/bace/Event/R08Event/EventR0810",
+			"http://sairiku.net/bace/Event/R08Event/EventR0811",
+		},
+	},
+	{Prefecture: "13", PageURL: "https://toriku.or.jp/competition/"},
+	{Prefecture: "14", PageURL: "https://www.kanagawariku.org/kana31com100.html"},
 	{Prefecture: "16", PageURL: "https://www.jaaf-toyama.net/schedule/"},
 	{Prefecture: "17", PageURL: "https://www.ishiriku.jp/youkou.html"},
 	{

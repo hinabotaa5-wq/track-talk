@@ -319,3 +319,44 @@ func TestParsePageTableLeadingMonthHeader(t *testing.T) {
 	}
 }
 
+func TestParsePageNestedLayoutTable(t *testing.T) {
+	html := `<html><body>
+<table><tr><td>
+<p>注意事項 要項は基本的に「陸上茨城2026」に掲載するものです。</p>
+<table>
+<tr><td>月</td><td>日</td><td>大会名</td><td>場所</td><td>要項・ＨＰ</td></tr>
+<tr><td rowspan="2">4</td><td>5(日)</td><td>茨城マスターズ記録会</td><td>石岡</td><td><a href="plan/2026/kiroku68.pdf">要項</a></td></tr>
+<tr><td>11(土)</td><td>第１回県記録会</td><td>笠松</td><td><a href="plan/2026/kiroku1.pdf">要項</a></td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "http://example.com/event/2026.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.rows) != 2 {
+		t.Fatalf("rows = %d, want 2: %s", len(page.rows), page.Body)
+	}
+	for _, want := range []string{"茨城マスターズ記録会", "第１回県記録会", "笠松"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+}
+
+func TestParsePageEraSeasonYear(t *testing.T) {
+	html := `<html><body>
+<p>◆ R8（2026）年度 県陸協主催競技会</p>
+<table>
+<tr><td>開催日</td><td>競技場</td><td>競技会名</td><td>要項他</td></tr>
+<tr><td>8/22～23</td><td>三ツ沢</td><td>第4回神奈川県記録会</td><td><a href="youkou/2026/kiroku4.pdf">PDF</a></td></tr>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://example.com/kana31com100.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+}
