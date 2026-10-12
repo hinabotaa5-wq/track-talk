@@ -5,7 +5,7 @@ import { RecruitmentForm } from "@/components/recruitment-form";
 
 export default function RecruitPostPage() {
   return (
-    <ComposerPage title="クラブチームの募集" lead="チームの活動と募集条件を書いて、メンバーを募ります。">
+    <ComposerPage title="クラブチームの募集">
       <RecruitmentForm />
     </ComposerPage>
   );

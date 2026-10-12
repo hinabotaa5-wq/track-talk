@@ -175,7 +175,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         <Textarea rows={8} className="mt-1" maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
+      <Button type="submit" className="w-full" disabled={submitting}>
         {initial ? "更新する" : "投稿する"}
       </Button>
     </form>

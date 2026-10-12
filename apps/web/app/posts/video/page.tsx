@@ -79,10 +79,7 @@ export default function OwnVideoPage() {
   }
 
   return (
-    <ComposerPage
-      title="自分の動画"
-      lead="ファイルはCloudinaryに保存します。保存が終わってからホームに出ます。見るのにログインは要りません。"
-    >
+    <ComposerPage title="自分の動画">
       <form onSubmit={onSubmit} className="space-y-4">
         <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
@@ -99,7 +96,7 @@ export default function OwnVideoPage() {
         {upload ? <UploadProgress noun="動画" phase={uploadPhase} progress={upload} /> : null}
         {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
+        <Button type="submit" className="w-full" disabled={submitting}>
           アップロードして投稿
         </Button>
       </form>

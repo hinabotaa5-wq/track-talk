@@ -56,7 +56,7 @@ export default function LoginPage() {
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button type="submit" className="w-full md:w-auto">ログイン</Button>
+        <Button type="submit" className="w-full">ログイン</Button>
       </form>
       <GoogleSignInButton />
       <p className="text-sm">

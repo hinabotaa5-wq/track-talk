@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
-import { FeedCard } from "@/components/feed-card";
+import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
 
@@ -53,7 +53,7 @@ export function SavedFeed({ q, page }: { q: string; page: number }) {
         />
       ) : null}
       {posts.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className={feedGridClass}>
           {posts.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}

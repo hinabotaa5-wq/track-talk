@@ -45,10 +45,7 @@ export default function YouTubePostPage() {
   }
 
   return (
-    <ComposerPage
-      title="YouTubeのURL"
-      lead="同じ動画のスレがあれば、それを開きます。タイトルを空にすると動画のタイトルを使います。新しい動画は、サムネイルが取れてからホームに出ます。"
-    >
+    <ComposerPage title="YouTubeのURL">
       <form onSubmit={onSubmit} className="space-y-4">
         <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
@@ -64,7 +61,7 @@ export default function YouTubePostPage() {
           />
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
+        <Button type="submit" className="w-full" disabled={submitting}>
           この動画のスレを開く
         </Button>
       </form>

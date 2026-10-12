@@ -41,29 +41,35 @@ export default function MePage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">マイページ</h1>
-      <button type="button" onClick={logout} className="block text-sm text-zinc-500">
-        ログアウト
-      </button>
-      <Link href="/me/contact" className="block text-sm text-zinc-500">
-        お問い合わせ
-      </Link>
-      <Link href="/about" className="block text-sm text-zinc-500">
-        このアプリについて
-      </Link>
-      <h2 className="text-xl font-semibold">自分の投稿</h2>
-      {postsError ? (
-        <p className="text-sm text-red-600">{postsError}</p>
-      ) : posts.length === 0 ? (
-        <p className="text-sm text-zinc-600">まだ投稿がありません</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {posts.map((p) => (
-            <FeedCard key={p.id} post={p} returnTo="me" />
-          ))}
+    <div className="space-y-4 md:grid md:grid-cols-[14rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
+      <div className="space-y-3">
+        <h1 className="text-2xl font-bold">マイページ</h1>
+        <div className="flex flex-col gap-3 md:rounded-2xl md:border md:bg-white md:p-4">
+          <button type="button" onClick={logout} className="block text-left text-sm text-zinc-500">
+            ログアウト
+          </button>
+          <Link href="/me/contact" className="block text-sm text-zinc-500">
+            お問い合わせ
+          </Link>
+          <Link href="/about" className="block text-sm text-zinc-500">
+            このアプリについて
+          </Link>
         </div>
-      )}
+      </div>
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">自分の投稿</h2>
+        {postsError ? (
+          <p className="text-sm text-red-600">{postsError}</p>
+        ) : posts.length === 0 ? (
+          <p className="text-sm text-zinc-600">まだ投稿がありません</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {posts.map((p) => (
+              <FeedCard key={p.id} post={p} returnTo="me" />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

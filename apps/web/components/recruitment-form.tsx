@@ -322,7 +322,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       {upload ? <UploadProgress noun="写真" phase={uploadPhase} progress={upload} /> : null}
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
+      <Button type="submit" className="w-full" disabled={submitting}>
         {initial ? "更新する" : "投稿する"}
       </Button>
     </form>

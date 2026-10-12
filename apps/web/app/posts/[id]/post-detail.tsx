@@ -127,7 +127,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }
 
   return (
-    <article className="space-y-6 pb-36 md:pb-0">
+    <article className="pb-36 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 lg:pb-0">
+      <div className="space-y-6">
       {post.kind === "recruitment" ? (
         <RecruitmentFacts post={post} />
       ) : post.kind === "practice" ? (
@@ -190,7 +191,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           {post.saved_by_me ? "保存済み" : "保存"}
         </Button>
       </div>
-      <section className="space-y-3">
+      </div>
+      <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
         <h2 className="text-xl font-semibold">コメント</h2>
         {comments.length === 0 ? <p className="text-sm text-zinc-500">まだコメントはありません。</p> : null}
         {comments.map((c) => (
@@ -232,11 +234,11 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         ))}
         <form
           onSubmit={form.handleSubmit(onComment)}
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:p-0"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
         >
-          <div className="mx-auto flex w-full max-w-5xl items-end gap-2 md:flex-col md:items-stretch">
+          <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
             <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
-            <Button type="submit" className="shrink-0 md:w-auto">
+            <Button type="submit" className="shrink-0 lg:w-full">
               コメントする
             </Button>
           </div>
@@ -468,7 +470,7 @@ function RecruitmentFacts({ post }: { post: Post }) {
   return (
     <div className="space-y-4">
       {info.photos.length > 0 ? (
-        <div className="grid gap-2">
+        <div className={info.photos.length > 1 ? "grid gap-2 md:grid-cols-2" : "grid gap-2"}>
           {info.photos.map((photo) => (
             <img
               key={photo.public_id}

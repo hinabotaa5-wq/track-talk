@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
-import { FeedCard } from "@/components/feed-card";
+import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
 
@@ -75,7 +75,7 @@ export function HomeFeed({
         />
       ) : null}
       {posts.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className={feedGridClass}>
           {posts.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}

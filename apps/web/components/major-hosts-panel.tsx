@@ -19,7 +19,7 @@ export function MajorHostsPanel({
       <Button
         type="button"
         variant="secondary"
-        className="h-11 w-full"
+        className="h-11 w-full md:w-fit"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >

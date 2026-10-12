@@ -24,10 +24,9 @@ export default function UploadPage() {
   if (loading || !session) return <p>読み込み中…</p>;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       <h1 className="text-2xl font-bold">投稿</h1>
-      <p className="text-sm text-zinc-600">文章、YouTube、自分の動画、クラブチームの募集、練習相手募集から選べます。</p>
-      <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {doors.map((door) => (
           <Link
             key={door.href}

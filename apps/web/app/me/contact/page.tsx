@@ -106,7 +106,7 @@ export default function ContactPage() {
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {sent ? <p className="text-sm text-blue-700">送信しました。</p> : null}
-        <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting}>
+        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
           送信
         </Button>
       </form>

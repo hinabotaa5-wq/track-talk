@@ -7,11 +7,9 @@ import { Input } from "@/components/ui/input";
 
 export function ComposerPage({
   title,
-  lead,
   children,
 }: {
   title: string;
-  lead: string;
   children: ReactNode;
 }) {
   const { session, loading } = useAuth();
@@ -26,7 +24,6 @@ export function ComposerPage({
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="text-sm text-zinc-600">{lead}</p>
       {children}
     </div>
   );

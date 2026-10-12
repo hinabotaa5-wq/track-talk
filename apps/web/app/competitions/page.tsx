@@ -65,7 +65,7 @@ export default async function CompetitionsPage({
           />
         ) : null}
         {items.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
             {items.map((c) => (
               <a
                 key={c.id}

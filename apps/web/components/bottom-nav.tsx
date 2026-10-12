@@ -5,12 +5,27 @@ import { usePathname } from "next/navigation";
 import { Home, Plus, Trophy, UserRound } from "lucide-react";
 import { useAuth } from "./auth-provider";
 
-const tabs = [
+export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "post", href: "/upload", label: "投稿", icon: Plus },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
+
+export function mainTabHref(id: (typeof mainTabs)[number]["id"], signedIn: boolean) {
+  const tab = mainTabs.find((item) => item.id === id);
+  if (!tab) return "/";
+  if ((id === "post" || id === "competitions") && !signedIn) return "/login";
+  return tab.href;
+}
+
+export function activeMainTab(pathname: string) {
+  if (pathname === "/") return "home";
+  if (pathname === "/upload") return "post";
+  if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
+  if (pathname === "/me") return "me";
+  return "";
+}
 
 export function hidesTabBar(pathname: string) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
@@ -19,20 +34,12 @@ export function hidesTabBar(pathname: string) {
   return false;
 }
 
-function activeTab(pathname: string) {
-  if (pathname === "/") return "home";
-  if (pathname === "/upload") return "post";
-  if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
-  if (pathname === "/me") return "me";
-  return "";
-}
-
 export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   if (hidesTabBar(pathname)) return null;
 
-  const current = activeTab(pathname);
+  const current = activeMainTab(pathname);
 
   return (
     <>
@@ -43,11 +50,10 @@ export function BottomNav() {
         aria-label="メイン"
       >
         <ul className="mx-auto grid h-14 max-w-5xl grid-cols-4">
-          {tabs.map((tab) => {
+          {mainTabs.map((tab) => {
             const Icon = tab.icon;
             const active = current === tab.id;
-            const href =
-              (tab.id === "post" || tab.id === "competitions") && !session ? "/login" : tab.href;
+            const href = mainTabHref(tab.id, !!session);
             return (
               <li key={tab.id}>
                 <Link

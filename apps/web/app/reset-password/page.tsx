@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         {message ? <p className="text-sm">{message}</p> : null}
-        <Button type="submit" className="w-full md:w-auto">送信</Button>
+        <Button type="submit" className="w-full">送信</Button>
       </form>
     </div>
   );

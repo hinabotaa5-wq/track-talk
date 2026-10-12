@@ -20,7 +20,7 @@ export function CompetitionFilters({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-3 md:max-w-xl">
       <label className="block text-sm">
         <span className="mb-1 block text-zinc-600">月</span>
         <select

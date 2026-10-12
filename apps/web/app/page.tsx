@@ -59,40 +59,42 @@ export default async function HomePage({
   }
 
   return (
-    <div className="-mx-4 -mt-6">
+    <div className="-mx-4 -mt-6 md:mx-0 md:mt-0">
       <h1 className="sr-only">ホーム</h1>
-      <form action="/" className="border-b border-zinc-200 bg-white px-4 py-3">
-        {sort !== "popular" ? <input type="hidden" name="sort" value={sort} /> : null}
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400"
-            aria-hidden
-          />
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="キーワード"
-            aria-label="キーワード"
-            className="h-11 w-full rounded-full border border-zinc-300 bg-white pr-4 pl-10 text-base outline-none focus:border-blue-500"
-          />
+      <div className="md:mb-4 md:flex md:items-center md:gap-4">
+        <form action="/" className="border-b border-zinc-200 bg-white px-4 py-3 md:w-72 md:shrink-0 md:border-0 md:bg-transparent md:p-0">
+          {sort !== "popular" ? <input type="hidden" name="sort" value={sort} /> : null}
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400"
+              aria-hidden
+            />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="キーワード"
+              aria-label="キーワード"
+              className="h-11 w-full rounded-full border border-zinc-300 bg-white pr-4 pl-10 text-base outline-none focus:border-blue-500"
+            />
+          </div>
+        </form>
+        <div className="flex flex-wrap gap-2 px-4 py-3 md:flex-1 md:px-0 md:py-0">
+          <Link href={homeHref("popular", q)} className={chipClass(sort === "popular")} aria-current={sort === "popular" ? "page" : undefined}>
+            人気
+          </Link>
+          <Link href={homeHref("new", q)} className={chipClass(sort === "new")} aria-current={sort === "new" ? "page" : undefined}>
+            新しい順
+          </Link>
+          <Link href={homeHref("recruitment", q)} className={chipClass(sort === "recruitment")} aria-current={sort === "recruitment" ? "page" : undefined}>
+            募集
+          </Link>
+          <Link href={homeHref("saved", q)} className={chipClass(sort === "saved")} aria-current={sort === "saved" ? "page" : undefined}>
+            保存
+          </Link>
         </div>
-      </form>
-      <div className="flex flex-wrap gap-2 px-4 py-3">
-        <Link href={homeHref("popular", q)} className={chipClass(sort === "popular")} aria-current={sort === "popular" ? "page" : undefined}>
-          人気
-        </Link>
-        <Link href={homeHref("new", q)} className={chipClass(sort === "new")} aria-current={sort === "new" ? "page" : undefined}>
-          新しい順
-        </Link>
-        <Link href={homeHref("recruitment", q)} className={chipClass(sort === "recruitment")} aria-current={sort === "recruitment" ? "page" : undefined}>
-          募集
-        </Link>
-        <Link href={homeHref("saved", q)} className={chipClass(sort === "saved")} aria-current={sort === "saved" ? "page" : undefined}>
-          保存
-        </Link>
       </div>
-      <div className="space-y-4 px-4 pb-4">
+      <div className="space-y-4 px-4 pb-4 md:px-0">
         {sort === "saved" ? (
           <SavedFeed q={q} page={page} />
         ) : (

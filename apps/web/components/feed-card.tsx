@@ -3,6 +3,8 @@ import type { Post } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 import { practiceReputationLine } from "@/components/practice-reputation";
 
+export const feedGridClass = "grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4";
+
 export function feedTitle(title: string) {
   const trimmed = title.trim();
   return trimmed === "" ? "（質問なし）" : trimmed;
@@ -20,7 +22,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   if (post.kind === "practice") {
     const info = post.practice;
     return (
-      <Link href={href} className="block overflow-hidden rounded-2xl border bg-white">
+      <Link href={href} className="block overflow-hidden rounded-2xl border bg-white hover:border-blue-300">
         <div className="flex aspect-[4/3] flex-col gap-2 bg-zinc-50 p-3">
           <KindBadge>練習</KindBadge>
           {info ? (
@@ -44,7 +46,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     );
   }
   return (
-    <Link href={href} className="block overflow-hidden rounded-2xl border bg-white">
+    <Link href={href} className="block overflow-hidden rounded-2xl border bg-white hover:border-blue-300">
       <div className="relative aspect-[4/3] bg-zinc-200">
         {post.kind === "recruitment" ? (
           <span className="absolute top-2 left-2 z-10">
