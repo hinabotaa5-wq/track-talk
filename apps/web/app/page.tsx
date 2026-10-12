@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { HomeFeed } from "@/components/home-feed";
+import { FeedLoadingFrame } from "@/components/loading-frame";
 import { SavedFeed } from "@/components/saved-feed";
 import { homeFeedServerTimeoutMs, type PostsPage } from "@/lib/fetch-posts";
 import type { Meta, Post } from "@/lib/types";
@@ -25,6 +27,34 @@ function chipClass(active: boolean) {
     : "inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm text-zinc-700";
 }
 
+async function ServerHomeFeed({
+  sort,
+  kind,
+  q,
+  page,
+}: {
+  sort: "popular" | "new";
+  kind?: "recruitment";
+  q: string;
+  page: number;
+}) {
+  const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
+  if (q) qs.set("q", q);
+  if (kind) qs.set("kind", kind);
+
+  let initial: PostsPage | null = null;
+  try {
+    const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`, {
+      signal: AbortSignal.timeout(homeFeedServerTimeoutMs),
+    });
+    initial = { posts: data.posts ?? [], meta: data.meta };
+  } catch {
+    initial = null;
+  }
+
+  return <HomeFeed sort={sort} kind={kind} q={q} page={page} initial={initial} />;
+}
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -41,23 +71,6 @@ export default async function HomePage({
           : "popular";
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, Number(sp.page) || 1);
-  const listSort = sort === "recruitment" ? "new" : sort;
-  const qs = new URLSearchParams({ sort: listSort, page: String(page), per_page: "20" });
-  if (q) qs.set("q", q);
-  if (sort === "recruitment") qs.set("kind", "recruitment");
-
-  let initial: PostsPage | null = null;
-  if (sort !== "saved") {
-    try {
-      const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`, {
-        signal: AbortSignal.timeout(homeFeedServerTimeoutMs),
-      });
-      initial = { posts: data.posts ?? [], meta: data.meta };
-    } catch {
-      initial = null;
-    }
-  }
-
   return (
     <div className="-mx-4 -mt-6 md:mx-0 md:mt-0">
       <h1 className="sr-only">ホーム</h1>
@@ -98,14 +111,14 @@ export default async function HomePage({
         {sort === "saved" ? (
           <SavedFeed q={q} page={page} />
         ) : (
-          <HomeFeed
-            key={`${sort}:${q}:${page}`}
-            sort={sort === "recruitment" ? "new" : sort}
-            kind={sort === "recruitment" ? "recruitment" : undefined}
-            q={q}
-            page={page}
-            initial={initial}
-          />
+          <Suspense key={`${sort}:${q}:${page}`} fallback={<FeedLoadingFrame />}>
+            <ServerHomeFeed
+              sort={sort === "recruitment" ? "new" : sort}
+              kind={sort === "recruitment" ? "recruitment" : undefined}
+              q={q}
+              page={page}
+            />
+          </Suspense>
         )}
       </div>
     </div>
