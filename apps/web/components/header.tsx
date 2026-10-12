@@ -33,13 +33,11 @@ export function Header() {
             >
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
-          ) : null}
-          <Link
-            href="/"
-            className={`truncate text-lg font-bold tracking-tight text-blue-700 ${showBack ? "hidden md:inline" : ""}`}
-          >
-            TRACK TALK
-          </Link>
+          ) : (
+            <Link href="/" className="truncate text-lg font-bold tracking-tight text-blue-700">
+              TRACK TALK
+            </Link>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
