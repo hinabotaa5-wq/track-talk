@@ -3,6 +3,12 @@ package competitions
 // Sources are the athletics association homepages to read.
 // Other prefectures are added here as their schedule page URL is known.
 var Sources = []Source{
+	{Prefecture: "24", PageURL: "https://mierk.jp/taikaiyoukou/"},
+	{Prefecture: "25", PageURL: "https://srkshiga.com/?page_id=874"},
+	{Prefecture: "27", PageURL: "https://www.oaaa.jp/competition/?y=2026"},
+	{Prefecture: "28", PageURL: "http://haaa.jp/taikai.html"},
+	{Prefecture: "29", PageURL: "http://www.narariku.com/information.html"},
+	{Prefecture: "30", PageURL: "https://wariku.com/athletics-list/"},
 	{Prefecture: "31", PageURL: "https://jaaf-tottori.com/competition/"},
 	{Prefecture: "33", PageURL: "https://okariku33.com/?page_id=1291"},
 	{Prefecture: "35", PageURL: "https://yaaf.jp/kyougikai-top/schedule-all/"},
