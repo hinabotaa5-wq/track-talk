@@ -59,7 +59,9 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
 }
 
 function cityName(host: MajorHost) {
-  return host.city || host.country;
+  const name = host.city || host.country;
+  if (name.endsWith("市") && name.length > 1) return name.slice(0, -1);
+  return name;
 }
 
 function scheduleRange(label: string) {
