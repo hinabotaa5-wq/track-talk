@@ -25,6 +25,11 @@ var Sources = []Source{
 	{Prefecture: "19", PageURL: "https://yamanashitf.com/2026nendo-taikai"},
 	{Prefecture: "20", PageURL: "https://nagano-rk.com/calendar/2026nrk_calendar-2-2-2-2-2/"},
 	{
+		Prefecture: "22",
+		PageURL:    "https://shizuoka-jaaf.com/srkkyogi.html",
+		ExtraURLs:  []string{"https://seiburiku.jp/schedule/"},
+	},
+	{
 		Prefecture: "23",
 		PageURL:    "http://aichi-rk.jp/01nittei.htm",
 		ExtraURLs: []string{
