@@ -46,8 +46,23 @@ var Sources = []Source{
 	{Prefecture: "15", PageURL: "https://nrkk.net/official-eventschedule", PDFLinks: []string{`公認競技会`}},
 	{Prefecture: "16", PageURL: "https://www.jaaf-toyama.net/schedule/"},
 	{Prefecture: "17", PageURL: "https://www.ishiriku.jp/youkou.html"},
-	// 年間の主要競技会は「大会・競技場コード」のリンク先 code.pdf に載っている。月ごとのページは冬の月に表が無く失敗する。
-	{Prefecture: "18", PageURL: "https://www.fukui-jaaf.com/020_schedule/", PDFLinks: []string{`code\.pdf`}},
+	{
+		Prefecture: "18",
+		PageURL:    "https://www.fukui-jaaf.com/020_schedule/index.php?m=4&y=2026",
+		ExtraURLs: []string{
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=5&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=6&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=7&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=8&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=9&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=10&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=11&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=12&y=2026",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=1&y=2027",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=2&y=2027",
+			"https://www.fukui-jaaf.com/020_schedule/index.php?m=3&y=2027",
+		},
+	},
 	{Prefecture: "19", PageURL: "https://yamanashitf.com/2026nendo-taikai"},
 	{Prefecture: "20", PageURL: "https://nagano-rk.com/calendar/2026nrk_calendar-2-2-2-2-2/"},
 	{
