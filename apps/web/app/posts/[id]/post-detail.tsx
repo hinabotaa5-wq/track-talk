@@ -141,6 +141,9 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       className={`${allowComment ? "pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
     >
       <div className="space-y-6">
+      {post.kind === "practice" ? (
+        <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
+      ) : null}
       {post.kind === "recruitment" ? (
         <RecruitmentFacts post={post} />
       ) : post.kind === "practice" ? (
@@ -168,8 +171,12 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ) : post.thumbnail_url ? (
         <img src={post.thumbnail_url} alt="" className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain" />
       ) : null}
-      <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
-      <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
+      {post.kind === "practice" ? null : (
+        <>
+          <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
+          <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
+        </>
+      )}
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
           <h2 className="mb-2 text-xl font-semibold">詳細</h2>
