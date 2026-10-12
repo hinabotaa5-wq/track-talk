@@ -3,41 +3,22 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { apiFetch } from "@/lib/api";
+import { cityPhotoSrc, preloadCityPhotos } from "@/lib/city-photo";
+import { loadMajorHosts, peekMajorHosts } from "@/lib/major-hosts";
 import type { MajorHost } from "@/lib/types";
-
-let cachedHosts: MajorHost[] | null = null;
-let hostsRequest: Promise<MajorHost[]> | null = null;
-
-function loadMajorHosts() {
-  if (cachedHosts) return Promise.resolve(cachedHosts);
-  if (!hostsRequest) {
-    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts")
-      .then((data) => {
-        cachedHosts = data.hosts ?? [];
-        return cachedHosts;
-      })
-      .catch((err) => {
-        hostsRequest = null;
-        throw err;
-      });
-  }
-  return hostsRequest;
-}
 
 export function MajorHostsPanel() {
   const [open, setOpen] = useState(false);
-  const [hosts, setHosts] = useState<MajorHost[] | null>(cachedHosts);
+  const [hosts, setHosts] = useState<MajorHost[] | null>(peekMajorHosts);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => peekMajorHosts() === null);
 
   useEffect(() => {
-    if (!open || hosts) return;
     let active = true;
-    setLoading(true);
     loadMajorHosts()
       .then((next) => {
         if (!active) return;
+        preloadCityPhotos(next.map((host) => host.image_url), "high");
         setHosts(next);
         setError("");
       })
@@ -50,7 +31,7 @@ export function MajorHostsPanel() {
     return () => {
       active = false;
     };
-  }, [open, hosts]);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -59,10 +40,7 @@ export function MajorHostsPanel() {
         variant="secondary"
         className="h-11 w-full md:w-fit"
         aria-expanded={open}
-        onClick={() => {
-          if (!open && !hosts) setLoading(true);
-          setOpen((value) => !value);
-        }}
+        onClick={() => setOpen((value) => !value)}
       >
         今後の世界陸上・オリンピック
       </Button>
@@ -114,13 +92,28 @@ function scheduleRange(label: string) {
 }
 
 function HostPhoto({ url, alt }: { url: string; alt: string }) {
+  const preferred = cityPhotoSrc(url);
+  const [src, setSrc] = useState(preferred);
   const [failed, setFailed] = useState(false);
-  const visible = url !== "" && !failed;
+  const visible = src !== "" && !failed;
   return (
     <div className="relative aspect-[4/3] bg-zinc-100">
       {visible ? (
         <>
-          <img src={url} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+          <img
+            src={src}
+            alt={alt}
+            decoding="async"
+            fetchPriority="high"
+            className="h-full w-full object-cover"
+            onError={() => {
+              if (src !== url && url !== "") {
+                setSrc(url);
+                return;
+              }
+              setFailed(true);
+            }}
+          />
           <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-white">
             写真: Wikimedia Commons
           </p>

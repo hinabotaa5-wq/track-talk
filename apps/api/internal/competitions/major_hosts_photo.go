@@ -12,7 +12,8 @@ import (
 const (
 	commonsAPI  = "https://commons.wikimedia.org/w/api.php"
 	englishWiki = "https://en.wikipedia.org/w/api.php"
-	thumbWidth  = "1200"
+	// 960 is a Wikimedia thumbnail step. A 1200px request is served as a 1280px file.
+	thumbWidth = "960"
 )
 
 // cityLandscape is the skyline editors put first on the English Wikipedia city article.
@@ -311,7 +312,7 @@ func parseCommonsImages(body []byte) []commonsImage {
 			photoURL = info.URL
 		}
 		images = append(images, commonsImage{
-			Title: page.Title, URL: photoURL, Width: info.Width, Height: info.Height, MIME: info.MIME,
+			Title: page.Title, URL: canonicalPhotoURL(photoURL), Width: info.Width, Height: info.Height, MIME: info.MIME,
 		})
 	}
 	return images
@@ -356,6 +357,16 @@ func cityPhotoScore(image commonsImage) int {
 		}
 	}
 	return score
+}
+
+func canonicalPhotoURL(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Host == "" {
+		return strings.TrimSpace(raw)
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
 }
 
 func photoMIME(mime string) bool {

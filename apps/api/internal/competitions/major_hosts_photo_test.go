@@ -96,6 +96,15 @@ func TestUsableLeadPhotoRejectsCollageAndLogo(t *testing.T) {
 	}
 }
 
+func TestParseCommonsImagesDropsTrackingQuery(t *testing.T) {
+	body := []byte(`{"query":{"pages":[{"title":"File:Beijing Skyline.jpg","imageinfo":[{"thumburl":"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Beijing_Skyline.jpg/1280px-Beijing_Skyline.jpg?utm_source=commons","width":3000,"height":2000,"mime":"image/jpeg"}]}]}}`)
+	images := parseCommonsImages(body)
+	want := "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Beijing_Skyline.jpg/1280px-Beijing_Skyline.jpg"
+	if len(images) != 1 || images[0].URL != want {
+		t.Fatalf("url: %+v", images)
+	}
+}
+
 func TestParseCommonsImages(t *testing.T) {
 	body := []byte(`{"query":{"pages":[
 		{"title":"File:Missing.jpg","missing":true},

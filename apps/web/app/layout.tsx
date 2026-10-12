@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { preconnect } from "react-dom";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
@@ -23,6 +24,9 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  preconnect("https://upload.wikimedia.org");
+  preconnect("https://thumb.wikimedia.org");
+
   return (
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
