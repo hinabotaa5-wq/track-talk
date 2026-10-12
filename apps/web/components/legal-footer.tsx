@@ -6,6 +6,7 @@ import { hidesTabBar } from "./bottom-nav";
 
 export function LegalFooter() {
   const pathname = usePathname();
+  if (pathname === "/about") return null;
   const aboveTabBar = !hidesTabBar(pathname);
 
   return (
