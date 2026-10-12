@@ -18,7 +18,17 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND ($1::uuid IS NULL OR p.author_id = $1)
-  AND ($2::text IS NULL OR p.kind = $2)
+  AND (
+    $2::text IS NULL
+    OR (
+      $2 = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      $2 <> 'recruitment'
+      AND p.kind = $2
+    )
+  )
   AND ($3::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
     $4::text IS NULL
@@ -33,6 +43,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || $4 || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || $4 || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || $4 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $4 || '%' ESCAPE '\'
         )
     )
     OR (
@@ -87,6 +105,14 @@ WHERE s.user_id = $1
           OR d.gender_ratio ILIKE '%' || $2 || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || $2 || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || $2 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $2 || '%' ESCAPE '\'
         )
     )
     OR (
@@ -439,7 +465,17 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND ($1::uuid IS NULL OR p.author_id = $1)
-  AND ($2::text IS NULL OR p.kind = $2)
+  AND (
+    $2::text IS NULL
+    OR (
+      $2 = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      $2 <> 'recruitment'
+      AND p.kind = $2
+    )
+  )
   AND (
     $3::text IS NULL
     OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
@@ -453,6 +489,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || $3 || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || $3 || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || $3 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $3 || '%' ESCAPE '\'
         )
     )
     OR (
@@ -551,7 +595,17 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
   AND ($1::uuid IS NULL OR p.author_id = $1)
-  AND ($2::text IS NULL OR p.kind = $2)
+  AND (
+    $2::text IS NULL
+    OR (
+      $2 = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      $2 <> 'recruitment'
+      AND p.kind = $2
+    )
+  )
   AND (
     $3::text IS NULL
     OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
@@ -565,6 +619,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || $3 || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || $3 || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || $3 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $3 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $3 || '%' ESCAPE '\'
         )
     )
     OR (
@@ -708,6 +770,14 @@ WHERE s.user_id = $1
           OR d.gender_ratio ILIKE '%' || $2 || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || $2 || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || $2 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $2 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $2 || '%' ESCAPE '\'
         )
     )
     OR (

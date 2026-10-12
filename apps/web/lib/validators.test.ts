@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { authErrorMessage } from "./auth-errors";
 import { cloudinaryErrorMessage } from "./cloudinary-upload";
-import { commentSchema, inquirySchema, loginSchema, postSchema, recruitmentSchema } from "./validators";
+import { commentSchema, inquirySchema, loginSchema, postSchema, practiceSchema, recruitmentSchema } from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -36,6 +36,29 @@ describe("validators", () => {
         average_age: "",
         recruit_age: "",
         links: [],
+        body: "詳細",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a practice partner post and rejects a blank venue", () => {
+    expect(
+      practiceSchema.safeParse({
+        venue: "駒沢競技場",
+        starts_at: "2026-10-20T18:00",
+        event: "100m",
+        event_other: "",
+        capacity: 3,
+        body: "ジョグから入ります",
+      }).success,
+    ).toBe(true);
+    expect(
+      practiceSchema.safeParse({
+        venue: " ",
+        starts_at: "2026-10-20T18:00",
+        event: "100m",
+        event_other: "",
+        capacity: 0,
         body: "詳細",
       }).success,
     ).toBe(false);

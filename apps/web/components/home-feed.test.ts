@@ -42,4 +42,41 @@ describe("HomeFeed", () => {
     expect(html).toContain("いい感じ");
     expect(html).not.toContain("読み込み中…");
   });
+
+  it("shows club and practice posts with their labels", () => {
+    const practice = {
+      ...post,
+      id: "11111111-1111-4111-8111-111111111111",
+      title: "100m 10月20日 18:00",
+      kind: "practice",
+        practice: {
+        venue: "駒沢競技場",
+        starts_at: "2026-10-20T09:00:00.000Z",
+        event: "100m",
+        event_label: "100m",
+        capacity: 3,
+        accepted_count: 1,
+        status: "open",
+      },
+    } as Post;
+    const club = {
+      ...post,
+      id: "22222222-2222-4222-8222-222222222222",
+      title: "城南クラブ",
+      kind: "recruitment",
+    } as Post;
+    const html = renderToStaticMarkup(
+      createElement(HomeFeed, {
+        sort: "new",
+        q: "",
+        page: 1,
+        kind: "recruitment",
+        initial: { posts: [club, practice], meta: { page: 1, per_page: 20, total: 2 } },
+      }),
+    );
+    expect(html).toContain("クラブ");
+    expect(html).toContain("練習");
+    expect(html).toContain("駒沢競技場");
+    expect(html).toContain("募集 1/3人");
+  });
 });

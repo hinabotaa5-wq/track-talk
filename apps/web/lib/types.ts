@@ -41,13 +41,14 @@ export type Post = {
   comment_count: number;
   liked_by_me: boolean;
   saved_by_me: boolean;
-  kind: "text" | "youtube" | "video" | "recruitment";
+  kind: "text" | "youtube" | "video" | "recruitment" | "practice";
   thumbnail_url?: string;
   youtube_video_id?: string;
   video_public_id?: string;
   image_public_id?: string;
   playback_url?: string;
   recruitment?: Recruitment;
+  practice?: Practice;
   created_at: string;
   updated_at: string;
 };
@@ -66,6 +67,26 @@ export type Recruitment = {
   recruit_age: string;
   links: string[];
   photos: RecruitmentPhoto[];
+};
+
+export type PracticeApplication = {
+  id: string;
+  status: "pending" | "accepted" | "declined";
+  created_at: string;
+};
+
+export type Practice = {
+  venue: string;
+  starts_at: string;
+  event: string;
+  event_other?: string;
+  event_label: string;
+  capacity: number;
+  accepted_count: number;
+  status: "open" | "full" | "dissolved";
+  dissolved_at?: string;
+  my_application?: PracticeApplication["status"];
+  applications?: PracticeApplication[];
 };
 
 export type Comment = {

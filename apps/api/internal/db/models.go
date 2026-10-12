@@ -90,6 +90,25 @@ type PostSafe struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type PracticeApplication struct {
+	ID        uuid.UUID `json:"id"`
+	PostID    uuid.UUID `json:"post_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PracticeDetail struct {
+	PostID      uuid.UUID  `json:"post_id"`
+	Venue       string     `json:"venue"`
+	StartsAt    time.Time  `json:"starts_at"`
+	Event       string     `json:"event"`
+	EventOther  string     `json:"event_other"`
+	Capacity    int32      `json:"capacity"`
+	DissolvedAt *time.Time `json:"dissolved_at"`
+}
+
 type Profile struct {
 	ID        uuid.UUID `json:"id"`
 	IsAdmin   bool      `json:"is_admin"`

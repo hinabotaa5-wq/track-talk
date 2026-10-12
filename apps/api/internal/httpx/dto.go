@@ -33,6 +33,7 @@ type postDTO struct {
 	ImagePublicID  string          `json:"image_public_id,omitempty"`
 	PlaybackURL    string          `json:"playback_url,omitempty"`
 	Recruitment    *recruitmentDTO `json:"recruitment,omitempty"`
+	Practice       *practiceDTO    `json:"practice,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
@@ -51,6 +52,26 @@ type recruitmentDTO struct {
 	RecruitAge  string                `json:"recruit_age"`
 	Links       []string              `json:"links"`
 	Photos      []recruitmentPhotoDTO `json:"photos"`
+}
+
+type practiceDTO struct {
+	Venue         string                   `json:"venue"`
+	StartsAt      time.Time                `json:"starts_at"`
+	Event         string                   `json:"event"`
+	EventOther    string                   `json:"event_other,omitempty"`
+	EventLabel    string                   `json:"event_label"`
+	Capacity      int32                    `json:"capacity"`
+	DissolvedAt   *time.Time               `json:"dissolved_at,omitempty"`
+	AcceptedCount int32                    `json:"accepted_count"`
+	Status        string                   `json:"status"`
+	MyApplication string                   `json:"my_application,omitempty"`
+	Applications  []practiceApplicationDTO `json:"applications,omitempty"`
+}
+
+type practiceApplicationDTO struct {
+	ID        uuid.UUID `json:"id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) {

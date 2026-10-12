@@ -1,16 +1,51 @@
 import Link from "next/link";
 import type { Post } from "@/lib/types";
+import { formatDateTime } from "@/lib/format";
 
 export function feedTitle(title: string) {
   const trimmed = title.trim();
   return trimmed === "" ? "（質問なし）" : trimmed;
 }
 
+function KindBadge({ children }: { children: string }) {
+  return (
+    <span className="w-fit rounded-full bg-white px-2 py-0.5 text-xs font-medium text-zinc-700">{children}</span>
+  );
+}
+
 export function FeedCard({ post }: { post: Post }) {
   const title = feedTitle(post.title);
+  if (post.kind === "practice") {
+    const info = post.practice;
+    return (
+      <Link href={`/posts/${post.id}`} className="block overflow-hidden rounded-2xl border bg-white">
+        <div className="flex aspect-[4/3] flex-col gap-2 bg-zinc-50 p-3">
+          <KindBadge>練習</KindBadge>
+          {info ? (
+            <div className="space-y-1 text-sm leading-snug">
+              <p className="font-semibold">{info.event_label}</p>
+              <p>{formatDateTime(info.starts_at)}</p>
+              <p className="line-clamp-2">{info.venue}</p>
+              <p>
+                募集 {info.accepted_count}/{info.capacity}人
+                {info.status === "full" ? "・満員" : info.status === "dissolved" ? "・解散" : ""}
+              </p>
+            </div>
+          ) : (
+            <p className="line-clamp-4 text-sm font-semibold leading-snug">{title}</p>
+          )}
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link href={`/posts/${post.id}`} className="block overflow-hidden rounded-2xl border bg-white">
-      <div className="aspect-[4/3] bg-zinc-200">
+      <div className="relative aspect-[4/3] bg-zinc-200">
+        {post.kind === "recruitment" ? (
+          <span className="absolute top-2 left-2 z-10">
+            <KindBadge>クラブ</KindBadge>
+          </span>
+        ) : null}
         {post.thumbnail_url ? (
           <img src={post.thumbnail_url} alt="" className="h-full w-full object-cover" />
         ) : (

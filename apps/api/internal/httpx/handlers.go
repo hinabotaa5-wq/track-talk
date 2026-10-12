@@ -179,6 +179,10 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		MapDBError(w, err)
 		return
 	}
+	if err := s.attachPracticeSummaries(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
 }
 
@@ -258,6 +262,16 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	item, err = s.attachPractice(r.Context(), item)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	item, err = s.attachPracticeViewer(r, item)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	item.SavedByMe = saved
 	JSON(w, http.StatusOK, item)
 }
@@ -278,33 +292,40 @@ type postReq struct {
 	RecruitAge          string   `json:"recruit_age"`
 	Links               []string `json:"links"`
 	ImagePublicIDs      []string `json:"image_public_ids"`
+	StartsAt            string   `json:"starts_at"`
+	Event               string   `json:"event"`
+	EventOther          string   `json:"event_other"`
+	Capacity            int      `json:"capacity"`
 }
 
-func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, bool) {
+func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return db.CreatePostParams{}, recruitmentInput{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, false
 	}
 	if forceKind != "" {
 		req.Kind = forceKind
 	}
-	fields := map[string]string{}
-	if e := Title(req.Title); e != "" {
-		fields["title"] = e
-	}
-	if e := PostBody(req.Body); e != "" {
-		fields["body"] = e
-	}
 	kind := strings.TrimSpace(req.Kind)
 	if kind == "" {
 		kind = "text"
+	}
+	fields := map[string]string{}
+	if kind != "practice" {
+		if e := Title(req.Title); e != "" {
+			fields["title"] = e
+		}
+	}
+	if e := PostBody(req.Body); e != "" {
+		fields["body"] = e
 	}
 	if e := Kind(kind); e != "" {
 		fields["kind"] = e
 	}
 	var youtubeID, youtubeThumb, publicID *string
 	var recruitment recruitmentInput
+	var practice practiceInput
 	switch kind {
 	case "text":
 		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
@@ -364,19 +385,41 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 			fields[key] = value
 		}
 		recruitment = parsed
+	case "practice":
+		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
+			fields["kind"] = "練習相手の募集に動画情報は付けられません"
+		}
+		if strings.TrimSpace(req.ImagePublicID) != "" || len(req.ImagePublicIDs) > 0 {
+			fields["image_public_id"] = "この募集に写真は付けられません"
+		}
+		body, bodyErr := textLimit(req.Body, 2000, "詳細を入力してください", "詳細は2000文字以内で入力してください", true)
+		if bodyErr != "" {
+			fields["body"] = bodyErr
+		} else {
+			req.Body = body
+		}
+		parsed, fieldErrs := normalizePractice(req)
+		for key, value := range fieldErrs {
+			fields[key] = value
+		}
+		practice = parsed
 	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
-		return db.CreatePostParams{}, recruitmentInput{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, false
+	}
+	title := strings.TrimSpace(req.Title)
+	if kind == "practice" {
+		title = practiceTitle(practice.Event, practice.EventOther, practice.StartsAt)
 	}
 	return db.CreatePostParams{
-		Title:               strings.TrimSpace(req.Title),
+		Title:               title,
 		Body:                strings.TrimSpace(req.Body),
 		Kind:                kind,
 		YoutubeVideoID:      youtubeID,
 		YoutubeThumbnailUrl: youtubeThumb,
 		CloudinaryPublicID:  publicID,
-	}, recruitment, true
+	}, recruitment, practice, true
 }
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
@@ -384,12 +427,16 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	params, recruitment, ok := s.parsePostReq(w, r, "")
+	params, recruitment, practice, ok := s.parsePostReq(w, r, "")
 	if !ok {
 		return
 	}
 	if params.Kind == "recruitment" {
 		s.createRecruitment(w, r, p, params, recruitment)
+		return
+	}
+	if params.Kind == "practice" {
+		s.createPractice(w, r, p, params, practice)
 		return
 	}
 	params.ID = uuid.New()
@@ -441,7 +488,15 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updateRecruitment(w, r, p, id)
 		return
 	}
-	params, _, ok := s.parsePostReq(w, r, "")
+	if err == nil && existing.Kind == "practice" {
+		if existing.AuthorID != p.ID {
+			Error(w, http.StatusForbidden, "forbidden", "編集できません")
+			return
+		}
+		s.updatePractice(w, r, p, id)
+		return
+	}
+	params, _, _, ok := s.parsePostReq(w, r, "")
 	if !ok {
 		return
 	}
@@ -536,6 +591,10 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := s.attachPracticeSummaries(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return
 	}

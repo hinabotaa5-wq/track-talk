@@ -129,6 +129,11 @@ export function PostDetail({ id }: { id: string }) {
     <article className="space-y-6 pb-36 md:pb-0">
       {post.kind === "recruitment" ? (
         <RecruitmentFacts post={post} />
+      ) : post.kind === "practice" ? (
+        <>
+          <PracticeFacts post={post} />
+          <PracticeJoin post={post} onDone={load} />
+        </>
       ) : post.kind === "video" && post.playback_url ? (
         <video
           className="aspect-video w-full rounded-xl bg-black"
@@ -151,7 +156,7 @@ export function PostDetail({ id }: { id: string }) {
       ) : null}
       <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
-      {post.kind === "recruitment" && post.body ? (
+      {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
           <h2 className="mb-2 text-xl font-semibold">詳細</h2>
           <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
@@ -237,6 +242,124 @@ export function PostDetail({ id }: { id: string }) {
         </form>
       </section>
     </article>
+  );
+}
+
+function practiceStatusLabel(status: "open" | "full" | "dissolved") {
+  if (status === "full") return "満員";
+  if (status === "dissolved") return "解散";
+  return "募集中";
+}
+
+function applicationStatusLabel(status: "pending" | "accepted" | "declined") {
+  if (status === "accepted") return "承認済み";
+  if (status === "declined") return "見送り";
+  return "申請中";
+}
+
+function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
+  const { session, token } = useAuth();
+  const router = useRouter();
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const info = post.practice;
+  if (!info) return null;
+
+  async function run(path: string, confirmMessage?: string) {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    if (confirmMessage && !confirm(confirmMessage)) return;
+    setPending(true);
+    setError("");
+    try {
+      await apiFetch(path, { method: "POST", token });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const mine = post.mine;
+  const open = info.status === "open";
+
+  return (
+    <div className="space-y-3">
+      {mine && info.status !== "dissolved" ? (
+        <Button type="button" variant="danger" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/dissolve`, "この練習を解散しますか？")}>
+          解散する
+        </Button>
+      ) : null}
+      {!mine && info.my_application === "pending" ? <p className="text-sm">申請中です</p> : null}
+      {!mine && info.my_application === "accepted" ? <p className="text-sm">参加が承認されました</p> : null}
+      {!mine && info.my_application === "declined" ? <p className="text-sm">見送りになりました</p> : null}
+      {!mine && !info.my_application && info.status === "full" ? <p className="text-sm">満員です</p> : null}
+      {!mine && !info.my_application && open ? (
+        <Button type="button" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/applications`)}>
+          参加したい
+        </Button>
+      ) : null}
+      {mine && info.applications && info.applications.length > 0 ? (
+        <ul className="space-y-2">
+          {info.applications.map((application) => (
+            <li key={application.id} className="rounded-xl border bg-white p-3">
+              <p className="text-sm">参加希望 · {formatDateTime(application.created_at)}</p>
+              <p className="mt-1 text-sm text-zinc-500">{applicationStatusLabel(application.status)}</p>
+              {application.status === "pending" && info.status !== "dissolved" ? (
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    disabled={pending || info.status === "full"}
+                    onClick={() => run(`/v1/posts/${post.id}/practice/applications/${application.id}/accept`)}
+                  >
+                    承認
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={pending}
+                    onClick={() =>
+                      run(
+                        `/v1/posts/${post.id}/practice/applications/${application.id}/decline`,
+                        "この参加希望を見送りますか？",
+                      )
+                    }
+                  >
+                    見送り
+                  </Button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
+function PracticeFacts({ post }: { post: Post }) {
+  const info = post.practice;
+  if (!info) return null;
+  const rows = [
+    { label: "練習場所", value: info.venue },
+    { label: "練習日時", value: formatDateTime(info.starts_at) },
+    { label: "種目", value: info.event_label },
+    { label: "募集人数", value: `${info.accepted_count}/${info.capacity}人` },
+    { label: "状態", value: practiceStatusLabel(info.status) },
+  ];
+  return (
+    <dl className="space-y-3 rounded-xl border bg-white p-4">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt className="text-sm text-zinc-500">{row.label}</dt>
+          <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

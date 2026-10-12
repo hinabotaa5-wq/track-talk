@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { practiceEventValues } from "./practice-events";
 
 z.config(z.locales.ja());
 
@@ -28,6 +29,19 @@ export const recruitmentSchema = z.object({
     .array(z.string().trim().refine(httpsUrl, "httpsのURLを入力してください"))
     .max(4, "URLは4件までです"),
   body: z.string("詳細を入力してください").trim().min(1, "詳細を入力してください").max(10000, "10000文字以内"),
+});
+
+export const practiceSchema = z.object({
+  venue: z.string("練習場所を入力してください").trim().min(1, "練習場所を入力してください").max(80, "練習場所は80文字以内で入力してください"),
+  starts_at: z.string("練習日時を入力してください").trim().min(1, "練習日時を入力してください"),
+  event: z.enum(practiceEventValues, "種目を選んでください"),
+  event_other: z.string().trim().max(40, "種目名は40文字以内で入力してください"),
+  capacity: z
+    .number("募集人数は1〜99で入力してください")
+    .int("募集人数は1〜99で入力してください")
+    .min(1, "募集人数は1〜99で入力してください")
+    .max(99, "募集人数は1〜99で入力してください"),
+  body: z.string("詳細を入力してください").trim().min(1, "詳細を入力してください").max(2000, "詳細は2000文字以内で入力してください"),
 });
 
 export const commentSchema = z.object({

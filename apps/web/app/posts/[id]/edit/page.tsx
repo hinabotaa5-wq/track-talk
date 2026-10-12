@@ -1,6 +1,7 @@
 "use client";
 
 import { PostForm } from "@/components/post-form";
+import { PracticeForm } from "@/components/practice-form";
 import { RecruitmentForm } from "@/components/recruitment-form";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
@@ -29,11 +30,19 @@ export default function EditPostPage() {
   }
 
   const recruitment = post.kind === "recruitment";
+  const practice = post.kind === "practice";
+  const heading = practice ? "練習相手募集を編集" : recruitment ? "募集を編集" : "投稿を編集";
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">{recruitment ? "募集を編集" : "投稿を編集"}</h1>
-      {recruitment ? <RecruitmentForm initial={post} /> : <PostForm initial={post} />}
+      <h1 className="text-2xl font-bold">{heading}</h1>
+      {practice ? (
+        <PracticeForm initial={post} />
+      ) : recruitment ? (
+        <RecruitmentForm initial={post} />
+      ) : (
+        <PostForm initial={post} />
+      )}
     </div>
   );
 }

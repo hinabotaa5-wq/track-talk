@@ -16,7 +16,17 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
-  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
+  AND (
+    sqlc.narg('kind')::text IS NULL
+    OR (
+      sqlc.narg('kind') = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      sqlc.narg('kind') <> 'recruitment'
+      AND p.kind = sqlc.narg('kind')
+    )
+  )
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
@@ -30,6 +40,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
         )
     )
     OR (
@@ -63,7 +81,17 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND p.created_at >= now() - interval '14 days'
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
-  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
+  AND (
+    sqlc.narg('kind')::text IS NULL
+    OR (
+      sqlc.narg('kind') = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      sqlc.narg('kind') <> 'recruitment'
+      AND p.kind = sqlc.narg('kind')
+    )
+  )
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
@@ -77,6 +105,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
         )
     )
     OR (
@@ -97,7 +133,17 @@ FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
-  AND (sqlc.narg('kind')::text IS NULL OR p.kind = sqlc.narg('kind'))
+  AND (
+    sqlc.narg('kind')::text IS NULL
+    OR (
+      sqlc.narg('kind') = 'recruitment'
+      AND p.kind IN ('recruitment', 'practice')
+    )
+    OR (
+      sqlc.narg('kind') <> 'recruitment'
+      AND p.kind = sqlc.narg('kind')
+    )
+  )
   AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (
     sqlc.narg('keyword')::text IS NULL
@@ -112,6 +158,14 @@ WHERE p.deleted_at IS NULL
           OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
         )
     )
     OR (
@@ -215,6 +269,14 @@ WHERE s.user_id = sqlc.arg('user_id')
           OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
         )
     )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
     OR (
       cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
       AND EXISTS (
@@ -247,6 +309,14 @@ WHERE s.user_id = sqlc.arg('user_id')
           OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
           OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
         )
     )
     OR (
