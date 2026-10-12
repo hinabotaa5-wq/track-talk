@@ -262,6 +262,7 @@ func isDistrict(link LinkRef) bool {
 func isDistrictText(text string) bool {
 	return strings.Contains(text, "ホームページ") ||
 		strings.Contains(text, "陸協") ||
+		strings.Contains(text, "競技協会") ||
 		strings.Contains(text, "スポ協") ||
 		strings.Contains(text, "体連") ||
 		strings.Contains(text, "公式")
