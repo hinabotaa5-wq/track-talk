@@ -62,7 +62,7 @@ export default function YouTubePostPage() {
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? "開いています" : "この動画のスレを開く"}
+          {submitting ? "開いています" : "この動画のスレッドを開く"}
         </Button>
       </form>
     </ComposerPage>
