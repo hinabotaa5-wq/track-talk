@@ -34,6 +34,8 @@ type Page struct {
 	Links      []LinkRef
 	rows       []row
 	plainText  bool
+	// PDFs are set instead of Body when the schedule is only published as PDFs.
+	PDFs [][]byte
 }
 
 var seasonYearPattern = regexp.MustCompile(`(20\d{2})年`)

@@ -3,6 +3,7 @@ package competitions
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,9 +33,17 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+	var parts []map[string]any
+	for _, pdf := range page.PDFs {
+		parts = append(parts, map[string]any{"inline_data": map[string]string{
+			"mime_type": "application/pdf",
+			"data":      base64.StdEncoding.EncodeToString(pdf),
+		}})
+	}
+	parts = append(parts, map[string]any{"text": extractionPrompt(page)})
 	body, err := json.Marshal(map[string]any{
 		"contents": []map[string]any{
-			{"role": "user", "parts": []map[string]string{{"text": extractionPrompt(page)}}},
+			{"role": "user", "parts": parts},
 		},
 		"generationConfig": map[string]any{
 			"temperature":      0,
@@ -82,8 +91,18 @@ func extractionPrompt(page Page) string {
 	if page.plainText {
 		prompt += "\n\n" + plainTextNote
 	}
+	if len(page.PDFs) > 0 {
+		prompt += "\n\n" + pdfNote
+	}
 	return prompt
 }
+
+// pdfNote is added when the schedule is the attached PDF instead of page text.
+const pdfNote = `注意: 大会一覧は添付のPDFです。PDFの中の大会をすべて読んでください。PDFにURLは無いので guidelines_url と district_url は空文字にしてください。
+PDFが複数あるときは、同じ大会が複数のPDFに載っていても1件だけ返してください。
+回数が大会名とは別の列にあるときや、「81宍道湖一周駅伝」のように大会名の先頭に数字だけが付いているときは、「第81回宍道湖一周駅伝」のように書いてください。
+GP や ① などの区分記号は大会名に入れないでください。
+理事会、講習会、会議、合宿などの行事と、中止、延期の大会は返さないでください。`
 
 // plainTextNote is added when the page is plain lines of text instead of table rows.
 const plainTextNote = `注意: 次の本文は表ではなく、ページの文字を行ごとに並べたものです。リンクは「文字 URL」の形です。大会名、日付、会場、要項のリンクは近い行にあります。

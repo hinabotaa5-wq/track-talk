@@ -148,19 +148,34 @@ func importTimes(ctx context.Context, pool *pgxpool.Pool) (map[string]time.Time,
 }
 
 func readMeets(ctx context.Context, client competitions.Client, source competitions.Source) ([]competitions.Meet, error) {
-	urls := source.URLs()
+	urls, err := source.ResolveURLs(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if len(urls) == 0 {
 		return nil, errors.New("日程ページのURLがありません")
 	}
-	var allMeets []competitions.Meet
-	seen := map[string]bool{}
-	for i, u := range urls {
-		if i > 0 {
-			time.Sleep(5 * time.Second)
-		}
+	// Consecutive PDFs go to Gemini together so a meet listed in several of them is returned once.
+	var pages []competitions.Page
+	var pageURLs []string
+	for _, u := range urls {
 		page, err := competitions.FetchPage(ctx, u)
 		if err != nil {
 			return nil, err
+		}
+		if n := len(pages); n > 0 && len(page.PDFs) > 0 && len(pages[n-1].PDFs) > 0 {
+			pages[n-1].PDFs = append(pages[n-1].PDFs, page.PDFs...)
+			continue
+		}
+		pages = append(pages, page)
+		pageURLs = append(pageURLs, u)
+	}
+	var allMeets []competitions.Meet
+	seen := map[string]bool{}
+	for i, page := range pages {
+		u := pageURLs[i]
+		if i > 0 {
+			time.Sleep(5 * time.Second)
 		}
 		drafts, err := client.Extract(ctx, page)
 		if err != nil {
@@ -169,7 +184,7 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 		meets, err := competitions.BuildMeets(page, drafts, source.Prefecture, u)
 		if err != nil {
 			// If one of multiple URLs has no meets, continue to others unless all fail
-			if len(urls) > 1 && strings.Contains(err.Error(), "大会がありません") {
+			if len(pages) > 1 && strings.Contains(err.Error(), "大会がありません") {
 				continue
 			}
 			return nil, err
