@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { practiceSchema } from "@/lib/validators";
 import { practiceEvents } from "@/lib/practice-events";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
-import type { Post, PracticeReputation } from "@/lib/types";
+import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useAuth } from "./auth-provider";
-import { PracticeReputationSummary } from "./practice-reputation";
 
 const fieldClass = "mt-1 placeholder:text-zinc-400";
 const selectClass =
@@ -35,14 +34,6 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [reputation, setReputation] = useState<PracticeReputation | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    apiFetch<PracticeReputation>("/v1/me/practice-reputation", { token })
-      .then(setReputation)
-      .catch(() => setReputation(null));
-  }, [token]);
 
   async function onSubmit(formEvent: FormEvent) {
     formEvent.preventDefault();
@@ -113,7 +104,6 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <PracticeReputationSummary reputation={reputation} heading="あなたのこれまでの評価" />
       <label className="block text-sm font-medium">
         練習場所
         <Input
