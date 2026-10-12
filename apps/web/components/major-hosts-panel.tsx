@@ -36,17 +36,18 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
     return <EmptyState title="今後の開催地はまだありません" body="開催地が決まると、ここに表示されます。" />;
   }
   return (
-    <div className="space-y-3">
+    <div className="grid gap-4 sm:grid-cols-2">
       {hosts.map((host) => (
         <article key={`${host.kind}-${host.year}`} className="overflow-hidden rounded-xl border bg-white">
-          <HostPhoto url={host.image_url} alt={host.city} />
+          <HostPhoto url={host.image_url} alt={cityName(host)} />
           <div className="space-y-1 p-4">
-            <p className="text-xs text-zinc-500">{kindLabel(host.kind)}</p>
-            <h2 className="text-lg font-semibold">{host.name}</h2>
-            <p className="text-sm text-zinc-600">{placeLabel(host)}</p>
-            <p className="text-sm text-zinc-600">{host.schedule_label}</p>
+            <h2 className="text-2xl font-bold">{cityName(host)}</h2>
+            <p className="font-medium">
+              {host.year}年・{kindLabel(host.kind)}
+            </p>
+            <p className="text-sm text-zinc-600">{scheduleRange(host.schedule_label)}</p>
             {host.page_url ? (
-              <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-700">
+              <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-blue-700">
                 Wikipedia
               </a>
             ) : null}
@@ -57,26 +58,34 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
   );
 }
 
+function cityName(host: MajorHost) {
+  return host.city || host.country;
+}
+
+function scheduleRange(label: string) {
+  const rest = label.replace(/^\d{4}年/, "");
+  if (rest.includes("日")) return rest;
+  if (/^\d{1,2}月$/.test(rest)) return `${rest}（日にち未定）`;
+  return "日程未定";
+}
+
 function HostPhoto({ url, alt }: { url: string; alt: string }) {
   const [failed, setFailed] = useState(false);
   const visible = url !== "" && !failed;
   return (
-    <div>
-      <div className="aspect-video bg-zinc-100">
-        {visible ? (
+    <div className="relative aspect-[4/3] bg-zinc-100">
+      {visible ? (
+        <>
           <img src={url} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
-        ) : null}
-      </div>
-      {visible ? <p className="px-4 pt-2 text-xs text-zinc-500">写真: Wikipedia</p> : null}
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-white">
+            写真: Wikimedia Commons
+          </p>
+        </>
+      ) : null}
     </div>
   );
 }
 
 function kindLabel(kind: MajorHost["kind"]) {
   return kind === "olympics" ? "オリンピック" : "世界陸上";
-}
-
-function placeLabel(host: MajorHost) {
-  const city = host.country ? `${host.city}（${host.country}）` : host.city;
-  return host.venue ? `${city} ${host.venue}` : city;
 }

@@ -13,7 +13,7 @@ import (
 const wikiAPI = "https://ja.wikipedia.org/w/api.php"
 
 // FetchMajorHosts reads one Wikipedia host table and keeps editions that have not ended.
-// A thumbnail is taken from the edition page, then from the city page. A missing photo is left blank.
+// The photo is a city skyline from Wikimedia Commons. A missing photo is left blank.
 func FetchMajorHosts(ctx context.Context, kind string, now time.Time) ([]MajorHost, error) {
 	page, heading, parse := wikiSource(kind)
 	if parse == nil {
@@ -115,20 +115,11 @@ func sectionIndex(body []byte, heading string) (string, error) {
 
 func attachThumbnails(ctx context.Context, hosts []MajorHost) {
 	for i := range hosts {
-		for _, page := range photoPages(hosts[i]) {
-			image, err := wikiThumbnail(ctx, page)
-			if err != nil || image == "" {
-				continue
-			}
+		if image := cityLandscape(ctx, hosts[i]); image != "" {
 			hosts[i].ImageURL = image
-			break
+			continue
 		}
-		if hosts[i].ImageURL == "" && hosts[i].City != "" {
-			image, err := wikiSummaryThumbnail(ctx, hosts[i].City)
-			if err == nil {
-				hosts[i].ImageURL = image
-			}
-		}
+		hosts[i].ImageURL = wikiCityLead(ctx, hosts[i])
 	}
 }
 
