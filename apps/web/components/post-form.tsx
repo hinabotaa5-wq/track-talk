@@ -19,7 +19,7 @@ type Values = z.infer<typeof postSchema>;
 
 const maxPhotoBytes = 10 * 1024 * 1024;
 
-export function PostForm({ initial }: { initial?: Post }) {
+export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
@@ -83,7 +83,7 @@ export function PostForm({ initial }: { initial?: Post }) {
             token,
             body: JSON.stringify(payload),
           });
-      router.push(`/posts/${post.id}`);
+      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";

@@ -25,7 +25,7 @@ type KeptPhoto = { public_id: string; url: string };
 
 type PhotoFile = { file: File; url: string };
 
-export function RecruitmentForm({ initial }: { initial?: Post }) {
+export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const recruitment = initial?.recruitment;
@@ -140,7 +140,7 @@ export function RecruitmentForm({ initial }: { initial?: Post }) {
             token,
             body: JSON.stringify(payload),
           });
-      router.push(`/posts/${post.id}`);
+      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";

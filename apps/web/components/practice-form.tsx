@@ -22,7 +22,7 @@ function toLocalInput(iso: string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function PracticeForm({ initial }: { initial?: Post }) {
+export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const practice = initial?.practice;
@@ -89,7 +89,7 @@ export function PracticeForm({ initial }: { initial?: Post }) {
             token,
             body: JSON.stringify(payload),
           });
-      router.push(`/posts/${post.id}`);
+      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";

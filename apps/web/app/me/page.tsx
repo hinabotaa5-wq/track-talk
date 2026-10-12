@@ -60,7 +60,7 @@ export default function MePage() {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           {posts.map((p) => (
-            <FeedCard key={p.id} post={p} />
+            <FeedCard key={p.id} post={p} returnTo="me" />
           ))}
         </div>
       )}

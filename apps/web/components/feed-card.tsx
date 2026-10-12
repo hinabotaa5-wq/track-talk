@@ -13,12 +13,13 @@ function KindBadge({ children }: { children: string }) {
   );
 }
 
-export function FeedCard({ post }: { post: Post }) {
+export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   const title = feedTitle(post.title);
+  const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
   if (post.kind === "practice") {
     const info = post.practice;
     return (
-      <Link href={`/posts/${post.id}`} className="block overflow-hidden rounded-2xl border bg-white">
+      <Link href={href} className="block overflow-hidden rounded-2xl border bg-white">
         <div className="flex aspect-[4/3] flex-col gap-2 bg-zinc-50 p-3">
           <KindBadge>練習</KindBadge>
           {info ? (
@@ -39,7 +40,7 @@ export function FeedCard({ post }: { post: Post }) {
     );
   }
   return (
-    <Link href={`/posts/${post.id}`} className="block overflow-hidden rounded-2xl border bg-white">
+    <Link href={href} className="block overflow-hidden rounded-2xl border bg-white">
       <div className="relative aspect-[4/3] bg-zinc-200">
         {post.kind === "recruitment" ? (
           <span className="absolute top-2 left-2 z-10">

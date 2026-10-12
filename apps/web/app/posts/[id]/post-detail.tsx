@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-export function PostDetail({ id }: { id: string }) {
+export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
@@ -84,7 +84,7 @@ export function PostDetail({ id }: { id: string }) {
   async function remove() {
     if (!confirm("この投稿を削除しますか？")) return;
     await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
-    router.push("/");
+    router.push(returnTo === "me" ? "/me" : "/");
     router.refresh();
   }
 
@@ -171,7 +171,7 @@ export function PostDetail({ id }: { id: string }) {
         {mine ? (
           <>
             <Link
-              href={`/posts/${post.id}/edit`}
+              href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
               className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
             >
               編集
