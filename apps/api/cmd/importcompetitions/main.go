@@ -184,6 +184,11 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 	for _, u := range urls {
 		page, err := competitions.FetchPage(ctx, u)
 		if err != nil {
+			// A month that is not published yet must not stop the other pages of the same prefecture.
+			if len(urls) > 1 {
+				log.Printf("%s: %s を飛ばします: %v", source.Prefecture, u, err)
+				continue
+			}
 			return nil, err
 		}
 		if n := len(pages); n > 0 && len(page.PDFs) > 0 && len(pages[n-1].PDFs) > 0 {

@@ -149,8 +149,20 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 			return year, true
 		}
 	}
+	// Some pages only say 令和８年度 with no Western year. Reiwa 1 is 2019, so the season starts in 2018+N.
+	newest := 0
+	for _, match := range eraSeasonPattern.FindAllStringSubmatch(text, -1) {
+		if n, err := strconv.Atoi(match[1]); err == nil && n >= 1 && 2018+n <= seasonYearCap() && 2018+n > newest {
+			newest = 2018 + n
+		}
+	}
+	if newest > 0 {
+		return newest, true
+	}
 	return 0, false
 }
+
+var eraSeasonPattern = regexp.MustCompile(`(?:R|令和)\s*(\d{1,2})\s*年度`)
 
 var (
 	headingYearPattern       = regexp.MustCompile(`(20\d{2})年度`)

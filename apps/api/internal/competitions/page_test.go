@@ -1,6 +1,7 @@
 package competitions
 
 import (
+	xhtml "golang.org/x/net/html"
 	"strings"
 	"testing"
 )
@@ -376,5 +377,21 @@ func TestParsePageEraSeasonYear(t *testing.T) {
 	}
 	if page.SeasonYear != 2026 {
 		t.Fatalf("season %d", page.SeasonYear)
+	}
+}
+
+func TestParsePageEraOnlySeasonYear(t *testing.T) {
+	html := `<html><body>
+<p>ホーム &gt; 行事予定 &gt; 令和８年度 &gt; ５月</p>
+<p>５月２日(土) 関東私学６大学対抗陸上 会場：上尾運動公園陸上競技場</p>
+<p>５月９日(土) 第４７回 三郷市陸上競技選手権大会 会場：三郷市陸上競技場</p>
+</body></html>`
+	doc, err := xhtml.Parse(strings.NewReader(html))
+	if err != nil {
+		t.Fatal(err)
+	}
+	year, ok := findSeasonYear(doc)
+	if !ok || year != 2026 {
+		t.Fatalf("season %d ok %v", year, ok)
 	}
 }
