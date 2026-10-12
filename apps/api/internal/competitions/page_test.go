@@ -344,6 +344,24 @@ func TestParsePageNestedLayoutTable(t *testing.T) {
 	}
 }
 
+func TestParsePageBareYearHeading(t *testing.T) {
+	for _, heading := range []string{"2026　青森陸上競技協会　競技日程", "2026競技会情報"} {
+		html := `<html><body><h2>` + heading + `</h2>
+<table>
+<tr><th>日程</th><th>競技（会場）</th><th>要項</th></tr>
+<tr><td>5月8日～10日</td><td>県春季大会（新青森県営）</td><td><a href="yoko.pdf">要項</a></td></tr>
+</table>
+</body></html>`
+		page, err := ParsePage(strings.NewReader(html), "https://example.com/schedule/")
+		if err != nil {
+			t.Fatalf("%s: %v", heading, err)
+		}
+		if page.SeasonYear != 2026 {
+			t.Fatalf("%s: season %d", heading, page.SeasonYear)
+		}
+	}
+}
+
 func TestParsePageEraSeasonYear(t *testing.T) {
 	html := `<html><body>
 <p>◆ R8（2026）年度 県陸協主催競技会</p>

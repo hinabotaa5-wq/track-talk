@@ -3,6 +3,17 @@ package competitions
 // Sources are the athletics association homepages to read.
 // Other prefectures are added here as their schedule page URL is known.
 var Sources = []Source{
+	{Prefecture: "02", PageURL: "https://www.jaafaomori.com/schedule/"},
+	{Prefecture: "03", PageURL: "https://iwate-rk.com/page-5443/"},
+	{
+		Prefecture: "05",
+		PageURL:    "http://jaaf-akita.com/?s=2026&sm=06",
+		ExtraURLs: []string{
+			"http://jaaf-akita.com/?s=2026&sm=07",
+			"http://jaaf-akita.com/?s=2026&sm=08",
+			"http://jaaf-akita.com/?s=2026&sm=09",
+		},
+	},
 	{Prefecture: "08", PageURL: "http://ibariku.com/event/2026.html"},
 	{Prefecture: "09", PageURL: "https://www.jaaftochigi.jp/event2026/"},
 	{Prefecture: "10", PageURL: "http://gold.jaic.org/gunma/competitions.html"},

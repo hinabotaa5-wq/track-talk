@@ -135,6 +135,7 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 		regexp.MustCompile(`(20\d{2})年競技`),
 		regexp.MustCompile(`(20\d{2})年度`),
 		seasonYearPattern,
+		regexp.MustCompile(`(20\d{2})[\s　]*(?:[^\s　\d]{1,15}[\s　]*)?(?:競技日程|競技会情報)`),
 	}
 	for _, pattern := range patterns {
 		match := pattern.FindStringSubmatch(text)
