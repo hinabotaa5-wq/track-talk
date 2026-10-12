@@ -98,7 +98,7 @@ func renderRows(rows []row) string {
 
 var (
 	urlQueryYearPattern = regexp.MustCompile(`(?:^|[?&])(?:y|year)=(20\d{2})`)
-	urlPathYearPattern  = regexp.MustCompile(`(?:/|_|-)(20\d{2})(?:[a-zA-Z0-9_.-]*\.html?|/|$)`)
+	urlPathYearPattern  = regexp.MustCompile(`(?:/|_|-)(20\d{2})[a-zA-Z0-9_.-]*(?:/|$)`)
 )
 
 func yearFromURL(u *url.URL) (int, bool) {
@@ -149,10 +149,13 @@ func findSeasonYear(doc *html.Node) (int, bool) {
 }
 
 var (
-	headingYearPattern  = regexp.MustCompile(`(20\d{2})年度`)
-	monthHeadingPattern = regexp.MustCompile(`(20\d{2})年(0?[1-9]|1[0-2])月`)
-	digitMonthPattern   = regexp.MustCompile(`\d月`)
-	clockPattern        = regexp.MustCompile(`\d{1,2}:\d{2}\s*[～〜~]?`)
+	headingYearPattern       = regexp.MustCompile(`(20\d{2})年度`)
+	monthHeadingPattern      = regexp.MustCompile(`(?:(20\d{2})年)?\s*(0?[1-9]|1[0-2])月`)
+	digitMonthPattern        = regexp.MustCompile(`\d月`)
+	clockPattern             = regexp.MustCompile(`\d{1,2}:\d{2}\s*[～〜~]?`)
+	headlessFirstCellPattern = regexp.MustCompile(`^\d{1,2}(?:[\s,、・/～〜-]\d{1,2})*(?:日)?$`)
+	weekdayPattern           = regexp.MustCompile(`^[月火水木金土日祝・,、/\s()（）]+$`)
+	yearHeaderPattern        = regexp.MustCompile(`^20\d{2}年?$`)
 )
 
 type foundTable struct {
@@ -215,7 +218,7 @@ func withMonth(header, text, month string) string {
 	if month == "" || text == "" || digitMonthPattern.MatchString(text) {
 		return text
 	}
-	if header != "日" && !strings.Contains(header, "開催日") {
+	if !isDateHeader(header) {
 		return text
 	}
 	return month + " " + text
@@ -378,7 +381,8 @@ type placed struct {
 }
 
 func isDateHeader(header string) bool {
-	return header == "日" || header == "月" || header == "月日" || header == "期日" || isDayWithWeekday(header) || strings.Contains(header, "開催日") || strings.Contains(header, "日程")
+	compact := compactHeader(header)
+	return header == "日" || header == "月" || header == "月日" || header == "期日" || isDayWithWeekday(header) || strings.Contains(header, "開催日") || strings.Contains(header, "日程") || strings.Contains(header, "日／曜") || strings.Contains(header, "日/曜") || strings.Contains(compact, "日/曜") || yearHeaderPattern.MatchString(header)
 }
 
 // isDayWithWeekday matches a column titled 日（曜）or 日(曜).
@@ -394,7 +398,8 @@ func isNameHeader(header string) bool {
 	if strings.Contains(header, "要項") {
 		return false
 	}
-	return strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") || strings.Contains(header, "主催")
+	compact := compactHeader(header)
+	return strings.Contains(header, "競技会") || strings.Contains(header, "行事") || strings.Contains(header, "大会") || strings.Contains(header, "主催") || strings.Contains(compact, "内容")
 }
 
 func cellLines(n *html.Node) []string {
@@ -488,26 +493,110 @@ func layoutTable(table *html.Node) [][]*html.Node {
 	return grid
 }
 
+func isHeadlessDataRow(firstCellText string, remainingCells int, secondCellText string) bool {
+	firstCellText = strings.TrimSpace(normalizeDigits(firstCellText))
+	if !headlessFirstCellPattern.MatchString(firstCellText) {
+		return false
+	}
+	if remainingCells >= 1 && weekdayPattern.MatchString(strings.TrimSpace(secondCellText)) {
+		return true
+	}
+	return remainingCells >= 2
+}
+
+func synthesizedHeaders(cols int) []string {
+	switch cols {
+	case 3:
+		return []string{"日", "競技会", "会場"}
+	case 4:
+		return []string{"日", "曜日", "競技会", "会場"}
+	case 5:
+		return []string{"日", "曜日", "競技会", "会場", "備考"}
+	default:
+		headers := make([]string, cols)
+		for i := range headers {
+			switch i {
+			case 0:
+				headers[i] = "日"
+			case 1:
+				headers[i] = "曜日"
+			case 2:
+				headers[i] = "競技会"
+			case 3:
+				headers[i] = "会場"
+			default:
+				headers[i] = fmt.Sprintf("備考%d", i-3)
+			}
+		}
+		return headers
+	}
+}
+
+func inThead(n *html.Node) bool {
+	for p := n.Parent; p != nil; p = p.Parent {
+		if p.Type == html.ElementNode && p.Data == "thead" {
+			return true
+		}
+	}
+	return false
+}
+
 func gridHeaders(grid [][]*html.Node) ([]string, int) {
 	for i, line := range grid {
-		labels := make([]string, len(line))
-		found := false
-		for col, node := range line {
-			if node == nil || node.Data != "th" {
+		inTh := false
+		for _, node := range line {
+			if node != nil && inThead(node) {
+				inTh = true
+				break
+			}
+		}
+		if inTh {
+			labels := make([]string, len(line))
+			for col, node := range line {
+				if node != nil {
+					labels[col] = compactHeader(cellText(node))
+				}
+			}
+			return labels, i
+		}
+	}
+	for i, line := range grid {
+		thCount := 0
+		total := 0
+		for _, node := range line {
+			if node == nil {
 				continue
 			}
-			found = true
-			labels[col] = compactHeader(cellText(node))
+			total++
+			if node.Data == "th" {
+				thCount++
+			}
 		}
-		if found {
+		if thCount > 0 && thCount*2 >= total {
+			labels := make([]string, len(line))
+			for col, node := range line {
+				if node != nil {
+					labels[col] = compactHeader(cellText(node))
+				}
+			}
 			return labels, i
 		}
 	}
 	if len(grid) == 0 {
 		return nil, 0
 	}
-	labels := make([]string, len(grid[0]))
-	for col, node := range grid[0] {
+	firstLine := grid[0]
+	if len(firstLine) > 0 && firstLine[0] != nil {
+		second := ""
+		if len(firstLine) > 1 && firstLine[1] != nil {
+			second = cellText(firstLine[1])
+		}
+		if isHeadlessDataRow(cellText(firstLine[0]), len(firstLine)-1, second) {
+			return synthesizedHeaders(len(firstLine)), -1
+		}
+	}
+	labels := make([]string, len(firstLine))
+	for col, node := range firstLine {
 		if node != nil {
 			labels[col] = compactHeader(cellText(node))
 		}
@@ -544,7 +633,10 @@ func isCalendarWidget(n *html.Node) bool {
 		if attr.Key == "id" && attr.Val == "wp-calendar" {
 			return true
 		}
-		if attr.Key == "class" && strings.Contains(attr.Val, "wp-calendar") {
+		if attr.Key == "class" && (strings.Contains(attr.Val, "wp-calendar") || strings.Contains(attr.Val, "MonthIdouTable") || strings.Contains(attr.Val, "YearListTable")) {
+			return true
+		}
+		if attr.Key == "summary" && strings.Contains(attr.Val, "月操作") {
 			return true
 		}
 	}
@@ -568,7 +660,7 @@ func isScheduleHeader(headers []string) bool {
 	}
 	for _, header := range headers {
 		header = strings.TrimSpace(header)
-		if header == "日" || header == "月日" || header == "期日" || isDayWithWeekday(header) || strings.Contains(header, "開催日") || strings.Contains(header, "要項") || strings.Contains(header, "日程") {
+		if isDateHeader(header) || strings.Contains(header, "要項") {
 			return true
 		}
 	}
@@ -578,20 +670,57 @@ func isScheduleHeader(headers []string) bool {
 func tableHeaders(table *html.Node) ([]string, int) {
 	rows := directRows(table)
 	for i, row := range rows {
-		cells := elementChildren(row, "th")
-		if len(cells) == 0 {
+		if !inThead(row) {
 			continue
 		}
-		headers := make([]string, len(cells))
-		for j, cell := range cells {
-			headers[j] = compactHeader(cellText(cell))
+		var cells []*html.Node
+		for c := row.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && (c.Data == "th" || c.Data == "td") {
+				cells = append(cells, c)
+			}
 		}
-		return headers, i
+		if len(cells) > 0 {
+			headers := make([]string, len(cells))
+			for j, cell := range cells {
+				headers[j] = compactHeader(cellText(cell))
+			}
+			return headers, i
+		}
+	}
+	for i, row := range rows {
+		thCount := 0
+		total := 0
+		for c := row.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && (c.Data == "th" || c.Data == "td") {
+				total++
+				if c.Data == "th" {
+					thCount++
+				}
+			}
+		}
+		if thCount > 0 && thCount*2 >= total {
+			var headers []string
+			for c := row.FirstChild; c != nil; c = c.NextSibling {
+				if c.Type == html.ElementNode && (c.Data == "th" || c.Data == "td") {
+					headers = append(headers, compactHeader(cellText(c)))
+				}
+			}
+			return headers, i
+		}
 	}
 	if len(rows) == 0 {
 		return nil, 0
 	}
 	cells := elementChildren(rows[0], "td")
+	if len(cells) > 0 {
+		second := ""
+		if len(cells) > 1 {
+			second = cellText(cells[1])
+		}
+		if isHeadlessDataRow(cellText(cells[0]), len(cells)-1, second) {
+			return synthesizedHeaders(len(cells)), -1
+		}
+	}
 	headers := make([]string, len(cells))
 	for i, cell := range cells {
 		headers[i] = compactHeader(cellText(cell))
@@ -627,13 +756,6 @@ func elementChildren(n *html.Node, tag string) []*html.Node {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		if c.Type == html.ElementNode && c.Data == tag {
 			out = append(out, c)
-		}
-	}
-	if len(out) == 0 && (tag == "td" || tag == "th") {
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.ElementNode && (c.Data == "td" || c.Data == "th") {
-				out = append(out, c)
-			}
 		}
 	}
 	return out

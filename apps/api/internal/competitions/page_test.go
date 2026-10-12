@@ -204,3 +204,87 @@ func TestParsePageFullwidthYear(t *testing.T) {
 		t.Fatalf("links %+v", page.Links)
 	}
 }
+
+func TestParsePageHeadlessTable(t *testing.T) {
+	html := `<html><body>
+<h2>2026年度大会・行事</h2>
+<h2>4月</h2>
+<table><tbody>
+<tr><td>4</td><td>土</td><td>審判講習会</td><td>小瀬</td><td></td></tr>
+<tr><td>5,12</td><td>日,日</td><td><a href="https://example.com/record">第57回県記録会</a></td><td>小瀬</td><td>Web申込</td></tr>
+</tbody></table>
+<h2>5月</h2>
+<table><tbody>
+<tr><td>2</td><td>土</td><td>県中学普及記録会</td><td>小瀬</td><td></td></tr>
+</tbody></table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://example.com/2026nendo-taikai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	for _, want := range []string{"4月 4", "審判講習会", "4月 5,12", "第57回県記録会", "5月 2", "県中学普及記録会"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+}
+
+func TestParsePageTheadTdWithTbodyTh(t *testing.T) {
+	html := `<html><body>
+<p>2026年4月</p>
+<table summary="日程">
+<thead>
+  <tr><td colspan="2">日／曜</td><td>内　容</td></tr>
+</thead>
+<tbody>
+  <tr><th>4</th><td>土</td><td><a href="https://example.com/yoko.pdf">春季記録会</a></td></tr>
+  <tr><th>5</th><td>日</td><td></td></tr>
+  <tr><th>18</th><td>土</td><td>県選手権大会</td></tr>
+</tbody>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://example.com/schedule?m=4&y=2026")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	for _, want := range []string{"2026年4月 4", "春季記録会", "2026年4月 18", "県選手権大会"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+	if strings.Contains(page.Body, "2026年4月 5") {
+		t.Fatalf("empty row should not be parsed: %s", page.Body)
+	}
+}
+
+func TestParsePageYearHeader(t *testing.T) {
+	html := `<html><body>
+<h1>2026年度競技日程</h1>
+<h2>2026年4月競技日程</h2>
+<table>
+<thead><tr><th>2026年</th><th>競技会名</th><th>会場</th><th>要項</th></tr></thead>
+<tbody>
+<tr><td>4(土)</td><td>春季トライアル</td><td>佐久</td><td><a href="https://example.com/yoko.pdf">要項</a></td></tr>
+</tbody>
+</table>
+</body></html>`
+	page, err := ParsePage(strings.NewReader(html), "https://example.com/calendar/2026nrk_calendar-2-2-2-2-2/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2026 {
+		t.Fatalf("season %d", page.SeasonYear)
+	}
+	for _, want := range []string{"2026年4月 4(土)", "春季トライアル", "佐久"} {
+		if !strings.Contains(page.Body, want) {
+			t.Fatalf("missing %s in %s", want, page.Body)
+		}
+	}
+}
+
