@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { FeedCard } from "@/components/feed-card";
+import { HomeFeed } from "@/components/home-feed";
 import { SavedFeed } from "@/components/saved-feed";
-import { EmptyState, ErrorState } from "@/components/empty-state";
+import { homeFeedServerTimeoutMs, type PostsPage } from "@/lib/fetch-posts";
 import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,20 +37,17 @@ export default async function HomePage({
   const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
   if (q) qs.set("q", q);
 
-  let posts: Post[] = [];
-  let meta: Meta = { page: 1, per_page: 20, total: 0 };
-  let error = "";
+  let initial: PostsPage | null = null;
   if (sort !== "saved") {
     try {
-      const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`);
-      posts = data.posts ?? [];
-      meta = data.meta;
+      const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`, {
+        signal: AbortSignal.timeout(homeFeedServerTimeoutMs),
+      });
+      initial = { posts: data.posts ?? [], meta: data.meta };
     } catch {
-      error = "投稿の取得に失敗しました。APIの起動を確認してください。";
+      initial = null;
     }
   }
-
-  const hasNext = meta.page * meta.per_page < meta.total;
 
   return (
     <div className="-mx-4 -mt-6">
@@ -84,29 +81,11 @@ export default async function HomePage({
         </Link>
       </div>
       <div className="space-y-4 px-4 pb-4">
-        {sort === "saved" ? <SavedFeed q={q} page={page} /> : null}
-        {sort !== "saved" && error ? <ErrorState message={error} /> : null}
-        {sort !== "saved" && !error && posts.length === 0 ? (
-          <EmptyState
-            title={q ? "一致する投稿がありません" : "まだ投稿がありません"}
-            body={q ? "別の言葉で探してください。" : "最初のレース感想を書いてみましょう。"}
-          />
-        ) : null}
-        {sort !== "saved" && posts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {posts.map((post) => (
-              <FeedCard key={post.id} post={post} />
-            ))}
-          </div>
-        ) : null}
-        {sort !== "saved" && hasNext ? (
-          <Link
-            href={homeHref(sort, q, meta.page + 1)}
-            className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium"
-          >
-            次の投稿
-          </Link>
-        ) : null}
+        {sort === "saved" ? (
+          <SavedFeed q={q} page={page} />
+        ) : (
+          <HomeFeed key={`${sort}:${q}:${page}`} sort={sort} q={q} page={page} initial={initial} />
+        )}
       </div>
     </div>
   );
