@@ -114,7 +114,7 @@ func TestBuildInternationalMeetsUsesDiamondLeagueSiteAndKeepsSeries(t *testing.T
 	if brussels.EndsOn == nil || brussels.EndsOn.Day() != 5 || brussels.OrganizerURL != "https://brussels.diamondleague.com/" || brussels.Location != "ブリュッセル（ベルギー）" {
 		t.Fatalf("brussels %+v", brussels)
 	}
-	chicago := byName["Bank of America Chicago Marathon"]
+	chicago := byName["シカゴマラソン"]
 	if chicago.LinkLabel != "世界陸連のカレンダー" || chicago.OrganizerURL != worldAthleticsCalendar || chicago.StartsOn.Month() != time.October || chicago.Location != "シカゴ（アメリカ）" {
 		t.Fatalf("chicago %+v", chicago)
 	}

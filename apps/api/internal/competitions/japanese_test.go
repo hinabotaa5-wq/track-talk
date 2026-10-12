@@ -32,9 +32,15 @@ func TestLocalizeMeetName(t *testing.T) {
 		{"Doha Meeting", "ダイヤモンドリーグ・ドーハ"},
 		{"Silesia Kamila Skolimowska Memorial", "カミラスコリモフスカ記念"},
 		{"Prefontaine Classic", "プレフォンテーンクラシック"},
-		{"Bank of America Chicago Marathon", "Bank of America Chicago Marathon"},
-		{"TCS Sydney Marathon Presented by ASICS", "TCS Sydney Marathon Presented by ASICS"},
-		{"Maratón Valencia Trinidad Alfonso Zurich", "Maratón Valencia Trinidad Alfonso Zurich"},
+		{"Bank of America Chicago Marathon", "シカゴマラソン"},
+		{"TCS London Marathon", "ロンドンマラソン"},
+		{"Boston Marathon", "ボストンマラソン"},
+		{"BMW Berlin Marathon", "ベルリンマラソン"},
+		{"TCS Amsterdam Marathon", "アムステルダムマラソン"},
+		{"TCS New York City Marathon", "ニューヨークシティマラソン"},
+		{"TCS Sydney Marathon Presented by ASICS", "シドニーマラソン"},
+		{"Maratón Valencia Trinidad Alfonso Zurich", "バレンシアマラソン"},
+		{"Shanghai Marathon", "上海マラソン"},
 	}
 	for _, tc := range cases {
 		if got := localizeMeetName(tc.name); got != tc.want {

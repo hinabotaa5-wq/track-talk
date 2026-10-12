@@ -7,8 +7,8 @@ import (
 	"unicode"
 )
 
-// localizeMeetName translates a known series or meeting title into Japanese.
-// Sponsored names that are not in the table, such as road races, stay in English.
+// localizeMeetName translates a known series, meeting, or road race into Japanese.
+// Titles that are not in the table stay as written.
 func localizeMeetName(name string) string {
 	original := strings.TrimSpace(name)
 	normalized := normalizeTitle(original)
@@ -353,6 +353,16 @@ var meetingNames = []titled{
 	{"Doha Meeting", "ダイヤモンドリーグ・ドーハ"},
 	{"Mohammed VI", "モハメド6世記念"},
 	{"Herculis", "ヘラクレス"},
+	{"New York City Marathon", "ニューヨークシティマラソン"},
+	{"Bank of America Chicago Marathon", "シカゴマラソン"},
+	{"Chicago Marathon", "シカゴマラソン"},
+	{"Amsterdam Marathon", "アムステルダムマラソン"},
+	{"Sydney Marathon", "シドニーマラソン"},
+	{"London Marathon", "ロンドンマラソン"},
+	{"Berlin Marathon", "ベルリンマラソン"},
+	{"Boston Marathon", "ボストンマラソン"},
+	{"Shanghai Marathon", "上海マラソン"},
+	{"Maratón Valencia", "バレンシアマラソン"},
 }
 
 var cityNames = []titled{
