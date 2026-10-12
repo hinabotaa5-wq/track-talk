@@ -23,13 +23,13 @@ export function Header() {
   return (
     <header className={`border-b border-zinc-200 bg-white${showBack ? " sticky top-0 z-40" : ""}`}>
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <div className="flex min-w-0 items-center">
+        <div className="flex min-w-0 items-center gap-4">
           {showBack ? (
             <button
               type="button"
               onClick={goBack}
               aria-label="戻る"
-              className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-blue-700"
+              className="-ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-blue-700"
             >
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
