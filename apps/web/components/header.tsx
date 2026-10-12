@@ -60,7 +60,7 @@ export function Header() {
               );
             })}
           </nav>
-          {session ? <NotificationBell /> : null}
+          {session && !showBack ? <NotificationBell /> : null}
         </div>
       </div>
     </header>
