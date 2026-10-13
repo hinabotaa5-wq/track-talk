@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import { Geist } from "next/font/google";
 import { preconnect } from "react-dom";
 import Script from "next/script";
@@ -23,7 +24,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   preconnect("https://upload.wikimedia.org");
   preconnect("https://thumb.wikimedia.org");
 

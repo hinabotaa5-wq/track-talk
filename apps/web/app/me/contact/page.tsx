@@ -10,7 +10,7 @@ import type { Inquiry, Meta } from "@/lib/types";
 import { inquiryCategories, inquiryCategoryLabels, inquirySchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
@@ -22,7 +22,6 @@ export default function ContactPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
-  const historyLoaded = useRef(false);
   const form = useForm<Values>({
     resolver: zodResolver(inquirySchema),
     defaultValues: { category: "bug", subject: "", body: "" },
@@ -37,9 +36,11 @@ export default function ContactPage() {
     let cancelled = false;
     apiFetch<{ inquiries: Inquiry[]; meta: Meta }>("/v1/me/inquiries", { token })
       .then((d) => {
-        if (cancelled || historyLoaded.current) return;
-        historyLoaded.current = true;
-        setInquiries(d.inquiries ?? []);
+        if (cancelled) return;
+        setInquiries((current) => {
+          const shown = new Set(current.map((inquiry) => inquiry.id));
+          return [...current, ...(d.inquiries ?? []).filter((inquiry) => !shown.has(inquiry.id))];
+        });
       })
       .catch(() => {
         if (!cancelled) setError("送信履歴の取得に失敗しました");
@@ -53,7 +54,6 @@ export default function ContactPage() {
     setError("");
     setSent(false);
     try {
-      historyLoaded.current = true;
       const created = await apiFetch<Inquiry>("/v1/me/inquiries", {
         method: "POST",
         token,
