@@ -323,7 +323,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             {commentError ? <p className="mt-2 text-sm text-red-400">{commentError}</p> : null}
           </form>
         ) : (
-          <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">募集は終了しています。コメントは閲覧できます。</p>
+          <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">募集は終了しています。</p>
         )}
       </section>
     </article>
