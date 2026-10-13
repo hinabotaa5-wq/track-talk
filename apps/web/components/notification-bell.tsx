@@ -36,24 +36,25 @@ export function NotificationBell() {
   const [error, setError] = useState("");
 
   const load = useCallback(
-    async (list: boolean) => {
+    (list: boolean) => {
       if (!token) return;
-      if (list) setLoading(true);
-      try {
-        const data = await apiFetch<{ notifications: AppNotification[]; unread_count: number; meta: Meta }>(
-          `/v1/me/notifications?per_page=${list ? 20 : 1}`,
-          { token },
-        );
-        setUnread(data.unread_count ?? 0);
-        if (list) {
-          setItems(data.notifications ?? []);
-          setError("");
-        }
-      } catch {
-        if (list) setError("通知を読み込めませんでした");
-      } finally {
-        if (list) setLoading(false);
-      }
+      apiFetch<{ notifications: AppNotification[]; unread_count: number; meta: Meta }>(
+        `/v1/me/notifications?per_page=${list ? 20 : 1}`,
+        { token },
+      )
+        .then((data) => {
+          setUnread(data.unread_count ?? 0);
+          if (list) {
+            setItems(data.notifications ?? []);
+            setError("");
+          }
+        })
+        .catch(() => {
+          if (list) setError("通知を読み込めませんでした");
+        })
+        .finally(() => {
+          if (list) setLoading(false);
+        });
     },
     [token],
   );
@@ -61,9 +62,9 @@ export function NotificationBell() {
   useEffect(() => {
     if (!token) return;
     const refresh = () => {
-      if (document.visibilityState === "visible") void load(open);
+      if (document.visibilityState === "visible") load(open);
     };
-    void load(open);
+    load(open);
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
   }, [token, open, load]);
@@ -115,7 +116,10 @@ export function NotificationBell() {
         aria-label={label}
         aria-expanded={open}
         aria-controls={panelID}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (!open) setLoading(true);
+          setOpen(!open);
+        }}
         className="relative inline-flex size-11 items-center justify-center rounded-md text-zinc-700 hover:bg-zinc-100"
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />

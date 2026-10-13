@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { z } from "zod";
 
 const callbackErrors: Record<string, string> = {
@@ -19,16 +19,19 @@ const callbackErrors: Record<string, string> = {
   google: "Googleログインに失敗しました。",
 };
 
+function subscribeToNothing() {
+  return () => {};
+}
+
+function callbackErrorCode() {
+  return new URLSearchParams(window.location.search).get("error");
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("error");
-    if (code && callbackErrors[code]) {
-      setError(callbackErrors[code]);
-    }
-  }, []);
+  const [submitError, setError] = useState("");
+  const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
+  const error = submitError || (code ? (callbackErrors[code] ?? "") : "");
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),

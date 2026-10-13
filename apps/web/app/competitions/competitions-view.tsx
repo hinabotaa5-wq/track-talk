@@ -49,13 +49,6 @@ export function CompetitionsView() {
   }, [fromUrl]);
 
   useEffect(() => {
-    const known = readCompetitions(prefecture, month);
-    if (known) {
-      setItems(known.items);
-      setError(known.error);
-      setLoadedKey(key);
-    }
-
     if (!token) return;
     let active = true;
     loadCompetitions(prefecture, month, token).then((entry) => {
