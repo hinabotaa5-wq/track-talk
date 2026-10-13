@@ -21,7 +21,7 @@ export default function UploadPage() {
     if (!loading && !session) router.replace("/login");
   }, [loading, session, router]);
 
-  if (loading || !session) return <p>読み込み中…</p>;
+  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
   return (
     <div className="space-y-4">
@@ -30,10 +30,10 @@ export default function UploadPage() {
           <Link
             key={door.href}
             href={door.href}
-            className="block min-h-11 rounded-2xl border bg-white p-4 hover:border-blue-300"
+            className="block min-h-11 rounded-2xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16"
           >
-            <span className="block text-lg font-semibold">{door.title}</span>
-            <span className="mt-1 block text-sm text-zinc-600">{door.body}</span>
+            <span className="block text-lg font-semibold text-slate-100">{door.title}</span>
+            <span className="mt-1 block text-sm text-slate-200">{door.body}</span>
           </Link>
         ))}
       </div>

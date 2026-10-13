@@ -83,12 +83,12 @@ export function CompetitionsView() {
                 href={c.organizer_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-xl border bg-white p-4 hover:border-blue-300"
+                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16"
               >
-                <p className="text-xs text-zinc-500">{competitionDates(c.starts_on, c.ends_on)}</p>
-                <h2 className="text-lg font-semibold">{c.name}</h2>
-                {c.location ? <p className="mt-1 text-sm text-zinc-600">{c.location}</p> : null}
-                <p className="text-sm text-blue-700">{destinationLabel(c, prefecture)}</p>
+                <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
+                <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
+                {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
+                <p className="text-sm text-blue-400">{destinationLabel(c, prefecture)}</p>
               </a>
             ))}
           </div>

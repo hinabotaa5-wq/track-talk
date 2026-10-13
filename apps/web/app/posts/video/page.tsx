@@ -85,7 +85,7 @@ export default function OwnVideoPage() {
         <label className="block text-sm font-medium">
           動画ファイル
           <input
-            className="mt-1 block w-full text-base"
+            className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
             type="file"
             accept="video/mp4,video/quicktime,video/webm"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -96,8 +96,8 @@ export default function OwnVideoPage() {
         {upload ? (
           <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
         ) : null}
-        {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {status ? <p className="text-sm text-slate-200">{status}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? "送っています" : "アップロードして投稿"}
         </Button>

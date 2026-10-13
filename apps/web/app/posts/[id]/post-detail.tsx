@@ -60,7 +60,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }, [id, token]);
 
   if (loading) return <DetailLoadingFrame />;
-  if (error || !post) return <p className="text-red-700">{error || "エラー"}</p>;
+  if (error || !post) return <p className="text-red-400">{error || "エラー"}</p>;
 
   const current = post;
   const mine = current.mine;
@@ -210,7 +210,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           thumbnailUrl={post.thumbnail_url}
         />
       ) : post.thumbnail_url ? (
-        <div className="relative w-full overflow-hidden rounded-xl bg-zinc-100">
+        <div className="relative w-full overflow-hidden rounded-xl bg-black/25">
           <Image
             src={post.thumbnail_url}
             alt={feedTitle(post.title)}
@@ -225,16 +225,16 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       {post.kind === "practice" ? null : (
         <>
           <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
-          <p className="text-sm text-zinc-500">{formatDateTime(post.created_at)}</p>
+          <p className="text-sm text-slate-200">{formatDateTime(post.created_at)}</p>
         </>
       )}
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
-          <h2 className="mb-2 text-xl font-semibold">詳細</h2>
-          <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
+          <h2 className="mb-2 text-xl font-semibold text-slate-100">詳細</h2>
+          <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
         </div>
       ) : post.body ? (
-        <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
+        <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
       ) : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-2">
         <LikeButton
@@ -252,7 +252,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           <>
             <Link
               href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
-              className="inline-flex items-center justify-center rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-xs transition hover:bg-zinc-50 active:scale-95"
+              className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-95"
             >
               編集
             </Link>
@@ -270,7 +270,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           <Button
             type="button"
             variant="ghost"
-            className="rounded-full text-zinc-500 hover:text-zinc-700 active:scale-95"
+            className="rounded-full text-slate-200 hover:text-white active:scale-95"
             disabled={action.pending}
             onClick={() => report("post", post.id)}
           >
@@ -281,16 +281,16 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       </div>
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
         <h2 className="text-xl font-semibold">コメント</h2>
-        {comments.length === 0 ? <p className="text-sm text-zinc-500">まだコメントはありません。</p> : null}
+        {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {comments.map((c) => (
-          <div key={c.id} className="rounded-lg border bg-white p-3">
+          <div key={c.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-slate-200">
             <p className="whitespace-pre-wrap text-sm">{c.body}</p>
-            <p className="mt-2 text-xs text-zinc-500">{formatDateTime(c.created_at)}</p>
+            <p className="mt-2 text-xs text-slate-300">{formatDateTime(c.created_at)}</p>
             {c.mine ? (
               <div className="mt-1 flex gap-3">
                 <button
                   type="button"
-                  className="text-xs text-blue-700 disabled:opacity-50"
+                  className="text-xs text-blue-400 disabled:opacity-50"
                   disabled={action.pending}
                   onClick={() => editComment(c)}
                 >
@@ -298,7 +298,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-red-600 disabled:opacity-50"
+                  className="text-xs text-red-400 disabled:opacity-50"
                   disabled={action.pending}
                   onClick={() => deleteComment(c.id)}
                 >
@@ -308,7 +308,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             ) : (
               <button
                 type="button"
-                className="mt-1 text-xs text-zinc-500 disabled:opacity-50"
+                className="mt-1 text-xs text-slate-300 disabled:opacity-50"
                 disabled={action.pending}
                 onClick={() => report("comment", c.id)}
               >
@@ -320,18 +320,18 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         {allowComment ? (
           <form
             onSubmit={form.handleSubmit(onComment)}
-            className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
+            className="glass fixed inset-x-0 bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
-              <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
+              <Textarea rows={2} className="min-h-11 flex-1 glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500" placeholder="コメントを書く" {...form.register("body")} />
               <Button type="submit" className="shrink-0 lg:w-full" disabled={commentLock.pending}>
                 {commentLock.pending ? "送っています" : "コメントする"}
               </Button>
             </div>
-            {commentError ? <p className="mt-2 text-sm text-red-600">{commentError}</p> : null}
+            {commentError ? <p className="mt-2 text-sm text-red-400">{commentError}</p> : null}
           </form>
         ) : (
-          <p className="rounded-lg border bg-white p-3 text-sm text-zinc-600">募集は終了しています。コメントは閲覧できます。</p>
+          <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">募集は終了しています。コメントは閲覧できます。</p>
         )}
       </section>
     </article>
@@ -372,7 +372,7 @@ function RatingForm({
       <label className="block text-sm font-medium">
         評価
         <select
-          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base outline-none focus:border-blue-500"
+          className="mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
           value={score}
           onChange={(event) => setScore(event.target.value)}
         >
@@ -476,9 +476,9 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
       {mine && info.applications && info.applications.length > 0 ? (
         <ul className="space-y-2">
           {info.applications.map((application) => (
-            <li key={application.id} className="rounded-xl border bg-white p-3">
+            <li key={application.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3">
               <p className="text-sm">参加希望 · {formatDateTime(application.created_at)}</p>
-              <p className="mt-1 text-sm text-zinc-500">{applicationStatusLabel(application.status)}</p>
+              <p className="mt-1 text-sm text-slate-200">{applicationStatusLabel(application.status)}</p>
               {application.status === "pending" && info.status !== "dissolved" ? (
                 <div className="mt-2 flex gap-2">
                   <Button
@@ -514,7 +514,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
           ))}
         </ul>
       ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
 }
@@ -531,10 +531,10 @@ function PracticeFacts({ post }: { post: Post }) {
   ];
   return (
     <div className="space-y-4">
-      <dl className="space-y-3 rounded-xl border bg-white p-4">
+      <dl className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
         {rows.map((row) => (
           <div key={row.label}>
-            <dt className="text-sm text-zinc-500">{row.label}</dt>
+            <dt className="text-sm text-slate-200">{row.label}</dt>
             <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
           </div>
         ))}
@@ -564,7 +564,7 @@ function RecruitmentFacts({ post }: { post: Post }) {
           {info.photos.map((photo) => (
             <div
               key={photo.public_id}
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-zinc-100"
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/25"
             >
               <Image
                 src={photo.url}
@@ -578,19 +578,19 @@ function RecruitmentFacts({ post }: { post: Post }) {
           ))}
         </div>
       ) : null}
-      <dl className="space-y-3 rounded-xl border bg-white p-4">
+      <dl className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
         {rows.map((row) => (
           <div key={row.label}>
-            <dt className="text-sm text-zinc-500">{row.label}</dt>
+            <dt className="text-sm text-slate-200">{row.label}</dt>
             <dd className="mt-1 whitespace-pre-wrap">{row.value}</dd>
           </div>
         ))}
         {info.links.length > 0 ? (
           <div>
-            <dt className="text-sm text-zinc-500">SNS</dt>
+            <dt className="text-sm text-slate-200">SNS</dt>
             <dd className="mt-1 space-y-1">
               {info.links.map((link) => (
-                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-700">
+                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-400">
                   {link}
                 </a>
               ))}

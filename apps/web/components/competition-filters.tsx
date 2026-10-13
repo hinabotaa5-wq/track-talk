@@ -25,12 +25,12 @@ export function CompetitionFilters({
   return (
     <div className="grid grid-cols-2 gap-3 md:max-w-xl">
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600">月</span>
+        <span className="mb-1 block text-slate-200">月</span>
         <select
           name="month"
           value={String(month)}
           onChange={(e) => apply(e.target.value, prefecture)}
-          className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base outline-none focus:border-blue-500"
+          className="h-11 w-full rounded-md border border-white/25 glass bg-white/10 px-3 text-base text-slate-100 outline-none focus:border-blue-400"
         >
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
             <option key={m} value={m}>
@@ -40,12 +40,12 @@ export function CompetitionFilters({
         </select>
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600">地域</span>
+        <span className="mb-1 block text-slate-200">地域</span>
         <select
           name="prefecture"
           value={prefecture}
           onChange={(e) => apply(String(month), e.target.value)}
-          className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base outline-none focus:border-blue-500"
+          className="h-11 w-full rounded-md border border-white/25 glass bg-white/10 px-3 text-base text-slate-100 outline-none focus:border-blue-400"
         >
           <option value={INTERNATIONAL}>国際</option>
           {PREFECTURES.map((p) => (

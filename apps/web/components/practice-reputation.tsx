@@ -23,14 +23,14 @@ export function PracticeReputationSummary({
   if (!reputation) return null;
   const line = practiceReputationLine(reputation);
   return (
-    <section className="rounded-xl border bg-white p-4">
-      <h2 className="text-sm font-medium text-zinc-500">{heading}</h2>
-      <p className="mt-1 text-sm">{line}</p>
+    <section className="rounded-xl border border-white/20 glass bg-white/10 p-4">
+      <h2 className="text-sm font-medium text-slate-200">{heading}</h2>
+      <p className="mt-1 text-sm text-slate-200">{line}</p>
       {reputation.comments && reputation.comments.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {reputation.comments.map((item) => (
             <li key={`${item.created_at}:${item.score}:${item.comment}`} className="text-sm">
-              <span className="text-zinc-500">{practiceScoreLabel(item.score)}</span>
+              <span className="text-slate-200">{practiceScoreLabel(item.score)}</span>
               <span className="mt-1 block whitespace-pre-wrap">{item.comment}</span>
             </li>
           ))}

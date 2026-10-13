@@ -73,7 +73,7 @@ export function BottomNav() {
     <>
       <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden" aria-hidden />
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200/80 bg-white/90 backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="メイン"
       >
@@ -87,7 +87,7 @@ export function BottomNav() {
                 <Link
                   href={href}
                   className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-150 active:scale-90 ${
-                    active ? "font-semibold text-blue-600" : "text-zinc-500 hover:text-zinc-800"
+                    active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}
                   aria-current={active ? "page" : undefined}
                 >

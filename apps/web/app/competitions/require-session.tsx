@@ -12,6 +12,6 @@ export function RequireSession({ children }: { children: React.ReactNode }) {
     if (!loading && !session) router.replace("/login");
   }, [loading, session, router]);
 
-  if (loading || !session) return <p className="text-sm text-zinc-600">読み込み中...</p>;
+  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
   return children;
 }

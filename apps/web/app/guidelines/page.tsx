@@ -11,7 +11,7 @@ export default function GuidelinesPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">コミュニティガイドライン</h1>
-        <p className="text-sm leading-7 text-zinc-700">
+        <p className="text-sm leading-7 text-slate-300">
           議論のための場所です。記録やレースへの意見は歓迎します。人を傷つけること、権利を侵害すること、対面の集まりを悪用することは禁止です。違反した投稿は、通報を受けて、または運営の判断で非表示にすることがあります。
         </p>
       </div>

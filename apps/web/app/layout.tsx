@@ -8,6 +8,8 @@ import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
+import { AmbientBackground } from "@/components/ambient-background";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -30,7 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
+      <body className="isolate flex min-h-full flex-col">
         <Script
           defer
           src="https://cloud.umami.is/script.js"
@@ -38,6 +40,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           strategy="afterInteractive"
         />
         <AuthProvider>
+          <AmbientBackground />
           <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

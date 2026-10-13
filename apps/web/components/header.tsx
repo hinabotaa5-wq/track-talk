@@ -7,6 +7,14 @@ import { NotificationBell } from "./notification-bell";
 import { activeMainTab, hidesTabBar, mainTabHref, mainTabs, useRememberedCompetitionPrefecture } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
 
+function TrackLogo() {
+  return (
+    <span className="flex items-baseline tracking-wider font-black text-white text-base">
+      TRACK<span className="ml-1 font-bold text-blue-300">TALK</span>
+    </span>
+  );
+}
+
 export function Header() {
   const { session } = useAuth();
   const router = useRouter();
@@ -22,21 +30,21 @@ export function Header() {
   const current = activeMainTab(pathname);
 
   return (
-    <header className={`border-b border-zinc-200 bg-white${showBack ? " sticky top-0 z-40" : ""}`}>
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-white/20 glass bg-white/8 backdrop-blur-md">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-4">
           {showBack ? (
             <button
               type="button"
               onClick={goBack}
               aria-label="戻る"
-              className="-ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-blue-700"
+              className="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
             >
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" className="truncate text-lg font-bold tracking-tight text-blue-700">
-              TRACK TALK
+            <Link href="/" className="group flex items-center transition active:scale-[0.98]">
+              <TrackLogo />
             </Link>
           )}
         </div>
@@ -50,8 +58,10 @@ export function Header() {
                   key={tab.id}
                   href={mainTabHref(tab.id, !!session, competitionPrefecture)}
                   aria-current={active ? "page" : undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm ${
-                    active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-600 hover:bg-zinc-100"
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition ${
+                    active
+                      ? "border border-white/35 bg-white/20 font-semibold text-white backdrop-blur-xl"
+                      : "text-slate-200 hover:bg-white/12 hover:text-white"
                   }`}
                 >
                   <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />

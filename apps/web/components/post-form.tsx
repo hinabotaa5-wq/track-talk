@@ -106,20 +106,20 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <TitleField {...form.register("title")} />
       {form.formState.errors.title ? (
-        <p className="text-sm text-red-600">{form.formState.errors.title.message}</p>
+        <p className="text-sm text-red-400">{form.formState.errors.title.message}</p>
       ) : null}
       <label className="block text-sm font-medium">
         本文
         <Textarea rows={10} className="mt-1" {...form.register("body")} />
       </label>
       {form.formState.errors.body ? (
-        <p className="text-sm text-red-600">{form.formState.errors.body.message}</p>
+        <p className="text-sm text-red-400">{form.formState.errors.body.message}</p>
       ) : null}
       {!initial ? (
         <label className="block text-sm font-medium">
           写真
           <input
-            className="mt-1 block w-full text-base"
+            className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
@@ -127,13 +127,13 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
           />
         </label>
       ) : initial.thumbnail_url ? (
-        <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-zinc-100 object-contain" />
+        <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
       ) : null}
       {upload ? (
         <UploadProgress noun="写真" phase={uploadPhase} progress={upload} fileName={photo?.name} fileSize={photo?.size} />
       ) : null}
-      {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {status ? <p className="text-sm text-slate-200">{status}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
       </Button>

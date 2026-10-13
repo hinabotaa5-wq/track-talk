@@ -52,8 +52,8 @@ export default function RegisterPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        {message ? <p className="text-sm text-green-700">{message}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>
           登録
         </Button>

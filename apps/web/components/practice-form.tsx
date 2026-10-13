@@ -12,9 +12,9 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 
-const fieldClass = "mt-1 placeholder:text-zinc-400";
+const fieldClass = "mt-1";
 const selectClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base outline-none focus:border-blue-500";
+  "mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
 function toLocalInput(iso: string) {
   const date = new Date(iso);
@@ -164,7 +164,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         詳細
         <Textarea rows={8} className="mt-1" maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
       </Button>

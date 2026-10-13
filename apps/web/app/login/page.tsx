@@ -61,17 +61,17 @@ export default function LoginPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>
           ログイン
         </Button>
       </form>
       <GoogleSignInButton />
       <p className="text-sm">
-        アカウントがない場合は <Link href="/register" className="text-blue-700">登録</Link>
+        アカウントがない場合は <Link href="/register" className="text-blue-400">登録</Link>
       </p>
       <p className="text-sm">
-        <Link href="/reset-password" className="text-blue-700">
+        <Link href="/reset-password" className="text-blue-400">
           パスワードを忘れた
         </Link>
       </p>

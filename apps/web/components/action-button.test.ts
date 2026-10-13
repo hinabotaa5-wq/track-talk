@@ -24,7 +24,7 @@ describe("LikeButton & SaveButton", () => {
         onClick: () => {},
       })
     );
-    expect(html).toContain("bg-rose-50");
+    expect(html).toContain("bg-rose-950");
   });
 
   it("renders save button states", () => {
