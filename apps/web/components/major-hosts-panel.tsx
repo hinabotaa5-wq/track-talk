@@ -59,24 +59,44 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
     return <EmptyState title="今後の開催地はまだありません" body="開催地が決まると、ここに表示されます。" />;
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {hosts.map((host) => (
-        <article key={`${host.kind}-${host.year}`} className="overflow-hidden rounded-xl border border-white/20 glass bg-white/10">
-          <HostPhoto url={host.image_url} alt={cityName(host)} />
-          <div className="space-y-1 p-4">
-            <h2 className="text-2xl font-bold text-slate-100">{cityName(host)}</h2>
-            <p className="font-medium">
+    <div className="space-y-10">
+      {hosts.map((host) => {
+        const rows = [
+          { label: "日程", value: scheduleRange(host.schedule_label) },
+          host.venue ? { label: "会場", value: host.venue } : null,
+          host.country ? { label: "開催国", value: host.country } : null,
+        ].filter((row) => row !== null);
+        return (
+          <article key={`${host.kind}-${host.year}`} className="space-y-6">
+            <HostPhoto url={host.image_url} alt={cityName(host)} />
+            <h2 className="text-3xl font-bold text-slate-100">{cityName(host)}</h2>
+            <p className="text-sm text-slate-200">
               {host.year}年・{kindLabel(host.kind)}
             </p>
-            <p className="text-sm text-slate-200">{scheduleRange(host.schedule_label)}</p>
-            {host.page_url ? (
-              <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-blue-400">
-                Wikipedia
-              </a>
-            ) : null}
-          </div>
-        </article>
-      ))}
+            <div>
+              <h3 className="mb-2 text-xl font-semibold text-slate-100">詳細</h3>
+              <dl className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
+                {rows.map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-sm text-slate-200">{row.label}</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-slate-100">{row.value}</dd>
+                  </div>
+                ))}
+                {host.page_url ? (
+                  <div>
+                    <dt className="text-sm text-slate-200">関連ページ</dt>
+                    <dd className="mt-1">
+                      <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="text-blue-400">
+                        Wikipedia
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -100,7 +120,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
   const [failed, setFailed] = useState(false);
   const visible = src !== "" && !failed;
   return (
-    <div className="relative aspect-[4/3] bg-black/25">
+    <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-black/25">
       {visible ? (
         <>
           <img
