@@ -30,3 +30,15 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+  - type: cron
+    name: track-talk-competitions
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    schedule: "0 21 * * *"
+    dockerCommand: /app/importcompetitions
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

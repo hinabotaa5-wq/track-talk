@@ -15,7 +15,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
-	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -37,14 +36,16 @@ func main() {
 		log.Fatal("-url は -dry-run と一緒に使います")
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatal(err)
+	_ = godotenv.Load()
+	_ = godotenv.Load("../../.env")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
