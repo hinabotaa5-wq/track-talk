@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { useActionLock } from "@/lib/use-action-lock";
 
 export default function MePage() {
   const { session, token, loading } = useAuth();
@@ -15,7 +16,10 @@ export default function MePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsError, setPostsError] = useState("");
 
+  const logoutLock = useActionLock();
+
   async function logout() {
+    if (!logoutLock.acquire()) return;
     const supabase = createClient();
     await supabase?.auth.signOut();
     router.push("/");
@@ -44,7 +48,12 @@ export default function MePage() {
     <div className="space-y-4 md:grid md:grid-cols-[14rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
       <div className="space-y-3">
         <div className="flex flex-col gap-3 md:rounded-2xl md:border md:bg-white md:p-4">
-          <button type="button" onClick={logout} className="block text-left text-sm text-zinc-500">
+          <button
+            type="button"
+            onClick={logout}
+            disabled={logoutLock.pending}
+            className="block text-left text-sm text-zinc-500 disabled:opacity-50"
+          >
             ログアウト
           </button>
           <Link href="/me/contact" className="block text-sm text-zinc-500">

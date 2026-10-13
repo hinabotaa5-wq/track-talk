@@ -11,6 +11,7 @@ import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 
 const maxPhotoBytes = 10 * 1024 * 1024;
@@ -45,7 +46,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
-  const [submitting, setSubmitting] = useState(false);
+  const { pending: submitting, acquire, release } = useActionLock();
   const filesRef = useRef(files);
 
   useEffect(() => {
@@ -113,7 +114,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         return;
       }
     }
-    setSubmitting(true);
+    if (!acquire()) return;
     try {
       const imageIDs = kept.map((photo) => photo.public_id);
       for (const [index, item] of files.entries()) {
@@ -154,8 +155,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       setStatus("");
       setUpload(null);
       setUploadFile(null);
-    } finally {
-      setSubmitting(false);
+      release();
     }
   }
 

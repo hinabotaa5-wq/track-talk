@@ -8,6 +8,7 @@ import { ComposerPage, TitleField } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Post } from "@/lib/types";
+import { useActionLock } from "@/lib/use-action-lock";
 
 export default function YouTubePostPage() {
   const { session, token } = useAuth();
@@ -15,7 +16,7 @@ export default function YouTubePostPage() {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { pending: submitting, acquire, release } = useActionLock();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -23,8 +24,8 @@ export default function YouTubePostPage() {
       router.push("/login");
       return;
     }
+    if (!acquire()) return;
     setError("");
-    setSubmitting(true);
     try {
       const data = await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
         method: "POST",
@@ -39,8 +40,7 @@ export default function YouTubePostPage() {
       } else {
         setError("保存に失敗しました");
       }
-    } finally {
-      setSubmitting(false);
+      release();
     }
   }
 

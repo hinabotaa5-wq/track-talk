@@ -32,4 +32,13 @@ describe("FeedCard", () => {
     expect(html).toContain('href="/posts/4020b4de-956e-4819-97e6-90cb82f83fc0"');
     expect(html).not.toContain("from=me");
   });
+
+  it("renders optimized image when thumbnail is present", () => {
+    const postWithThumb = {
+      ...post,
+      thumbnail_url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    };
+    const html = renderToStaticMarkup(createElement(FeedCard, { post: postWithThumb }));
+    expect(html).toContain("res.cloudinary.com");
+  });
 });

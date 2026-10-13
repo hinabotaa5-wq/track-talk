@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { apiFetch } from "@/lib/api";
+import { loadSavedFeed, prefetchHomeFeeds, readFeed, savedFeedPath } from "@/lib/home-feed-cache";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -13,10 +13,12 @@ import type { Meta, Post } from "@/lib/types";
 export function SavedFeed({ q, page }: { q: string; page: number }) {
   const { session, loading, token } = useAuth();
   const router = useRouter();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [meta, setMeta] = useState<Meta>({ page: 1, per_page: 20, total: 0 });
+  const path = savedFeedPath(q, page);
+  const [cached] = useState(() => readFeed(path));
+  const [posts, setPosts] = useState<Post[]>(cached?.posts ?? []);
+  const [meta, setMeta] = useState<Meta>(cached?.meta ?? { page: 1, per_page: 20, total: 0 });
   const [error, setError] = useState("");
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(cached !== undefined);
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login");
@@ -24,17 +26,26 @@ export function SavedFeed({ q, page }: { q: string; page: number }) {
 
   useEffect(() => {
     if (!token) return;
-    const qs = new URLSearchParams({ page: String(page), per_page: "20" });
-    if (q) qs.set("q", q);
-    apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/me/saves?${qs}`, { token })
+    let active = true;
+    // Cached saves show at once; always refresh because saving happens on other screens.
+    loadSavedFeed(path, token)
       .then((data) => {
-        setPosts(data.posts ?? []);
+        if (!active) return;
+        setPosts(data.posts);
         setMeta(data.meta);
         setError("");
+        prefetchHomeFeeds(q);
       })
-      .catch(() => setError("保存した投稿の取得に失敗しました。"))
-      .finally(() => setReady(true));
-  }, [token, q, page]);
+      .catch(() => {
+        if (active && readFeed(path) === undefined) setError("保存した投稿の取得に失敗しました。");
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, path, q]);
 
   if (loading || !session || !ready) return <FeedLoadingFrame />;
 

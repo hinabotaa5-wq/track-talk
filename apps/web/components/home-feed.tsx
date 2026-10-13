@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
+import type { PostsPage } from "@/lib/fetch-posts";
+import { homeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds } from "@/lib/home-feed-cache";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -35,26 +36,31 @@ export function HomeFeed({
   const [posts, setPosts] = useState<Post[] | null>(initial?.posts ?? null);
   const [meta, setMeta] = useState<Meta>(initial?.meta ?? { page, per_page: 20, total: 0 });
   const [error, setError] = useState("");
-  const shouldRetry = initial === null;
+  const hasInitial = initial !== null;
+  const path = homeFeedPath(kind ?? sort, q, page);
 
   useEffect(() => {
-    if (!shouldRetry) return;
-    const controller = new AbortController();
-    const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
-    if (q) qs.set("q", q);
-    if (kind) qs.set("kind", kind);
-    fetchPostsRetrying(`/v1/posts?${qs}`, { signal: controller.signal })
+    let active = true;
+    if (hasInitial && isFeedFresh(path)) {
+      prefetchHomeFeeds(q);
+      return;
+    }
+    // Without data, keep retrying while the API wakes up; with stale data, refresh quietly.
+    loadHomeFeed(path, !hasInitial)
       .then((data) => {
-        if (controller.signal.aborted) return;
+        if (!active) return;
         setPosts(data.posts);
         setMeta(data.meta);
+        setError("");
+        prefetchHomeFeeds(q);
       })
       .catch(() => {
-        if (controller.signal.aborted) return;
-        setError(loadError);
+        if (active && !hasInitial) setError(loadError);
       });
-    return () => controller.abort();
-  }, [shouldRetry, sort, q, page, kind]);
+    return () => {
+      active = false;
+    };
+  }, [hasInitial, path, q]);
 
   if (error) return <ErrorState message={error} />;
   if (posts === null) return <FeedLoadingFrame />;

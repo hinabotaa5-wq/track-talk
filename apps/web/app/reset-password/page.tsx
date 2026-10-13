@@ -2,6 +2,7 @@
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
+import { useActionLock } from "@/lib/use-action-lock";
 import { resetSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -12,6 +13,7 @@ import type { z } from "zod";
 
 export default function ResetPasswordPage() {
   const [message, setMessage] = useState("");
+  const { pending, acquire, release } = useActionLock();
   const form = useForm<z.infer<typeof resetSchema>>({
     resolver: zodResolver(resetSchema),
     defaultValues: { email: "" },
@@ -19,9 +21,9 @@ export default function ResetPasswordPage() {
 
   async function onSubmit(values: z.infer<typeof resetSchema>) {
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase || !acquire()) return;
     const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/login`;
-    const { error } = await supabase.auth.resetPasswordForEmail(values.email, { redirectTo });
+    const { error } = await supabase.auth.resetPasswordForEmail(values.email, { redirectTo }).finally(release);
     setMessage(error ? authErrorMessage(error) : "リセット用メールを送信しました。");
   }
 
@@ -31,7 +33,9 @@ export default function ResetPasswordPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         {message ? <p className="text-sm">{message}</p> : null}
-        <Button type="submit" className="w-full">送信</Button>
+        <Button type="submit" className="w-full" disabled={pending}>
+          送信
+        </Button>
       </form>
     </div>
   );

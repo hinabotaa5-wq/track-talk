@@ -11,6 +11,7 @@ import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,6 +28,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [photo, setPhoto] = useState<File | null>(null);
+  const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -40,6 +42,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       router.push("/login");
       return;
     }
+    if (!acquire()) return;
     setError("");
     setStatus("");
     setUpload(null);
@@ -52,10 +55,12 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         const looksLikeImage = photo.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(photo.name);
         if (!looksLikeImage) {
           setError("写真ファイルを選んでください");
+          release();
           return;
         }
         if (photo.size > maxPhotoBytes) {
           setError("10MB以内の写真にしてください");
+          release();
           return;
         }
         setStatus("アップロードの準備をしています…");
@@ -93,6 +98,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       }
       setStatus("");
       setUpload(null);
+      release();
     }
   }
 
@@ -117,7 +123,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-            disabled={form.formState.isSubmitting}
+            disabled={pending}
           />
         </label>
       ) : initial.thumbnail_url ? (
@@ -128,8 +134,8 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       ) : null}
       {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-        {form.formState.isSubmitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
       </Button>
     </form>
   );

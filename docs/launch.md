@@ -18,6 +18,7 @@
 - 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`
 - ヘルスチェック: `/health`
 - 無料Webサービスはスリープする場合がある
+- スリープを避けたい場合は [Oracle Cloud で動かす手順](oracle-deploy.md) に移せる
 
 ## Netlify（Next.js）
 

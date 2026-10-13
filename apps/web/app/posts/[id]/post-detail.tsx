@@ -12,11 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
 import { commentSchema } from "@/lib/validators";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { YouTubePlayer } from "@/components/youtube-player";
+import { LikeButton, SaveButton } from "@/components/action-button";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
@@ -27,6 +31,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const [commentError, setCommentError] = useState("");
   const [loading, setLoading] = useState(true);
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
+  const action = useActionLock();
+  const commentLock = useActionLock();
 
   async function load() {
     try {
@@ -65,12 +71,13 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
-    if (current.liked_by_me) {
-      await apiFetch(`/v1/posts/${current.id}/likes`, { method: "DELETE", token });
-    } else {
-      await apiFetch(`/v1/posts/${current.id}/likes`, { method: "POST", token });
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/posts/${current.id}/likes`, { method: current.liked_by_me ? "DELETE" : "POST", token });
+      await load();
+    } finally {
+      action.release();
     }
-    load();
   }
 
   async function toggleSave() {
@@ -78,17 +85,24 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
-    if (current.saved_by_me) {
-      await apiFetch(`/v1/posts/${current.id}/saves`, { method: "DELETE", token });
-    } else {
-      await apiFetch(`/v1/posts/${current.id}/saves`, { method: "POST", token });
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/posts/${current.id}/saves`, { method: current.saved_by_me ? "DELETE" : "POST", token });
+      await load();
+    } finally {
+      action.release();
     }
-    load();
   }
 
   async function remove() {
     if (!confirm("この投稿を削除しますか？")) return;
-    await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
+    } catch (e) {
+      action.release();
+      throw e;
+    }
     router.push(returnTo === "me" ? "/me" : "/");
     router.refresh();
   }
@@ -98,17 +112,22 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
-    await apiFetch("/v1/reports", {
-      method: "POST",
-      token,
-      body: JSON.stringify({
-        target_type: targetType,
-        target_id: targetId,
-        reason: "other",
-        detail: "",
-      }),
-    });
-    alert("通報を受け付けました");
+    if (!action.acquire()) return;
+    try {
+      await apiFetch("/v1/reports", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          target_type: targetType,
+          target_id: targetId,
+          reason: "other",
+          detail: "",
+        }),
+      });
+      alert("通報を受け付けました");
+    } finally {
+      action.release();
+    }
   }
 
   async function onComment(values: { body: string }) {
@@ -116,6 +135,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
+    if (!commentLock.acquire()) return;
     setCommentError("");
     try {
       await apiFetch(`/v1/posts/${current.id}/comments`, {
@@ -124,16 +144,39 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         body: JSON.stringify(values),
       });
       form.reset();
-      load();
+      await load();
     } catch (e) {
       setCommentError(e instanceof ApiRequestError ? e.message : "コメントできませんでした");
-      load();
+      await load();
+    } finally {
+      commentLock.release();
+    }
+  }
+
+  async function editComment(c: Comment) {
+    const body = window.prompt("コメントを編集", c.body);
+    if (!body) return;
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/comments/${c.id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ body }),
+      });
+      await load();
+    } finally {
+      action.release();
     }
   }
 
   async function deleteComment(cid: string) {
-    await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
-    load();
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
+      await load();
+    } finally {
+      action.release();
+    }
   }
 
   return (
@@ -161,15 +204,23 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           preload="metadata"
         />
       ) : post.kind === "youtube" && post.youtube_video_id ? (
-        <iframe
-          className="aspect-video w-full rounded-xl"
-          src={`https://www.youtube-nocookie.com/embed/${post.youtube_video_id}`}
+        <YouTubePlayer
+          videoId={post.youtube_video_id}
           title={feedTitle(post.title)}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
+          thumbnailUrl={post.thumbnail_url}
         />
       ) : post.thumbnail_url ? (
-        <img src={post.thumbnail_url} alt="" className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain" />
+        <div className="relative w-full overflow-hidden rounded-xl bg-zinc-100">
+          <Image
+            src={post.thumbnail_url}
+            alt={feedTitle(post.title)}
+            width={1200}
+            height={800}
+            sizes="(max-width: 1024px) 100vw, 800px"
+            className="max-h-[70vh] w-full object-contain h-auto"
+            priority
+          />
+        </div>
       ) : null}
       {post.kind === "practice" ? null : (
         <>
@@ -185,30 +236,47 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ) : post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border bg-white p-4 leading-7">{post.body}</div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant={post.liked_by_me ? "primary" : "secondary"} onClick={toggleLike}>
-          いいね {post.like_count}
-        </Button>
+      <div className="flex flex-wrap items-center gap-2.5 pt-2">
+        <LikeButton
+          liked={post.liked_by_me}
+          count={post.like_count}
+          disabled={action.pending}
+          onClick={toggleLike}
+        />
+        <SaveButton
+          saved={post.saved_by_me}
+          disabled={action.pending}
+          onClick={toggleSave}
+        />
         {mine ? (
           <>
             <Link
               href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
-              className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
+              className="inline-flex items-center justify-center rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-xs transition hover:bg-zinc-50 active:scale-95"
             >
               編集
             </Link>
-            <Button type="button" variant="danger" onClick={remove}>
+            <Button
+              type="button"
+              variant="danger"
+              className="rounded-full shadow-xs active:scale-95"
+              disabled={action.pending}
+              onClick={remove}
+            >
               削除
             </Button>
           </>
         ) : (
-          <Button type="button" variant="ghost" onClick={() => report("post", post.id)}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="rounded-full text-zinc-500 hover:text-zinc-700 active:scale-95"
+            disabled={action.pending}
+            onClick={() => report("post", post.id)}
+          >
             通報
           </Button>
         )}
-        <Button type="button" variant={post.saved_by_me ? "primary" : "secondary"} onClick={toggleSave}>
-          {post.saved_by_me ? "保存済み" : "保存"}
-        </Button>
       </div>
       </div>
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
@@ -222,30 +290,28 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
               <div className="mt-1 flex gap-3">
                 <button
                   type="button"
-                  className="text-xs text-blue-700"
-                  onClick={async () => {
-                    const body = window.prompt("コメントを編集", c.body);
-                    if (!body) return;
-                    await apiFetch(`/v1/comments/${c.id}`, {
-                      method: "PATCH",
-                      token,
-                      body: JSON.stringify({ body }),
-                    });
-                    load();
-                  }}
+                  className="text-xs text-blue-700 disabled:opacity-50"
+                  disabled={action.pending}
+                  onClick={() => editComment(c)}
                 >
                   編集
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-red-600"
+                  className="text-xs text-red-600 disabled:opacity-50"
+                  disabled={action.pending}
                   onClick={() => deleteComment(c.id)}
                 >
                   削除
                 </button>
               </div>
             ) : (
-              <button type="button" className="mt-1 text-xs text-zinc-500" onClick={() => report("comment", c.id)}>
+              <button
+                type="button"
+                className="mt-1 text-xs text-zinc-500 disabled:opacity-50"
+                disabled={action.pending}
+                onClick={() => report("comment", c.id)}
+              >
                 通報
               </button>
             )}
@@ -258,8 +324,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           >
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
               <Textarea rows={2} className="min-h-11 flex-1" placeholder="コメントを書く" {...form.register("body")} />
-              <Button type="submit" className="shrink-0 lg:w-full">
-                コメントする
+              <Button type="submit" className="shrink-0 lg:w-full" disabled={commentLock.pending}>
+                {commentLock.pending ? "送っています" : "コメントする"}
               </Button>
             </div>
             {commentError ? <p className="mt-2 text-sm text-red-600">{commentError}</p> : null}
@@ -331,11 +397,11 @@ function RatingForm({
   );
 }
 
-function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
+function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void> }) {
   const { session, token } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const { pending, acquire, release } = useActionLock();
   const info = post.practice;
   if (!info) return null;
 
@@ -345,15 +411,15 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
       return;
     }
     if (confirmMessage && !confirm(confirmMessage)) return;
-    setPending(true);
+    if (!acquire()) return;
     setError("");
     try {
       await apiFetch(path, { method: "POST", token });
-      onDone();
+      await onDone();
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
     } finally {
-      setPending(false);
+      release();
     }
   }
 
@@ -362,7 +428,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
       router.push("/login");
       return;
     }
-    setPending(true);
+    if (!acquire()) return;
     setError("");
     try {
       await apiFetch(`/v1/posts/${post.id}/practice/applications/${applicationId}/rating`, {
@@ -370,11 +436,11 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => void }) {
         token,
         body: JSON.stringify({ score, comment }),
       });
-      onDone();
+      await onDone();
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
     } finally {
-      setPending(false);
+      release();
     }
   }
 
@@ -496,12 +562,19 @@ function RecruitmentFacts({ post }: { post: Post }) {
       {info.photos.length > 0 ? (
         <div className={info.photos.length > 1 ? "grid gap-2 md:grid-cols-2" : "grid gap-2"}>
           {info.photos.map((photo) => (
-            <img
+            <div
               key={photo.public_id}
-              src={photo.url}
-              alt=""
-              className="max-h-[70vh] w-full rounded-xl bg-zinc-100 object-contain"
-            />
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-zinc-100"
+            >
+              <Image
+                src={photo.url}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+                loading="lazy"
+              />
+            </div>
           ))}
         </div>
       ) : null}

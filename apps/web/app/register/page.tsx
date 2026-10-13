@@ -2,6 +2,7 @@
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
+import { useActionLock } from "@/lib/use-action-lock";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -14,6 +15,7 @@ import type { z } from "zod";
 export default function RegisterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -25,11 +27,14 @@ export default function RegisterPage() {
       setError("Supabase の公開設定がありません。");
       return;
     }
+    if (!acquire()) return;
     setError("");
-    const { data, error: err } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-    });
+    const { data, error: err } = await supabase.auth
+      .signUp({
+        email: values.email,
+        password: values.password,
+      })
+      .finally(release);
     if (err) {
       setError(authErrorMessage(err));
       return;
@@ -49,7 +54,9 @@ export default function RegisterPage() {
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {message ? <p className="text-sm text-green-700">{message}</p> : null}
-        <Button type="submit" className="w-full">登録</Button>
+        <Button type="submit" className="w-full" disabled={pending}>
+          登録
+        </Button>
       </form>
       <GoogleSignInButton />
     </div>

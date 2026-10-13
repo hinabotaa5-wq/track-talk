@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { useActionLock } from "@/lib/use-action-lock";
 import type { Inquiry, Meta } from "@/lib/types";
 import { inquiryCategories, inquiryCategoryLabels, inquirySchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
@@ -22,6 +23,8 @@ export default function ContactPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const historyLoaded = useRef(false);
+  const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
     resolver: zodResolver(inquirySchema),
     defaultValues: { category: "bug", subject: "", body: "" },
@@ -51,6 +54,7 @@ export default function ContactPage() {
   }, [token]);
 
   async function onSubmit(values: Values) {
+    if (!acquire()) return;
     setError("");
     setSent(false);
     try {
@@ -69,6 +73,8 @@ export default function ContactPage() {
         return;
       }
       setError("送信に失敗しました");
+    } finally {
+      release();
     }
   }
 
@@ -106,7 +112,7 @@ export default function ContactPage() {
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {sent ? <p className="text-sm text-blue-700">送信しました。</p> : null}
-        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+        <Button type="submit" className="w-full" disabled={pending}>
           送信
         </Button>
       </form>

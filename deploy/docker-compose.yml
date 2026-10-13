@@ -1,0 +1,58 @@
+name: track-talk
+
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE を .env に設定してください}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      API_ADDR: ":8080"
+    expose:
+      - "8080"
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN を .env に設定してください}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 年2回の主要大会ホスト取り込み（Render の cron 相当）。
+  # 手動: docker compose --profile jobs run --rm importmajors
+  importmajors:
+    image: ${API_IMAGE:?API_IMAGE を .env に設定してください}
+    profiles: ["jobs"]
+    restart: "no"
+    env_file: .env
+    command: ["/app/importmajors"]
+
+volumes:
+  caddy_data:
+  caddy_config:

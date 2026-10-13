@@ -3,6 +3,7 @@
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/safe-next";
+import { useActionLock } from "@/lib/use-action-lock";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -10,7 +11,6 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import type { z } from "zod";
 
@@ -28,8 +28,8 @@ function callbackErrorCode() {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [submitError, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
   const error = submitError || (code ? (callbackErrors[code] ?? "") : "");
 
@@ -44,13 +44,15 @@ export default function LoginPage() {
       setError("Supabase の公開設定がありません。");
       return;
     }
+    if (!acquire()) return;
     const { error: err } = await supabase.auth.signInWithPassword(values);
     if (err) {
       setError(authErrorMessage(err));
+      release();
       return;
     }
-    router.push(safeNextPath(new URLSearchParams(window.location.search).get("next")));
-    router.refresh();
+    // ログイン前に先読みした「/login への転送」を捨てるため、ページを読み直す。
+    window.location.assign(safeNextPath(new URLSearchParams(window.location.search).get("next")));
   }
 
   return (
@@ -60,7 +62,9 @@ export default function LoginPage() {
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button type="submit" className="w-full">ログイン</Button>
+        <Button type="submit" className="w-full" disabled={pending}>
+          ログイン
+        </Button>
       </form>
       <GoogleSignInButton />
       <p className="text-sm">

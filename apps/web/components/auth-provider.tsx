@@ -7,6 +7,7 @@ import type { Profile } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { clearCompetitions } from "@/lib/competition-list";
 import { clearMajorHosts } from "@/lib/major-hosts";
+import { clearSavedFeeds } from "@/lib/home-feed-cache";
 
 type AuthState = {
   session: Session | null;
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!next) {
         clearCompetitions();
         clearMajorHosts();
+        clearSavedFeeds();
       }
       loadProfile(next?.access_token ?? null);
     });

@@ -2,6 +2,7 @@
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
+import { useActionLock } from "@/lib/use-action-lock";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -30,7 +31,7 @@ function GoogleLogo() {
 
 export function GoogleSignInButton() {
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const { pending, acquire, release } = useActionLock();
 
   async function signIn() {
     const supabase = createClient();
@@ -38,14 +39,14 @@ export function GoogleSignInButton() {
       setError("Supabase の公開設定がありません。");
       return;
     }
+    if (!acquire()) return;
     setError("");
-    setPending(true);
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (err) {
-      setPending(false);
+      release();
       setError(authErrorMessage(err));
     }
   }

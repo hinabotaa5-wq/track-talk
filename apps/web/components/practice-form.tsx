@@ -9,6 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 
 const fieldClass = "mt-1 placeholder:text-zinc-400";
@@ -33,7 +34,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   const [capacity, setCapacity] = useState(practice ? String(practice.capacity) : "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { pending: submitting, acquire, release } = useActionLock();
 
   async function onSubmit(formEvent: FormEvent) {
     formEvent.preventDefault();
@@ -67,7 +68,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       setError("練習日時は現在より後にしてください");
       return;
     }
-    setSubmitting(true);
+    if (!acquire()) return;
     try {
       const payload = {
         kind: "practice",
@@ -97,8 +98,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       } else {
         setError("保存に失敗しました");
       }
-    } finally {
-      setSubmitting(false);
+      release();
     }
   }
 

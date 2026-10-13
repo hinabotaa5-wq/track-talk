@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -16,7 +17,7 @@ export default function DeleteAccountPage() {
   const leaving = useRef(false);
   const [phrase, setPhrase] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { pending: submitting, acquire, release } = useActionLock();
   const [authLeft, setAuthLeft] = useState(false);
 
   useEffect(() => {
@@ -33,9 +34,8 @@ export default function DeleteAccountPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (phrase !== confirmPhrase || submitting) return;
+    if (phrase !== confirmPhrase || !acquire()) return;
     setError("");
-    setSubmitting(true);
     try {
       const result = await apiFetch<{ auth_deleted: boolean }>("/v1/me", {
         method: "DELETE",
@@ -53,7 +53,7 @@ export default function DeleteAccountPage() {
       } else {
         setError("退会に失敗しました");
       }
-      setSubmitting(false);
+      release();
     }
   }
 

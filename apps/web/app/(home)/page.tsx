@@ -1,33 +1,19 @@
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
-import { HomeFeed } from "@/components/home-feed";
+import { HomeView } from "@/components/home-view";
 import { FeedLoadingFrame } from "@/components/loading-frame";
-import { SavedFeed } from "@/components/saved-feed";
 import { homeFeedServerTimeoutMs, type PostsPage } from "@/lib/fetch-posts";
+import { homeFeedPath } from "@/lib/home-feed-cache";
 import { parseHomeSort } from "@/lib/home-sort";
 import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-async function ServerHomeFeed({
-  sort,
-  kind,
-  q,
-  page,
-}: {
-  sort: "popular" | "new";
-  kind?: "recruitment";
-  q: string;
-  page: number;
-}) {
-  const qs = new URLSearchParams({ sort, page: String(page), per_page: "20" });
-  if (q) qs.set("q", q);
-  if (kind) qs.set("kind", kind);
-
+async function ServerHomeFeed({ path }: { path: string }) {
   // On timeout or failure, HomeFeed retries from the browser when initial is null.
   let initial: PostsPage | null = null;
   try {
-    const data = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/posts?${qs}`, {
+    const data = await apiFetch<{ posts: Post[]; meta: Meta }>(path, {
       signal: AbortSignal.timeout(homeFeedServerTimeoutMs),
     });
     initial = { posts: data.posts ?? [], meta: data.meta };
@@ -35,7 +21,7 @@ async function ServerHomeFeed({
     initial = null;
   }
 
-  return <HomeFeed sort={sort} kind={kind} q={q} page={page} initial={initial} />;
+  return <HomeView initialPath={path} initial={initial} />;
 }
 
 export default async function HomePage({
@@ -48,16 +34,12 @@ export default async function HomePage({
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, Number(sp.page) || 1);
 
-  if (sort === "saved") return <SavedFeed q={q} page={page} />;
+  if (sort === "saved") return <HomeView initialPath="" initial={null} />;
 
+  const path = homeFeedPath(sort, q, page);
   return (
-    <Suspense key={`${sort}:${q}:${page}`} fallback={<FeedLoadingFrame />}>
-      <ServerHomeFeed
-        sort={sort === "recruitment" ? "new" : sort}
-        kind={sort === "recruitment" ? "recruitment" : undefined}
-        q={q}
-        page={page}
-      />
+    <Suspense key={path} fallback={<FeedLoadingFrame />}>
+      <ServerHomeFeed path={path} />
     </Suspense>
   );
 }

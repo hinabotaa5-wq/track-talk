@@ -9,6 +9,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import type { Post } from "@/lib/types";
+import { useActionLock } from "@/lib/use-action-lock";
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -21,7 +22,7 @@ export default function OwnVideoPage() {
   const [status, setStatus] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
-  const [submitting, setSubmitting] = useState(false);
+  const { pending: submitting, acquire, release } = useActionLock();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,9 +38,9 @@ export default function OwnVideoPage() {
       setError("100MB以内の動画にしてください");
       return;
     }
+    if (!acquire()) return;
     setError("");
     setUpload(null);
-    setSubmitting(true);
     try {
       setStatus("アップロードの準備をしています…");
       const signed = await apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token });
@@ -73,8 +74,7 @@ export default function OwnVideoPage() {
       }
       setStatus("");
       setUpload(null);
-    } finally {
-      setSubmitting(false);
+      release();
     }
   }
 
