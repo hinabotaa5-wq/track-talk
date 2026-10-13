@@ -13,8 +13,8 @@ func TestDueSourcesCapsRequestsAndSkipsFreshImports(t *testing.T) {
 	}
 	now := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	updated := map[string]time.Time{
-		"01": now.Add(-13 * 24 * time.Hour),
-		"03": now.Add(-15 * 24 * time.Hour),
+		"01": now.Add(-9 * 24 * time.Hour),
+		"03": now.Add(-11 * 24 * time.Hour),
 	}
 	due := DueSources(sources, updated, now, 7)
 	if len(due) != 7 {

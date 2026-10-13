@@ -11,7 +11,7 @@ import (
 const DailyRequestLimit = 15
 
 // RefreshAfter is how long a successful prefecture import stays fresh.
-const RefreshAfter = 14 * 24 * time.Hour
+const RefreshAfter = 10 * 24 * time.Hour
 
 // InternationalRefreshAfter is shorter because international meets are read without Gemini.
 const InternationalRefreshAfter = 7 * 24 * time.Hour
