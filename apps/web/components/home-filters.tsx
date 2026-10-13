@@ -6,7 +6,7 @@ import { homeHref, parseHomeSort, type HomeSort } from "@/lib/home-sort";
 
 const chips: { sort: HomeSort; label: string }[] = [
   { sort: "popular", label: "人気" },
-  { sort: "new", label: "新しい順" },
+  { sort: "new", label: "新しい" },
   { sort: "recruitment", label: "募集" },
   { sort: "saved", label: "保存" },
 ];
@@ -29,7 +29,7 @@ export function HomeFilters() {
         {sort !== "popular" ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="relative">
           <Search
-            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-300"
+            className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-slate-300"
             aria-hidden
           />
           <input
