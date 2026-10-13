@@ -109,7 +109,7 @@ CI（`.github/workflows/ci.yml`）は push／PR ごとに API テスト（Postgr
 ## デプロイ
 
 - **API**: Render（`apps/api/Dockerfile`、ヘルスチェック `/health`）。`render.yaml` は設定の参考で、Render のサービスは手動作成のため自動では反映されません。
-- **Web**: `apps/web` をビルドします（Netlify 用の設定は `netlify.toml`）。
+- **Web**: Vercel（`apps/web`）。PR ごとにプレビューがデプロイされます。
 - **DB / Auth**: Supabase
 
 公開前の手順・確認事項は [docs/launch.md](docs/launch.md) を参照してください。料金・無料枠・商用条件は変わるため、公開直前に各公式ドキュメントで確認してください。
