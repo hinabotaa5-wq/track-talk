@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { LikeButton, SaveButton } from "./action-button";
+import { LikeButton, ReportButton, SaveButton } from "./action-button";
 
 describe("LikeButton & SaveButton", () => {
   it("renders like count and inactive state", () => {
@@ -43,5 +43,16 @@ describe("LikeButton & SaveButton", () => {
       })
     );
     expect(active).toContain("保存済み");
+  });
+
+  it("renders the report button in the same idle style", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportButton, {
+        onClick: () => {},
+      })
+    );
+    expect(html).toContain("通報");
+    expect(html).toContain("rounded-full");
+    expect(html).toContain("glass");
   });
 });

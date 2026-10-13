@@ -20,7 +20,7 @@ import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
-import { LikeButton, SaveButton } from "@/components/action-button";
+import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
@@ -267,15 +267,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             </Button>
           </>
         ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            className="rounded-full text-slate-200 hover:text-white active:scale-95"
-            disabled={action.pending}
-            onClick={() => report("post", post.id)}
-          >
-            通報
-          </Button>
+          <ReportButton disabled={action.pending} onClick={() => report("post", post.id)} />
         )}
       </div>
       </div>

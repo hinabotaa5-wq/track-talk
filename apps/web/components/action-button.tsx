@@ -1,8 +1,14 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Heart, Bookmark } from "lucide-react";
+import { Heart, Bookmark, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const actionClass =
+  "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 shadow-xs cursor-pointer disabled:opacity-50";
+
+const idleClass =
+  "border border-white/20 glass bg-white/12 text-slate-300 hover:bg-white/16 hover:text-white";
 
 export function LikeButton({
   liked,
@@ -22,10 +28,10 @@ export function LikeButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 shadow-xs cursor-pointer disabled:opacity-50",
+        actionClass,
         liked
           ? "bg-rose-950/60 text-rose-300 border border-rose-800/60 hover:bg-rose-900/60"
-          : "border border-white/20 glass bg-white/12 text-slate-300 hover:bg-white/16 hover:text-white"
+          : idleClass
       )}
     >
       <motion.span
@@ -63,10 +69,10 @@ export function SaveButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 shadow-xs cursor-pointer disabled:opacity-50",
+        actionClass,
         saved
           ? "bg-blue-950/60 text-blue-400 border border-blue-800/60 hover:bg-blue-900/60"
-          : "border border-white/20 glass bg-white/12 text-slate-300 hover:bg-white/16 hover:text-white"
+          : idleClass
       )}
     >
       <motion.span
@@ -83,6 +89,27 @@ export function SaveButton({
         />
       </motion.span>
       <span>{saved ? "保存済み" : "保存"}</span>
+    </motion.button>
+  );
+}
+
+export function ReportButton({
+  disabled,
+  onClick,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.92 }}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(actionClass, idleClass)}
+    >
+      <Flag className="size-4 text-slate-200" />
+      <span>通報</span>
     </motion.button>
   );
 }
