@@ -25,12 +25,12 @@ export default function UploadPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid auto-rows-[9.5rem] grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {doors.map((door) => (
           <Link
             key={door.href}
             href={door.href}
-            className="block min-h-11 rounded-2xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16"
+            className="flex h-full flex-col justify-center rounded-2xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16"
           >
             <span className="block text-lg font-semibold text-slate-100">{door.title}</span>
             <span className="mt-1 block text-sm text-slate-200">{door.body}</span>
