@@ -3,7 +3,7 @@ import { Article } from "@/components/legal-prose";
 
 export const metadata: Metadata = {
   title: "プライバシーポリシー",
-  description: "TRACK TALK のプライバシーポリシー",
+  description: "TrackTalk のプライバシーポリシー",
 };
 
 const privacyUpdated = "2026年10月13日";
@@ -14,13 +14,13 @@ export default function PrivacyPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">プライバシーポリシー</h1>
         <p className="text-sm leading-7 text-slate-300">
-          TRACK TALK 運営（個人。以下「運営者」）は、本サービスで扱う個人情報を、個人情報の保護に関する法律その他の法令に従って取り扱います。
+          TrackTalk 運営（個人。以下「運営者」）は、本サービスで扱う個人情報を、個人情報の保護に関する法律その他の法令に従って取り扱います。
         </p>
         <p className="text-xs text-slate-300">最終更新日: {privacyUpdated}</p>
       </div>
 
       <Article n={1} title="運営者と連絡先">
-        <p>運営者の名称は TRACK TALK 運営です。個人が運営しています。</p>
+        <p>運営者の名称は TrackTalk 運営です。個人が運営しています。</p>
         <p>
           住所は、保有個人データの開示などの請求を受けたときに、遅滞なく通知します。連絡と苦情は、ログイン後のマイページ「お問い合わせ」で受け付けます。
         </p>

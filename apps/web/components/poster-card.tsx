@@ -77,7 +77,7 @@ export function PosterFallback({ id, title }: { id: string; title: string }) {
 
       {/* 下部の微小タイポ */}
       <div className="flex items-center justify-between text-[10px] font-medium text-white/70">
-        <span>TRACK TALK</span>
+        <span>TrackTalk</span>
         <span className="font-mono">TALK &gt;&gt;</span>
       </div>
     </div>

@@ -16,7 +16,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "TRACK TALK",
+  title: "TrackTalk",
   description: "陸上競技を、もっと深く楽しむコミュニティ",
 };
 

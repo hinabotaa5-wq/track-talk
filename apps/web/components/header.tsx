@@ -9,8 +9,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 function TrackLogo() {
   return (
-    <span className="flex items-baseline tracking-wider font-black text-white text-base">
-      TRACK<span className="ml-1 font-bold text-blue-300">TALK</span>
+    <span className="flex items-baseline font-black text-white text-base">
+      Track<span className="font-bold text-blue-300">Talk</span>
     </span>
   );
 }
@@ -43,7 +43,7 @@ export function Header() {
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" className="group flex items-center transition active:scale-[0.98]">
+            <Link href="/" aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
               <TrackLogo />
             </Link>
           )}

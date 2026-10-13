@@ -3,7 +3,7 @@ import { Article } from "@/components/legal-prose";
 
 export const metadata: Metadata = {
   title: "利用規約",
-  description: "TRACK TALK の利用規約",
+  description: "TrackTalk の利用規約",
 };
 
 const updated = "2026年10月12日";
@@ -14,7 +14,7 @@ export default function TermsPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">利用規約</h1>
         <p className="text-sm leading-7 text-slate-300">
-          この規約は、TRACK TALK（以下「本サービス」）の利用条件です。本サービスは個人が運営します。アカウント登録、ログイン、または投稿を始めたとき、この規約とコミュニティガイドラインに同意したものとみなします。
+          この規約は、TrackTalk（以下「本サービス」）の利用条件です。本サービスは個人が運営します。アカウント登録、ログイン、または投稿を始めたとき、この規約とコミュニティガイドラインに同意したものとみなします。
         </p>
         <p className="text-xs text-slate-300">施行日: {updated}</p>
       </div>

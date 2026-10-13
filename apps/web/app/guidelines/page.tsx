@@ -3,7 +3,7 @@ import { Rule } from "@/components/legal-prose";
 
 export const metadata: Metadata = {
   title: "コミュニティガイドライン",
-  description: "TRACK TALK のコミュニティガイドライン",
+  description: "TrackTalk のコミュニティガイドライン",
 };
 
 export default function GuidelinesPage() {
