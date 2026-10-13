@@ -19,7 +19,7 @@ export default async function CompetitionsPage({
   if (target) redirect(target);
 
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-600">読み込み中...</p>}>
+    <Suspense fallback={<p className="text-sm text-muted">読み込み中...</p>}>
       <CompetitionsView />
     </Suspense>
   );

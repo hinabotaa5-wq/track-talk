@@ -13,8 +13,8 @@ const chips: { sort: HomeSort; label: string }[] = [
 
 function chipClass(active: boolean) {
   return active
-    ? "inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4.5 text-sm font-semibold text-white shadow-xs transition-all duration-200 active:scale-95 cursor-pointer"
-    : "inline-flex min-h-11 items-center rounded-full bg-zinc-100/90 px-4.5 text-sm font-medium text-zinc-700 transition-all duration-200 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 cursor-pointer";
+    ? "inline-flex min-h-11 items-center rounded-full bg-accent px-4.5 text-sm font-semibold text-accent-foreground shadow-xs transition-all duration-200 active:scale-95 cursor-pointer"
+    : "inline-flex min-h-11 items-center rounded-full bg-surface px-4.5 text-sm font-medium text-muted transition-all duration-200 hover:bg-surface-raised hover:text-foreground active:scale-95 cursor-pointer";
 }
 
 export function HomeFilters() {
@@ -25,11 +25,11 @@ export function HomeFilters() {
 
   return (
     <div className="md:mb-4 md:flex md:items-center md:gap-4">
-      <form action="/" className="border-b border-zinc-200 bg-white px-4 py-3 md:w-72 md:shrink-0 md:border-0 md:bg-transparent md:p-0">
+      <form action="/" className="border-b border-border bg-surface px-4 py-3 md:w-72 md:shrink-0 md:border-0 md:bg-transparent md:p-0">
         {sort !== "popular" ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="relative">
           <Search
-            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400"
+            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
             aria-hidden
           />
           <input
@@ -39,7 +39,7 @@ export function HomeFilters() {
             defaultValue={q}
             placeholder="キーワード"
             aria-label="キーワード"
-            className="h-11 w-full rounded-full border border-zinc-200 bg-white pr-4 pl-10 text-base shadow-2xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-11 w-full rounded-full border border-input-border bg-field pr-4 pl-10 text-base placeholder:text-muted shadow-2xs outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
         </div>
       </form>

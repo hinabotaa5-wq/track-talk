@@ -58,14 +58,14 @@ export default function DeleteAccountPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-zinc-600">読み込み中...</p>;
+    return <p className="text-sm text-muted">読み込み中...</p>;
   }
 
   if (authLeft) {
     return (
       <div className="mx-auto max-w-md space-y-4">
         <h1 className="text-2xl font-bold">退会</h1>
-        <p className="text-sm text-zinc-700">
+        <p className="text-sm text-foreground">
           投稿・コメントなどのデータは削除しました。ログイン用アカウントは削除できなかったため、同じメールアドレスで再びログインできることがあります。
         </p>
         <Button type="button" className="w-full" onClick={() => void leave()}>
@@ -79,27 +79,27 @@ export default function DeleteAccountPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">退会</h1>
-        <p className="text-sm text-zinc-700">退会すると、次のデータが削除され、元に戻せません。</p>
+        <p className="text-sm text-foreground">退会すると、次のデータが削除され、元に戻せません。</p>
       </div>
-      <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-700">
+      <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
         <li>あなたの投稿、コメント、いいね、保存、通知</li>
         <li>練習への参加と評価。あなたが作った練習の投稿も削除されます</li>
         <li>お問い合わせと、あなたが送った通報</li>
         <li>ログインに使うアカウント</li>
       </ul>
-      <p className="text-sm text-zinc-700">
+      <p className="text-sm text-foreground">
         他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。
       </p>
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
-          <span className="text-zinc-700">確認のため「退会する」と入力</span>
+          <span className="text-foreground">確認のため「退会する」と入力</span>
           <Input
             value={phrase}
             onChange={(event) => setPhrase(event.target.value)}
             autoComplete="off"
           />
         </label>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button
           type="submit"
           variant="danger"

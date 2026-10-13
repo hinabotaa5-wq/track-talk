@@ -13,10 +13,10 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">プライバシーポリシー</h1>
-        <p className="text-sm leading-7 text-zinc-700">
+        <p className="text-sm leading-7 text-foreground">
           TRACK TALK 運営（個人。以下「運営者」）は、本サービスで扱う個人情報を、個人情報の保護に関する法律その他の法令に従って取り扱います。
         </p>
-        <p className="text-xs text-zinc-500">最終更新日: {privacyUpdated}</p>
+        <p className="text-xs text-muted">最終更新日: {privacyUpdated}</p>
       </div>
 
       <Article n={1} title="運営者と連絡先">

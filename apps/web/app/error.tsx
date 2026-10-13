@@ -6,11 +6,11 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
   return (
     <div className="space-y-3">
       <h1 className="text-2xl font-bold">ページを表示できません</h1>
-      <p className="text-sm text-zinc-600">しばらくしてからもう一度試してください。</p>
-      <button type="button" onClick={reset} className="text-blue-700">
+      <p className="text-sm text-muted">しばらくしてからもう一度試してください。</p>
+      <button type="button" onClick={reset} className="text-accent">
         再読み込み
       </button>
-      <Link href="/" className="block text-blue-700">
+      <Link href="/" className="block text-accent">
         トップへ戻る
       </Link>
     </div>

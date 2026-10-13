@@ -47,7 +47,7 @@ export function MajorHostsPanel() {
       >
         今後の世界陸上・オリンピック
       </Button>
-      {open && loading ? <p className="text-sm text-zinc-600">読み込み中...</p> : null}
+      {open && loading ? <p className="text-sm text-muted">読み込み中...</p> : null}
       {open && !loading ? <MajorHostList hosts={hosts ?? []} error={error} /> : null}
     </div>
   );
@@ -61,16 +61,16 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {hosts.map((host) => (
-        <article key={`${host.kind}-${host.year}`} className="overflow-hidden rounded-xl border bg-white">
+        <article key={`${host.kind}-${host.year}`} className="overflow-hidden rounded-xl border bg-surface">
           <HostPhoto url={host.image_url} alt={cityName(host)} />
           <div className="space-y-1 p-4">
             <h2 className="text-2xl font-bold">{cityName(host)}</h2>
             <p className="font-medium">
               {host.year}年・{kindLabel(host.kind)}
             </p>
-            <p className="text-sm text-zinc-600">{scheduleRange(host.schedule_label)}</p>
+            <p className="text-sm text-muted">{scheduleRange(host.schedule_label)}</p>
             {host.page_url ? (
-              <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-blue-700">
+              <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-accent">
                 Wikipedia
               </a>
             ) : null}
@@ -100,7 +100,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
   const [failed, setFailed] = useState(false);
   const visible = src !== "" && !failed;
   return (
-    <div className="relative aspect-[4/3] bg-zinc-100">
+    <div className="relative aspect-[4/3] bg-surface-raised">
       {visible ? (
         <>
           <img
@@ -117,7 +117,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
               setFailed(true);
             }}
           />
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-white">
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-foreground">
             写真: Wikimedia Commons
           </p>
         </>

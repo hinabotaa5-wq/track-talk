@@ -41,34 +41,34 @@ export default function MePage() {
   }, [token]);
 
   if (loading || !session) {
-    return <p className="text-sm text-zinc-600">読み込み中...</p>;
+    return <p className="text-sm text-muted">読み込み中...</p>;
   }
 
   return (
     <div className="space-y-4 md:grid md:grid-cols-[14rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
       <div className="space-y-3">
-        <div className="flex flex-col gap-3 md:rounded-2xl md:border md:bg-white md:p-4">
+        <div className="flex flex-col gap-3 md:rounded-2xl md:border md:bg-surface md:p-4">
           <button
             type="button"
             onClick={logout}
             disabled={logoutLock.pending}
-            className="block text-left text-sm text-zinc-500 disabled:opacity-50"
+            className="block text-left text-sm text-muted disabled:opacity-50"
           >
             ログアウト
           </button>
-          <Link href="/me/contact" className="block text-sm text-zinc-500">
+          <Link href="/me/contact" className="block text-sm text-muted">
             お問い合わせ
           </Link>
-          <Link href="/guidelines" className="block text-sm text-zinc-500">
+          <Link href="/guidelines" className="block text-sm text-muted">
             ガイドライン
           </Link>
-          <Link href="/terms" className="block text-sm text-zinc-500">
+          <Link href="/terms" className="block text-sm text-muted">
             利用規約
           </Link>
-          <Link href="/privacy" className="block text-sm text-zinc-500">
+          <Link href="/privacy" className="block text-sm text-muted">
             プライバシーポリシー
           </Link>
-          <Link href="/me/delete" className="block text-sm text-red-700">
+          <Link href="/me/delete" className="block text-sm text-danger">
             退会する
           </Link>
         </div>
@@ -76,9 +76,9 @@ export default function MePage() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">自分の投稿</h2>
         {postsError ? (
-          <p className="text-sm text-red-600">{postsError}</p>
+          <p className="text-sm text-danger">{postsError}</p>
         ) : posts.length === 0 ? (
-          <p className="text-sm text-zinc-600">まだ投稿がありません</p>
+          <p className="text-sm text-muted">まだ投稿がありません</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {posts.map((p) => (

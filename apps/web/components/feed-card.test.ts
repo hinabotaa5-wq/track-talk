@@ -31,6 +31,9 @@ describe("FeedCard", () => {
     const html = renderToStaticMarkup(createElement(FeedCard, { post }));
     expect(html).toContain('href="/posts/4020b4de-956e-4819-97e6-90cb82f83fc0"');
     expect(html).not.toContain("from=me");
+    expect(html).toContain("bg-surface");
+    expect(html).toContain("text-foreground");
+    expect(html).not.toContain("bg-white");
   });
 
   it("renders optimized image when thumbnail is present", () => {

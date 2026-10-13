@@ -16,7 +16,7 @@ import { useAuth } from "./auth-provider";
 
 const maxPhotoBytes = 10 * 1024 * 1024;
 const maxPhotos = 3;
-const fieldClass = "mt-1 placeholder:text-zinc-400";
+const fieldClass = "mt-1 placeholder:text-muted";
 
 function looksLikeImage(file: File) {
   return file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
@@ -169,7 +169,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       </label>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">活動場所</legend>
-        <div className="max-h-48 overflow-y-auto rounded-md border border-zinc-300 p-2">
+        <div className="max-h-48 overflow-y-auto rounded-md border border-input-border p-2">
           <ul className="grid grid-cols-3 gap-1">
             {PREFECTURES.map((prefecture) => (
               <li key={prefecture.code}>
@@ -236,11 +236,11 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       </label>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">SNSのURL</legend>
-        <p className="text-sm text-zinc-600">4件までです。</p>
+        <p className="text-sm text-muted">4件までです。</p>
         {links.map((link, index) => (
           <div key={index} className="flex items-center gap-2">
             <Input
-              className="placeholder:text-zinc-400"
+              className="placeholder:text-muted"
               type="url"
               inputMode="url"
               maxLength={500}
@@ -254,7 +254,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             {links.length > 1 ? (
               <button
                 type="button"
-                className="shrink-0 text-sm text-zinc-500"
+                className="shrink-0 text-sm text-muted"
                 onClick={() => setLinks((current) => current.filter((_, i) => i !== index))}
               >
                 削除
@@ -264,7 +264,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         ))}
         <button
           type="button"
-          className="text-sm text-blue-700 disabled:text-zinc-400"
+          className="text-sm text-accent disabled:text-muted"
           disabled={links.length >= 4}
           onClick={() => setLinks((current) => [...current, ""])}
         >
@@ -277,15 +277,15 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       </label>
       <div className="space-y-2">
         <p className="text-sm font-medium">チームの写真</p>
-        <p className="text-sm text-zinc-600">3枚までです。なくても投稿できます。</p>
+        <p className="text-sm text-muted">3枚までです。なくても投稿できます。</p>
         {kept.length > 0 || files.length > 0 ? (
           <ul className="grid grid-cols-3 gap-2">
             {kept.map((photo) => (
               <li key={photo.public_id} className="space-y-1">
-                <img src={photo.url} alt="" className="aspect-[4/3] w-full rounded-md bg-zinc-100 object-cover" />
+                <img src={photo.url} alt="" className="aspect-[4/3] w-full rounded-md bg-surface-raised object-cover" />
                 <button
                   type="button"
-                  className="text-sm text-zinc-500"
+                  className="text-sm text-muted"
                   onClick={() => setKept((current) => current.filter((item) => item.public_id !== photo.public_id))}
                 >
                   削除
@@ -294,10 +294,10 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             ))}
             {files.map((preview) => (
               <li key={preview.url} className="space-y-1">
-                <img src={preview.url} alt="" className="aspect-[4/3] w-full rounded-md bg-zinc-100 object-cover" />
+                <img src={preview.url} alt="" className="aspect-[4/3] w-full rounded-md bg-surface-raised object-cover" />
                 <button
                   type="button"
-                  className="text-sm text-zinc-500"
+                  className="text-sm text-muted"
                   onClick={() => {
                     URL.revokeObjectURL(preview.url);
                     setFiles((current) => current.filter((item) => item !== preview));
@@ -332,8 +332,8 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           fileSize={uploadFile?.size}
         />
       ) : null}
-      {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {status ? <p className="text-sm text-muted">{status}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
       </Button>

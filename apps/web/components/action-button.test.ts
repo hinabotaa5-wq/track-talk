@@ -14,6 +14,8 @@ describe("LikeButton & SaveButton", () => {
     );
     expect(html).toContain("いいね");
     expect(html).toContain("5");
+    expect(html).toContain("bg-surface");
+    expect(html).not.toContain("bg-white");
   });
 
   it("renders active like state", () => {
@@ -24,7 +26,8 @@ describe("LikeButton & SaveButton", () => {
         onClick: () => {},
       })
     );
-    expect(html).toContain("bg-rose-50");
+    expect(html).toContain("bg-like-soft");
+    expect(html).toContain("text-like");
   });
 
   it("renders save button states", () => {
@@ -43,5 +46,6 @@ describe("LikeButton & SaveButton", () => {
       })
     );
     expect(active).toContain("保存済み");
+    expect(active).toContain("bg-accent-soft");
   });
 });

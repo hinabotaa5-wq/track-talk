@@ -91,7 +91,7 @@ export function HomeFeed({
       {hasNext ? (
         <Link
           href={nextHref(sort, q, meta.page + 1, kind)}
-          className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium"
+          className="block w-full rounded-md border bg-surface py-3 text-center text-sm font-medium"
         >
           次の投稿
         </Link>

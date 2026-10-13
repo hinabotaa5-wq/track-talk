@@ -79,20 +79,20 @@ export default function ContactPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-zinc-600">読み込み中...</p>;
+    return <p className="text-sm text-muted">読み込み中...</p>;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-8">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">お問い合わせ</h1>
-        <p className="text-sm text-zinc-600">不具合やアカウントの相談を運営へ送れます。</p>
+        <p className="text-sm text-muted">不具合やアカウントの相談を運営へ送れます。</p>
       </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <label className="block space-y-1 text-sm">
-          <span className="text-zinc-700">種類</span>
+          <span className="text-foreground">種類</span>
           <select
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base outline-none focus:border-blue-500"
+            className="w-full rounded-md border border-input-border bg-field px-3 py-2 text-base outline-none focus:border-accent"
             {...form.register("category")}
           >
             {inquiryCategories.map((category) => (
@@ -104,14 +104,14 @@ export default function ContactPage() {
         </label>
         <Input placeholder="件名" {...form.register("subject")} />
         {form.formState.errors.subject ? (
-          <p className="text-sm text-red-600">{form.formState.errors.subject.message}</p>
+          <p className="text-sm text-danger">{form.formState.errors.subject.message}</p>
         ) : null}
         <Textarea rows={6} placeholder="内容" {...form.register("body")} />
         {form.formState.errors.body ? (
-          <p className="text-sm text-red-600">{form.formState.errors.body.message}</p>
+          <p className="text-sm text-danger">{form.formState.errors.body.message}</p>
         ) : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        {sent ? <p className="text-sm text-blue-700">送信しました。</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {sent ? <p className="text-sm text-accent">送信しました。</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>
           送信
         </Button>
@@ -119,16 +119,16 @@ export default function ContactPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">送信履歴</h2>
         {inquiries.length === 0 ? (
-          <p className="text-sm text-zinc-600">まだお問い合わせはありません</p>
+          <p className="text-sm text-muted">まだお問い合わせはありません</p>
         ) : (
           <ul className="space-y-3">
             {inquiries.map((item) => (
-              <li key={item.id} className="space-y-1 rounded-md border border-zinc-200 p-3">
-                <p className="text-xs text-zinc-500">
+              <li key={item.id} className="space-y-1 rounded-md border border-border p-3">
+                <p className="text-xs text-muted">
                   {inquiryCategoryLabels[item.category]} · {formatDateTime(item.created_at)}
                 </p>
                 <p className="font-medium">{item.subject}</p>
-                <p className="whitespace-pre-wrap text-sm text-zinc-700">{item.body}</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground">{item.body}</p>
               </li>
             ))}
           </ul>

@@ -96,8 +96,8 @@ export default function OwnVideoPage() {
         {upload ? (
           <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
         ) : null}
-        {status ? <p className="text-sm text-zinc-600">{status}</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {status ? <p className="text-sm text-muted">{status}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? "送っています" : "アップロードして投稿"}
         </Button>

@@ -30,10 +30,10 @@ export default function UploadPage() {
           <Link
             key={door.href}
             href={door.href}
-            className="block min-h-11 rounded-2xl border bg-white p-4 hover:border-blue-300"
+            className="block min-h-11 rounded-2xl border bg-surface p-4 hover:border-accent"
           >
             <span className="block text-lg font-semibold">{door.title}</span>
-            <span className="mt-1 block text-sm text-zinc-600">{door.body}</span>
+            <span className="mt-1 block text-sm text-muted">{door.body}</span>
           </Link>
         ))}
       </div>

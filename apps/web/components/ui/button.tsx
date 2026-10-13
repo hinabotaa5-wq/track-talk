@@ -11,11 +11,11 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center rounded-full px-4.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-        variant === "primary" && "bg-blue-600 text-white shadow-xs hover:bg-blue-700 active:bg-blue-800",
-        variant === "secondary" && "border border-zinc-200 bg-white text-zinc-800 shadow-xs hover:bg-zinc-50 hover:text-zinc-900 active:bg-zinc-100",
-        variant === "ghost" && "text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200/60",
-        variant === "danger" && "bg-red-600 text-white shadow-xs hover:bg-red-700 active:bg-red-800",
+        "inline-flex items-center justify-center rounded-full px-4.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        variant === "primary" && "bg-accent text-accent-foreground shadow-xs hover:bg-accent-hover active:bg-accent",
+        variant === "secondary" && "border border-border bg-surface text-foreground shadow-xs hover:bg-surface-raised active:bg-field",
+        variant === "ghost" && "text-foreground hover:bg-surface-raised active:bg-surface-raised/60",
+        variant === "danger" && "bg-danger-strong text-danger-foreground shadow-xs hover:bg-danger-hover active:bg-danger-strong",
         className,
       )}
       {...props}

@@ -13,10 +13,10 @@ export default function TermsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">利用規約</h1>
-        <p className="text-sm leading-7 text-zinc-700">
+        <p className="text-sm leading-7 text-foreground">
           この規約は、TRACK TALK（以下「本サービス」）の利用条件です。本サービスは個人が運営します。アカウント登録、ログイン、または投稿を始めたとき、この規約とコミュニティガイドラインに同意したものとみなします。
         </p>
-        <p className="text-xs text-zinc-500">施行日: {updated}</p>
+        <p className="text-xs text-muted">施行日: {updated}</p>
       </div>
 
       <Article n={1} title="サービスの内容">

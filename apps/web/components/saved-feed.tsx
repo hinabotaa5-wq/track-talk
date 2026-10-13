@@ -72,7 +72,7 @@ export function SavedFeed({ q, page }: { q: string; page: number }) {
         </div>
       ) : null}
       {hasNext ? (
-        <Link href={`/?${next}`} className="block w-full rounded-md border bg-white py-3 text-center text-sm font-medium">
+        <Link href={`/?${next}`} className="block w-full rounded-md border bg-surface py-3 text-center text-sm font-medium">
           次の投稿
         </Link>
       ) : null}

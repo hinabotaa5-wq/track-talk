@@ -120,11 +120,11 @@ export function NotificationBell() {
           if (!open) setLoading(true);
           setOpen(!open);
         }}
-        className="relative inline-flex size-11 items-center justify-center rounded-md text-zinc-700 hover:bg-zinc-100"
+        className="relative inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-surface-raised"
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (
-          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] leading-4 font-semibold text-white">
+          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-danger-strong px-1 text-[10px] leading-4 font-semibold text-danger-foreground">
             {badgeText(unread)}
           </span>
         ) : null}
@@ -132,37 +132,37 @@ export function NotificationBell() {
       {open ? (
         <div
           id={panelID}
-          className="absolute right-0 z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg"
+          className="absolute right-0 z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
         >
-          <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <p className="text-sm font-semibold">通知</p>
             {unread > 0 ? (
-              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-700 hover:underline">
+              <button type="button" onClick={() => void markAll()} className="text-xs text-accent hover:underline">
                 すべて既読
               </button>
             ) : null}
           </div>
-          {loading && items.length === 0 ? <p className="px-3 py-6 text-center text-sm text-zinc-500">読み込み中</p> : null}
-          {error ? <p className="px-3 py-3 text-sm text-red-700">{error}</p> : null}
+          {loading && items.length === 0 ? <p className="px-3 py-6 text-center text-sm text-muted">読み込み中</p> : null}
+          {error ? <p className="px-3 py-3 text-sm text-danger">{error}</p> : null}
           {!loading && !error && items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-zinc-500">通知はありません</p>
+            <p className="px-3 py-6 text-center text-sm text-muted">通知はありません</p>
           ) : null}
           {items.length > 0 ? (
             <ul className="max-h-96 overflow-y-auto">
               {items.map((item) => (
-                <li key={item.id} className={item.read ? "" : "bg-blue-50"}>
+                <li key={item.id} className={item.read ? "" : "bg-accent-soft"}>
                   <Link
                     href={`/posts/${item.post_id}`}
                     onClick={() => {
                       setOpen(false);
                       if (!item.read) void markRead(item.id);
                     }}
-                    className="block px-3 py-3 hover:bg-zinc-50"
+                    className="block px-3 py-3 hover:bg-surface-raised"
                   >
                     <p className="text-sm">
                       {labelFor(item.kind)}: {item.post_title}
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500">{formatRelativeTime(item.created_at)}</p>
+                    <p className="mt-1 text-xs text-muted">{formatRelativeTime(item.created_at)}</p>
                   </Link>
                 </li>
               ))}

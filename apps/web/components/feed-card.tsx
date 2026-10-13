@@ -13,7 +13,7 @@ export function feedTitle(title: string) {
 
 function KindBadge({ children }: { children: string }) {
   return (
-    <span className="w-fit rounded-full bg-white/90 backdrop-blur-md px-2.5 py-0.5 text-xs font-medium text-zinc-800 shadow-xs border border-white/50">
+    <span className="w-fit rounded-full bg-surface/90 backdrop-blur-md px-2.5 py-0.5 text-xs font-medium text-foreground shadow-xs border border-border/50">
       {children}
     </span>
   );
@@ -27,25 +27,25 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     return (
       <Link
         href={href}
-        className="group block overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 active:scale-[0.98]"
+        className="group block overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:border-input-border active:scale-[0.98]"
       >
-        <div className="flex aspect-[4/3] flex-col gap-2 bg-zinc-50/70 p-3.5 transition-colors group-hover:bg-zinc-50">
+        <div className="flex aspect-[4/3] flex-col gap-2 bg-field/70 p-3.5 transition-colors group-hover:bg-field">
           <KindBadge>練習</KindBadge>
           {info ? (
             <div className="space-y-1 text-sm leading-snug">
-              <p className="font-semibold text-zinc-900 transition-colors group-hover:text-blue-600">{info.event_label}</p>
-              <p className="text-zinc-600">{formatDateTime(info.starts_at)}</p>
-              <p className="line-clamp-2 text-zinc-600">{info.venue}</p>
-              <p className="text-zinc-600">
+              <p className="font-semibold text-foreground transition-colors group-hover:text-accent">{info.event_label}</p>
+              <p className="text-muted">{formatDateTime(info.starts_at)}</p>
+              <p className="line-clamp-2 text-muted">{info.venue}</p>
+              <p className="text-muted">
                 募集 {info.accepted_count}/{info.capacity}人
                 {info.status === "full" ? "・満員" : info.status === "dissolved" ? "・解散" : ""}
               </p>
               {practiceReputationLine(info.reputation) ? (
-                <p className="text-xs text-zinc-500">{practiceReputationLine(info.reputation)}</p>
+                <p className="text-xs text-muted">{practiceReputationLine(info.reputation)}</p>
               ) : null}
             </div>
           ) : (
-            <p className="line-clamp-4 text-sm font-semibold leading-snug text-zinc-900 transition-colors group-hover:text-blue-600">{title}</p>
+            <p className="line-clamp-4 text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-accent">{title}</p>
           )}
         </div>
       </Link>
@@ -54,9 +54,9 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 active:scale-[0.98]"
+      className="group block overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:border-input-border active:scale-[0.98]"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface-raised">
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
@@ -73,11 +73,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           />
         ) : (
           <div className="flex h-full items-center p-3.5">
-            <p className="line-clamp-4 text-sm font-semibold leading-snug text-zinc-900 transition-colors group-hover:text-blue-600">{title}</p>
+            <p className="line-clamp-4 text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-accent">{title}</p>
           </div>
         )}
       </div>
-      <p className="truncate px-3.5 py-3 text-sm font-medium text-zinc-900 transition-colors group-hover:text-blue-600">{title}</p>
+      <p className="truncate px-3.5 py-3 text-sm font-medium text-foreground transition-colors group-hover:text-accent">{title}</p>
     </Link>
   );
 }

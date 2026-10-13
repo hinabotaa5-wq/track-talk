@@ -1,20 +1,90 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f6fb;
-  --foreground: #18181b;
+  color-scheme: dark;
+  --background: #16212e;
+  --foreground: #dae4ec;
+  --surface: #202e3d;
+  --surface-raised: #2b3d50;
+  --field: #192635;
+  --muted: #a6b8c9;
+  --border: #43586d;
+  --input-border: #637d95;
+  --accent: #a9c9e5;
+  --accent-hover: #bed8ed;
+  --accent-foreground: #16212e;
+  --accent-soft: #2c435a;
+  --danger: #f2a4ab;
+  --danger-soft: #402d39;
+  --danger-strong: #e69aa4;
+  --danger-hover: #f0b1b9;
+  --danger-foreground: #291820;
+  --like: #efacc3;
+  --like-soft: #443044;
+  --success: #a3d6bd;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-field: var(--field);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-input-border: var(--input-border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-like: var(--like);
+  --color-like-soft: var(--like-soft);
+  --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  input, textarea, select {
+    accent-color: var(--accent);
+  }
+
+  ::placeholder {
+    color: var(--muted);
+  }
+
+  ::file-selector-button {
+    margin-right: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--input-border);
+    border-radius: 0.5rem;
+    background: var(--surface-raised);
+    color: var(--foreground);
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), "Hiragino Sans", sans-serif;
+  font-family: var(--font-geist-sans, "Hiragino Sans"), sans-serif;
 }
 
 @keyframes upload-slide {
