@@ -14,6 +14,15 @@ DELETE FROM competitions
 WHERE prefecture = sqlc.arg(prefecture)
   AND season_year = sqlc.arg(season_year);
 
+-- name: DeleteCompetitionsBeforeSeason :exec
+DELETE FROM competitions
+WHERE prefecture = sqlc.arg(prefecture)
+  AND season_year < sqlc.arg(season_year);
+
+-- name: DeletePastCompetitionSeasons :execrows
+DELETE FROM competitions
+WHERE season_year < sqlc.arg(season_year);
+
 -- name: UpsertCompetition :exec
 INSERT INTO competitions (
     id, name, starts_on, ends_on, location, prefecture, season_year, organizer_url, source_url, link_label

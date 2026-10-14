@@ -1,0 +1,8 @@
+DELETE FROM competitions
+WHERE season_year < (
+    CASE
+        WHEN EXTRACT(MONTH FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')) >= 4
+            THEN EXTRACT(YEAR FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'))
+        ELSE EXTRACT(YEAR FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')) - 1
+    END
+)::int;

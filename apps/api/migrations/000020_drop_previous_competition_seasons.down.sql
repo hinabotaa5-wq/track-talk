@@ -1,0 +1,1 @@
+-- Deleted competition rows from earlier seasons are not restored.

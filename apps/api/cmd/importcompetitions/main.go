@@ -51,6 +51,14 @@ func main() {
 	}
 	defer pool.Close()
 
+	removed, err := db.New(pool).DeletePastCompetitionSeasons(ctx, int32(competitions.SeasonYear(time.Now())))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if removed > 0 {
+		fmt.Fprintf(os.Stdout, "dropped %d competitions from previous seasons\n", removed)
+	}
+
 	if isInternational(*prefecture) {
 		if err := importInternational(ctx, pool); err != nil {
 			log.Fatal(err)
@@ -306,9 +314,16 @@ func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.C
 	}
 	defer tx.Rollback(ctx)
 	q := db.New(tx)
+	season := int32(meets[0].SeasonYear)
+	if err := q.DeleteCompetitionsBeforeSeason(ctx, db.DeleteCompetitionsBeforeSeasonParams{
+		Prefecture: source.Prefecture,
+		SeasonYear: season,
+	}); err != nil {
+		return err
+	}
 	if err := q.DeleteCompetitionsBySeason(ctx, db.DeleteCompetitionsBySeasonParams{
 		Prefecture: source.Prefecture,
-		SeasonYear: int32(meets[0].SeasonYear),
+		SeasonYear: season,
 	}); err != nil {
 		return err
 	}
@@ -362,6 +377,14 @@ func importInternational(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	defer tx.Rollback(ctx)
 	q := db.New(tx)
+	if len(seasons) > 0 {
+		if err := q.DeleteCompetitionsBeforeSeason(ctx, db.DeleteCompetitionsBeforeSeasonParams{
+			Prefecture: competitions.InternationalPrefecture,
+			SeasonYear: int32(seasons[0]),
+		}); err != nil {
+			return err
+		}
+	}
 	for _, season := range seasons {
 		if err := q.DeleteCompetitionsBySeason(ctx, db.DeleteCompetitionsBySeasonParams{
 			Prefecture: competitions.InternationalPrefecture,

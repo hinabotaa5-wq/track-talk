@@ -11,7 +11,9 @@ import (
 
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
+	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,6 +41,14 @@ func main() {
 	if err := pool.Ping(pingCtx); err != nil {
 		slog.Error("db ping", "err", err)
 		os.Exit(1)
+	}
+	removed, err := db.New(pool).DeletePastCompetitionSeasons(ctx, int32(competitions.SeasonYear(time.Now())))
+	if err != nil {
+		slog.Error("drop previous competition seasons", "err", err)
+		os.Exit(1)
+	}
+	if removed > 0 {
+		slog.Info("dropped previous competition seasons", "rows", removed)
 	}
 	verifier, err := auth.NewVerifier(cfg.JWTSecret, cfg.SupabaseURL, cfg.JWTAUD)
 	if err != nil {

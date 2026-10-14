@@ -28,6 +28,35 @@ func (q *Queries) DeleteCompetitionsBySeason(ctx context.Context, arg DeleteComp
 	return err
 }
 
+const deleteCompetitionsBeforeSeason = `-- name: DeleteCompetitionsBeforeSeason :exec
+DELETE FROM competitions
+WHERE prefecture = $1
+  AND season_year < $2
+`
+
+type DeleteCompetitionsBeforeSeasonParams struct {
+	Prefecture string `json:"prefecture"`
+	SeasonYear int32  `json:"season_year"`
+}
+
+func (q *Queries) DeleteCompetitionsBeforeSeason(ctx context.Context, arg DeleteCompetitionsBeforeSeasonParams) error {
+	_, err := q.db.Exec(ctx, deleteCompetitionsBeforeSeason, arg.Prefecture, arg.SeasonYear)
+	return err
+}
+
+const deletePastCompetitionSeasons = `-- name: DeletePastCompetitionSeasons :execrows
+DELETE FROM competitions
+WHERE season_year < $1
+`
+
+func (q *Queries) DeletePastCompetitionSeasons(ctx context.Context, seasonYear int32) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePastCompetitionSeasons, seasonYear)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listCompetitions = `-- name: ListCompetitions :many
 SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url, link_label
 FROM competitions
