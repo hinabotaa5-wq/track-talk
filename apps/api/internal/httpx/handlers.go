@@ -164,11 +164,8 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	page, per, offset := s.queryPage(r)
 	popular := sort == "popular"
 	keyword, codes := searchArgs(r.URL.Query().Get("q"))
-	var mood, part, stage *string
+	var part, stage *string
 	if kind != nil && *kind == "injury" {
-		if v := strings.TrimSpace(r.URL.Query().Get("mood")); validInjuryMood(v) {
-			mood = &v
-		}
 		if v := strings.TrimSpace(r.URL.Query().Get("part")); validInjuryBodyPart(v) {
 			part = &v
 		}
@@ -179,7 +176,6 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
 		AuthorID:        author,
 		Kind:            kind,
-		Mood:            mood,
 		Part:            part,
 		Stage:           stage,
 		PopularWindow:   boolPtr(popular && author == nil),
@@ -195,7 +191,6 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
 			AuthorID:        author,
 			Kind:            kind,
-			Mood:            mood,
 			Part:            part,
 			Stage:           stage,
 			PopularWindow:   boolPtr(author == nil),
@@ -221,7 +216,6 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
 			AuthorID:        author,
 			Kind:            kind,
-			Mood:            mood,
 			Part:            part,
 			Stage:           stage,
 			Keyword:         keyword,
@@ -373,7 +367,6 @@ type postReq struct {
 	Event               string   `json:"event"`
 	EventOther          string   `json:"event_other"`
 	Capacity            int      `json:"capacity"`
-	Mood                string   `json:"mood"`
 	BodyPart            string   `json:"body_part"`
 }
 

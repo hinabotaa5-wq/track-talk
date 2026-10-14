@@ -112,7 +112,7 @@ func (q *Queries) DeleteInjuryUpdate(ctx context.Context, arg DeleteInjuryUpdate
 }
 
 const getInjuryDetail = `-- name: GetInjuryDetail :one
-SELECT post_id, mood, body_part
+SELECT post_id, body_part
 FROM injury_details
 WHERE post_id = $1
 `
@@ -120,7 +120,7 @@ WHERE post_id = $1
 func (q *Queries) GetInjuryDetail(ctx context.Context, postID uuid.UUID) (InjuryDetail, error) {
 	row := q.db.QueryRow(ctx, getInjuryDetail, postID)
 	var i InjuryDetail
-	err := row.Scan(&i.PostID, &i.Mood, &i.BodyPart)
+	err := row.Scan(&i.PostID, &i.BodyPart)
 	return i, err
 }
 
@@ -179,7 +179,7 @@ func (q *Queries) InjuryStageStats(ctx context.Context) ([]InjuryStageStatsRow, 
 }
 
 const listInjuryDetails = `-- name: ListInjuryDetails :many
-SELECT post_id, mood, body_part
+SELECT post_id, body_part
 FROM injury_details
 WHERE post_id = ANY($1::uuid[])
 `
@@ -193,7 +193,7 @@ func (q *Queries) ListInjuryDetails(ctx context.Context, postIds []uuid.UUID) ([
 	var items []InjuryDetail
 	for rows.Next() {
 		var i InjuryDetail
-		if err := rows.Scan(&i.PostID, &i.Mood, &i.BodyPart); err != nil {
+		if err := rows.Scan(&i.PostID, &i.BodyPart); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -306,7 +306,7 @@ func (q *Queries) ListMyInjuryFirstReports(ctx context.Context, authorID uuid.UU
 }
 
 const listMyInjuryPosts = `-- name: ListMyInjuryPosts :many
-SELECT p.id, p.title, p.created_at, i.mood, i.body_part
+SELECT p.id, p.title, p.created_at, i.body_part
 FROM posts p
 JOIN injury_details i ON i.post_id = p.id
 WHERE p.author_id = $1
@@ -319,7 +319,6 @@ type ListMyInjuryPostsRow struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
-	Mood      string    `json:"mood"`
 	BodyPart  string    `json:"body_part"`
 }
 
@@ -336,7 +335,6 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 			&i.ID,
 			&i.Title,
 			&i.CreatedAt,
-			&i.Mood,
 			&i.BodyPart,
 		); err != nil {
 			return nil, err
@@ -419,20 +417,18 @@ func (q *Queries) UpdateInjuryUpdate(ctx context.Context, arg UpdateInjuryUpdate
 }
 
 const upsertInjuryDetail = `-- name: UpsertInjuryDetail :exec
-INSERT INTO injury_details (post_id, mood, body_part)
-VALUES ($1, $2, $3)
+INSERT INTO injury_details (post_id, body_part)
+VALUES ($1, $2)
 ON CONFLICT (post_id) DO UPDATE SET
-    mood = EXCLUDED.mood,
     body_part = EXCLUDED.body_part
 `
 
 type UpsertInjuryDetailParams struct {
 	PostID   uuid.UUID `json:"post_id"`
-	Mood     string    `json:"mood"`
 	BodyPart string    `json:"body_part"`
 }
 
 func (q *Queries) UpsertInjuryDetail(ctx context.Context, arg UpsertInjuryDetailParams) error {
-	_, err := q.db.Exec(ctx, upsertInjuryDetail, arg.PostID, arg.Mood, arg.BodyPart)
+	_, err := q.db.Exec(ctx, upsertInjuryDetail, arg.PostID, arg.BodyPart)
 	return err
 }

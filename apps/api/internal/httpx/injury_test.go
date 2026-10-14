@@ -14,7 +14,6 @@ type injuryListResp struct {
 		ID     string `json:"id"`
 		Kind   string `json:"kind"`
 		Injury *struct {
-			Mood          string `json:"mood"`
 			BodyPartLabel string `json:"body_part_label"`
 		} `json:"injury"`
 	} `json:"posts"`
@@ -42,20 +41,20 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	tok := token(t, author)
 
 	bad := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "body": "走れない", "mood": "vent", "body_part": "head",
+		"kind": "injury", "body": "走れない", "body_part": "head",
 	})
 	if bad.Code != http.StatusUnprocessableEntity && bad.Code != http.StatusBadRequest {
 		t.Fatalf("invalid part status %d %s", bad.Code, bad.Body.String())
 	}
 	empty := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "body": "  ", "mood": "vent", "body_part": "knee",
+		"kind": "injury", "body": "  ", "body_part": "knee",
 	})
 	if empty.Code == http.StatusCreated {
 		t.Fatalf("empty body accepted")
 	}
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "title": "肉離れ", "body": "もう三週間走れていない", "mood": "vent", "body_part": "hamstring",
+		"kind": "injury", "title": "肉離れ", "body": "もう三週間走れていない", "body_part": "hamstring",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -64,18 +63,17 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 		ID     string `json:"id"`
 		Kind   string `json:"kind"`
 		Injury struct {
-			Mood          string `json:"mood"`
 			BodyPartLabel string `json:"body_part_label"`
 		} `json:"injury"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if created.Kind != "injury" || created.Injury.Mood != "vent" || created.Injury.BodyPartLabel != "ハムストリング" {
+	if created.Kind != "injury" || created.Injury.BodyPartLabel != "ハムストリング" {
 		t.Fatalf("unexpected create response %+v", created)
 	}
 	rehab := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "body": "バイクとコアを続ける", "mood": "rehab", "body_part": "knee",
+		"kind": "injury", "body": "バイクとコアを続ける", "body_part": "knee",
 	})
 	if rehab.Code != http.StatusCreated {
 		t.Fatalf("create rehab %d %s", rehab.Code, rehab.Body.String())
@@ -91,12 +89,8 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if all.Meta.Total != 2 || len(all.Posts) != 2 || all.Posts[0].Injury == nil {
 		t.Fatalf("injury feed %+v", all)
 	}
-	vent := listInjury(t, h, "/v1/posts?kind=injury&mood=vent", "")
-	if vent.Meta.Total != 1 || vent.Posts[0].ID != created.ID {
-		t.Fatalf("mood filter %+v", vent)
-	}
 	knee := listInjury(t, h, "/v1/posts?kind=injury&part=knee", "")
-	if knee.Meta.Total != 1 || knee.Posts[0].Injury.Mood != "rehab" {
+	if knee.Meta.Total != 1 {
 		t.Fatalf("part filter %+v", knee)
 	}
 	mine := listInjury(t, h, "/v1/me/posts", tok)
@@ -105,7 +99,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	}
 
 	patch := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
-		"title": "肉離れ", "body": "少し歩けた", "mood": "rehab", "body_part": "calf",
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "calf",
 	})
 	if patch.Code != http.StatusOK {
 		t.Fatalf("patch %d %s", patch.Code, patch.Body.String())
@@ -114,14 +108,13 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	var detail struct {
 		Body   string `json:"body"`
 		Injury struct {
-			Mood     string `json:"mood"`
 			BodyPart string `json:"body_part"`
 		} `json:"injury"`
 	}
 	if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Body != "少し歩けた" || detail.Injury.Mood != "rehab" || detail.Injury.BodyPart != "calf" {
+	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "calf" {
 		t.Fatalf("detail after patch %+v", detail)
 	}
 }
@@ -133,7 +126,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 	other := token(t, uuid.New())
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "mood": "vent", "body_part": "shin",
+		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "body_part": "shin",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -246,7 +239,7 @@ func TestInjuryFeedFilterByLatestStage(t *testing.T) {
 	create := func(title string) string {
 		t.Helper()
 		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-			"kind": "injury", "title": title, "body": "本文", "mood": "vent", "body_part": "knee",
+			"kind": "injury", "title": title, "body": "本文", "body_part": "knee",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -342,7 +335,7 @@ func TestInjuryStatsAggregatesAnonymously(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		tok := token(t, uuid.New())
 		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-			"kind": "injury", "title": "鼠径部", "body": "本文", "mood": "rehab", "body_part": "groin",
+			"kind": "injury", "title": "鼠径部", "body": "本文", "body_part": "groin",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -380,7 +373,7 @@ func TestMyInjuryHistoryIsPrivateToTheAuthor(t *testing.T) {
 	create := func(tok, title string) string {
 		t.Helper()
 		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-			"kind": "injury", "title": title, "body": "本文", "mood": "vent", "body_part": "calf",
+			"kind": "injury", "title": title, "body": "本文", "body_part": "calf",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -439,7 +432,7 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	bystander := token(t, uuid.New())
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
-		"kind": "injury", "title": "通知の確認", "body": "本文", "mood": "vent", "body_part": "hip",
+		"kind": "injury", "title": "通知の確認", "body": "本文", "body_part": "hip",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -527,7 +520,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	follower := token(t, uuid.New())
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
-		"kind": "injury", "title": "編集の確認", "body": "本文", "mood": "vent", "body_part": "upper-body",
+		"kind": "injury", "title": "編集の確認", "body": "本文", "body_part": "upper-body",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())

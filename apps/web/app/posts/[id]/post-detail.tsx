@@ -212,9 +212,6 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ) : null}
       {post.kind === "injury" && post.injury ? (
         <p className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-rose-950/70 px-3 py-1 text-xs font-bold text-rose-300 border border-rose-800/60">
-            {post.injury.mood_label}
-          </span>
           <span className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-slate-200 border border-white/20">
             {post.injury.body_part_label}
           </span>
