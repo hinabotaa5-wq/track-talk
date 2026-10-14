@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { injuryFeedPath, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
+import { injuryFeedPath, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("builds the feed path with only valid filters", () => {
@@ -53,5 +53,20 @@ describe("injury", () => {
     expect(injuryTypicalStages(stats as never, "knee").map((s) => s.stage)).toEqual(["rehab"]);
     expect(injuryTypicalStages(stats as never, "ankle")).toEqual([]);
     expect(injuryTypicalStages(null, "knee")).toEqual([]);
+  });
+
+  it("formats the days to a stage in the personal history", () => {
+    expect(injuryHistoryStageText({ stage_label: "ジョグ再開", days: 45 })).toBe("ジョグ再開（45日後）");
+    expect(injuryHistoryStageText({ stage_label: "安静中", days: 0 })).toBe("安静中（投稿の当日）");
+  });
+
+  it("finds body parts injured more than once", () => {
+    const items = [
+      { body_part: "knee", body_part_label: "膝" },
+      { body_part: "calf", body_part_label: "ふくらはぎ" },
+      { body_part: "knee", body_part_label: "膝" },
+    ];
+    expect(injuryRepeatedParts(items)).toEqual([{ label: "膝", count: 2 }]);
+    expect(injuryRepeatedParts([])).toEqual([]);
   });
 });

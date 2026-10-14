@@ -71,3 +71,21 @@ JOIN injury_details i ON i.post_id = p.id
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
 GROUP BY i.body_part, f.stage;
+
+-- name: ListMyInjuryPosts :many
+SELECT p.id, p.title, p.created_at, i.mood, i.body_part
+FROM posts p
+JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+ORDER BY p.created_at DESC;
+
+-- name: ListMyInjuryFirstReports :many
+SELECT u.post_id, u.stage, min(u.created_at)::timestamptz AS first_at
+FROM injury_updates u
+JOIN posts p ON p.id = u.post_id
+WHERE p.author_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+GROUP BY u.post_id, u.stage;

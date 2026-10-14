@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -258,6 +259,86 @@ func (q *Queries) ListLatestInjuryStages(ctx context.Context, postIds []uuid.UUI
 	for rows.Next() {
 		var i ListLatestInjuryStagesRow
 		if err := rows.Scan(&i.PostID, &i.Stage); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyInjuryFirstReports = `-- name: ListMyInjuryFirstReports :many
+SELECT u.post_id, u.stage, min(u.created_at)::timestamptz AS first_at
+FROM injury_updates u
+JOIN posts p ON p.id = u.post_id
+WHERE p.author_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+GROUP BY u.post_id, u.stage
+`
+
+type ListMyInjuryFirstReportsRow struct {
+	PostID  uuid.UUID `json:"post_id"`
+	Stage   string    `json:"stage"`
+	FirstAt time.Time `json:"first_at"`
+}
+
+func (q *Queries) ListMyInjuryFirstReports(ctx context.Context, authorID uuid.UUID) ([]ListMyInjuryFirstReportsRow, error) {
+	rows, err := q.db.Query(ctx, listMyInjuryFirstReports, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyInjuryFirstReportsRow
+	for rows.Next() {
+		var i ListMyInjuryFirstReportsRow
+		if err := rows.Scan(&i.PostID, &i.Stage, &i.FirstAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyInjuryPosts = `-- name: ListMyInjuryPosts :many
+SELECT p.id, p.title, p.created_at, i.mood, i.body_part
+FROM posts p
+JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+ORDER BY p.created_at DESC
+`
+
+type ListMyInjuryPostsRow struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+	Mood      string    `json:"mood"`
+	BodyPart  string    `json:"body_part"`
+}
+
+func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]ListMyInjuryPostsRow, error) {
+	rows, err := q.db.Query(ctx, listMyInjuryPosts, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyInjuryPostsRow
+	for rows.Next() {
+		var i ListMyInjuryPostsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CreatedAt,
+			&i.Mood,
+			&i.BodyPart,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

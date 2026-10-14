@@ -84,3 +84,28 @@ export function injuryTypicalStages(stats: InjuryStats | null, bodyPart: string)
   const part = stats?.parts.find((item) => item.body_part === bodyPart);
   return part ? part.stages.filter((stage) => stage.median_days !== null) : [];
 }
+
+export type InjuryHistoryItem = {
+  id: string;
+  title: string;
+  mood_label: string;
+  body_part: string;
+  body_part_label: string;
+  created_at: string;
+  stages: { stage: InjuryStage; stage_label: string; days: number }[];
+};
+
+// 履歴の1行に出す、段階ごとの日数。当日なら「当日」。
+export function injuryHistoryStageText(stage: { stage_label: string; days: number }) {
+  return stage.days === 0 ? `${stage.stage_label}（投稿の当日）` : `${stage.stage_label}（${stage.days}日後）`;
+}
+
+// 同じ部位のケガが複数あるとき、その部位名と件数を返す（再発の振り返り用）。
+export function injuryRepeatedParts(items: { body_part: string; body_part_label: string }[]) {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const item of items) {
+    const current = counts.get(item.body_part);
+    counts.set(item.body_part, { label: item.body_part_label, count: (current?.count ?? 0) + 1 });
+  }
+  return [...counts.values()].filter((item) => item.count >= 2);
+}
