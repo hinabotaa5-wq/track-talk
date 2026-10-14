@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -17,6 +18,9 @@ const withdrawConfirm = "退会する"
 
 type deleteAccountReq struct {
 	Confirm string `json:"confirm"`
+	// KeepInjuryAnonymized is the member's consent to keep their injury records, stripped of anything that
+	// links to the account, for analysis after they leave.
+	KeepInjuryAnonymized bool `json:"keep_injury_anonymized"`
 }
 
 func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +46,12 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	if req.KeepInjuryAnonymized {
+		if err := archiveInjuryData(r.Context(), s.q.WithTx(tx), uid, time.Now()); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
 	if err := purgeAccount(r.Context(), s.q.WithTx(tx), uid); err != nil {
 		MapDBError(w, err)
 		return

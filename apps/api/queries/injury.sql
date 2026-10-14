@@ -175,3 +175,25 @@ ORDER BY stage, rn;
 
 -- name: IsProfileAdmin :one
 SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean AS is_admin;
+
+-- name: ListInjuryGroupStageLog :many
+SELECT stage, created_at
+FROM injury_group_stage_log
+WHERE user_id = $1 AND body_part = $2
+ORDER BY created_at, id;
+
+-- name: ListMyInjuryPostsForArchive :many
+SELECT p.id, p.title, p.body, p.created_at, i.body_part, i.group_stage
+FROM posts p
+JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+ORDER BY p.created_at;
+
+-- name: InsertInjuryArchive :exec
+INSERT INTO injury_archives (body_part, injured_month, archived_month, stage_timeline, place, situation, posts)
+VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: GetProfileNickname :one
+SELECT nickname FROM profiles WHERE id = $1;

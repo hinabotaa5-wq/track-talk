@@ -84,7 +84,7 @@ describe("DeleteAccountPage", () => {
     const view = await renderPage();
     expect(view.div.querySelector('input[type="password"]')).toBeNull();
     expect(view.div.textContent).not.toContain("再ログイン");
-    const phrase = view.div.querySelector("input");
+    const phrase = view.div.querySelector('input:not([type="checkbox"])');
     if (!(phrase instanceof HTMLInputElement)) throw new Error("phrase missing");
     await act(async () => {
       setInput(phrase, "退会する");
@@ -97,5 +97,30 @@ describe("DeleteAccountPage", () => {
     expect(signInWithPassword).not.toHaveBeenCalled();
     expect(apiFetch).toHaveBeenCalledWith("/v1/me", expect.objectContaining({ token: "old-token" }));
     await view.unmount();
+  });
+
+  async function submit(keep: boolean) {
+    apiFetch.mockResolvedValue({ auth_deleted: true });
+    const view = await renderPage();
+    const phrase = view.div.querySelector('input:not([type="checkbox"])');
+    const box = view.div.querySelector('input[type="checkbox"]');
+    if (!(phrase instanceof HTMLInputElement) || !(box instanceof HTMLInputElement)) throw new Error("inputs missing");
+    await act(async () => {
+      setInput(phrase, "退会する");
+      if (keep) box.click();
+    });
+    const form = view.div.querySelector("form");
+    if (!form) throw new Error("form missing");
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await view.unmount();
+    return JSON.parse((apiFetch.mock.calls[0][1] as { body: string }).body);
+  }
+
+  it("keeps the injury records only when the box is checked", async () => {
+    expect(await submit(false)).toEqual({ confirm: "退会する", keep_injury_anonymized: false });
+    apiFetch.mockReset();
+    expect(await submit(true)).toEqual({ confirm: "退会する", keep_injury_anonymized: true });
   });
 });

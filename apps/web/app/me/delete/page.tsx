@@ -15,6 +15,7 @@ export default function DeleteAccountPage() {
   const router = useRouter();
   const leaving = useRef(false);
   const [phrase, setPhrase] = useState("");
+  const [keepInjury, setKeepInjury] = useState(false);
   const [error, setError] = useState("");
   const { pending: submitting, acquire, release } = useActionLock();
   const [authLeft, setAuthLeft] = useState(false);
@@ -39,7 +40,7 @@ export default function DeleteAccountPage() {
       const result = await apiFetch<{ auth_deleted: boolean }>("/v1/me", {
         method: "DELETE",
         token,
-        body: JSON.stringify({ confirm: confirmPhrase }),
+        body: JSON.stringify({ confirm: confirmPhrase, keep_injury_anonymized: keepInjury }),
       });
       if (!result.auth_deleted) {
         setAuthLeft(true);
@@ -91,6 +92,20 @@ export default function DeleteAccountPage() {
       <p className="text-sm text-slate-300">
         他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。
       </p>
+      <label className="flex items-start gap-2 rounded-xl border border-white/20 glass bg-white/8 p-3 text-sm text-slate-200">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={keepInjury}
+          onChange={(event) => setKeepInjury(event.target.checked)}
+        />
+        <span className="space-y-1">
+          <span className="block font-semibold text-slate-100">ケガの記録を、匿名にして残す(任意)</span>
+          <span className="block text-slate-300">
+            ケガ人の溜まり場での、部位・段階の移り変わり・答えた状況・投稿の文章を、あなたと結びつかない形にして残し、統計や研究に使います。メールアドレスやリンクなどは取り除きますが、文章の中の名前や地名は取り除けないことがあります。残した記録は、退会後に探し出して削除できません。チェックしなければ、何も残りません。
+          </span>
+        </span>
+      </label>
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
           <span className="text-slate-300">確認のため「退会する」と入力</span>
