@@ -222,7 +222,7 @@ const setCompetitionGuidelines = `-- name: SetCompetitionGuidelines :exec
 UPDATE competitions
 SET guidelines_url = $1
 WHERE id = $2
-  AND guidelines_url = ''
+  AND guidelines_url <> $1
 `
 
 type SetCompetitionGuidelinesParams struct {
@@ -230,7 +230,7 @@ type SetCompetitionGuidelinesParams struct {
 	ID            uuid.UUID `json:"id"`
 }
 
-// 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。まだ要項が無い行にだけ入れる。
+// 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。新着の最新の要項で上書きする。
 func (q *Queries) SetCompetitionGuidelines(ctx context.Context, arg SetCompetitionGuidelinesParams) error {
 	_, err := q.db.Exec(ctx, setCompetitionGuidelines, arg.GuidelinesUrl, arg.ID)
 	return err

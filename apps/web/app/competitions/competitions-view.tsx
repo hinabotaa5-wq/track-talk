@@ -15,9 +15,9 @@ import type { Competition } from "@/lib/types";
 import { RequireSession } from "./require-session";
 
 function destination(competition: Competition, prefecture: string) {
-  // 年間表の要項を優先し、無ければ新着から補った要項を出す。
-  if (competition.link_label === "要項") return { href: competition.organizer_url, label: "要項" };
+  // 新着から補った最新の要項を優先し、無ければ年間表の要項を出す。
   if (competition.guidelines_url) return { href: competition.guidelines_url, label: "要項" };
+  if (competition.link_label === "要項") return { href: competition.organizer_url, label: "要項" };
   if (competition.link_label) return { href: competition.organizer_url, label: competition.link_label };
   if (prefecture === INTERNATIONAL) return { href: competition.organizer_url, label: "公式サイト" };
   if (competition.organizer_url === competition.source_url) {

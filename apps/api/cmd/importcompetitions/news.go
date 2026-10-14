@@ -105,14 +105,11 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 	return failed
 }
 
-// newsCandidates are the meets that still lack guidelines. A meet whose annual table already had its 要項 is left alone.
+// newsCandidates are all meets of the season. Guidelines from news are newer than the annual table's, so they replace it.
 func newsCandidates(rows []db.ListCompetitionsForNewsRow) ([]competitions.KnownMeet, map[string]db.ListCompetitionsForNewsRow) {
 	var known []competitions.KnownMeet
 	byKey := map[string]db.ListCompetitionsForNewsRow{}
 	for _, row := range rows {
-		if row.GuidelinesUrl != "" || row.LinkLabel == "要項" {
-			continue
-		}
 		key := row.ID.String()
 		byKey[key] = row
 		known = append(known, competitions.KnownMeet{Key: key, Name: row.Name, StartsOn: row.StartsOn, EndsOn: row.EndsOn, Location: row.Location})
