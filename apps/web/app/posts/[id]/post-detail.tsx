@@ -181,7 +181,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
 
   return (
     <article
-      className={`${allowComment ? "pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
+      className={`${allowComment ? "pb-[calc(12.5rem+env(safe-area-inset-bottom))] md:pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
     >
       <div className="space-y-6">
       {post.kind === "practice" ? (
@@ -312,7 +312,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         {allowComment ? (
           <form
             onSubmit={form.handleSubmit(onComment)}
-            className="glass fixed inset-x-0 bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:rounded-xl lg:border lg:p-3 lg:pb-3"
+            className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:bottom-auto lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
               <Textarea rows={2} className="min-h-11 flex-1 glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500" placeholder="コメントを書く" {...form.register("body")} />

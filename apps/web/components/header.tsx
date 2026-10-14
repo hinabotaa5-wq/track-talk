@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { NotificationBell } from "./notification-bell";
-import { activeMainTab, hidesTabBar, mainTabHref, mainTabs, useRememberedCompetitionPrefecture } from "./bottom-nav";
+import { activeMainTab, mainTabHref, mainTabs, showsBackButton, useRememberedCompetitionPrefecture } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
 
 function TrackMark() {
@@ -57,7 +57,7 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const competitionPrefecture = useRememberedCompetitionPrefecture();
-  const showBack = hidesTabBar(pathname);
+  const showBack = showsBackButton(pathname);
 
   function goBack() {
     if (window.history.length > 1) router.back();

@@ -53,7 +53,7 @@ export function activeMainTab(pathname: string) {
   return "";
 }
 
-export function hidesTabBar(pathname: string) {
+export function showsBackButton(pathname: string) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
   if (pathname === "/me/contact" || pathname === "/me/delete") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
@@ -65,7 +65,6 @@ export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   const competitionPrefecture = useRememberedCompetitionPrefecture();
-  if (hidesTabBar(pathname)) return null;
 
   const current = activeMainTab(pathname);
 
