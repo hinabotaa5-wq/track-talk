@@ -70,12 +70,20 @@ export function CompetitionsView() {
   return (
     <RequireSession>
       <div className="space-y-4">
-        <Link
-          href="/competitions/major-hosts"
-          className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4.5 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95 md:w-fit"
-        >
-          今後の世界陸上・オリンピック
-        </Link>
+        <div className="flex flex-col gap-2 md:flex-row">
+          {[
+            { href: "/competitions/major-domestic", label: "国内主要大会" },
+            { href: "/competitions/major-hosts", label: "今後の世界陸上・オリンピック" },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4.5 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95 md:w-fit"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
         <CompetitionFilters month={month} prefecture={prefecture} />
         {loading ? <CompetitionLoadingFrame /> : null}
         {!loading && shownError ? <ErrorState message={shownError} /> : null}

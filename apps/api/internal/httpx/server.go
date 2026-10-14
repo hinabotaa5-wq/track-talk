@@ -64,6 +64,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Use(RequireAuth(v))
 			r.Get("/competitions", s.listCompetitions)
 			r.Get("/major-hosts", s.listMajorHosts)
+			r.Get("/domestic-majors", s.listDomesticMajors)
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Delete("/me", s.deleteAccount)

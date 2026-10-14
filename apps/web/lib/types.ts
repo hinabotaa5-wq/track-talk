@@ -18,6 +18,18 @@ export type MajorHost = {
   page_url: string;
 };
 
+export type DomesticMajor = {
+  slug: string;
+  year: number;
+  name: string;
+  category: "youth" | "student" | "open";
+  venue: string;
+  starts_on: string;
+  ends_on: string;
+  schedule_label: string;
+  site_url: string;
+};
+
 export type Competition = {
   id: string;
   name: string;

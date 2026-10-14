@@ -47,7 +47,7 @@ export function MajorHostsPanel() {
   );
 }
 
-function BackButton() {
+export function BackButton() {
   const router = useRouter();
   const { confirmLeave } = useLeaveGuard();
   function goBack() {
