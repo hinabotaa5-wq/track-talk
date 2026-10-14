@@ -8,6 +8,10 @@ vi.mock("next/link", () => ({
   default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: () => {} }),
+}));
+
 const post = {
   id: "4020b4de-956e-4819-97e6-90cb82f83fc0",
   title: "いい感じ",
