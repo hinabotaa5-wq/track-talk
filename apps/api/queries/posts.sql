@@ -197,9 +197,13 @@ SELECT
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
+    profile.nickname AS author_name,
     p.created_at,
     p.updated_at
 FROM posts p
+LEFT JOIN profiles profile
+    ON profile.id = p.author_id
+   AND profile.nickname_public
 WHERE p.id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL;

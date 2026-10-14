@@ -283,9 +283,13 @@ SELECT
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
+    profile.nickname AS author_name,
     p.created_at,
     p.updated_at
 FROM posts p
+LEFT JOIN profiles profile
+    ON profile.id = p.author_id
+   AND profile.nickname_public
 WHERE p.id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
@@ -302,6 +306,7 @@ type GetPostRow struct {
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
+	AuthorName          *string   `json:"author_name"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -320,6 +325,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.CloudinaryPublicID,
 		&i.LikeCount,
 		&i.CommentCount,
+		&i.AuthorName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

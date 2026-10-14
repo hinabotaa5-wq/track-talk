@@ -4,9 +4,13 @@ import { practiceEventValues } from "./practice-events";
 z.config(z.locales.ja());
 
 export const postSchema = z.object({
-  title: z.string("タイトルを入力してください").trim().min(1, "タイトルを入力してください").max(120, "120文字以内"),
-  body: z.string("本文を入力してください").trim().min(1, "本文を入力してください").max(10000, "10000文字以内"),
+  title: z.string("タイトルを入力してください").trim().max(120, "120文字以内"),
+  body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
 });
+
+export function hasTextPostContent(title: string, body: string, hasPhoto: boolean) {
+  return title.trim() !== "" || body.trim() !== "" || hasPhoto;
+}
 
 function httpsUrl(value: string) {
   try {
@@ -67,6 +71,13 @@ export const loginSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),
   password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
 });
+
+export const nicknameSchema = z.object({
+  nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(30, "30文字以内で入力してください"),
+  nickname_public: z.boolean(),
+});
+
+export const registerSchema = loginSchema.extend(nicknameSchema.shape);
 
 export const resetSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),

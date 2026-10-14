@@ -232,11 +232,12 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         </div>
       ) : null}
       {post.kind === "practice" ? null : (
-        <>
-          <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
-          <p className="text-sm text-slate-200">{formatDateTime(post.created_at)}</p>
-        </>
+        <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
       )}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
+        <span>{formatDateTime(post.created_at)}</span>
+        {post.author_name ? <span>{post.author_name}</span> : null}
+      </p>
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
           <h2 className="mb-2 text-xl font-semibold text-slate-100">詳細</h2>

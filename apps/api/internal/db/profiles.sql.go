@@ -12,21 +12,58 @@ import (
 )
 
 const ensureProfile = `-- name: EnsureProfile :one
-INSERT INTO profiles (id)
-VALUES ($1)
+INSERT INTO profiles (id, nickname, nickname_public)
+VALUES ($1, $2, $3)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public
 `
 
-func (q *Queries) EnsureProfile(ctx context.Context, id uuid.UUID) (Profile, error) {
-	row := q.db.QueryRow(ctx, ensureProfile, id)
+type EnsureProfileParams struct {
+	ID             uuid.UUID `json:"id"`
+	Nickname       *string   `json:"nickname"`
+	NicknamePublic bool      `json:"nickname_public"`
+}
+
+func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, ensureProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
 	var i Profile
 	err := row.Scan(
 		&i.ID,
 		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+	)
+	return i, err
+}
+
+const updateProfile = `-- name: UpdateProfile :one
+UPDATE profiles
+SET nickname = $2,
+    nickname_public = $3,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public
+`
+
+type UpdateProfileParams struct {
+	ID             uuid.UUID `json:"id"`
+	Nickname       *string   `json:"nickname"`
+	NicknamePublic bool      `json:"nickname_public"`
+}
+
+func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, updateProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
 	)
 	return i, err
 }

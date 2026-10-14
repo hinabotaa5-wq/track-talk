@@ -15,15 +15,20 @@ import (
 
 type ctxKey int
 
-const userIDKey ctxKey = iota
+const identityKey ctxKey = iota
 
 func UserID(ctx context.Context) (uuid.UUID, bool) {
-	id, ok := ctx.Value(userIDKey).(uuid.UUID)
-	return id, ok && id != uuid.Nil
+	identity, ok := ctx.Value(identityKey).(auth.Identity)
+	return identity.UserID, ok && identity.UserID != uuid.Nil
 }
 
-func withUser(ctx context.Context, id uuid.UUID) context.Context {
-	return context.WithValue(ctx, userIDKey, id)
+func userIdentity(ctx context.Context) (auth.Identity, bool) {
+	identity, ok := ctx.Value(identityKey).(auth.Identity)
+	return identity, ok && identity.UserID != uuid.Nil
+}
+
+func withUser(ctx context.Context, identity auth.Identity) context.Context {
+	return context.WithValue(ctx, identityKey, identity)
 }
 
 func SecurityHeaders(next http.Handler) http.Handler {
@@ -81,9 +86,9 @@ func OptionalAuth(v *auth.Verifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if raw := bearer(r); raw != "" {
-				id, err := v.Parse(raw)
+				identity, err := v.ParseIdentity(raw)
 				if err == nil {
-					r = r.WithContext(withUser(r.Context(), id))
+					r = r.WithContext(withUser(r.Context(), identity))
 				}
 			}
 			next.ServeHTTP(w, r)
@@ -99,12 +104,12 @@ func RequireAuth(v *auth.Verifier) func(http.Handler) http.Handler {
 				Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 				return
 			}
-			id, err := v.Parse(raw)
+			identity, err := v.ParseIdentity(raw)
 			if err != nil {
 				Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(withUser(r.Context(), id)))
+			next.ServeHTTP(w, r.WithContext(withUser(r.Context(), identity)))
 		})
 	}
 }

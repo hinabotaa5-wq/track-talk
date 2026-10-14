@@ -50,12 +50,20 @@ func parseUUIDParam(w http.ResponseWriter, r *http.Request, name string) (uuid.U
 }
 
 func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Profile, bool) {
-	uid, ok := UserID(r.Context())
+	identity, ok := userIdentity(r.Context())
 	if !ok {
 		Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 		return db.Profile{}, false
 	}
-	p, err := s.q.EnsureProfile(r.Context(), uid)
+	var nickname *string
+	if value := strings.TrimSpace(identity.Nickname); value != "" && Nickname(value) == "" {
+		nickname = &value
+	}
+	p, err := s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
+		ID:             identity.UserID,
+		Nickname:       nickname,
+		NicknamePublic: nickname != nil && identity.NicknamePublic,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return db.Profile{}, false
@@ -77,10 +85,12 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (db.Profil
 
 func profileJSON(p db.Profile) map[string]any {
 	return map[string]any{
-		"id":         p.ID,
-		"is_admin":   p.IsAdmin,
-		"created_at": p.CreatedAt,
-		"updated_at": p.UpdatedAt,
+		"id":              p.ID,
+		"nickname":        p.Nickname,
+		"nickname_public": p.NicknamePublic,
+		"is_admin":        p.IsAdmin,
+		"created_at":      p.CreatedAt,
+		"updated_at":      p.UpdatedAt,
 	}
 }
 
@@ -90,6 +100,38 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, profileJSON(p))
+}
+
+type profileReq struct {
+	Nickname       string `json:"nickname"`
+	NicknamePublic bool   `json:"nickname_public"`
+}
+
+func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req profileReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	nickname := strings.TrimSpace(req.Nickname)
+	if message := Nickname(nickname); message != "" {
+		FieldError(w, map[string]string{"nickname": message})
+		return
+	}
+	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
+		ID:             p.ID,
+		Nickname:       &nickname,
+		NicknamePublic: req.NicknamePublic,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, profileJSON(updated))
 }
 
 func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
@@ -422,6 +464,19 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	}, recruitment, practice, true
 }
 
+func textPostHasContent(title, body string, imagePublicID *string) bool {
+	if strings.TrimSpace(title) != "" || strings.TrimSpace(body) != "" {
+		return true
+	}
+	return imagePublicID != nil && strings.TrimSpace(*imagePublicID) != ""
+}
+
+func writeEmptyTextPostError(w http.ResponseWriter) {
+	FieldError(w, map[string]string{
+		"body": "タイトル、本文、写真のいずれかを入力してください",
+	})
+}
+
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -437,6 +492,10 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if params.Kind == "practice" {
 		s.createPractice(w, r, p, params, practice)
+		return
+	}
+	if params.Kind == "text" && !textPostHasContent(params.Title, params.Body, params.CloudinaryPublicID) {
+		writeEmptyTextPostError(w)
 		return
 	}
 	params.ID = uuid.New()
@@ -480,24 +539,28 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	existing, err := s.q.GetPost(r.Context(), id)
-	if err == nil && existing.Kind == "recruitment" {
-		if existing.AuthorID != p.ID {
-			Error(w, http.StatusForbidden, "forbidden", "編集できません")
-			return
-		}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if existing.AuthorID != p.ID {
+		Error(w, http.StatusForbidden, "forbidden", "編集できません")
+		return
+	}
+	if existing.Kind == "recruitment" {
 		s.updateRecruitment(w, r, p, id)
 		return
 	}
-	if err == nil && existing.Kind == "practice" {
-		if existing.AuthorID != p.ID {
-			Error(w, http.StatusForbidden, "forbidden", "編集できません")
-			return
-		}
+	if existing.Kind == "practice" {
 		s.updatePractice(w, r, p, id)
 		return
 	}
 	params, _, _, ok := s.parsePostReq(w, r, "")
 	if !ok {
+		return
+	}
+	if existing.Kind == "text" && !textPostHasContent(params.Title, params.Body, existing.CloudinaryPublicID) {
+		writeEmptyTextPostError(w)
 		return
 	}
 	_, err = s.q.UpdatePost(r.Context(), db.UpdatePostParams{

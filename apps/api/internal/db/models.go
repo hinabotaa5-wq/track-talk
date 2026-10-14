@@ -132,10 +132,12 @@ type PracticeRating struct {
 }
 
 type Profile struct {
-	ID        uuid.UUID `json:"id"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             uuid.UUID `json:"id"`
+	IsAdmin        bool      `json:"is_admin"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Nickname       *string   `json:"nickname"`
+	NicknamePublic bool      `json:"nickname_public"`
 }
 
 type RecruitmentDetail struct {

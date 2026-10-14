@@ -38,6 +38,15 @@ func PostBody(v string) string {
 	return ""
 }
 
+func Nickname(v string) string {
+	v = strings.TrimSpace(v)
+	n := utf8.RuneCountInString(v)
+	if n < 1 || n > 30 {
+		return "1〜30文字で入力してください"
+	}
+	return ""
+}
+
 func Kind(v string) string {
 	switch v {
 	case "text", "youtube", "video", "recruitment", "practice":

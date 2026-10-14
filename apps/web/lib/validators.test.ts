@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { authErrorMessage } from "./auth-errors";
 import { cloudinaryErrorMessage } from "./cloudinary-upload";
-import { commentSchema, inquirySchema, loginSchema, postSchema, practiceSchema, recruitmentSchema } from "./validators";
+import {
+  commentSchema,
+  hasTextPostContent,
+  inquirySchema,
+  loginSchema,
+  nicknameSchema,
+  postSchema,
+  practiceSchema,
+  recruitmentSchema,
+} from "./validators";
 
 describe("validators", () => {
   it("accepts a valid post", () => {
@@ -10,6 +19,21 @@ describe("validators", () => {
       body: "展開が熱かった",
     });
     expect(parsed.title).toBe("100m決勝");
+  });
+
+  it("accepts optional text fields and requires title, body, or a photo", () => {
+    expect(postSchema.safeParse({ title: "タイトルだけ", body: "" }).success).toBe(true);
+    expect(postSchema.safeParse({ title: "", body: "本文だけ" }).success).toBe(true);
+    expect(postSchema.safeParse({ title: "", body: "" }).success).toBe(true);
+    expect(hasTextPostContent("タイトルだけ", "", false)).toBe(true);
+    expect(hasTextPostContent("", "本文だけ", false)).toBe(true);
+    expect(hasTextPostContent("", "", true)).toBe(true);
+    expect(hasTextPostContent("  ", "\n", false)).toBe(false);
+  });
+
+  it("keeps text post length limits", () => {
+    expect(postSchema.safeParse({ title: "あ".repeat(121), body: "" }).success).toBe(false);
+    expect(postSchema.safeParse({ title: "", body: "あ".repeat(10001) }).success).toBe(false);
   });
 
   it("accepts a club recruitment and rejects a missing prefecture", () => {
@@ -82,6 +106,12 @@ describe("validators", () => {
     if (!result.success) {
       expect(result.error.issues[0]?.message).toBe("パスワードを入力してください");
     }
+  });
+
+  it("validates nicknames and their visibility setting", () => {
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(31), nickname_public: true }).success).toBe(false);
   });
 
   it("translates auth and upload errors", () => {

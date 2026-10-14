@@ -17,6 +17,7 @@ type postDTO struct {
 	ID             uuid.UUID `json:"id"`
 	Title          string    `json:"title"`
 	Body           string    `json:"body,omitempty"`
+	AuthorName     *string   `json:"author_name,omitempty"`
 	authorID       uuid.UUID
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
@@ -143,7 +144,7 @@ func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO 
 }
 
 func postFromGet(row db.GetPostRow, liked bool) postDTO {
-	return postFromList(db.ListPostsNewRow{
+	p := postFromList(db.ListPostsNewRow{
 		ID:                  row.ID,
 		AuthorID:            row.AuthorID,
 		Title:               row.Title,
@@ -157,4 +158,6 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 	}, liked, false)
+	p.AuthorName = row.AuthorName
+	return p
 }

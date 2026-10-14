@@ -99,6 +99,28 @@ func tokenAt(t *testing.T, id uuid.UUID, authTime time.Time) string {
 	return s
 }
 
+func tokenWithProfile(t *testing.T, id uuid.UUID, nickname string, public bool) string {
+	t.Helper()
+	secret := os.Getenv("SUPABASE_JWT_SECRET")
+	if secret == "" {
+		secret = "test-jwt-secret-for-ci-only"
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": id.String(),
+		"aud": "authenticated",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"user_metadata": map[string]any{
+			"nickname":        nickname,
+			"nickname_public": public,
+		},
+	})
+	s, err := tok.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 func doJSON(t *testing.T, h http.Handler, method, path, tok string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
@@ -132,6 +154,65 @@ func TestUnauthorized(t *testing.T) {
 	rec = doJSON(t, h, http.MethodGet, "/v1/me", "not-a-jwt", nil)
 	if rec.Code != 401 {
 		t.Fatalf("status %d", rec.Code)
+	}
+}
+
+func TestProfileNicknameAndPostVisibility(t *testing.T) {
+	h := setup(t)
+	userID := uuid.New()
+	tok := tokenWithProfile(t, userID, "初期ネーム", true)
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/me", tok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("me %d %s", rec.Code, rec.Body.String())
+	}
+	var profile struct {
+		Nickname       string `json:"nickname"`
+		NicknamePublic bool   `json:"nickname_public"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &profile)
+	if profile.Nickname != "初期ネーム" || !profile.NicknamePublic {
+		t.Fatalf("profile %+v", profile)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]string{
+		"title": "公開名の投稿", "body": "本文",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
+	var post struct {
+		AuthorName *string `json:"author_name"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &post)
+	if rec.Code != http.StatusOK || post.AuthorName == nil || *post.AuthorName != "初期ネーム" {
+		t.Fatalf("public post %d %+v", rec.Code, post)
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "変更後", "nickname_public": false,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
+	post.AuthorName = nil
+	_ = json.Unmarshal(rec.Body.Bytes(), &post)
+	if rec.Code != http.StatusOK || post.AuthorName != nil {
+		t.Fatalf("private post %d %+v", rec.Code, post)
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "", "nickname_public": true,
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid nickname %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -208,9 +289,9 @@ func TestPostKindsShareOneList(t *testing.T) {
 	a := uuid.New()
 	ta := token(t, a)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "", "body": ""})
+		"title": "テキスト", "body": ""})
 	if rec.Code != 201 {
-		t.Fatalf("empty text %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("text %d %s", rec.Code, rec.Body.String())
 	}
 	var textPost struct {
 		Kind string `json:"kind"`
@@ -271,6 +352,47 @@ func TestPostKindsShareOneList(t *testing.T) {
 	}
 	if !seen["text"] || !seen["youtube"] || seen["video"] {
 		t.Fatalf("kinds %#v", seen)
+	}
+}
+
+func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+
+	for name, payload := range map[string]map[string]any{
+		"title only": {"title": "タイトルだけ", "body": ""},
+		"body only":  {"title": "", "body": "本文だけ"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, payload)
+			if rec.Code != 201 {
+				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": " \t", "body": "\n",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("empty text %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "編集前", "body": "",
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create for update %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
+		"title": "", "body": "",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("empty update %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -404,12 +526,13 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "スタート", "body": "写真つき", "image_public_id": signed.PublicID,
+		"title": "", "body": "", "image_public_id": signed.PublicID,
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
 	var created struct {
+		ID            string `json:"id"`
 		Kind          string `json:"kind"`
 		ThumbnailURL  string `json:"thumbnail_url"`
 		PlaybackURL   string `json:"playback_url"`
@@ -418,6 +541,13 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	if created.Kind != "text" || created.ImagePublicID != signed.PublicID || created.PlaybackURL != "" || !strings.Contains(created.ThumbnailURL, "/image/upload/") {
 		t.Fatalf("created %+v", created)
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
+		"title": "", "body": "",
+	})
+	if rec.Code != 200 {
+		t.Fatalf("update image-only post %d %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { postSchema } from "@/lib/validators";
+import { hasTextPostContent, postSchema } from "@/lib/validators";
 import type { z } from "zod";
 import { TitleField } from "./composer-page";
 import { Textarea } from "./ui/textarea";
@@ -41,6 +41,11 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   async function onSubmit(values: Values) {
     if (!session) {
       router.push("/login");
+      return;
+    }
+    const validatesTextContent = !initial || initial.kind === "text";
+    if (validatesTextContent && !hasTextPostContent(values.title, values.body, Boolean(photo || initial?.image_public_id))) {
+      setError("タイトル、本文、写真のいずれかを入力してください");
       return;
     }
     if (!acquire()) return;

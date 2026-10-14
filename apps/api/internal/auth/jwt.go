@@ -17,6 +17,12 @@ type Verifier struct {
 	jwks   keyfunc.Keyfunc
 }
 
+type Identity struct {
+	UserID         uuid.UUID
+	Nickname       string
+	NicknamePublic bool
+}
+
 func NewVerifier(secret, supabaseURL, aud string) (*Verifier, error) {
 	v := &Verifier{secret: []byte(secret), aud: aud}
 	if supabaseURL != "" {
@@ -36,16 +42,29 @@ func NewVerifier(secret, supabaseURL, aud string) (*Verifier, error) {
 }
 
 func (v *Verifier) Parse(tokenString string) (uuid.UUID, error) {
-	claims, err := v.parseClaims(tokenString)
+	identity, err := v.ParseIdentity(tokenString)
 	if err != nil {
 		return uuid.Nil, err
+	}
+	return identity.UserID, nil
+}
+
+func (v *Verifier) ParseIdentity(tokenString string) (Identity, error) {
+	claims, err := v.parseClaims(tokenString)
+	if err != nil {
+		return Identity{}, err
 	}
 	sub, _ := claims["sub"].(string)
 	id, err := uuid.Parse(sub)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid sub")
+		return Identity{}, fmt.Errorf("invalid sub")
 	}
-	return id, nil
+	identity := Identity{UserID: id}
+	if metadata, ok := claims["user_metadata"].(map[string]any); ok {
+		identity.Nickname, _ = metadata["nickname"].(string)
+		identity.NicknamePublic, _ = metadata["nickname_public"].(bool)
+	}
+	return identity, nil
 }
 
 // RecentLogin reports whether the token was issued by a sign-in within maxAge.
