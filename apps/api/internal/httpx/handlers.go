@@ -1021,10 +1021,13 @@ func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rows, err := s.q.ListReports(r.Context(), db.ListReportsParams{Limit: per, Offset: offset})
+	rows, err := s.q.ListAdminReports(r.Context(), db.ListAdminReportsParams{Limit: per, Offset: offset})
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if rows == nil {
+		rows = []db.ListAdminReportsRow{}
 	}
 	JSON(w, http.StatusOK, map[string]any{"reports": rows, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
@@ -1053,6 +1056,14 @@ type inquiryReq struct {
 	Category string `json:"category"`
 	Subject  string `json:"subject"`
 	Body     string `json:"body"`
+	Source   string `json:"source"`
+}
+
+func inquirySource(v string) string {
+	if v == "" {
+		return "contact"
+	}
+	return v
 }
 
 func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
@@ -1075,6 +1086,9 @@ func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
 	if e := Body(req.Body, 2000); e != "" {
 		fields["body"] = e
 	}
+	if e := InquirySource(inquirySource(req.Source)); e != "" {
+		fields["source"] = e
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -1085,6 +1099,7 @@ func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
 		Category: req.Category,
 		Subject:  strings.TrimSpace(req.Subject),
 		Body:     strings.TrimSpace(req.Body),
+		Source:   inquirySource(req.Source),
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -1114,7 +1129,7 @@ func (s *Server) listMyInquiries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rows == nil {
-		rows = []db.Inquiry{}
+		rows = []db.ListMyInquiriesRow{}
 	}
 	JSON(w, http.StatusOK, map[string]any{
 		"inquiries": rows,
@@ -1126,19 +1141,24 @@ func (s *Server) listInquiries(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
 	}
+	source := inquirySource(r.URL.Query().Get("source"))
+	if e := InquirySource(source); e != "" {
+		FieldError(w, map[string]string{"source": e})
+		return
+	}
 	page, per, offset := s.queryPage(r)
-	total, err := s.q.CountInquiries(r.Context())
+	total, err := s.q.CountAdminInquiries(r.Context(), source)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	rows, err := s.q.ListInquiries(r.Context(), db.ListInquiriesParams{Limit: per, Offset: offset})
+	rows, err := s.q.ListAdminInquiries(r.Context(), db.ListAdminInquiriesParams{Source: source, Limit: per, Offset: offset})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	if rows == nil {
-		rows = []db.Inquiry{}
+		rows = []db.ListAdminInquiriesRow{}
 	}
 	JSON(w, http.StatusOK, map[string]any{
 		"inquiries": rows,

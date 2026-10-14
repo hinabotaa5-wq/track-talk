@@ -125,6 +125,15 @@ func InquiryCategory(v string) string {
 	}
 }
 
+func InquirySource(v string) string {
+	switch v {
+	case "contact", "feedback":
+		return ""
+	default:
+		return "送信元が不正です"
+	}
+}
+
 func InquirySubject(v string) string {
 	v = strings.TrimSpace(v)
 	n := utf8.RuneCountInString(v)

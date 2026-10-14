@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -58,6 +59,81 @@ func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (Rep
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listAdminReports = `-- name: ListAdminReports :many
+SELECT
+    r.id,
+    r.target_type,
+    r.target_id,
+    r.reason,
+    r.detail,
+    r.status,
+    r.created_at,
+    rp.nickname AS reporter_nickname,
+    COALESCE(p.id, c.post_id, '00000000-0000-0000-0000-000000000000'::uuid)::uuid AS post_id,
+    COALESCE(p.title, ''::text)::text AS target_title,
+    COALESCE(p.body, c.body, ''::text)::text AS target_body,
+    (COALESCE(p.hidden_at, c.hidden_at) IS NOT NULL)::boolean AS target_hidden
+FROM reports r
+JOIN profiles rp ON rp.id = r.reporter_id
+LEFT JOIN posts p ON r.target_type = 'post' AND p.id = r.target_id
+LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
+ORDER BY r.created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListAdminReportsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListAdminReportsRow struct {
+	ID               uuid.UUID `json:"id"`
+	TargetType       string    `json:"target_type"`
+	TargetID         uuid.UUID `json:"target_id"`
+	Reason           string    `json:"reason"`
+	Detail           string    `json:"detail"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	ReporterNickname *string   `json:"reporter_nickname"`
+	PostID           uuid.UUID `json:"post_id"`
+	TargetTitle      string    `json:"target_title"`
+	TargetBody       string    `json:"target_body"`
+	TargetHidden     bool      `json:"target_hidden"`
+}
+
+func (q *Queries) ListAdminReports(ctx context.Context, arg ListAdminReportsParams) ([]ListAdminReportsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminReports, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminReportsRow
+	for rows.Next() {
+		var i ListAdminReportsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TargetType,
+			&i.TargetID,
+			&i.Reason,
+			&i.Detail,
+			&i.Status,
+			&i.CreatedAt,
+			&i.ReporterNickname,
+			&i.PostID,
+			&i.TargetTitle,
+			&i.TargetBody,
+			&i.TargetHidden,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listReports = `-- name: ListReports :many

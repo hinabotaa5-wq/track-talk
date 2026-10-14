@@ -46,6 +46,7 @@ export function FeedbackBox() {
         token,
         body: JSON.stringify({
           category: "other",
+          source: "feedback",
           subject: subjectFrom(body),
           body,
         }),
