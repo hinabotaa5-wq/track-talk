@@ -3,11 +3,12 @@
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import type { AdminInquiry, AdminReport, Meta } from "@/lib/types";
+import { productKindLabels } from "@/lib/product";
+import type { AdminInquiry, AdminReport, Meta, Product } from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const reasonLabels: Record<AdminReport["reason"], string> = {
   spam: "スパム",
@@ -25,7 +26,7 @@ const statusLabels: Record<AdminReport["status"], string> = {
 
 const perPage = 20;
 
-type Tab = "reports" | "feedback" | "contact";
+type Tab = "reports" | "feedback" | "contact" | "products";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   const [items, setItems] = useState<T[]>([]);
@@ -60,6 +61,112 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
   return { items, total, error, loading, more: items.length < total, loadMore: () => setPage((p) => p + 1) };
 }
 
+function ProductsAdmin({ token }: { token: string | null }) {
+  const [kind, setKind] = useState<"shoe" | "spike">("shoe");
+  const [brand, setBrand] = useState("");
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch<{ products: Product[] }>(`/v1/products?kind=${kind}&per_page=100`);
+      setProducts(d.products ?? []);
+    } catch {
+      setMessage("取得に失敗しました");
+    }
+  }, [kind]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setMessage("");
+    try {
+      await apiFetch("/v1/admin/products", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ kind, brand, name, image_url: imageUrl }),
+      });
+      setBrand("");
+      setName("");
+      setImageUrl("");
+      setMessage("登録しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "登録できませんでした");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function hide(id: string) {
+    if (!window.confirm("この商品を非表示にしますか？")) return;
+    try {
+      await apiFetch(`/v1/admin/products/${id}/hide`, { method: "POST", token });
+      await load();
+    } catch {
+      setMessage("非表示にできませんでした");
+    }
+  }
+
+  const input = "mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white";
+  return (
+    <div className="space-y-4">
+      <form onSubmit={add} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
+        <div className="flex gap-2">
+          {(["shoe", "spike"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              className={`rounded-full border px-4 py-1.5 text-sm ${kind === k ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"}`}
+            >
+              {productKindLabels[k]}
+            </button>
+          ))}
+        </div>
+        <label className="block text-sm">
+          ブランド
+          <input className={input} value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} required />
+        </label>
+        <label className="block text-sm">
+          商品名
+          <input className={input} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label className="block text-sm">
+          画像URL（https、任意）
+          <input className={input} value={imageUrl} maxLength={500} onChange={(e) => setImageUrl(e.target.value)} />
+        </label>
+        <button type="submit" disabled={pending} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          {pending ? "登録中..." : "商品を登録"}
+        </button>
+        {message ? <p className="text-sm text-slate-200">{message}</p> : null}
+      </form>
+      <ul className="space-y-2">
+        {products.map((p) => (
+          <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+            <span>
+              {p.brand} {p.name}
+              <span className="ml-2 text-xs text-slate-300">レビュー{p.review_count}件</span>
+            </span>
+            <button type="button" onClick={() => hide(p.id)} className="shrink-0 text-red-300 underline">
+              非表示
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { session, profile, token, loading } = useAuth();
   const router = useRouter();
@@ -80,11 +187,12 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact };
-  const list = lists[tab];
+  const list = tab === "products" ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
     { id: "feedback", label: "なんでも書いてね", total: feedback.total },
     { id: "contact", label: "お問い合わせ", total: contact.total },
+    { id: "products", label: "商品", total: -1 },
   ];
 
   return (
@@ -102,12 +210,13 @@ export default function AdminPage() {
               tab === t.id ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
             }`}
           >
-            {t.label} ({t.total})
+            {t.label}{t.total >= 0 ? ` (${t.total})` : ""}
           </button>
         ))}
       </div>
-      {list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
-      {tab === "reports" ? (
+      {tab === "products" ? <ProductsAdmin token={token} /> : null}
+      {tab === "products" ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
+      {tab === "products" ? null : tab === "reports" ? (
         <ul className="space-y-3">
           {reports.items.map((r) => (
             <li key={r.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
@@ -145,10 +254,10 @@ export default function AdminPage() {
           ))}
         </ul>
       )}
-      {!list.loading && list.items.length === 0 && !list.error ? (
+      {tab !== "products" && !list.loading && list.items.length === 0 && !list.error ? (
         <p className="text-sm text-slate-200">まだありません</p>
       ) : null}
-      {list.more ? (
+      {tab !== "products" && list.more ? (
         <button
           type="button"
           onClick={list.loadMore}

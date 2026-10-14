@@ -10,6 +10,7 @@ const chips: { sort: HomeSort; label: string }[] = [
   { sort: "popular", label: "人気" },
   { sort: "new", label: "新しい" },
   { sort: "recruitment", label: "募集" },
+  { sort: "review", label: "レビュー" },
   { sort: "saved", label: "保存" },
 ];
 
