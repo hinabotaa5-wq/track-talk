@@ -6,7 +6,6 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, sortInjuryGroups, type InjuryGroupSummary } from "@/lib/injury";
-import { injuryNotice } from "@/lib/injury";
 
 export function InjuryView() {
   const { session, token, loading } = useAuth();
@@ -32,7 +31,7 @@ export function InjuryView() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">ケガ人の溜まり場</h1>
+        <h1 className="text-2xl font-bold">ケガ</h1>
         <p className="mt-1 text-sm text-slate-200">痛めた部位のグループに入って、同じ仲間と一緒に乗り越えよう。</p>
       </div>
 
@@ -72,7 +71,6 @@ export function InjuryView() {
         </ul>
       )}
 
-      <p className="text-xs text-slate-300">{injuryNotice}</p>
     </div>
   );
 }

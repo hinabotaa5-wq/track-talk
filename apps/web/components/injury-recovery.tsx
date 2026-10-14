@@ -7,6 +7,7 @@ import { injuryStages, injuryUpdateMaxLength, isInjuryStage, type InjuryStage } 
 import type { InjuryUpdate } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import { LeaveGuardArea, useLeaveGuard } from "@/components/leave-guard";
 import { Textarea } from "@/components/ui/textarea";
 import { useActionLock } from "@/lib/use-action-lock";
 
@@ -27,6 +28,7 @@ export function InjuryRecovery({
 }) {
   const { token } = useAuth();
   const lock = useActionLock();
+  const { setDirty } = useLeaveGuard();
   const [stage, setStage] = useState<InjuryStage | "">("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
@@ -50,6 +52,7 @@ export function InjuryRecovery({
       setStage("");
       setBody("");
       setError("");
+      setDirty(false);
       await onChanged();
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "追加できませんでした");
@@ -76,6 +79,7 @@ export function InjuryRecovery({
         body: JSON.stringify({ stage: editStage, body: editBody }),
       });
       setEditingId(null);
+      setDirty(false);
       await onChanged();
     } catch (e) {
       setEditError(e instanceof ApiRequestError ? e.message : "保存できませんでした");
@@ -98,7 +102,7 @@ export function InjuryRecovery({
   }
 
   return (
-    <section className="space-y-3">
+    <LeaveGuardArea className="space-y-3">
       <h2 className="text-xl font-semibold text-slate-100">復帰までの経過</h2>
       {updates.length > 0 ? (
         <ol className="space-y-3 border-l border-emerald-800/60 pl-4">
@@ -156,7 +160,10 @@ export function InjuryRecovery({
                     <Button type="button" disabled={lock.pending} onClick={() => saveEdit(u.id)}>
                       保存
                     </Button>
-                    <Button type="button" variant="secondary" disabled={lock.pending} onClick={() => setEditingId(null)}>
+                    <Button type="button" variant="secondary" disabled={lock.pending} onClick={() => {
+                      setEditingId(null);
+                      setDirty(false);
+                    }}>
                       キャンセル
                     </Button>
                   </div>
@@ -199,6 +206,6 @@ export function InjuryRecovery({
           </Button>
         </div>
       ) : null}
-    </section>
+    </LeaveGuardArea>
   );
 }

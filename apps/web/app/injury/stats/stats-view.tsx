@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { apiFetch } from "@/lib/api";
-import { injuryNotice, injuryStageStatText, type InjuryStats } from "@/lib/injury";
+import { injuryStageStatText, type InjuryStats } from "@/lib/injury";
 
 export function InjuryStatsView() {
   const [stats, setStats] = useState<InjuryStats | null>(null);
@@ -24,7 +24,7 @@ export function InjuryStatsView() {
     <div className="space-y-4">
       <div>
         <Link href="/injury" className="text-sm text-slate-200 underline-offset-2 hover:underline">
-          ← ケガ人の溜まり場
+          ← ケガ
         </Link>
         <h1 className="mt-2 text-2xl font-bold">みんなの復帰データ</h1>
         <p className="mt-1 text-sm text-slate-200">
@@ -64,7 +64,6 @@ export function InjuryStatsView() {
         </ul>
       )}
 
-      <p className="text-xs text-slate-300">{injuryNotice}</p>
     </div>
   );
 }
