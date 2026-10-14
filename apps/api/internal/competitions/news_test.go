@@ -111,6 +111,16 @@ func TestGuidelinesFromArticleUsesYoukouLink(t *testing.T) {
 	}
 }
 
+func TestGuidelinesFromArticleUsesImageLinkWithYoukouPath(t *testing.T) {
+	link, ok := guidelinesFrom(t, `<p>開催します</p><a href="/taikaiyoukou/2026/18_DENSOCUP.pdf"><img src="/yoko.gif"></a><a href="/entry/manual.pdf"><img src="/m.gif"></a>`)
+	if !ok || link != "https://example.com/taikaiyoukou/2026/18_DENSOCUP.pdf" {
+		t.Fatalf("got %q %v", link, ok)
+	}
+	if link, ok := guidelinesFrom(t, `<a href="/entry/manual.pdf"><img src="/m.gif"></a>`); ok {
+		t.Fatalf("took %q", link)
+	}
+}
+
 func TestGuidelinesFromArticleUsesArticleWhenYoukouIsOnlyText(t *testing.T) {
 	link, ok := guidelinesFrom(t, `<p>要項は次のとおりです。種目 100m</p><a href="/files/entry.pdf">申込書</a>`)
 	if !ok || link != "https://example.com/news/10" {

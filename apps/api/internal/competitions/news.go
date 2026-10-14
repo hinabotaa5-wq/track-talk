@@ -375,6 +375,12 @@ func GuidelinesFromArticle(r io.Reader, articleURL string) (string, bool) {
 			return link.URL, true
 		}
 	}
+	// A button image has no link text, so the file's own path (taikaiyoukou, yoko…) is what says it is the guidelines.
+	for _, link := range links {
+		if link.Text == "" && pathHasGuidelines(link.URL) {
+			return link.URL, true
+		}
+	}
 	if strings.Contains(text.String(), "要項") {
 		return articleURL, true
 	}
