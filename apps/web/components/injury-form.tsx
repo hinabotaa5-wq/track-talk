@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { injuryBodyParts, injuryNotice, isInjuryBodyPart } from "@/lib/injury";
+import { injuryBodyPartLabel, injuryBodyParts, injuryGroupPath, injuryNotice, isInjuryBodyPart } from "@/lib/injury";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -15,10 +15,11 @@ import { useAuth } from "./auth-provider";
 const selectClass =
   "mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
-export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
+// groupPart を渡すと、その部位のグループへ、いまの段階として投稿する(部位は固定)。
+export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; returnTo?: "me"; groupPart?: string }) {
   const { token, session } = useAuth();
   const router = useRouter();
-  const [part, setPart] = useState(initial?.injury?.body_part ?? "");
+  const [part, setPart] = useState(groupPart ?? initial?.injury?.body_part ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
@@ -44,10 +45,10 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
       const payload = { kind: "injury", title: title.trim(), body: body.trim(), body_part: part };
       const post = initial
         ? await apiFetch<Post>(`/v1/posts/${initial.id}`, { method: "PATCH", token, body: JSON.stringify(payload) })
-        : await apiFetch<Post>("/v1/posts", { method: "POST", token, body: JSON.stringify(payload) });
+        : await apiFetch<Post>(groupPart ? `/v1/injury/groups/${groupPart}/posts` : "/v1/posts", { method: "POST", token, body: JSON.stringify(payload) });
       clearHomeFeeds();
       router.push(
-        initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/injury",
+        initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : groupPart ? injuryGroupPath(groupPart) : "/injury",
       );
     } catch (e) {
       if (e instanceof ApiRequestError) {
@@ -62,17 +63,21 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <label className="block text-sm font-medium">
-        部位
-        <select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
-          <option value="">選んでください</option>
-          {injuryBodyParts.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {groupPart ? (
+        <p className="text-sm font-medium">部位: {injuryBodyPartLabel(groupPart)}</p>
+      ) : (
+        <label className="block text-sm font-medium">
+          部位
+          <select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
+            <option value="">選んでください</option>
+            {injuryBodyParts.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block text-sm font-medium">
         タイトル(任意)
         <Input

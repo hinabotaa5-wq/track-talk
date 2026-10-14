@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryFeedPath, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryFeedPath, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("builds the feed path with only valid filters", () => {
@@ -116,5 +116,32 @@ describe("injury group join", () => {
       { body_part: "calf", body_part_label: "ふくらはぎ", members: 9 },
     ]);
     expect(sorted.map((item) => item.body_part)).toEqual(["knee", "calf", "foot", "ankle"]);
+  });
+});
+
+describe("injury group roadmap", () => {
+  it("lets a member post only in their own stage", () => {
+    expect(canPostInStage("jogging", "jogging")).toBe(true);
+    expect(canPostInStage("rehab", "jogging")).toBe(false);
+  });
+
+  it("celebrates only the first arrival at the goal", () => {
+    expect(shouldCelebrate("race", false)).toBe(true);
+    expect(shouldCelebrate("race", true)).toBe(false);
+    expect(shouldCelebrate("practice", false)).toBe(false);
+    expect(injuryCelebrationKey("knee")).toBe("injury-celebrated:knee");
+  });
+
+  it("gives the same name the same face", () => {
+    expect(injuryFaceHue("はると")).toBe(injuryFaceHue("はると"));
+    expect(injuryFaceHue("はると")).toBeGreaterThanOrEqual(0);
+    expect(injuryFaceHue("はると")).toBeLessThan(360);
+    expect(injuryFaceInitial(" ハルト")).toBe("ハ");
+    expect(injuryFaceInitial("")).toBe("?");
+  });
+
+  it("counts the members the faces leave out", () => {
+    expect(injuryFaceOverflow(23, 5)).toBe(18);
+    expect(injuryFaceOverflow(3, 5)).toBe(0);
   });
 });
