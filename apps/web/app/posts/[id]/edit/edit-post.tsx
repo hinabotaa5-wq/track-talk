@@ -3,6 +3,7 @@
 import { PostForm } from "@/components/post-form";
 import { PracticeForm } from "@/components/practice-form";
 import { RecruitmentForm } from "@/components/recruitment-form";
+import { LeaveGuardArea } from "@/components/leave-guard";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import type { Post } from "@/lib/types";
@@ -33,7 +34,7 @@ export function EditPost({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const heading = practice ? "練習相手募集を編集" : recruitment ? "募集を編集" : "投稿を編集";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <LeaveGuardArea className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">{heading}</h1>
       {practice ? (
         <PracticeForm initial={post} returnTo={returnTo} />
@@ -42,6 +43,6 @@ export function EditPost({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ) : (
         <PostForm initial={post} returnTo={returnTo} />
       )}
-    </div>
+    </LeaveGuardArea>
   );
 }
