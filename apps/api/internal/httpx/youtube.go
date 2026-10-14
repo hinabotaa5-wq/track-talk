@@ -21,6 +21,7 @@ var youtubeClient = &http.Client{Timeout: 8 * time.Second}
 type citeYouTubeReq struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
+	Body  string `json:"body"`
 }
 
 type citeYouTubeResp struct {
@@ -134,6 +135,9 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	if e := Title(customTitle); e != "" {
 		fields["title"] = e
 	}
+	if e := PostBody(req.Body); e != "" {
+		fields["body"] = e
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -153,7 +157,7 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 		ID:                  uuid.New(),
 		AuthorID:            profile.ID,
 		Title:               title,
-		Body:                "",
+		Body:                strings.TrimSpace(req.Body),
 		Kind:                "youtube",
 		YoutubeVideoID:      &videoID,
 		YoutubeThumbnailUrl: &thumb,

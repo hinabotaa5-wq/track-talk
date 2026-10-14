@@ -45,7 +45,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
     }
     const validatesTextContent = !initial || initial.kind === "text";
     if (validatesTextContent && !hasTextPostContent(values.title, values.body, Boolean(photo || initial?.image_public_id))) {
-      setError("タイトル、本文、写真のいずれかを入力してください");
+      setError("タイトル、詳細、写真のいずれかを入力してください");
       return;
     }
     if (!acquire()) return;
@@ -115,13 +115,6 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       {form.formState.errors.title ? (
         <p className="text-sm text-red-400">{form.formState.errors.title.message}</p>
       ) : null}
-      <label className="block text-sm font-medium">
-        本文
-        <Textarea rows={10} className="mt-1" {...form.register("body")} />
-      </label>
-      {form.formState.errors.body ? (
-        <p className="text-sm text-red-400">{form.formState.errors.body.message}</p>
-      ) : null}
       {!initial ? (
         <label className="block text-sm font-medium">
           写真
@@ -135,6 +128,13 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         </label>
       ) : initial.thumbnail_url ? (
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
+      ) : null}
+      <label className="block text-sm font-medium">
+        詳細
+        <Textarea rows={3} className="mt-1" {...form.register("body")} />
+      </label>
+      {form.formState.errors.body ? (
+        <p className="text-sm text-red-400">{form.formState.errors.body.message}</p>
       ) : null}
       {upload ? (
         <UploadProgress noun="写真" phase={uploadPhase} progress={upload} fileName={photo?.name} fileSize={photo?.size} />

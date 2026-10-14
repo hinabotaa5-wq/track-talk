@@ -12,6 +12,10 @@ export function hasTextPostContent(title: string, body: string, hasPhoto: boolea
   return title.trim() !== "" || body.trim() !== "" || hasPhoto;
 }
 
+export function isYouTubeUrl(value: string) {
+  return /^https?:\/\/(www\.youtube\.com\/watch\?v=|youtu\.be\/)[^\s]+$/i.test(value.trim());
+}
+
 function httpsUrl(value: string) {
   try {
     const url = new URL(value);

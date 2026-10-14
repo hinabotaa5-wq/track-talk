@@ -7,6 +7,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { ComposerPage, TitleField } from "@/components/composer-page";
 import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import type { Post } from "@/lib/types";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
@@ -18,6 +19,7 @@ export default function OwnVideoPage() {
   const { session, token } = useAuth();
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -60,7 +62,7 @@ export default function OwnVideoPage() {
         token,
         body: JSON.stringify({
           title,
-          body: "",
+          body,
           kind: "video",
           video_public_id: payload.public_id,
         }),
@@ -95,12 +97,16 @@ export default function OwnVideoPage() {
             required
           />
         </label>
+        <label className="block text-sm font-medium">
+          詳細
+          <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
+        </label>
         {upload ? (
           <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
         ) : null}
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button type="submit" className="w-full" disabled={submitting || !file}>
           {submitting ? "送っています" : "アップロードして投稿"}
         </Button>
       </form>

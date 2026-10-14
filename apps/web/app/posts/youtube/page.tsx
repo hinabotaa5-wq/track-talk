@@ -7,6 +7,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { ComposerPage, TitleField } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { isYouTubeUrl } from "@/lib/validators";
 import type { Post } from "@/lib/types";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -16,6 +18,7 @@ export default function YouTubePostPage() {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const { pending: submitting, acquire, release } = useActionLock();
 
@@ -25,13 +28,17 @@ export default function YouTubePostPage() {
       router.push("/login");
       return;
     }
+    if (!isYouTubeUrl(url)) {
+      setError("YouTubeのURLを貼ってください");
+      return;
+    }
     if (!acquire()) return;
     setError("");
     try {
       const data = await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
         method: "POST",
         token,
-        body: JSON.stringify({ url, title }),
+        body: JSON.stringify({ url: url.trim(), title, body }),
       });
       clearHomeFeeds();
       router.push("/");
@@ -59,11 +66,17 @@ export default function YouTubePostPage() {
             placeholder="https://www.youtube.com/watch?v="
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            required
           />
         </label>
+        {url.trim() !== "" && !isYouTubeUrl(url) ? (
+          <p className="text-sm text-red-400">YouTubeのURLを貼ってください</p>
+        ) : null}
+        <label className="block text-sm font-medium">
+          詳細
+          <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
+        </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button type="submit" className="w-full" disabled={submitting || !isYouTubeUrl(url)}>
           {submitting ? "開いています" : "この動画のスレッドを開く"}
         </Button>
       </form>

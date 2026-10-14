@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const doors = [
-  { href: "/posts/new", title: "文章", body: "タイトル・本文・写真のいずれかでスレッドを立てます。" },
+  { href: "/posts/new", title: "文章", body: "タイトル・詳細・写真のいずれかでスレッドを立てます。" },
   { href: "/posts/youtube", title: "YouTubeのURL", body: "動画を引用して、そのスレッドに集まります。" },
   { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。" },
   { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。" },
