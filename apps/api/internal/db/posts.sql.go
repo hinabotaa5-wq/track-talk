@@ -600,56 +600,57 @@ SELECT
 FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND p.created_at >= now() - interval '14 days'
-  AND ($1::uuid IS NULL OR p.author_id = $1)
+  AND ($1::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
+  AND ($2::uuid IS NULL OR p.author_id = $2)
   AND (
-    $2::text IS NULL
+    $3::text IS NULL
     OR (
-      $2 = 'recruitment'
+      $3 = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
     )
     OR (
-      $2 <> 'recruitment'
-      AND p.kind = $2
+      $3 <> 'recruitment'
+      AND p.kind = $3
     )
   )
   AND (
-    $3::text IS NULL
-    OR p.title ILIKE '%' || $3 || '%' ESCAPE '\'
-    OR p.body ILIKE '%' || $3 || '%' ESCAPE '\'
+    $4::text IS NULL
+    OR p.title ILIKE '%' || $4 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $4 || '%' ESCAPE '\'
     OR EXISTS (
       SELECT 1 FROM recruitment_details d
       WHERE d.post_id = p.id
         AND (
-          d.venue ILIKE '%' || $3 || '%' ESCAPE '\'
-          OR d.schedule ILIKE '%' || $3 || '%' ESCAPE '\'
-          OR d.gender_ratio ILIKE '%' || $3 || '%' ESCAPE '\'
-          OR d.average_age ILIKE '%' || $3 || '%' ESCAPE '\'
-          OR d.recruit_age ILIKE '%' || $3 || '%' ESCAPE '\'
+          d.venue ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $4 || '%' ESCAPE '\'
         )
     )
     OR EXISTS (
       SELECT 1 FROM practice_details pd
       WHERE pd.post_id = p.id
         AND (
-          pd.venue ILIKE '%' || $3 || '%' ESCAPE '\'
-          OR pd.event_other ILIKE '%' || $3 || '%' ESCAPE '\'
+          pd.venue ILIKE '%' || $4 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $4 || '%' ESCAPE '\'
         )
     )
     OR (
-      cardinality($4::text[]) > 0
+      cardinality($5::text[]) > 0
       AND EXISTS (
         SELECT 1 FROM recruitment_prefectures rp
         WHERE rp.post_id = p.id
-          AND rp.prefecture = ANY($4::text[])
+          AND rp.prefecture = ANY($5::text[])
       )
     )
   )
 ORDER BY p.like_count DESC, p.created_at DESC
-LIMIT $6 OFFSET $5
+LIMIT $7 OFFSET $6
 `
 
 type ListPostsPopularParams struct {
+	PopularWindow   *bool      `json:"popular_window"`
 	AuthorID        *uuid.UUID `json:"author_id"`
 	Kind            *string    `json:"kind"`
 	Keyword         *string    `json:"keyword"`
@@ -675,6 +676,7 @@ type ListPostsPopularRow struct {
 
 func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularParams) ([]ListPostsPopularRow, error) {
 	rows, err := q.db.Query(ctx, listPostsPopular,
+		arg.PopularWindow,
 		arg.AuthorID,
 		arg.Kind,
 		arg.Keyword,

@@ -68,7 +68,7 @@ export default function ProfilePage() {
         ) : null}
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
-          ニックネームを公開する
+          投稿にニックネームを公開する
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}

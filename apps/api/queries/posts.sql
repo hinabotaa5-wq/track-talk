@@ -79,7 +79,7 @@ SELECT
 FROM posts p
 WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
-  AND p.created_at >= now() - interval '14 days'
+  AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
     sqlc.narg('kind')::text IS NULL

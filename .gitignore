@@ -21,3 +21,6 @@ apps/api/tmp/
 
 # Local Netlify folder
 .netlify
+
+# Claude Code personal instructions
+CLAUDE.local.md
