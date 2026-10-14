@@ -61,6 +61,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts/{id}/comments", s.listComments)
 		r.Get("/injury/stats", s.injuryStats)
 		r.Get("/injury/groups", s.listInjuryGroups)
+		r.Get("/products", s.listProducts)
+		r.Get("/products/{id}", s.getProduct)
+		r.Get("/products/{id}/reviews", s.listProductReviews)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
@@ -105,6 +108,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts/{id}/practice/dissolve", s.dissolvePractice)
 			r.Patch("/comments/{id}", s.updateComment)
 			r.Delete("/comments/{id}", s.deleteComment)
+			r.Post("/products/{id}/reviews", s.createProductReview)
+			r.Delete("/product-reviews/{id}", s.deleteProductReview)
 			r.Post("/reports", s.createReport)
 			r.Get("/posts/{id}/my-reports", s.myReports)
 			r.Get("/admin/reports", s.listReports)
@@ -115,6 +120,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Delete("/admin/injury-archives/{id}", s.deleteInjuryArchive)
 			r.Post("/admin/posts/{id}/hide", s.hidePost)
 			r.Post("/admin/comments/{id}/hide", s.hideComment)
+			r.Post("/admin/products", s.createProduct)
+			r.Post("/admin/products/{id}/hide", s.hideProduct)
+			r.Post("/admin/product-reviews/{id}/hide", s.hideProductReview)
 		})
 	})
 	return r
