@@ -86,13 +86,12 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 			t.Fatalf("injury post leaked into the home feed")
 		}
 	}
-	all := listInjury(t, h, "/v1/posts?kind=injury&sort=new", "")
-	if all.Meta.Total != 2 || len(all.Posts) != 2 || all.Posts[0].Injury == nil {
-		t.Fatalf("injury feed %+v", all)
+	if r := doJSON(t, h, http.MethodGet, "/v1/posts?kind=injury&sort=new", "", nil); r.Code != http.StatusForbidden {
+		t.Fatalf("public injury feed should be closed: %d", r.Code)
 	}
-	knee := listInjury(t, h, "/v1/posts?kind=injury&part=knee", "")
-	if knee.Meta.Total != 1 {
-		t.Fatalf("part filter %+v", knee)
+	knee := listInjury(t, h, "/v1/injury/groups/knee/posts", tok)
+	if knee.Meta.Total != 1 || len(knee.Posts) != 1 || knee.Posts[0].Injury == nil {
+		t.Fatalf("group feed %+v", knee)
 	}
 	mine := listInjury(t, h, "/v1/me/posts", tok)
 	if mine.Meta.Total != 2 {
@@ -105,7 +104,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if patch.Code != http.StatusOK {
 		t.Fatalf("patch %d %s", patch.Code, patch.Body.String())
 	}
-	got := doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
+	got := doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, tok, nil)
 	var detail struct {
 		Body   string `json:"body"`
 		Injury struct {
@@ -183,7 +182,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 		}
 	}
 
-	got := doJSON(t, h, http.MethodGet, "/v1/posts/"+post.ID, "", nil)
+	got := doJSON(t, h, http.MethodGet, "/v1/posts/"+post.ID, tok, nil)
 	var detail struct {
 		Injury struct {
 			Stage      string `json:"stage"`
@@ -201,7 +200,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 		t.Fatalf("detail %+v", detail)
 	}
 
-	feed := doJSON(t, h, http.MethodGet, "/v1/posts?kind=injury", "", nil)
+	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/shin/posts", tok, nil)
 	var list struct {
 		Posts []struct {
 			Injury struct {
@@ -223,7 +222,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 	if r := doJSON(t, h, http.MethodDelete, path+"/"+firstID, tok, nil); r.Code != http.StatusNoContent {
 		t.Fatalf("delete status %d %s", r.Code, r.Body.String())
 	}
-	got = doJSON(t, h, http.MethodGet, "/v1/posts/"+post.ID, "", nil)
+	got = doJSON(t, h, http.MethodGet, "/v1/posts/"+post.ID, tok, nil)
 	detail.Injury.Updates = nil
 	if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
@@ -268,20 +267,20 @@ func TestInjuryFeedFilterByLatestStage(t *testing.T) {
 	report(resting, "resting")
 	create("経過なし")
 
-	base := "/v1/posts?kind=injury&sort=new&per_page=20"
-	if got := listInjury(t, h, base, "").Meta.Total; got != 3 {
+	base := "/v1/injury/groups/knee/posts?per_page=20"
+	if got := listInjury(t, h, base, tok).Meta.Total; got != 3 {
 		t.Fatalf("no filter total %d", got)
 	}
-	race := listInjury(t, h, base+"&stage=race", "")
+	race := listInjury(t, h, base+"&stage=race", tok)
 	if race.Meta.Total != 1 || len(race.Posts) != 1 || race.Posts[0].ID != back {
 		t.Fatalf("stage=race %+v", race)
 	}
 	// 途中の段階(rehab)は最新ではないので一致しない。
-	if got := listInjury(t, h, base+"&stage=rehab", "").Meta.Total; got != 0 {
+	if got := listInjury(t, h, base+"&stage=rehab", tok).Meta.Total; got != 0 {
 		t.Fatalf("stage=rehab total %d", got)
 	}
 	// 不正な値は無視されて絞り込まれない。
-	if got := listInjury(t, h, base+"&stage=flying", "").Meta.Total; got != 3 {
+	if got := listInjury(t, h, base+"&stage=flying", tok).Meta.Total; got != 3 {
 		t.Fatalf("invalid stage total %d", got)
 	}
 }
@@ -444,6 +443,9 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
 		t.Fatal(err)
 	}
+	// 読めるのはグループの参加者だけ。
+	joinGroup(t, h, liker, "hip")
+	joinGroup(t, h, saver, "hip")
 	// 投稿者本人の「わかる」は対象外。
 	for _, tok := range []string{liker, author} {
 		if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/likes", tok, nil); r.Code >= 300 {
@@ -532,6 +534,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
 		t.Fatal(err)
 	}
+	joinGroup(t, h, follower, "upper-body")
 	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/saves", follower, nil); r.Code >= 300 {
 		t.Fatalf("save %d", r.Code)
 	}
@@ -588,7 +591,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	}
 
 	// フィードの最新の段階にも反映される。
-	feed := doJSON(t, h, http.MethodGet, "/v1/posts?kind=injury&sort=new&stage=jogging", "", nil)
+	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/upper-body/posts?stage=jogging", author, nil)
 	if feed.Code != http.StatusOK || !strings.Contains(feed.Body.String(), post.ID) {
 		t.Fatalf("edited stage should appear in the stage filter: %d %s", feed.Code, feed.Body.String())
 	}
@@ -623,5 +626,58 @@ func TestInjuryPostIsOnlyWrittenThroughAGroup(t *testing.T) {
 	})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("injury post outside a group %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func joinGroup(t *testing.T, h http.Handler, tok, part string) {
+	t.Helper()
+	if r := doJSON(t, h, http.MethodPost, "/v1/injury/groups/"+part+"/join", tok, joinBody("resting")); r.Code != http.StatusOK {
+		t.Fatalf("join %s %d %s", part, r.Code, r.Body.String())
+	}
+}
+
+func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
+	h := setup(t)
+	author := token(t, uuid.New())
+	member := token(t, uuid.New())
+	otherPart := token(t, uuid.New())
+	outsider := token(t, uuid.New())
+
+	rec := postInjury(t, h, author, map[string]any{"kind": "injury", "body": "膝がつらい", "body_part": "knee"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var post struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+		t.Fatal(err)
+	}
+	joinGroup(t, h, member, "knee")
+	joinGroup(t, h, otherPart, "ankle")
+
+	for _, c := range []struct {
+		name, tok string
+		want      int
+	}{
+		{"author", author, http.StatusOK},
+		{"same group", member, http.StatusOK},
+		{"other group", otherPart, http.StatusForbidden},
+		{"not in any group", outsider, http.StatusForbidden},
+		{"logged out", "", http.StatusUnauthorized},
+	} {
+		for _, path := range []string{"/v1/posts/" + post.ID, "/v1/posts/" + post.ID + "/comments"} {
+			if got := doJSON(t, h, http.MethodGet, path, c.tok, nil).Code; got != c.want {
+				t.Fatalf("%s GET %s: %d want %d", c.name, path, got, c.want)
+			}
+		}
+	}
+	for _, path := range []string{"/likes", "/saves", "/comments"} {
+		if got := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+path, outsider, map[string]any{"body": "x"}).Code; got != http.StatusForbidden {
+			t.Fatalf("outsider POST %s: %d", path, got)
+		}
+		if got := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+path, member, map[string]any{"body": "わかる"}).Code; got >= 300 {
+			t.Fatalf("member POST %s: %d", path, got)
+		}
 	}
 }

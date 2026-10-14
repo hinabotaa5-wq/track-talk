@@ -58,7 +58,10 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       setError("");
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
-      else setError("読み込みに失敗しました");
+      else if (e instanceof ApiRequestError && (e.status === 401 || e.code === "not_joined")) {
+        // ケガの投稿は、同じ部位のグループに参加した人だけが読める。
+        setError("この投稿は、同じ部位のグループに参加すると読めます");
+      } else setError("読み込みに失敗しました");
     } finally {
       setLoading(false);
     }

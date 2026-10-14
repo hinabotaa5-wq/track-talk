@@ -148,7 +148,11 @@ func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	var kind *string
-	if value := strings.TrimSpace(r.URL.Query().Get("kind")); value == "recruitment" || value == "injury" {
+	if value := strings.TrimSpace(r.URL.Query().Get("kind")); value == "injury" {
+		// ケガの投稿は、部位のグループ(GET /v1/injury/groups/{part}/posts)から、参加した人だけが読める。
+		Error(w, http.StatusForbidden, "not_joined", "ケガの投稿は、部位のグループから読めます")
+		return
+	} else if value == "recruitment" {
 		kind = &value
 	}
 	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil, kind)
@@ -305,9 +309,8 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	row, err := s.q.GetPost(r.Context(), id)
-	if err != nil {
-		MapDBError(w, err)
+	row, ok := s.getReadablePost(w, r, id)
+	if !ok {
 		return
 	}
 	liked := false
@@ -323,7 +326,7 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	item := withMine(r, s.present(postFromGet(row, liked)))
-	item, err = s.attachRecruitment(r.Context(), item)
+	item, err := s.attachRecruitment(r.Context(), item)
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -739,8 +742,7 @@ func (s *Server) savePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.q.GetPost(r.Context(), id); err != nil {
-		MapDBError(w, err)
+	if _, ok := s.getReadablePost(w, r, id); !ok {
 		return
 	}
 	if _, err := s.q.InsertSave(r.Context(), db.InsertSaveParams{PostID: id, UserID: p.ID}); err != nil {
@@ -775,8 +777,7 @@ func (s *Server) likePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.q.GetPost(r.Context(), id); err != nil {
-		MapDBError(w, err)
+	if _, ok := s.getReadablePost(w, r, id); !ok {
 		return
 	}
 	tx, err := s.pool.Begin(r.Context())
@@ -855,8 +856,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.q.GetPost(r.Context(), id); err != nil {
-		MapDBError(w, err)
+	if _, ok := s.getReadablePost(w, r, id); !ok {
 		return
 	}
 	page, per, offset := s.queryPage(r)
@@ -890,9 +890,8 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	post, err := s.q.GetPost(r.Context(), postID)
-	if err != nil {
-		MapDBError(w, err)
+	post, ok := s.getReadablePost(w, r, postID)
+	if !ok {
 		return
 	}
 	allowed, err := s.practiceCommentAllowed(r.Context(), post, p.ID)
