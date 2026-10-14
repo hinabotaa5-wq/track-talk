@@ -112,7 +112,7 @@ func incareRow(tr *html.Node, fiscalYear int, pageURL string) (DomesticMajor, st
 	}
 	return DomesticMajor{
 		Year:          year,
-		Name:          leadingYearPattern.ReplaceAllString(cleanText(nodeText(cells[3])), ""),
+		Name:          leadingYearPattern.ReplaceAllString(baseMeetName(nodeText(cells[3])), ""),
 		Category:      DomesticStudent,
 		StartsOn:      start,
 		EndsOn:        end,

@@ -120,7 +120,7 @@ func ParseJAAFDetail(r io.Reader, detailURL string) (DomesticMajor, error) {
 	}
 	major := DomesticMajor{SiteURL: detailURL}
 	if h := findElement(doc, func(n *html.Node) bool { return n.Data == "h3" && hasClass(n, "middle") }); h != nil {
-		major.Name = cleanText(nodeText(h))
+		major.Name = baseMeetName(nodeText(h))
 	}
 	if major.Name == "" {
 		return DomesticMajor{}, fmt.Errorf("%s: 大会名がありません", detailURL)
@@ -163,6 +163,13 @@ func ParseJAAFDetail(r io.Reader, detailURL string) (DomesticMajor, error) {
 		}
 	}
 	return major, nil
+}
+
+var alsoPattern = regexp.MustCompile(`\s*兼\s.*$`)
+
+// baseMeetName drops the "兼 …" tail that JAAF adds when a meet doubles as a team-selection meet.
+func baseMeetName(raw string) string {
+	return alsoPattern.ReplaceAllString(cleanText(raw), "")
 }
 
 // MatchDomesticMeet returns the card a JAAF list title belongs to.

@@ -184,3 +184,16 @@ func TestParseRegionalIncareOtherCases(t *testing.T) {
 		t.Fatalf("code of no federation: %+v", major)
 	}
 }
+
+func TestBaseMeetName(t *testing.T) {
+	cases := map[string]string{
+		"第111回日本陸上競技選手権大会 兼 北京2027世界陸上競技選手権大会 日本代表選手選考競技会": "第111回日本陸上競技選手権大会",
+		"第110回日本陸上競技選手権大会 兼 愛知・名古屋2026アジア競技大会 日本代表選手選考競技会": "第110回日本陸上競技選手権大会",
+		"第53回全日本中学校陸上競技選手権大会":                              "第53回全日本中学校陸上競技選手権大会",
+	}
+	for raw, want := range cases {
+		if got := baseMeetName(raw); got != want {
+			t.Errorf("%q: got %q, want %q", raw, got, want)
+		}
+	}
+}
