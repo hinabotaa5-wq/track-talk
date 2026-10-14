@@ -85,7 +85,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         {post.thumbnail_url ? (
           <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
         ) : (
-          <PosterFallback id={post.id} title={title} />
+          <PosterFallback title={title} />
         )}
       </div>
       <CardTitle title={title} />
