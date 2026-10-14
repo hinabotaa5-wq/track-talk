@@ -762,7 +762,7 @@ func TestInquiryStaysWithTheSender(t *testing.T) {
 		t.Fatalf("admin %d %s", rec.Code, rec.Body.String())
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].UserID != a.String() {
+	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].Subject != "ログインできない" {
 		t.Fatalf("admin list %+v", list)
 	}
 }
