@@ -78,3 +78,13 @@ select:-webkit-autofill {
     display: none;
   }
 }
+
+/* コメント入力中は下部タブを隠し、入力欄を画面下に寄せる(モバイル幅のみ) */
+@media (max-width: 767px) {
+  body[data-comment-typing] [data-bottom-nav] {
+    display: none !important;
+  }
+  body[data-comment-typing] [data-comment-form] {
+    bottom: 0 !important;
+  }
+}

@@ -86,9 +86,10 @@ export function BottomNav() {
 
   return (
     <>
-      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden [body[data-comment-typing]_&]:hidden" aria-hidden />
+      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden" data-bottom-nav aria-hidden />
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden [body[data-comment-typing]_&]:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden"
+        data-bottom-nav
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="メイン"
       >
