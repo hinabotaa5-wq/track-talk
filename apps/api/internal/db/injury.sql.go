@@ -283,6 +283,17 @@ func (q *Queries) InjuryStageStats(ctx context.Context) ([]InjuryStageStatsRow, 
 	return items, nil
 }
 
+const isProfileAdmin = `-- name: IsProfileAdmin :one
+SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean AS is_admin
+`
+
+func (q *Queries) IsProfileAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isProfileAdmin, id)
+	var is_admin bool
+	err := row.Scan(&is_admin)
+	return is_admin, err
+}
+
 const listInjuryDetails = `-- name: ListInjuryDetails :many
 SELECT post_id, body_part, group_stage
 FROM injury_details

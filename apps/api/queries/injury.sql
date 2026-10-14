@@ -172,3 +172,6 @@ FROM (
 ) t
 WHERE rn <= sqlc.arg('limit_n')::int
 ORDER BY stage, rn;
+
+-- name: IsProfileAdmin :one
+SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean AS is_admin;

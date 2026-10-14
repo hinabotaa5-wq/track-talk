@@ -409,3 +409,47 @@ func (s *Server) updateInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	JSON(w, http.StatusOK, injuryUpdateFromRow(row))
 }
+
+// getReadablePost loads a post for a request that reads or reacts to it. An injury post is readable
+// only by its author, by members of the group for its body part, and by admins; anyone else is turned away.
+func (s *Server) getReadablePost(w http.ResponseWriter, r *http.Request, id uuid.UUID) (db.GetPostRow, bool) {
+	post, err := s.q.GetPost(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return db.GetPostRow{}, false
+	}
+	if post.Kind != "injury" {
+		return post, true
+	}
+	uid, ok := UserID(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized", "ログインすると読めます")
+		return db.GetPostRow{}, false
+	}
+	if uid == post.AuthorID {
+		return post, true
+	}
+	admin, err := s.q.IsProfileAdmin(r.Context(), uid)
+	if err != nil {
+		MapDBError(w, err)
+		return db.GetPostRow{}, false
+	}
+	if admin {
+		return post, true
+	}
+	detail, err := s.q.GetInjuryDetail(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return db.GetPostRow{}, false
+	}
+	_, err = s.q.GetInjuryGroupMember(r.Context(), db.GetInjuryGroupMemberParams{UserID: uid, BodyPart: detail.BodyPart})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusForbidden, "not_joined", "グループに参加すると読めます")
+		return db.GetPostRow{}, false
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return db.GetPostRow{}, false
+	}
+	return post, true
+}
