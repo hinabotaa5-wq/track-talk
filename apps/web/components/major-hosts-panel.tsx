@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import { useLeaveGuard } from "@/components/leave-guard";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { cityPhotoSrc, preloadCityPhotos } from "@/lib/city-photo";
 import { loadMajorHosts, peekMajorHosts } from "@/lib/major-hosts";
@@ -10,7 +13,6 @@ import type { MajorHost } from "@/lib/types";
 
 export function MajorHostsPanel() {
   const { token } = useAuth();
-  const [open, setOpen] = useState(false);
   const [hosts, setHosts] = useState<MajorHost[] | null>(peekMajorHosts);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(() => peekMajorHosts() === null);
@@ -37,19 +39,29 @@ export function MajorHostsPanel() {
   }, [token]);
 
   return (
-    <div className="space-y-3">
-      <Button
-        type="button"
-        variant="secondary"
-        className="h-11 w-full md:w-fit"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        今後の世界陸上・オリンピック
-      </Button>
-      {open && loading ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
-      {open && !loading ? <MajorHostList hosts={hosts ?? []} error={error} /> : null}
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-slate-100">今後の世界陸上・オリンピック</h1>
+      {loading ? <p className="text-sm text-slate-200">読み込み中...</p> : <MajorHostList hosts={hosts ?? []} error={error} />}
+      <BackButton />
     </div>
+  );
+}
+
+function BackButton() {
+  const router = useRouter();
+  const { confirmLeave } = useLeaveGuard();
+  function goBack() {
+    const go = () => {
+      if (window.history.length > 1) router.back();
+      else router.push("/competitions");
+    };
+    if (!confirmLeave(go)) go();
+  }
+  return (
+    <Button type="button" variant="secondary" className="h-11 w-full md:w-fit" onClick={goBack}>
+      <ChevronLeft className="size-5" aria-hidden />
+      戻る
+    </Button>
   );
 }
 
