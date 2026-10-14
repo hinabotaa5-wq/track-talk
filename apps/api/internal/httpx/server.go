@@ -71,6 +71,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Delete("/me", s.deleteAccount)
 			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
+			r.Get("/me/injury-history", s.myInjuryHistory)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)

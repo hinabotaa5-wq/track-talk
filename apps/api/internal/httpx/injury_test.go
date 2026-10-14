@@ -370,3 +370,62 @@ func TestInjuryStatsAggregatesAnonymously(t *testing.T) {
 		t.Fatalf("median should be shown once the sample is large enough: %v", median)
 	}
 }
+
+func TestMyInjuryHistoryIsPrivateToTheAuthor(t *testing.T) {
+	h := setup(t)
+	mine := token(t, uuid.New())
+	other := token(t, uuid.New())
+
+	create := func(tok, title string) string {
+		t.Helper()
+		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
+			"kind": "injury", "title": title, "body": "本文", "mood": "vent", "body_part": "calf",
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+		}
+		var post struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+			t.Fatal(err)
+		}
+		return post.ID
+	}
+	id := create(mine, "ふくらはぎの肉離れ")
+	create(other, "他人のケガ")
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+id+"/injury/updates", mine, map[string]any{"stage": "rehab", "body": "歩ける"}); r.Code != http.StatusCreated {
+		t.Fatalf("update %d %s", r.Code, r.Body.String())
+	}
+	// ケガ以外の投稿は履歴に出ない。
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts", mine, map[string]any{"kind": "text", "title": "ふつう", "body": "本文"}); r.Code != http.StatusCreated {
+		t.Fatalf("create text %d", r.Code)
+	}
+
+	if r := doJSON(t, h, http.MethodGet, "/v1/me/injury-history", "", nil); r.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status %d", r.Code)
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/injury-history", mine, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("history %d %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Items []struct {
+			ID     string `json:"id"`
+			Title  string `json:"title"`
+			Stages []struct {
+				Stage string `json:"stage"`
+				Days  int    `json:"days"`
+			} `json:"stages"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Items) != 1 || got.Items[0].ID != id || got.Items[0].Title != "ふくらはぎの肉離れ" {
+		t.Fatalf("history %s", rec.Body.String())
+	}
+	if len(got.Items[0].Stages) != 1 || got.Items[0].Stages[0].Stage != "rehab" || got.Items[0].Stages[0].Days != 0 {
+		t.Fatalf("stages %s", rec.Body.String())
+	}
+}
