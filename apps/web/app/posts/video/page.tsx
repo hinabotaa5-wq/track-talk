@@ -85,7 +85,6 @@ export default function OwnVideoPage() {
   return (
     <ComposerPage title="自分の動画">
       <form onSubmit={onSubmit} className="space-y-4">
-        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           動画ファイル
           <input
@@ -97,6 +96,7 @@ export default function OwnVideoPage() {
             required
           />
         </label>
+        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />

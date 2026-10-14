@@ -56,7 +56,6 @@ export default function YouTubePostPage() {
   return (
     <ComposerPage title="YouTubeのURL">
       <form onSubmit={onSubmit} className="space-y-4">
-        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           URL
           <Input
@@ -71,6 +70,7 @@ export default function YouTubePostPage() {
         {url.trim() !== "" && !isYouTubeUrl(url) ? (
           <p className="text-sm text-red-400">YouTubeのURLを貼ってください</p>
         ) : null}
+        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
