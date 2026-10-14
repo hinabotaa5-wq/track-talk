@@ -183,3 +183,53 @@ func TestInjuryGroupPostsStayInTheirStage(t *testing.T) {
 		t.Fatalf("rehab feed after post %+v", rehab)
 	}
 }
+
+func TestInjuryGroupCanBeLeftAndJoinedAgain(t *testing.T) {
+	h := setup(t)
+	a, b := token(t, uuid.New()), token(t, uuid.New())
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/knee/join", a, joinBody("rehab"))
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/knee/join", b, joinBody("jogging"))
+	rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/knee/posts", a, map[string]any{"kind": "injury", "body": "抜ける前の投稿", "body_part": "knee"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("post %d %s", rec.Code, rec.Body.String())
+	}
+	var post struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+		t.Fatal(err)
+	}
+
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/knee/me", "", nil); r.Code != http.StatusUnauthorized {
+		t.Fatalf("leave without login %d", r.Code)
+	}
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/ankle/me", a, nil); r.Code != http.StatusForbidden {
+		t.Fatalf("leave a group never joined %d", r.Code)
+	}
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/knee/me", a, nil); r.Code != http.StatusNoContent {
+		t.Fatalf("leave %d %s", r.Code, r.Body.String())
+	}
+
+	// 抜けるとグループの中は読めなくなり、人数も減る。自分の投稿は、自分なら今までどおり読める。
+	if r := doJSON(t, h, http.MethodGet, "/v1/injury/groups/knee", a, nil); r.Code != http.StatusForbidden {
+		t.Fatalf("group still readable after leaving %d", r.Code)
+	}
+	if g := getGroup(t, h, "knee", b); g.Members != 1 {
+		t.Fatalf("members after leaving %+v", g)
+	}
+	if r := doJSON(t, h, http.MethodGet, "/v1/posts/"+post.ID, a, nil); r.Code != http.StatusOK {
+		t.Fatalf("own post after leaving %d", r.Code)
+	}
+	// 書いた投稿は、グループに残る。
+	if feed := listInjury(t, h, "/v1/injury/groups/knee/posts", b); feed.Meta.Total != 1 {
+		t.Fatalf("post should stay in the group %+v", feed)
+	}
+
+	// もう一度入れる。
+	if r := doJSON(t, h, http.MethodPost, "/v1/injury/groups/knee/join", a, joinBody("resting")); r.Code != http.StatusOK {
+		t.Fatalf("join again %d", r.Code)
+	}
+	if g := getGroup(t, h, "knee", a); g.Members != 2 || g.Me.Stage != "resting" {
+		t.Fatalf("after joining again %+v", g)
+	}
+}

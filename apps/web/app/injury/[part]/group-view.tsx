@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
@@ -45,7 +46,11 @@ export function GroupView({ part }: { part: string }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
   const [posts, setPosts] = useState<{ stage: string; page: PostsPage } | null>(null);
+  const router = useRouter();
   const [changing, setChanging] = useState(false);
+  const [applying, setApplying] = useState<InjuryStage | null>(null);
+  const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
+  const [leaveError, setLeaveError] = useState("");
   const [changeError, setChangeError] = useState("");
   const [celebrate, setCelebrate] = useState(false);
 
@@ -92,7 +97,9 @@ export function GroupView({ part }: { part: string }) {
       setChanging(false);
       return;
     }
+    if (applying) return;
     setChangeError("");
+    setApplying(stage);
     try {
       await apiFetch(`/v1/injury/groups/${part}/me`, { method: "PATCH", token, body: JSON.stringify({ stage }) });
       setChanging(false);
@@ -105,6 +112,20 @@ export function GroupView({ part }: { part: string }) {
       }
     } catch (e) {
       setChangeError(e instanceof ApiRequestError ? e.message : "段階を変えられませんでした");
+    } finally {
+      setApplying(null);
+    }
+  }
+
+  async function leaveGroup() {
+    setLeaving("busy");
+    setLeaveError("");
+    try {
+      await apiFetch(`/v1/injury/groups/${part}/me`, { method: "DELETE", token });
+      router.push("/injury");
+    } catch (e) {
+      setLeaveError(e instanceof ApiRequestError ? e.message : "グループを抜けられませんでした");
+      setLeaving("confirm");
     }
   }
 
@@ -194,14 +215,24 @@ export function GroupView({ part }: { part: string }) {
               role="radio"
               aria-checked={item.value === mine}
               onClick={() => void changeStage(item.value)}
-              className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition active:scale-[0.98] ${
-                item.value === mine ? "border-blue-400 bg-blue-950/60 text-white" : "border-white/20 bg-white/8 text-slate-100 hover:bg-white/14"
-              }`}
+              disabled={applying !== null}
+              className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition active:scale-[0.98] disabled:cursor-wait ${
+                item.value === applying
+                  ? "border-blue-400 bg-blue-950/60 text-white"
+                  : item.value === mine
+                    ? "border-blue-400 bg-blue-950/60 text-white"
+                    : "border-white/20 bg-white/8 text-slate-100 hover:bg-white/14"
+              } ${applying !== null && item.value !== applying ? "opacity-50" : ""}`}
             >
               {item.label}
-              {item.value === mine ? "(いま)" : ""}
+              {item.value === applying ? "に変更しています…" : item.value === mine ? "(いま)" : ""}
             </button>
           ))}
+          {applying ? (
+            <p role="status" className="text-sm text-slate-300">
+              段階を変えています。少し待ってください。
+            </p>
+          ) : null}
           {changeError ? <p className="text-sm text-red-400">{changeError}</p> : null}
         </div>
       ) : null}
@@ -236,6 +267,32 @@ export function GroupView({ part }: { part: string }) {
             </span>
             <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
           </>
+        )}
+      </div>
+      <div className="space-y-2 border-t border-white/15 pt-4">
+        {leaving === "idle" ? (
+          <button
+            type="button"
+            onClick={() => setLeaving("confirm")}
+            className="text-sm font-semibold text-slate-300 underline-offset-2 hover:underline"
+          >
+            このグループを抜ける
+          </button>
+        ) : (
+          <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/8 p-3 text-sm text-slate-200">
+            <p>
+              {injuryBodyPartLabel(group.body_part)}のグループを抜けます。段階の記録は消えて、グループの中は読めなくなります。書いた投稿は残ります(投稿ごとに削除できます)。あとで、もう一度入れます。
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" variant="danger" disabled={leaving === "busy"} onClick={() => void leaveGroup()}>
+                {leaving === "busy" ? "抜けています…" : "抜ける"}
+              </Button>
+              <Button type="button" variant="secondary" disabled={leaving === "busy"} onClick={() => setLeaving("idle")}>
+                やめる
+              </Button>
+            </div>
+            {leaveError ? <p className="text-red-400">{leaveError}</p> : null}
+          </div>
         )}
       </div>
     </div>
