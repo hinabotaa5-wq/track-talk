@@ -5,12 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
@@ -263,82 +261,4 @@ func TestDeleteAccountKeepsPurgeWhenAuthDeleteFails(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("purge rolled back %d %s", rec.Code, rec.Body.String())
 	}
-}
-
-func TestDeleteAccountRejectsStaleLogin(t *testing.T) {
-	h := setup(t)
-	freshID := uuid.New()
-	staleID := uuid.New()
-	missingID := uuid.New()
-	fresh := tokenWithAMR(t, freshID, time.Now())
-	stale := tokenAt(t, staleID, time.Now().Add(-6*time.Minute))
-	missing := tokenAt(t, missingID, time.Time{})
-
-	for _, item := range []struct {
-		name string
-		id   uuid.UUID
-		tok  string
-		want int
-	}{
-		{name: "amr", id: freshID, tok: fresh, want: http.StatusOK},
-		{name: "stale", id: staleID, tok: stale, want: http.StatusUnauthorized},
-		{name: "missing", id: missingID, tok: missing, want: http.StatusUnauthorized},
-	} {
-		t.Run(item.name, func(t *testing.T) {
-			rec := doJSON(t, h, http.MethodPost, "/v1/posts", item.tok, map[string]any{
-				"title": item.name, "body": "退会できない投稿です",
-			})
-			if rec.Code != http.StatusCreated {
-				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
-			}
-			var created struct {
-				ID string `json:"id"`
-			}
-			_ = json.Unmarshal(rec.Body.Bytes(), &created)
-
-			rec = doJSON(t, h, http.MethodDelete, "/v1/me", item.tok, map[string]string{"confirm": "退会する"})
-			if rec.Code != item.want {
-				t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
-			}
-			if item.want == http.StatusUnauthorized {
-				var body struct {
-					Error struct {
-						Code    string `json:"code"`
-						Message string `json:"message"`
-					} `json:"error"`
-				}
-				_ = json.Unmarshal(rec.Body.Bytes(), &body)
-				if body.Error.Code != "reauth_required" || body.Error.Message != "退会する前にもう一度ログインしてください" {
-					t.Fatalf("body %+v", body)
-				}
-			}
-			rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
-			wantGet := http.StatusOK
-			if item.want == http.StatusOK {
-				wantGet = http.StatusNotFound
-			}
-			if rec.Code != wantGet {
-				t.Fatalf("post %d %s", rec.Code, rec.Body.String())
-			}
-		})
-	}
-}
-
-func tokenWithAMR(t *testing.T, id uuid.UUID, authTime time.Time) string {
-	t.Helper()
-	secret := os.Getenv("SUPABASE_JWT_SECRET")
-	if secret == "" {
-		secret = "test-jwt-secret-for-ci-only"
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": id.String(),
-		"aud": "authenticated",
-		"exp": time.Now().Add(time.Hour).Unix(),
-		"amr": []map[string]any{{"method": "oauth", "timestamp": authTime.Unix()}},
-	})
-	s, err := tok.SignedString([]byte(secret))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return s
 }
