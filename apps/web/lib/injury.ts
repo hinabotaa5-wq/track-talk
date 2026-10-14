@@ -198,3 +198,33 @@ export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
     return (order.get(a.body_part) ?? 0) - (order.get(b.body_part) ?? 0);
   });
 }
+
+// ロードマップ上の自分の段階だけ投稿できる。ほかの段階は読むだけ。
+export function canPostInStage(selected: string, mine: string) {
+  return selected === mine;
+}
+
+export function injuryCelebrationKey(part: string) {
+  return `injury-celebrated:${part}`;
+}
+
+// 初めてゴール(大会に復帰)に着いたときだけ祝う。戻ってからの2回目は出さない。
+export function shouldCelebrate(stage: string, alreadyCelebrated: boolean) {
+  return stage === "race" && !alreadyCelebrated;
+}
+
+// ニックネームから、毎回同じアバターの色を決める。
+export function injuryFaceHue(name: string) {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 360;
+  return hash;
+}
+
+export function injuryFaceInitial(name: string) {
+  return [...name.trim()][0] ?? "?";
+}
+
+// ロードマップの人数の表示。顔に出し切れない分は「+N」にする。
+export function injuryFaceOverflow(members: number, faces: number) {
+  return Math.max(members - faces, 0);
+}
