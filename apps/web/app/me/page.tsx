@@ -7,7 +7,7 @@ import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronRight, FileText, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
+import { ChevronRight, ClipboardList, FileText, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 
@@ -26,7 +26,7 @@ function menuRowClass(danger = false) {
 }
 
 export default function MePage() {
-  const { session, token, loading } = useAuth();
+  const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsError, setPostsError] = useState("");
@@ -35,6 +35,7 @@ export default function MePage() {
   const logoutLock = useActionLock();
 
   async function logout() {
+    if (!confirm("ログアウトしますか？")) return;
     if (!logoutLock.acquire()) return;
     const supabase = createClient();
     await supabase?.auth.signOut();
@@ -84,6 +85,13 @@ export default function MePage() {
             </Link>
           );
         })}
+        {profile?.is_admin ? (
+          <Link href="/admin" className={menuRowClass()}>
+            <ClipboardList className="size-4 shrink-0 text-slate-300" aria-hidden />
+            <span className="flex-1">管理者画面</span>
+            <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+          </Link>
+        ) : null}
         <Link href="/me/delete" className={menuRowClass(true)}>
           <UserX className="size-4 shrink-0" aria-hidden />
           <span className="flex-1">退会する</span>

@@ -7,9 +7,21 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const countAdminInquiries = `-- name: CountAdminInquiries :one
+SELECT count(*) FROM inquiries WHERE source = $1
+`
+
+func (q *Queries) CountAdminInquiries(ctx context.Context, source string) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminInquiries, source)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const countInquiries = `-- name: CountInquiries :one
 SELECT count(*) FROM inquiries
@@ -34,9 +46,9 @@ func (q *Queries) CountMyInquiries(ctx context.Context, userID uuid.UUID) (int64
 }
 
 const createInquiry = `-- name: CreateInquiry :one
-INSERT INTO inquiries (id, user_id, category, subject, body)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, user_id, category, subject, body, created_at
+INSERT INTO inquiries (id, user_id, category, subject, body, source)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, category, subject, body, source, created_at
 `
 
 type CreateInquiryParams struct {
@@ -45,30 +57,96 @@ type CreateInquiryParams struct {
 	Category string    `json:"category"`
 	Subject  string    `json:"subject"`
 	Body     string    `json:"body"`
+	Source   string    `json:"source"`
 }
 
-func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (Inquiry, error) {
+type CreateInquiryRow struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (CreateInquiryRow, error) {
 	row := q.db.QueryRow(ctx, createInquiry,
 		arg.ID,
 		arg.UserID,
 		arg.Category,
 		arg.Subject,
 		arg.Body,
+		arg.Source,
 	)
-	var i Inquiry
+	var i CreateInquiryRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Category,
 		&i.Subject,
 		&i.Body,
+		&i.Source,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
+const listAdminInquiries = `-- name: ListAdminInquiries :many
+SELECT i.id, i.category, i.subject, i.body, i.source, i.created_at, p.nickname AS user_nickname
+FROM inquiries i
+JOIN profiles p ON p.id = i.user_id
+WHERE i.source = $1
+ORDER BY i.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListAdminInquiriesParams struct {
+	Source string `json:"source"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+}
+
+type ListAdminInquiriesRow struct {
+	ID           uuid.UUID `json:"id"`
+	Category     string    `json:"category"`
+	Subject      string    `json:"subject"`
+	Body         string    `json:"body"`
+	Source       string    `json:"source"`
+	CreatedAt    time.Time `json:"created_at"`
+	UserNickname *string   `json:"user_nickname"`
+}
+
+func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiriesParams) ([]ListAdminInquiriesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminInquiries, arg.Source, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminInquiriesRow
+	for rows.Next() {
+		var i ListAdminInquiriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Category,
+			&i.Subject,
+			&i.Body,
+			&i.Source,
+			&i.CreatedAt,
+			&i.UserNickname,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInquiries = `-- name: ListInquiries :many
-SELECT id, user_id, category, subject, body, created_at
+SELECT id, user_id, category, subject, body, source, created_at
 FROM inquiries
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -79,21 +157,32 @@ type ListInquiriesParams struct {
 	Offset int32 `json:"offset"`
 }
 
-func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([]Inquiry, error) {
+type ListInquiriesRow struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([]ListInquiriesRow, error) {
 	rows, err := q.db.Query(ctx, listInquiries, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Inquiry
+	var items []ListInquiriesRow
 	for rows.Next() {
-		var i Inquiry
+		var i ListInquiriesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
 			&i.Category,
 			&i.Subject,
 			&i.Body,
+			&i.Source,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -107,7 +196,7 @@ func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([
 }
 
 const listMyInquiries = `-- name: ListMyInquiries :many
-SELECT id, user_id, category, subject, body, created_at
+SELECT id, user_id, category, subject, body, source, created_at
 FROM inquiries
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -120,21 +209,32 @@ type ListMyInquiriesParams struct {
 	Offset int32     `json:"offset"`
 }
 
-func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams) ([]Inquiry, error) {
+type ListMyInquiriesRow struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams) ([]ListMyInquiriesRow, error) {
 	rows, err := q.db.Query(ctx, listMyInquiries, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Inquiry
+	var items []ListMyInquiriesRow
 	for rows.Next() {
-		var i Inquiry
+		var i ListMyInquiriesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
 			&i.Category,
 			&i.Subject,
 			&i.Body,
+			&i.Source,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

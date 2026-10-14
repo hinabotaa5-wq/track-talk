@@ -44,6 +44,7 @@ type Inquiry struct {
 	Subject   string    `json:"subject"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
+	Source    string    `json:"source"`
 }
 
 type MajorHost struct {

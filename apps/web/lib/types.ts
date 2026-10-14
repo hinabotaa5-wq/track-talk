@@ -139,6 +139,25 @@ export type Inquiry = {
   created_at: string;
 };
 
+export type AdminInquiry = Inquiry & {
+  user_nickname: string | null;
+};
+
+export type AdminReport = {
+  id: string;
+  target_type: "post" | "comment";
+  target_id: string;
+  reason: "spam" | "harassment" | "misinfo" | "other";
+  detail: string;
+  status: "open" | "reviewed" | "actioned" | "dismissed";
+  created_at: string;
+  reporter_nickname: string | null;
+  post_id: string;
+  target_title: string;
+  target_body: string;
+  target_hidden: boolean;
+};
+
 export type Profile = {
   id: string;
   nickname: string | null;
