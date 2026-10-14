@@ -16,12 +16,13 @@ import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { ZoomableImage } from "@/components/zoomable-image";
+import { ZoomableVideo } from "@/components/zoomable-video";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
-import { clearHomeFeeds } from "@/lib/home-feed-cache";
+import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
@@ -112,8 +113,11 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
     } catch (e) {
       action.release();
-      throw e;
+      alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
+      return;
     }
+    clearHomeFeeds();
+    clearSavedFeeds();
     router.push(returnTo === "me" ? "/me" : "/");
     router.refresh();
   }
@@ -123,6 +127,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       router.push("/login");
       return;
     }
+    if (!confirm("この内容を通報しますか？")) return;
     if (!action.acquire()) return;
     try {
       await apiFetch("/v1/reports", {
@@ -136,6 +141,9 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         }),
       });
       alert("通報を受け付けました");
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.status === 409) alert("すでに通報済みです");
+      else alert(e instanceof ApiRequestError ? e.message : "通報できませんでした");
     } finally {
       action.release();
     }
@@ -185,6 +193,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     try {
       await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
     } finally {
       action.release();
     }
@@ -206,13 +216,10 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           <PracticeJoin post={post} onDone={load} />
         </>
       ) : post.kind === "video" && post.playback_url ? (
-        <video
-          className="aspect-video w-full rounded-xl bg-black"
+        <ZoomableVideo
+          className="aspect-video w-full bg-black"
           src={post.playback_url}
           poster={post.thumbnail_url}
-          controls
-          playsInline
-          preload="metadata"
         />
       ) : post.kind === "youtube" && post.youtube_video_id ? (
         <YouTubePlayer
@@ -221,17 +228,14 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           thumbnailUrl={post.thumbnail_url}
         />
       ) : post.thumbnail_url ? (
-        <div className="relative w-full overflow-hidden rounded-xl bg-black/25">
-          <Image
-            src={post.thumbnail_url}
-            alt={feedTitle(post.title)}
-            width={1200}
-            height={800}
-            sizes="(max-width: 1024px) 100vw, 800px"
-            className="max-h-[70vh] w-full object-contain h-auto"
-            priority
-          />
-        </div>
+        <ZoomableImage
+          src={post.thumbnail_url}
+          alt={feedTitle(post.title)}
+          sizes="(max-width: 1024px) 100vw, 800px"
+          wrapperClassName="relative w-full overflow-hidden rounded-xl bg-black/25"
+          imageClassName="max-h-[70vh] w-full object-contain h-auto"
+          priority
+        />
       ) : null}
       {post.kind === "practice" ? null : (
         <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
@@ -278,9 +282,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
               削除
             </Button>
           </>
-        ) : (
-          <ReportButton disabled={action.pending} onClick={() => report("post", post.id)} />
-        )}
+        ) : null}
+        <ReportButton disabled={action.pending} onClick={() => report("post", post.id)} />
       </div>
       </div>
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
@@ -572,19 +575,15 @@ function RecruitmentFacts({ post }: { post: Post }) {
       {info.photos.length > 0 ? (
         <div className={info.photos.length > 1 ? "grid gap-2 md:grid-cols-2" : "grid gap-2"}>
           {info.photos.map((photo) => (
-            <div
+            <ZoomableImage
               key={photo.public_id}
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/25"
-            >
-              <Image
-                src={photo.url}
-                alt=""
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-                loading="lazy"
-              />
-            </div>
+              src={photo.url}
+              alt=""
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              wrapperClassName="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/25"
+              imageClassName="object-cover"
+            />
           ))}
         </div>
       ) : null}
