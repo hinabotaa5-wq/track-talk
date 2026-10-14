@@ -62,7 +62,7 @@ var Sources = []Source{
 	{Prefecture: "20", PageURL: "https://nagano-rk.com/calendar/2026nrk_calendar-2-2-2-2-2-2/", NewsURL: "https://nagano-rk.com/"},
 	{
 		Prefecture: "22",
-		NewsURL:    "https://shizuoka-jaaf.com/",
+		NewsURL:    "https://shizuoka-jaaf.com/sjmain.html",
 		PageURL:    "https://shizuoka-jaaf.com/srkkyogi.html",
 		ExtraURLs:  []string{"https://seiburiku.jp/schedule/"},
 	},
@@ -77,7 +77,7 @@ var Sources = []Source{
 		},
 	},
 	{Prefecture: "21", PageURL: "https://www.gifu-riku.com/schedule/", NewsURL: "https://www.gifu-riku.com/news/"},
-	{Prefecture: "24", PageURL: "https://mierk.jp/taikaiyoukou/", PDFLinks: []string{`県内日程表`}, NewsURL: "https://mierk.jp/"},
+	{Prefecture: "24", PageURL: "https://mierk.jp/taikaiyoukou/", PDFLinks: []string{`県内日程表`}, NewsURL: "https://mierk.jp/menu/"},
 	{Prefecture: "25", PageURL: "https://srkshiga.com/?page_id=1036", NewsURL: "https://srkshiga.com/"},
 	{Prefecture: "26", PageURL: "https://www.krk26.jp/", PDFLinks: []string{`競技会日程`}, NewsURL: "https://www.krk26.jp/index.php?belong2=一般競技会"},
 	{Prefecture: "27", PageURL: "https://www.oaaa.jp/competition/?y=2026", NewsURL: "https://www.oaaa.jp/news/"},
