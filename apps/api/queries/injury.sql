@@ -89,3 +89,22 @@ WHERE p.author_id = $1
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
 GROUP BY u.post_id, u.stage;
+
+-- name: NotifyInjuryFollowers :exec
+-- 経過報告があったとき、その投稿に「わかる」か保存をした人(投稿者を除く)へ通知する。
+-- 同じ投稿の未読の通知がすでにある人には重ねて送らない。
+INSERT INTO notifications (id, recipient_id, kind, post_id)
+SELECT gen_random_uuid(), f.user_id, 'injury_update', sqlc.arg('post_id')::uuid
+FROM (
+    SELECT l.user_id FROM post_likes l WHERE l.post_id = sqlc.arg('post_id')::uuid
+    UNION
+    SELECT s.user_id FROM post_saves s WHERE s.post_id = sqlc.arg('post_id')::uuid
+) f
+WHERE f.user_id <> sqlc.arg('author_id')::uuid
+  AND NOT EXISTS (
+    SELECT 1 FROM notifications n
+    WHERE n.recipient_id = f.user_id
+      AND n.post_id = sqlc.arg('post_id')::uuid
+      AND n.kind = 'injury_update'
+      AND n.read_at IS NULL
+  );

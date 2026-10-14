@@ -15,6 +15,7 @@ const labels: Record<NotificationKind, string> = {
   practice_application: "参加申請がありました",
   practice_accepted: "参加が承認されました",
   practice_rate: "解散しました。評価しあってください",
+  injury_update: "復帰の経過が更新されました",
 };
 
 function labelFor(kind: string) {

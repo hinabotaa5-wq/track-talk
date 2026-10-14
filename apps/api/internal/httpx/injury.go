@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -353,6 +354,10 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	// 通知は補足なので、失敗しても経過報告そのものは成功として返す。
+	if err := s.q.NotifyInjuryFollowers(r.Context(), db.NotifyInjuryFollowersParams{PostID: postID, AuthorID: p.ID}); err != nil {
+		slog.Error("injury update notification failed", "err", err, "post_id", postID.String())
 	}
 	JSON(w, http.StatusCreated, injuryUpdateFromRow(row))
 }
