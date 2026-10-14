@@ -75,7 +75,7 @@ type injuryUpdateReq struct {
 }
 
 var injuryBodyParts = []struct{ Code, Label string }{
-	{"foot", "足裏・足部"},
+	{"foot", "足裏"},
 	{"ankle", "足首"},
 	{"achilles", "アキレス腱"},
 	{"calf", "ふくらはぎ"},
@@ -83,10 +83,13 @@ var injuryBodyParts = []struct{ Code, Label string }{
 	{"knee", "膝"},
 	{"quad", "太もも前"},
 	{"hamstring", "ハムストリング"},
-	{"groin", "股関節・鼠径部"},
-	{"hip", "お尻・骨盤"},
+	{"groin", "股関節"},
+	{"hip", "お尻"},
 	{"lower-back", "腰"},
-	{"upper-body", "上半身"},
+	{"abs", "腹筋"},
+	{"scapula", "肩甲骨"},
+	{"shoulder", "肩"},
+	{"neck", "首"},
 	{"other", "その他"},
 }
 

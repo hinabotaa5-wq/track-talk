@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { injuryBodyPartLabel, injuryBodyParts, injuryGroupPath, injuryNotice, isInjuryBodyPart } from "@/lib/injury";
+import { injuryBodyPartLabel, injuryBodyParts, injuryGroupPath, isInjuryBodyPart } from "@/lib/injury";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -99,7 +99,6 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
           onChange={(e) => setBody(e.target.value)}
         />
       </label>
-      <p className="text-xs text-slate-300">{injuryNotice}</p>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}

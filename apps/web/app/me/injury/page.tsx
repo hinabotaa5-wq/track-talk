@@ -52,7 +52,7 @@ export default function MyInjuryHistoryPage() {
       ) : items === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>
       ) : items.length === 0 ? (
-        <EmptyState title="まだケガの投稿がありません" body="ケガの溜まり場に投稿すると、ここに履歴がたまります。" />
+        <EmptyState title="まだケガの投稿がありません" body="ケガのグループに投稿すると、ここに履歴がたまります。" />
       ) : (
         <>
           {repeated.length > 0 ? (
