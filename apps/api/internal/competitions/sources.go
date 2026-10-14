@@ -39,7 +39,7 @@ var Sources = []Source{
 	{Prefecture: "14", PageURL: "https://www.kanagawariku.org/kana21cal100.html", NewsURL: "https://www.kanagawariku.org/kana31com100.html"},
 	{Prefecture: "15", PageURL: "https://nrkk.net/official-eventschedule", PDFLinks: []string{`公認競技会`}, NewsURL: "https://nrkk.net/news/"},
 	{Prefecture: "16", PageURL: "https://www.jaaf-toyama.net/schedule/", PDFLinks: []string{`行事日程`}, NewsURL: "https://www.jaaf-toyama.net/news/"},
-	{Prefecture: "17", PageURL: "https://ishiriku.jp/schedule.html", PDFLinks: []string{`競技日程`}, NewsURL: "https://ishiriku.jp/"},
+	{Prefecture: "17", PageURL: "https://ishiriku.jp/schedule.html", PDFLinks: []string{`石川陸上競技協会.*競技日程`}, NewsURL: "https://ishiriku.jp/"},
 	{
 		Prefecture: "18",
 		NewsURL:    "https://www.fukui-jaaf.com/information/",
