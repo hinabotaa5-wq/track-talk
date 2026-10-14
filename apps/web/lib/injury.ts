@@ -1,5 +1,5 @@
 export const injuryBodyParts = [
-  { value: "foot", label: "足裏・足部" },
+  { value: "foot", label: "足裏" },
   { value: "ankle", label: "足首" },
   { value: "achilles", label: "アキレス腱" },
   { value: "calf", label: "ふくらはぎ" },
@@ -7,10 +7,13 @@ export const injuryBodyParts = [
   { value: "knee", label: "膝" },
   { value: "quad", label: "太もも前" },
   { value: "hamstring", label: "ハムストリング" },
-  { value: "groin", label: "股関節・鼠径部" },
-  { value: "hip", label: "お尻・骨盤" },
+  { value: "groin", label: "股関節" },
+  { value: "hip", label: "お尻" },
   { value: "lower-back", label: "腰" },
-  { value: "upper-body", label: "上半身" },
+  { value: "abs", label: "腹筋" },
+  { value: "scapula", label: "肩甲骨" },
+  { value: "shoulder", label: "肩" },
+  { value: "neck", label: "首" },
   { value: "other", label: "その他" },
 ] as const;
 
@@ -33,8 +36,6 @@ export const injuryUpdateMaxLength = 2000;
 export function isInjuryBodyPart(value: string | null | undefined) {
   return injuryBodyParts.some((item) => item.value === value);
 }
-
-export const injuryNotice = "ここでの投稿は医療的な助言ではありません。痛みが続くときは医療機関に相談してください。";
 
 export type InjuryStageStat = {
   stage: InjuryStage;
