@@ -12,6 +12,7 @@ on:
         options:
           - competitions
           - major-hosts
+          - domestic-majors
         default: competitions
 
 concurrency:
@@ -51,3 +52,19 @@ jobs:
       - name: Import major hosts
         working-directory: apps/api
         run: go run ./cmd/importmajors
+
+  domestic-majors:
+    if: github.event.schedule == '0 0 1 4,10 *' || inputs.job == 'domestic-majors'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: apps/api/go.sum
+      - name: Import domestic majors
+        working-directory: apps/api
+        run: go run ./cmd/importdomestic
