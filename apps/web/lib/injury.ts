@@ -78,3 +78,9 @@ export function injuryStageStatText(stage: InjuryStageStat, minSample: number) {
   }
   return stage.median_days === 0 ? `投稿から当日（${stage.reached}人）` : `投稿から約${stage.median_days}日（${stage.reached}人）`;
 }
+
+// 指定した部位のうち、日数の目安が出ている段階だけを返す。部位のデータがなければ空。
+export function injuryTypicalStages(stats: InjuryStats | null, bodyPart: string) {
+  const part = stats?.parts.find((item) => item.body_part === bodyPart);
+  return part ? part.stages.filter((stage) => stage.median_days !== null) : [];
+}
