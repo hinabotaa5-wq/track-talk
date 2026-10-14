@@ -10,16 +10,6 @@ import (
 	"time"
 )
 
-const deleteDomesticMajorsBySlug = `-- name: DeleteDomesticMajorsBySlug :exec
-DELETE FROM domestic_majors
-WHERE slug = $1
-`
-
-func (q *Queries) DeleteDomesticMajorsBySlug(ctx context.Context, slug string) error {
-	_, err := q.db.Exec(ctx, deleteDomesticMajorsBySlug, slug)
-	return err
-}
-
 const listDomesticMajors = `-- name: ListDomesticMajors :many
 SELECT DISTINCT ON (slug) slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors

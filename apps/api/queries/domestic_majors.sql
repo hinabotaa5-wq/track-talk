@@ -7,10 +7,6 @@ ORDER BY slug,
     CASE WHEN ends_on >= sqlc.arg(today)::date THEN starts_on END ASC,
     ends_on DESC;
 
--- name: DeleteDomesticMajorsBySlug :exec
-DELETE FROM domestic_majors
-WHERE slug = sqlc.arg(slug);
-
 -- name: UpsertDomesticMajor :exec
 INSERT INTO domestic_majors (
     slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
