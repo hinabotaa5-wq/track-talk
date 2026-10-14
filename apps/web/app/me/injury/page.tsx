@@ -41,10 +41,7 @@ export default function MyInjuryHistoryPage() {
   return (
     <div className="space-y-4">
       <div>
-        <Link href="/me" className="text-sm text-slate-200 underline-offset-2 hover:underline">
-          ← マイページ
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold">自分のケガ履歴</h1>
+        <h1 className="text-2xl font-bold">自分のケガ履歴</h1>
         <p className="mt-1 text-sm text-slate-200">
           これまでのケガの投稿と、経過を報告した段階ごとの日数を振り返れます。あなただけに表示されます。
         </p>
