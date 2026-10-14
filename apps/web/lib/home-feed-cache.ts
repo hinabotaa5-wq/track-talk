@@ -42,6 +42,15 @@ export function seedFeed(path: string, data: PostsPage) {
   cache.set(path, { data, at: Date.now() });
 }
 
+export function clearHomeFeeds() {
+  for (const key of [...cache.keys(), ...inflight.keys()]) {
+    if (key.startsWith("/v1/posts")) {
+      cache.delete(key);
+      inflight.delete(key);
+    }
+  }
+}
+
 export function clearSavedFeeds() {
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/me/")) {

@@ -41,24 +41,29 @@ export function HomeFeed({
 
   useEffect(() => {
     let active = true;
-    if (hasInitial && isFeedFresh(path)) {
-      prefetchHomeFeeds(q);
-      return;
+    function refresh(retry: boolean) {
+      // Without data, keep retrying while the API wakes up; with stale data, refresh quietly.
+      loadHomeFeed(path, retry)
+        .then((data) => {
+          if (!active) return;
+          setPosts(data.posts);
+          setMeta(data.meta);
+          setError("");
+          prefetchHomeFeeds(q);
+        })
+        .catch(() => {
+          if (active && !hasInitial) setError(loadError);
+        });
     }
-    // Without data, keep retrying while the API wakes up; with stale data, refresh quietly.
-    loadHomeFeed(path, !hasInitial)
-      .then((data) => {
-        if (!active) return;
-        setPosts(data.posts);
-        setMeta(data.meta);
-        setError("");
-        prefetchHomeFeeds(q);
-      })
-      .catch(() => {
-        if (active && !hasInitial) setError(loadError);
-      });
+    if (!(hasInitial && isFeedFresh(path))) refresh(!hasInitial);
+    else prefetchHomeFeeds(q);
+    function onVisible() {
+      if (document.visibilityState === "visible") refresh(false);
+    }
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [hasInitial, path, q]);
 

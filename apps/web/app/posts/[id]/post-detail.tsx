@@ -21,6 +21,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
@@ -55,7 +56,14 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     const handle = window.setTimeout(() => {
       void load();
     }, 0);
-    return () => window.clearTimeout(handle);
+    function onVisible() {
+      if (document.visibilityState === "visible") void load();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(handle);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token]);
 
@@ -74,6 +82,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/posts/${current.id}/likes`, { method: current.liked_by_me ? "DELETE" : "POST", token });
+      clearHomeFeeds();
       await load();
     } finally {
       action.release();
