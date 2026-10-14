@@ -12,8 +12,7 @@ import (
 )
 
 type archiveRow struct {
-	BodyPart, Place, Situation, Timeline, Posts, Review string
-	InjuredMonth                                        string
+	BodyPart, Timeline, InjuredMonth, ArchivedMonth string
 }
 
 func readArchives(t *testing.T) []archiveRow {
@@ -28,7 +27,7 @@ func readArchives(t *testing.T) []archiveRow {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	rows, err := pool.Query(ctx, `SELECT body_part, place, situation, stage_timeline::text, posts::text, review_status, to_char(injured_month, 'YYYY-MM-DD') FROM injury_archives ORDER BY body_part`)
+	rows, err := pool.Query(ctx, `SELECT body_part, stage_timeline::text, to_char(injured_month, 'YYYY-MM-DD'), to_char(archived_month, 'YYYY-MM-DD') FROM injury_archives ORDER BY body_part`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +35,7 @@ func readArchives(t *testing.T) []archiveRow {
 	var out []archiveRow
 	for rows.Next() {
 		var r archiveRow
-		if err := rows.Scan(&r.BodyPart, &r.Place, &r.Situation, &r.Timeline, &r.Posts, &r.Review, &r.InjuredMonth); err != nil {
+		if err := rows.Scan(&r.BodyPart, &r.Timeline, &r.InjuredMonth, &r.ArchivedMonth); err != nil {
 			t.Fatal(err)
 		}
 		out = append(out, r)
@@ -61,7 +60,7 @@ func clearArchives(t *testing.T) {
 	}
 }
 
-func TestWithdrawKeepsInjuryRecordsOnlyWithConsent(t *testing.T) {
+func TestWithdrawKeepsOnlyNumbersAndChoicesWithConsent(t *testing.T) {
 	h := setup(t)
 	clearArchives(t)
 
@@ -69,6 +68,7 @@ func TestWithdrawKeepsInjuryRecordsOnlyWithConsent(t *testing.T) {
 		tok := token(t, uuid.New())
 		body := joinBody("resting")
 		body["place"] = "河川敷 連絡 runner@example.com"
+		body["situation"] = "山田コーチに言われた"
 		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/knee/join", tok, body); rec.Code != http.StatusOK {
 			t.Fatalf("join %d %s", rec.Code, rec.Body.String())
 		}
@@ -92,7 +92,7 @@ func TestWithdrawKeepsInjuryRecordsOnlyWithConsent(t *testing.T) {
 		t.Fatalf("archived without consent: %+v", rows)
 	}
 
-	// 同意した退会では、個人が特定できそうな記述を取り除いて、匿名で残る。
+	// 同意した退会では、部位・月・段階と日数の数字と選択式だけが、匿名で残る。
 	agreed := build()
 	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", agreed, map[string]any{"confirm": "退会する", "keep_injury_anonymized": true}); rec.Code != http.StatusOK {
 		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
@@ -102,17 +102,38 @@ func TestWithdrawKeepsInjuryRecordsOnlyWithConsent(t *testing.T) {
 		t.Fatalf("archives %+v", rows)
 	}
 	got := rows[0]
-	if got.BodyPart != "knee" || got.Review != "pending" || !strings.HasSuffix(got.InjuredMonth, "-01") {
+	if got.BodyPart != "knee" || !strings.HasSuffix(got.InjuredMonth, "-01") || !strings.HasSuffix(got.ArchivedMonth, "-01") {
 		t.Fatalf("archive %+v", got)
-	}
-	if strings.Contains(got.Place, "runner@example.com") || !strings.Contains(got.Place, "河川敷") {
-		t.Fatalf("place not scrubbed: %q", got.Place)
-	}
-	if strings.Contains(got.Posts, "090-1234-5678") || !strings.Contains(got.Posts, "5分走れた") {
-		t.Fatalf("posts not scrubbed: %s", got.Posts)
 	}
 	if !strings.Contains(got.Timeline, `"resting"`) || !strings.Contains(got.Timeline, `"jogging"`) {
 		t.Fatalf("timeline %s", got.Timeline)
+	}
+
+	// 自由記述の列は、そもそもテーブルにない。
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
+	}
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var columns []string
+	cols, err := pool.Query(context.Background(), `SELECT column_name FROM information_schema.columns WHERE table_name = 'injury_archives' ORDER BY column_name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for cols.Next() {
+		var name string
+		if err := cols.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		columns = append(columns, name)
+	}
+	cols.Close()
+	if strings.Join(columns, ",") != "archived_month,body_part,id,injured_month,stage_timeline" {
+		t.Fatalf("columns %v", columns)
 	}
 
 	// 退会したら、グループの参加と投稿そのものは消える。

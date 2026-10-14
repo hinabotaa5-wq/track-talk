@@ -229,17 +229,6 @@ func (q *Queries) GetInjuryGroupMember(ctx context.Context, arg GetInjuryGroupMe
 	return i, err
 }
 
-const getProfileNickname = `-- name: GetProfileNickname :one
-SELECT nickname FROM profiles WHERE id = $1
-`
-
-func (q *Queries) GetProfileNickname(ctx context.Context, id uuid.UUID) (*string, error) {
-	row := q.db.QueryRow(ctx, getProfileNickname, id)
-	var nickname *string
-	err := row.Scan(&nickname)
-	return nickname, err
-}
-
 const injuryStageStats = `-- name: InjuryStageStats :many
 SELECT
     i.body_part,
@@ -295,8 +284,8 @@ func (q *Queries) InjuryStageStats(ctx context.Context) ([]InjuryStageStatsRow, 
 }
 
 const insertInjuryArchive = `-- name: InsertInjuryArchive :exec
-INSERT INTO injury_archives (body_part, injured_month, archived_month, stage_timeline, place, situation, posts)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO injury_archives (body_part, injured_month, archived_month, stage_timeline)
+VALUES ($1, $2, $3, $4)
 `
 
 type InsertInjuryArchiveParams struct {
@@ -304,9 +293,6 @@ type InsertInjuryArchiveParams struct {
 	InjuredMonth  time.Time `json:"injured_month"`
 	ArchivedMonth time.Time `json:"archived_month"`
 	StageTimeline []byte    `json:"stage_timeline"`
-	Place         string    `json:"place"`
-	Situation     string    `json:"situation"`
-	Posts         []byte    `json:"posts"`
 }
 
 func (q *Queries) InsertInjuryArchive(ctx context.Context, arg InsertInjuryArchiveParams) error {
@@ -315,9 +301,6 @@ func (q *Queries) InsertInjuryArchive(ctx context.Context, arg InsertInjuryArchi
 		arg.InjuredMonth,
 		arg.ArchivedMonth,
 		arg.StageTimeline,
-		arg.Place,
-		arg.Situation,
-		arg.Posts,
 	)
 	return err
 }
@@ -607,52 +590,6 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 			&i.Title,
 			&i.CreatedAt,
 			&i.BodyPart,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listMyInjuryPostsForArchive = `-- name: ListMyInjuryPostsForArchive :many
-SELECT p.id, p.title, p.body, p.created_at, i.body_part, i.group_stage
-FROM posts p
-JOIN injury_details i ON i.post_id = p.id
-WHERE p.author_id = $1
-  AND p.deleted_at IS NULL
-  AND p.hidden_at IS NULL
-ORDER BY p.created_at
-`
-
-type ListMyInjuryPostsForArchiveRow struct {
-	ID         uuid.UUID `json:"id"`
-	Title      string    `json:"title"`
-	Body       string    `json:"body"`
-	CreatedAt  time.Time `json:"created_at"`
-	BodyPart   string    `json:"body_part"`
-	GroupStage *string   `json:"group_stage"`
-}
-
-func (q *Queries) ListMyInjuryPostsForArchive(ctx context.Context, authorID uuid.UUID) ([]ListMyInjuryPostsForArchiveRow, error) {
-	rows, err := q.db.Query(ctx, listMyInjuryPostsForArchive, authorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListMyInjuryPostsForArchiveRow
-	for rows.Next() {
-		var i ListMyInjuryPostsForArchiveRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Title,
-			&i.Body,
-			&i.CreatedAt,
-			&i.BodyPart,
-			&i.GroupStage,
 		); err != nil {
 			return nil, err
 		}

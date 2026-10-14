@@ -62,10 +62,6 @@ type InjuryArchive struct {
 	InjuredMonth  time.Time `json:"injured_month"`
 	ArchivedMonth time.Time `json:"archived_month"`
 	StageTimeline []byte    `json:"stage_timeline"`
-	Place         string    `json:"place"`
-	Situation     string    `json:"situation"`
-	Posts         []byte    `json:"posts"`
-	ReviewStatus  string    `json:"review_status"`
 }
 
 type InjuryDetail struct {
