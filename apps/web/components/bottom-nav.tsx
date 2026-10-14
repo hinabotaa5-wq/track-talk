@@ -48,7 +48,7 @@ export function mainTabHref(
 }
 
 export function activeMainTab(pathname: string) {
-  if (pathname === "/") return "home";
+  if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
   if (pathname === "/upload") return "post";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
@@ -64,6 +64,7 @@ export function showsBackButton(pathname: string) {
   if (pathname === "/competitions/major-domestic") return true;
   if (pathname === "/injury/new") return true;
   if (pathname.startsWith("/posts/")) return true;
+  if (pathname.startsWith("/reviews/")) return true;
   return false;
 }
 
