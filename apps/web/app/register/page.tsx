@@ -3,7 +3,7 @@
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
-import { registerSchema } from "@/lib/validators";
+import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
@@ -16,12 +16,12 @@ export default function RegisterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
-  const form = useForm<z.infer<typeof registerSchema>>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "", nickname: "", nickname_public: false },
+  const form = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
   });
 
-  async function onSubmit(values: z.infer<typeof registerSchema>) {
+  async function onSubmit(values: z.infer<typeof loginSchema>) {
     const supabase = createClient();
     if (!supabase) {
       setError("Supabase の公開設定がありません。");
@@ -29,16 +29,12 @@ export default function RegisterPage() {
     }
     if (!acquire()) return;
     setError("");
+    document.cookie = "tracktalk-next=%2Fme%2Fprofile%3Fonboarding%3D1; Path=/; Max-Age=86400; SameSite=Lax";
     const { data, error: err } = await supabase.auth
       .signUp({
         email: values.email,
         password: values.password,
-        options: {
-          data: {
-            nickname: values.nickname.trim(),
-            nickname_public: values.nickname_public,
-          },
-        },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
       .finally(release);
     if (err) {
@@ -46,7 +42,7 @@ export default function RegisterPage() {
       return;
     }
     if (data.session) {
-      setMessage("登録しました。トップへ移動できます。");
+      window.location.assign("/me/profile?onboarding=1");
       return;
     }
     setMessage("確認メールを送信しました。メール内のリンクを開いてください。");
@@ -58,14 +54,6 @@ export default function RegisterPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
-        <Input maxLength={30} placeholder="ニックネーム" {...form.register("nickname")} />
-        <label className="flex items-center gap-2 text-sm text-slate-200">
-          <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
-          投稿詳細でニックネームを公開する
-        </label>
-        {form.formState.errors.nickname ? (
-          <p className="text-sm text-red-400">{form.formState.errors.nickname.message}</p>
-        ) : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>

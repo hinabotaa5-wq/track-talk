@@ -73,11 +73,9 @@ export const loginSchema = z.object({
 });
 
 export const nicknameSchema = z.object({
-  nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(30, "30文字以内で入力してください"),
+  nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(10, "10文字以内で入力してください"),
   nickname_public: z.boolean(),
 });
-
-export const registerSchema = loginSchema.extend(nicknameSchema.shape);
 
 export const resetSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),

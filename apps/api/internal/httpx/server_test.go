@@ -214,6 +214,12 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid nickname %d %s", rec.Code, rec.Body.String())
 	}
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "12345678901", "nickname_public": true,
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("long nickname %d %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestPostLifecycleAndAuthz(t *testing.T) {

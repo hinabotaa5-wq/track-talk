@@ -20,6 +20,8 @@ export default function ProfilePage() {
     resolver: zodResolver(nicknameSchema),
     defaultValues: { nickname: "", nickname_public: false },
   });
+  const nickname = form.watch("nickname");
+  const overLimit = Array.from(nickname).length > 10;
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/me/profile");
@@ -58,13 +60,15 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">ニックネームの変更</h1>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input maxLength={30} placeholder="ニックネーム" {...form.register("nickname")} />
-        {form.formState.errors.nickname ? (
+        <Input placeholder="ニックネーム" {...form.register("nickname")} />
+        {overLimit ? (
+          <p className="text-sm text-red-400">10文字以内で入力してください</p>
+        ) : form.formState.errors.nickname ? (
           <p className="text-sm text-red-400">{form.formState.errors.nickname.message}</p>
         ) : null}
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
-          投稿詳細でニックネームを公開する
+          ニックネームを公開する
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}

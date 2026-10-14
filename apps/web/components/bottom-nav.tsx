@@ -55,7 +55,7 @@ export function activeMainTab(pathname: string) {
 
 export function showsBackButton(pathname: string) {
   if (pathname === "/register" || pathname === "/reset-password") return true;
-  if (pathname === "/me/contact" || pathname === "/me/delete") return true;
+  if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
