@@ -429,3 +429,92 @@ func TestMyInjuryHistoryIsPrivateToTheAuthor(t *testing.T) {
 		t.Fatalf("stages %s", rec.Body.String())
 	}
 }
+
+func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
+	h := setup(t)
+	author := token(t, uuid.New())
+	liker := token(t, uuid.New())
+	saver := token(t, uuid.New())
+	bystander := token(t, uuid.New())
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
+		"kind": "injury", "title": "通知の確認", "body": "本文", "mood": "vent", "body_part": "hip",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var post struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+		t.Fatal(err)
+	}
+	// 投稿者本人の「わかる」は対象外。
+	for _, tok := range []string{liker, author} {
+		if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/likes", tok, nil); r.Code >= 300 {
+			t.Fatalf("like %d %s", r.Code, r.Body.String())
+		}
+	}
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/saves", saver, nil); r.Code >= 300 {
+		t.Fatalf("save %d %s", r.Code, r.Body.String())
+	}
+
+	notes := func(tok string) []struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+		Read bool   `json:"read"`
+	} {
+		t.Helper()
+		r := doJSON(t, h, http.MethodGet, "/v1/me/notifications", tok, nil)
+		if r.Code != http.StatusOK {
+			t.Fatalf("notifications %d %s", r.Code, r.Body.String())
+		}
+		var out struct {
+			Notifications []struct {
+				ID   string `json:"id"`
+				Kind string `json:"kind"`
+				Read bool   `json:"read"`
+			} `json:"notifications"`
+		}
+		if err := json.Unmarshal(r.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Notifications
+	}
+	report := func(stage string) {
+		t.Helper()
+		r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/injury/updates", author, map[string]any{"stage": stage, "body": "経過 " + stage})
+		if r.Code != http.StatusCreated {
+			t.Fatalf("update %d %s", r.Code, r.Body.String())
+		}
+	}
+
+	report("rehab")
+	for name, tok := range map[string]string{"liker": liker, "saver": saver} {
+		got := notes(tok)
+		if len(got) != 1 || got[0].Kind != "injury_update" {
+			t.Fatalf("%s notifications %+v", name, got)
+		}
+	}
+	if got := notes(author); len(got) != 0 {
+		t.Fatalf("author must not be notified of their own update: %+v", got)
+	}
+	if got := notes(bystander); len(got) != 0 {
+		t.Fatalf("bystander notified: %+v", got)
+	}
+
+	// 未読のあいだは重ねて通知しない。
+	report("jogging")
+	if got := notes(liker); len(got) != 1 {
+		t.Fatalf("unread notification must not be duplicated: %+v", got)
+	}
+	// 読んだあとの次の報告は、あらためて通知する。
+	first := notes(liker)[0]
+	if r := doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+first.ID+"/read", liker, nil); r.Code >= 300 {
+		t.Fatalf("read %d %s", r.Code, r.Body.String())
+	}
+	report("practice")
+	if got := notes(liker); len(got) != 2 {
+		t.Fatalf("a new update after reading should notify again: %+v", got)
+	}
+}

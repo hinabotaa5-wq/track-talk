@@ -152,7 +152,8 @@ export type NotificationKind =
   | "comment"
   | "practice_application"
   | "practice_accepted"
-  | "practice_rate";
+  | "practice_rate"
+  | "injury_update";
 
 export type AppNotification = {
   id: string;
