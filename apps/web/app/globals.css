@@ -38,6 +38,19 @@ body {
   font-family: var(--font-geist-sans), "Hiragino Sans", sans-serif;
 }
 
+input[type="datetime-local"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit {
+  min-width: 0;
+  overflow: hidden;
+}
+
 input:-webkit-autofill,
 textarea:-webkit-autofill,
 select:-webkit-autofill {

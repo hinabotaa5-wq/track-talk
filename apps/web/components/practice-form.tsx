@@ -116,15 +116,17 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           onChange={(e) => setVenue(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
+      <label className="block min-w-0 text-sm font-medium">
         練習日時
-        <Input
-          className={fieldClass}
-          type="datetime-local"
-          value={startsAt}
-          min={initial ? undefined : toLocalInput(new Date().toISOString())}
-          onChange={(e) => setStartsAt(e.target.value)}
-        />
+        <span className="mt-1 grid grid-cols-[minmax(0,1fr)]">
+          <Input
+            className="block w-full min-w-0 max-w-full"
+            type="datetime-local"
+            value={startsAt}
+            min={initial ? undefined : toLocalInput(new Date().toISOString())}
+            onChange={(e) => setStartsAt(e.target.value)}
+          />
+        </span>
       </label>
       <label className="block text-sm font-medium">
         種目
