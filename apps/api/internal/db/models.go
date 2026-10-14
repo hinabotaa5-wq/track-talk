@@ -57,8 +57,28 @@ type DomesticMajor struct {
 }
 
 type InjuryDetail struct {
-	PostID   uuid.UUID `json:"post_id"`
-	BodyPart string    `json:"body_part"`
+	PostID     uuid.UUID `json:"post_id"`
+	BodyPart   string    `json:"body_part"`
+	GroupStage *string   `json:"group_stage"`
+}
+
+type InjuryGroupMember struct {
+	UserID    uuid.UUID `json:"user_id"`
+	BodyPart  string    `json:"body_part"`
+	InjuredOn time.Time `json:"injured_on"`
+	Place     string    `json:"place"`
+	Situation string    `json:"situation"`
+	Stage     string    `json:"stage"`
+	JoinedAt  time.Time `json:"joined_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type InjuryGroupStageLog struct {
+	ID        int64     `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	BodyPart  string    `json:"body_part"`
+	Stage     string    `json:"stage"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type InjuryUpdate struct {

@@ -26,11 +26,14 @@ WHERE p.deleted_at IS NULL
   )
   AND (
     sqlc.narg('stage')::text IS NULL
-    OR (
-      SELECT u.stage FROM injury_updates u
-      WHERE u.post_id = p.id
-      ORDER BY u.created_at DESC
-      LIMIT 1
+    OR COALESCE(
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
+      (
+        SELECT u.stage FROM injury_updates u
+        WHERE u.post_id = p.id
+        ORDER BY u.created_at DESC
+        LIMIT 1
+      )
     ) = sqlc.narg('stage')
   )
   AND (
@@ -108,11 +111,14 @@ WHERE p.deleted_at IS NULL
   )
   AND (
     sqlc.narg('stage')::text IS NULL
-    OR (
-      SELECT u.stage FROM injury_updates u
-      WHERE u.post_id = p.id
-      ORDER BY u.created_at DESC
-      LIMIT 1
+    OR COALESCE(
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
+      (
+        SELECT u.stage FROM injury_updates u
+        WHERE u.post_id = p.id
+        ORDER BY u.created_at DESC
+        LIMIT 1
+      )
     ) = sqlc.narg('stage')
   )
   AND (
@@ -177,11 +183,14 @@ WHERE p.deleted_at IS NULL
   )
   AND (
     sqlc.narg('stage')::text IS NULL
-    OR (
-      SELECT u.stage FROM injury_updates u
-      WHERE u.post_id = p.id
-      ORDER BY u.created_at DESC
-      LIMIT 1
+    OR COALESCE(
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
+      (
+        SELECT u.stage FROM injury_updates u
+        WHERE u.post_id = p.id
+        ORDER BY u.created_at DESC
+        LIMIT 1
+      )
     ) = sqlc.narg('stage')
   )
   AND (

@@ -96,3 +96,105 @@ export function injuryRepeatedParts(items: { body_part: string; body_part_label:
   }
   return [...counts.values()].filter((item) => item.count >= 2);
 }
+
+export function injuryBodyPartLabel(code: string) {
+  return injuryBodyParts.find((item) => item.value === code)?.label ?? code;
+}
+
+export type InjuryGroupMember = {
+  stage: InjuryStage;
+  stage_label: string;
+  injured_on: string;
+  place: string;
+  situation: string;
+};
+
+export type InjuryGroupSummary = {
+  body_part: string;
+  body_part_label: string;
+  members: number;
+  me?: InjuryGroupMember;
+};
+
+export type InjuryGroupStage = {
+  stage: InjuryStage;
+  stage_label: string;
+  members: number;
+  faces: string[];
+};
+
+export type InjuryGroup = {
+  body_part: string;
+  body_part_label: string;
+  members: number;
+  stages: InjuryGroupStage[];
+  me: InjuryGroupMember;
+};
+
+// 参加時に1問ずつ聞く質問。順番がそのまま画面の順。
+export const injuryJoinSteps = ["injuredOn", "place", "situation", "stage"] as const;
+export type InjuryJoinStep = (typeof injuryJoinSteps)[number];
+
+export const injuryJoinPlaces = ["練習中", "大会・試合中", "日常生活", "ジム・筋トレ", "その他"] as const;
+
+export const injuryJoinPlaceMaxLength = 100;
+export const injuryJoinSituationMaxLength = 500;
+
+export type InjuryJoinAnswers = {
+  injuredOn: string;
+  place: string;
+  situation: string;
+  stage: InjuryStage | "";
+};
+
+export const emptyInjuryJoinAnswers: InjuryJoinAnswers = { injuredOn: "", place: "", situation: "", stage: "" };
+
+// 端末の日付を YYYY-MM-DD で返す(「今日より先」を選べなくするため)。
+export function localDateString(now: Date) {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+// その質問の答えに問題があれば、画面に出す文言を返す。問題なければ空文字。
+export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAnswers, today: string) {
+  switch (step) {
+    case "injuredOn":
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.injuredOn)) return "いつ痛めたかを選んでください";
+      if (answers.injuredOn > today) return "未来の日付は選べません";
+      return "";
+    case "place":
+      if (answers.place.trim() === "") return "どこで痛めたかを入力してください";
+      if ([...answers.place.trim()].length > injuryJoinPlaceMaxLength) return `${injuryJoinPlaceMaxLength}文字以内で入力してください`;
+      return "";
+    case "situation":
+      if (answers.situation.trim() === "") return "どんな状況だったかを入力してください";
+      if ([...answers.situation.trim()].length > injuryJoinSituationMaxLength) return `${injuryJoinSituationMaxLength}文字以内で入力してください`;
+      return "";
+    case "stage":
+      return isInjuryStage(answers.stage) ? "" : "いまの状況を選んでください";
+  }
+}
+
+export function injuryJoinPayload(answers: InjuryJoinAnswers) {
+  return {
+    injured_on: answers.injuredOn,
+    place: answers.place.trim(),
+    situation: answers.situation.trim(),
+    stage: answers.stage,
+  };
+}
+
+export function injuryGroupPath(part: string) {
+  return `/injury/${part}`;
+}
+
+// 一覧の並び: 参加中のグループを先に、そのあとは人の多い順(同数なら部位の並び順)。
+export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
+  const order = new Map<string, number>(injuryBodyParts.map((item, index) => [item.value, index]));
+  return [...groups].sort((a, b) => {
+    if (!!a.me !== !!b.me) return a.me ? -1 : 1;
+    if (a.members !== b.members) return b.members - a.members;
+    return (order.get(a.body_part) ?? 0) - (order.get(b.body_part) ?? 0);
+  });
+}
