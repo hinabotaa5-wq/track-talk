@@ -41,6 +41,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		},
 	}
 	r := chi.NewRouter()
+	r.Use(SecurityHeaders)
 	r.Use(Recover)
 	r.Use(RequestLog)
 	r.Use(cors.Handler(cors.Options{
