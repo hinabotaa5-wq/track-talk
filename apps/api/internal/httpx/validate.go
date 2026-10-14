@@ -1,7 +1,6 @@
 package httpx
 
 import (
-	"net/mail"
 	"net/url"
 	"strings"
 	"unicode/utf8"
@@ -140,21 +139,6 @@ func InquirySubject(v string) string {
 	n := utf8.RuneCountInString(v)
 	if n < 1 || n > 80 {
 		return "1〜80文字で入力してください"
-	}
-	return ""
-}
-
-func ContactEmail(v string) string {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return "メールアドレスを入力してください"
-	}
-	if len(v) > 254 {
-		return "254文字以内で入力してください"
-	}
-	a, err := mail.ParseAddress(v)
-	if err != nil || a.Address != v || !strings.Contains(v[strings.LastIndex(v, "@"):], ".") {
-		return "メールアドレスを確認してください"
 	}
 	return ""
 }

@@ -247,7 +247,6 @@ export default function AdminPage() {
             <li key={i.id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3">
               <p className="text-xs text-slate-200">
                 {inquiryCategoryLabels[i.category]} · {i.user_nickname ?? "名前なし"} · {formatDateTime(i.created_at)}
-                {i.contact_email ? ` · ${i.contact_email}` : ""}
               </p>
               {i.body.startsWith(i.subject) ? null : <p className="font-medium">{i.subject}</p>}
               <p className="whitespace-pre-wrap text-sm text-slate-100">{i.body}</p>

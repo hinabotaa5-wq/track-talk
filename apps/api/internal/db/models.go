@@ -90,14 +90,13 @@ type InjuryUpdate struct {
 }
 
 type Inquiry struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	CreatedAt    time.Time `json:"created_at"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	Source    string    `json:"source"`
 }
 
 type MajorHost struct {

@@ -46,30 +46,28 @@ func (q *Queries) CountMyInquiries(ctx context.Context, userID uuid.UUID) (int64
 }
 
 const createInquiry = `-- name: CreateInquiry :one
-INSERT INTO inquiries (id, user_id, category, subject, body, source, contact_email)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, category, subject, body, source, contact_email, created_at
+INSERT INTO inquiries (id, user_id, category, subject, body, source)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, category, subject, body, source, created_at
 `
 
 type CreateInquiryParams struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
+	ID       uuid.UUID `json:"id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Category string    `json:"category"`
+	Subject  string    `json:"subject"`
+	Body     string    `json:"body"`
+	Source   string    `json:"source"`
 }
 
 type CreateInquiryRow struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (CreateInquiryRow, error) {
@@ -80,7 +78,6 @@ func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (C
 		arg.Subject,
 		arg.Body,
 		arg.Source,
-		arg.ContactEmail,
 	)
 	var i CreateInquiryRow
 	err := row.Scan(
@@ -90,14 +87,13 @@ func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (C
 		&i.Subject,
 		&i.Body,
 		&i.Source,
-		&i.ContactEmail,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listAdminInquiries = `-- name: ListAdminInquiries :many
-SELECT i.id, i.category, i.subject, i.body, i.source, i.contact_email, i.created_at, p.nickname AS user_nickname
+SELECT i.id, i.category, i.subject, i.body, i.source, i.created_at, p.nickname AS user_nickname
 FROM inquiries i
 JOIN profiles p ON p.id = i.user_id
 WHERE i.source = $1
@@ -117,7 +113,6 @@ type ListAdminInquiriesRow struct {
 	Subject      string    `json:"subject"`
 	Body         string    `json:"body"`
 	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
 	CreatedAt    time.Time `json:"created_at"`
 	UserNickname *string   `json:"user_nickname"`
 }
@@ -137,7 +132,6 @@ func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiries
 			&i.Subject,
 			&i.Body,
 			&i.Source,
-			&i.ContactEmail,
 			&i.CreatedAt,
 			&i.UserNickname,
 		); err != nil {
@@ -152,7 +146,7 @@ func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiries
 }
 
 const listInquiries = `-- name: ListInquiries :many
-SELECT id, user_id, category, subject, body, source, contact_email, created_at
+SELECT id, user_id, category, subject, body, source, created_at
 FROM inquiries
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -164,14 +158,13 @@ type ListInquiriesParams struct {
 }
 
 type ListInquiriesRow struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([]ListInquiriesRow, error) {
@@ -190,7 +183,6 @@ func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([
 			&i.Subject,
 			&i.Body,
 			&i.Source,
-			&i.ContactEmail,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -204,7 +196,7 @@ func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([
 }
 
 const listMyInquiries = `-- name: ListMyInquiries :many
-SELECT id, user_id, category, subject, body, source, contact_email, created_at
+SELECT id, user_id, category, subject, body, source, created_at
 FROM inquiries
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -218,14 +210,13 @@ type ListMyInquiriesParams struct {
 }
 
 type ListMyInquiriesRow struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Category  string    `json:"category"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams) ([]ListMyInquiriesRow, error) {
@@ -244,7 +235,6 @@ func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams
 			&i.Subject,
 			&i.Body,
 			&i.Source,
-			&i.ContactEmail,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

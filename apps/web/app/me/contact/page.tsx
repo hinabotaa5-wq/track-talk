@@ -26,7 +26,7 @@ export default function ContactPage() {
   const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
     resolver: zodResolver(inquirySchema),
-    defaultValues: { category: "bug", email: "", subject: "", body: "" },
+    defaultValues: { category: "bug", subject: "", body: "" },
   });
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function ContactPage() {
         body: JSON.stringify(values),
       });
       setInquiries((current) => [created, ...current]);
-      form.reset({ category: values.category, email: values.email, subject: "", body: "" });
+      form.reset({ category: values.category, subject: "", body: "" });
       setSent(true);
     } catch (err) {
       if (err instanceof ApiRequestError) {
@@ -101,10 +101,6 @@ export default function ContactPage() {
             ))}
           </select>
         </label>
-        <Input type="email" autoComplete="email" placeholder="返信先のメールアドレス" {...form.register("email")} />
-        {form.formState.errors.email ? (
-          <p className="text-sm text-red-400">{form.formState.errors.email.message}</p>
-        ) : null}
         <Input placeholder="件名" {...form.register("subject")} />
         {form.formState.errors.subject ? (
           <p className="text-sm text-red-400">{form.formState.errors.subject.message}</p>

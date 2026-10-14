@@ -73,7 +73,7 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 		t.Fatalf("report %d %s", rec.Code, rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", author, map[string]string{
-		"category": "other", "subject": "退会前", "body": "問い合わせ本文", "email": "runner@example.com",
+		"category": "other", "subject": "退会前", "body": "問い合わせ本文",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("inquiry %d %s", rec.Code, rec.Body.String())
