@@ -167,6 +167,7 @@ export type Inquiry = {
   category: "bug" | "account" | "request" | "other";
   subject: string;
   body: string;
+  contact_email: string | null;
   created_at: string;
 };
 

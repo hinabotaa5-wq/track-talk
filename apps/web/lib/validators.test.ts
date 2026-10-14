@@ -95,9 +95,11 @@ describe("validators", () => {
 
   it("accepts an inquiry and rejects a blank subject", () => {
     expect(
-      inquirySchema.safeParse({ category: "bug", subject: "ログインできない", body: "再設定後も入れません" }).success,
+      inquirySchema.safeParse({ category: "bug", email: "a@b.co", subject: "ログインできない", body: "再設定後も入れません" }).success,
     ).toBe(true);
-    expect(inquirySchema.safeParse({ category: "bug", subject: "  ", body: "本文" }).success).toBe(false);
+    expect(inquirySchema.safeParse({ category: "bug", email: "a@b.co", subject: "  ", body: "本文" }).success).toBe(false);
+    expect(inquirySchema.safeParse({ category: "bug", email: "", subject: "件名", body: "本文" }).success).toBe(false);
+    expect(inquirySchema.safeParse({ category: "bug", email: "not-an-email", subject: "件名", body: "本文" }).success).toBe(false);
   });
 
   it("uses Japanese messages when a field is missing", () => {

@@ -723,6 +723,20 @@ func TestInquiryStaysWithTheSender(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
 		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません",
 	})
+	if rec.Code != 422 {
+		t.Fatalf("missing email %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません", "email": "not-an-email",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("bad email %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "bug", "subject": "ログインできない", "body": "パスワード再設定後も入れません", "email": "runner@example.com",
+	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -733,15 +747,17 @@ func TestInquiryStaysWithTheSender(t *testing.T) {
 	}
 	var list struct {
 		Inquiries []struct {
-			Subject string `json:"subject"`
-			UserID  string `json:"user_id"`
+			Subject      string  `json:"subject"`
+			UserID       string  `json:"user_id"`
+			ContactEmail *string `json:"contact_email"`
 		} `json:"inquiries"`
 		Meta struct {
 			Total int64 `json:"total"`
 		} `json:"meta"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].Subject != "ログインできない" || list.Inquiries[0].UserID != a.String() {
+	if list.Meta.Total != 1 || len(list.Inquiries) != 1 || list.Inquiries[0].Subject != "ログインできない" || list.Inquiries[0].UserID != a.String() ||
+		list.Inquiries[0].ContactEmail == nil || *list.Inquiries[0].ContactEmail != "runner@example.com" {
 		t.Fatalf("mine %+v", list)
 	}
 

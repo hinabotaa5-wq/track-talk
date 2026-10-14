@@ -67,6 +67,12 @@ export const inquiryCategoryLabels: Record<(typeof inquiryCategories)[number], s
 
 export const inquirySchema = z.object({
   category: z.enum(inquiryCategories, "種類を選んでください"),
+  email: z
+    .string("メールアドレスを入力してください")
+    .trim()
+    .min(1, "メールアドレスを入力してください")
+    .max(254, "254文字以内で入力してください")
+    .email("メールアドレスを確認してください"),
   subject: z.string("件名を入力してください").trim().min(1, "件名を入力してください").max(80, "80文字以内で入力してください"),
   body: z.string("内容を入力してください").trim().min(1, "内容を入力してください").max(2000, "2000文字以内で入力してください"),
 });
