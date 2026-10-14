@@ -88,11 +88,8 @@ func parseOEmbed(videoID string, raw []byte) (string, string, error) {
 	}
 	title := clipRunes(strings.TrimSpace(body.Title), 120)
 	thumb := strings.TrimSpace(body.ThumbnailURL)
-	if HTTPSURL(thumb) != "" {
+	if YouTubeThumbnailURL(thumb) != "" {
 		thumb = "https://i.ytimg.com/vi/" + videoID + "/hqdefault.jpg"
-	}
-	if HTTPSURL(thumb) != "" {
-		return "", "", errors.New("thumbnail")
 	}
 	return title, thumb, nil
 }

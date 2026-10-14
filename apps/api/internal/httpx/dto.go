@@ -105,7 +105,7 @@ func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) 
 	if publicID != nil && kind == "text" {
 		p.ImagePublicID = *publicID
 	}
-	if kind == "youtube" && thumbnail != nil {
+	if kind == "youtube" && thumbnail != nil && YouTubeThumbnailURL(*thumbnail) == "" {
 		p.ThumbnailURL = *thumbnail
 	}
 }

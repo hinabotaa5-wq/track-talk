@@ -344,7 +344,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 		if e := YouTubeVideoID(id); e != "" {
 			fields["youtube_video_id"] = e
 		}
-		if e := HTTPSURL(thumb); e != "" {
+		if e := YouTubeThumbnailURL(thumb); e != "" {
 			fields["youtube_thumbnail_url"] = e
 		}
 		if strings.TrimSpace(req.VideoPublicID) != "" {
@@ -650,13 +650,27 @@ func (s *Server) likePost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	n, err := s.q.InsertLike(r.Context(), db.InsertLikeParams{PostID: id, UserID: p.ID})
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	n, err := q.InsertLike(r.Context(), db.InsertLikeParams{PostID: id, UserID: p.ID})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	if n > 0 {
-		_ = s.q.IncrementLikeCount(r.Context(), id)
+		if err := q.IncrementLikeCount(r.Context(), id); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -670,13 +684,27 @@ func (s *Server) unlikePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n, err := s.q.DeleteLike(r.Context(), db.DeleteLikeParams{PostID: id, UserID: p.ID})
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	n, err := q.DeleteLike(r.Context(), db.DeleteLikeParams{PostID: id, UserID: p.ID})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	if n > 0 {
-		_ = s.q.DecrementLikeCount(r.Context(), id)
+		if err := q.DecrementLikeCount(r.Context(), id); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -696,6 +724,10 @@ func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, c
 func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
+		return
+	}
+	if _, err := s.q.GetPost(r.Context(), id); err != nil {
+		MapDBError(w, err)
 		return
 	}
 	page, per, offset := s.queryPage(r)
@@ -752,7 +784,14 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"body": e})
 		return
 	}
-	c, err := s.q.CreateComment(r.Context(), db.CreateCommentParams{
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	c, err := q.CreateComment(r.Context(), db.CreateCommentParams{
 		ID:       uuid.New(),
 		PostID:   postID,
 		AuthorID: p.ID,
@@ -762,12 +801,19 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	_ = s.q.IncrementCommentCount(r.Context(), postID)
+	if err := q.IncrementCommentCount(r.Context(), postID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if post.AuthorID != p.ID {
-		if err := insertNotification(r.Context(), s.q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
+		if err := insertNotification(r.Context(), q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
 }
@@ -815,12 +861,19 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c, err := s.q.GetComment(r.Context(), id)
+	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	n, err := s.q.SoftDeleteComment(r.Context(), db.SoftDeleteCommentParams{ID: id, AuthorID: p.ID})
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	c, err := q.GetComment(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	n, err := q.SoftDeleteComment(r.Context(), db.SoftDeleteCommentParams{ID: id, AuthorID: p.ID})
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -829,7 +882,14 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusForbidden, "forbidden", "削除できません")
 		return
 	}
-	_ = s.q.DecrementCommentCount(r.Context(), c.PostID)
+	if err := q.DecrementCommentCount(r.Context(), c.PostID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1026,13 +1086,33 @@ func (s *Server) hideComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n, err := s.q.HideComment(r.Context(), id)
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	c, err := q.GetComment(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	n, err := q.HideComment(r.Context(), id)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	if n == 0 {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+		return
+	}
+	if err := q.DecrementCommentCount(r.Context(), c.PostID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

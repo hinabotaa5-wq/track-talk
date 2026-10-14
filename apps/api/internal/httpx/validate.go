@@ -64,10 +64,26 @@ func HTTPSURL(v string) string {
 		return "サムネイルのURLが不正です"
 	}
 	u, err := url.Parse(v)
-	if err != nil || u.Scheme != "https" || u.Host == "" {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
 		return "サムネイルのURLが不正です"
 	}
 	return ""
+}
+
+func YouTubeThumbnailURL(v string) string {
+	if msg := HTTPSURL(v); msg != "" {
+		return msg
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Port() != "" {
+		return "サムネイルのURLが不正です"
+	}
+	switch strings.TrimSuffix(strings.ToLower(u.Hostname()), ".") {
+	case "i.ytimg.com", "img.youtube.com":
+		return ""
+	default:
+		return "サムネイルのURLが不正です"
+	}
 }
 
 func VideoPublicID(v string) string {
