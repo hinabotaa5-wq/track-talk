@@ -35,7 +35,7 @@ export default function YouTubePostPage() {
     if (!acquire()) return;
     setError("");
     try {
-      const data = await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
+      await apiFetch<{ post: Post; existing: boolean }>("/v1/posts/youtube", {
         method: "POST",
         token,
         body: JSON.stringify({ url: url.trim(), title, body }),

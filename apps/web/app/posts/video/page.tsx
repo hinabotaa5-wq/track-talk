@@ -57,7 +57,7 @@ export default function OwnVideoPage() {
       setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
       setUploadPhase("saving");
       setStatus("");
-      const post = await apiFetch<Post>("/v1/posts", {
+      await apiFetch<Post>("/v1/posts", {
         method: "POST",
         token,
         body: JSON.stringify({
