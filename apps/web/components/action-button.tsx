@@ -15,11 +15,13 @@ export function LikeButton({
   count,
   disabled,
   onClick,
+  label = "いいね",
 }: {
   liked: boolean;
   count: number;
   disabled?: boolean;
   onClick: () => void;
+  label?: string;
 }) {
   return (
     <motion.button
@@ -47,7 +49,7 @@ export function LikeButton({
           )}
         />
       </motion.span>
-      <span>いいね</span>
+      <span>{label}</span>
       <span className="font-bold tabular-nums">{count}</span>
     </motion.button>
   );

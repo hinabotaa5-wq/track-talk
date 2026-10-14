@@ -42,7 +42,7 @@ export type Post = {
   comment_count: number;
   liked_by_me: boolean;
   saved_by_me: boolean;
-  kind: "text" | "youtube" | "video" | "recruitment" | "practice";
+  kind: "text" | "youtube" | "video" | "recruitment" | "practice" | "injury";
   thumbnail_url?: string;
   youtube_video_id?: string;
   video_public_id?: string;
@@ -50,8 +50,16 @@ export type Post = {
   playback_url?: string;
   recruitment?: Recruitment;
   practice?: Practice;
+  injury?: Injury;
   created_at: string;
   updated_at: string;
+};
+
+export type Injury = {
+  mood: "vent" | "rehab";
+  mood_label: string;
+  body_part: string;
+  body_part_label: string;
 };
 
 export type RecruitmentPhoto = {

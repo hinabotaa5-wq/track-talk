@@ -148,7 +148,7 @@ func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	var kind *string
-	if value := strings.TrimSpace(r.URL.Query().Get("kind")); value == "recruitment" {
+	if value := strings.TrimSpace(r.URL.Query().Get("kind")); value == "recruitment" || value == "injury" {
 		kind = &value
 	}
 	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil, kind)
@@ -164,9 +164,20 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	page, per, offset := s.queryPage(r)
 	popular := sort == "popular"
 	keyword, codes := searchArgs(r.URL.Query().Get("q"))
+	var mood, part *string
+	if kind != nil && *kind == "injury" {
+		if v := strings.TrimSpace(r.URL.Query().Get("mood")); validInjuryMood(v) {
+			mood = &v
+		}
+		if v := strings.TrimSpace(r.URL.Query().Get("part")); validInjuryBodyPart(v) {
+			part = &v
+		}
+	}
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
 		AuthorID:        author,
 		Kind:            kind,
+		Mood:            mood,
+		Part:            part,
 		PopularWindow:   boolPtr(popular && author == nil),
 		Keyword:         keyword,
 		PrefectureCodes: codes,
@@ -180,6 +191,8 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
 			AuthorID:        author,
 			Kind:            kind,
+			Mood:            mood,
+			Part:            part,
 			PopularWindow:   boolPtr(author == nil),
 			Keyword:         keyword,
 			PrefectureCodes: codes,
@@ -203,6 +216,8 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		rows, err := s.q.ListPostsNew(r.Context(), db.ListPostsNewParams{
 			AuthorID:        author,
 			Kind:            kind,
+			Mood:            mood,
+			Part:            part,
 			Keyword:         keyword,
 			PrefectureCodes: codes,
 			LimitN:          per,
@@ -227,6 +242,10 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		return
 	}
 	if err := s.attachPracticeSummaries(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := s.attachInjurySummaries(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -314,6 +333,11 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	item, err = s.attachInjury(r.Context(), item)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	item, err = s.attachPracticeViewer(r, item)
 	if err != nil {
 		MapDBError(w, err)
@@ -343,13 +367,15 @@ type postReq struct {
 	Event               string   `json:"event"`
 	EventOther          string   `json:"event_other"`
 	Capacity            int      `json:"capacity"`
+	Mood                string   `json:"mood"`
+	BodyPart            string   `json:"body_part"`
 }
 
-func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, bool) {
+func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, injuryInput{}, false
 	}
 	if forceKind != "" {
 		req.Kind = forceKind
@@ -373,6 +399,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	var youtubeID, youtubeThumb, publicID *string
 	var recruitment recruitmentInput
 	var practice practiceInput
+	var injury injuryInput
 	switch kind {
 	case "text":
 		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
@@ -450,14 +477,35 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 			fields[key] = value
 		}
 		practice = parsed
+	case "injury":
+		if strings.TrimSpace(req.YouTubeVideoID) != "" || strings.TrimSpace(req.YouTubeThumbnailURL) != "" || strings.TrimSpace(req.VideoPublicID) != "" {
+			fields["kind"] = "ケガの投稿に動画情報は付けられません"
+		}
+		if strings.TrimSpace(req.ImagePublicID) != "" || len(req.ImagePublicIDs) > 0 {
+			fields["image_public_id"] = "ケガの投稿に写真は付けられません"
+		}
+		body, bodyErr := textLimit(req.Body, 5000, "いまの気持ちや状況を入力してください", "本文は5000文字以内で入力してください", true)
+		if bodyErr != "" {
+			fields["body"] = bodyErr
+		} else {
+			req.Body = body
+		}
+		parsed, fieldErrs := normalizeInjury(req)
+		for key, value := range fieldErrs {
+			fields[key] = value
+		}
+		injury = parsed
 	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
-		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, false
+		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, injuryInput{}, false
 	}
 	title := strings.TrimSpace(req.Title)
 	if kind == "practice" {
 		title = practiceTitle(practice.Event, practice.EventOther, practice.StartsAt)
+	}
+	if kind == "injury" && title == "" {
+		title = injuryTitle(req.Body)
 	}
 	return db.CreatePostParams{
 		Title:               title,
@@ -466,7 +514,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 		YoutubeVideoID:      youtubeID,
 		YoutubeThumbnailUrl: youtubeThumb,
 		CloudinaryPublicID:  publicID,
-	}, recruitment, practice, true
+	}, recruitment, practice, injury, true
 }
 
 func textPostHasContent(title, body string, imagePublicID *string) bool {
@@ -487,7 +535,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	params, recruitment, practice, ok := s.parsePostReq(w, r, "")
+	params, recruitment, practice, injury, ok := s.parsePostReq(w, r, "")
 	if !ok {
 		return
 	}
@@ -497,6 +545,10 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if params.Kind == "practice" {
 		s.createPractice(w, r, p, params, practice)
+		return
+	}
+	if params.Kind == "injury" {
+		s.createInjury(w, r, p, params, injury)
 		return
 	}
 	if params.Kind == "text" && !textPostHasContent(params.Title, params.Body, params.CloudinaryPublicID) {
@@ -560,7 +612,11 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updatePractice(w, r, p, id)
 		return
 	}
-	params, _, _, ok := s.parsePostReq(w, r, "")
+	if existing.Kind == "injury" {
+		s.updateInjury(w, r, p, id)
+		return
+	}
+	params, _, _, _, ok := s.parsePostReq(w, r, "")
 	if !ok {
 		return
 	}
@@ -663,6 +719,10 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.attachPracticeSummaries(r.Context(), items); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := s.attachInjurySummaries(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return
 	}

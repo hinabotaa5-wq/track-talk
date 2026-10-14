@@ -74,6 +74,34 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       </Link>
     );
   }
+  if (post.kind === "injury") {
+    const info = post.injury;
+    return (
+      <Link href={href} className={cardClass}>
+        <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-rose-400/10 p-3.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {info ? (
+              <>
+                <span className="w-fit rounded-full bg-rose-950/70 px-2.5 py-0.5 text-[11px] font-bold text-rose-300 border border-rose-800/60">
+                  {info.mood_label}
+                </span>
+                <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 border border-white/20">
+                  {info.body_part_label}
+                </span>
+              </>
+            ) : null}
+          </div>
+          <p className="line-clamp-4 text-sm font-bold leading-snug text-slate-100 transition-colors group-hover:text-blue-400">
+            {title}
+          </p>
+          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-[10px] font-mono text-slate-300">
+            <span>TrackTalk</span>
+            <span className="font-semibold text-rose-300">わかる {post.like_count}</span>
+          </div>
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link href={href} className={cardClass}>
       <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url ? "" : "aspect-[4/3]"}`}>

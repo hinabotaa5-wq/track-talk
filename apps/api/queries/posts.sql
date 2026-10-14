@@ -17,7 +17,16 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
-    sqlc.narg('kind')::text IS NULL
+    (sqlc.narg('mood')::text IS NULL AND sqlc.narg('part')::text IS NULL)
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      WHERE i.post_id = p.id
+        AND (sqlc.narg('mood')::text IS NULL OR i.mood = sqlc.narg('mood'))
+        AND (sqlc.narg('part')::text IS NULL OR i.body_part = sqlc.narg('part'))
+    )
+  )
+  AND (
+    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -82,7 +91,16 @@ WHERE p.deleted_at IS NULL
   AND (sqlc.narg('popular_window')::bool IS NOT TRUE OR p.created_at >= now() - interval '14 days')
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
-    sqlc.narg('kind')::text IS NULL
+    (sqlc.narg('mood')::text IS NULL AND sqlc.narg('part')::text IS NULL)
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      WHERE i.post_id = p.id
+        AND (sqlc.narg('mood')::text IS NULL OR i.mood = sqlc.narg('mood'))
+        AND (sqlc.narg('part')::text IS NULL OR i.body_part = sqlc.narg('part'))
+    )
+  )
+  AND (
+    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -134,7 +152,16 @@ WHERE p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (sqlc.narg('author_id')::uuid IS NULL OR p.author_id = sqlc.narg('author_id'))
   AND (
-    sqlc.narg('kind')::text IS NULL
+    (sqlc.narg('mood')::text IS NULL AND sqlc.narg('part')::text IS NULL)
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      WHERE i.post_id = p.id
+        AND (sqlc.narg('mood')::text IS NULL OR i.mood = sqlc.narg('mood'))
+        AND (sqlc.narg('part')::text IS NULL OR i.body_part = sqlc.narg('part'))
+    )
+  )
+  AND (
+    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')

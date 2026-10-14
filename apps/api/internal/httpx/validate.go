@@ -49,7 +49,7 @@ func Nickname(v string) string {
 
 func Kind(v string) string {
 	switch v {
-	case "text", "youtube", "video", "recruitment", "practice":
+	case "text", "youtube", "video", "recruitment", "practice", "injury":
 		return ""
 	default:
 		return "種類が不正です"

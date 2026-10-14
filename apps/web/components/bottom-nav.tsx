@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, Trophy, UserRound } from "lucide-react";
+import { HeartPulse, Home, Plus, Trophy, UserRound } from "lucide-react";
 import { competitionPrefectureEvent, competitionsPath, readSavedCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
-  { id: "post", href: "/upload", label: "投稿", icon: Plus },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
+  { id: "post", href: "/upload", label: "投稿", icon: Plus },
+  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
@@ -50,6 +51,7 @@ export function activeMainTab(pathname: string) {
   if (pathname === "/") return "home";
   if (pathname === "/upload") return "post";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
+  if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
   if (pathname === "/me") return "me";
   return "";
 }
@@ -59,6 +61,7 @@ export function showsBackButton(pathname: string) {
   if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
+  if (pathname === "/injury/new") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
 }
@@ -87,7 +90,7 @@ export function BottomNav() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="メイン"
       >
-        <ul className="mx-auto grid h-14 max-w-5xl grid-cols-4">
+        <ul className="mx-auto grid h-14 max-w-5xl grid-cols-5">
           {mainTabs.map((tab) => {
             const Icon = tab.icon;
             const active = current === tab.id;

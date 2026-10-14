@@ -1,0 +1,39 @@
+export const injuryMoods = [
+  { value: "vent", label: "吐き出し", hint: "つらい気持ちをそのまま書く" },
+  { value: "rehab", label: "代替トレ", hint: "走れない中でやっていることを共有する" },
+] as const;
+
+export const injuryBodyParts = [
+  { value: "foot", label: "足裏・足部" },
+  { value: "ankle", label: "足首" },
+  { value: "achilles", label: "アキレス腱" },
+  { value: "calf", label: "ふくらはぎ" },
+  { value: "shin", label: "すね" },
+  { value: "knee", label: "膝" },
+  { value: "quad", label: "太もも前" },
+  { value: "hamstring", label: "ハムストリング" },
+  { value: "groin", label: "股関節・鼠径部" },
+  { value: "hip", label: "お尻・骨盤" },
+  { value: "lower-back", label: "腰" },
+  { value: "upper-body", label: "上半身" },
+  { value: "other", label: "その他" },
+] as const;
+
+export type InjuryMood = (typeof injuryMoods)[number]["value"];
+
+export function isInjuryMood(value: string | null | undefined): value is InjuryMood {
+  return injuryMoods.some((item) => item.value === value);
+}
+
+export function isInjuryBodyPart(value: string | null | undefined) {
+  return injuryBodyParts.some((item) => item.value === value);
+}
+
+export const injuryNotice = "ここでの投稿は医療的な助言ではありません。痛みが続くときは医療機関に相談してください。";
+
+export function injuryFeedPath(mood: string, part: string, page: number) {
+  const qs = new URLSearchParams({ kind: "injury", sort: "new", page: String(page), per_page: "20" });
+  if (isInjuryMood(mood)) qs.set("mood", mood);
+  if (isInjuryBodyPart(part)) qs.set("part", part);
+  return `/v1/posts?${qs}`;
+}
