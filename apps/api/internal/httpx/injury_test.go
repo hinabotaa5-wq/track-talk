@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -516,5 +517,98 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	report("practice")
 	if got := notes(liker); len(got) != 2 {
 		t.Fatalf("a new update after reading should notify again: %+v", got)
+	}
+}
+
+func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
+	h := setup(t)
+	author := token(t, uuid.New())
+	other := token(t, uuid.New())
+	follower := token(t, uuid.New())
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
+		"kind": "injury", "title": "編集の確認", "body": "本文", "mood": "vent", "body_part": "upper-body",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var post struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+		t.Fatal(err)
+	}
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/saves", follower, nil); r.Code >= 300 {
+		t.Fatalf("save %d", r.Code)
+	}
+	created := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/injury/updates", author, map[string]any{"stage": "rehab", "body": "最初の報告"})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("update %d %s", created.Code, created.Body.String())
+	}
+	var up struct {
+		ID        string `json:"id"`
+		CreatedAt string `json:"created_at"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &up); err != nil {
+		t.Fatal(err)
+	}
+	path := "/v1/posts/" + post.ID + "/injury/updates/" + up.ID
+	fix := map[string]any{"stage": "jogging", "body": "書き直した報告"}
+
+	if r := doJSON(t, h, http.MethodPatch, path, "", fix); r.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status %d", r.Code)
+	}
+	if r := doJSON(t, h, http.MethodPatch, path, other, fix); r.Code != http.StatusNotFound {
+		t.Fatalf("other user status %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, http.MethodPatch, path, author, map[string]any{"stage": "flying", "body": "x"}); r.Code == http.StatusOK {
+		t.Fatalf("invalid stage accepted")
+	}
+	if r := doJSON(t, h, http.MethodPatch, path, author, map[string]any{"stage": "rehab", "body": "  "}); r.Code == http.StatusOK {
+		t.Fatalf("empty body accepted")
+	}
+	missing := "/v1/posts/" + post.ID + "/injury/updates/" + uuid.NewString()
+	if r := doJSON(t, h, http.MethodPatch, missing, author, fix); r.Code != http.StatusNotFound {
+		t.Fatalf("unknown update status %d", r.Code)
+	}
+
+	r := doJSON(t, h, http.MethodPatch, path, author, fix)
+	if r.Code != http.StatusOK {
+		t.Fatalf("edit %d %s", r.Code, r.Body.String())
+	}
+	var edited struct {
+		ID         string `json:"id"`
+		Stage      string `json:"stage"`
+		StageLabel string `json:"stage_label"`
+		Body       string `json:"body"`
+		CreatedAt  string `json:"created_at"`
+	}
+	if err := json.Unmarshal(r.Body.Bytes(), &edited); err != nil {
+		t.Fatal(err)
+	}
+	if edited.ID != up.ID || edited.Stage != "jogging" || edited.StageLabel != "ジョグ再開" || edited.Body != "書き直した報告" {
+		t.Fatalf("edited %+v", edited)
+	}
+	if edited.CreatedAt != up.CreatedAt {
+		t.Fatalf("created_at must not change: %s -> %s", up.CreatedAt, edited.CreatedAt)
+	}
+
+	// フィードの最新の段階にも反映される。
+	feed := doJSON(t, h, http.MethodGet, "/v1/posts?kind=injury&sort=new&stage=jogging", "", nil)
+	if feed.Code != http.StatusOK || !strings.Contains(feed.Body.String(), post.ID) {
+		t.Fatalf("edited stage should appear in the stage filter: %d %s", feed.Code, feed.Body.String())
+	}
+	// 編集では通知を送らない(保存した人への通知は最初の報告の1件のまま)。
+	nr := doJSON(t, h, http.MethodGet, "/v1/me/notifications", follower, nil)
+	var notes struct {
+		Notifications []struct {
+			Kind string `json:"kind"`
+		} `json:"notifications"`
+	}
+	if err := json.Unmarshal(nr.Body.Bytes(), &notes); err != nil {
+		t.Fatal(err)
+	}
+	if len(notes.Notifications) != 1 {
+		t.Fatalf("edit must not notify again: %+v", notes.Notifications)
 	}
 }

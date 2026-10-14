@@ -310,6 +310,18 @@ func (s *Server) injuryOwnedPost(w http.ResponseWriter, r *http.Request, author 
 	return postID, true
 }
 
+func normalizeInjuryUpdate(req injuryUpdateReq) (stage, body string, fields map[string]string) {
+	fields = map[string]string{}
+	stage = strings.TrimSpace(req.Stage)
+	if !validInjuryStage(stage) {
+		fields["stage"] = "いまの状況を選んでください"
+	}
+	if e := Body(req.Body, 2000); e != "" {
+		fields["body"] = e
+	}
+	return stage, strings.TrimSpace(req.Body), fields
+}
+
 func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -324,14 +336,7 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	fields := map[string]string{}
-	stage := strings.TrimSpace(req.Stage)
-	if !validInjuryStage(stage) {
-		fields["stage"] = "いまの状況を選んでください"
-	}
-	if e := Body(req.Body, 2000); e != "" {
-		fields["body"] = e
-	}
+	stage, body, fields := normalizeInjuryUpdate(req)
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -349,7 +354,7 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 		ID:     uuid.New(),
 		PostID: postID,
 		Stage:  stage,
-		Body:   strings.TrimSpace(req.Body),
+		Body:   body,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -385,4 +390,47 @@ func (s *Server) deleteInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// updateInjuryUpdate lets the author correct a report's stage and text. The report keeps its
+// original time and sends no notification, so edits neither reorder the timeline nor nudge followers.
+func (s *Server) updateInjuryUpdate(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	postID, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	updateID, ok := parseUUIDParam(w, r, "updateID")
+	if !ok {
+		return
+	}
+	var req injuryUpdateReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	stage, body, fields := normalizeInjuryUpdate(req)
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	row, err := s.q.UpdateInjuryUpdate(r.Context(), db.UpdateInjuryUpdateParams{
+		ID:       updateID,
+		PostID:   postID,
+		AuthorID: p.ID,
+		Stage:    stage,
+		Body:     body,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			Error(w, http.StatusNotFound, "not_found", "経過報告が見つかりません")
+			return
+		}
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, injuryUpdateFromRow(row))
 }

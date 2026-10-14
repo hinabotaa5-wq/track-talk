@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { injuryStages, injuryUpdateMaxLength, type InjuryStage } from "@/lib/injury";
+import { injuryStages, injuryUpdateMaxLength, isInjuryStage, type InjuryStage } from "@/lib/injury";
 import type { InjuryUpdate } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,10 @@ export function InjuryRecovery({
   const [stage, setStage] = useState<InjuryStage | "">("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editStage, setEditStage] = useState<InjuryStage | "">("");
+  const [editBody, setEditBody] = useState("");
+  const [editError, setEditError] = useState("");
 
   if (!mine && updates.length === 0) return null;
 
@@ -49,6 +53,32 @@ export function InjuryRecovery({
       await onChanged();
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "追加できませんでした");
+    } finally {
+      lock.release();
+    }
+  }
+
+  function startEdit(u: InjuryUpdate) {
+    setEditingId(u.id);
+    setEditStage(isInjuryStage(u.stage) ? u.stage : "");
+    setEditBody(u.body);
+    setEditError("");
+  }
+
+  async function saveEdit(id: string) {
+    if (!editStage) return setEditError("いまの状況を選んでください");
+    if (!editBody.trim()) return setEditError("経過を書いてください");
+    if (!lock.acquire()) return;
+    try {
+      await apiFetch(`/v1/posts/${postId}/injury/updates/${id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ stage: editStage, body: editBody }),
+      });
+      setEditingId(null);
+      await onChanged();
+    } catch (e) {
+      setEditError(e instanceof ApiRequestError ? e.message : "保存できませんでした");
     } finally {
       lock.release();
     }
@@ -79,20 +109,63 @@ export function InjuryRecovery({
                   {u.stage_label}
                 </span>
                 <span>{formatDateTime(u.created_at)}</span>
-                {mine ? (
-                  <button
-                    type="button"
-                    disabled={lock.pending}
-                    onClick={() => remove(u.id)}
-                    className="ml-auto text-slate-300 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    削除
-                  </button>
+                {mine && editingId !== u.id ? (
+                  <span className="ml-auto flex gap-3">
+                    <button
+                      type="button"
+                      disabled={lock.pending}
+                      onClick={() => startEdit(u)}
+                      className="text-slate-300 underline-offset-2 hover:text-white hover:underline"
+                    >
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      disabled={lock.pending}
+                      onClick={() => remove(u.id)}
+                      className="text-slate-300 underline-offset-2 hover:text-white hover:underline"
+                    >
+                      削除
+                    </button>
+                  </span>
                 ) : null}
               </p>
-              <p className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-3 leading-7 text-slate-200">
-                {u.body}
-              </p>
+              {editingId === u.id ? (
+                <div className="space-y-2.5 rounded-xl border border-white/20 glass bg-white/10 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {injuryStages.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        aria-pressed={editStage === item.value}
+                        onClick={() => setEditStage(item.value)}
+                        className={`${chipClass} ${editStage === item.value ? chipActive : chipIdle}`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <Textarea
+                    value={editBody}
+                    maxLength={injuryUpdateMaxLength}
+                    rows={3}
+                    onChange={(e) => setEditBody(e.target.value)}
+                  />
+                  {editError ? <p className="text-sm text-red-400">{editError}</p> : null}
+                  <div className="flex gap-2">
+                    <Button type="button" disabled={lock.pending} onClick={() => saveEdit(u.id)}>
+                      保存
+                    </Button>
+                    <Button type="button" variant="secondary" disabled={lock.pending} onClick={() => setEditingId(null)}>
+                      キャンセル
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-3 leading-7 text-slate-200">
+                  {u.body}
+                </p>
+              )}
             </li>
           ))}
         </ol>
