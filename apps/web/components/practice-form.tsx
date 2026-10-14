@@ -65,7 +65,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       setError("練習日時を入力してください");
       return;
     }
-    if (!initial && when.getTime() <= Date.now()) {
+    if (when.getTime() <= Date.now()) {
       setError("練習日時は現在より後にしてください");
       return;
     }
@@ -123,7 +123,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
             className="block w-full min-w-0 max-w-full"
             type="datetime-local"
             value={startsAt}
-            min={initial ? undefined : toLocalInput(new Date().toISOString())}
+            min={toLocalInput(new Date().toISOString())}
             onChange={(e) => setStartsAt(e.target.value)}
           />
         </span>

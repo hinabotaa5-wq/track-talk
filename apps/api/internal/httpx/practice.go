@@ -191,13 +191,17 @@ func (s *Server) updatePractice(w http.ResponseWriter, r *http.Request, author d
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
-	_, err = q.LockPracticeDetail(r.Context(), id)
+	detail, err := q.LockPracticeDetail(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 			return
 		}
 		MapDBError(w, err)
+		return
+	}
+	if detail.DissolvedAt == nil && !in.StartsAt.After(time.Now()) {
+		FieldError(w, map[string]string{"starts_at": "練習日時は現在より後にしてください"})
 		return
 	}
 	accepted, err := q.CountAcceptedApplications(r.Context(), id)
