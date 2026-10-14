@@ -74,15 +74,24 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 
 func token(t *testing.T, id uuid.UUID) string {
 	t.Helper()
+	return tokenAt(t, id, time.Now())
+}
+
+func tokenAt(t *testing.T, id uuid.UUID, authTime time.Time) string {
+	t.Helper()
 	secret := os.Getenv("SUPABASE_JWT_SECRET")
 	if secret == "" {
 		secret = "test-jwt-secret-for-ci-only"
 	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"sub": id.String(),
 		"aud": "authenticated",
 		"exp": time.Now().Add(time.Hour).Unix(),
-	})
+	}
+	if !authTime.IsZero() {
+		claims["auth_time"] = authTime.Unix()
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	s, err := tok.SignedString([]byte(secret))
 	if err != nil {
 		t.Fatal(err)
@@ -470,6 +479,13 @@ func TestValidation(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": strings.Repeat("あ", 121), "body": "本文"})
 	if rec.Code != 422 {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"kind": "youtube", "title": "動画", "body": "",
+		"youtube_video_id": "abcdefghijk", "youtube_thumbnail_url": "https://example.com/t.jpg",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("thumbnail %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -1406,9 +1422,27 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("author was notified of their own recruitment %+v", authorNotes)
 	}
 	viewerNotes, viewerUnread := listNotifications(t, h, viewer)
-	recruitmentNotes := notesFor(viewerNotes, recruitmentPost.ID, "recruitment_post")
-	if len(recruitmentNotes) != 1 || recruitmentNotes[0].PostTitle != "城南クラブ" || recruitmentNotes[0].Read || viewerUnread != 1 {
-		t.Fatalf("viewer recruitment %+v unread %d", viewerNotes, viewerUnread)
+	if len(notesFor(viewerNotes, recruitmentPost.ID, "recruitment_post")) != 0 || viewerUnread != 0 {
+		t.Fatalf("viewer was notified of a recruitment %+v unread %d", viewerNotes, viewerUnread)
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new&kind=recruitment", "", nil)
+	if rec.Code != 200 {
+		t.Fatalf("recruitment list %d %s", rec.Code, rec.Body.String())
+	}
+	var recruitmentFeed struct {
+		Posts []struct {
+			ID string `json:"id"`
+		} `json:"posts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &recruitmentFeed)
+	var listed bool
+	for _, post := range recruitmentFeed.Posts {
+		if post.ID == recruitmentPost.ID {
+			listed = true
+		}
+	}
+	if !listed {
+		t.Fatalf("recruitment missing from feed %+v", recruitmentFeed.Posts)
 	}
 	if len(notesFor(viewerNotes, practicePost.ID, "")) != 0 || len(notesFor(viewerNotes, textPost.ID, "")) != 0 {
 		t.Fatalf("unexpected post notifications %+v", viewerNotes)

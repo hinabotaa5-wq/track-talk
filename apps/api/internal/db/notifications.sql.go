@@ -81,23 +81,6 @@ func (q *Queries) InsertNotification(ctx context.Context, arg InsertNotification
 	return err
 }
 
-const insertRecruitmentPostNotifications = `-- name: InsertRecruitmentPostNotifications :exec
-INSERT INTO notifications (id, recipient_id, kind, post_id)
-SELECT gen_random_uuid(), profiles.id, 'recruitment_post', $1
-FROM profiles
-WHERE profiles.id <> $2
-`
-
-type InsertRecruitmentPostNotificationsParams struct {
-	PostID   uuid.UUID `json:"post_id"`
-	AuthorID uuid.UUID `json:"author_id"`
-}
-
-func (q *Queries) InsertRecruitmentPostNotifications(ctx context.Context, arg InsertRecruitmentPostNotificationsParams) error {
-	_, err := q.db.Exec(ctx, insertRecruitmentPostNotifications, arg.PostID, arg.AuthorID)
-	return err
-}
-
 const listMyNotifications = `-- name: ListMyNotifications :many
 SELECT
     n.id,
