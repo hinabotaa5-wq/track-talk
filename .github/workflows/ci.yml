@@ -58,3 +58,64 @@ jobs:
       - name: Typecheck
         working-directory: apps/web
         run: npx tsc --noEmit
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tracktalk
+          POSTGRES_PASSWORD: tracktalk
+          POSTGRES_DB: tracktalk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracktalk -d tracktalk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable
+      SUPABASE_JWT_SECRET: test-jwt-secret-for-ci-only
+      SUPABASE_JWT_AUD: authenticated
+      SUPABASE_URL: ""
+      CORS_ORIGINS: http://localhost:3000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: apps/api/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci
+      - name: Install browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Login to post
+        working-directory: apps/web
+        run: |
+          node e2e/auth-stub.mjs &
+          (cd ../api && go run ./cmd/api) &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8080/health && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8080/health
+          curl -sf -o /dev/null -X POST http://127.0.0.1:54321/auth/v1/token
+          npx playwright test e2e/login-post.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: login-post-e2e
+          path: apps/web/test-results
