@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
 
 const fieldClass = "mt-1";
@@ -90,7 +91,8 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
             token,
             body: JSON.stringify(payload),
           });
-      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
+      clearHomeFeeds();
+      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";

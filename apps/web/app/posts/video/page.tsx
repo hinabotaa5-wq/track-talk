@@ -9,6 +9,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import type { Post } from "@/lib/types";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useActionLock } from "@/lib/use-action-lock";
 
 const maxBytes = 100 * 1024 * 1024;
@@ -64,7 +65,8 @@ export default function OwnVideoPage() {
           video_public_id: payload.public_id,
         }),
       });
-      router.push(`/posts/${post.id}`);
+      clearHomeFeeds();
+      router.push("/");
     } catch (err) {
       if (err instanceof ApiRequestError) {
         const field = err.fields ? Object.values(err.fields)[0] : "";

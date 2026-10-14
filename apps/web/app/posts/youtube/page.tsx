@@ -8,6 +8,7 @@ import { ComposerPage, TitleField } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Post } from "@/lib/types";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useActionLock } from "@/lib/use-action-lock";
 
 export default function YouTubePostPage() {
@@ -32,7 +33,8 @@ export default function YouTubePostPage() {
         token,
         body: JSON.stringify({ url, title }),
       });
-      router.push(`/posts/${data.post.id}`);
+      clearHomeFeeds();
+      router.push("/");
     } catch (err) {
       if (err instanceof ApiRequestError) {
         const field = err.fields ? Object.values(err.fields)[0] : "";

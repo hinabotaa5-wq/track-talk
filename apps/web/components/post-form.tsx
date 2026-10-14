@@ -13,6 +13,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -88,7 +89,8 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
             token,
             body: JSON.stringify(payload),
           });
-      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
+      clearHomeFeeds();
+      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";

@@ -12,6 +12,7 @@ import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { useActionLock } from "@/lib/use-action-lock";
+import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
 
 const maxPhotoBytes = 10 * 1024 * 1024;
@@ -148,7 +149,8 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             token,
             body: JSON.stringify(payload),
           });
-      router.push(returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`);
+      clearHomeFeeds();
+      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";
