@@ -139,7 +139,11 @@ func (s *Server) listMyPosts(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.listPostsFiltered(w, r, "new", &p.ID, nil)
+	sort := "new"
+	if r.URL.Query().Get("sort") == "popular" {
+		sort = "popular"
+	}
+	s.listPostsFiltered(w, r, sort, &p.ID, nil)
 }
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +167,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
 		AuthorID:        author,
 		Kind:            kind,
-		PopularWindow:   boolPtr(popular),
+		PopularWindow:   boolPtr(popular && author == nil),
 		Keyword:         keyword,
 		PrefectureCodes: codes,
 	})
@@ -176,6 +180,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
 			AuthorID:        author,
 			Kind:            kind,
+			PopularWindow:   boolPtr(author == nil),
 			Keyword:         keyword,
 			PrefectureCodes: codes,
 			LimitN:          per,
