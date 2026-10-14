@@ -90,6 +90,9 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">管理者画面</h1>
+      <Link href="/admin/injury-archives" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
+        ケガの匿名記録の確認 →
+      </Link>
       <div role="tablist" className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button

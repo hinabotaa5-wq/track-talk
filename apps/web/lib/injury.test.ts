@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
+import { archiveTimelineText, maskWordsError, parseMaskWords, canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -130,5 +130,29 @@ describe("injury group roadmap", () => {
   it("counts the members the faces leave out", () => {
     expect(injuryFaceOverflow(23, 5)).toBe(18);
     expect(injuryFaceOverflow(3, 5)).toBe(0);
+  });
+});
+
+describe("injury archive review", () => {
+  it("splits the words to hide, dropping blanks and repeats", () => {
+    expect(parseMaskWords("山田\n 山田コーチ, 、 山田 \n")).toEqual(["山田", "山田コーチ"]);
+    expect(parseMaskWords("  ")).toEqual([]);
+  });
+
+  it("checks the words to hide", () => {
+    expect(maskWordsError([])).not.toBe("");
+    expect(maskWordsError(["山田"])).toBe("");
+    expect(maskWordsError(Array.from({ length: 21 }, (_, i) => `語${i}`))).not.toBe("");
+    expect(maskWordsError(["あ".repeat(51)])).not.toBe("");
+  });
+
+  it("writes the timeline with the days from the first stage", () => {
+    expect(
+      archiveTimelineText([
+        { stage: "resting", days: 0 },
+        { stage: "rehab", days: 12 },
+      ]),
+    ).toBe("安静中(0日) → リハビリ中(12日)");
+    expect(archiveTimelineText([])).toBe("");
   });
 });

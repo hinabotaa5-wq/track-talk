@@ -221,3 +221,52 @@ export function injuryFaceInitial(name: string) {
 export function injuryFaceOverflow(members: number, faces: number) {
   return Math.max(members - faces, 0);
 }
+
+export type InjuryArchiveStatus = "pending" | "approved" | "rejected";
+
+export const injuryArchiveStatuses: { value: InjuryArchiveStatus; label: string }[] = [
+  { value: "pending", label: "確認待ち" },
+  { value: "approved", label: "承認済み" },
+  { value: "rejected", label: "却下" },
+];
+
+export type InjuryArchive = {
+  id: string;
+  body_part: string;
+  body_part_label: string;
+  injured_month: string;
+  archived_month: string;
+  stage_timeline: { stage: string; days: number }[];
+  place: string;
+  situation: string;
+  posts: { stage?: string; title: string; body: string; updates: { stage: string; body: string }[] }[];
+  review_status: InjuryArchiveStatus;
+};
+
+export const injuryArchiveMaskMaxWords = 20;
+export const injuryArchiveMaskMaxLength = 50;
+
+// 「伏せる言葉」の入力(改行かカンマ区切り)を、空を除いて重複なしの一覧にする。
+export function parseMaskWords(text: string) {
+  const words = text
+    .split(/[\n,、]/)
+    .map((word) => word.trim())
+    .filter((word) => word !== "");
+  return [...new Set(words)];
+}
+
+export function maskWordsError(words: string[]) {
+  if (words.length === 0) return "伏せる言葉を入力してください";
+  if (words.length > injuryArchiveMaskMaxWords) return `伏せる言葉は${injuryArchiveMaskMaxWords}個までです`;
+  if (words.some((word) => [...word].length > injuryArchiveMaskMaxLength)) return `1つの言葉は${injuryArchiveMaskMaxLength}文字以内です`;
+  return "";
+}
+
+export function injuryStageLabelOf(stage: string) {
+  return injuryStages.find((item) => item.value === stage)?.label ?? stage;
+}
+
+// 段階の移り変わりを「安静中(0日) → リハビリ中(12日)」の形にする。日数は最初の段階からの日数。
+export function archiveTimelineText(timeline: { stage: string; days: number }[]) {
+  return timeline.map((step) => `${injuryStageLabelOf(step.stage)}(${step.days}日)`).join(" → ");
+}

@@ -27,6 +27,18 @@ func (q *Queries) AddInjuryGroupStageLog(ctx context.Context, arg AddInjuryGroup
 	return err
 }
 
+const countInjuryArchives = `-- name: CountInjuryArchives :one
+SELECT count(*) FROM injury_archives
+WHERE $1::text = '' OR review_status = $1
+`
+
+func (q *Queries) CountInjuryArchives(ctx context.Context, status string) (int64, error) {
+	row := q.db.QueryRow(ctx, countInjuryArchives, status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countInjuryGroupMembers = `-- name: CountInjuryGroupMembers :many
 SELECT body_part, count(*)::bigint AS members
 FROM injury_group_members
@@ -189,6 +201,41 @@ func (q *Queries) DeleteInjuryUpdate(ctx context.Context, arg DeleteInjuryUpdate
 	return result.RowsAffected(), nil
 }
 
+const deleteRejectedInjuryArchive = `-- name: DeleteRejectedInjuryArchive :execrows
+DELETE FROM injury_archives WHERE id = $1 AND review_status = 'rejected'
+`
+
+func (q *Queries) DeleteRejectedInjuryArchive(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRejectedInjuryArchive, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getInjuryArchive = `-- name: GetInjuryArchive :one
+SELECT id, body_part, injured_month, archived_month, stage_timeline, place, situation, posts, review_status
+FROM injury_archives
+WHERE id = $1
+`
+
+func (q *Queries) GetInjuryArchive(ctx context.Context, id uuid.UUID) (InjuryArchive, error) {
+	row := q.db.QueryRow(ctx, getInjuryArchive, id)
+	var i InjuryArchive
+	err := row.Scan(
+		&i.ID,
+		&i.BodyPart,
+		&i.InjuredMonth,
+		&i.ArchivedMonth,
+		&i.StageTimeline,
+		&i.Place,
+		&i.Situation,
+		&i.Posts,
+		&i.ReviewStatus,
+	)
+	return i, err
+}
+
 const getInjuryDetail = `-- name: GetInjuryDetail :one
 SELECT post_id, body_part, group_stage
 FROM injury_details
@@ -331,6 +378,50 @@ func (q *Queries) IsProfileAdmin(ctx context.Context, id uuid.UUID) (bool, error
 	var is_admin bool
 	err := row.Scan(&is_admin)
 	return is_admin, err
+}
+
+const listInjuryArchives = `-- name: ListInjuryArchives :many
+SELECT id, body_part, injured_month, archived_month, stage_timeline, place, situation, posts, review_status
+FROM injury_archives
+WHERE $1::text = '' OR review_status = $1
+ORDER BY archived_month DESC, id
+LIMIT $3 OFFSET $2
+`
+
+type ListInjuryArchivesParams struct {
+	Status  string `json:"status"`
+	OffsetN int32  `json:"offset_n"`
+	LimitN  int32  `json:"limit_n"`
+}
+
+func (q *Queries) ListInjuryArchives(ctx context.Context, arg ListInjuryArchivesParams) ([]InjuryArchive, error) {
+	rows, err := q.db.Query(ctx, listInjuryArchives, arg.Status, arg.OffsetN, arg.LimitN)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InjuryArchive
+	for rows.Next() {
+		var i InjuryArchive
+		if err := rows.Scan(
+			&i.ID,
+			&i.BodyPart,
+			&i.InjuredMonth,
+			&i.ArchivedMonth,
+			&i.StageTimeline,
+			&i.Place,
+			&i.Situation,
+			&i.Posts,
+			&i.ReviewStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listInjuryDetails = `-- name: ListInjuryDetails :many
@@ -694,6 +785,23 @@ func (q *Queries) NotifyInjuryFollowers(ctx context.Context, arg NotifyInjuryFol
 	return err
 }
 
+const setInjuryArchiveReview = `-- name: SetInjuryArchiveReview :execrows
+UPDATE injury_archives SET review_status = $2 WHERE id = $1
+`
+
+type SetInjuryArchiveReviewParams struct {
+	ID           uuid.UUID `json:"id"`
+	ReviewStatus string    `json:"review_status"`
+}
+
+func (q *Queries) SetInjuryArchiveReview(ctx context.Context, arg SetInjuryArchiveReviewParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setInjuryArchiveReview, arg.ID, arg.ReviewStatus)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setInjuryGroupStage = `-- name: SetInjuryGroupStage :one
 UPDATE injury_group_members
 SET stage = $3, updated_at = now()
@@ -721,6 +829,33 @@ func (q *Queries) SetInjuryGroupStage(ctx context.Context, arg SetInjuryGroupSta
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateInjuryArchiveText = `-- name: UpdateInjuryArchiveText :execrows
+UPDATE injury_archives
+SET place = $2, situation = $3, posts = $4, review_status = 'pending'
+WHERE id = $1
+`
+
+type UpdateInjuryArchiveTextParams struct {
+	ID        uuid.UUID `json:"id"`
+	Place     string    `json:"place"`
+	Situation string    `json:"situation"`
+	Posts     []byte    `json:"posts"`
+}
+
+// 伏せ字にした文章で置き換える。書き換えた行は、もう一度確かめるために pending に戻す。
+func (q *Queries) UpdateInjuryArchiveText(ctx context.Context, arg UpdateInjuryArchiveTextParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateInjuryArchiveText,
+		arg.ID,
+		arg.Place,
+		arg.Situation,
+		arg.Posts,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateInjuryUpdate = `-- name: UpdateInjuryUpdate :one

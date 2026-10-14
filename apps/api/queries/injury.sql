@@ -197,3 +197,31 @@ VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: GetProfileNickname :one
 SELECT nickname FROM profiles WHERE id = $1;
+
+-- name: CountInjuryArchives :one
+SELECT count(*) FROM injury_archives
+WHERE sqlc.arg('status')::text = '' OR review_status = sqlc.arg('status');
+
+-- name: ListInjuryArchives :many
+SELECT id, body_part, injured_month, archived_month, stage_timeline, place, situation, posts, review_status
+FROM injury_archives
+WHERE sqlc.arg('status')::text = '' OR review_status = sqlc.arg('status')
+ORDER BY archived_month DESC, id
+LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
+
+-- name: GetInjuryArchive :one
+SELECT id, body_part, injured_month, archived_month, stage_timeline, place, situation, posts, review_status
+FROM injury_archives
+WHERE id = $1;
+
+-- name: SetInjuryArchiveReview :execrows
+UPDATE injury_archives SET review_status = $2 WHERE id = $1;
+
+-- name: UpdateInjuryArchiveText :execrows
+-- 伏せ字にした文章で置き換える。書き換えた行は、もう一度確かめるために pending に戻す。
+UPDATE injury_archives
+SET place = $2, situation = $3, posts = $4, review_status = 'pending'
+WHERE id = $1;
+
+-- name: DeleteRejectedInjuryArchive :execrows
+DELETE FROM injury_archives WHERE id = $1 AND review_status = 'rejected';
