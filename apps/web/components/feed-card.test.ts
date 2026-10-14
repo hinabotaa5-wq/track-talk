@@ -33,6 +33,12 @@ describe("FeedCard", () => {
     expect(html).not.toContain("from=me");
   });
 
+  it("hides the like mark on the list card", () => {
+    const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, like_count: 4 } }));
+    expect(html).not.toContain("いいね");
+    expect(html).not.toContain(">4<");
+  });
+
   it("renders optimized image when thumbnail is present", () => {
     const postWithThumb = {
       ...post,
