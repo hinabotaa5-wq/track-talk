@@ -164,7 +164,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 	page, per, offset := s.queryPage(r)
 	popular := sort == "popular"
 	keyword, codes := searchArgs(r.URL.Query().Get("q"))
-	var mood, part *string
+	var mood, part, stage *string
 	if kind != nil && *kind == "injury" {
 		if v := strings.TrimSpace(r.URL.Query().Get("mood")); validInjuryMood(v) {
 			mood = &v
@@ -172,12 +172,16 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		if v := strings.TrimSpace(r.URL.Query().Get("part")); validInjuryBodyPart(v) {
 			part = &v
 		}
+		if v := strings.TrimSpace(r.URL.Query().Get("stage")); validInjuryStage(v) {
+			stage = &v
+		}
 	}
 	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
 		AuthorID:        author,
 		Kind:            kind,
 		Mood:            mood,
 		Part:            part,
+		Stage:           stage,
 		PopularWindow:   boolPtr(popular && author == nil),
 		Keyword:         keyword,
 		PrefectureCodes: codes,
@@ -193,6 +197,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			Kind:            kind,
 			Mood:            mood,
 			Part:            part,
+			Stage:           stage,
 			PopularWindow:   boolPtr(author == nil),
 			Keyword:         keyword,
 			PrefectureCodes: codes,
@@ -218,6 +223,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			Kind:            kind,
 			Mood:            mood,
 			Part:            part,
+			Stage:           stage,
 			Keyword:         keyword,
 			PrefectureCodes: codes,
 			LimitN:          per,

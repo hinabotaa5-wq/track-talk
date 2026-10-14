@@ -8,7 +8,16 @@ import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { useAuth } from "@/components/auth-provider";
 import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
-import { injuryBodyParts, injuryFeedPath, injuryMoods, injuryNotice, isInjuryBodyPart, isInjuryMood } from "@/lib/injury";
+import {
+  injuryBodyParts,
+  injuryFeedPath,
+  injuryMoods,
+  injuryNotice,
+  injuryStages,
+  isInjuryBodyPart,
+  isInjuryMood,
+  isInjuryStage,
+} from "@/lib/injury";
 
 const chipClass = "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition active:scale-95";
 const chipIdle = "border-white/20 glass bg-white/10 text-slate-200 hover:bg-white/16 hover:text-white";
@@ -23,8 +32,10 @@ export function InjuryView() {
   const partParam = sp.get("part");
   const mood = isInjuryMood(moodParam) ? moodParam : "";
   const part = isInjuryBodyPart(partParam) ? (partParam ?? "") : "";
+  const stageParam = sp.get("stage");
+  const stage = isInjuryStage(stageParam) ? stageParam : "";
   const page = Math.max(1, Number(sp.get("page")) || 1);
-  const path = injuryFeedPath(mood, part, page);
+  const path = injuryFeedPath(mood, part, page, stage);
 
   const [data, setData] = useState<{ path: string; page: PostsPage } | null>(null);
   const [failed, setFailed] = useState("");
@@ -42,12 +53,14 @@ export function InjuryView() {
     return () => controller.abort();
   }, [path]);
 
-  function go(next: { mood?: string; part?: string; page?: number }) {
+  function go(next: { mood?: string; part?: string; stage?: string; page?: number }) {
     const qs = new URLSearchParams();
     const nextMood = next.mood ?? mood;
     const nextPart = next.part ?? part;
     if (nextMood) qs.set("mood", nextMood);
     if (nextPart) qs.set("part", nextPart);
+    const nextStage = next.stage ?? stage;
+    if (nextStage) qs.set("stage", nextStage);
     if (next.page && next.page > 1) qs.set("page", String(next.page));
     const query = qs.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -55,7 +68,7 @@ export function InjuryView() {
 
   const current = data?.path === path ? data.page : null;
   const hasNext = current ? current.meta.page * current.meta.per_page < current.meta.total : false;
-  const filtered = mood !== "" || part !== "";
+  const filtered = mood !== "" || part !== "" || stage !== "";
 
   return (
     <div className="space-y-4">
@@ -96,6 +109,19 @@ export function InjuryView() {
         >
           <option value="">すべての部位</option>
           {injuryBodyParts.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="復帰の段階で絞り込む"
+          className="rounded-full border border-white/25 glass bg-white/10 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-400"
+          value={stage}
+          onChange={(e) => go({ stage: e.target.value, page: 1 })}
+        >
+          <option value="">すべての段階</option>
+          {injuryStages.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
