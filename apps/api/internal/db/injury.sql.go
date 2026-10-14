@@ -12,6 +12,84 @@ import (
 	"github.com/google/uuid"
 )
 
+const addInjuryGroupStageLog = `-- name: AddInjuryGroupStageLog :exec
+INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3)
+`
+
+type AddInjuryGroupStageLogParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	BodyPart string    `json:"body_part"`
+	Stage    string    `json:"stage"`
+}
+
+func (q *Queries) AddInjuryGroupStageLog(ctx context.Context, arg AddInjuryGroupStageLogParams) error {
+	_, err := q.db.Exec(ctx, addInjuryGroupStageLog, arg.UserID, arg.BodyPart, arg.Stage)
+	return err
+}
+
+const countInjuryGroupMembers = `-- name: CountInjuryGroupMembers :many
+SELECT body_part, count(*)::bigint AS members
+FROM injury_group_members
+GROUP BY body_part
+`
+
+type CountInjuryGroupMembersRow struct {
+	BodyPart string `json:"body_part"`
+	Members  int64  `json:"members"`
+}
+
+func (q *Queries) CountInjuryGroupMembers(ctx context.Context) ([]CountInjuryGroupMembersRow, error) {
+	rows, err := q.db.Query(ctx, countInjuryGroupMembers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountInjuryGroupMembersRow
+	for rows.Next() {
+		var i CountInjuryGroupMembersRow
+		if err := rows.Scan(&i.BodyPart, &i.Members); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countInjuryGroupMembersByStage = `-- name: CountInjuryGroupMembersByStage :many
+SELECT stage, count(*)::bigint AS members
+FROM injury_group_members
+WHERE body_part = $1
+GROUP BY stage
+`
+
+type CountInjuryGroupMembersByStageRow struct {
+	Stage   string `json:"stage"`
+	Members int64  `json:"members"`
+}
+
+func (q *Queries) CountInjuryGroupMembersByStage(ctx context.Context, bodyPart string) ([]CountInjuryGroupMembersByStageRow, error) {
+	rows, err := q.db.Query(ctx, countInjuryGroupMembersByStage, bodyPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountInjuryGroupMembersByStageRow
+	for rows.Next() {
+		var i CountInjuryGroupMembersByStageRow
+		if err := rows.Scan(&i.Stage, &i.Members); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countInjuryPostsByPart = `-- name: CountInjuryPostsByPart :many
 SELECT i.body_part, count(*)::bigint AS posts
 FROM injury_details i
@@ -112,7 +190,7 @@ func (q *Queries) DeleteInjuryUpdate(ctx context.Context, arg DeleteInjuryUpdate
 }
 
 const getInjuryDetail = `-- name: GetInjuryDetail :one
-SELECT post_id, body_part
+SELECT post_id, body_part, group_stage
 FROM injury_details
 WHERE post_id = $1
 `
@@ -120,7 +198,34 @@ WHERE post_id = $1
 func (q *Queries) GetInjuryDetail(ctx context.Context, postID uuid.UUID) (InjuryDetail, error) {
 	row := q.db.QueryRow(ctx, getInjuryDetail, postID)
 	var i InjuryDetail
-	err := row.Scan(&i.PostID, &i.BodyPart)
+	err := row.Scan(&i.PostID, &i.BodyPart, &i.GroupStage)
+	return i, err
+}
+
+const getInjuryGroupMember = `-- name: GetInjuryGroupMember :one
+SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+FROM injury_group_members
+WHERE user_id = $1 AND body_part = $2
+`
+
+type GetInjuryGroupMemberParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	BodyPart string    `json:"body_part"`
+}
+
+func (q *Queries) GetInjuryGroupMember(ctx context.Context, arg GetInjuryGroupMemberParams) (InjuryGroupMember, error) {
+	row := q.db.QueryRow(ctx, getInjuryGroupMember, arg.UserID, arg.BodyPart)
+	var i InjuryGroupMember
+	err := row.Scan(
+		&i.UserID,
+		&i.BodyPart,
+		&i.InjuredOn,
+		&i.Place,
+		&i.Situation,
+		&i.Stage,
+		&i.JoinedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
@@ -179,7 +284,7 @@ func (q *Queries) InjuryStageStats(ctx context.Context) ([]InjuryStageStatsRow, 
 }
 
 const listInjuryDetails = `-- name: ListInjuryDetails :many
-SELECT post_id, body_part
+SELECT post_id, body_part, group_stage
 FROM injury_details
 WHERE post_id = ANY($1::uuid[])
 `
@@ -193,7 +298,51 @@ func (q *Queries) ListInjuryDetails(ctx context.Context, postIds []uuid.UUID) ([
 	var items []InjuryDetail
 	for rows.Next() {
 		var i InjuryDetail
-		if err := rows.Scan(&i.PostID, &i.BodyPart); err != nil {
+		if err := rows.Scan(&i.PostID, &i.BodyPart, &i.GroupStage); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInjuryGroupFaces = `-- name: ListInjuryGroupFaces :many
+SELECT stage, COALESCE(nickname, '')::text AS nickname
+FROM (
+    SELECT m.stage, p.nickname,
+           row_number() OVER (PARTITION BY m.stage ORDER BY m.updated_at DESC) AS rn
+    FROM injury_group_members m
+    JOIN profiles p ON p.id = m.user_id
+    WHERE m.body_part = $1
+) t
+WHERE rn <= $2::int
+ORDER BY stage, rn
+`
+
+type ListInjuryGroupFacesParams struct {
+	BodyPart string `json:"body_part"`
+	LimitN   int32  `json:"limit_n"`
+}
+
+type ListInjuryGroupFacesRow struct {
+	Stage    string `json:"stage"`
+	Nickname string `json:"nickname"`
+}
+
+// 段階ごとに、新しく入った順で最大 limit_n 人のニックネーム。
+func (q *Queries) ListInjuryGroupFaces(ctx context.Context, arg ListInjuryGroupFacesParams) ([]ListInjuryGroupFacesRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryGroupFaces, arg.BodyPart, arg.LimitN)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryGroupFacesRow
+	for rows.Next() {
+		var i ListInjuryGroupFacesRow
+		if err := rows.Scan(&i.Stage, &i.Nickname); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -305,6 +454,41 @@ func (q *Queries) ListMyInjuryFirstReports(ctx context.Context, authorID uuid.UU
 	return items, nil
 }
 
+const listMyInjuryGroupMembers = `-- name: ListMyInjuryGroupMembers :many
+SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+FROM injury_group_members
+WHERE user_id = $1
+`
+
+func (q *Queries) ListMyInjuryGroupMembers(ctx context.Context, userID uuid.UUID) ([]InjuryGroupMember, error) {
+	rows, err := q.db.Query(ctx, listMyInjuryGroupMembers, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InjuryGroupMember
+	for rows.Next() {
+		var i InjuryGroupMember
+		if err := rows.Scan(
+			&i.UserID,
+			&i.BodyPart,
+			&i.InjuredOn,
+			&i.Place,
+			&i.Situation,
+			&i.Stage,
+			&i.JoinedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMyInjuryPosts = `-- name: ListMyInjuryPosts :many
 SELECT p.id, p.title, p.created_at, i.body_part
 FROM posts p
@@ -377,6 +561,35 @@ func (q *Queries) NotifyInjuryFollowers(ctx context.Context, arg NotifyInjuryFol
 	return err
 }
 
+const setInjuryGroupStage = `-- name: SetInjuryGroupStage :one
+UPDATE injury_group_members
+SET stage = $3, updated_at = now()
+WHERE user_id = $1 AND body_part = $2
+RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+`
+
+type SetInjuryGroupStageParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	BodyPart string    `json:"body_part"`
+	Stage    string    `json:"stage"`
+}
+
+func (q *Queries) SetInjuryGroupStage(ctx context.Context, arg SetInjuryGroupStageParams) (InjuryGroupMember, error) {
+	row := q.db.QueryRow(ctx, setInjuryGroupStage, arg.UserID, arg.BodyPart, arg.Stage)
+	var i InjuryGroupMember
+	err := row.Scan(
+		&i.UserID,
+		&i.BodyPart,
+		&i.InjuredOn,
+		&i.Place,
+		&i.Situation,
+		&i.Stage,
+		&i.JoinedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateInjuryUpdate = `-- name: UpdateInjuryUpdate :one
 UPDATE injury_updates u
 SET stage = $1,
@@ -417,18 +630,63 @@ func (q *Queries) UpdateInjuryUpdate(ctx context.Context, arg UpdateInjuryUpdate
 }
 
 const upsertInjuryDetail = `-- name: UpsertInjuryDetail :exec
-INSERT INTO injury_details (post_id, body_part)
-VALUES ($1, $2)
+INSERT INTO injury_details (post_id, body_part, group_stage)
+VALUES ($1, $2, $3)
 ON CONFLICT (post_id) DO UPDATE SET
     body_part = EXCLUDED.body_part
 `
 
 type UpsertInjuryDetailParams struct {
-	PostID   uuid.UUID `json:"post_id"`
-	BodyPart string    `json:"body_part"`
+	PostID     uuid.UUID `json:"post_id"`
+	BodyPart   string    `json:"body_part"`
+	GroupStage *string   `json:"group_stage"`
 }
 
 func (q *Queries) UpsertInjuryDetail(ctx context.Context, arg UpsertInjuryDetailParams) error {
-	_, err := q.db.Exec(ctx, upsertInjuryDetail, arg.PostID, arg.BodyPart)
+	_, err := q.db.Exec(ctx, upsertInjuryDetail, arg.PostID, arg.BodyPart, arg.GroupStage)
 	return err
+}
+
+const upsertInjuryGroupMember = `-- name: UpsertInjuryGroupMember :one
+INSERT INTO injury_group_members (user_id, body_part, injured_on, place, situation, stage)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id, body_part) DO UPDATE SET
+    injured_on = EXCLUDED.injured_on,
+    place = EXCLUDED.place,
+    situation = EXCLUDED.situation,
+    stage = EXCLUDED.stage,
+    updated_at = now()
+RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+`
+
+type UpsertInjuryGroupMemberParams struct {
+	UserID    uuid.UUID `json:"user_id"`
+	BodyPart  string    `json:"body_part"`
+	InjuredOn time.Time `json:"injured_on"`
+	Place     string    `json:"place"`
+	Situation string    `json:"situation"`
+	Stage     string    `json:"stage"`
+}
+
+func (q *Queries) UpsertInjuryGroupMember(ctx context.Context, arg UpsertInjuryGroupMemberParams) (InjuryGroupMember, error) {
+	row := q.db.QueryRow(ctx, upsertInjuryGroupMember,
+		arg.UserID,
+		arg.BodyPart,
+		arg.InjuredOn,
+		arg.Place,
+		arg.Situation,
+		arg.Stage,
+	)
+	var i InjuryGroupMember
+	err := row.Scan(
+		&i.UserID,
+		&i.BodyPart,
+		&i.InjuredOn,
+		&i.Place,
+		&i.Situation,
+		&i.Stage,
+		&i.JoinedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

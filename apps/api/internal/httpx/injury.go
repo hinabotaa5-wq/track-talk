@@ -15,6 +15,8 @@ import (
 
 type injuryInput struct {
 	BodyPart string
+	// GroupStage is the writer's stage in the part's group when the post was made; nil for posts made outside a group.
+	GroupStage *string
 }
 
 type injuryDTO struct {
@@ -129,8 +131,9 @@ func injuryFromDetail(row db.InjuryDetail) *injuryDTO {
 
 func saveInjury(ctx context.Context, q *db.Queries, postID uuid.UUID, in injuryInput) error {
 	return q.UpsertInjuryDetail(ctx, db.UpsertInjuryDetailParams{
-		PostID:   postID,
-		BodyPart: in.BodyPart,
+		PostID:     postID,
+		BodyPart:   in.BodyPart,
+		GroupStage: in.GroupStage,
 	})
 }
 

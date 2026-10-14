@@ -1,16 +1,16 @@
 -- name: UpsertInjuryDetail :exec
-INSERT INTO injury_details (post_id, body_part)
-VALUES ($1, $2)
+INSERT INTO injury_details (post_id, body_part, group_stage)
+VALUES ($1, $2, sqlc.narg('group_stage'))
 ON CONFLICT (post_id) DO UPDATE SET
     body_part = EXCLUDED.body_part;
 
 -- name: GetInjuryDetail :one
-SELECT post_id, body_part
+SELECT post_id, body_part, group_stage
 FROM injury_details
 WHERE post_id = $1;
 
 -- name: ListInjuryDetails :many
-SELECT post_id, body_part
+SELECT post_id, body_part, group_stage
 FROM injury_details
 WHERE post_id = ANY(sqlc.arg('post_ids')::uuid[]);
 
@@ -118,3 +118,57 @@ WHERE u.id = sqlc.arg('id')
   AND p.id = u.post_id
   AND p.author_id = sqlc.arg('author_id')
 RETURNING u.id, u.post_id, u.stage, u.body, u.created_at;
+
+-- name: UpsertInjuryGroupMember :one
+INSERT INTO injury_group_members (user_id, body_part, injured_on, place, situation, stage)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id, body_part) DO UPDATE SET
+    injured_on = EXCLUDED.injured_on,
+    place = EXCLUDED.place,
+    situation = EXCLUDED.situation,
+    stage = EXCLUDED.stage,
+    updated_at = now()
+RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+
+-- name: GetInjuryGroupMember :one
+SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+FROM injury_group_members
+WHERE user_id = $1 AND body_part = $2;
+
+-- name: ListMyInjuryGroupMembers :many
+SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+FROM injury_group_members
+WHERE user_id = $1;
+
+-- name: SetInjuryGroupStage :one
+UPDATE injury_group_members
+SET stage = $3, updated_at = now()
+WHERE user_id = $1 AND body_part = $2
+RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+
+-- name: AddInjuryGroupStageLog :exec
+INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3);
+
+-- name: CountInjuryGroupMembers :many
+SELECT body_part, count(*)::bigint AS members
+FROM injury_group_members
+GROUP BY body_part;
+
+-- name: CountInjuryGroupMembersByStage :many
+SELECT stage, count(*)::bigint AS members
+FROM injury_group_members
+WHERE body_part = $1
+GROUP BY stage;
+
+-- name: ListInjuryGroupFaces :many
+-- 段階ごとに、新しく入った順で最大 limit_n 人のニックネーム。
+SELECT stage, COALESCE(nickname, '')::text AS nickname
+FROM (
+    SELECT m.stage, p.nickname,
+           row_number() OVER (PARTITION BY m.stage ORDER BY m.updated_at DESC) AS rn
+    FROM injury_group_members m
+    JOIN profiles p ON p.id = m.user_id
+    WHERE m.body_part = $1
+) t
+WHERE rn <= sqlc.arg('limit_n')::int
+ORDER BY stage, rn;

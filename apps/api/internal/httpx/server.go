@@ -60,6 +60,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
 		r.Get("/injury/stats", s.injuryStats)
+		r.Get("/injury/groups", s.listInjuryGroups)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
@@ -89,6 +90,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts/{id}/saves", s.savePost)
 			r.Delete("/posts/{id}/saves", s.unsavePost)
 			r.Post("/posts/{id}/comments", s.createComment)
+			r.Get("/injury/groups/{part}", s.getInjuryGroup)
+			r.Post("/injury/groups/{part}/join", s.joinInjuryGroup)
+			r.Patch("/injury/groups/{part}/me", s.updateInjuryGroupStage)
+			r.Get("/injury/groups/{part}/posts", s.listInjuryGroupPosts)
+			r.Post("/injury/groups/{part}/posts", s.createInjuryGroupPost)
 			r.Post("/posts/{id}/injury/updates", s.createInjuryUpdate)
 			r.Patch("/posts/{id}/injury/updates/{updateID}", s.updateInjuryUpdate)
 			r.Delete("/posts/{id}/injury/updates/{updateID}", s.deleteInjuryUpdate)
