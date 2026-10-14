@@ -99,7 +99,7 @@ describe("injury group join", () => {
     const sorted = sortInjuryGroups([
       { body_part: "ankle", body_part_label: "足首", members: 5 },
       { body_part: "knee", body_part_label: "膝", members: 1, me },
-      { body_part: "foot", body_part_label: "足裏・足部", members: 5 },
+      { body_part: "foot", body_part_label: "足裏", members: 5 },
       { body_part: "calf", body_part_label: "ふくらはぎ", members: 9 },
     ]);
     expect(sorted.map((item) => item.body_part)).toEqual(["knee", "calf", "foot", "ankle"]);

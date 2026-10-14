@@ -16,7 +16,6 @@ import {
   canPostInStage,
   injuryBodyPartLabel,
   injuryCelebrationKey,
-  injuryNotice,
   injuryStages,
   shouldCelebrate,
   type InjuryGroup,
@@ -111,7 +110,7 @@ export function GroupView({ part }: { part: string }) {
 
   const back = (
     <Link href="/injury" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
-      ← ケガ人の溜まり場
+      ← ケガ
     </Link>
   );
 
@@ -239,7 +238,6 @@ export function GroupView({ part }: { part: string }) {
           </>
         )}
       </div>
-      <p className="text-xs text-slate-300">{injuryNotice}</p>
     </div>
   );
 }

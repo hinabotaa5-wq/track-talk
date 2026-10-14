@@ -523,7 +523,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	follower := token(t, uuid.New())
 
 	rec := postInjury(t, h, author, map[string]any{
-		"kind": "injury", "title": "編集の確認", "body": "本文", "body_part": "upper-body",
+		"kind": "injury", "title": "編集の確認", "body": "本文", "body_part": "shoulder",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -534,7 +534,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
 		t.Fatal(err)
 	}
-	joinGroup(t, h, follower, "upper-body")
+	joinGroup(t, h, follower, "shoulder")
 	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/saves", follower, nil); r.Code >= 300 {
 		t.Fatalf("save %d", r.Code)
 	}
@@ -591,7 +591,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	}
 
 	// フィードの最新の段階にも反映される。
-	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/upper-body/posts?stage=jogging", author, nil)
+	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/shoulder/posts?stage=jogging", author, nil)
 	if feed.Code != http.StatusOK || !strings.Contains(feed.Body.String(), post.ID) {
 		t.Fatalf("edited stage should appear in the stage filter: %d %s", feed.Code, feed.Body.String())
 	}
