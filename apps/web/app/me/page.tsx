@@ -19,7 +19,7 @@ const menuLinks = [
 ] as const;
 
 function menuRowClass(danger = false) {
-  return `flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium transition hover:bg-white/12 active:bg-white/16 disabled:opacity-50 ${
+  return `flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium transition hover:bg-white/12 active:scale-95 active:bg-white/16 disabled:opacity-50 ${
     danger ? "text-red-300" : "text-slate-100"
   }`;
 }

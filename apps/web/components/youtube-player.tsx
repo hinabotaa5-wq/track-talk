@@ -36,7 +36,7 @@ export function YouTubePlayer({
       type="button"
       onClick={() => setIsPlaying(true)}
       aria-label={`YouTube動画「${title}」を再生`}
-      className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black text-left shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-95"
     >
       <Image
         src={poster}

@@ -54,17 +54,25 @@ export function activeMainTab(pathname: string) {
 }
 
 export function showsBackButton(pathname: string) {
-  if (pathname === "/login" || pathname === "/register" || pathname === "/reset-password") return true;
+  if (pathname === "/register" || pathname === "/reset-password") return true;
   if (pathname === "/me/contact" || pathname === "/me/delete") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname.startsWith("/posts/")) return true;
   return false;
 }
 
+const bottomNavHidden = new Set(["/login", "/register", "/reset-password"]);
+
+export function hidesBottomNav(pathname: string) {
+  return bottomNavHidden.has(pathname);
+}
+
 export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   const competitionPrefecture = useRememberedCompetitionPrefecture();
+
+  if (hidesBottomNav(pathname)) return null;
 
   const current = activeMainTab(pathname);
 
@@ -85,7 +93,7 @@ export function BottomNav() {
               <li key={tab.id}>
                 <Link
                   href={href}
-                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-150 active:scale-90 ${
+                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-150 active:scale-95 ${
                     active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}
                   aria-current={active ? "page" : undefined}

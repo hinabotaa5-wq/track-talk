@@ -258,7 +258,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             {links.length > 1 ? (
               <button
                 type="button"
-                className="shrink-0 text-sm text-slate-200"
+                className="shrink-0 text-sm text-slate-200 transition active:scale-95"
                 onClick={() => setLinks((current) => current.filter((_, i) => i !== index))}
               >
                 削除
@@ -268,7 +268,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         ))}
         <button
           type="button"
-          className="text-sm text-blue-400 disabled:text-slate-600"
+          className="text-sm text-blue-400 transition active:scale-95 disabled:text-slate-600"
           disabled={links.length >= 4}
           onClick={() => setLinks((current) => [...current, ""])}
         >
@@ -289,7 +289,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                 <img src={photo.url} alt="" className="aspect-[4/3] w-full rounded-md bg-black/25 object-cover" />
                 <button
                   type="button"
-                  className="text-sm text-slate-200"
+                  className="text-sm text-slate-200 transition active:scale-95"
                   onClick={() => {
                     setPhotoNotice("");
                     setKept((current) => current.filter((item) => item.public_id !== photo.public_id));
@@ -304,7 +304,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                 <img src={preview.url} alt="" className="aspect-[4/3] w-full rounded-md bg-black/25 object-cover" />
                 <button
                   type="button"
-                  className="text-sm text-slate-200"
+                  className="text-sm text-slate-200 transition active:scale-95"
                   onClick={() => {
                     setPhotoNotice("");
                     URL.revokeObjectURL(preview.url);

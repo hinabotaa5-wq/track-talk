@@ -3,12 +3,13 @@
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
 import { Box } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { AnchoredPanel } from "./anchored-panel";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
-const prompt = "なんでも、このサービスのことについて言ってね";
+const prompt = "思ったことをなんでも書いてね(欲しい機能、修正点、このアプリの悪口などなど)";
 
 function subjectFrom(message: string) {
   return Array.from(message).slice(0, 80).join("");
@@ -23,22 +24,6 @@ export function FeedbackBox() {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const { pending, acquire, release } = useActionLock();
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointer(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   async function send() {
     const body = message.trim();
@@ -82,15 +67,18 @@ export function FeedbackBox() {
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex size-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/16"
+        className="inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-95"
       >
         <Box className="size-5" strokeWidth={2} aria-hidden />
       </button>
-      {open ? (
-        <div
-          id={panelID}
-          className="absolute top-full right-[calc(-1*(2.75rem+0.25rem))] z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 glass bg-[#16243a]/92 p-3 shadow-lg backdrop-blur-md"
-        >
+      <AnchoredPanel
+        open={open}
+        anchorRef={rootRef}
+        panelID={panelID}
+        rightShiftRem={3}
+        onClose={() => setOpen(false)}
+        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-[#16243a] p-3 shadow-xl"
+      >
           <p className="text-balance text-sm font-semibold leading-snug text-slate-100">{prompt}</p>
           <form
             className="mt-3 space-y-2"
@@ -115,8 +103,7 @@ export function FeedbackBox() {
               送る
             </Button>
           </form>
-        </div>
-      ) : null}
+      </AnchoredPanel>
     </div>
   );
 }

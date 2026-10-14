@@ -312,7 +312,7 @@ export function PostDetail({ id, returnTo, autoplay = false }: { id: string; ret
               <div className="mt-1 flex gap-3">
                 <button
                   type="button"
-                  className="text-xs text-blue-400 disabled:opacity-50"
+                  className="text-xs text-blue-400 transition active:scale-95 disabled:opacity-50"
                   disabled={action.pending}
                   onClick={() => editComment(c)}
                 >
@@ -320,7 +320,7 @@ export function PostDetail({ id, returnTo, autoplay = false }: { id: string; ret
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-red-400 disabled:opacity-50"
+                  className="text-xs text-red-400 transition active:scale-95 disabled:opacity-50"
                   disabled={action.pending}
                   onClick={() => deleteComment(c.id)}
                 >
@@ -330,7 +330,7 @@ export function PostDetail({ id, returnTo, autoplay = false }: { id: string; ret
             ) : (
               <button
                 type="button"
-                className="mt-1 text-xs text-slate-300 disabled:opacity-50"
+                className="mt-1 text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
                 disabled={action.pending}
                 onClick={() => report("comment", c.id)}
               >
@@ -612,7 +612,7 @@ function RecruitmentFacts({ post }: { post: Post }) {
             <dt className="text-sm text-slate-200">SNS</dt>
             <dd className="mt-1 space-y-1">
               {info.links.map((link) => (
-                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-400">
+                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-400 transition active:scale-95">
                   {link}
                 </a>
               ))}

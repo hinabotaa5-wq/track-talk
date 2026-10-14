@@ -24,12 +24,12 @@ export default function UploadPage() {
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
   return (
-    <div className="-my-6 grid h-[calc(100dvh-7.75rem-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:my-0 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
+    <div className="-mb-6 grid h-[calc(100dvh-9.25rem-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:mb-0 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
       {doors.map((door) => (
         <Link
           key={door.href}
           href={door.href}
-          className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16"
+          className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
         >
           <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
           <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>

@@ -83,7 +83,7 @@ export function CompetitionsView() {
                 href={c.organizer_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16"
+                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
               >
                 <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
                 <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>

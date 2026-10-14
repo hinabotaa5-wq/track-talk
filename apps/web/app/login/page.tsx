@@ -68,10 +68,10 @@ export default function LoginPage() {
       </form>
       <GoogleSignInButton />
       <p className="text-sm">
-        アカウントがない場合は <Link href="/register" className="text-blue-400">登録</Link>
+        アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-95">登録</Link>
       </p>
       <p className="text-sm">
-        <Link href="/reset-password" className="text-blue-400">
+        <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-95">
           パスワードを忘れた
         </Link>
       </p>

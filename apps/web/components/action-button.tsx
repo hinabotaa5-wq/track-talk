@@ -24,7 +24,7 @@ export function LikeButton({
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.92 }}
+      whileTap={{ scale: 0.95 }}
       disabled={disabled}
       onClick={onClick}
       className={cn(
@@ -65,7 +65,7 @@ export function SaveButton({
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.92 }}
+      whileTap={{ scale: 0.95 }}
       disabled={disabled}
       onClick={onClick}
       className={cn(
@@ -103,7 +103,7 @@ export function ReportButton({
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.92 }}
+      whileTap={{ scale: 0.95 }}
       disabled={disabled}
       onClick={onClick}
       className={cn(actionClass, idleClass)}

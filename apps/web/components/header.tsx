@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 function TrackMark() {
   return (
-    <svg viewBox="4 6 42 38" className="h-[22px] w-[24px] shrink-0" aria-hidden="true">
+    <svg viewBox="4 6 42 38" className="h-7 w-[31px] shrink-0" aria-hidden="true">
       <path
         d="M42 10H28A20 20 0 0 0 8 30v10"
         fill="none"
@@ -44,7 +44,7 @@ function TrackMark() {
 
 function TrackLogo() {
   return (
-    <span className="flex items-center gap-2 font-black text-white text-base">
+    <span className="flex items-center gap-2.5 font-black text-white text-xl">
       <TrackMark />
       <span>
         Track<span className="font-bold text-blue-300">Talk</span>
@@ -81,7 +81,7 @@ export function Header() {
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
+            <Link href="/" aria-label="TrackTalk" className="group flex items-center transition active:scale-95">
               <TrackLogo />
             </Link>
           )}
@@ -96,7 +96,7 @@ export function Header() {
                   key={tab.id}
                   href={mainTabHref(tab.id, !!session, competitionPrefecture)}
                   aria-current={active ? "page" : undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
                     active
                       ? "border border-white/35 bg-white/20 font-semibold text-white backdrop-blur-xl"
                       : "text-slate-200 hover:bg-white/12 hover:text-white"

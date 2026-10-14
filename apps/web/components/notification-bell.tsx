@@ -6,6 +6,7 @@ import type { AppNotification, Meta, NotificationKind } from "@/lib/types";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { AnchoredPanel } from "./anchored-panel";
 import { useAuth } from "./auth-provider";
 
 const labels: Record<NotificationKind, string> = {
@@ -69,22 +70,6 @@ export function NotificationBell() {
     return () => document.removeEventListener("visibilitychange", refresh);
   }, [token, open, load]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointer(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   async function markRead(id: string) {
     if (!token) return;
     try {
@@ -120,7 +105,7 @@ export function NotificationBell() {
           if (!open) setLoading(true);
           setOpen(!open);
         }}
-        className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 hover:bg-white/16"
+        className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-95"
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (
@@ -129,15 +114,17 @@ export function NotificationBell() {
           </span>
         ) : null}
       </button>
-      {open ? (
-        <div
-          id={panelID}
-          className="absolute right-0 z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 glass bg-[#16243a]/45 shadow-lg backdrop-blur-md"
-        >
+      <AnchoredPanel
+        open={open}
+        anchorRef={rootRef}
+        panelID={panelID}
+        onClose={() => setOpen(false)}
+        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-[#16243a] shadow-xl"
+      >
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
             <p className="text-sm font-semibold text-slate-100">通知</p>
             {unread > 0 ? (
-              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 hover:underline">
+              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:scale-95">
                 すべて既読
               </button>
             ) : null}
@@ -157,7 +144,7 @@ export function NotificationBell() {
                       setOpen(false);
                       if (!item.read) void markRead(item.id);
                     }}
-                    className="block px-3 py-3 hover:bg-white/16"
+                    className="block px-3 py-3 transition hover:bg-white/16 active:scale-95"
                   >
                     <p className="text-sm text-slate-100">
                       {labelFor(item.kind)}: {item.post_title}
@@ -168,8 +155,7 @@ export function NotificationBell() {
               ))}
             </ul>
           ) : null}
-        </div>
-      ) : null}
+      </AnchoredPanel>
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 export const feedGridClass = "columns-2 gap-3 md:columns-3 xl:columns-4";
 
 const cardClass =
-  "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
+  "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-95";
 
 export function feedTitle(title: string) {
   const trimmed = title.trim();

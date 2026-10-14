@@ -86,7 +86,7 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
                   <div>
                     <dt className="text-sm text-slate-200">関連ページ</dt>
                     <dd className="mt-1">
-                      <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="text-blue-400">
+                      <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-blue-400 transition active:scale-95">
                         Wikipedia
                       </a>
                     </dd>
