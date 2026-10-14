@@ -205,3 +205,22 @@ export type ApiError = {
     fields?: Record<string, string>;
   };
 };
+
+export type Product = {
+  id: string;
+  kind: "shoe" | "spike";
+  brand: string;
+  name: string;
+  image_url: string;
+  review_count: number;
+  avg_rating: number;
+};
+
+export type ProductReview = {
+  id: string;
+  product_id: string;
+  rating: number;
+  body: string;
+  mine: boolean;
+  created_at: string;
+};
