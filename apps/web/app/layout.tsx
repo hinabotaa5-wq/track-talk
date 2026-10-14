@@ -18,6 +18,9 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "TrackTalk",
   description: "陸上競技を、もっと深く楽しむコミュニティ",
+  verification: {
+    google: "erl1lifh6-0oXq1ecreI-JSTA70vLV_03V2Cwx4b8_k",
+  },
 };
 
 export const viewport: Viewport = {
