@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import type { MouseEvent } from "react";
 import type { Post } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
+import { openExpandedVideo, openExpandedYouTube } from "@/lib/expanded-playback";
 import { practiceReputationLine } from "@/components/practice-reputation";
 import { PosterFallback } from "@/components/poster-card";
+import { useRouter } from "next/navigation";
 
 export const feedGridClass = "columns-2 gap-3 md:columns-3 xl:columns-4";
 
@@ -30,9 +35,25 @@ function KindBadge({ children }: { children: string }) {
   );
 }
 
+function playHref(href: string) {
+  return `${href}${href.includes("?") ? "&" : "?"}play=1`;
+}
+
+function canExpand(post: Post) {
+  return (post.kind === "video" && !!post.playback_url) || (post.kind === "youtube" && !!post.youtube_video_id);
+}
+
 export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
+  const router = useRouter();
   const title = feedTitle(post.title);
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
+  function openFromThumbnail(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    if (post.kind === "video" && post.playback_url) openExpandedVideo(post.id, post.playback_url, title, post.thumbnail_url);
+    if (post.kind === "youtube" && post.youtube_video_id) openExpandedYouTube(post.id, post.youtube_video_id, title);
+    router.push(playHref(href));
+  }
   if (post.kind === "practice") {
     const info = post.practice;
     return (
@@ -74,20 +95,35 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       </Link>
     );
   }
+  const media = (
+    <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url ? "" : "aspect-[4/3]"}`}>
+      {post.kind === "recruitment" ? (
+        <span className="absolute top-2.5 left-2.5 z-10">
+          <KindBadge>クラブ</KindBadge>
+        </span>
+      ) : null}
+      {post.thumbnail_url ? (
+        <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
+      ) : (
+        <PosterFallback title={title} />
+      )}
+    </div>
+  );
+  if (canExpand(post)) {
+    return (
+      <article className={cardClass}>
+        <Link href={playHref(href)} aria-label={`${title}を再生`} onClick={openFromThumbnail} className="block">
+          {media}
+        </Link>
+        <Link href={href}>
+          <CardTitle title={title} />
+        </Link>
+      </article>
+    );
+  }
   return (
     <Link href={href} className={cardClass}>
-      <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url ? "" : "aspect-[4/3]"}`}>
-        {post.kind === "recruitment" ? (
-          <span className="absolute top-2.5 left-2.5 z-10">
-            <KindBadge>クラブ</KindBadge>
-          </span>
-        ) : null}
-        {post.thumbnail_url ? (
-          <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
-        ) : (
-          <PosterFallback title={title} />
-        )}
-      </div>
+      {media}
       <CardTitle title={title} />
     </Link>
   );

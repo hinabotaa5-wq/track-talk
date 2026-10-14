@@ -30,4 +30,16 @@ describe("YouTubePlayer", () => {
     );
     expect(html).toContain("https://example.com/custom.jpg");
   });
+
+  it("starts the embed when opened from a thumbnail", () => {
+    const html = renderToStaticMarkup(
+      createElement(YouTubePlayer, {
+        videoId: "dQw4w9WgXcQ",
+        title: "テスト動画",
+        startPlaying: true,
+      }),
+    );
+    expect(html).toContain("<iframe");
+    expect(html).toContain("autoplay=1");
+  });
 });

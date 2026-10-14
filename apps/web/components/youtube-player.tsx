@@ -8,12 +8,14 @@ export function YouTubePlayer({
   videoId,
   title,
   thumbnailUrl,
+  startPlaying = false,
 }: {
   videoId: string;
   title: string;
   thumbnailUrl?: string;
+  startPlaying?: boolean;
 }) {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(startPlaying);
   const poster = thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   if (isPlaying) {
