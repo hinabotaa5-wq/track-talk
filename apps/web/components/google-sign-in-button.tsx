@@ -29,7 +29,13 @@ function GoogleLogo() {
   );
 }
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({
+  nextPath,
+  label = "Googleでログイン",
+}: {
+  nextPath?: string;
+  label?: string;
+}) {
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
 
@@ -41,6 +47,9 @@ export function GoogleSignInButton() {
     }
     if (!acquire()) return;
     setError("");
+    if (nextPath) {
+      document.cookie = `tracktalk-next=${encodeURIComponent(nextPath)}; Path=/; Max-Age=600; SameSite=Lax`;
+    }
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -62,7 +71,7 @@ export function GoogleSignInButton() {
         onClick={signIn}
       >
         <GoogleLogo />
-        Googleでログイン
+        {label}
       </Button>
     </div>
   );

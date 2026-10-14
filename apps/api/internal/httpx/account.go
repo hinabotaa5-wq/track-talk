@@ -2,14 +2,20 @@ package httpx
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
+var errAuthDelete = errors.New("auth delete")
+
 const withdrawConfirm = "退会する"
+const withdrawMaxLoginAge = 5 * time.Minute
 
 type deleteAccountReq struct {
 	Confirm string `json:"confirm"`
@@ -30,6 +36,10 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"confirm": "確認のため「退会する」と入力してください"})
 		return
 	}
+	if err := s.auth.RecentLogin(bearer(r), time.Now(), withdrawMaxLoginAge); err != nil {
+		Error(w, http.StatusUnauthorized, "reauth_required", "退会する前にもう一度ログインしてください")
+		return
+	}
 
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
@@ -43,24 +53,43 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authDeleted := false
+	var deleteAuth func() error
 	if s.authAdmin.Enabled() {
-		if err := s.authAdmin.DeleteUser(r.Context(), uid); err != nil {
-			slog.Error("delete auth user", "err", err, "user_id", uid.String())
-			Error(w, http.StatusBadGateway, "auth_delete_failed", "退会を完了できませんでした。時間をおいてもう一度試してください")
-			return
+		deleteAuth = func() error {
+			return s.authAdmin.DeleteUser(r.Context(), uid)
 		}
-		authDeleted = true
 	} else {
 		slog.Warn("supabase service role key is not set; auth user was not deleted", "user_id", uid.String())
 	}
 
-	if err := tx.Commit(r.Context()); err != nil {
-		slog.Error("account delete commit failed", "err", err, "user_id", uid.String(), "auth_deleted", authDeleted)
+	authDeleted, err := finishWithdraw(func() error {
+		return tx.Commit(r.Context())
+	}, deleteAuth)
+	if err != nil && !errors.Is(err, errAuthDelete) {
+		slog.Error("account delete commit failed", "err", err, "user_id", uid.String())
 		MapDBError(w, err)
 		return
 	}
+	if errors.Is(err, errAuthDelete) {
+		slog.Error("auth user remains after account purge", "err", err, "user_id", uid.String())
+	}
 	JSON(w, http.StatusOK, map[string]bool{"auth_deleted": authDeleted})
+}
+
+// finishWithdraw commits the purge before deleting the Auth user. A commit
+// failure leaves the Auth user in place. An Auth failure after commit is
+// returned as errAuthDelete so the caller can retry that deletion.
+func finishWithdraw(commit func() error, deleteAuth func() error) (bool, error) {
+	if err := commit(); err != nil {
+		return false, err
+	}
+	if deleteAuth == nil {
+		return false, nil
+	}
+	if err := deleteAuth(); err != nil {
+		return false, fmt.Errorf("%w: %w", errAuthDelete, err)
+	}
+	return true, nil
 }
 
 func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {

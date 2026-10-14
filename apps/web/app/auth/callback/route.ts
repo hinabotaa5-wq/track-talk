@@ -1,5 +1,11 @@
+import { nextCookiePath } from "@/lib/safe-next";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+
+function finish(response: NextResponse) {
+  response.cookies.set("tracktalk-next", "", { path: "/", maxAge: 0 });
+  return response;
+}
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
@@ -9,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   if (!url || !key) {
     login.searchParams.set("error", "config");
-    return NextResponse.redirect(login);
+    return finish(NextResponse.redirect(login));
   }
 
   const code = request.nextUrl.searchParams.get("code");
@@ -18,10 +24,10 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("error");
   if (!code || oauthError) {
     login.searchParams.set("error", "google");
-    return NextResponse.redirect(login);
+    return finish(NextResponse.redirect(login));
   }
 
-  const success = NextResponse.redirect(new URL("/", origin));
+  const success = NextResponse.redirect(new URL(nextCookiePath(request.cookies.get("tracktalk-next")?.value), origin));
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     login.searchParams.set("error", "google");
-    return NextResponse.redirect(login);
+    return finish(NextResponse.redirect(login));
   }
-  return success;
+  return finish(success);
 }

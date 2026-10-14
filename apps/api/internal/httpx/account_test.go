@@ -2,11 +2,15 @@ package httpx_test
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
@@ -210,7 +214,7 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 	}
 }
 
-func TestDeleteAccountRollsBackWhenAuthDeleteFails(t *testing.T) {
+func TestDeleteAccountKeepsPurgeWhenAuthDeleteFails(t *testing.T) {
 	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("method %s", r.Method)
@@ -223,9 +227,10 @@ func TestDeleteAccountRollsBackWhenAuthDeleteFails(t *testing.T) {
 		cfg.SupabaseURL = authSrv.URL
 		cfg.SupabaseServiceRoleKey = "service-role-test"
 	})
-	author := token(t, uuid.New())
+	authorID := uuid.New()
+	author := token(t, authorID)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
-		"title": "残る投稿", "body": "認証削除に失敗したら残します",
+		"title": "消える投稿", "body": "認証削除に失敗しても投稿は残しません",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -235,12 +240,105 @@ func TestDeleteAccountRollsBackWhenAuthDeleteFails(t *testing.T) {
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 
+	var logs strings.Builder
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
 	rec = doJSON(t, h, http.MethodDelete, "/v1/me", author, map[string]string{"confirm": "退会する"})
-	if rec.Code != http.StatusBadGateway {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 	}
-	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, author, nil)
-	if rec.Code != 200 {
-		t.Fatalf("post rolled back %d %s", rec.Code, rec.Body.String())
+	var deleted struct {
+		AuthDeleted bool `json:"auth_deleted"`
 	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &deleted)
+	if deleted.AuthDeleted {
+		t.Fatal("auth user deleted after supabase error")
+	}
+	if !strings.Contains(logs.String(), authorID.String()) || !strings.Contains(logs.String(), "auth user remains after account purge") {
+		t.Fatalf("retry log %s", logs.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("purge rolled back %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDeleteAccountRejectsStaleLogin(t *testing.T) {
+	h := setup(t)
+	freshID := uuid.New()
+	staleID := uuid.New()
+	missingID := uuid.New()
+	fresh := tokenWithAMR(t, freshID, time.Now())
+	stale := tokenAt(t, staleID, time.Now().Add(-6*time.Minute))
+	missing := tokenAt(t, missingID, time.Time{})
+
+	for _, item := range []struct {
+		name string
+		id   uuid.UUID
+		tok  string
+		want int
+	}{
+		{name: "amr", id: freshID, tok: fresh, want: http.StatusOK},
+		{name: "stale", id: staleID, tok: stale, want: http.StatusUnauthorized},
+		{name: "missing", id: missingID, tok: missing, want: http.StatusUnauthorized},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			rec := doJSON(t, h, http.MethodPost, "/v1/posts", item.tok, map[string]any{
+				"title": item.name, "body": "退会できない投稿です",
+			})
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+			}
+			var created struct {
+				ID string `json:"id"`
+			}
+			_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+			rec = doJSON(t, h, http.MethodDelete, "/v1/me", item.tok, map[string]string{"confirm": "退会する"})
+			if rec.Code != item.want {
+				t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
+			}
+			if item.want == http.StatusUnauthorized {
+				var body struct {
+					Error struct {
+						Code    string `json:"code"`
+						Message string `json:"message"`
+					} `json:"error"`
+				}
+				_ = json.Unmarshal(rec.Body.Bytes(), &body)
+				if body.Error.Code != "reauth_required" || body.Error.Message != "退会する前にもう一度ログインしてください" {
+					t.Fatalf("body %+v", body)
+				}
+			}
+			rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
+			wantGet := http.StatusOK
+			if item.want == http.StatusOK {
+				wantGet = http.StatusNotFound
+			}
+			if rec.Code != wantGet {
+				t.Fatalf("post %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func tokenWithAMR(t *testing.T, id uuid.UUID, authTime time.Time) string {
+	t.Helper()
+	secret := os.Getenv("SUPABASE_JWT_SECRET")
+	if secret == "" {
+		secret = "test-jwt-secret-for-ci-only"
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": id.String(),
+		"aud": "authenticated",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"amr": []map[string]any{{"method": "oauth", "timestamp": authTime.Unix()}},
+	})
+	s, err := tok.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
 }

@@ -4,3 +4,12 @@ export function safeNextPath(value: string | null | undefined) {
   if (value === "/login" || value.startsWith("/login?")) return "/";
   return value;
 }
+
+export function nextCookiePath(value: string | null | undefined) {
+  if (!value) return "/";
+  try {
+    return safeNextPath(decodeURIComponent(value));
+  } catch {
+    return safeNextPath(value);
+  }
+}

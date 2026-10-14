@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeNextPath } from "./safe-next";
+import { nextCookiePath, safeNextPath } from "./safe-next";
 
 describe("safeNextPath", () => {
   it("keeps same-site paths", () => {
@@ -19,5 +19,12 @@ describe("safeNextPath", () => {
   it("does not loop back to the login page", () => {
     expect(safeNextPath("/login")).toBe("/");
     expect(safeNextPath("/login?next=/me")).toBe("/");
+  });
+
+  it("reads a same-site return path from a cookie", () => {
+    expect(nextCookiePath("%2Fme%2Fdelete")).toBe("/me/delete");
+    expect(nextCookiePath("/me/delete")).toBe("/me/delete");
+    expect(nextCookiePath("https%3A%2F%2Fevil.example")).toBe("/");
+    expect(nextCookiePath(null)).toBe("/");
   });
 });
