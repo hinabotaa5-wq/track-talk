@@ -125,7 +125,7 @@ docs/launch.md               公開チェックリスト
 ```bash
 cp .env.example .env
 # .env に Supabase の URL / anon key / JWT secret（必要なら Cloudinary）を入れる
-docker compose up -d postgres
+docker compose up -d postgres   # 5432 番が使われているときは POSTGRES_PORT=55432 docker compose up -d postgres
 make migrate
 make api        # http://localhost:8080/health
 # 別ターミナル
@@ -184,6 +184,7 @@ go run ./cmd/importdomestic                               # 国内主要大会�
 
 ```bash
 make test-api                                  # Go（統合テストは DATABASE_URL の PostgreSQL が必要）
+# ポートを変えたときは DATABASE_URL=postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable make test-api
 make test-web                                  # Vitest
 cd apps/web && npm run lint && npx tsc --noEmit
 cd apps/web && npm run test:e2e                # Playwright
