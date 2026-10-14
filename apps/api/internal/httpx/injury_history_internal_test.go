@@ -12,8 +12,8 @@ func TestBuildInjuryHistory(t *testing.T) {
 	start := time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC)
 	withReports, noReports := uuid.New(), uuid.New()
 	posts := []db.ListMyInjuryPostsRow{
-		{ID: withReports, Title: "疲労骨折", CreatedAt: start, Mood: "vent", BodyPart: "shin"},
-		{ID: noReports, Title: "肉離れ", CreatedAt: start, Mood: "rehab", BodyPart: "hamstring"},
+		{ID: withReports, Title: "疲労骨折", CreatedAt: start, BodyPart: "shin"},
+		{ID: noReports, Title: "肉離れ", CreatedAt: start, BodyPart: "hamstring"},
 	}
 	reports := []db.ListMyInjuryFirstReportsRow{
 		{PostID: withReports, Stage: "jogging", FirstAt: start.Add(45*24*time.Hour + 3*time.Hour)},

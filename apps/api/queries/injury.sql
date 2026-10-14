@@ -1,17 +1,16 @@
 -- name: UpsertInjuryDetail :exec
-INSERT INTO injury_details (post_id, mood, body_part)
-VALUES ($1, $2, $3)
+INSERT INTO injury_details (post_id, body_part)
+VALUES ($1, $2)
 ON CONFLICT (post_id) DO UPDATE SET
-    mood = EXCLUDED.mood,
     body_part = EXCLUDED.body_part;
 
 -- name: GetInjuryDetail :one
-SELECT post_id, mood, body_part
+SELECT post_id, body_part
 FROM injury_details
 WHERE post_id = $1;
 
 -- name: ListInjuryDetails :many
-SELECT post_id, mood, body_part
+SELECT post_id, body_part
 FROM injury_details
 WHERE post_id = ANY(sqlc.arg('post_ids')::uuid[]);
 
@@ -73,7 +72,7 @@ WHERE p.deleted_at IS NULL
 GROUP BY i.body_part, f.stage;
 
 -- name: ListMyInjuryPosts :many
-SELECT p.id, p.title, p.created_at, i.mood, i.body_part
+SELECT p.id, p.title, p.created_at, i.body_part
 FROM posts p
 JOIN injury_details i ON i.post_id = p.id
 WHERE p.author_id = $1

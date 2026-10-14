@@ -11,31 +11,23 @@ import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
 import {
   injuryBodyParts,
   injuryFeedPath,
-  injuryMoods,
   injuryNotice,
   injuryStages,
   isInjuryBodyPart,
-  isInjuryMood,
   isInjuryStage,
 } from "@/lib/injury";
-
-const chipClass = "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition active:scale-95";
-const chipIdle = "border-white/20 glass bg-white/10 text-slate-200 hover:bg-white/16 hover:text-white";
-const chipActive = "border-blue-400 bg-blue-950/60 text-white";
 
 export function InjuryView() {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const { session } = useAuth();
-  const moodParam = sp.get("mood");
   const partParam = sp.get("part");
-  const mood = isInjuryMood(moodParam) ? moodParam : "";
   const part = isInjuryBodyPart(partParam) ? (partParam ?? "") : "";
   const stageParam = sp.get("stage");
   const stage = isInjuryStage(stageParam) ? stageParam : "";
   const page = Math.max(1, Number(sp.get("page")) || 1);
-  const path = injuryFeedPath(mood, part, page, stage);
+  const path = injuryFeedPath(part, page, stage);
 
   const [data, setData] = useState<{ path: string; page: PostsPage } | null>(null);
   const [failed, setFailed] = useState("");
@@ -53,11 +45,9 @@ export function InjuryView() {
     return () => controller.abort();
   }, [path]);
 
-  function go(next: { mood?: string; part?: string; stage?: string; page?: number }) {
+  function go(next: { part?: string; stage?: string; page?: number }) {
     const qs = new URLSearchParams();
-    const nextMood = next.mood ?? mood;
     const nextPart = next.part ?? part;
-    if (nextMood) qs.set("mood", nextMood);
     if (nextPart) qs.set("part", nextPart);
     const nextStage = next.stage ?? stage;
     if (nextStage) qs.set("stage", nextStage);
@@ -68,7 +58,7 @@ export function InjuryView() {
 
   const current = data?.path === path ? data.page : null;
   const hasNext = current ? current.meta.page * current.meta.per_page < current.meta.total : false;
-  const filtered = mood !== "" || part !== "" || stage !== "";
+  const filtered = part !== "" || stage !== "";
 
   return (
     <div className="space-y-4">
@@ -91,23 +81,10 @@ export function InjuryView() {
         みんなの復帰データを見る →
       </Link>
 
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="投稿の種類">
-        <button type="button" className={`${chipClass} ${mood === "" ? chipActive : chipIdle}`} onClick={() => go({ mood: "", page: 1 })}>
-          すべて
-        </button>
-        {injuryMoods.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            className={`${chipClass} ${mood === item.value ? chipActive : chipIdle}`}
-            onClick={() => go({ mood: item.value, page: 1 })}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="絞り込み">
         <select
           aria-label="部位で絞り込む"
-          className="ml-auto rounded-full border border-white/25 glass bg-white/10 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-400"
+          className="rounded-full border border-white/25 glass bg-white/10 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-400"
           value={part}
           onChange={(e) => go({ part: e.target.value, page: 1 })}
         >

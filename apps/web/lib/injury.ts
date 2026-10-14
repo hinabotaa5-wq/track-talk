@@ -1,8 +1,3 @@
-export const injuryMoods = [
-  { value: "vent", label: "吐き出し", hint: "つらい気持ちをそのまま書く" },
-  { value: "rehab", label: "代替トレ", hint: "走れない中でやっていることを共有する" },
-] as const;
-
 export const injuryBodyParts = [
   { value: "foot", label: "足裏・足部" },
   { value: "ankle", label: "足首" },
@@ -35,21 +30,14 @@ export function isInjuryStage(value: string | null | undefined): value is Injury
 
 export const injuryUpdateMaxLength = 2000;
 
-export type InjuryMood = (typeof injuryMoods)[number]["value"];
-
-export function isInjuryMood(value: string | null | undefined): value is InjuryMood {
-  return injuryMoods.some((item) => item.value === value);
-}
-
 export function isInjuryBodyPart(value: string | null | undefined) {
   return injuryBodyParts.some((item) => item.value === value);
 }
 
 export const injuryNotice = "ここでの投稿は医療的な助言ではありません。痛みが続くときは医療機関に相談してください。";
 
-export function injuryFeedPath(mood: string, part: string, page: number, stage = "") {
+export function injuryFeedPath(part: string, page: number, stage = "") {
   const qs = new URLSearchParams({ kind: "injury", sort: "new", page: String(page), per_page: "20" });
-  if (isInjuryMood(mood)) qs.set("mood", mood);
   if (isInjuryBodyPart(part)) qs.set("part", part);
   if (isInjuryStage(stage)) qs.set("stage", stage);
   return `/v1/posts?${qs}`;
@@ -88,7 +76,6 @@ export function injuryTypicalStages(stats: InjuryStats | null, bodyPart: string)
 export type InjuryHistoryItem = {
   id: string;
   title: string;
-  mood_label: string;
   body_part: string;
   body_part_label: string;
   created_at: string;

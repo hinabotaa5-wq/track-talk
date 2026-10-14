@@ -58,7 +58,6 @@ type DomesticMajor struct {
 
 type InjuryDetail struct {
 	PostID   uuid.UUID `json:"post_id"`
-	Mood     string    `json:"mood"`
 	BodyPart string    `json:"body_part"`
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { injuryBodyParts, injuryMoods, injuryNotice, isInjuryBodyPart, isInjuryMood } from "@/lib/injury";
+import { injuryBodyParts, injuryNotice, isInjuryBodyPart } from "@/lib/injury";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -18,7 +18,6 @@ const selectClass =
 export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
   const { token, session } = useAuth();
   const router = useRouter();
-  const [mood, setMood] = useState<string>(initial?.injury?.mood ?? "");
   const [part, setPart] = useState(initial?.injury?.body_part ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
@@ -32,10 +31,6 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
       return;
     }
     setError("");
-    if (!isInjuryMood(mood)) {
-      setError("投稿の種類を選んでください");
-      return;
-    }
     if (!isInjuryBodyPart(part)) {
       setError("部位を選んでください");
       return;
@@ -46,7 +41,7 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
     }
     if (!acquire()) return;
     try {
-      const payload = { kind: "injury", title: title.trim(), body: body.trim(), mood, body_part: part };
+      const payload = { kind: "injury", title: title.trim(), body: body.trim(), body_part: part };
       const post = initial
         ? await apiFetch<Post>(`/v1/posts/${initial.id}`, { method: "PATCH", token, body: JSON.stringify(payload) })
         : await apiFetch<Post>("/v1/posts", { method: "POST", token, body: JSON.stringify(payload) });
@@ -67,32 +62,6 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <fieldset>
-        <legend className="text-sm font-medium">投稿の種類</legend>
-        <div className="mt-1 grid grid-cols-2 gap-2">
-          {injuryMoods.map((item) => (
-            <label
-              key={item.value}
-              className={`cursor-pointer rounded-xl border px-3 py-2.5 text-sm transition active:scale-95 ${
-                mood === item.value
-                  ? "border-blue-400 bg-blue-950/60 text-white"
-                  : "border-white/20 glass bg-white/10 text-slate-200 hover:bg-white/16"
-              }`}
-            >
-              <input
-                type="radio"
-                name="mood"
-                value={item.value}
-                checked={mood === item.value}
-                onChange={() => setMood(item.value)}
-                className="sr-only"
-              />
-              <span className="block font-semibold">{item.label}</span>
-              <span className="mt-0.5 block text-xs text-slate-300">{item.hint}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
       <label className="block text-sm font-medium">
         部位
         <select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
@@ -120,9 +89,7 @@ export function InjuryForm({ initial, returnTo }: { initial?: Post; returnTo?: "
           rows={8}
           className="mt-1"
           maxLength={5000}
-          placeholder={
-            mood === "rehab" ? "いまやっているトレーニングや基礎練を書いてみましょう" : "いまの気持ちをそのまま書いてOKです"
-          }
+          placeholder="いまの気持ちをそのまま書いてOKです"
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />

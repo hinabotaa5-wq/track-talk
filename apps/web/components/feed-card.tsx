@@ -82,9 +82,6 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           <div className="flex flex-wrap items-center gap-1.5">
             {info ? (
               <>
-                <span className="w-fit rounded-full bg-rose-950/70 px-2.5 py-0.5 text-[11px] font-bold text-rose-300 border border-rose-800/60">
-                  {info.mood_label}
-                </span>
                 <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 border border-white/20">
                   {info.body_part_label}
                 </span>

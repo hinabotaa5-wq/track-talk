@@ -68,8 +68,6 @@ export type Post = {
 };
 
 export type Injury = {
-  mood: "vent" | "rehab";
-  mood_label: string;
   body_part: string;
   body_part_label: string;
   stage?: string;

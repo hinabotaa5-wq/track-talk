@@ -15,7 +15,6 @@ type injuryHistoryDTO struct {
 type injuryHistoryItemDTO struct {
 	ID            uuid.UUID               `json:"id"`
 	Title         string                  `json:"title"`
-	MoodLabel     string                  `json:"mood_label"`
 	BodyPart      string                  `json:"body_part"`
 	BodyPartLabel string                  `json:"body_part_label"`
 	CreatedAt     time.Time               `json:"created_at"`
@@ -43,7 +42,6 @@ func buildInjuryHistory(posts []db.ListMyInjuryPostsRow, reports []db.ListMyInju
 		item := injuryHistoryItemDTO{
 			ID:            post.ID,
 			Title:         post.Title,
-			MoodLabel:     injuryMoodLabel(post.Mood),
 			BodyPart:      post.BodyPart,
 			BodyPartLabel: injuryBodyPartLabel(post.BodyPart),
 			CreatedAt:     post.CreatedAt,

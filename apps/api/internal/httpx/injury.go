@@ -14,13 +14,10 @@ import (
 )
 
 type injuryInput struct {
-	Mood     string
 	BodyPart string
 }
 
 type injuryDTO struct {
-	Mood          string `json:"mood"`
-	MoodLabel     string `json:"mood_label"`
 	BodyPart      string `json:"body_part"`
 	BodyPartLabel string `json:"body_part_label"`
 	// Stage is the latest recovery stage reported on the post; empty until the first update.
@@ -75,11 +72,6 @@ type injuryUpdateReq struct {
 	Body  string `json:"body"`
 }
 
-var injuryMoods = []struct{ Code, Label string }{
-	{"vent", "吐き出し"},
-	{"rehab", "代替トレ"},
-}
-
 var injuryBodyParts = []struct{ Code, Label string }{
 	{"foot", "足裏・足部"},
 	{"ankle", "足首"},
@@ -96,15 +88,6 @@ var injuryBodyParts = []struct{ Code, Label string }{
 	{"other", "その他"},
 }
 
-func injuryMoodLabel(code string) string {
-	for _, item := range injuryMoods {
-		if item.Code == code {
-			return item.Label
-		}
-	}
-	return code
-}
-
 func injuryBodyPartLabel(code string) string {
 	for _, item := range injuryBodyParts {
 		if item.Code == code {
@@ -114,25 +97,17 @@ func injuryBodyPartLabel(code string) string {
 	return code
 }
 
-func validInjuryMood(code string) bool {
-	return injuryMoodLabel(code) != code
-}
-
 func validInjuryBodyPart(code string) bool {
 	return injuryBodyPartLabel(code) != code
 }
 
 func normalizeInjury(req postReq) (injuryInput, map[string]string) {
 	fields := map[string]string{}
-	mood := strings.TrimSpace(req.Mood)
-	if !validInjuryMood(mood) {
-		fields["mood"] = "投稿の種類を選んでください"
-	}
 	part := strings.TrimSpace(req.BodyPart)
 	if !validInjuryBodyPart(part) {
 		fields["body_part"] = "部位を選んでください"
 	}
-	return injuryInput{Mood: mood, BodyPart: part}, fields
+	return injuryInput{BodyPart: part}, fields
 }
 
 // injuryTitle gives a post without a title the start of its body, so feed cards still have a heading.
@@ -147,8 +122,6 @@ func injuryTitle(body string) string {
 
 func injuryFromDetail(row db.InjuryDetail) *injuryDTO {
 	return &injuryDTO{
-		Mood:          row.Mood,
-		MoodLabel:     injuryMoodLabel(row.Mood),
 		BodyPart:      row.BodyPart,
 		BodyPartLabel: injuryBodyPartLabel(row.BodyPart),
 	}
@@ -157,7 +130,6 @@ func injuryFromDetail(row db.InjuryDetail) *injuryDTO {
 func saveInjury(ctx context.Context, q *db.Queries, postID uuid.UUID, in injuryInput) error {
 	return q.UpsertInjuryDetail(ctx, db.UpsertInjuryDetailParams{
 		PostID:   postID,
-		Mood:     in.Mood,
 		BodyPart: in.BodyPart,
 	})
 }
