@@ -54,3 +54,27 @@ export function injuryFeedPath(mood: string, part: string, page: number, stage =
   if (isInjuryStage(stage)) qs.set("stage", stage);
   return `/v1/posts?${qs}`;
 }
+
+export type InjuryStageStat = {
+  stage: InjuryStage;
+  stage_label: string;
+  reached: number;
+  median_days: number | null;
+};
+
+export type InjuryPartStat = {
+  body_part: string;
+  body_part_label: string;
+  posts: number;
+  stages: InjuryStageStat[];
+};
+
+export type InjuryStats = { min_sample: number; parts: InjuryPartStat[] };
+
+// 中央値が出ている段階は日数、足りない段階はあと何人で目安が出るかを返す。
+export function injuryStageStatText(stage: InjuryStageStat, minSample: number) {
+  if (stage.median_days === null) {
+    return `報告 ${stage.reached}人（あと${Math.max(minSample - stage.reached, 1)}人で目安を表示）`;
+  }
+  return stage.median_days === 0 ? `投稿から当日（${stage.reached}人）` : `投稿から約${stage.median_days}日（${stage.reached}人）`;
+}

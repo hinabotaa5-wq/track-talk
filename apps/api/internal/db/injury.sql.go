@@ -11,6 +11,40 @@ import (
 	"github.com/google/uuid"
 )
 
+const countInjuryPostsByPart = `-- name: CountInjuryPostsByPart :many
+SELECT i.body_part, count(*)::bigint AS posts
+FROM injury_details i
+JOIN posts p ON p.id = i.post_id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+GROUP BY i.body_part
+`
+
+type CountInjuryPostsByPartRow struct {
+	BodyPart string `json:"body_part"`
+	Posts    int64  `json:"posts"`
+}
+
+func (q *Queries) CountInjuryPostsByPart(ctx context.Context) ([]CountInjuryPostsByPartRow, error) {
+	rows, err := q.db.Query(ctx, countInjuryPostsByPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountInjuryPostsByPartRow
+	for rows.Next() {
+		var i CountInjuryPostsByPartRow
+		if err := rows.Scan(&i.BodyPart, &i.Posts); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countInjuryUpdates = `-- name: CountInjuryUpdates :one
 SELECT count(*) FROM injury_updates WHERE post_id = $1
 `
@@ -87,6 +121,60 @@ func (q *Queries) GetInjuryDetail(ctx context.Context, postID uuid.UUID) (Injury
 	var i InjuryDetail
 	err := row.Scan(&i.PostID, &i.Mood, &i.BodyPart)
 	return i, err
+}
+
+const injuryStageStats = `-- name: InjuryStageStats :many
+SELECT
+    i.body_part,
+    f.stage,
+    count(*)::bigint AS reached,
+    COALESCE(
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (f.first_at - p.created_at)) / 86400.0),
+        0
+    )::float8 AS median_days
+FROM (
+    SELECT post_id, stage, min(created_at) AS first_at
+    FROM injury_updates
+    GROUP BY post_id, stage
+) f
+JOIN posts p ON p.id = f.post_id
+JOIN injury_details i ON i.post_id = p.id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+GROUP BY i.body_part, f.stage
+`
+
+type InjuryStageStatsRow struct {
+	BodyPart   string  `json:"body_part"`
+	Stage      string  `json:"stage"`
+	Reached    int64   `json:"reached"`
+	MedianDays float64 `json:"median_days"`
+}
+
+// 部位ごと・段階ごとに、その段階まで経過を報告した投稿の数と、投稿から最初の報告までの日数の中央値。
+func (q *Queries) InjuryStageStats(ctx context.Context) ([]InjuryStageStatsRow, error) {
+	rows, err := q.db.Query(ctx, injuryStageStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InjuryStageStatsRow
+	for rows.Next() {
+		var i InjuryStageStatsRow
+		if err := rows.Scan(
+			&i.BodyPart,
+			&i.Stage,
+			&i.Reached,
+			&i.MedianDays,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listInjuryDetails = `-- name: ListInjuryDetails :many
