@@ -24,7 +24,7 @@ export default function UploadPage() {
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
   return (
-    <div className="-mb-6 grid h-[calc(100dvh-9.25rem-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:mb-0 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
+    <div className="grid h-[calc(100dvh-10.625rem-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
       {doors.map((door) => (
         <Link
           key={door.href}

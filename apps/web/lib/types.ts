@@ -35,7 +35,6 @@ export type Post = {
   id: string;
   title: string;
   body?: string;
-  body_preview?: string;
   mine: boolean;
   like_count: number;
   comment_count: number;

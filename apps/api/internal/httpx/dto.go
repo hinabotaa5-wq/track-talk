@@ -1,9 +1,7 @@
 package httpx
 
 import (
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -19,7 +17,6 @@ type postDTO struct {
 	ID             uuid.UUID `json:"id"`
 	Title          string    `json:"title"`
 	Body           string    `json:"body,omitempty"`
-	BodyPreview    string    `json:"body_preview,omitempty"`
 	authorID       uuid.UUID
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
@@ -110,15 +107,6 @@ func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) 
 	}
 }
 
-func preview(body string) string {
-	body = strings.TrimSpace(body)
-	if utf8.RuneCountInString(body) <= 140 {
-		return body
-	}
-	r := []rune(body)
-	return string(r[:140]) + "…"
-}
-
 func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	p := postDTO{
 		ID:           row.ID,
@@ -131,9 +119,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 		UpdatedAt:    row.UpdatedAt,
 	}
 	applyKind(&p, row.Kind, row.YoutubeVideoID, row.YoutubeThumbnailUrl, row.CloudinaryPublicID)
-	if list {
-		p.BodyPreview = preview(row.Body)
-	} else {
+	if !list {
 		p.Body = row.Body
 	}
 	return p

@@ -19,12 +19,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlaybackSlot } from "@/components/playback-slot";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 
-export function PostDetail({ id, returnTo, autoplay = false }: { id: string; returnTo?: "me"; autoplay?: boolean }) {
+export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const { session, token } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
@@ -205,40 +204,20 @@ export function PostDetail({ id, returnTo, autoplay = false }: { id: string; ret
           <PracticeJoin post={post} onDone={load} />
         </>
       ) : post.kind === "video" && post.playback_url ? (
-        autoplay ? (
-          <PlaybackSlot
-            postId={post.id}
-            kind="video"
-            title={feedTitle(post.title)}
-            playbackUrl={post.playback_url}
-            thumbnailUrl={post.thumbnail_url}
-          />
-        ) : (
-          <video
-            className="aspect-video w-full rounded-xl bg-black"
-            src={post.playback_url}
-            poster={post.thumbnail_url}
-            controls
-            playsInline
-            preload="metadata"
-          />
-        )
+        <video
+          className="aspect-video w-full rounded-xl bg-black"
+          src={post.playback_url}
+          poster={post.thumbnail_url}
+          controls
+          playsInline
+          preload="metadata"
+        />
       ) : post.kind === "youtube" && post.youtube_video_id ? (
-        autoplay ? (
-          <PlaybackSlot
-            postId={post.id}
-            kind="youtube"
-            title={feedTitle(post.title)}
-            youtubeId={post.youtube_video_id}
-            thumbnailUrl={post.thumbnail_url}
-          />
-        ) : (
-          <YouTubePlayer
-            videoId={post.youtube_video_id}
-            title={feedTitle(post.title)}
-            thumbnailUrl={post.thumbnail_url}
-          />
-        )
+        <YouTubePlayer
+          videoId={post.youtube_video_id}
+          title={feedTitle(post.title)}
+          thumbnailUrl={post.thumbnail_url}
+        />
       ) : post.thumbnail_url ? (
         <div className="relative w-full overflow-hidden rounded-xl bg-black/25">
           <Image

@@ -5,9 +5,9 @@ export default async function PostPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; play?: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
-  const { from, play } = await searchParams;
-  return <PostDetail id={id} returnTo={from === "me" ? "me" : undefined} autoplay={play === "1"} />;
+  const { from } = await searchParams;
+  return <PostDetail id={id} returnTo={from === "me" ? "me" : undefined} />;
 }

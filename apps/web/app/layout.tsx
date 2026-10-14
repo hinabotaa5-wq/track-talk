@@ -8,7 +8,6 @@ import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
-import { ExpandedPlaybackGuard } from "@/components/expanded-playback-guard";
 import { AmbientBackground } from "@/components/ambient-background";
 
 const geistSans = Geist({
@@ -43,7 +42,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <AmbientBackground />
           <CompetitionPrefetch />
-          <ExpandedPlaybackGuard />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
             {children}

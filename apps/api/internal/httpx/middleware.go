@@ -15,19 +15,11 @@ import (
 
 type ctxKey int
 
-const (
-	userIDKey ctxKey = iota
-	requestIDKey
-)
+const userIDKey ctxKey = iota
 
 func UserID(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(userIDKey).(uuid.UUID)
 	return id, ok && id != uuid.Nil
-}
-
-func RequestID(ctx context.Context) string {
-	s, _ := ctx.Value(requestIDKey).(string)
-	return s
 }
 
 func withUser(ctx context.Context, id uuid.UUID) context.Context {
@@ -60,11 +52,10 @@ func Recover(next http.Handler) http.Handler {
 func RequestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.NewString()
-		ctx := context.WithValue(r.Context(), requestIDKey, id)
 		start := time.Now()
 		ww := &statusWriter{ResponseWriter: w, status: 200}
-		next.ServeHTTP(ww, r.WithContext(ctx))
-		uid, _ := UserID(ctx)
+		next.ServeHTTP(ww, r)
+		uid, _ := UserID(r.Context())
 		slog.Info("http",
 			"request_id", id,
 			"method", r.Method,

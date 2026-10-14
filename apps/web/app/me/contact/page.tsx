@@ -11,7 +11,7 @@ import type { Inquiry, Meta } from "@/lib/types";
 import { inquiryCategories, inquiryCategoryLabels, inquirySchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
@@ -23,7 +23,6 @@ export default function ContactPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
-  const historyLoaded = useRef(false);
   const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
     resolver: zodResolver(inquirySchema),
