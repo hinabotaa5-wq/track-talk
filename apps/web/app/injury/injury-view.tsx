@@ -1,0 +1,136 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedLoadingFrame } from "@/components/loading-frame";
+import { EmptyState, ErrorState } from "@/components/empty-state";
+import { useAuth } from "@/components/auth-provider";
+import { fetchPostsRetrying, type PostsPage } from "@/lib/fetch-posts";
+import { injuryBodyParts, injuryFeedPath, injuryMoods, injuryNotice, isInjuryBodyPart, isInjuryMood } from "@/lib/injury";
+
+const chipClass = "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition active:scale-95";
+const chipIdle = "border-white/20 glass bg-white/10 text-slate-200 hover:bg-white/16 hover:text-white";
+const chipActive = "border-blue-400 bg-blue-950/60 text-white";
+
+export function InjuryView() {
+  const sp = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { session } = useAuth();
+  const moodParam = sp.get("mood");
+  const partParam = sp.get("part");
+  const mood = isInjuryMood(moodParam) ? moodParam : "";
+  const part = isInjuryBodyPart(partParam) ? (partParam ?? "") : "";
+  const page = Math.max(1, Number(sp.get("page")) || 1);
+  const path = injuryFeedPath(mood, part, page);
+
+  const [data, setData] = useState<{ path: string; page: PostsPage } | null>(null);
+  const [failed, setFailed] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchPostsRetrying(path, { signal: controller.signal })
+      .then((result) => {
+        setData({ path, page: result });
+        setFailed("");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(path);
+      });
+    return () => controller.abort();
+  }, [path]);
+
+  function go(next: { mood?: string; part?: string; page?: number }) {
+    const qs = new URLSearchParams();
+    const nextMood = next.mood ?? mood;
+    const nextPart = next.part ?? part;
+    if (nextMood) qs.set("mood", nextMood);
+    if (nextPart) qs.set("part", nextPart);
+    if (next.page && next.page > 1) qs.set("page", String(next.page));
+    const query = qs.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  const current = data?.path === path ? data.page : null;
+  const hasNext = current ? current.meta.page * current.meta.per_page < current.meta.total : false;
+  const filtered = mood !== "" || part !== "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">ケガ人の溜まり場</h1>
+          <p className="mt-1 text-sm text-slate-200">
+            走れないつらさも、いまできる頑張りも、ここで分け合おう。
+          </p>
+        </div>
+        <Link
+          href={session ? "/injury/new" : "/login"}
+          className="shrink-0 rounded-full bg-blue-600 px-4.5 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+        >
+          投稿する
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="投稿の種類">
+        <button type="button" className={`${chipClass} ${mood === "" ? chipActive : chipIdle}`} onClick={() => go({ mood: "", page: 1 })}>
+          すべて
+        </button>
+        {injuryMoods.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            className={`${chipClass} ${mood === item.value ? chipActive : chipIdle}`}
+            onClick={() => go({ mood: item.value, page: 1 })}
+          >
+            {item.label}
+          </button>
+        ))}
+        <select
+          aria-label="部位で絞り込む"
+          className="ml-auto rounded-full border border-white/25 glass bg-white/10 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-400"
+          value={part}
+          onChange={(e) => go({ part: e.target.value, page: 1 })}
+        >
+          <option value="">すべての部位</option>
+          {injuryBodyParts.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {failed === path ? (
+        <ErrorState message="投稿の取得に失敗しました。APIの起動を確認してください。" />
+      ) : current === null ? (
+        <FeedLoadingFrame />
+      ) : current.posts.length === 0 ? (
+        <EmptyState
+          title={filtered ? "一致する投稿がありません" : "まだ投稿がありません"}
+          body={filtered ? "条件を変えて探してみてください。" : "最初の一言を書いてみましょう。"}
+        />
+      ) : (
+        <div className={feedGridClass}>
+          {current.posts.map((post) => (
+            <FeedCard key={post.id} post={post} />
+          ))}
+        </div>
+      )}
+
+      {hasNext ? (
+        <button
+          type="button"
+          onClick={() => go({ page: page + 1 })}
+          className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95"
+        >
+          次の投稿
+        </button>
+      ) : null}
+
+      <p className="text-xs text-slate-300">{injuryNotice}</p>
+    </div>
+  );
+}

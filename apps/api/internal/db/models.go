@@ -43,6 +43,12 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type InjuryDetail struct {
+	PostID   uuid.UUID `json:"post_id"`
+	Mood     string    `json:"mood"`
+	BodyPart string    `json:"body_part"`
+}
+
 type Inquiry struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`

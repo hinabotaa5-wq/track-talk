@@ -32,6 +32,7 @@ type postDTO struct {
 	PlaybackURL    string          `json:"playback_url,omitempty"`
 	Recruitment    *recruitmentDTO `json:"recruitment,omitempty"`
 	Practice       *practiceDTO    `json:"practice,omitempty"`
+	Injury         *injuryDTO      `json:"injury,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }

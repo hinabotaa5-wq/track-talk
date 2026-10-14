@@ -252,7 +252,7 @@ func (s *Server) createRecruitment(w http.ResponseWriter, r *http.Request, autho
 }
 
 func (s *Server) updateRecruitment(w http.ResponseWriter, r *http.Request, author db.Profile, id uuid.UUID) {
-	params, in, _, ok := s.parsePostReq(w, r, "recruitment")
+	params, in, _, _, ok := s.parsePostReq(w, r, "recruitment")
 	if !ok {
 		return
 	}
@@ -302,6 +302,11 @@ func (s *Server) writePost(w http.ResponseWriter, r *http.Request, id uuid.UUID,
 		return
 	}
 	item, err = s.attachPractice(r.Context(), item)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	item, err = s.attachInjury(r.Context(), item)
 	if err != nil {
 		MapDBError(w, err)
 		return

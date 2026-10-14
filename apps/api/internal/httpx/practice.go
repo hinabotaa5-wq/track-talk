@@ -180,7 +180,7 @@ func (s *Server) createPractice(w http.ResponseWriter, r *http.Request, author d
 }
 
 func (s *Server) updatePractice(w http.ResponseWriter, r *http.Request, author db.Profile, id uuid.UUID) {
-	params, _, in, ok := s.parsePostReq(w, r, "practice")
+	params, _, in, _, ok := s.parsePostReq(w, r, "practice")
 	if !ok {
 		return
 	}
