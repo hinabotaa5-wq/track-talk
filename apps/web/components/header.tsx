@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { FeedbackBox } from "./feedback-box";
 import { NotificationBell } from "./notification-bell";
 import { activeMainTab, mainTabHref, mainTabs, showsBackButton, useRememberedCompetitionPrefecture } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
@@ -107,7 +108,12 @@ export function Header() {
               );
             })}
           </nav>
-          {session && !showBack ? <NotificationBell /> : null}
+          {session && !showBack ? (
+            <>
+              <FeedbackBox />
+              <NotificationBell />
+            </>
+          ) : null}
         </div>
       </div>
     </header>
