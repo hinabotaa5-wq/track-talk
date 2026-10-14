@@ -1,6 +1,6 @@
 # API を Oracle Cloud（Always Free）で動かす
 
-Go API だけを Oracle の VM に移し、Next.js は Netlify のままにする構成です。
+Go API は Oracle の VM で動かし、Next.js は Netlify で動かします。
 VM では Docker 上で API と Caddy（HTTPS）が動き、`main` への push で GitHub Actions が自動デプロイします。
 無料枠の条件は変わるので、作成前に [Always Free の公式ページ](https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) を確認してください。
 
@@ -34,7 +34,7 @@ scp deploy/.env.example ubuntu@<IP>:/opt/track-talk/.env
 ssh ubuntu@<IP> nano /opt/track-talk/.env
 ```
 
-`API_DOMAIN`、`API_IMAGE`（`OWNER` は GitHub のユーザー名を小文字で）、`DATABASE_URL`、`CORS_ORIGINS`（Netlify の URL）などを Render に入れていた値から移します。
+入れる値は `deploy/.env.example` です。`API_IMAGE` の `OWNER` は GitHub のユーザー名を小文字にし、`CORS_ORIGINS` は Netlify の URL にします。
 
 ## 3. GitHub に登録する（手作業）
 
@@ -60,8 +60,8 @@ ssh-keyscan -t ed25519 <IP>
 
 1. Actions の「Deploy API」を **Run workflow** で実行する
 2. `https://api.<ドメイン>/health` が `{"status":"ok"}` を返すことを確認する
-3. Netlify の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` に変えて再デプロイする
-4. 画面から動作を確認してから、Render のサービスを止める
+3. Netlify の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
+4. 画面からログインと投稿ができることを確認する
 
 以降は `main` の CI が通るたびに自動でデプロイされます。
 
