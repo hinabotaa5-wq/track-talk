@@ -25,14 +25,6 @@ type Client struct {
 }
 
 func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
-	model := c.Model
-	if model == "" {
-		model = Model
-	}
-	httpClient := c.HTTP
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
 	var parts []map[string]any
 	for _, pdf := range page.PDFs {
 		parts = append(parts, map[string]any{"inline_data": map[string]string{
@@ -41,6 +33,23 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 		}})
 	}
 	parts = append(parts, map[string]any{"text": extractionPrompt(page)})
+	text, err := c.generate(ctx, parts)
+	if err != nil {
+		return nil, err
+	}
+	return parseDrafts(text)
+}
+
+// generate sends one request to Gemini and returns the JSON text it answers with.
+func (c Client) generate(ctx context.Context, parts []map[string]any) (string, error) {
+	model := c.Model
+	if model == "" {
+		model = Model
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	body, err := json.Marshal(map[string]any{
 		"contents": []map[string]any{
 			{"role": "user", "parts": parts},
@@ -52,7 +61,7 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 		},
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	endpoint := generateEndpoint
 	if strings.Contains(generateEndpoint, "%s") {
@@ -60,30 +69,26 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", c.Key)
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer res.Body.Close()
 	payload, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if res.StatusCode == http.StatusTooManyRequests || bytes.Contains(payload, []byte("RESOURCE_EXHAUSTED")) {
-		return nil, fmt.Errorf("%w: %s", ErrRateLimited, truncate(payload))
+		return "", fmt.Errorf("%w: %s", ErrRateLimited, truncate(payload))
 	}
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini %s: %s", res.Status, truncate(payload))
+		return "", fmt.Errorf("gemini %s: %s", res.Status, truncate(payload))
 	}
-	text, err := responseText(payload)
-	if err != nil {
-		return nil, err
-	}
-	return parseDrafts(text)
+	return responseText(payload)
 }
 
 func extractionPrompt(page Page) string {

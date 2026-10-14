@@ -23,10 +23,11 @@ import (
 func main() {
 	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と、Gemini の1日の上限（GEMINI_DAILY_REQUESTS、既定15回）に収まる県まで")
 	dryRun := flag.Bool("dry-run", false, "DB に書かず、読み取れた大会を表示する。-prefecture が必要")
+	news := flag.Bool("news", false, "県陸協の新着から要項を補う。-prefecture があればその県だけ。-dry-run なら DB を書き換えず、補える要項を表示する")
 	pageURL := flag.String("url", "", "-dry-run のとき、未登録の県でも試せる日程ページの URL")
 	flag.Parse()
 
-	if *dryRun {
+	if *dryRun && !*news {
 		if err := runDryRun(*prefecture, *pageURL); err != nil {
 			log.Fatal(err)
 		}
@@ -51,12 +52,35 @@ func main() {
 	}
 	defer pool.Close()
 
-	removed, err := db.New(pool).DeletePastCompetitionSeasons(ctx, int32(competitions.SeasonYear(time.Now())))
-	if err != nil {
-		log.Fatal(err)
+	if !(*news && *dryRun) {
+		removed, err := db.New(pool).DeletePastCompetitionSeasons(ctx, int32(competitions.SeasonYear(time.Now())))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if removed > 0 {
+			fmt.Fprintf(os.Stdout, "dropped %d competitions from previous seasons\n", removed)
+		}
 	}
-	if removed > 0 {
-		fmt.Fprintf(os.Stdout, "dropped %d competitions from previous seasons\n", removed)
+
+	if *news {
+		if isInternational(*prefecture) {
+			log.Fatal("-news は都道府県だけに使えます")
+		}
+		key := os.Getenv("GEMINI_API_KEY")
+		if key == "" {
+			log.Fatal("GEMINI_API_KEY is required")
+		}
+		if *prefecture == "" {
+			log.Fatal("-news には -prefecture が必要です")
+		}
+		sources, err := newsTargets(ctx, pool, *prefecture, -1)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if importNews(ctx, pool, competitions.Client{Key: key}, sources, -1, *dryRun) {
+			os.Exit(1)
+		}
+		return
 	}
 
 	if isInternational(*prefecture) {
@@ -87,7 +111,27 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if len(targets) == 0 {
+	// Annual schedules come first. News gets only the Gemini requests they leave over, so on the days in April
+	// and October when prefectures are being imported, almost nothing is left for it.
+	newsBudget := 0
+	if *prefecture == "" {
+		limit, err := dailyRequestLimit()
+		if err != nil {
+			log.Fatal(err)
+		}
+		newsBudget = limit
+		for _, source := range targets {
+			newsBudget -= source.Requests()
+		}
+	}
+	var newsSources []competitions.Source
+	if newsBudget > 0 {
+		newsSources, err = newsTargets(ctx, pool, "", newsBudget)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	if len(targets) == 0 && len(newsSources) == 0 {
 		if failed {
 			os.Exit(1)
 		}
@@ -111,6 +155,15 @@ func main() {
 			if errors.Is(err, competitions.ErrRateLimited) {
 				os.Exit(1)
 			}
+			failed = true
+		}
+	}
+	if len(newsSources) > 0 {
+		// Same pacing as between prefectures, so the free tier's per-minute limit is not hit.
+		if len(targets) > 0 {
+			time.Sleep(15 * time.Second)
+		}
+		if importNews(ctx, pool, client, newsSources, newsBudget, false) {
 			failed = true
 		}
 	}
@@ -321,9 +374,16 @@ func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.C
 	}); err != nil {
 		return err
 	}
-	if err := q.DeleteCompetitionsBySeason(ctx, db.DeleteCompetitionsBySeasonParams{
+	// Meets that are still in the table are updated in place, so the guidelines found from news survive the re-import.
+	// Only meets that left the table are removed.
+	keys := make([]string, 0, len(meets))
+	for _, meet := range meets {
+		keys = append(keys, meet.Name+"|"+meet.StartsOn.Format("2006-01-02"))
+	}
+	if err := q.DeleteCompetitionsBySeasonExcept(ctx, db.DeleteCompetitionsBySeasonExceptParams{
 		Prefecture: source.Prefecture,
 		SeasonYear: season,
+		Keys:       keys,
 	}); err != nil {
 		return err
 	}

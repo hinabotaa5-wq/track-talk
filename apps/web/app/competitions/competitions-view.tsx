@@ -14,11 +14,16 @@ import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, 
 import type { Competition } from "@/lib/types";
 import { RequireSession } from "./require-session";
 
-function destinationLabel(competition: Competition, prefecture: string) {
-  if (competition.link_label) return competition.link_label;
-  if (prefecture === INTERNATIONAL) return "公式サイト";
-  if (competition.organizer_url === competition.source_url) return associationListLabel(prefecture);
-  return "要項";
+function destination(competition: Competition, prefecture: string) {
+  // 年間表の要項を優先し、無ければ新着から補った要項を出す。
+  if (competition.link_label === "要項") return { href: competition.organizer_url, label: "要項" };
+  if (competition.guidelines_url) return { href: competition.guidelines_url, label: "要項" };
+  if (competition.link_label) return { href: competition.organizer_url, label: competition.link_label };
+  if (prefecture === INTERNATIONAL) return { href: competition.organizer_url, label: "公式サイト" };
+  if (competition.organizer_url === competition.source_url) {
+    return { href: competition.organizer_url, label: associationListLabel(prefecture) };
+  }
+  return { href: competition.organizer_url, label: "要項" };
 }
 
 function competitionDates(startsOn: string, endsOn: string | null) {
@@ -82,20 +87,23 @@ export function CompetitionsView() {
         ) : null}
         {!loading && shownItems.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
-            {shownItems.map((c) => (
-              <a
-                key={c.id}
-                href={c.organizer_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
-              >
-                <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
-                <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
-                {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
-                <p className="text-sm text-blue-400">{destinationLabel(c, prefecture)}</p>
-              </a>
-            ))}
+            {shownItems.map((c) => {
+              const link = destination(c, prefecture);
+              return (
+                <a
+                  key={c.id}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+                >
+                  <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
+                  <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
+                  {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
+                  <p className="text-sm text-blue-400">{link.label}</p>
+                </a>
+              );
+            })}
           </div>
         ) : null}
       </div>
