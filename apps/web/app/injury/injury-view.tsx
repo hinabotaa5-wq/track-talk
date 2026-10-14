@@ -87,6 +87,10 @@ export function InjuryView() {
         </Link>
       </div>
 
+      <Link href="/injury/stats" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
+        みんなの復帰データを見る →
+      </Link>
+
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="投稿の種類">
         <button type="button" className={`${chipClass} ${mood === "" ? chipActive : chipIdle}`} onClick={() => go({ mood: "", page: 1 })}>
           すべて

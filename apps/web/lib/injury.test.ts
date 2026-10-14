@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { injuryFeedPath, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
+import { injuryFeedPath, injuryStageStatText, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("builds the feed path with only valid filters", () => {
@@ -26,5 +26,12 @@ describe("injury", () => {
     expect(isInjuryStage("jogging")).toBe(true);
     expect(isInjuryStage("vent")).toBe(false);
     expect(isInjuryStage(undefined)).toBe(false);
+  });
+
+  it("describes a stage's median, or how many more reports are needed", () => {
+    const base = { stage: "jogging", stage_label: "ジョグ再開" } as const;
+    expect(injuryStageStatText({ ...base, reached: 6, median_days: 42 }, 5)).toBe("投稿から約42日（6人）");
+    expect(injuryStageStatText({ ...base, reached: 5, median_days: 0 }, 5)).toBe("投稿から当日（5人）");
+    expect(injuryStageStatText({ ...base, reached: 3, median_days: null }, 5)).toBe("報告 3人（あと2人で目安を表示）");
   });
 });

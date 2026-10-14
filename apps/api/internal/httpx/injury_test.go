@@ -290,3 +290,83 @@ func TestInjuryFeedFilterByLatestStage(t *testing.T) {
 		t.Fatalf("invalid stage total %d", got)
 	}
 }
+
+type injuryStatsResp struct {
+	MinSample int `json:"min_sample"`
+	Parts     []struct {
+		BodyPart string `json:"body_part"`
+		Posts    int64  `json:"posts"`
+		Stages   []struct {
+			Stage      string `json:"stage"`
+			Reached    int64  `json:"reached"`
+			MedianDays *int   `json:"median_days"`
+		} `json:"stages"`
+	} `json:"parts"`
+}
+
+func getInjuryStats(t *testing.T, h http.Handler) injuryStatsResp {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, "/v1/injury/stats", "", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stats %d %s", rec.Code, rec.Body.String())
+	}
+	var out injuryStatsResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// reached returns the post count and the reached count for a part and stage (0 when absent).
+func (r injuryStatsResp) reached(part, stage string) (posts, reached int64, median *int) {
+	for _, p := range r.Parts {
+		if p.BodyPart != part {
+			continue
+		}
+		posts = p.Posts
+		for _, s := range p.Stages {
+			if s.Stage == stage {
+				return posts, s.Reached, s.MedianDays
+			}
+		}
+	}
+	return posts, 0, nil
+}
+
+func TestInjuryStatsAggregatesAnonymously(t *testing.T) {
+	h := setup(t)
+	// DB はテスト間で共有されるので、増えた分で確かめる。
+	beforePosts, beforeReached, _ := getInjuryStats(t, h).reached("groin", "jogging")
+
+	for i := 0; i < 5; i++ {
+		tok := token(t, uuid.New())
+		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
+			"kind": "injury", "title": "鼠径部", "body": "本文", "mood": "rehab", "body_part": "groin",
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+		}
+		var post struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+			t.Fatal(err)
+		}
+		up := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/injury/updates", tok, map[string]any{"stage": "jogging", "body": "走れた"})
+		if up.Code != http.StatusCreated {
+			t.Fatalf("update %d %s", up.Code, up.Body.String())
+		}
+	}
+
+	stats := getInjuryStats(t, h)
+	if stats.MinSample != 5 {
+		t.Fatalf("min sample %d", stats.MinSample)
+	}
+	posts, reached, median := stats.reached("groin", "jogging")
+	if posts-beforePosts != 5 || reached-beforeReached != 5 {
+		t.Fatalf("delta posts %d reached %d", posts-beforePosts, reached-beforeReached)
+	}
+	if median == nil || *median < 0 {
+		t.Fatalf("median should be shown once the sample is large enough: %v", median)
+	}
+}

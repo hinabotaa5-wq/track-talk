@@ -59,6 +59,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts", s.listPosts)
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
+		r.Get("/injury/stats", s.injuryStats)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
