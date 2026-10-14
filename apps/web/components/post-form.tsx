@@ -123,6 +123,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
           />
         </label>
       ) : initial.thumbnail_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
       ) : null}
       <TitleField {...form.register("title")} />

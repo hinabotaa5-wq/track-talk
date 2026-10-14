@@ -286,6 +286,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           <ul className="grid grid-cols-3 gap-2">
             {kept.map((photo) => (
               <li key={photo.public_id} className="space-y-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photo.url} alt="" className="aspect-[4/3] w-full rounded-md bg-black/25 object-cover" />
                 <button
                   type="button"
@@ -301,6 +302,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             ))}
             {files.map((preview) => (
               <li key={preview.url} className="space-y-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview.url} alt="" className="aspect-[4/3] w-full rounded-md bg-black/25 object-cover" />
                 <button
                   type="button"

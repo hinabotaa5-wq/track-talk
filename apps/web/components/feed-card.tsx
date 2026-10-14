@@ -116,6 +116,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           </span>
         ) : null}
         {post.thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
         ) : (
           <PosterFallback title={title} />

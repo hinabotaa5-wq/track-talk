@@ -8,7 +8,7 @@ import { nicknameSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 
 export default function ProfilePage() {
@@ -20,7 +20,7 @@ export default function ProfilePage() {
     resolver: zodResolver(nicknameSchema),
     defaultValues: { nickname: "", nickname_public: false },
   });
-  const nickname = form.watch("nickname");
+  const nickname = useWatch({ control: form.control, name: "nickname" });
   const overLimit = Array.from(nickname).length > 10;
 
   useEffect(() => {
