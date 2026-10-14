@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { injuryFeedPath, isInjuryBodyPart, isInjuryMood } from "./injury";
+import { injuryFeedPath, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("builds the feed path with only valid filters", () => {
@@ -15,5 +15,11 @@ describe("injury", () => {
     expect(isInjuryMood("other")).toBe(false);
     expect(isInjuryBodyPart("lower-back")).toBe(true);
     expect(isInjuryBodyPart(null)).toBe(false);
+  });
+
+  it("validates recovery stage codes", () => {
+    expect(isInjuryStage("jogging")).toBe(true);
+    expect(isInjuryStage("vent")).toBe(false);
+    expect(isInjuryStage(undefined)).toBe(false);
   });
 });

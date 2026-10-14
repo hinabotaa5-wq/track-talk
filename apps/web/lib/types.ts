@@ -60,6 +60,17 @@ export type Injury = {
   mood_label: string;
   body_part: string;
   body_part_label: string;
+  stage?: string;
+  stage_label?: string;
+  updates?: InjuryUpdate[];
+};
+
+export type InjuryUpdate = {
+  id: string;
+  stage: string;
+  stage_label: string;
+  body: string;
+  created_at: string;
 };
 
 export type RecruitmentPhoto = {

@@ -88,6 +88,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
                 <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 border border-white/20">
                   {info.body_part_label}
                 </span>
+                {info.stage_label ? (
+                  <span className="w-fit rounded-full bg-emerald-950/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-800/60">
+                    {info.stage_label}
+                  </span>
+                ) : null}
               </>
             ) : null}
           </div>

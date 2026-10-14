@@ -86,6 +86,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts/{id}/saves", s.savePost)
 			r.Delete("/posts/{id}/saves", s.unsavePost)
 			r.Post("/posts/{id}/comments", s.createComment)
+			r.Post("/posts/{id}/injury/updates", s.createInjuryUpdate)
+			r.Delete("/posts/{id}/injury/updates/{updateID}", s.deleteInjuryUpdate)
 			r.Post("/posts/{id}/practice/applications", s.applyPractice)
 			r.Post("/posts/{id}/practice/applications/{applicationID}/accept", s.acceptPractice)
 			r.Post("/posts/{id}/practice/applications/{applicationID}/decline", s.declinePractice)

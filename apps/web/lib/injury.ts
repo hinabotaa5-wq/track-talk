@@ -19,6 +19,22 @@ export const injuryBodyParts = [
   { value: "other", label: "その他" },
 ] as const;
 
+export const injuryStages = [
+  { value: "resting", label: "安静中" },
+  { value: "rehab", label: "リハビリ中" },
+  { value: "jogging", label: "ジョグ再開" },
+  { value: "practice", label: "練習に復帰" },
+  { value: "race", label: "大会に復帰" },
+] as const;
+
+export type InjuryStage = (typeof injuryStages)[number]["value"];
+
+export function isInjuryStage(value: string | null | undefined): value is InjuryStage {
+  return injuryStages.some((item) => item.value === value);
+}
+
+export const injuryUpdateMaxLength = 2000;
+
 export type InjuryMood = (typeof injuryMoods)[number]["value"];
 
 export function isInjuryMood(value: string | null | undefined): value is InjuryMood {
