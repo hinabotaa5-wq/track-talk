@@ -6,6 +6,7 @@ import { useAuth } from "./auth-provider";
 import { FeedbackBox } from "./feedback-box";
 import { NotificationBell } from "./notification-bell";
 import { activeMainTab, mainTabHref, mainTabs, showsBackButton, useRememberedCompetitionPrefecture } from "./bottom-nav";
+import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
 
 function TrackMark() {
@@ -59,10 +60,15 @@ export function Header() {
   const pathname = usePathname();
   const competitionPrefecture = useRememberedCompetitionPrefecture();
   const showBack = showsBackButton(pathname);
+  const { confirmLeave } = useLeaveGuard();
+  const guardedClick = useGuardedLinkClick();
 
   function goBack() {
-    if (window.history.length > 1) router.back();
-    else router.push("/");
+    const go = () => {
+      if (window.history.length > 1) router.back();
+      else router.push("/");
+    };
+    if (!confirmLeave(go)) go();
   }
 
   const current = activeMainTab(pathname);
@@ -81,7 +87,7 @@ export function Header() {
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" aria-label="TrackTalk" className="group flex items-center transition active:scale-95">
+            <Link href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-95">
               <TrackLogo />
             </Link>
           )}
@@ -95,6 +101,7 @@ export function Header() {
                 <Link
                   key={tab.id}
                   href={mainTabHref(tab.id, !!session, competitionPrefecture)}
+                  onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session, competitionPrefecture))}
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
                     active

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Plus, Trophy, UserRound } from "lucide-react";
 import { competitionPrefectureEvent, competitionsPath, readSavedCompetitionPrefecture } from "@/lib/competition-prefecture";
+import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 
 export const mainTabs = [
@@ -71,6 +72,7 @@ export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   const competitionPrefecture = useRememberedCompetitionPrefecture();
+  const guardedClick = useGuardedLinkClick();
 
   if (hidesBottomNav(pathname)) return null;
 
@@ -93,6 +95,7 @@ export function BottomNav() {
               <li key={tab.id}>
                 <Link
                   href={href}
+                  onClick={(event) => guardedClick(event, href)}
                   className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-150 active:scale-95 ${
                     active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}

@@ -4,6 +4,7 @@ import { useEffect, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { FormLoadingFrame } from "@/components/loading-frame";
+import { LeaveGuardArea } from "@/components/leave-guard";
 import { Input } from "@/components/ui/input";
 
 export function ComposerPage({
@@ -21,10 +22,10 @@ export function ComposerPage({
   }, [loading, session, router]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <LeaveGuardArea className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">{title}</h1>
       {loading || !session ? <FormLoadingFrame /> : children}
-    </div>
+    </LeaveGuardArea>
   );
 }
 
