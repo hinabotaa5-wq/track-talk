@@ -23,6 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
 import { InjuryRecovery } from "@/components/injury-recovery";
+import { InjuryTypicalRecovery } from "@/components/injury-typical-recovery";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
@@ -270,6 +271,9 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ) : null}
       {post.kind === "injury" ? (
         <InjuryRecovery postId={post.id} updates={post.injury?.updates ?? []} mine={post.mine} onChanged={load} />
+      ) : null}
+      {post.kind === "injury" && post.injury ? (
+        <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
       ) : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-2">
         <LikeButton

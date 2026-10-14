@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { injuryFeedPath, injuryStageStatText, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
+import { injuryFeedPath, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryMood, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("builds the feed path with only valid filters", () => {
@@ -33,5 +33,25 @@ describe("injury", () => {
     expect(injuryStageStatText({ ...base, reached: 6, median_days: 42 }, 5)).toBe("投稿から約42日（6人）");
     expect(injuryStageStatText({ ...base, reached: 5, median_days: 0 }, 5)).toBe("投稿から当日（5人）");
     expect(injuryStageStatText({ ...base, reached: 3, median_days: null }, 5)).toBe("報告 3人（あと2人で目安を表示）");
+  });
+
+  it("picks only the stages with a median for the given body part", () => {
+    const stats = {
+      min_sample: 5,
+      parts: [
+        {
+          body_part: "knee",
+          body_part_label: "膝",
+          posts: 9,
+          stages: [
+            { stage: "rehab", stage_label: "リハビリ中", reached: 6, median_days: 12 },
+            { stage: "race", stage_label: "大会に復帰", reached: 2, median_days: null },
+          ],
+        },
+      ],
+    } as const;
+    expect(injuryTypicalStages(stats as never, "knee").map((s) => s.stage)).toEqual(["rehab"]);
+    expect(injuryTypicalStages(stats as never, "ankle")).toEqual([]);
+    expect(injuryTypicalStages(null, "knee")).toEqual([]);
   });
 });
