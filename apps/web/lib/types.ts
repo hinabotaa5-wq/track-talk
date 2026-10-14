@@ -29,6 +29,7 @@ export type Competition = {
   organizer_url: string;
   source_url: string;
   link_label: string;
+  guidelines_url: string;
 };
 
 export type Post = {

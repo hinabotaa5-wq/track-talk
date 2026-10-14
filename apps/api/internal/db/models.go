@@ -23,18 +23,24 @@ type Comment struct {
 }
 
 type Competition struct {
-	ID           uuid.UUID  `json:"id"`
-	Name         string     `json:"name"`
-	StartsOn     time.Time  `json:"starts_on"`
-	EndsOn       *time.Time `json:"ends_on"`
-	Location     string     `json:"location"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	Prefecture   string     `json:"prefecture"`
-	SeasonYear   int32      `json:"season_year"`
-	OrganizerUrl string     `json:"organizer_url"`
-	SourceUrl    string     `json:"source_url"`
-	LinkLabel    string     `json:"link_label"`
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	StartsOn      time.Time  `json:"starts_on"`
+	EndsOn        *time.Time `json:"ends_on"`
+	Location      string     `json:"location"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	Prefecture    string     `json:"prefecture"`
+	SeasonYear    int32      `json:"season_year"`
+	OrganizerUrl  string     `json:"organizer_url"`
+	SourceUrl     string     `json:"source_url"`
+	LinkLabel     string     `json:"link_label"`
+	GuidelinesUrl string     `json:"guidelines_url"`
+}
+
+type CompetitionNewsCheck struct {
+	Prefecture string    `json:"prefecture"`
+	CheckedAt  time.Time `json:"checked_at"`
 }
 
 type Inquiry struct {

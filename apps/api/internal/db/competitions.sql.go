@@ -12,6 +12,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteCompetitionsBeforeSeason = `-- name: DeleteCompetitionsBeforeSeason :exec
+DELETE FROM competitions
+WHERE prefecture = $1
+  AND season_year < $2
+`
+
+type DeleteCompetitionsBeforeSeasonParams struct {
+	Prefecture string `json:"prefecture"`
+	SeasonYear int32  `json:"season_year"`
+}
+
+func (q *Queries) DeleteCompetitionsBeforeSeason(ctx context.Context, arg DeleteCompetitionsBeforeSeasonParams) error {
+	_, err := q.db.Exec(ctx, deleteCompetitionsBeforeSeason, arg.Prefecture, arg.SeasonYear)
+	return err
+}
+
 const deleteCompetitionsBySeason = `-- name: DeleteCompetitionsBySeason :exec
 DELETE FROM competitions
 WHERE prefecture = $1
@@ -28,19 +44,22 @@ func (q *Queries) DeleteCompetitionsBySeason(ctx context.Context, arg DeleteComp
 	return err
 }
 
-const deleteCompetitionsBeforeSeason = `-- name: DeleteCompetitionsBeforeSeason :exec
-DELETE FROM competitions
-WHERE prefecture = $1
-  AND season_year < $2
+const deleteCompetitionsBySeasonExcept = `-- name: DeleteCompetitionsBySeasonExcept :exec
+DELETE FROM competitions c
+WHERE c.prefecture = $1
+  AND c.season_year = $2
+  AND (c.name || '|' || to_char(c.starts_on, 'YYYY-MM-DD')) <> ALL ($3::text[])
 `
 
-type DeleteCompetitionsBeforeSeasonParams struct {
-	Prefecture string `json:"prefecture"`
-	SeasonYear int32  `json:"season_year"`
+type DeleteCompetitionsBySeasonExceptParams struct {
+	Prefecture string   `json:"prefecture"`
+	SeasonYear int32    `json:"season_year"`
+	Keys       []string `json:"keys"`
 }
 
-func (q *Queries) DeleteCompetitionsBeforeSeason(ctx context.Context, arg DeleteCompetitionsBeforeSeasonParams) error {
-	_, err := q.db.Exec(ctx, deleteCompetitionsBeforeSeason, arg.Prefecture, arg.SeasonYear)
+// 取り込んだ大会に含まれない行だけを消す。残る行は upsert で更新され、新着から補った要項が消えない。
+func (q *Queries) DeleteCompetitionsBySeasonExcept(ctx context.Context, arg DeleteCompetitionsBySeasonExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteCompetitionsBySeasonExcept, arg.Prefecture, arg.SeasonYear, arg.Keys)
 	return err
 }
 
@@ -58,7 +77,7 @@ func (q *Queries) DeletePastCompetitionSeasons(ctx context.Context, seasonYear i
 }
 
 const listCompetitions = `-- name: ListCompetitions :many
-SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url, link_label
+SELECT id, name, starts_on, ends_on, location, created_at, updated_at, prefecture, season_year, organizer_url, source_url, link_label, guidelines_url
 FROM competitions
 WHERE prefecture = $1
   AND starts_on < $2::date
@@ -97,6 +116,7 @@ func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsPara
 			&i.OrganizerUrl,
 			&i.SourceUrl,
 			&i.LinkLabel,
+			&i.GuidelinesUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -106,6 +126,114 @@ func (q *Queries) ListCompetitions(ctx context.Context, arg ListCompetitionsPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const listCompetitionsForNews = `-- name: ListCompetitionsForNews :many
+SELECT id, name, starts_on, ends_on, location, link_label, organizer_url, source_url, guidelines_url
+FROM competitions
+WHERE prefecture = $1
+  AND season_year = $2
+ORDER BY starts_on ASC, name ASC
+`
+
+type ListCompetitionsForNewsParams struct {
+	Prefecture string `json:"prefecture"`
+	SeasonYear int32  `json:"season_year"`
+}
+
+type ListCompetitionsForNewsRow struct {
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	StartsOn      time.Time  `json:"starts_on"`
+	EndsOn        *time.Time `json:"ends_on"`
+	Location      string     `json:"location"`
+	LinkLabel     string     `json:"link_label"`
+	OrganizerUrl  string     `json:"organizer_url"`
+	SourceUrl     string     `json:"source_url"`
+	GuidelinesUrl string     `json:"guidelines_url"`
+}
+
+func (q *Queries) ListCompetitionsForNews(ctx context.Context, arg ListCompetitionsForNewsParams) ([]ListCompetitionsForNewsRow, error) {
+	rows, err := q.db.Query(ctx, listCompetitionsForNews, arg.Prefecture, arg.SeasonYear)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCompetitionsForNewsRow
+	for rows.Next() {
+		var i ListCompetitionsForNewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.StartsOn,
+			&i.EndsOn,
+			&i.Location,
+			&i.LinkLabel,
+			&i.OrganizerUrl,
+			&i.SourceUrl,
+			&i.GuidelinesUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNewsCheckTimes = `-- name: ListNewsCheckTimes :many
+SELECT prefecture, checked_at FROM competition_news_checks
+`
+
+func (q *Queries) ListNewsCheckTimes(ctx context.Context) ([]CompetitionNewsCheck, error) {
+	rows, err := q.db.Query(ctx, listNewsCheckTimes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompetitionNewsCheck
+	for rows.Next() {
+		var i CompetitionNewsCheck
+		if err := rows.Scan(&i.Prefecture, &i.CheckedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markNewsChecked = `-- name: MarkNewsChecked :exec
+INSERT INTO competition_news_checks (prefecture, checked_at)
+VALUES ($1, now())
+ON CONFLICT (prefecture) DO UPDATE SET checked_at = now()
+`
+
+func (q *Queries) MarkNewsChecked(ctx context.Context, prefecture string) error {
+	_, err := q.db.Exec(ctx, markNewsChecked, prefecture)
+	return err
+}
+
+const setCompetitionGuidelines = `-- name: SetCompetitionGuidelines :exec
+UPDATE competitions
+SET guidelines_url = $1
+WHERE id = $2
+  AND guidelines_url = ''
+`
+
+type SetCompetitionGuidelinesParams struct {
+	GuidelinesUrl string    `json:"guidelines_url"`
+	ID            uuid.UUID `json:"id"`
+}
+
+// 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。まだ要項が無い行にだけ入れる。
+func (q *Queries) SetCompetitionGuidelines(ctx context.Context, arg SetCompetitionGuidelinesParams) error {
+	_, err := q.db.Exec(ctx, setCompetitionGuidelines, arg.GuidelinesUrl, arg.ID)
+	return err
 }
 
 const upsertCompetition = `-- name: UpsertCompetition :exec

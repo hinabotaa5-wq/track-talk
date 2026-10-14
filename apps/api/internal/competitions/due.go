@@ -10,8 +10,21 @@ import (
 // so this stays well under the lowest reported figure (20 per model per day).
 const DailyRequestLimit = 15
 
-// RefreshAfter is how long a successful prefecture import stays fresh.
-const RefreshAfter = 10 * 24 * time.Hour
+// ImportWindowStart is when the current annual-schedule import window opened: the latest April 1 or
+// October 1 (Japan time) not after now. Prefectures publish the year's table in spring and some revise it
+// in autumn, so each prefecture is imported once per window and then left alone.
+func ImportWindowStart(now time.Time) time.Time {
+	local := now.In(japanTime)
+	year := local.Year()
+	for _, month := range []time.Month{time.October, time.April} {
+		if start := time.Date(year, month, 1, 0, 0, 0, 0, japanTime); !start.After(local) {
+			return start
+		}
+	}
+	return time.Date(year-1, time.October, 1, 0, 0, 0, 0, japanTime)
+}
+
+var japanTime = time.FixedZone("JST", 9*60*60)
 
 // InternationalRefreshAfter is shorter because international meets are read without Gemini.
 const InternationalRefreshAfter = 7 * 24 * time.Hour
@@ -24,8 +37,7 @@ func (s Source) Requests() int {
 	return len(s.URLs())
 }
 
-// DueSources returns sources that have never been imported or whose latest row is at least
-// RefreshAfter old, oldest first, as long as their Gemini requests fit in limit.
+// DueSources returns sources that have not been imported since the current window opened, oldest first, as long as their Gemini requests fit in limit.
 // A source that does not fit is left for a later day, when it will be first in line.
 func DueSources(sources []Source, updated map[string]time.Time, now time.Time, limit int) []Source {
 	sorted := append([]Source(nil), sources...)
@@ -43,11 +55,12 @@ func DueSources(sources []Source, updated map[string]time.Time, now time.Time, l
 		}
 		return sorted[i].Prefecture < sorted[j].Prefecture
 	})
+	windowStart := ImportWindowStart(now)
 	var due []Source
 	remaining := limit
 	for _, source := range sorted {
 		imported, ok := freshTime(updated, source.Prefecture)
-		if ok && now.Sub(imported) < RefreshAfter {
+		if ok && !imported.Before(windowStart) {
 			continue
 		}
 		cost := source.Requests()
