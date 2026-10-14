@@ -7,10 +7,47 @@ import { NotificationBell } from "./notification-bell";
 import { activeMainTab, hidesTabBar, mainTabHref, mainTabs, useRememberedCompetitionPrefecture } from "./bottom-nav";
 import { usePathname, useRouter } from "next/navigation";
 
+function TrackMark() {
+  return (
+    <svg viewBox="4 6 42 38" className="h-[22px] w-[24px] shrink-0" aria-hidden="true">
+      <path
+        d="M42 10H28A20 20 0 0 0 8 30v10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-white"
+      />
+      <path
+        d="M42 16.5H28A13.5 13.5 0 0 0 14.5 30v10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-blue-300"
+      />
+      <path
+        d="M42 23H28A7 7 0 0 0 21 30v10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-white/80"
+      />
+    </svg>
+  );
+}
+
 function TrackLogo() {
   return (
-    <span className="flex items-baseline font-black text-white text-base">
-      Track<span className="font-bold text-blue-300">Talk</span>
+    <span className="flex items-center gap-2 font-black text-white text-base">
+      <TrackMark />
+      <span>
+        Track<span className="font-bold text-blue-300">Talk</span>
+      </span>
     </span>
   );
 }
