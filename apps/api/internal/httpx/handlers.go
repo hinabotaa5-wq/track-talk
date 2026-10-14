@@ -1143,6 +1143,7 @@ type inquiryReq struct {
 	Subject  string `json:"subject"`
 	Body     string `json:"body"`
 	Source   string `json:"source"`
+	Email    string `json:"email"`
 }
 
 func inquirySource(v string) string {
@@ -1175,17 +1176,28 @@ func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
 	if e := InquirySource(inquirySource(req.Source)); e != "" {
 		fields["source"] = e
 	}
+	source := inquirySource(req.Source)
+	var email *string
+	if source == "contact" {
+		if e := ContactEmail(req.Email); e != "" {
+			fields["email"] = e
+		} else {
+			v := strings.TrimSpace(req.Email)
+			email = &v
+		}
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
 	}
 	row, err := s.q.CreateInquiry(r.Context(), db.CreateInquiryParams{
-		ID:       uuid.New(),
-		UserID:   p.ID,
-		Category: req.Category,
-		Subject:  strings.TrimSpace(req.Subject),
-		Body:     strings.TrimSpace(req.Body),
-		Source:   inquirySource(req.Source),
+		ID:           uuid.New(),
+		UserID:       p.ID,
+		Category:     req.Category,
+		Subject:      strings.TrimSpace(req.Subject),
+		Body:         strings.TrimSpace(req.Body),
+		Source:       source,
+		ContactEmail: email,
 	})
 	if err != nil {
 		MapDBError(w, err)
