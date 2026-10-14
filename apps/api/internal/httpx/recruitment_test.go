@@ -51,9 +51,9 @@ func TestNormalizeRecruitment(t *testing.T) {
 	_, fields = normalizeRecruitment(postReq{
 		Prefectures:    []string{"13"},
 		Schedule:       "毎週",
-		ImagePublicIDs: []string{"a", "b", "c", "d"},
+		ImagePublicIDs: []string{"a", "b"},
 	})
-	if fields["image_public_ids"] != "写真は3枚までです" {
+	if fields["image_public_ids"] != "写真は1枚までです" {
 		t.Fatalf("fields %#v", fields)
 	}
 }

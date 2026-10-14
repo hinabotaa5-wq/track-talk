@@ -140,8 +140,8 @@ func normalizeLinks(in []string) ([]string, string) {
 }
 
 func normalizePhotoIDs(in []string) ([]string, string) {
-	if len(in) > 3 {
-		return nil, "写真は3枚までです"
+	if len(in) > 1 {
+		return nil, "写真は1枚までです"
 	}
 	seen := map[string]bool{}
 	out := make([]string, 0, len(in))

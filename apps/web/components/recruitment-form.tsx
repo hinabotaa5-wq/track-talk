@@ -15,7 +15,7 @@ import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 
 const maxPhotoBytes = 10 * 1024 * 1024;
-const maxPhotos = 3;
+const maxPhotos = 1;
 const fieldClass = "mt-1";
 
 function looksLikeImage(file: File) {
@@ -41,6 +41,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   const [body, setBody] = useState(initial?.body ?? "");
   const [kept, setKept] = useState<KeptPhoto[]>(recruitment?.photos ?? []);
   const [files, setFiles] = useState<PhotoFile[]>([]);
+  const [photoNotice, setPhotoNotice] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
@@ -66,10 +67,13 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   }
 
   function addFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const incoming = Array.from(list);
+    setPhotoNotice(incoming.length > maxPhotos ? "1枚までです。" : "");
     const room = maxPhotos - kept.length - files.length;
-    if (!list || room <= 0) return;
+    if (room <= 0) return;
     const next = [...files];
-    for (const file of Array.from(list).slice(0, room)) {
+    for (const file of incoming.slice(0, room)) {
       next.push({ file, url: URL.createObjectURL(file) });
     }
     setFiles(next);
@@ -101,7 +105,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       return;
     }
     if (kept.length + files.length > maxPhotos) {
-      setError("写真は3枚までです");
+      setError("写真は1枚までです");
       return;
     }
     for (const item of files) {
@@ -236,7 +240,6 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       </label>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">SNSのURL</legend>
-        <p className="text-sm text-slate-200">4件までです。</p>
         {links.map((link, index) => (
           <div key={index} className="flex items-center gap-2">
             <Input
@@ -276,7 +279,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       </label>
       <div className="space-y-2">
         <p className="text-sm font-medium">チームの写真</p>
-        <p className="text-sm text-slate-200">3枚までです。なくても投稿できます。</p>
+        {photoNotice ? <p className="text-sm text-red-400">{photoNotice}</p> : null}
         {kept.length > 0 || files.length > 0 ? (
           <ul className="grid grid-cols-3 gap-2">
             {kept.map((photo) => (
@@ -285,7 +288,10 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                 <button
                   type="button"
                   className="text-sm text-slate-200"
-                  onClick={() => setKept((current) => current.filter((item) => item.public_id !== photo.public_id))}
+                  onClick={() => {
+                    setPhotoNotice("");
+                    setKept((current) => current.filter((item) => item.public_id !== photo.public_id));
+                  }}
                 >
                   削除
                 </button>
@@ -298,6 +304,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                   type="button"
                   className="text-sm text-slate-200"
                   onClick={() => {
+                    setPhotoNotice("");
                     URL.revokeObjectURL(preview.url);
                     setFiles((current) => current.filter((item) => item !== preview));
                   }}
