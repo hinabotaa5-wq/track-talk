@@ -43,6 +43,19 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type DomesticMajor struct {
+	Slug          string    `json:"slug"`
+	Year          int32     `json:"year"`
+	Name          string    `json:"name"`
+	Category      string    `json:"category"`
+	Venue         string    `json:"venue"`
+	StartsOn      time.Time `json:"starts_on"`
+	EndsOn        time.Time `json:"ends_on"`
+	ScheduleLabel string    `json:"schedule_label"`
+	SiteUrl       string    `json:"site_url"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type InjuryDetail struct {
 	PostID   uuid.UUID `json:"post_id"`
 	Mood     string    `json:"mood"`
