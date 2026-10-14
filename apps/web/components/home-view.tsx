@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { HomeFeed } from "@/components/home-feed";
+import { ReviewHome } from "@/components/review-home";
 import { SavedFeed } from "@/components/saved-feed";
 import type { PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, prefetchSavedFeed, readFeed, seedFeed, savedFeedPath } from "@/lib/home-feed-cache";
-import { parseHomeSort } from "@/lib/home-sort";
+import { parseHomeSort, parseProductKind } from "@/lib/home-sort";
 
 // The filter chips change the URL with history.pushState, so this reads the tab from the URL
 // instead of server props and switches without a server round trip.
@@ -25,6 +26,11 @@ export function HomeView({ initialPath, initial }: { initialPath: string; initia
   useEffect(() => {
     if (token) prefetchSavedFeed(q, token);
   }, [token, q]);
+
+  if (sort === "review") {
+    const kind = parseProductKind(sp.get("type"));
+    return <ReviewHome key={`${kind}:${q}:${page}`} kind={kind} q={q} page={page} />;
+  }
 
   if (sort === "saved") {
     return <SavedFeed key={savedFeedPath(q, page)} q={q} page={page} />;
