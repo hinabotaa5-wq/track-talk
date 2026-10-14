@@ -14,7 +14,10 @@ export function ZoomableVideo({ src, poster, className }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
-  viewRef.current = view;
+
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
 
   useEffect(() => {
     const el = wrapRef.current;
