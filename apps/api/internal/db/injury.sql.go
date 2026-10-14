@@ -379,6 +379,45 @@ func (q *Queries) NotifyInjuryFollowers(ctx context.Context, arg NotifyInjuryFol
 	return err
 }
 
+const updateInjuryUpdate = `-- name: UpdateInjuryUpdate :one
+UPDATE injury_updates u
+SET stage = $1,
+    body = $2
+FROM posts p
+WHERE u.id = $3
+  AND u.post_id = $4
+  AND p.id = u.post_id
+  AND p.author_id = $5
+RETURNING u.id, u.post_id, u.stage, u.body, u.created_at
+`
+
+type UpdateInjuryUpdateParams struct {
+	Stage    string    `json:"stage"`
+	Body     string    `json:"body"`
+	ID       uuid.UUID `json:"id"`
+	PostID   uuid.UUID `json:"post_id"`
+	AuthorID uuid.UUID `json:"author_id"`
+}
+
+func (q *Queries) UpdateInjuryUpdate(ctx context.Context, arg UpdateInjuryUpdateParams) (InjuryUpdate, error) {
+	row := q.db.QueryRow(ctx, updateInjuryUpdate,
+		arg.Stage,
+		arg.Body,
+		arg.ID,
+		arg.PostID,
+		arg.AuthorID,
+	)
+	var i InjuryUpdate
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.Stage,
+		&i.Body,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const upsertInjuryDetail = `-- name: UpsertInjuryDetail :exec
 INSERT INTO injury_details (post_id, mood, body_part)
 VALUES ($1, $2, $3)

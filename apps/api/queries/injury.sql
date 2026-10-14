@@ -108,3 +108,14 @@ WHERE f.user_id <> sqlc.arg('author_id')::uuid
       AND n.kind = 'injury_update'
       AND n.read_at IS NULL
   );
+
+-- name: UpdateInjuryUpdate :one
+UPDATE injury_updates u
+SET stage = sqlc.arg('stage'),
+    body = sqlc.arg('body')
+FROM posts p
+WHERE u.id = sqlc.arg('id')
+  AND u.post_id = sqlc.arg('post_id')
+  AND p.id = u.post_id
+  AND p.author_id = sqlc.arg('author_id')
+RETURNING u.id, u.post_id, u.stage, u.body, u.created_at;
