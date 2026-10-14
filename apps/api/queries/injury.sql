@@ -175,3 +175,6 @@ ORDER BY stage, rn;
 
 -- name: IsProfileAdmin :one
 SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean AS is_admin;
+
+-- name: DeleteInjuryGroupMember :execrows
+DELETE FROM injury_group_members WHERE user_id = $1 AND body_part = $2;

@@ -166,6 +166,23 @@ func (q *Queries) CreateInjuryUpdate(ctx context.Context, arg CreateInjuryUpdate
 	return i, err
 }
 
+const deleteInjuryGroupMember = `-- name: DeleteInjuryGroupMember :execrows
+DELETE FROM injury_group_members WHERE user_id = $1 AND body_part = $2
+`
+
+type DeleteInjuryGroupMemberParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	BodyPart string    `json:"body_part"`
+}
+
+func (q *Queries) DeleteInjuryGroupMember(ctx context.Context, arg DeleteInjuryGroupMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInjuryGroupMember, arg.UserID, arg.BodyPart)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteInjuryUpdate = `-- name: DeleteInjuryUpdate :execrows
 DELETE FROM injury_updates u
 USING posts p

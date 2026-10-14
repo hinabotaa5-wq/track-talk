@@ -96,6 +96,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/injury/groups/{part}", s.getInjuryGroup)
 			r.Post("/injury/groups/{part}/join", s.joinInjuryGroup)
 			r.Patch("/injury/groups/{part}/me", s.updateInjuryGroupStage)
+			r.Delete("/injury/groups/{part}/me", s.leaveInjuryGroup)
 			r.Get("/injury/groups/{part}/posts", s.listInjuryGroupPosts)
 			r.Post("/injury/groups/{part}/posts", s.createInjuryGroupPost)
 			r.Post("/posts/{id}/injury/updates", s.createInjuryUpdate)

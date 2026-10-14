@@ -322,3 +322,17 @@ func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 	in.GroupStage = &member.Stage
 	s.createInjury(w, r, p, params, in)
 }
+
+// leaveInjuryGroup takes the caller out of the group. Their stage history goes with the membership;
+// the posts they wrote stay, and they can delete those one by one. They can join again later.
+func (s *Server) leaveInjuryGroup(w http.ResponseWriter, r *http.Request) {
+	p, part, _, ok := s.injuryGroupMember(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.q.DeleteInjuryGroupMember(r.Context(), db.DeleteInjuryGroupMemberParams{UserID: p.ID, BodyPart: part}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
