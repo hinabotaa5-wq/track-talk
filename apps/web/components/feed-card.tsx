@@ -1,15 +1,25 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Post } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 import { practiceReputationLine } from "@/components/practice-reputation";
 import { PosterFallback } from "@/components/poster-card";
 
-export const feedGridClass = "grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4";
+export const feedGridClass = "columns-2 gap-3 md:columns-3 xl:columns-4";
+
+const cardClass =
+  "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
 
 export function feedTitle(title: string) {
   const trimmed = title.trim();
   return trimmed === "" ? "（質問なし）" : trimmed;
+}
+
+function CardTitle({ title }: { title: string }) {
+  return (
+    <div className="px-3.5 py-2.5">
+      <p className="truncate text-sm font-medium text-slate-200 transition-colors group-hover:text-blue-400">{title}</p>
+    </div>
+  );
 }
 
 function KindBadge({ children }: { children: string }) {
@@ -28,7 +38,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     return (
       <Link
         href={href}
-        className="group block overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]"
+        className={cardClass}
       >
         <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
           <div className="flex items-center justify-between">
@@ -60,35 +70,25 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
             <span className="font-semibold text-blue-400">JOIN &gt;</span>
           </div>
         </div>
-        <p className="truncate px-3.5 py-2.5 text-sm font-medium text-slate-200 transition-colors group-hover:text-blue-400">{title}</p>
+        <CardTitle title={title} />
       </Link>
     );
   }
   return (
-    <Link
-      href={href}
-      className="group block overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]"
-    >
-      <div className="relative aspect-[4/3] overflow-hidden bg-black/25">
+    <Link href={href} className={cardClass}>
+      <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
           </span>
         ) : null}
         {post.thumbnail_url ? (
-          <Image
-            src={post.thumbnail_url}
-            alt={title}
-            fill
-            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-            className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-            loading="lazy"
-          />
+          <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
         ) : (
           <PosterFallback id={post.id} title={title} />
         )}
       </div>
-      <p className="truncate px-3.5 py-3 text-sm font-medium text-slate-200 transition-colors group-hover:text-blue-400">{title}</p>
+      <CardTitle title={title} />
     </Link>
   );
 }

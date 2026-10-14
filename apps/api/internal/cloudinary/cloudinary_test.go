@@ -21,7 +21,7 @@ func TestVideoURLs(t *testing.T) {
 	id := "track-talk/11111111-1111-4111-8111-111111111111"
 	thumb := c.ThumbnailURL(id)
 	play := c.PlaybackURL(id)
-	if !strings.Contains(thumb, "/demo/video/upload/so_auto,c_fill,w_640,h_480,f_jpg/track-talk/") || !strings.HasSuffix(thumb, ".jpg") {
+	if !strings.Contains(thumb, "/demo/video/upload/so_auto,c_limit,w_800,f_jpg/track-talk/") || !strings.HasSuffix(thumb, ".jpg") {
 		t.Fatal(thumb)
 	}
 	if !strings.Contains(play, "/demo/video/upload/q_auto/track-talk/") || !strings.HasSuffix(play, ".mp4") {

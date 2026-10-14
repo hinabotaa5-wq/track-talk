@@ -14,8 +14,8 @@ export function FeedLoadingFrame() {
   return (
     <Frame label="投稿を読み込んでいます">
       <div className={feedGridClass}>
-        {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className="aspect-[4/3] rounded-2xl glass bg-white/12 animate-pulse" />
+        {["h-40", "h-64", "h-48", "h-72", "h-36", "h-56", "h-44", "h-60"].map((height, index) => (
+          <div key={index} className={`mb-3 break-inside-avoid rounded-2xl glass bg-white/12 animate-pulse ${height}`} />
         ))}
       </div>
     </Frame>

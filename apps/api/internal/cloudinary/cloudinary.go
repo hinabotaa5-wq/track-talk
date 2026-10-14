@@ -111,7 +111,7 @@ func (c Client) ThumbnailURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_fill,w_640,h_480,f_jpg/" + deliveryPath(publicID) + ".jpg"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_800,f_jpg/" + deliveryPath(publicID) + ".jpg"
 }
 
 func (c Client) PlaybackURL(publicID string) string {
