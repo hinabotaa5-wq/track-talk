@@ -37,6 +37,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
   const action = useActionLock();
   const commentLock = useActionLock();
+  const [reportedPost, setReportedPost] = useState(false);
+  const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
   async function load() {
     try {
@@ -46,6 +48,13 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       ]);
       setPost(p);
       setComments(c.comments ?? []);
+      if (token) {
+        const mine = await apiFetch<{ post: boolean; comment_ids: string[] }>(`/v1/posts/${id}/my-reports`, { token }).catch(() => null);
+        if (mine) {
+          setReportedPost(mine.post);
+          setReportedComments(new Set(mine.comment_ids));
+        }
+      }
       setError("");
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
@@ -124,6 +133,11 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     router.refresh();
   }
 
+  function markReported(targetType: "post" | "comment", targetId: string) {
+    if (targetType === "post") setReportedPost(true);
+    else setReportedComments((prev) => new Set(prev).add(targetId));
+  }
+
   async function report(targetType: "post" | "comment", targetId: string) {
     if (!session) {
       router.push("/login");
@@ -142,10 +156,13 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           detail: "",
         }),
       });
+      markReported(targetType, targetId);
       alert("通報を受け付けました");
     } catch (e) {
-      if (e instanceof ApiRequestError && e.status === 409) alert("すでに通報済みです");
-      else alert(e instanceof ApiRequestError ? e.message : "通報できませんでした");
+      if (e instanceof ApiRequestError && e.status === 409) {
+        markReported(targetType, targetId);
+        alert("すでに通報済みです");
+      } else alert(e instanceof ApiRequestError ? e.message : "通報できませんでした");
     } finally {
       action.release();
     }
@@ -307,7 +324,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             </Button>
           </>
         ) : null}
-        <ReportButton disabled={action.pending} onClick={() => report("post", post.id)} />
+        <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
       </div>
       </div>
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
@@ -339,11 +356,15 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             ) : (
               <button
                 type="button"
-                className="mt-1 text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
-                disabled={action.pending}
+                className={
+                  reportedComments.has(c.id)
+                    ? "mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-300"
+                    : "mt-1 text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
+                }
+                disabled={action.pending || reportedComments.has(c.id)}
                 onClick={() => report("comment", c.id)}
               >
-                通報
+                {reportedComments.has(c.id) ? "通報済み" : "通報"}
               </button>
             )}
           </div>

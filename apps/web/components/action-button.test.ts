@@ -55,4 +55,16 @@ describe("LikeButton & SaveButton", () => {
     expect(html).toContain("rounded-full");
     expect(html).toContain("glass");
   });
+
+  it("renders the reported state colored and disabled", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportButton, {
+        reported: true,
+        onClick: () => {},
+      })
+    );
+    expect(html).toContain("通報済み");
+    expect(html).toContain("bg-amber-950");
+    expect(html).toContain("disabled");
+  });
 });

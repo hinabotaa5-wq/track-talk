@@ -100,6 +100,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Patch("/comments/{id}", s.updateComment)
 			r.Delete("/comments/{id}", s.deleteComment)
 			r.Post("/reports", s.createReport)
+			r.Get("/posts/{id}/my-reports", s.myReports)
 			r.Get("/admin/reports", s.listReports)
 			r.Get("/admin/inquiries", s.listInquiries)
 			r.Post("/admin/posts/{id}/hide", s.hidePost)

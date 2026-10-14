@@ -1077,6 +1077,32 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusCreated, row)
 }
 
+func (s *Server) myReports(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	postID, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	rows, err := s.q.ListMyReportedTargets(r.Context(), db.ListMyReportedTargetsParams{ReporterID: p.ID, PostID: postID})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	post := false
+	commentIDs := []uuid.UUID{}
+	for _, row := range rows {
+		if row.TargetType == "post" {
+			post = true
+		} else {
+			commentIDs = append(commentIDs, row.TargetID)
+		}
+	}
+	JSON(w, http.StatusOK, map[string]any{"post": post, "comment_ids": commentIDs})
+}
+
 func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return

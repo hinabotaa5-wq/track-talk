@@ -136,6 +136,46 @@ func (q *Queries) ListAdminReports(ctx context.Context, arg ListAdminReportsPara
 	return items, nil
 }
 
+const listMyReportedTargets = `-- name: ListMyReportedTargets :many
+SELECT target_type, target_id
+FROM reports
+WHERE reporter_id = $1
+  AND (
+    (target_type = 'post' AND target_id = $2::uuid)
+    OR (target_type = 'comment' AND target_id IN (SELECT c.id FROM comments c WHERE c.post_id = $2::uuid))
+  )
+`
+
+type ListMyReportedTargetsParams struct {
+	ReporterID uuid.UUID `json:"reporter_id"`
+	PostID     uuid.UUID `json:"post_id"`
+}
+
+type ListMyReportedTargetsRow struct {
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+}
+
+func (q *Queries) ListMyReportedTargets(ctx context.Context, arg ListMyReportedTargetsParams) ([]ListMyReportedTargetsRow, error) {
+	rows, err := q.db.Query(ctx, listMyReportedTargets, arg.ReporterID, arg.PostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyReportedTargetsRow
+	for rows.Next() {
+		var i ListMyReportedTargetsRow
+		if err := rows.Scan(&i.TargetType, &i.TargetID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReports = `-- name: ListReports :many
 SELECT id, reporter_id, target_type, target_id, reason, detail, status, created_at
 FROM reports
