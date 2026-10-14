@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -15,7 +14,6 @@ import (
 var errAuthDelete = errors.New("auth delete")
 
 const withdrawConfirm = "退会する"
-const withdrawMaxLoginAge = 5 * time.Minute
 
 type deleteAccountReq struct {
 	Confirm string `json:"confirm"`
@@ -34,10 +32,6 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Confirm != withdrawConfirm {
 		FieldError(w, map[string]string{"confirm": "確認のため「退会する」と入力してください"})
-		return
-	}
-	if err := s.auth.RecentLogin(bearer(r), time.Now(), withdrawMaxLoginAge); err != nil {
-		Error(w, http.StatusUnauthorized, "reauth_required", "退会する前にもう一度ログインしてください")
 		return
 	}
 

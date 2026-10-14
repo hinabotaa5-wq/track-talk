@@ -67,20 +67,6 @@ func (v *Verifier) ParseIdentity(tokenString string) (Identity, error) {
 	return identity, nil
 }
 
-// RecentLogin reports whether the token was issued by a sign-in within maxAge.
-// A refreshed access token keeps the original sign-in time, so it does not count.
-func (v *Verifier) RecentLogin(tokenString string, now time.Time, maxAge time.Duration) error {
-	claims, err := v.parseClaims(tokenString)
-	if err != nil {
-		return err
-	}
-	at, ok := loginTime(claims)
-	if !ok || now.Sub(at) > maxAge {
-		return fmt.Errorf("login is not recent")
-	}
-	return nil
-}
-
 func (v *Verifier) parseClaims(tokenString string) (jwt.MapClaims, error) {
 	opts := []jwt.ParserOption{
 		jwt.WithValidMethods([]string{"HS256", "RS256", "ES256", "EdDSA"}),
@@ -113,26 +99,6 @@ func (v *Verifier) parseClaims(tokenString string) (jwt.MapClaims, error) {
 		return nil, fmt.Errorf("invalid audience")
 	}
 	return claims, nil
-}
-
-func loginTime(claims jwt.MapClaims) (time.Time, bool) {
-	var latest time.Time
-	if at, ok := numericTime(claims["auth_time"]); ok {
-		latest = at
-	}
-	switch amr := claims["amr"].(type) {
-	case []any:
-		for _, item := range amr {
-			entry, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if at, ok := numericTime(entry["timestamp"]); ok && at.After(latest) {
-				latest = at
-			}
-		}
-	}
-	return latest, !latest.IsZero()
 }
 
 func numericTime(value any) (time.Time, bool) {
