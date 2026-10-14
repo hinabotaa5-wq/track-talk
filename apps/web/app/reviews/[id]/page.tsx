@@ -47,6 +47,8 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
     }
   }, [id, token]);
 
+  useEffect(() => () => document.body.removeAttribute("data-comment-typing"), []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
@@ -128,7 +130,16 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
           この商品にはレビューを書いています。書き直す場合は削除してください。
         </p>
       ) : (
-        <form onSubmit={submit} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3.5">
+        <form
+          onSubmit={submit}
+          onFocus={() => document.body.setAttribute("data-comment-typing", "")}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              document.body.removeAttribute("data-comment-typing");
+            }
+          }}
+          className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3.5"
+        >
           <p className="text-sm font-medium">レビューを書く</p>
           <div className="flex gap-1" role="radiogroup" aria-label="評価">
             {[1, 2, 3, 4, 5].map((n) => (
