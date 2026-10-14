@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { homeHref, parseHomeSort, type HomeSort } from "@/lib/home-sort";
 
 const chips: { sort: HomeSort; label: string }[] = [
@@ -15,6 +17,41 @@ function chipClass(active: boolean) {
   return active
     ? "inline-flex min-h-11 items-center rounded-full border border-white/35 bg-blue-500/75 px-4.5 text-sm font-semibold text-white shadow-md shadow-blue-950/30 backdrop-blur-xl transition-all duration-200 active:scale-95 cursor-pointer"
     : "inline-flex min-h-11 items-center rounded-full glass bg-white/10 border border-white/20 px-4.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:bg-white/16 hover:text-white active:scale-95 cursor-pointer";
+}
+
+function KeywordInput({ initial }: { initial: string }) {
+  const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="search"
+        name="q"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="キーワード"
+        aria-label="キーワード"
+        className="h-11 w-full rounded-full border border-white/20 glass bg-white/12 pr-10 pl-10 text-base text-white placeholder:text-slate-300 shadow-2xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none"
+      />
+      {value ? (
+        <button
+          type="button"
+          aria-label="キーワードを消す"
+          onClick={() => {
+            flushSync(() => setValue(""));
+            inputRef.current?.focus();
+            // Reset the applied search too, if one is active.
+            if (initial) inputRef.current?.form?.requestSubmit();
+          }}
+          className="absolute top-1/2 right-2 z-10 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 hover:text-white"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      ) : null}
+    </>
+  );
 }
 
 export function HomeFilters() {
@@ -32,15 +69,7 @@ export function HomeFilters() {
             className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-slate-300"
             aria-hidden
           />
-          <input
-            key={q}
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="キーワード"
-            aria-label="キーワード"
-            className="h-11 w-full rounded-full border border-white/20 glass bg-white/12 pr-4 pl-10 text-base text-white placeholder:text-slate-300 shadow-2xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-          />
+          <KeywordInput key={q} initial={q} />
         </div>
       </form>
       <div className="flex flex-wrap gap-2 px-4 py-3 md:flex-1 md:px-0 md:py-0">
