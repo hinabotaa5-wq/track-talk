@@ -22,6 +22,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
+import { InjuryRecovery } from "@/components/injury-recovery";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 
 export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
@@ -216,6 +217,11 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           <span className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-slate-200 border border-white/20">
             {post.injury.body_part_label}
           </span>
+          {post.injury.stage_label ? (
+            <span className="rounded-full bg-emerald-950/70 px-3 py-1 text-xs font-bold text-emerald-300 border border-emerald-800/60">
+              {post.injury.stage_label}
+            </span>
+          ) : null}
         </p>
       ) : null}
       {post.kind === "recruitment" ? (
@@ -261,6 +267,9 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         </div>
       ) : post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
+      ) : null}
+      {post.kind === "injury" ? (
+        <InjuryRecovery postId={post.id} updates={post.injury?.updates ?? []} mine={post.mine} onChanged={load} />
       ) : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-2">
         <LikeButton

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -21,6 +22,56 @@ type injuryDTO struct {
 	MoodLabel     string `json:"mood_label"`
 	BodyPart      string `json:"body_part"`
 	BodyPartLabel string `json:"body_part_label"`
+	// Stage is the latest recovery stage reported on the post; empty until the first update.
+	Stage      string            `json:"stage,omitempty"`
+	StageLabel string            `json:"stage_label,omitempty"`
+	Updates    []injuryUpdateDTO `json:"updates,omitempty"`
+}
+
+type injuryUpdateDTO struct {
+	ID         uuid.UUID `json:"id"`
+	Stage      string    `json:"stage"`
+	StageLabel string    `json:"stage_label"`
+	Body       string    `json:"body"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+const maxInjuryUpdates = 50
+
+var injuryStages = []struct{ Code, Label string }{
+	{"resting", "安静中"},
+	{"rehab", "リハビリ中"},
+	{"jogging", "ジョグ再開"},
+	{"practice", "練習に復帰"},
+	{"race", "大会に復帰"},
+}
+
+func injuryStageLabel(code string) string {
+	for _, item := range injuryStages {
+		if item.Code == code {
+			return item.Label
+		}
+	}
+	return code
+}
+
+func validInjuryStage(code string) bool {
+	return injuryStageLabel(code) != code
+}
+
+func injuryUpdateFromRow(row db.InjuryUpdate) injuryUpdateDTO {
+	return injuryUpdateDTO{
+		ID:         row.ID,
+		Stage:      row.Stage,
+		StageLabel: injuryStageLabel(row.Stage),
+		Body:       row.Body,
+		CreatedAt:  row.CreatedAt,
+	}
+}
+
+type injuryUpdateReq struct {
+	Stage string `json:"stage"`
+	Body  string `json:"body"`
 }
 
 var injuryMoods = []struct{ Code, Label string }{
@@ -181,7 +232,19 @@ func (s *Server) attachInjury(ctx context.Context, item postDTO) (postDTO, error
 	if err != nil {
 		return item, err
 	}
-	item.Injury = injuryFromDetail(detail)
+	info := injuryFromDetail(detail)
+	updates, err := s.q.ListInjuryUpdates(ctx, item.ID)
+	if err != nil {
+		return item, err
+	}
+	for _, row := range updates {
+		info.Updates = append(info.Updates, injuryUpdateFromRow(row))
+	}
+	if n := len(updates); n > 0 {
+		info.Stage = updates[n-1].Stage
+		info.StageLabel = injuryStageLabel(info.Stage)
+	}
+	item.Injury = info
 	return item, nil
 }
 
@@ -199,14 +262,122 @@ func (s *Server) attachInjurySummaries(ctx context.Context, items []postDTO) err
 	if err != nil {
 		return err
 	}
+	stages, err := s.q.ListLatestInjuryStages(ctx, ids)
+	if err != nil {
+		return err
+	}
+	stageByID := map[uuid.UUID]string{}
+	for _, row := range stages {
+		stageByID[row.PostID] = row.Stage
+	}
 	byID := map[uuid.UUID]db.InjuryDetail{}
 	for _, row := range rows {
 		byID[row.PostID] = row
 	}
 	for i := range items {
 		if row, ok := byID[items[i].ID]; ok {
-			items[i].Injury = injuryFromDetail(row)
+			info := injuryFromDetail(row)
+			if stage, ok := stageByID[row.PostID]; ok {
+				info.Stage = stage
+				info.StageLabel = injuryStageLabel(stage)
+			}
+			items[i].Injury = info
 		}
 	}
 	return nil
+}
+
+// injuryOwnedPost loads the post and reports whether it is an injury post written by the caller.
+func (s *Server) injuryOwnedPost(w http.ResponseWriter, r *http.Request, author db.Profile) (uuid.UUID, bool) {
+	postID, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return uuid.Nil, false
+	}
+	post, err := s.q.GetPost(r.Context(), postID)
+	if err != nil {
+		MapDBError(w, err)
+		return uuid.Nil, false
+	}
+	if post.Kind != "injury" {
+		Error(w, http.StatusNotFound, "not_found", "ケガの投稿ではありません")
+		return uuid.Nil, false
+	}
+	if post.AuthorID != author.ID {
+		Error(w, http.StatusForbidden, "forbidden", "経過を追加できるのは投稿者だけです")
+		return uuid.Nil, false
+	}
+	return postID, true
+}
+
+func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	postID, ok := s.injuryOwnedPost(w, r, p)
+	if !ok {
+		return
+	}
+	var req injuryUpdateReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	fields := map[string]string{}
+	stage := strings.TrimSpace(req.Stage)
+	if !validInjuryStage(stage) {
+		fields["stage"] = "いまの状況を選んでください"
+	}
+	if e := Body(req.Body, 2000); e != "" {
+		fields["body"] = e
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	count, err := s.q.CountInjuryUpdates(r.Context(), postID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if count >= maxInjuryUpdates {
+		Error(w, http.StatusUnprocessableEntity, "validation_error", "経過報告は1つの投稿につき50件までです")
+		return
+	}
+	row, err := s.q.CreateInjuryUpdate(r.Context(), db.CreateInjuryUpdateParams{
+		ID:     uuid.New(),
+		PostID: postID,
+		Stage:  stage,
+		Body:   strings.TrimSpace(req.Body),
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusCreated, injuryUpdateFromRow(row))
+}
+
+func (s *Server) deleteInjuryUpdate(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	postID, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	updateID, ok := parseUUIDParam(w, r, "updateID")
+	if !ok {
+		return
+	}
+	n, err := s.q.DeleteInjuryUpdate(r.Context(), db.DeleteInjuryUpdateParams{ID: updateID, PostID: postID, AuthorID: p.ID})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if n == 0 {
+		Error(w, http.StatusNotFound, "not_found", "経過報告が見つかりません")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

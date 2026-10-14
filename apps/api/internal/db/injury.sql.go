@@ -11,6 +11,71 @@ import (
 	"github.com/google/uuid"
 )
 
+const countInjuryUpdates = `-- name: CountInjuryUpdates :one
+SELECT count(*) FROM injury_updates WHERE post_id = $1
+`
+
+func (q *Queries) CountInjuryUpdates(ctx context.Context, postID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countInjuryUpdates, postID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createInjuryUpdate = `-- name: CreateInjuryUpdate :one
+INSERT INTO injury_updates (id, post_id, stage, body)
+VALUES ($1, $2, $3, $4)
+RETURNING id, post_id, stage, body, created_at
+`
+
+type CreateInjuryUpdateParams struct {
+	ID     uuid.UUID `json:"id"`
+	PostID uuid.UUID `json:"post_id"`
+	Stage  string    `json:"stage"`
+	Body   string    `json:"body"`
+}
+
+func (q *Queries) CreateInjuryUpdate(ctx context.Context, arg CreateInjuryUpdateParams) (InjuryUpdate, error) {
+	row := q.db.QueryRow(ctx, createInjuryUpdate,
+		arg.ID,
+		arg.PostID,
+		arg.Stage,
+		arg.Body,
+	)
+	var i InjuryUpdate
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.Stage,
+		&i.Body,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteInjuryUpdate = `-- name: DeleteInjuryUpdate :execrows
+DELETE FROM injury_updates u
+USING posts p
+WHERE u.id = $1
+  AND u.post_id = $2
+  AND p.id = u.post_id
+  AND p.author_id = $3
+`
+
+type DeleteInjuryUpdateParams struct {
+	ID       uuid.UUID `json:"id"`
+	PostID   uuid.UUID `json:"post_id"`
+	AuthorID uuid.UUID `json:"author_id"`
+}
+
+func (q *Queries) DeleteInjuryUpdate(ctx context.Context, arg DeleteInjuryUpdateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInjuryUpdate, arg.ID, arg.PostID, arg.AuthorID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getInjuryDetail = `-- name: GetInjuryDetail :one
 SELECT post_id, mood, body_part
 FROM injury_details
@@ -40,6 +105,71 @@ func (q *Queries) ListInjuryDetails(ctx context.Context, postIds []uuid.UUID) ([
 	for rows.Next() {
 		var i InjuryDetail
 		if err := rows.Scan(&i.PostID, &i.Mood, &i.BodyPart); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInjuryUpdates = `-- name: ListInjuryUpdates :many
+SELECT id, post_id, stage, body, created_at
+FROM injury_updates
+WHERE post_id = $1
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ListInjuryUpdates(ctx context.Context, postID uuid.UUID) ([]InjuryUpdate, error) {
+	rows, err := q.db.Query(ctx, listInjuryUpdates, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InjuryUpdate
+	for rows.Next() {
+		var i InjuryUpdate
+		if err := rows.Scan(
+			&i.ID,
+			&i.PostID,
+			&i.Stage,
+			&i.Body,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLatestInjuryStages = `-- name: ListLatestInjuryStages :many
+SELECT DISTINCT ON (post_id) post_id, stage
+FROM injury_updates
+WHERE post_id = ANY($1::uuid[])
+ORDER BY post_id, created_at DESC
+`
+
+type ListLatestInjuryStagesRow struct {
+	PostID uuid.UUID `json:"post_id"`
+	Stage  string    `json:"stage"`
+}
+
+func (q *Queries) ListLatestInjuryStages(ctx context.Context, postIds []uuid.UUID) ([]ListLatestInjuryStagesRow, error) {
+	rows, err := q.db.Query(ctx, listLatestInjuryStages, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLatestInjuryStagesRow
+	for rows.Next() {
+		var i ListLatestInjuryStagesRow
+		if err := rows.Scan(&i.PostID, &i.Stage); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

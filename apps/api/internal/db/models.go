@@ -62,6 +62,14 @@ type InjuryDetail struct {
 	BodyPart string    `json:"body_part"`
 }
 
+type InjuryUpdate struct {
+	ID        uuid.UUID `json:"id"`
+	PostID    uuid.UUID `json:"post_id"`
+	Stage     string    `json:"stage"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Inquiry struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
