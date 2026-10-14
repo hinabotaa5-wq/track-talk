@@ -32,3 +32,12 @@ LEFT JOIN posts p ON r.target_type = 'post' AND p.id = r.target_id
 LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
 ORDER BY r.created_at DESC
 LIMIT $1 OFFSET $2;
+
+-- name: ListMyReportedTargets :many
+SELECT target_type, target_id
+FROM reports
+WHERE reporter_id = sqlc.arg(reporter_id)
+  AND (
+    (target_type = 'post' AND target_id = sqlc.arg(post_id)::uuid)
+    OR (target_type = 'comment' AND target_id IN (SELECT c.id FROM comments c WHERE c.post_id = sqlc.arg(post_id)::uuid))
+  );

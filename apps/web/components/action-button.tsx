@@ -96,22 +96,34 @@ export function SaveButton({
 }
 
 export function ReportButton({
+  reported = false,
   disabled,
   onClick,
 }: {
+  reported?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.95 }}
-      disabled={disabled}
+      whileTap={reported ? undefined : { scale: 0.95 }}
+      disabled={disabled || reported}
       onClick={onClick}
-      className={cn(actionClass, idleClass)}
+      className={cn(
+        actionClass,
+        reported
+          ? "bg-amber-950/60 text-amber-300 border border-amber-800/60 disabled:cursor-default disabled:opacity-100"
+          : idleClass
+      )}
     >
-      <Flag className="size-4 text-slate-200" />
-      <span>通報</span>
+      <Flag
+        className={cn(
+          "size-4 transition-colors",
+          reported ? "fill-amber-400 text-amber-400" : "text-slate-200"
+        )}
+      />
+      <span>{reported ? "通報済み" : "通報"}</span>
     </motion.button>
   );
 }
