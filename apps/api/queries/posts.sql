@@ -182,7 +182,8 @@ WHERE p.deleted_at IS NULL
 SELECT id
 FROM posts
 WHERE youtube_video_id = $1
-  AND deleted_at IS NULL;
+  AND deleted_at IS NULL
+  AND hidden_at IS NULL;
 
 -- name: GetPost :one
 SELECT
