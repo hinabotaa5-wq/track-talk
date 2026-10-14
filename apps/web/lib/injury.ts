@@ -47,9 +47,10 @@ export function isInjuryBodyPart(value: string | null | undefined) {
 
 export const injuryNotice = "ここでの投稿は医療的な助言ではありません。痛みが続くときは医療機関に相談してください。";
 
-export function injuryFeedPath(mood: string, part: string, page: number) {
+export function injuryFeedPath(mood: string, part: string, page: number, stage = "") {
   const qs = new URLSearchParams({ kind: "injury", sort: "new", page: String(page), per_page: "20" });
   if (isInjuryMood(mood)) qs.set("mood", mood);
   if (isInjuryBodyPart(part)) qs.set("part", part);
+  if (isInjuryStage(stage)) qs.set("stage", stage);
   return `/v1/posts?${qs}`;
 }

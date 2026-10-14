@@ -26,6 +26,15 @@ WHERE p.deleted_at IS NULL
     )
   )
   AND (
+    sqlc.narg('stage')::text IS NULL
+    OR (
+      SELECT u.stage FROM injury_updates u
+      WHERE u.post_id = p.id
+      ORDER BY u.created_at DESC
+      LIMIT 1
+    ) = sqlc.narg('stage')
+  )
+  AND (
     (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
@@ -100,6 +109,15 @@ WHERE p.deleted_at IS NULL
     )
   )
   AND (
+    sqlc.narg('stage')::text IS NULL
+    OR (
+      SELECT u.stage FROM injury_updates u
+      WHERE u.post_id = p.id
+      ORDER BY u.created_at DESC
+      LIMIT 1
+    ) = sqlc.narg('stage')
+  )
+  AND (
     (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
@@ -159,6 +177,15 @@ WHERE p.deleted_at IS NULL
         AND (sqlc.narg('mood')::text IS NULL OR i.mood = sqlc.narg('mood'))
         AND (sqlc.narg('part')::text IS NULL OR i.body_part = sqlc.narg('part'))
     )
+  )
+  AND (
+    sqlc.narg('stage')::text IS NULL
+    OR (
+      SELECT u.stage FROM injury_updates u
+      WHERE u.post_id = p.id
+      ORDER BY u.created_at DESC
+      LIMIT 1
+    ) = sqlc.narg('stage')
   )
   AND (
     (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))

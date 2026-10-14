@@ -237,3 +237,56 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 		t.Fatalf("after delete %+v", detail)
 	}
 }
+
+func TestInjuryFeedFilterByLatestStage(t *testing.T) {
+	h := setup(t)
+	tok := token(t, uuid.New())
+
+	create := func(title string) string {
+		t.Helper()
+		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
+			"kind": "injury", "title": title, "body": "本文", "mood": "vent", "body_part": "knee",
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+		}
+		var post struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+			t.Fatal(err)
+		}
+		return post.ID
+	}
+	report := func(id, stage string) {
+		t.Helper()
+		r := doJSON(t, h, http.MethodPost, "/v1/posts/"+id+"/injury/updates", tok, map[string]any{"stage": stage, "body": "経過 " + stage})
+		if r.Code != http.StatusCreated {
+			t.Fatalf("update %d %s", r.Code, r.Body.String())
+		}
+	}
+
+	back := create("復帰した")
+	report(back, "rehab")
+	report(back, "race")
+	resting := create("まだ安静")
+	report(resting, "resting")
+	create("経過なし")
+
+	base := "/v1/posts?kind=injury&sort=new&per_page=20"
+	if got := listInjury(t, h, base, "").Meta.Total; got != 3 {
+		t.Fatalf("no filter total %d", got)
+	}
+	race := listInjury(t, h, base+"&stage=race", "")
+	if race.Meta.Total != 1 || len(race.Posts) != 1 || race.Posts[0].ID != back {
+		t.Fatalf("stage=race %+v", race)
+	}
+	// 途中の段階(rehab)は最新ではないので一致しない。
+	if got := listInjury(t, h, base+"&stage=rehab", "").Meta.Total; got != 0 {
+		t.Fatalf("stage=rehab total %d", got)
+	}
+	// 不正な値は無視されて絞り込まれない。
+	if got := listInjury(t, h, base+"&stage=flying", "").Meta.Total; got != 3 {
+		t.Fatalf("invalid stage total %d", got)
+	}
+}

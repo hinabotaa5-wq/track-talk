@@ -10,6 +10,11 @@ describe("injury", () => {
     expect(injuryFeedPath("angry", "head", 1)).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20");
   });
 
+  it("adds the latest recovery stage filter only when valid", () => {
+    expect(injuryFeedPath("", "", 1, "race")).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20&stage=race");
+    expect(injuryFeedPath("", "", 1, "flying")).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20");
+  });
+
   it("validates mood and body part codes", () => {
     expect(isInjuryMood("rehab")).toBe(true);
     expect(isInjuryMood("other")).toBe(false);
