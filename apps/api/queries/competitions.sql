@@ -54,11 +54,11 @@ WHERE prefecture = sqlc.arg(prefecture)
 ORDER BY starts_on ASC, name ASC;
 
 -- name: SetCompetitionGuidelines :exec
--- 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。まだ要項が無い行にだけ入れる。
+-- 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。新着の最新の要項で上書きする。
 UPDATE competitions
 SET guidelines_url = sqlc.arg(guidelines_url)
 WHERE id = sqlc.arg(id)
-  AND guidelines_url = '';
+  AND guidelines_url <> sqlc.arg(guidelines_url);
 
 -- name: ListNewsCheckTimes :many
 SELECT prefecture, checked_at FROM competition_news_checks;

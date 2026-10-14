@@ -62,6 +62,7 @@ var Sources = []Source{
 	{Prefecture: "20", PageURL: "https://nagano-rk.com/calendar/2026nrk_calendar-2-2-2-2-2-2/", NewsURL: "https://nagano-rk.com/"},
 	{
 		Prefecture: "22",
+		NewsURL:    "https://shizuoka-jaaf.com/",
 		PageURL:    "https://shizuoka-jaaf.com/srkkyogi.html",
 		ExtraURLs:  []string{"https://seiburiku.jp/schedule/"},
 	},
