@@ -33,7 +33,8 @@ type DomesticMajor struct {
 }
 
 // DomesticMeet describes one card. Title picks its entry out of the JAAF monthly list.
-// A meet without Title has no machine-readable source and is entered by hand.
+// A meet without Title is not on the JAAF list; the regional intercollegiate meets come
+// from the federation pages on iuau.jp instead (see regionalIncare).
 type DomesticMeet struct {
 	Slug     string
 	Category string
@@ -41,8 +42,7 @@ type DomesticMeet struct {
 	Skip     *regexp.Regexp
 }
 
-// DomesticMeets is the card order. A regional intercollegiate meet has no page that lists
-// its dates, so those eight stay manual until the district federations publish one.
+// DomesticMeets is the card order.
 var DomesticMeets = []DomesticMeet{
 	{Slug: "nissin-cup", Category: DomesticYouth, Title: regexp.MustCompile(`日清食品カップ.*小学生`)},
 	{Slug: "zenchu", Category: DomesticYouth, Title: regexp.MustCompile(`全日本中学校陸上競技選手権大会`)},

@@ -78,6 +78,7 @@ func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, e
 		major.Category = t.meet.Category
 		majors = append(majors, major)
 	}
+	majors = append(majors, fetchRegionalIncare(ctx, season)...)
 	sort.SliceStable(majors, func(i, j int) bool { return majors[i].StartsOn.Before(majors[j].StartsOn) })
 	return majors, nil
 }
@@ -89,4 +90,36 @@ func seasonMonths(season, count int) []time.Time {
 		months = append(months, time.Date(season, time.April+time.Month(i), 1, 0, 0, 0, 0, time.UTC))
 	}
 	return months
+}
+
+// fetchRegionalIncare reads the eight federation pages of this fiscal year and the next.
+// The next year's pages appear late, so a missing page is not an error.
+func fetchRegionalIncare(ctx context.Context, season int) []DomesticMajor {
+	var majors []DomesticMajor
+	for _, fiscalYear := range []int{season, season + 1} {
+		for federation, slug := range regionalIncare {
+			pageURL := iuauPageURL(fiscalYear, federation)
+			body, err := getBody(ctx, pageURL)
+			if err != nil {
+				log.Printf("domestic majors: %v", err)
+				continue
+			}
+			page, err := decodeShiftJIS(body)
+			if err != nil {
+				log.Printf("domestic majors: %s: %v", pageURL, err)
+				continue
+			}
+			major, err := ParseRegionalIncare(page, fiscalYear, pageURL)
+			if err != nil {
+				log.Printf("domestic majors: %s: %v", pageURL, err)
+				continue
+			}
+			if major == nil {
+				continue
+			}
+			major.Slug = slug
+			majors = append(majors, *major)
+		}
+	}
+	return majors
 }
