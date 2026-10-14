@@ -135,6 +135,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
     <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-black/25">
       {visible ? (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
             alt={alt}
