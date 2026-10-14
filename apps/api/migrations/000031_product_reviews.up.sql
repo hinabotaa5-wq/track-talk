@@ -52,10 +52,10 @@ INSERT INTO products (id, kind, brand, name) VALUES
     (gen_random_uuid(), 'spike', 'Nike', 'Dragonfly 2'),
     (gen_random_uuid(), 'spike', 'adidas', 'Adizero Prime SP 3 Strung'),
     (gen_random_uuid(), 'spike', 'adidas', 'Adizero Avanti TYO'),
-    (gen_random_uuid(), 'spike', 'New Balance', 'FuelCell MD-X'),
-    (gen_random_uuid(), 'spike', 'New Balance', 'FuelCell LD-X'),
+    (gen_random_uuid(), 'spike', 'New Balance', 'FuelCell SuperComp MD-X v3'),
+    (gen_random_uuid(), 'spike', 'New Balance', 'FuelCell SuperComp LD-X v3'),
     (gen_random_uuid(), 'spike', 'HOKA', 'Cielo X MD'),
     (gen_random_uuid(), 'spike', 'HOKA', 'Cielo X 2 LD'),
     (gen_random_uuid(), 'spike', 'PUMA', 'evoSPEED Sprint NITRO Elite 2'),
     (gen_random_uuid(), 'spike', 'PUMA', 'evoSPEED Long Distance NITRO Elite 2'),
-    (gen_random_uuid(), 'spike', 'On', 'Cloudspike 10000m');
+    (gen_random_uuid(), 'spike', 'Mizuno', 'CHRONO INX NEO JAPAN');
