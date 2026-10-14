@@ -1,20 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryFeedPath, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
 
 describe("injury", () => {
-  it("builds the feed path with only valid filters", () => {
-    expect(injuryFeedPath("", 1)).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20");
-    expect(injuryFeedPath("knee", 2)).toBe(
-      "/v1/posts?kind=injury&sort=new&page=2&per_page=20&part=knee",
-    );
-    expect(injuryFeedPath("head", 1)).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20");
-  });
-
-  it("adds the latest recovery stage filter only when valid", () => {
-    expect(injuryFeedPath("", 1, "race")).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20&stage=race");
-    expect(injuryFeedPath("", 1, "flying")).toBe("/v1/posts?kind=injury&sort=new&page=1&per_page=20");
-  });
-
   it("validates body part codes", () => {
     expect(isInjuryBodyPart("lower-back")).toBe(true);
     expect(isInjuryBodyPart(null)).toBe(false);

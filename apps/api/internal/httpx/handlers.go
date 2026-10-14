@@ -547,7 +547,9 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if params.Kind == "injury" {
-		s.createInjury(w, r, p, params, injury)
+		// ケガの投稿は、部位のグループ(POST /v1/injury/groups/{part}/posts)から書く。
+		_ = injury
+		FieldError(w, map[string]string{"kind": "ケガの投稿は、部位のグループから書いてください"})
 		return
 	}
 	if params.Kind == "text" && !textPostHasContent(params.Title, params.Body, params.CloudinaryPublicID) {

@@ -29,13 +29,13 @@ WHERE p.deleted_at IS NULL
   AND (
     $3::text IS NULL
     OR COALESCE(
-      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
       (
         SELECT u.stage FROM injury_updates u
         WHERE u.post_id = p.id
         ORDER BY u.created_at DESC
         LIMIT 1
-      )
+      ),
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id)
     ) = $3
   )
   AND (
@@ -507,13 +507,13 @@ WHERE p.deleted_at IS NULL
   AND (
     $3::text IS NULL
     OR COALESCE(
-      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
       (
         SELECT u.stage FROM injury_updates u
         WHERE u.post_id = p.id
         ORDER BY u.created_at DESC
         LIMIT 1
-      )
+      ),
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id)
     ) = $3
   )
   AND (
@@ -661,13 +661,13 @@ WHERE p.deleted_at IS NULL
   AND (
     $4::text IS NULL
     OR COALESCE(
-      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id),
       (
         SELECT u.stage FROM injury_updates u
         WHERE u.post_id = p.id
         ORDER BY u.created_at DESC
         LIMIT 1
-      )
+      ),
+      (SELECT d.group_stage FROM injury_details d WHERE d.post_id = p.id)
     ) = $4
   )
   AND (

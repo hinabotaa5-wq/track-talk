@@ -31,17 +31,9 @@ export function InjuryView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">ケガ人の溜まり場</h1>
-          <p className="mt-1 text-sm text-slate-200">痛めた部位のグループに入って、同じ仲間と一緒に乗り越えよう。</p>
-        </div>
-        <Link
-          href={session ? "/injury/new" : "/login"}
-          className="shrink-0 rounded-full bg-blue-600 px-4.5 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
-        >
-          投稿する
-        </Link>
+      <div>
+        <h1 className="text-2xl font-bold">ケガ人の溜まり場</h1>
+        <p className="mt-1 text-sm text-slate-200">痛めた部位のグループに入って、同じ仲間と一緒に乗り越えよう。</p>
       </div>
 
       <Link href="/injury/stats" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
