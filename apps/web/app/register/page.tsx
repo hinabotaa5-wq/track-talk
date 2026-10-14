@@ -1,6 +1,7 @@
 "use client";
 
 import { authErrorMessage } from "@/lib/auth-errors";
+import { rememberNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { loginSchema } from "@/lib/validators";
@@ -9,10 +10,12 @@ import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { z } from "zod";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -29,7 +32,7 @@ export default function RegisterPage() {
     }
     if (!acquire()) return;
     setError("");
-    document.cookie = "tracktalk-next=%2Fme%2Fprofile%3Fonboarding%3D1; Path=/; Max-Age=86400; SameSite=Lax";
+    rememberNextPath("/me/profile?onboarding=1", 86400);
     const { data, error: err } = await supabase.auth
       .signUp({
         email: values.email,
@@ -42,7 +45,7 @@ export default function RegisterPage() {
       return;
     }
     if (data.session) {
-      window.location.assign("/me/profile?onboarding=1");
+      router.push("/me/profile?onboarding=1");
       return;
     }
     setMessage("確認メールを送信しました。メール内のリンクを開いてください。");

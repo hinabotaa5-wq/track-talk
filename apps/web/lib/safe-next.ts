@@ -5,6 +5,10 @@ export function safeNextPath(value: string | null | undefined) {
   return value;
 }
 
+export function rememberNextPath(path: string, maxAge = 600) {
+  document.cookie = `tracktalk-next=${encodeURIComponent(safeNextPath(path))}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
 export function nextCookiePath(value: string | null | undefined) {
   if (!value) return "/";
   try {
