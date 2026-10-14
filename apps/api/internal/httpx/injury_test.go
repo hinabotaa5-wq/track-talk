@@ -655,6 +655,10 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 	}
 	joinGroup(t, h, member, "knee")
 	joinGroup(t, h, otherPart, "ankle")
+	adminID := uuid.New()
+	admin := token(t, adminID)
+	doJSON(t, h, http.MethodGet, "/v1/me", admin, nil)
+	setAdmin(t, adminID)
 
 	for _, c := range []struct {
 		name, tok string
@@ -662,6 +666,7 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 	}{
 		{"author", author, http.StatusOK},
 		{"same group", member, http.StatusOK},
+		{"admin outside the group", admin, http.StatusOK},
 		{"other group", otherPart, http.StatusForbidden},
 		{"not in any group", outsider, http.StatusForbidden},
 		{"logged out", "", http.StatusUnauthorized},

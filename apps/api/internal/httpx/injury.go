@@ -411,7 +411,7 @@ func (s *Server) updateInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 // getReadablePost loads a post for a request that reads or reacts to it. An injury post is readable
-// only by its author and by members of the group for its body part; anyone else is turned away.
+// only by its author, by members of the group for its body part, and by admins; anyone else is turned away.
 func (s *Server) getReadablePost(w http.ResponseWriter, r *http.Request, id uuid.UUID) (db.GetPostRow, bool) {
 	post, err := s.q.GetPost(r.Context(), id)
 	if err != nil {
@@ -427,6 +427,14 @@ func (s *Server) getReadablePost(w http.ResponseWriter, r *http.Request, id uuid
 		return db.GetPostRow{}, false
 	}
 	if uid == post.AuthorID {
+		return post, true
+	}
+	admin, err := s.q.IsProfileAdmin(r.Context(), uid)
+	if err != nil {
+		MapDBError(w, err)
+		return db.GetPostRow{}, false
+	}
+	if admin {
 		return post, true
 	}
 	detail, err := s.q.GetInjuryDetail(r.Context(), id)
