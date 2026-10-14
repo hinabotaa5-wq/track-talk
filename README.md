@@ -172,8 +172,8 @@ CI（`.github/workflows/ci.yml`）は push／PR ごとに API テスト（Postgr
 
 ## デプロイ
 
-- **API**: Oracle Cloud の VM。`main` への push で CI（`.github/workflows/ci.yml`）が成功すると、`.github/workflows/deploy.yml` が `apps/api` のイメージを ghcr.io に置き、VM の `/opt/track-talk` で API と Caddy を更新する。ヘルスチェックは `/health`。初回の手順は [docs/oracle-deploy.md](docs/oracle-deploy.md)。
-- **Web**: Netlify。`netlify.toml` が `apps/web` を Node.js 22 でビルドする。
+- **API**: Render。`render.yaml` の Docker サービスが `main` をビルドする。ヘルスチェックは `/health`。初回は Render でこのリポジトリの Blueprint を作る。
+- **Web**: Vercel（`apps/web`）。`main` への push で本番が更新される。
 - **DB / Auth**: Supabase
 
 公開前の確認事項は [docs/launch.md](docs/launch.md) を参照してください。料金・無料枠・商用条件は変わるため、公開直前に各公式ドキュメントで確認してください。

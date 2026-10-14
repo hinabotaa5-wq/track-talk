@@ -1,11 +1,13 @@
 # API を Oracle Cloud（Always Free）で動かす
 
-Go API は Oracle の VM で動かし、Next.js は Netlify で動かします。
-VM では Docker 上で API と Caddy（HTTPS）が動き、`main` への push で GitHub Actions が自動デプロイします。
+いまの API の公開先は Render です。この手順は、あとから VM に移すときのためのものです。
+
+Go API を Oracle の VM で動かし、画面は Vercel のままにする構成です。
+VM では Docker 上で API と Caddy（HTTPS）が動きます。
 無料枠の条件は変わるので、作成前に [Always Free の公式ページ](https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) を確認してください。
 
 ```
-ブラウザ ─ Netlify（画面）
+ブラウザ ─ Vercel（画面）
    └────── https://api.<ドメイン> ─ Caddy ─ API（Docker）─ Supabase（DB・Auth）
 ```
 
@@ -34,7 +36,7 @@ scp deploy/.env.example ubuntu@<IP>:/opt/track-talk/.env
 ssh ubuntu@<IP> nano /opt/track-talk/.env
 ```
 
-入れる値は `deploy/.env.example` です。`API_IMAGE` の `OWNER` は GitHub のユーザー名を小文字にし、`CORS_ORIGINS` は Netlify の URL にします。
+入れる値は `deploy/.env.example` です。`API_IMAGE` の `OWNER` は GitHub のユーザー名を小文字にし、`CORS_ORIGINS` は Vercel の本番 URL にします。
 
 ## 3. GitHub に登録する（手作業）
 
@@ -45,7 +47,7 @@ ssh-keygen -t ed25519 -f deploy_key -N "" -C track-talk-deploy
 ssh-keyscan -t ed25519 <IP>
 ```
 
-リポジトリの Settings → Secrets and variables → Actions に登録します。
+VM へ自動で送る workflow を戻したときに、リポジトリの Settings → Secrets and variables → Actions へ登録します。
 
 | Secret | 値 |
 | --- | --- |
@@ -58,12 +60,10 @@ ssh-keyscan -t ed25519 <IP>
 
 ## 4. 初回デプロイと切り替え
 
-1. Actions の「Deploy API」を **Run workflow** で実行する
+1. VM 上でイメージを取得して `docker compose up -d` する。Render を使っているあいだは、そのための GitHub Actions は置いていない
 2. `https://api.<ドメイン>/health` が `{"status":"ok"}` を返すことを確認する
-3. Netlify の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
+3. Vercel の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
 4. 画面からログインと投稿ができることを確認する
-
-以降は `main` の CI が通るたびに自動でデプロイされます。
 
 ## 運用
 
