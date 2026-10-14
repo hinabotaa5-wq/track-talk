@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -264,6 +266,8 @@ func TestPostKindsShareOneList(t *testing.T) {
 }
 
 func TestSignedVideoJoinsTheList(t *testing.T) {
+	var assetBytes atomic.Int64
+	assetBytes.Store(1024)
 	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || user != "key" || pass != "secret" {
@@ -275,7 +279,7 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"resource_type":"video"}`))
+		_, _ = fmt.Fprintf(w, `{"resource_type":"video","format":"mp4","bytes":%d}`, assetBytes.Load())
 	}))
 	defer asset.Close()
 	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
@@ -291,22 +295,30 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
 	}
 	var signed struct {
-		CloudName string `json:"cloud_name"`
-		APIKey    string `json:"api_key"`
-		PublicID  string `json:"public_id"`
-		Signature string `json:"signature"`
-		Timestamp int64  `json:"timestamp"`
+		CloudName      string `json:"cloud_name"`
+		APIKey         string `json:"api_key"`
+		PublicID       string `json:"public_id"`
+		Signature      string `json:"signature"`
+		Timestamp      int64  `json:"timestamp"`
+		UploadPreset   string `json:"upload_preset"`
+		AllowedFormats string `json:"allowed_formats"`
+		ResourceType   string `json:"resource_type"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &signed)
 	if signed.CloudName != "demo" || signed.APIKey != "key" || !cloudinary.ValidPublicID(signed.PublicID) {
 		t.Fatalf("signed %+v", signed)
 	}
+	if signed.UploadPreset != cloudinary.VideoPreset || signed.AllowedFormats != cloudinary.VideoFormats || signed.ResourceType != "video" {
+		t.Fatalf("constraints %+v", signed)
+	}
 	if bytes.Contains(rec.Body.Bytes(), []byte("secret")) {
 		t.Fatal("secret leaked")
 	}
 	want := cloudinary.Sign(map[string]string{
-		"public_id": signed.PublicID,
-		"timestamp": strconv.FormatInt(signed.Timestamp, 10),
+		"allowed_formats": signed.AllowedFormats,
+		"public_id":       signed.PublicID,
+		"timestamp":       strconv.FormatInt(signed.Timestamp, 10),
+		"upload_preset":   signed.UploadPreset,
 	}, "secret")
 	if signed.Signature != want {
 		t.Fatalf("signature %s want %s", signed.Signature, want)
@@ -328,6 +340,23 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	if created.Kind != "video" || created.ThumbnailURL == "" || created.PlaybackURL == "" {
 		t.Fatalf("created %+v", created)
 	}
+
+	assetBytes.Store(cloudinary.MaxVideoBytes + 1)
+	rec = doJSON(t, h, http.MethodPost, "/v1/uploads/video", ta, map[string]any{})
+	if rec.Code != 200 {
+		t.Fatalf("sign large %d %s", rec.Code, rec.Body.String())
+	}
+	var large struct {
+		PublicID string `json:"public_id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &large)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "", "body": "", "kind": "video",
+		"video_public_id": large.PublicID,
+	})
+	if rec.Code != 422 {
+		t.Fatalf("large video %d %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestSignedImageJoinsTheList(t *testing.T) {
@@ -342,7 +371,7 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"resource_type":"image"}`))
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
 	}))
 	defer asset.Close()
 	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
@@ -598,7 +627,7 @@ func TestRecruitmentAppearsInTheFeed(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"resource_type":"image"}`))
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
 	}))
 	defer asset.Close()
 	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")

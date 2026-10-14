@@ -4,6 +4,9 @@ export type CloudinarySignature = {
   timestamp: number;
   public_id: string;
   signature: string;
+  upload_preset: string;
+  allowed_formats: string;
+  resource_type: "image" | "video";
 };
 
 export type CloudinaryUploadProgress = {
@@ -36,11 +39,16 @@ export function uploadToCloudinary(
   signed: CloudinarySignature,
   onProgress: (progress: CloudinaryUploadProgress) => void,
 ): Promise<CloudinaryUploadResult> {
+  if (signed.resource_type !== resource) {
+    return Promise.reject(new Error("アップロードに失敗しました"));
+  }
   const body = new FormData();
   body.append("file", file);
   body.append("api_key", signed.api_key);
   body.append("timestamp", String(signed.timestamp));
   body.append("public_id", signed.public_id);
+  body.append("upload_preset", signed.upload_preset);
+  body.append("allowed_formats", signed.allowed_formats);
   body.append("signature", signed.signature);
 
   return new Promise((resolve, reject) => {

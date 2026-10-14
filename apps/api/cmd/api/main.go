@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hinata/track-talk/apps/api/internal/auth"
+	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
@@ -43,6 +44,16 @@ func main() {
 	if err != nil {
 		slog.Error("jwt", "err", err)
 		os.Exit(1)
+	}
+	presetCtx, presetCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer presetCancel()
+	if err := (cloudinary.Client{
+		Cloud:   cfg.CloudName,
+		Key:     cfg.CloudAPIKey,
+		Secret:  cfg.CloudAPISecret,
+		APIBase: cfg.CloudAPIBase,
+	}).EnsureUploadPresets(presetCtx); err != nil {
+		slog.Error("cloudinary presets", "err", err)
 	}
 	srv := &http.Server{
 		Addr:              cfg.Addr,

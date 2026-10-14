@@ -9,18 +9,18 @@ import (
 )
 
 func (s *Server) signVideoUpload(w http.ResponseWriter, r *http.Request) {
-	s.signUpload(w, r, "動画")
+	s.signUpload(w, r, "video", "動画")
 }
 
 func (s *Server) signImageUpload(w http.ResponseWriter, r *http.Request) {
-	s.signUpload(w, r, "写真")
+	s.signUpload(w, r, "image", "写真")
 }
 
-func (s *Server) signUpload(w http.ResponseWriter, r *http.Request, noun string) {
+func (s *Server) signUpload(w http.ResponseWriter, r *http.Request, resource, noun string) {
 	if _, ok := s.requireProfile(w, r); !ok {
 		return
 	}
-	signed, err := s.cloud.SignedUpload(time.Now())
+	signed, err := s.cloud.SignedUpload(time.Now(), resource)
 	if err != nil {
 		writeAssetReadyError(w, err, noun)
 		return
@@ -40,6 +40,10 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"IDが不正です")
 	case errors.Is(err, cloudinary.ErrNotFound):
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"が見つかりません")
+	case errors.Is(err, cloudinary.ErrRejected):
+		Error(w, http.StatusUnprocessableEntity, "validation_error", "対応していないファイル形式です")
+	case errors.Is(err, cloudinary.ErrTooLarge):
+		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"はサイズの上限を超えています")
 	default:
 		Error(w, http.StatusBadGateway, "unavailable", noun+"の確認に失敗しました")
 	}
