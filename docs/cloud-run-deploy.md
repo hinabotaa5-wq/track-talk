@@ -83,3 +83,14 @@ gcloud run services describe track-talk-api --region asia-northeast1            
 - **予算超過で止まったとき**: 原因を確かめてから `gcloud run services update track-talk-api --region asia-northeast1 --ingress all` で再開する。予算は月ごとにリセットされるが、再開は自動では行わない
 - **予算を変える**: コンソールの「お支払い → 予算とアラート」で `track-talk` を編集する
 - **ロールバック**: コンソールの Cloud Run → `track-talk-api` → リビジョンで、前のリビジョンにトラフィックを戻す
+
+## トラブル
+
+- **docker のビルドで `go mod download` が `connection refused` になる**: Cloud Shell の docker のネットワークの問題。setup.sh は自動で Cloud Build に切り替える
+- **Cloud Build が `storage.objects.get` の 403 で止まる**: 新しいプロジェクトでは、ビルドを動かすアカウント（`<プロジェクト番号>-compute@developer.gserviceaccount.com`）に権限が無い。次を実行する（このアカウントに、Cloud Build の作業に必要な権限を与える）
+
+  ```bash
+  gcloud projects add-iam-policy-binding <プロジェクトID> \
+    --member="serviceAccount:<プロジェクト番号>-compute@developer.gserviceaccount.com" \
+    --role="roles/cloudbuild.builds.builder"
+  ```

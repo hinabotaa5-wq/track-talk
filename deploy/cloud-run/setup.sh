@@ -67,16 +67,10 @@ elif docker build --network host -t "$IMAGE" apps/api; then
 else
   echo "docker でのビルドに失敗したので、Cloud Build で作り直します"
   gcloud services enable cloudbuild.googleapis.com
-  # API を有効にした直後は、権限の反映が遅れて PERMISSION_DENIED になることがあるので、間を空けて試す。
-  for attempt in 1 2 3 4; do
-    gcloud builds submit apps/api --tag "$IMAGE" --region "$REGION" && break
-    if [ "$attempt" = 4 ]; then
-      echo "Cloud Build でも作れませんでした" >&2
-      exit 1
-    fi
-    echo "権限の反映を待って、もう一度試します（$attempt/3）"
-    sleep 45
-  done
+  # 新しいプロジェクトでは、ビルドを動かすサービスアカウントに権限が無く、
+  # "storage.objects.get" の 403 で止まることがある。その場合は docs/cloud-run-deploy.md の「トラブル」を見る。
+  gcloud builds submit apps/api --config deploy/cloud-run/cloudbuild.yaml \
+    --substitutions "_IMAGE=$IMAGE" --region "$REGION"
 fi
 
 echo "== API を立てる"
