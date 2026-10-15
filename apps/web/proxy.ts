@@ -50,6 +50,7 @@ export const config = {
     "/posts/new/:path*",
     "/posts/video/:path*",
     "/posts/youtube/:path*",
+    "/posts/instagram/:path*",
     "/posts/practice/:path*",
     "/posts/recruit/:path*",
     "/posts/:id/edit",

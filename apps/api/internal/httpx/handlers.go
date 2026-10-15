@@ -709,6 +709,8 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 			Kind:                row.Kind,
 			YoutubeVideoID:      row.YoutubeVideoID,
 			YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
+			InstagramType:       row.InstagramType,
+			InstagramShortcode:  row.InstagramShortcode,
 			CloudinaryPublicID:  row.CloudinaryPublicID,
 			LikeCount:           row.LikeCount,
 			CommentCount:        row.CommentCount,

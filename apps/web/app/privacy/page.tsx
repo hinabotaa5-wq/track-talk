@@ -60,6 +60,7 @@ export default function PrivacyPage() {
           <li>Netlify: 画面のホスティング</li>
           <li>Render: API のホスティング</li>
           <li>Google: Google アカウントによるログイン、利用者が指定した YouTube 動画の埋め込み表示</li>
+          <li>Meta: 利用者が指定した Instagram 投稿の埋め込み表示</li>
           <li>Umami: 画面を開いた人数と回数の計測</li>
         </ul>
         <p>
@@ -69,7 +70,7 @@ export default function PrivacyPage() {
 
       <Article n={5} title="第三者への提供">
         <p>
-          運営者は、法令に基づく場合、人の生命、身体または財産の保護に必要で本人の同意を得ることが困難な場合を除き、個人情報を第三者に提供しません。Google ログインと YouTube の表示は、利用者の操作に伴って各事業者へ接続します。
+          運営者は、法令に基づく場合、人の生命、身体または財産の保護に必要で本人の同意を得ることが困難な場合を除き、個人情報を第三者に提供しません。Google ログインと YouTube の表示は、利用者の操作に伴って各事業者へ接続します。Instagram の投稿を含むスレッドを開くと、その投稿を表示するために Meta へ接続します。
         </p>
       </Article>
 

@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { ZoomableVideo } from "@/components/zoomable-video";
+import { InstagramEmbed } from "@/components/instagram-embed";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
@@ -353,6 +354,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           title={feedTitle(post.title)}
           thumbnailUrl={post.thumbnail_url}
         />
+      ) : post.kind === "instagram" && post.instagram_type && post.instagram_shortcode ? (
+        <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title)} />
       ) : post.thumbnail_url ? (
         <ZoomableImage
           src={post.thumbnail_url}

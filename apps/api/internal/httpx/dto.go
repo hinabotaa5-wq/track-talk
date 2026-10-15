@@ -27,6 +27,8 @@ type postDTO struct {
 	Kind           string          `json:"kind"`
 	ThumbnailURL   string          `json:"thumbnail_url,omitempty"`
 	YouTubeVideoID string          `json:"youtube_video_id,omitempty"`
+	InstagramType  string          `json:"instagram_type,omitempty"`
+	InstagramCode  string          `json:"instagram_shortcode,omitempty"`
 	VideoPublicID  string          `json:"video_public_id,omitempty"`
 	ImagePublicID  string          `json:"image_public_id,omitempty"`
 	PlaybackURL    string          `json:"playback_url,omitempty"`
@@ -109,6 +111,17 @@ func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) 
 	}
 }
 
+func applyInstagram(p *postDTO, instagramType, shortcode *string) {
+	if p.Kind != "instagram" || instagramType == nil || shortcode == nil {
+		return
+	}
+	if (*instagramType != "p" && *instagramType != "reel") || InstagramShortcode(*shortcode) != "" {
+		return
+	}
+	p.InstagramType = *instagramType
+	p.InstagramCode = *shortcode
+}
+
 func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	p := postDTO{
 		ID:           row.ID,
@@ -121,6 +134,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 		UpdatedAt:    row.UpdatedAt,
 	}
 	applyKind(&p, row.Kind, row.YoutubeVideoID, row.YoutubeThumbnailUrl, row.CloudinaryPublicID)
+	applyInstagram(&p, row.InstagramType, row.InstagramShortcode)
 	if !list {
 		p.Body = row.Body
 	}
@@ -136,6 +150,8 @@ func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO 
 		Kind:                row.Kind,
 		YoutubeVideoID:      row.YoutubeVideoID,
 		YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
+		InstagramType:       row.InstagramType,
+		InstagramShortcode:  row.InstagramShortcode,
 		CloudinaryPublicID:  row.CloudinaryPublicID,
 		LikeCount:           row.LikeCount,
 		CommentCount:        row.CommentCount,
@@ -153,6 +169,8 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		Kind:                row.Kind,
 		YoutubeVideoID:      row.YoutubeVideoID,
 		YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
+		InstagramType:       row.InstagramType,
+		InstagramShortcode:  row.InstagramShortcode,
 		CloudinaryPublicID:  row.CloudinaryPublicID,
 		LikeCount:           row.LikeCount,
 		CommentCount:        row.CommentCount,

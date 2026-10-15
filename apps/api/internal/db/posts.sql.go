@@ -166,9 +166,10 @@ func (q *Queries) CountSavedPosts(ctx context.Context, arg CountSavedPostsParams
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
-    kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, like_count, comment_count, created_at, updated_at
+    kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id,
+    instagram_type, instagram_shortcode
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
@@ -180,6 +181,8 @@ type CreatePostParams struct {
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 }
 
 type CreatePostRow struct {
@@ -191,6 +194,8 @@ type CreatePostRow struct {
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -207,6 +212,8 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.YoutubeVideoID,
 		arg.YoutubeThumbnailUrl,
 		arg.CloudinaryPublicID,
+		arg.InstagramType,
+		arg.InstagramShortcode,
 	)
 	var i CreatePostRow
 	err := row.Scan(
@@ -218,6 +225,8 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.YoutubeVideoID,
 		&i.YoutubeThumbnailUrl,
 		&i.CloudinaryPublicID,
+		&i.InstagramType,
+		&i.InstagramShortcode,
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.CreatedAt,
@@ -280,6 +289,21 @@ func (q *Queries) DeleteSave(ctx context.Context, arg DeleteSaveParams) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const findInstagramPostID = `-- name: FindInstagramPostID :one
+SELECT id
+FROM posts
+WHERE instagram_shortcode = $1
+  AND deleted_at IS NULL
+  AND hidden_at IS NULL
+`
+
+func (q *Queries) FindInstagramPostID(ctx context.Context, instagramShortcode *string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findInstagramPostID, instagramShortcode)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const findYouTubePostID = `-- name: FindYouTubePostID :one
 SELECT id
 FROM posts
@@ -304,6 +328,8 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.instagram_type,
+    p.instagram_shortcode,
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
@@ -327,6 +353,8 @@ type GetPostRow struct {
 	Kind                string    `json:"kind"`
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
@@ -346,6 +374,8 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.Kind,
 		&i.YoutubeVideoID,
 		&i.YoutubeThumbnailUrl,
+		&i.InstagramType,
+		&i.InstagramShortcode,
 		&i.CloudinaryPublicID,
 		&i.LikeCount,
 		&i.CommentCount,
@@ -487,6 +517,8 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.instagram_type,
+    p.instagram_shortcode,
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
@@ -582,6 +614,8 @@ type ListPostsNewRow struct {
 	Kind                string    `json:"kind"`
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
@@ -615,6 +649,8 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.Kind,
 			&i.YoutubeVideoID,
 			&i.YoutubeThumbnailUrl,
+			&i.InstagramType,
+			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
 			&i.LikeCount,
 			&i.CommentCount,
@@ -640,6 +676,8 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.instagram_type,
+    p.instagram_shortcode,
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
@@ -737,6 +775,8 @@ type ListPostsPopularRow struct {
 	Kind                string    `json:"kind"`
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
@@ -771,6 +811,8 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.Kind,
 			&i.YoutubeVideoID,
 			&i.YoutubeThumbnailUrl,
+			&i.InstagramType,
+			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
 			&i.LikeCount,
 			&i.CommentCount,
@@ -828,6 +870,8 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.instagram_type,
+    p.instagram_shortcode,
     p.cloudinary_public_id,
     p.like_count,
     p.comment_count,
@@ -890,6 +934,8 @@ type ListSavedPostsRow struct {
 	Kind                string    `json:"kind"`
 	YoutubeVideoID      *string   `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
@@ -920,6 +966,8 @@ func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) 
 			&i.Kind,
 			&i.YoutubeVideoID,
 			&i.YoutubeThumbnailUrl,
+			&i.InstagramType,
+			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
 			&i.LikeCount,
 			&i.CommentCount,
