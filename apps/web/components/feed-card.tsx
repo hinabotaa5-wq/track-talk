@@ -111,6 +111,10 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
           </span>
+        ) : post.kind === "instagram" ? (
+          <span className="absolute top-2.5 left-2.5 z-10">
+            <KindBadge>Instagram</KindBadge>
+          </span>
         ) : null}
         {post.thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element

@@ -8,6 +8,7 @@ import { useEffect } from "react";
 const doors = [
   { href: "/posts/new", title: "文章", body: "タイトル・本文・写真のいずれかでスレッドを立てます。" },
   { href: "/posts/youtube", title: "YouTubeのURL", body: "動画を引用して、そのスレッドに集まります。" },
+  { href: "/posts/instagram", title: "InstagramのURL", body: "公開の投稿やリールを引用して、そのスレッドに集まります。" },
   { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。" },
   { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。" },
   { href: "/posts/practice", title: "練習相手募集", body: "練習場所と日時を書いて、一緒に練習する相手を募ります。" },
@@ -24,7 +25,7 @@ export default function UploadPage() {
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
   return (
-    <div className="grid h-[calc(100dvh-10.625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
+    <div className="grid h-[calc(100dvh-10.625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] grid-rows-[repeat(6,minmax(0,1fr))] gap-2 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
       {doors.map((door) => (
         <Link
           key={door.href}

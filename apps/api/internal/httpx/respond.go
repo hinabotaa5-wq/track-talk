@@ -57,6 +57,9 @@ func MapDBError(w http.ResponseWriter, err error) bool {
 			if pgErr.ConstraintName == "posts_youtube_video_id_active_idx" {
 				msg = "この動画のスレはすでにあります"
 			}
+			if pgErr.ConstraintName == "posts_instagram_shortcode_active_idx" {
+				msg = "この投稿のスレはすでにあります"
+			}
 			Error(w, http.StatusConflict, "conflict", msg)
 			return true
 		}

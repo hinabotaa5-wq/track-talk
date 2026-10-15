@@ -30,6 +30,7 @@ export default function GuidelinesPage() {
           <li>放送、配信、写真について、権利者の許諾がない複製をアップロードしないでください。</li>
           <li>人が写る画像や動画は、写った人の同意があるものだけにしてください。</li>
           <li>YouTube は、共有が許可されている動画の URL だけを投稿してください。</li>
+          <li>Instagram は、公開されている投稿やリールの URL だけを投稿してください。</li>
         </ul>
       </Rule>
 

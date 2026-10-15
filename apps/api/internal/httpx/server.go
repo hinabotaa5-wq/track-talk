@@ -84,6 +84,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
+			r.Post("/posts/instagram", s.citeInstagram)
 			r.Post("/uploads/video", s.signVideoUpload)
 			r.Post("/uploads/image", s.signImageUpload)
 			r.Patch("/posts/{id}", s.updatePost)

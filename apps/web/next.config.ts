@@ -34,7 +34,7 @@ function contentSecurityPolicy() {
     "img-src 'self' data: blob: https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://upload.wikimedia.org https://thumb.wikimedia.org",
     "media-src 'self' blob: https://res.cloudinary.com",
     "font-src 'self'",
-    "frame-src https://www.youtube-nocookie.com",
+    "frame-src https://www.youtube-nocookie.com https://www.instagram.com",
     `connect-src ${connect.join(" ")}`,
   ];
   return directives.join("; ");

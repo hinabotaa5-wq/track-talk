@@ -142,6 +142,8 @@ type Post struct {
 	YoutubeVideoID      *string    `json:"youtube_video_id"`
 	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
 	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	InstagramType       *string    `json:"instagram_type"`
+	InstagramShortcode  *string    `json:"instagram_shortcode"`
 }
 
 type PostLike struct {
