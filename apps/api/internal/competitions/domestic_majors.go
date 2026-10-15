@@ -128,10 +128,12 @@ var (
 	detailPathPattern    = regexp.MustCompile(`^/competition/detail/\d+/?$`)
 	parenthesizedPattern = regexp.MustCompile(`[（(][^）)]*[）)]`)
 	wavePattern          = regexp.MustCompile(`[～〜~]`)
+	yearlessDatePattern  = regexp.MustCompile(`^\d{1,2}月\d{1,2}日`)
 )
 
-// ParseJAAFDetail reads one /competition/detail/{id}/ page.
-func ParseJAAFDetail(r io.Reader, detailURL string) (DomesticMajor, error) {
+// ParseJAAFDetail reads one /competition/detail/{id}/ page. listedYear is the year of the monthly
+// list that linked to it, used when the 開催日 has no year (「12月30日（水）予定」). Zero leaves it unread.
+func ParseJAAFDetail(r io.Reader, detailURL string, listedYear int) (DomesticMajor, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
 		return DomesticMajor{}, err
@@ -162,6 +164,10 @@ func ParseJAAFDetail(r io.Reader, detailURL string) (DomesticMajor, error) {
 		return DomesticMajor{}, errScheduleUndecided
 	}
 	span := wavePattern.ReplaceAllString(parenthesizedPattern.ReplaceAllString(fields["開催日"], ""), "-")
+	span = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(span), "予定"))
+	if listedYear != 0 && yearlessDatePattern.MatchString(span) {
+		span = fmt.Sprintf("%d年%s", listedYear, span)
+	}
 	start, end, year, precision, ok := parseJapaneseSpan(span)
 	if !ok || precision != "day" {
 		return DomesticMajor{}, fmt.Errorf("%s: 開催日を読めません: %q", detailURL, fields["開催日"])
