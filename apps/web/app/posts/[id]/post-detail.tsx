@@ -23,7 +23,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
-import { InjuryRecovery } from "@/components/injury-recovery";
 import { InjuryTypicalRecovery } from "@/components/injury-typical-recovery";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 
@@ -378,9 +377,6 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
         </div>
       ) : post.body ? (
         <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
-      ) : null}
-      {post.kind === "injury" ? (
-        <InjuryRecovery postId={post.id} updates={post.injury?.updates ?? []} mine={post.mine} onChanged={load} />
       ) : null}
       {post.kind === "injury" && post.injury ? (
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />

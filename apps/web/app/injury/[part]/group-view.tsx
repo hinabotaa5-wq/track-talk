@@ -284,7 +284,9 @@ export function GroupView({ part }: { part: string }) {
           </div>
         )}
       </div>
-      <div className="sticky bottom-20 z-10 space-y-1.5 md:bottom-4">
+      {/* 投稿ボタンは下のメニューのすぐ上に固定する。その分だけ余白を空けて、最後の行が隠れないようにする。 */}
+      <div className={own ? "h-12" : "h-16"} aria-hidden />
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-5xl space-y-1.5 px-4 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
         {own ? (
           <Link
             href={`/injury/${part}/new`}
