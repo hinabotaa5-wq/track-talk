@@ -1568,8 +1568,9 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("author was notified of their own recruitment %+v", authorNotes)
 	}
 	viewerNotes, viewerUnread := listNotifications(t, h, viewer)
-	if len(notesFor(viewerNotes, recruitmentPost.ID, "recruitment_post")) != 0 || viewerUnread != 0 {
-		t.Fatalf("viewer was notified of a recruitment %+v unread %d", viewerNotes, viewerUnread)
+	recruitmentNotes := notesFor(viewerNotes, recruitmentPost.ID, "recruitment_post")
+	if len(recruitmentNotes) != 1 || recruitmentNotes[0].PostTitle != "城南クラブ" || recruitmentNotes[0].Read || viewerUnread != 1 {
+		t.Fatalf("viewer recruitment %+v unread %d", viewerNotes, viewerUnread)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new&kind=recruitment", "", nil)
 	if rec.Code != 200 {

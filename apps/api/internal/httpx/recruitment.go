@@ -244,6 +244,13 @@ func (s *Server) createRecruitment(w http.ResponseWriter, r *http.Request, autho
 		MapDBError(w, err)
 		return
 	}
+	if err := q.InsertRecruitmentPostNotifications(r.Context(), db.InsertRecruitmentPostNotificationsParams{
+		PostID:   row.ID,
+		AuthorID: author.ID,
+	}); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
