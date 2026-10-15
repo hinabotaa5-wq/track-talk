@@ -115,8 +115,8 @@ func normalizeInjury(req postReq) (injuryInput, map[string]string) {
 	return injuryInput{BodyPart: part}, fields
 }
 
-// injuryTitle gives a post without a title the start of its body, so feed cards still have a heading.
-func injuryTitle(body string) string {
+// titleFromBody gives a post without a title the start of its body, so feed cards still have a heading.
+func titleFromBody(body string) string {
 	flat := strings.Join(strings.Fields(body), " ")
 	runes := []rune(flat)
 	if len(runes) > 40 {

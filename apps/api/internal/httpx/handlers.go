@@ -506,8 +506,8 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	if kind == "practice" {
 		title = practiceTitle(practice.Event, practice.EventOther, practice.StartsAt)
 	}
-	if kind == "injury" && title == "" {
-		title = injuryTitle(req.Body)
+	if title == "" {
+		title = titleFromBody(req.Body)
 	}
 	return db.CreatePostParams{
 		Title:               title,
