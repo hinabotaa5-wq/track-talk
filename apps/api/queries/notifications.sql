@@ -2,6 +2,12 @@
 INSERT INTO notifications (id, recipient_id, kind, post_id, comment_id, application_id)
 VALUES ($1, $2, $3, $4, $5, $6);
 
+-- name: InsertRecruitmentPostNotifications :exec
+INSERT INTO notifications (id, recipient_id, kind, post_id)
+SELECT gen_random_uuid(), profiles.id, 'recruitment_post', sqlc.arg('post_id')
+FROM profiles
+WHERE profiles.id <> sqlc.arg('author_id');
+
 -- name: ListMyNotifications :many
 SELECT
     n.id,
