@@ -21,7 +21,7 @@ describe("UploadProgress", () => {
     expect(html).toContain("width:50%");
     expect(html).toContain("20.0 MB / 40.0 MB");
     expect(html).toContain("race.mp4");
-    expect(html).toContain("このあと投稿ページに移動します");
+    expect(html).toContain("自動でホームに移動します");
   });
 
   it("stays under 100 until the whole file is sent", () => {
@@ -48,7 +48,7 @@ describe("UploadProgress", () => {
     expect(html).toContain("race.mp4");
     expect(html).toContain("40.0 MB");
     expect(html).toContain("upload-indeterminate");
-    expect(html).toContain("このあと投稿ページに移動します");
+    expect(html).toContain("自動でホームに移動します");
     expect(html).not.toContain("100%");
     expect(html).not.toContain("aria-valuenow");
     expect(html).not.toContain("送り終わりました");
