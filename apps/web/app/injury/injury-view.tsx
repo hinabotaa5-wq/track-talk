@@ -32,7 +32,7 @@ export function InjuryView() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">ケガ</h1>
-        <p className="mt-1 text-sm text-slate-200">痛めた部位のグループに入って、同じ仲間と一緒に乗り越えよう。</p>
+        <p className="mt-1 text-sm text-slate-200">同じケガのグループに入って、仲間と一緒に大会出場を目指そう。</p>
       </div>
 
       {failed ? (

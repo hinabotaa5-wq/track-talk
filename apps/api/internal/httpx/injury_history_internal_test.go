@@ -12,8 +12,8 @@ func TestBuildInjuryHistory(t *testing.T) {
 	start := time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC)
 	withReports, noReports := uuid.New(), uuid.New()
 	posts := []db.ListMyInjuryPostsRow{
-		{ID: withReports, Title: "疲労骨折", CreatedAt: start, BodyPart: "shin"},
-		{ID: noReports, Title: "肉離れ", CreatedAt: start, BodyPart: "hamstring"},
+		{ID: withReports, Title: "疲労骨折", CreatedAt: start, BodyPart: "shin-splints"},
+		{ID: noReports, Title: "肉離れ", CreatedAt: start, BodyPart: "hamstring-strain"},
 	}
 	reports := []db.ListMyInjuryFirstReportsRow{
 		{PostID: withReports, Stage: "jogging", FirstAt: start.Add(45*24*time.Hour + 3*time.Hour)},
@@ -26,7 +26,7 @@ func TestBuildInjuryHistory(t *testing.T) {
 		t.Fatalf("items %+v", got.Items)
 	}
 	a := got.Items[0]
-	if a.BodyPartLabel != "すね" || len(a.Stages) != 3 {
+	if a.BodyPartLabel != "シンスプリント" || len(a.Stages) != 3 {
 		t.Fatalf("first item %+v", a)
 	}
 	// 段階は rehab → jogging → race の順。日数は切り捨て、負にはならない。

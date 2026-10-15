@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, localDateString, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
-    expect(isInjuryBodyPart("lower-back")).toBe(true);
+    expect(isInjuryBodyPart("shin-splints")).toBe(true);
+    expect(isInjuryBodyPart("lower-back")).toBe(false);
     expect(isInjuryBodyPart(null)).toBe(false);
   });
 
@@ -57,54 +58,82 @@ describe("injury", () => {
 });
 
 describe("injury group join", () => {
-  const today = "2026-10-15";
-  const filled = { injuredOn: "2026-09-20", place: "練習中", situation: "着地でひねった", stage: "rehab" } as const;
+  const thisMonth = "2026-10";
+  const filled = {
+    diagnosis: "",
+    severity: "moderate",
+    sawDoctor: false,
+    injuredMonth: "2026-09",
+    place: "tartan",
+    activity: "sprint",
+    preChanges: ["more-volume"],
+    event: "sprint",
+    stage: "rehab",
+  } as const;
+  const answers = { ...filled, preChanges: [...filled.preChanges] };
 
-  it("asks for the date, rejecting a missing or future one", () => {
-    expect(injuryJoinStepError("injuredOn", emptyInjuryJoinAnswers, today)).not.toBe("");
-    expect(injuryJoinStepError("injuredOn", { ...filled, injuredOn: "2026-10-16" }, today)).toBe("未来の日付は選べません");
-    expect(injuryJoinStepError("injuredOn", { ...filled, injuredOn: today }, today)).toBe("");
+  it("asks for the injury's name only in the other group", () => {
+    expect(injuryJoinStepsFor("sprain")[0]).toBe("severity");
+    expect(injuryJoinStepsFor("other")[0]).toBe("diagnosis");
+    expect(injuryJoinStepsFor("other").at(-1)).toBe("stage");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "  " }, thisMonth)).not.toBe("");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "あ".repeat(41) }, thisMonth)).not.toBe("");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "わからない" }, thisMonth)).toBe("");
   });
 
-  it("asks for the place and the situation within their limits", () => {
-    expect(injuryJoinStepError("place", { ...filled, place: "  " }, today)).not.toBe("");
-    expect(injuryJoinStepError("place", { ...filled, place: "あ".repeat(101) }, today)).not.toBe("");
-    expect(injuryJoinStepError("place", filled, today)).toBe("");
-    expect(injuryJoinStepError("situation", { ...filled, situation: "" }, today)).not.toBe("");
-    expect(injuryJoinStepError("situation", { ...filled, situation: "あ".repeat(501) }, today)).not.toBe("");
-    expect(injuryJoinStepError("situation", filled, today)).toBe("");
+  it("asks for the month, rejecting a missing or future one", () => {
+    expect(injuryJoinStepError("injuredMonth", emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
+    expect(injuryJoinStepError("injuredMonth", { ...answers, injuredMonth: "2026-11" }, thisMonth)).toBe("これから先の月は選べません");
+    expect(injuryJoinStepError("injuredMonth", { ...answers, injuredMonth: thisMonth }, thisMonth)).toBe("");
   });
 
-  it("asks for a known stage", () => {
-    expect(injuryJoinStepError("stage", { ...filled, stage: "" }, today)).not.toBe("");
-    expect(injuryJoinStepError("stage", filled, today)).toBe("");
+  it("needs an answer for every choice", () => {
+    for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "event", "stage"] as const) {
+      expect(injuryJoinStepError(step, emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
+      expect(injuryJoinStepError(step, answers, thisMonth)).toBe("");
+    }
   });
 
-  it("sends trimmed answers in the API's field names", () => {
-    expect(injuryJoinPayload({ ...filled, place: " 練習中 ", situation: " ひねった " })).toEqual({
-      injured_on: "2026-09-20",
-      place: "練習中",
-      situation: "ひねった",
+  it("keeps nothing-changed apart from the other changes", () => {
+    expect(togglePreChange(["fatigue"], "none")).toEqual(["none"]);
+    expect(togglePreChange(["none"], "fatigue")).toEqual(["fatigue"]);
+    expect(togglePreChange(["fatigue", "new-shoes"], "fatigue")).toEqual(["new-shoes"]);
+  });
+
+  it("sends the answers in the API's field names", () => {
+    expect(injuryJoinPayload("sprain", { ...answers, diagnosis: "無視される" })).toEqual({
+      severity: "moderate",
+      saw_doctor: false,
+      injured_month: "2026-09",
+      place: "tartan",
+      activity: "sprint",
+      pre_changes: ["more-volume"],
+      event: "sprint",
       stage: "rehab",
     });
+    expect(injuryJoinPayload("other", { ...answers, diagnosis: " 疲労骨折 " })).toMatchObject({ diagnosis: "疲労骨折" });
   });
 
-  it("formats the local date and the group path", () => {
-    expect(localDateString(new Date(2026, 0, 5))).toBe("2026-01-05");
-    expect(injuryGroupPath("lower-back")).toBe("/injury/lower-back");
-  });
-
-  it("lists groups from the foot up to the neck, with other last", () => {
-    const me = { stage: "rehab", stage_label: "リハビリ中", injured_on: "2026-09-20", place: "a", situation: "b" } as const;
-    const sorted = sortInjuryGroups([
-      { body_part: "ankle", body_part_label: "足首", members: 5 },
-      { body_part: "knee", body_part_label: "膝", members: 1, me },
-      { body_part: "foot", body_part_label: "足裏", members: 5 },
-      { body_part: "calf", body_part_label: "ふくらはぎ", members: 9 },
-      { body_part: "other", body_part_label: "その他", members: 9 },
-      { body_part: "neck", body_part_label: "首", members: 0 },
+  it("lists the recent months, newest first", () => {
+    const months = recentMonths(new Date(2026, 1, 10), 3);
+    expect(months).toEqual([
+      { value: "2026-02", label: "2026年2月" },
+      { value: "2026-01", label: "2026年1月" },
+      { value: "2025-12", label: "2025年12月" },
     ]);
-    expect(sorted.map((item) => item.body_part)).toEqual(["foot", "ankle", "calf", "knee", "neck", "other"]);
+    expect(localMonthString(new Date(2026, 0, 5))).toBe("2026-01");
+    expect(injuryGroupPath("shin-splints")).toBe("/injury/shin-splints");
+  });
+
+  it("lists groups in the fixed order, with other last", () => {
+    const me = { stage: "rehab", stage_label: "リハビリ中", injured_month: "2026-09", pre_changes: [] } as const;
+    const sorted = sortInjuryGroups([
+      { body_part: "other", body_part_label: "その他", members: 9 },
+      { body_part: "elbow", body_part_label: "肘の痛み", members: 0 },
+      { body_part: "sprain", body_part_label: "捻挫", members: 1, me: { ...me, pre_changes: [] } },
+      { body_part: "hamstring-strain", body_part_label: "ハムストリングの肉離れ", members: 5 },
+    ]);
+    expect(sorted.map((item) => item.body_part)).toEqual(["hamstring-strain", "sprain", "elbow", "other"]);
   });
 });
 

@@ -48,14 +48,14 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 		t.Fatalf("invalid part status %d %s", bad.Code, bad.Body.String())
 	}
 	empty := postInjury(t, h, tok, map[string]any{
-		"kind": "injury", "body": "  ", "body_part": "knee",
+		"kind": "injury", "body": "  ", "body_part": "jumpers-knee",
 	})
 	if empty.Code == http.StatusCreated {
 		t.Fatalf("empty body accepted")
 	}
 
 	rec := postInjury(t, h, tok, map[string]any{
-		"kind": "injury", "title": "肉離れ", "body": "もう三週間走れていない", "body_part": "hamstring",
+		"kind": "injury", "title": "肉離れ", "body": "もう三週間走れていない", "body_part": "hamstring-strain",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -70,11 +70,11 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if created.Kind != "injury" || created.Injury.BodyPartLabel != "ハムストリング" {
+	if created.Kind != "injury" || created.Injury.BodyPartLabel != "ハムストリングの肉離れ" {
 		t.Fatalf("unexpected create response %+v", created)
 	}
 	rehab := postInjury(t, h, tok, map[string]any{
-		"kind": "injury", "body": "バイクとコアを続ける", "body_part": "knee",
+		"kind": "injury", "body": "バイクとコアを続ける", "body_part": "jumpers-knee",
 	})
 	if rehab.Code != http.StatusCreated {
 		t.Fatalf("create rehab %d %s", rehab.Code, rehab.Body.String())
@@ -89,7 +89,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if r := doJSON(t, h, http.MethodGet, "/v1/posts?kind=injury&sort=new", "", nil); r.Code != http.StatusForbidden {
 		t.Fatalf("public injury feed should be closed: %d", r.Code)
 	}
-	knee := listInjury(t, h, "/v1/injury/groups/knee/posts", tok)
+	knee := listInjury(t, h, "/v1/injury/groups/jumpers-knee/posts", tok)
 	if knee.Meta.Total != 1 || len(knee.Posts) != 1 || knee.Posts[0].Injury == nil {
 		t.Fatalf("group feed %+v", knee)
 	}
@@ -99,7 +99,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	}
 
 	patch := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
-		"title": "肉離れ", "body": "少し歩けた", "body_part": "calf",
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "quad-strain",
 	})
 	if patch.Code != http.StatusOK {
 		t.Fatalf("patch %d %s", patch.Code, patch.Body.String())
@@ -114,7 +114,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "calf" {
+	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "quad-strain" {
 		t.Fatalf("detail after patch %+v", detail)
 	}
 }
@@ -126,7 +126,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 	other := token(t, uuid.New())
 
 	rec := postInjury(t, h, tok, map[string]any{
-		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "body_part": "shin",
+		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "body_part": "shin-splints",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -200,7 +200,7 @@ func TestInjuryRecoveryUpdates(t *testing.T) {
 		t.Fatalf("detail %+v", detail)
 	}
 
-	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/shin/posts", tok, nil)
+	feed := doJSON(t, h, http.MethodGet, "/v1/injury/groups/shin-splints/posts", tok, nil)
 	var list struct {
 		Posts []struct {
 			Injury struct {
@@ -239,7 +239,7 @@ func TestInjuryFeedFilterByLatestStage(t *testing.T) {
 	create := func(title string) string {
 		t.Helper()
 		rec := postInjury(t, h, tok, map[string]any{
-			"kind": "injury", "title": title, "body": "本文", "body_part": "knee",
+			"kind": "injury", "title": title, "body": "本文", "body_part": "jumpers-knee",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -267,7 +267,7 @@ func TestInjuryFeedFilterByLatestStage(t *testing.T) {
 	report(resting, "resting")
 	create("経過なし")
 
-	base := "/v1/injury/groups/knee/posts?per_page=20"
+	base := "/v1/injury/groups/jumpers-knee/posts?per_page=20"
 	if got := listInjury(t, h, base, tok).Meta.Total; got != 3 {
 		t.Fatalf("no filter total %d", got)
 	}
@@ -330,12 +330,12 @@ func (r injuryStatsResp) reached(part, stage string) (posts, reached int64, medi
 func TestInjuryStatsAggregatesAnonymously(t *testing.T) {
 	h := setup(t)
 	// DB はテスト間で共有されるので、増えた分で確かめる。
-	beforePosts, beforeReached, _ := getInjuryStats(t, h).reached("groin", "jogging")
+	beforePosts, beforeReached, _ := getInjuryStats(t, h).reached("elbow", "jogging")
 
 	for i := 0; i < 5; i++ {
 		tok := token(t, uuid.New())
 		rec := postInjury(t, h, tok, map[string]any{
-			"kind": "injury", "title": "鼠径部", "body": "本文", "body_part": "groin",
+			"kind": "injury", "title": "肘", "body": "本文", "body_part": "elbow",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -356,7 +356,7 @@ func TestInjuryStatsAggregatesAnonymously(t *testing.T) {
 	if stats.MinSample != 5 {
 		t.Fatalf("min sample %d", stats.MinSample)
 	}
-	posts, reached, median := stats.reached("groin", "jogging")
+	posts, reached, median := stats.reached("elbow", "jogging")
 	if posts-beforePosts != 5 || reached-beforeReached != 5 {
 		t.Fatalf("delta posts %d reached %d", posts-beforePosts, reached-beforeReached)
 	}
@@ -373,7 +373,7 @@ func TestMyInjuryHistoryIsPrivateToTheAuthor(t *testing.T) {
 	create := func(tok, title string) string {
 		t.Helper()
 		rec := postInjury(t, h, tok, map[string]any{
-			"kind": "injury", "title": title, "body": "本文", "body_part": "calf",
+			"kind": "injury", "title": title, "body": "本文", "body_part": "quad-strain",
 		})
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -432,7 +432,7 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	bystander := token(t, uuid.New())
 
 	rec := postInjury(t, h, author, map[string]any{
-		"kind": "injury", "title": "通知の確認", "body": "本文", "body_part": "hip",
+		"kind": "injury", "title": "通知の確認", "body": "本文", "body_part": "achilles-tendinitis",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -444,8 +444,8 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 読めるのはグループの参加者だけ。
-	joinGroup(t, h, liker, "hip")
-	joinGroup(t, h, saver, "hip")
+	joinGroup(t, h, liker, "achilles-tendinitis")
+	joinGroup(t, h, saver, "achilles-tendinitis")
 	// 投稿者本人の「わかる」は対象外。
 	for _, tok := range []string{liker, author} {
 		if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/likes", tok, nil); r.Code >= 300 {
@@ -622,7 +622,7 @@ func TestInjuryPostIsOnlyWrittenThroughAGroup(t *testing.T) {
 	h := setup(t)
 	tok := token(t, uuid.New())
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{
-		"kind": "injury", "body": "走れない", "body_part": "knee",
+		"kind": "injury", "body": "走れない", "body_part": "jumpers-knee",
 	})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("injury post outside a group %d %s", rec.Code, rec.Body.String())
@@ -643,7 +643,7 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 	otherPart := token(t, uuid.New())
 	outsider := token(t, uuid.New())
 
-	rec := postInjury(t, h, author, map[string]any{"kind": "injury", "body": "膝がつらい", "body_part": "knee"})
+	rec := postInjury(t, h, author, map[string]any{"kind": "injury", "body": "膝がつらい", "body_part": "jumpers-knee"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -653,8 +653,8 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
 		t.Fatal(err)
 	}
-	joinGroup(t, h, member, "knee")
-	joinGroup(t, h, otherPart, "ankle")
+	joinGroup(t, h, member, "jumpers-knee")
+	joinGroup(t, h, otherPart, "sprain")
 	adminID := uuid.New()
 	admin := token(t, adminID)
 	doJSON(t, h, http.MethodGet, "/v1/me", admin, nil)

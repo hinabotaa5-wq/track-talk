@@ -74,22 +74,17 @@ type injuryUpdateReq struct {
 	Body  string `json:"body"`
 }
 
+// injuryBodyParts are the injury groups. The name stays "body part" in the API and the database,
+// but each group is now one diagnosis; anything outside the eight goes to "other".
 var injuryBodyParts = []struct{ Code, Label string }{
-	{"foot", "足裏"},
-	{"ankle", "足首"},
-	{"achilles", "アキレス腱"},
-	{"calf", "ふくらはぎ"},
-	{"shin", "すね"},
-	{"knee", "膝"},
-	{"quad", "太もも前"},
-	{"hamstring", "ハムストリング"},
-	{"groin", "股関節"},
-	{"hip", "お尻"},
-	{"lower-back", "腰"},
-	{"abs", "腹筋"},
-	{"scapula", "肩甲骨"},
-	{"shoulder", "肩"},
-	{"neck", "首"},
+	{"hamstring-strain", "ハムストリングの肉離れ"},
+	{"quad-strain", "太もも前の肉離れ"},
+	{"sprain", "捻挫"},
+	{"achilles-tendinitis", "アキレス腱炎"},
+	{"jumpers-knee", "ジャンパー膝(膝蓋腱炎)"},
+	{"shin-splints", "シンスプリント"},
+	{"shoulder", "肩の痛み"},
+	{"elbow", "肘の痛み"},
 	{"other", "その他"},
 }
 
@@ -110,7 +105,7 @@ func normalizeInjury(req postReq) (injuryInput, map[string]string) {
 	fields := map[string]string{}
 	part := strings.TrimSpace(req.BodyPart)
 	if !validInjuryBodyPart(part) {
-		fields["body_part"] = "部位を選んでください"
+		fields["body_part"] = "ケガを選んでください"
 	}
 	return injuryInput{BodyPart: part}, fields
 }

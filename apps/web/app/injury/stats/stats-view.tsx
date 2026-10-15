@@ -28,7 +28,7 @@ export function InjuryStatsView() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold">みんなの復帰データ</h1>
         <p className="mt-1 text-sm text-slate-200">
-          投稿された経過報告を、部位ごとに匿名で集計しています。日数は「ケガの投稿から、その段階を最初に報告するまで」の中央値で、
+          投稿された経過報告を、ケガごとに匿名で集計しています。日数は「ケガの投稿から、その段階を最初に報告するまで」の中央値で、
           報告が{stats?.min_sample ?? 5}人そろった段階だけ表示します。
         </p>
       </div>
