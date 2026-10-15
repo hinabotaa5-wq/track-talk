@@ -38,7 +38,10 @@ body {
   font-family: var(--font-geist-sans), "Hiragino Sans", sans-serif;
 }
 
+input[type="date"],
 input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -46,6 +49,7 @@ input[type="datetime-local"] {
   max-width: 100%;
 }
 
+input[type="date"]::-webkit-datetime-edit,
 input[type="datetime-local"]::-webkit-datetime-edit {
   min-width: 0;
   overflow: hidden;
