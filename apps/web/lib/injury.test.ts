@@ -94,15 +94,17 @@ describe("injury group join", () => {
     expect(injuryGroupPath("lower-back")).toBe("/injury/lower-back");
   });
 
-  it("lists joined groups first, then the biggest", () => {
+  it("lists groups from the foot up to the neck, with other last", () => {
     const me = { stage: "rehab", stage_label: "リハビリ中", injured_on: "2026-09-20", place: "a", situation: "b" } as const;
     const sorted = sortInjuryGroups([
       { body_part: "ankle", body_part_label: "足首", members: 5 },
       { body_part: "knee", body_part_label: "膝", members: 1, me },
       { body_part: "foot", body_part_label: "足裏", members: 5 },
       { body_part: "calf", body_part_label: "ふくらはぎ", members: 9 },
+      { body_part: "other", body_part_label: "その他", members: 9 },
+      { body_part: "neck", body_part_label: "首", members: 0 },
     ]);
-    expect(sorted.map((item) => item.body_part)).toEqual(["knee", "calf", "foot", "ankle"]);
+    expect(sorted.map((item) => item.body_part)).toEqual(["foot", "ankle", "calf", "knee", "neck", "other"]);
   });
 });
 
