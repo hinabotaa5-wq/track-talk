@@ -2,7 +2,6 @@ package httpx_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -158,10 +157,7 @@ WHERE season_year < (
 
 func openPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		t.Fatal(err)

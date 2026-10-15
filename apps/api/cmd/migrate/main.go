@@ -13,6 +13,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := config.RequireLocalDatabase(cfg.DatabaseURL); err != nil {
+		log.Fatal(err)
+	}
 	if err := migrate.Up(cfg.DatabaseURL); err != nil {
 		log.Fatal(err)
 	}

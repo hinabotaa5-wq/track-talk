@@ -6,7 +6,8 @@ services:
       POSTGRES_PASSWORD: tracktalk
       POSTGRES_DB: tracktalk
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 開発用。ホスト側に別の Postgres が 5432 を使っていても衝突しないよう 55432 にし、外には公開しない
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

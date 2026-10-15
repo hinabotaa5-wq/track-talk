@@ -25,6 +25,10 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
+	if err := config.RequireLocalDatabase(cfg.DatabaseURL); err != nil {
+		slog.Error("config", "err", err)
+		os.Exit(1)
+	}
 	if err := migrate.Up(cfg.DatabaseURL); err != nil {
 		slog.Error("migrate", "err", err)
 		os.Exit(1)

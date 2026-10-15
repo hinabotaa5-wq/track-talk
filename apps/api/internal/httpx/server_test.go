@@ -31,10 +31,7 @@ func setup(t *testing.T) http.Handler {
 
 func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	secret := os.Getenv("SUPABASE_JWT_SECRET")
 	if secret == "" {
 		secret = "test-jwt-secret-for-ci-only"
@@ -1446,10 +1443,7 @@ func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
 
 func setAdmin(t *testing.T, id uuid.UUID) {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -1754,4 +1748,17 @@ func TestNotifications(t *testing.T) {
 	if _, authorUnread = listNotifications(t, h, author); authorUnread != 0 {
 		t.Fatalf("unread after mark all %d", authorUnread)
 	}
+}
+
+// testDSN は統合テストの接続先を返す。本番 DB を壊さないよう、ローカル以外は拒否する。
+func testDSN(t *testing.T) string {
+	t.Helper()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
+	}
+	if err := config.RequireLocalDatabase(dsn); err != nil {
+		t.Fatal(err)
+	}
+	return dsn
 }
