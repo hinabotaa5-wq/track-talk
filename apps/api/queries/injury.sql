@@ -217,12 +217,27 @@ ORDER BY l.created_at;
 
 -- name: ListPublicInjuryGroupNotes :many
 -- 公開してよいと選ばれた一言。ニックネームは返さず、その時の段階と種目だけをつける。
-SELECT l.note::text AS note, l.stage, m.event, l.created_at
+SELECT l.note_id, l.note::text AS note, l.stage, m.event, l.created_at
 FROM injury_group_stage_log l
 JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
 WHERE l.body_part = $1
   AND l.note_public
   AND l.note IS NOT NULL
+  AND l.hidden_at IS NULL
   AND l.created_at >= m.joined_at
 ORDER BY l.created_at DESC
 LIMIT $2;
+
+-- name: InjuryNoteIsPublic :one
+-- 通報できるのは、公開ページに載っている一言だけ。
+SELECT EXISTS (
+    SELECT 1 FROM injury_group_stage_log
+    WHERE note_id = $1 AND note_public AND note IS NOT NULL AND hidden_at IS NULL
+);
+
+-- name: HideInjuryNote :execrows
+UPDATE injury_group_stage_log
+SET hidden_at = now()
+WHERE note_id = $1
+  AND note IS NOT NULL
+  AND hidden_at IS NULL;

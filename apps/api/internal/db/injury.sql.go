@@ -264,6 +264,37 @@ func (q *Queries) GetInjuryGroupMember(ctx context.Context, arg GetInjuryGroupMe
 	return i, err
 }
 
+const hideInjuryNote = `-- name: HideInjuryNote :execrows
+UPDATE injury_group_stage_log
+SET hidden_at = now()
+WHERE note_id = $1
+  AND note IS NOT NULL
+  AND hidden_at IS NULL
+`
+
+func (q *Queries) HideInjuryNote(ctx context.Context, noteID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, hideInjuryNote, noteID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const injuryNoteIsPublic = `-- name: InjuryNoteIsPublic :one
+SELECT EXISTS (
+    SELECT 1 FROM injury_group_stage_log
+    WHERE note_id = $1 AND note_public AND note IS NOT NULL AND hidden_at IS NULL
+)
+`
+
+// 通報できるのは、公開ページに載っている一言だけ。
+func (q *Queries) InjuryNoteIsPublic(ctx context.Context, noteID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, injuryNoteIsPublic, noteID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const injuryStageStats = `-- name: InjuryStageStats :many
 SELECT
     i.body_part,
@@ -677,12 +708,13 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 }
 
 const listPublicInjuryGroupNotes = `-- name: ListPublicInjuryGroupNotes :many
-SELECT l.note::text AS note, l.stage, m.event, l.created_at
+SELECT l.note_id, l.note::text AS note, l.stage, m.event, l.created_at
 FROM injury_group_stage_log l
 JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
 WHERE l.body_part = $1
   AND l.note_public
   AND l.note IS NOT NULL
+  AND l.hidden_at IS NULL
   AND l.created_at >= m.joined_at
 ORDER BY l.created_at DESC
 LIMIT $2
@@ -694,6 +726,7 @@ type ListPublicInjuryGroupNotesParams struct {
 }
 
 type ListPublicInjuryGroupNotesRow struct {
+	NoteID    uuid.UUID `json:"note_id"`
 	Note      string    `json:"note"`
 	Stage     string    `json:"stage"`
 	Event     *string   `json:"event"`
@@ -711,6 +744,7 @@ func (q *Queries) ListPublicInjuryGroupNotes(ctx context.Context, arg ListPublic
 	for rows.Next() {
 		var i ListPublicInjuryGroupNotesRow
 		if err := rows.Scan(
+			&i.NoteID,
 			&i.Note,
 			&i.Stage,
 			&i.Event,

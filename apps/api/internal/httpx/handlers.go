@@ -1118,6 +1118,17 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	if req.TargetType == "injury_note" {
+		public, err := s.q.InjuryNoteIsPublic(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !public {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+	}
 	row, err := s.q.CreateReport(r.Context(), db.CreateReportParams{
 		ID:         uuid.New(),
 		ReporterID: p.ID,
