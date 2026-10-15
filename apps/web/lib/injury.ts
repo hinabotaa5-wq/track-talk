@@ -131,6 +131,7 @@ export type InjuryJoinStep = (typeof injuryJoinSteps)[number];
 
 export const injuryJoinPlaces = ["練習中", "大会・試合中", "日常生活", "ジム・筋トレ", "その他"] as const;
 
+export const injuryJoinOtherPlace = "その他";
 export const injuryJoinPlaceMaxLength = 100;
 export const injuryJoinSituationMaxLength = 500;
 
