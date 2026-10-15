@@ -141,6 +141,11 @@ export type Comment = {
   post_id: string;
   body: string;
   mine: boolean;
+  author_name?: string;
+  parent_id?: string | null;
+  reply_to_id?: string | null;
+  reply_to_name?: string | null;
+  reply_to_removed?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -148,6 +153,7 @@ export type Comment = {
 export type NotificationKind =
   | "recruitment_post"
   | "comment"
+  | "comment_reply"
   | "practice_application"
   | "practice_accepted"
   | "practice_rate"
