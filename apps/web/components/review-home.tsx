@@ -9,6 +9,7 @@ import type { Meta, Product } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { ProductImage } from "@/components/product-image";
+import { ProductRequest } from "@/components/product-request";
 
 const kinds: ProductKind[] = ["shoe", "spike"];
 
@@ -74,7 +75,10 @@ export function ReviewHome({ kind, q, page }: { kind: ProductKind; q: string; pa
             >
               <ProductImage product={p} />
               <div className="space-y-0.5 px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-300">{p.brand}</p>
+                <p className="text-[11px] text-slate-300">
+                  {p.brand}
+                  {p.discontinued ? <span className="ml-1.5 text-amber-300">旧モデル</span> : null}
+                </p>
                 <p className="line-clamp-2 text-sm font-medium text-slate-100 group-hover:text-blue-400">{p.name}</p>
                 <p className="text-xs text-amber-300">{ratingText(p.avg_rating, p.review_count)}</p>
               </div>
@@ -82,6 +86,7 @@ export function ReviewHome({ kind, q, page }: { kind: ProductKind; q: string; pa
           ))}
         </div>
       ) : null}
+      {products ? <ProductRequest kind={kind} /> : null}
       {products && (meta.page > 1 || hasNext) ? (
         <nav className="mt-4 flex justify-between text-sm">
           {meta.page > 1 ? (

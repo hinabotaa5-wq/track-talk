@@ -5,6 +5,8 @@ SELECT
     p.brand,
     p.name,
     p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
     COALESCE(s.review_count, 0)::bigint AS review_count,
     COALESCE(s.avg_rating, 0)::float8 AS avg_rating
 FROM products p
@@ -17,7 +19,7 @@ LEFT JOIN (
 WHERE p.hidden_at IS NULL
   AND p.kind = sqlc.arg(kind)
   AND (sqlc.narg(q)::text IS NULL OR p.name ILIKE '%' || sqlc.narg(q)::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || sqlc.narg(q)::text || '%' ESCAPE '\')
-ORDER BY COALESCE(s.review_count, 0) DESC, COALESCE(s.avg_rating, 0) DESC, p.created_at DESC
+ORDER BY (p.discontinued_at IS NOT NULL) ASC, COALESCE(s.review_count, 0) DESC, COALESCE(s.avg_rating, 0) DESC, p.created_at DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: CountProducts :one
@@ -34,6 +36,8 @@ SELECT
     p.brand,
     p.name,
     p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
     COALESCE(s.review_count, 0)::bigint AS review_count,
     COALESCE(s.avg_rating, 0)::float8 AS avg_rating
 FROM products p
@@ -46,9 +50,15 @@ LEFT JOIN (
 WHERE p.id = $1 AND p.hidden_at IS NULL;
 
 -- name: CreateProduct :one
-INSERT INTO products (id, kind, brand, name, image_url)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO products (id, kind, brand, name, image_url, product_url)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id;
+
+-- name: UpdateProduct :execrows
+UPDATE products
+SET product_url = sqlc.arg(product_url),
+    discontinued_at = CASE WHEN sqlc.arg(discontinued)::boolean THEN COALESCE(discontinued_at, now()) ELSE NULL END
+WHERE id = sqlc.arg(id) AND hidden_at IS NULL;
 
 -- name: HideProduct :execrows
 UPDATE products SET hidden_at = now() WHERE id = $1 AND hidden_at IS NULL;

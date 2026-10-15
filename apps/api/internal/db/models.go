@@ -186,13 +186,15 @@ type PracticeRating struct {
 }
 
 type Product struct {
-	ID        uuid.UUID  `json:"id"`
-	Kind      string     `json:"kind"`
-	Brand     string     `json:"brand"`
-	Name      string     `json:"name"`
-	ImageUrl  string     `json:"image_url"`
-	HiddenAt  *time.Time `json:"hidden_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID             uuid.UUID  `json:"id"`
+	Kind           string     `json:"kind"`
+	Brand          string     `json:"brand"`
+	Name           string     `json:"name"`
+	ImageUrl       string     `json:"image_url"`
+	HiddenAt       *time.Time `json:"hidden_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ProductUrl     string     `json:"product_url"`
+	DiscontinuedAt *time.Time `json:"discontinued_at"`
 }
 
 type ProductReview struct {

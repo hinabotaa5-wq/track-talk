@@ -213,6 +213,8 @@ export type Product = {
   brand: string;
   name: string;
   image_url: string;
+  product_url: string;
+  discontinued: boolean;
   review_count: number;
   avg_rating: number;
 };

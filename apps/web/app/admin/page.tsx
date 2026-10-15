@@ -26,7 +26,7 @@ const statusLabels: Record<AdminReport["status"], string> = {
 
 const perPage = 20;
 
-type Tab = "reports" | "feedback" | "contact" | "products";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   const [items, setItems] = useState<T[]>([]);
@@ -61,11 +61,50 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
   return { items, total, error, loading, more: items.length < total, loadMore: () => setPage((p) => p + 1) };
 }
 
+function ProductLinkEditor({
+  product,
+  onSave,
+  inputClass,
+}: {
+  product: Product;
+  onSave: (next: { product_url: string; discontinued: boolean }) => void;
+  inputClass: string;
+}) {
+  const [url, setUrl] = useState(product.product_url);
+  const [discontinued, setDiscontinued] = useState(product.discontinued);
+  const dirty = url !== product.product_url || discontinued !== product.discontinued;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        className={`${inputClass} mt-0 min-w-0 flex-1`}
+        value={url}
+        maxLength={500}
+        placeholder="公式ページURL（https）"
+        aria-label="公式ページURL"
+        onChange={(e) => setUrl(e.target.value)}
+      />
+      <label className="flex items-center gap-1 text-xs text-slate-200">
+        <input type="checkbox" checked={discontinued} onChange={(e) => setDiscontinued(e.target.checked)} />
+        旧モデル
+      </label>
+      <button
+        type="button"
+        disabled={!dirty}
+        onClick={() => onSave({ product_url: url.trim(), discontinued })}
+        className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40"
+      >
+        保存
+      </button>
+    </div>
+  );
+}
+
 function ProductsAdmin({ token }: { token: string | null }) {
   const [kind, setKind] = useState<"shoe" | "spike">("shoe");
   const [brand, setBrand] = useState("");
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [productUrl, setProductUrl] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -93,17 +132,28 @@ function ProductsAdmin({ token }: { token: string | null }) {
       await apiFetch("/v1/admin/products", {
         method: "POST",
         token,
-        body: JSON.stringify({ kind, brand, name, image_url: imageUrl }),
+        body: JSON.stringify({ kind, brand, name, image_url: imageUrl, product_url: productUrl }),
       });
       setBrand("");
       setName("");
       setImageUrl("");
+      setProductUrl("");
       setMessage("登録しました");
       await load();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "登録できませんでした");
     } finally {
       setPending(false);
+    }
+  }
+
+  async function save(p: Product, next: { product_url: string; discontinued: boolean }) {
+    try {
+      await apiFetch(`/v1/admin/products/${p.id}`, { method: "PATCH", token, body: JSON.stringify(next) });
+      setMessage("更新しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "更新できませんでした");
     }
   }
 
@@ -145,6 +195,10 @@ function ProductsAdmin({ token }: { token: string | null }) {
           画像URL（https、任意）
           <input className={input} value={imageUrl} maxLength={500} onChange={(e) => setImageUrl(e.target.value)} />
         </label>
+        <label className="block text-sm">
+          公式ページURL（https、任意）
+          <input className={input} value={productUrl} maxLength={500} onChange={(e) => setProductUrl(e.target.value)} />
+        </label>
         <button type="submit" disabled={pending} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
           {pending ? "登録中..." : "商品を登録"}
         </button>
@@ -152,14 +206,18 @@ function ProductsAdmin({ token }: { token: string | null }) {
       </form>
       <ul className="space-y-2">
         {products.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-            <span>
-              {p.brand} {p.name}
-              <span className="ml-2 text-xs text-slate-300">レビュー{p.review_count}件</span>
-            </span>
-            <button type="button" onClick={() => hide(p.id)} className="shrink-0 text-red-300 underline">
-              非表示
-            </button>
+          <li key={p.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span>
+                {p.brand} {p.name}
+                {p.discontinued ? <span className="ml-2 text-xs text-amber-300">旧モデル</span> : null}
+                <span className="ml-2 text-xs text-slate-300">レビュー{p.review_count}件</span>
+              </span>
+              <button type="button" onClick={() => hide(p.id)} className="shrink-0 text-red-300 underline">
+                非表示
+              </button>
+            </div>
+            <ProductLinkEditor product={p} onSave={(next) => save(p, next)} inputClass={input} />
           </li>
         ))}
       </ul>
@@ -175,6 +233,7 @@ export default function AdminPage() {
   const reports = useAdminList<AdminReport>("/v1/admin/reports", "reports", isAdmin, token);
   const feedback = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=feedback", "inquiries", isAdmin, token);
   const contact = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=contact", "inquiries", isAdmin, token);
+  const requests = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=product_request", "inquiries", isAdmin, token);
 
   useEffect(() => {
     if (loading) return;
@@ -186,12 +245,13 @@ export default function AdminPage() {
     return <p className="text-sm text-slate-200">読み込み中...</p>;
   }
 
-  const lists = { reports, feedback, contact };
+  const lists = { reports, feedback, contact, requests };
   const list = tab === "products" ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
     { id: "feedback", label: "なんでも書いてね", total: feedback.total },
     { id: "contact", label: "お問い合わせ", total: contact.total },
+    { id: "requests", label: "商品リクエスト", total: requests.total },
     { id: "products", label: "商品", total: -1 },
   ];
 
@@ -243,7 +303,7 @@ export default function AdminPage() {
         </ul>
       ) : (
         <ul className="space-y-3">
-          {(tab === "feedback" ? feedback : contact).items.map((i) => (
+          {lists[tab as "feedback" | "contact" | "requests"].items.map((i) => (
             <li key={i.id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3">
               <p className="text-xs text-slate-200">
                 {inquiryCategoryLabels[i.category]} · {i.user_nickname ?? "名前なし"} · {formatDateTime(i.created_at)}

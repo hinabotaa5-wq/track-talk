@@ -91,14 +91,35 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   return (
     <article className="mx-auto max-w-2xl space-y-4">
       <div className="overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
-        <ProductImage product={product} className="aspect-[16/9]" />
+        {product.product_url ? (
+          <a href={product.product_url} target="_blank" rel="noopener noreferrer" aria-label={`${product.name}の公式ページを開く`}>
+            <ProductImage product={product} className="aspect-[16/9]" />
+          </a>
+        ) : (
+          <ProductImage product={product} className="aspect-[16/9]" />
+        )}
         <div className="space-y-1 p-4">
           <span className="rounded-full border border-white/20 bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-slate-200">
             {productKindLabels[product.kind]}
           </span>
+          {product.discontinued ? (
+            <span className="ml-2 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">
+              旧モデル
+            </span>
+          ) : null}
           <p className="text-xs text-slate-300">{product.brand}</p>
           <h1 className="text-xl font-bold">{product.name}</h1>
           <p className="text-sm text-amber-300">{ratingText(product.avg_rating, product.review_count)}</p>
+          {product.product_url ? (
+            <a
+              href={product.product_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-95"
+            >
+              公式ページを見る ↗
+            </a>
+          ) : null}
         </div>
       </div>
 

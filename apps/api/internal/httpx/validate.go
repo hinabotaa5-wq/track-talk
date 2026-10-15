@@ -128,7 +128,7 @@ func InquiryCategory(v string) string {
 
 func InquirySource(v string) string {
 	switch v {
-	case "contact", "feedback":
+	case "contact", "feedback", "product_request":
 		return ""
 	default:
 		return "送信元が不正です"
