@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -18,6 +18,8 @@ import type { PostsPage } from "@/lib/fetch-posts";
 import {
   canPostInStage,
   injuryBodyPartLabel,
+  injuryGroupDescriptions,
+  injuryGroupTitle,
   injuryStages,
   type InjuryGroup,
   type InjuryGroupMember,
@@ -26,7 +28,7 @@ import {
 
 type Load = { kind: "loading" } | { kind: "joined"; group: InjuryGroup } | { kind: "not-joined" } | { kind: "failed" };
 
-export function GroupView({ part }: { part: string }) {
+export function GroupView({ part, members, summary }: { part: string; members: number | null; summary: ReactNode }) {
   const { session, token, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
@@ -37,6 +39,7 @@ export function GroupView({ part }: { part: string }) {
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
   const [celebrate, setCelebrate] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const applyGroup = useCallback((group: InjuryGroup) => {
     setLoad({ kind: "joined", group });
@@ -106,28 +109,45 @@ export function GroupView({ part }: { part: string }) {
     </Link>
   );
 
-  if (!loading && !session) {
-    return (
-      <div className="space-y-4">
-        {back}
-        <EmptyState title="ログインすると入れます" body="グループの中は、参加した人だけが読めます。" />
-        <Link href="/login" className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white">
-          ログイン
-        </Link>
+  // 入っていない人(ログインしていない人や検索から来た人も)には、グループの紹介と公開の集計を見せる。
+  // サーバーで描くときはまだログインがわからないので、最初はこの形で描く。
+  const intro = (cta: ReactNode) => (
+    <div className="space-y-4">
+      {back}
+      <div>
+        <h1 className="text-2xl font-bold">
+          {injuryGroupTitle(part)}
+          {members !== null ? <span className="text-lg font-semibold text-slate-200"> · {members}人</span> : null}
+        </h1>
+        <p className="mt-2 text-sm text-slate-200">{injuryGroupDescriptions[part]}</p>
+        <p className="mt-1 text-sm text-slate-200">同じケガをした仲間が集まる場所です。グループの中の会話は、参加した人だけが読めます。</p>
       </div>
+      {cta}
+      {summary}
+    </div>
+  );
+  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95";
+
+  if (!loading && !session) {
+    return intro(
+      <Link href={`/login?next=${encodeURIComponent(`/injury/${part}`)}`} className={ctaClass}>
+        ログインしてグループに入る
+      </Link>,
     );
   }
 
   if (load.kind === "failed") {
-    return (
-      <div className="space-y-4">
-        {back}
-        <ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />
-      </div>
-    );
+    return intro(<ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />);
   }
 
   if (load.kind === "not-joined") {
+    if (!joining) {
+      return intro(
+        <button type="button" onClick={() => setJoining(true)} className={ctaClass}>
+          このグループに入る
+        </button>,
+      );
+    }
     return (
       <div className="space-y-4">
         {back}
@@ -138,6 +158,7 @@ export function GroupView({ part }: { part: string }) {
             setLoad({ kind: "loading" });
             setSelected(null);
             setPosts(null);
+            setJoining(false);
             void fetchGroup();
           }}
         />
@@ -146,12 +167,7 @@ export function GroupView({ part }: { part: string }) {
   }
 
   if (load.kind === "loading" || !selected) {
-    return (
-      <div className="space-y-4">
-        {back}
-        <FeedLoadingFrame />
-      </div>
-    );
+    return intro(<div className="h-11" aria-hidden />);
   }
 
   const { group } = load;
@@ -166,7 +182,7 @@ export function GroupView({ part }: { part: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">
-            {injuryBodyPartLabel(group.body_part)}の仲間 · {group.members}人
+            {injuryGroupTitle(part)} · {group.members}人
           </h1>
           <p className="mt-1 text-sm text-slate-200">一緒に乗り越えよう。どの段階もタップして読めます。</p>
         </div>
@@ -201,6 +217,16 @@ export function GroupView({ part }: { part: string }) {
           ))}
         </div>
       )}
+
+      {summary ? (
+        <section className="space-y-3 border-t border-white/15 pt-4" aria-label="みんなのデータ">
+          <div>
+            <h2 className="text-base font-bold">みんなのデータ</h2>
+            <p className="mt-1 text-sm text-slate-300">この部分は、グループに入っていない人も見られます。</p>
+          </div>
+          {summary}
+        </section>
+      ) : null}
 
       <div className="space-y-2 border-t border-white/15 pt-4">
         {leaving === "idle" ? (

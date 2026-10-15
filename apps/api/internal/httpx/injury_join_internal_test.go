@@ -39,3 +39,14 @@ func TestNormalizeInjuryStageChange(t *testing.T) {
 		t.Fatalf("empty request should ask for stage and actions: %v", fields)
 	}
 }
+
+func TestInjuryMiddleHalf(t *testing.T) {
+	low, high := injuryMiddleHalf([]float64{100, 30, 60, 44, 74})
+	// 並べると 30,44,60,74,100。25%と75%は44と74で、ケガは月の半ばとして14日引く。
+	if low != 30 || high != 60 {
+		t.Fatalf("got %d-%d", low, high)
+	}
+	if low, _ := injuryMiddleHalf([]float64{3, 3, 3, 3, 3}); low != 0 {
+		t.Fatalf("should not go below zero: %d", low)
+	}
+}

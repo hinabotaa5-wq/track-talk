@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -198,5 +198,25 @@ describe("injury stage change", () => {
     expect(injuryElapsedText("2025-10", now)).toBe("ケガから約1年");
     expect(injuryElapsedText("2024-07", now)).toBe("ケガから約2年3か月");
     expect(injuryElapsedText("", now)).toBe("");
+  });
+});
+
+describe("injury public page", () => {
+  it("describes every group and names その他 naturally", () => {
+    for (const part of injuryBodyParts) expect(injuryGroupDescriptions[part.value]).toBeTruthy();
+    expect(injuryGroupTitle("sprain")).toBe("捻挫の仲間");
+    expect(injuryGroupTitle("other")).toBe("その他のケガの仲間");
+  });
+
+  it("shows the recovery range in weeks, or in months when it is long", () => {
+    expect(injuryRecoveryRangeText(14, 35)).toBe("約2〜5週間");
+    expect(injuryRecoveryRangeText(21, 21)).toBe("約3週間");
+    expect(injuryRecoveryRangeText(0, 3)).toBe("約1週間");
+    expect(injuryRecoveryRangeText(45, 120)).toBe("約2〜4か月");
+  });
+
+  it("rounds shares to whole percents", () => {
+    expect(injuryPercent(1, 3)).toBe(33);
+    expect(injuryPercent(0, 0)).toBe(0);
   });
 });

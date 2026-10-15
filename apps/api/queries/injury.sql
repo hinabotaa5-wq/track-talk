@@ -192,3 +192,37 @@ SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean A
 
 -- name: DeleteInjuryGroupMember :execrows
 DELETE FROM injury_group_members WHERE user_id = $1 AND body_part = $2;
+
+-- name: ListInjuryGroupAnswers :many
+-- 公開ページの予防の集計に使う、入るときの答え。選択式になる前に入った人は数えない。
+SELECT severity, place, activity, pre_changes, event
+FROM injury_group_members
+WHERE body_part = $1
+  AND severity IS NOT NULL;
+
+-- name: ListInjuryGroupStageChanges :many
+-- 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした月の1日からその記録までの日数。
+SELECT
+    l.user_id,
+    l.stage,
+    l.actions,
+    m.severity,
+    (EXTRACT(EPOCH FROM (l.created_at - m.injured_on::timestamptz)) / 86400.0)::float8 AS days
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND cardinality(l.actions) > 0
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at;
+
+-- name: ListPublicInjuryGroupNotes :many
+-- 公開してよいと選ばれた一言。ニックネームは返さず、その時の段階と種目だけをつける。
+SELECT l.note::text AS note, l.stage, m.event, l.created_at
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND l.note_public
+  AND l.note IS NOT NULL
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at DESC
+LIMIT $2;
