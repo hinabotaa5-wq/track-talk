@@ -1,8 +1,10 @@
 import { ImageResponse } from "next/og";
 
-// 仮アイコン。ロゴができたら差し替える。
-// maskable でも欠けないよう、文字は中央の安全領域(約 60%)に収める。
-export function renderAppIcon(size: number) {
+// ヘッダーのロゴ(トラックの3レーン)をアプリアイコンにする。
+// maskable でも欠けないよう、マークは中央の安全領域(直径 80% の円)に収める。
+export function renderAppIcon(size: number, markScale = 0.56) {
+  const markWidth = size * markScale;
+  const markHeight = (markWidth * 38) / 42;
   return new ImageResponse(
     (
       <div
@@ -12,14 +14,35 @@ export function renderAppIcon(size: number) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #2563eb, #0ea5e9)",
-          color: "#ffffff",
-          fontSize: size * 0.34,
-          fontWeight: 800,
-          letterSpacing: -size * 0.01,
+          background: "#16243a",
         }}
       >
-        TT
+        <svg width={markWidth} height={markHeight} viewBox="4 6 42 38">
+          <path
+            d="M42 10H28A20 20 0 0 0 8 30v10"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M42 16.5H28A13.5 13.5 0 0 0 14.5 30v10"
+            fill="none"
+            stroke="#93c5fd"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M42 23H28A7 7 0 0 0 21 30v10"
+            fill="none"
+            stroke="rgba(255,255,255,0.8)"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
     ),
     { width: size, height: size },
