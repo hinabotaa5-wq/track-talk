@@ -401,7 +401,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
           <>
             <Link
               href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
-              className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-95"
+              aria-disabled={action.pending}
+              className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-95 aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
               編集
             </Link>
