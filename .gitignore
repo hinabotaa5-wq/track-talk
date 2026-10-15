@@ -24,3 +24,6 @@ apps/api/tmp/
 
 # Claude Code personal instructions
 CLAUDE.local.md
+
+# Cloud Run の環境変数（deploy/cloud-run/env.example.yaml をコピーしたもの）
+deploy/cloud-run/env.yaml

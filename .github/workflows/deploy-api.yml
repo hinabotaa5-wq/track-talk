@@ -1,0 +1,47 @@
+name: Deploy API
+
+# main の API が変わったら Cloud Run（東京）へ送る。
+# 初回の作成と環境変数の登録は deploy/cloud-run/setup.sh で行い、ここではイメージだけを差し替える。
+# 下の GCP_* は秘密ではない（鍵ではなく、どのプロジェクトに送るかの指定）。プロジェクトを変えたら書き換える。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_PROJECT_ID: refined-bolt-493709-a8
+      GCP_WORKLOAD_IDENTITY_PROVIDER: projects/274141774717/locations/global/workloadIdentityPools/github/providers/github
+      GCP_SERVICE_ACCOUNT: github-deploy@refined-bolt-493709-a8.iam.gserviceaccount.com
+      REGION: asia-northeast1
+      IMAGE: asia-northeast1-docker.pkg.dev/refined-bolt-493709-a8/track-talk/api:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE" apps/api
+          docker push "$IMAGE"
+      # 予算超過で API を止める budget-stop も同じイメージなので、古いイメージが掃除されても動くよう一緒に差し替える。
+      - name: Deploy
+        run: |
+          gcloud run deploy track-talk-api --image "$IMAGE" --region "$REGION" --project "$GCP_PROJECT_ID" --quiet
+          gcloud run deploy track-talk-budget-stop --image "$IMAGE" --command /app/budgetstop --region "$REGION" --project "$GCP_PROJECT_ID" --quiet

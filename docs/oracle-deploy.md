@@ -1,6 +1,6 @@
 # API を Oracle Cloud（Always Free）で動かす
 
-いまの API の公開先は Render です。この手順は、あとから VM に移すときのためのものです。
+いまの API の公開先は Cloud Run です（[手順](cloud-run-deploy.md)）。この手順は、あとから VM に移すときのためのものです。
 
 Go API を Oracle の VM で動かし、画面は Vercel のままにする構成です。
 VM では Docker 上で API と Caddy（HTTPS）が動きます。
@@ -60,7 +60,7 @@ VM へ自動で送る workflow を戻したときに、リポジトリの Settin
 
 ## 4. 初回デプロイと切り替え
 
-1. VM 上でイメージを取得して `docker compose up -d` する。Render を使っているあいだは、そのための GitHub Actions は置いていない
+1. VM 上でイメージを取得して `docker compose up -d` する。Cloud Run を使っているあいだは、そのための GitHub Actions は置いていない
 2. `https://api.<ドメイン>/health` が `{"status":"ok"}` を返すことを確認する
 3. Vercel の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
 4. 画面からログインと投稿ができることを確認する
