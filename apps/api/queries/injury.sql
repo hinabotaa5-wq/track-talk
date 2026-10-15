@@ -120,23 +120,36 @@ WHERE u.id = sqlc.arg('id')
 RETURNING u.id, u.post_id, u.stage, u.body, u.created_at;
 
 -- name: UpsertInjuryGroupMember :one
-INSERT INTO injury_group_members (user_id, body_part, injured_on, place, situation, stage)
-VALUES ($1, $2, $3, $4, $5, $6)
+-- 入り直したときは答えを新しくし、前の自由記述は消す。
+INSERT INTO injury_group_members (
+    user_id, body_part, injured_on, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, stage
+)
+VALUES (
+    sqlc.arg('user_id'), sqlc.arg('body_part'), sqlc.arg('injured_on'), sqlc.narg('diagnosis'), sqlc.arg('severity'),
+    sqlc.arg('saw_doctor'), sqlc.arg('place'), sqlc.arg('activity'), sqlc.arg('pre_changes')::text[], sqlc.arg('event'), sqlc.arg('stage')
+)
 ON CONFLICT (user_id, body_part) DO UPDATE SET
     injured_on = EXCLUDED.injured_on,
+    place_note = NULL,
+    situation_note = NULL,
+    diagnosis = EXCLUDED.diagnosis,
+    severity = EXCLUDED.severity,
+    saw_doctor = EXCLUDED.saw_doctor,
     place = EXCLUDED.place,
-    situation = EXCLUDED.situation,
+    activity = EXCLUDED.activity,
+    pre_changes = EXCLUDED.pre_changes,
+    event = EXCLUDED.event,
     stage = EXCLUDED.stage,
     updated_at = now()
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event;
 
 -- name: GetInjuryGroupMember :one
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1 AND body_part = $2;
 
 -- name: ListMyInjuryGroupMembers :many
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1;
 
@@ -144,7 +157,7 @@ WHERE user_id = $1;
 UPDATE injury_group_members
 SET stage = $3, updated_at = now()
 WHERE user_id = $1 AND body_part = $2
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event;
 
 -- name: AddInjuryGroupStageLog :exec
 INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3);

@@ -64,14 +64,21 @@ type InjuryDetail struct {
 }
 
 type InjuryGroupMember struct {
-	UserID    uuid.UUID `json:"user_id"`
-	BodyPart  string    `json:"body_part"`
-	InjuredOn time.Time `json:"injured_on"`
-	Place     string    `json:"place"`
-	Situation string    `json:"situation"`
-	Stage     string    `json:"stage"`
-	JoinedAt  time.Time `json:"joined_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	UserID        uuid.UUID `json:"user_id"`
+	BodyPart      string    `json:"body_part"`
+	InjuredOn     time.Time `json:"injured_on"`
+	PlaceNote     *string   `json:"place_note"`
+	SituationNote *string   `json:"situation_note"`
+	Stage         string    `json:"stage"`
+	JoinedAt      time.Time `json:"joined_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Diagnosis     *string   `json:"diagnosis"`
+	Severity      *string   `json:"severity"`
+	SawDoctor     *bool     `json:"saw_doctor"`
+	Place         *string   `json:"place"`
+	Activity      *string   `json:"activity"`
+	PreChanges    []string  `json:"pre_changes"`
+	Event         *string   `json:"event"`
 }
 
 type InjuryGroupStageLog struct {
