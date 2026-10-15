@@ -381,3 +381,54 @@ func TestCoachingVideoUploadIsPrivate(t *testing.T) {
 		t.Fatal("secret leaked")
 	}
 }
+
+func TestGuardianConsentNotifiesTheMinor(t *testing.T) {
+	var received atomic.Int64
+	pushServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer pushServer.Close()
+	priv, pub, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.VAPIDPublicKey = pub
+		cfg.VAPIDPrivateKey = priv
+		cfg.VAPIDSubject = "mailto:test@example.com"
+		cfg.PushHTTP = pushServer.Client()
+	})
+
+	minor := uuid.New()
+	tm := token(t, minor)
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
+		t.Fatalf("birth month %d %s", rec.Code, rec.Body.String())
+	}
+	p256dh, auth := testPushKeys(t)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/push-subscriptions", tm, map[string]any{
+		"endpoint": pushServer.URL + "/minor",
+		"keys":     map[string]string{"p256dh": p256dh, "auth": auth},
+	}); rec.Code != http.StatusNoContent {
+		t.Fatalf("subscribe %d %s", rec.Code, rec.Body.String())
+	}
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
+	var issued guardianView
+	_ = json.Unmarshal(rec.Body.Bytes(), &issued)
+	path := "/v1/guardian/" + issued.Token
+	body := map[string]any{"guardian_name": "山田 花子", "relationship": "mother", "agree": true}
+
+	if rec := doJSON(t, h, http.MethodPost, path+"/consent", "", body); rec.Code != http.StatusOK {
+		t.Fatalf("consent %d %s", rec.Code, rec.Body.String())
+	}
+	if got := received.Load(); got != 1 {
+		t.Fatalf("pushes after consent %d", got)
+	}
+	// 同意済みのまま送り直しても、もう一度は知らせない。
+	if rec := doJSON(t, h, http.MethodPost, path+"/consent", "", body); rec.Code != http.StatusOK {
+		t.Fatalf("consent again %d %s", rec.Code, rec.Body.String())
+	}
+	if got := received.Load(); got != 1 {
+		t.Fatalf("pushes after second consent %d", got)
+	}
+}

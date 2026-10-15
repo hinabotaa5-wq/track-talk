@@ -47,3 +47,20 @@ func TestParseBirthMonth(t *testing.T) {
 		}
 	}
 }
+
+func TestGuardianLimitText(t *testing.T) {
+	three := int32(3000)
+	thousand := int32(1000)
+	if got := guardianLimitText(&three); got != "月3,000円まで" {
+		t.Fatalf("got %q", got)
+	}
+	if got := guardianLimitText(&thousand); got != "月1,000円まで" {
+		t.Fatalf("got %q", got)
+	}
+	if got := guardianLimitText(nil); got != "上限なし" {
+		t.Fatalf("got %q", got)
+	}
+	if got := formatYenNumber(500); got != "500" {
+		t.Fatalf("got %q", got)
+	}
+}

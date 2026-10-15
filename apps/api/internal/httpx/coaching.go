@@ -2,18 +2,22 @@ package httpx
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -252,7 +256,7 @@ type guardianConsentReq struct {
 }
 
 func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
-	hash, _, ok := s.guardianByToken(w, r)
+	hash, current, ok := s.guardianByToken(w, r)
 	if !ok {
 		return
 	}
@@ -297,7 +301,49 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if current.Status != "consented" {
+		s.notifyGuardianConsented(r.Context(), consent)
+	}
 	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+}
+
+// notifyGuardianConsented は、保護者が同意したことを本人の端末に知らせる。
+// 届かなくても同意は済んでいるので、失敗は記録だけして返事を遅らせすぎない。
+func (s *Server) notifyGuardianConsented(ctx context.Context, consent db.GuardianConsent) {
+	if !s.push.Configured() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, err := s.sendPush(ctx, consent.MinorID, push.Message{
+		Title: "保護者が同意しました",
+		Body:  "フォーム添削を" + guardianLimitText(consent.MonthlyLimitYen) + "の範囲で頼めます",
+		URL:   "/me/coaching",
+		Tag:   "guardian-consent",
+	}, 24*time.Hour)
+	if err != nil {
+		slog.Warn("guardian consent push", "err", err)
+	}
+}
+
+func guardianLimitText(limit *int32) string {
+	if limit == nil {
+		return "上限なし"
+	}
+	return "月" + formatYenNumber(*limit) + "円まで"
+}
+
+// formatYenNumber は 3000 を "3,000" にする。
+func formatYenNumber(v int32) string {
+	digits := strconv.Itoa(int(v))
+	var b strings.Builder
+	for i, c := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(c)
+	}
+	return b.String()
 }
 
 type guardianSettingsReq struct {
