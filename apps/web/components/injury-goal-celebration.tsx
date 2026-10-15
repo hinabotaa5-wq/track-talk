@@ -18,7 +18,7 @@ export function InjuryGoalCelebration({ onClose }: { onClose: () => void }) {
         />
       ))}
       <p className="text-lg font-bold text-emerald-200">大会に復帰、おめでとう</p>
-      <p className="mt-1 text-sm text-emerald-100">あなたも乗り越えた仲間の一人です。後ろの仲間に、一言残せます。</p>
+      <p className="mt-1 text-sm text-emerald-100">あなたも乗り越えた仲間の一人です。あなたの経験は、後ろの仲間のヒントになります。</p>
       <button
         type="button"
         onClick={onClose}

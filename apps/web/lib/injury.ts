@@ -241,11 +241,15 @@ export function recentMonths(now: Date, count = 24) {
   });
 }
 
-// ケガの前に変わったことは複数選べる。「とくになし」はほかと一緒に選べないので、どちらかを選ぶと他方を外す。
-export function togglePreChange(current: InjuryPreChange[], value: InjuryPreChange): InjuryPreChange[] {
+// 複数選べる質問で、「なし」にあたる選択肢はほかと一緒に選べない。どちらかを選ぶと他方を外す。
+function toggleExclusive<T extends string>(current: T[], value: T, exclusive: T): T[] {
   if (current.includes(value)) return current.filter((item) => item !== value);
-  if (value === "none") return ["none"];
-  return [...current.filter((item) => item !== "none"), value];
+  if (value === exclusive) return [exclusive];
+  return [...current.filter((item) => item !== exclusive), value];
+}
+
+export function togglePreChange(current: InjuryPreChange[], value: InjuryPreChange): InjuryPreChange[] {
+  return toggleExclusive(current, value, "none");
 }
 
 function hasValue(options: readonly { value: string }[], value: string) {
@@ -296,6 +300,61 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
   };
 }
 
+// 段階を変えるときに聞く「意識的にやったこと」。復帰までに何をしたかを集計して、次の人のヒントにする。
+export const injuryActions = [
+  { value: "hospital-rehab", label: "病院のリハビリ" },
+  { value: "osteopath", label: "整骨院" },
+  { value: "stretch", label: "ストレッチ" },
+  { value: "bath", label: "入浴" },
+  { value: "strength", label: "筋トレ・補強" },
+  { value: "icing", label: "アイシング" },
+  { value: "taping", label: "テーピング" },
+  { value: "rest", label: "できるだけ動かなかった" },
+  { value: "nothing", label: "何もしなかった" },
+] as const;
+export type InjuryAction = (typeof injuryActions)[number]["value"];
+
+export const injuryStageNoteMaxLength = 300;
+
+export function toggleInjuryAction(current: InjuryAction[], value: InjuryAction): InjuryAction[] {
+  return toggleExclusive(current, value, "nothing");
+}
+
+export type InjuryStageChangeAnswers = {
+  stage: InjuryStage | "";
+  actions: InjuryAction[];
+  note: string;
+  notePublic: boolean;
+};
+
+export const emptyInjuryStageChangeAnswers: InjuryStageChangeAnswers = { stage: "", actions: [], note: "", notePublic: false };
+
+// 段階を変えるフォームの答えに問題があれば、最初の問題の文言を返す。問題なければ空文字。
+export function injuryStageChangeError(answers: InjuryStageChangeAnswers, current: InjuryStage) {
+  if (!isInjuryStage(answers.stage)) return "新しい段階を選んでください";
+  if (answers.stage === current) return "いまと同じ段階です。変わった段階を選んでください";
+  if (answers.actions.length === 0) return "意識的にやったことを1つ以上選んでください(なければ「何もしなかった」)";
+  if ([...answers.note.trim()].length > injuryStageNoteMaxLength) return `一言は${injuryStageNoteMaxLength}文字以内で書いてください`;
+  return "";
+}
+
+export function injuryStageChangePayload(answers: InjuryStageChangeAnswers) {
+  const note = answers.note.trim();
+  return { stage: answers.stage, actions: answers.actions, note, note_public: note !== "" && answers.notePublic };
+}
+
+// マイページに出す「ケガから約◯か月」。ケガをした日は月までしか聞いていないので、月の差で言う。
+export function injuryElapsedText(injuredMonth: string, now: Date) {
+  const match = /^(\d{4})-(\d{2})$/.exec(injuredMonth);
+  if (!match) return "";
+  const months = (now.getFullYear() - Number(match[1])) * 12 + now.getMonth() + 1 - Number(match[2]);
+  if (months <= 0) return "今月ケガ";
+  if (months < 12) return `ケガから約${months}か月`;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return rest === 0 ? `ケガから約${years}年` : `ケガから約${years}年${rest}か月`;
+}
+
 export function injuryGroupPath(part: string) {
   return `/injury/${part}`;
 }
@@ -318,6 +377,25 @@ export function injuryCelebrationKey(part: string) {
 // 初めてゴール(大会に復帰)に着いたときだけ祝う。戻ってからの2回目は出さない。
 export function shouldCelebrate(stage: string, alreadyCelebrated: boolean) {
   return stage === "race" && !alreadyCelebrated;
+}
+
+function hasCelebrated(part: string) {
+  try {
+    return localStorage.getItem(injuryCelebrationKey(part)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+// 祝うべきなら、祝ったことを覚えて true を返す。保存できなくても、祝うのが1回余計に出るだけ。
+export function claimCelebration(part: string, stage: string) {
+  if (!shouldCelebrate(stage, hasCelebrated(part))) return false;
+  try {
+    localStorage.setItem(injuryCelebrationKey(part), "1");
+  } catch {
+    // 保存できなくても続ける。
+  }
+  return true;
 }
 
 // ニックネームから、毎回同じアバターの色を決める。
