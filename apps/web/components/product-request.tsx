@@ -1,7 +1,8 @@
 "use client";
 
+import { CircleCheck } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError, apiFetch } from "@/lib/api";
@@ -19,6 +20,12 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
+  const doneRef = useRef<HTMLDivElement>(null);
+
+  // フォームが閉じて高さが縮むので、完了の表示が画面の外に出ないようにする。
+  useEffect(() => {
+    if (done) doneRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [done]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,14 +53,22 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
   return (
     <section className="mt-6 space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm">
       <p className="font-medium">探している{productKindLabels[kind]}がありませんか？</p>
-      {done ? <p className="text-slate-200">リクエストを受け付けました。運営が確認して追加します。</p> : null}
+      {done ? (
+        <div ref={doneRef} role="status" className="flex scroll-mb-24 items-start gap-2 rounded-lg border border-emerald-500/60 bg-emerald-950/50 p-3">
+          <CircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-300" aria-hidden />
+          <div>
+            <p className="font-semibold text-emerald-200">リクエストしました</p>
+            <p className="mt-0.5 text-emerald-100">運営が確認して追加します。</p>
+          </div>
+        </div>
+      ) : null}
       {!session ? (
         <p className="text-slate-200">
           リクエストするには<Link href="/login" className="text-blue-300 underline">ログイン</Link>してください。
         </p>
       ) : !open ? (
         <Button type="button" variant="secondary" onClick={() => { setDone(false); setOpen(true); }}>
-          追加をリクエストする
+          {done ? "ほかの商品もリクエストする" : "追加をリクエストする"}
         </Button>
       ) : (
         <form onSubmit={submit} className="space-y-3">
