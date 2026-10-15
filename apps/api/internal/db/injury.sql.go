@@ -355,6 +355,48 @@ func (q *Queries) ListInjuryDetails(ctx context.Context, postIds []uuid.UUID) ([
 	return items, nil
 }
 
+const listInjuryGroupAnswers = `-- name: ListInjuryGroupAnswers :many
+SELECT severity, place, activity, pre_changes, event
+FROM injury_group_members
+WHERE body_part = $1
+  AND severity IS NOT NULL
+`
+
+type ListInjuryGroupAnswersRow struct {
+	Severity   *string  `json:"severity"`
+	Place      *string  `json:"place"`
+	Activity   *string  `json:"activity"`
+	PreChanges []string `json:"pre_changes"`
+	Event      *string  `json:"event"`
+}
+
+// 公開ページの予防の集計に使う、入るときの答え。選択式になる前に入った人は数えない。
+func (q *Queries) ListInjuryGroupAnswers(ctx context.Context, bodyPart string) ([]ListInjuryGroupAnswersRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryGroupAnswers, bodyPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryGroupAnswersRow
+	for rows.Next() {
+		var i ListInjuryGroupAnswersRow
+		if err := rows.Scan(
+			&i.Severity,
+			&i.Place,
+			&i.Activity,
+			&i.PreChanges,
+			&i.Event,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInjuryGroupFaces = `-- name: ListInjuryGroupFaces :many
 SELECT stage, COALESCE(nickname, '')::text AS nickname
 FROM (
@@ -389,6 +431,56 @@ func (q *Queries) ListInjuryGroupFaces(ctx context.Context, arg ListInjuryGroupF
 	for rows.Next() {
 		var i ListInjuryGroupFacesRow
 		if err := rows.Scan(&i.Stage, &i.Nickname); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInjuryGroupStageChanges = `-- name: ListInjuryGroupStageChanges :many
+SELECT
+    l.user_id,
+    l.stage,
+    l.actions,
+    m.severity,
+    (EXTRACT(EPOCH FROM (l.created_at - m.injured_on::timestamptz)) / 86400.0)::float8 AS days
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND cardinality(l.actions) > 0
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at
+`
+
+type ListInjuryGroupStageChangesRow struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Stage    string    `json:"stage"`
+	Actions  []string  `json:"actions"`
+	Severity *string   `json:"severity"`
+	Days     float64   `json:"days"`
+}
+
+// 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした月の1日からその記録までの日数。
+func (q *Queries) ListInjuryGroupStageChanges(ctx context.Context, bodyPart string) ([]ListInjuryGroupStageChangesRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryGroupStageChanges, bodyPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryGroupStageChangesRow
+	for rows.Next() {
+		var i ListInjuryGroupStageChangesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Stage,
+			&i.Actions,
+			&i.Severity,
+			&i.Days,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -573,6 +665,56 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 			&i.Title,
 			&i.CreatedAt,
 			&i.BodyPart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicInjuryGroupNotes = `-- name: ListPublicInjuryGroupNotes :many
+SELECT l.note::text AS note, l.stage, m.event, l.created_at
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND l.note_public
+  AND l.note IS NOT NULL
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at DESC
+LIMIT $2
+`
+
+type ListPublicInjuryGroupNotesParams struct {
+	BodyPart string `json:"body_part"`
+	Limit    int32  `json:"limit"`
+}
+
+type ListPublicInjuryGroupNotesRow struct {
+	Note      string    `json:"note"`
+	Stage     string    `json:"stage"`
+	Event     *string   `json:"event"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// 公開してよいと選ばれた一言。ニックネームは返さず、その時の段階と種目だけをつける。
+func (q *Queries) ListPublicInjuryGroupNotes(ctx context.Context, arg ListPublicInjuryGroupNotesParams) ([]ListPublicInjuryGroupNotesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicInjuryGroupNotes, arg.BodyPart, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicInjuryGroupNotesRow
+	for rows.Next() {
+		var i ListPublicInjuryGroupNotesRow
+		if err := rows.Scan(
+			&i.Note,
+			&i.Stage,
+			&i.Event,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

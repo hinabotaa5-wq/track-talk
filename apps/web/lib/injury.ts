@@ -413,3 +413,55 @@ export function injuryFaceInitial(name: string) {
 export function injuryFaceOverflow(members: number, faces: number) {
   return Math.max(members - faces, 0);
 }
+
+// グループの公開ページ(ログインなしでも見られ、検索にも載る)に出す説明。診断や治療のかわりにならない、ふつうの説明だけにする。
+export const injuryGroupDescriptions: Record<string, string> = {
+  "hamstring-strain": "太もも裏の肉離れ。スプリントの後半や加速で起きやすく、くり返しやすいケガです。",
+  "quad-strain": "太もも前の肉離れ。スタートや踏み切りなど、強く蹴る動きで起きやすいケガです。",
+  sprain: "足首の捻挫。着地や凸凹した地面で足をひねって起きます。軽く見られがちですが、くり返しやすいケガです。",
+  "achilles-tendinitis": "アキレス腱やそのまわりの痛み。走る量が増えたときや、ふくらはぎが硬いときに起きやすいケガです。",
+  "jumpers-knee": "膝のお皿の下(膝蓋腱)の痛み。ジャンプやダッシュをくり返す人に多いケガです。",
+  "shin-splints": "すねの内側の痛み。練習量が急に増えたときや、硬い地面を走り込んだときに起きやすいケガです。",
+  shoulder: "肩の痛みやケガ。投てきの投げ込みや、転んだときに起きやすいケガです。",
+  elbow: "肘の痛みやケガ。投てきで投げすぎたときに起きやすいケガです。",
+  other: "ここにないケガの人が集まるグループです。ケガの名前は、入るときに書いてもらっています。",
+};
+
+export function injuryGroupTitle(part: string) {
+  return part === "other" ? "その他のケガの仲間" : `${injuryBodyPartLabel(part)}の仲間`;
+}
+
+export type InjuryCount = { code: string; label: string; people: number };
+export type InjuryTally = { people: number; items: InjuryCount[] };
+
+export type InjuryPublicGroup = {
+  body_part: string;
+  body_part_label: string;
+  members: number;
+  min_people: number;
+  recovery: {
+    severity: InjurySeverity;
+    severity_label: string;
+    stages: { stage: InjuryStage; stage_label: string; people: number; low_days: number | null; high_days: number | null }[];
+  }[];
+  places: InjuryTally;
+  activities: InjuryTally;
+  pre_changes: InjuryTally;
+  events: InjuryTally;
+  actions: InjuryTally;
+  notes: { note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
+};
+
+// 復帰の目安は幅で出す。2か月までは週、それより長いと月で言う。
+export function injuryRecoveryRangeText(lowDays: number, highDays: number) {
+  const inWeeks = highDays < 60;
+  const unit = inWeeks ? 7 : 30;
+  const low = Math.max(1, Math.round(lowDays / unit));
+  const high = Math.max(low, Math.round(highDays / unit));
+  const suffix = inWeeks ? "週間" : "か月";
+  return low === high ? `約${low}${suffix}` : `約${low}〜${high}${suffix}`;
+}
+
+export function injuryPercent(people: number, total: number) {
+  return total > 0 ? Math.round((people / total) * 100) : 0;
+}
