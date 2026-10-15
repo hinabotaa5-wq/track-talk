@@ -95,7 +95,7 @@ func TestParseJAAFDetail(t *testing.T) {
 	files := `<ul class="compeFile"><li><a href="/files/x.pdf">大会要項</a></li><li><a href="https://tf.zenchuu.jp/">公式HP</a></li></ul>`
 	major, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML(
 		"第53回全日本中学校陸上競技選手権大会", "2026年8月20日（木）～23日（日）", "山口・維新百年記念公園陸上競技場", files,
-	)), "https://www.jaaf.or.jp/competition/detail/2058/")
+	)), "https://www.jaaf.or.jp/competition/detail/2058/", 2026)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestParseJAAFDetail(t *testing.T) {
 
 func TestParseJAAFDetailAcrossMonthsAndSingleDay(t *testing.T) {
 	detail := "https://www.jaaf.or.jp/competition/detail/2052/"
-	major, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("インターハイ", "2026年7月30日（木）～8月5日（水）", "滋賀", "")), detail)
+	major, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("インターハイ", "2026年7月30日（木）～8月5日（水）", "滋賀", "")), detail, 2026)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestParseJAAFDetailAcrossMonthsAndSingleDay(t *testing.T) {
 		t.Fatalf("without an official site the detail page is the link, got %q", major.SiteURL)
 	}
 
-	major, err = ParseJAAFDetail(strings.NewReader(jaafDetailHTML("日清", "2026年11月22日（日）", "東京", "")), detail)
+	major, err = ParseJAAFDetail(strings.NewReader(jaafDetailHTML("日清", "2026年11月22日（日）", "東京", "")), detail, 2026)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,12 +135,27 @@ func TestParseJAAFDetailAcrossMonthsAndSingleDay(t *testing.T) {
 	}
 }
 
+func TestParseJAAFDetailWithoutYear(t *testing.T) {
+	detail := "https://www.jaaf.or.jp/competition/detail/2080/"
+	page := jaafDetailHTML("2026全日本大学女子選抜駅伝競走（富士山女子駅伝）", "12月30日（水）予定", "静岡・富士山本宮浅間大社〜富士総合運動公園陸上競技場", "")
+	major, err := ParseJAAFDetail(strings.NewReader(page), detail, 2026)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !major.StartsOn.Equal(time.Date(2026, 12, 30, 0, 0, 0, 0, time.UTC)) || !major.EndsOn.Equal(major.StartsOn) || major.Year != 2026 {
+		t.Fatalf("span: %+v", major)
+	}
+	if _, err := ParseJAAFDetail(strings.NewReader(page), detail, 0); err == nil {
+		t.Fatal("a date without a year needs the list year")
+	}
+}
+
 func TestParseJAAFDetailUndecided(t *testing.T) {
-	_, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("クロカン", "調整中", "", "")), "https://www.jaaf.or.jp/competition/detail/2096/")
+	_, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("クロカン", "調整中", "", "")), "https://www.jaaf.or.jp/competition/detail/2096/", 2027)
 	if !errors.Is(err, errScheduleUndecided) {
 		t.Fatalf("got %v", err)
 	}
-	if _, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("大会", "来春", "", "")), "x"); err == nil || errors.Is(err, errScheduleUndecided) {
+	if _, err := ParseJAAFDetail(strings.NewReader(jaafDetailHTML("大会", "来春", "", "")), "x", 2026); err == nil || errors.Is(err, errScheduleUndecided) {
 		t.Fatalf("unreadable date should be a plain error, got %v", err)
 	}
 }

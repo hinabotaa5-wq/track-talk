@@ -26,6 +26,7 @@ func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, e
 	type target struct {
 		meet DomesticMeet
 		path string
+		year int
 	}
 	var targets []target
 	seen := map[string]bool{}
@@ -51,7 +52,7 @@ func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, e
 				continue
 			}
 			seen[entry.Path] = true
-			targets = append(targets, target{meet: meet, path: entry.Path})
+			targets = append(targets, target{meet: meet, path: entry.Path, year: month.Year()})
 		}
 	}
 	if listed == 0 {
@@ -66,7 +67,7 @@ func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, e
 			log.Printf("domestic majors: %v", err)
 			continue
 		}
-		major, err := ParseJAAFDetail(bytes.NewReader(body), detailURL)
+		major, err := ParseJAAFDetail(bytes.NewReader(body), detailURL, t.year)
 		if errors.Is(err, errScheduleUndecided) {
 			continue
 		}
