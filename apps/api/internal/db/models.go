@@ -20,6 +20,7 @@ type Comment struct {
 	DeletedAt *time.Time `json:"deleted_at"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 type Competition struct {

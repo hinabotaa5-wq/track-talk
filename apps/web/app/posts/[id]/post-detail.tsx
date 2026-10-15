@@ -11,6 +11,7 @@ import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
+import { buildCommentThreads, replyLabel } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
@@ -37,6 +38,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
   const action = useActionLock();
   const commentLock = useActionLock();
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [reportedPost, setReportedPost] = useState(false);
   const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
@@ -182,9 +185,10 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       await apiFetch(`/v1/posts/${current.id}/comments`, {
         method: "POST",
         token,
-        body: JSON.stringify(values),
+        body: JSON.stringify(replyTo ? { ...values, reply_to_id: replyTo.id } : values),
       });
       form.reset();
+      setReplyTo(null);
       await load();
     } catch (e) {
       setCommentError(e instanceof ApiRequestError ? e.message : "コメントできませんでした");
@@ -192,6 +196,24 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     } finally {
       commentLock.release();
     }
+  }
+
+  // 返信先コメントの投稿者名(API が「あなた」「投稿者」「ニックネーム/匿名」に解決済み)。
+  function replyTargetName(c: Comment) {
+    return c.author_name ?? "匿名";
+  }
+
+  function startReply(c: Comment) {
+    setReplyTo(c);
+    form.setFocus("body");
+  }
+
+  function jumpToComment(id: string) {
+    const el = document.getElementById(`comment-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightId(id);
+    window.setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1600);
   }
 
   async function editComment(c: Comment) {
@@ -220,6 +242,76 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     } finally {
       action.release();
     }
+  }
+
+  function renderComment(c: Comment, isReply: boolean) {
+    return (
+      <div
+        key={c.id}
+        id={`comment-${c.id}`}
+        className={`rounded-xl border glass p-3.5 text-slate-200 transition-colors ${highlightId === c.id ? "border-blue-400 bg-blue-400/20" : "border-white/20 bg-white/10"}`}
+      >
+        {isReply && c.reply_to_id ? (
+          <button
+            type="button"
+            className="mb-1 inline-flex max-w-full items-center gap-1 rounded-full bg-blue-400/20 px-2 py-0.5 text-xs font-semibold text-blue-200 disabled:opacity-60"
+            disabled={c.reply_to_removed}
+            onClick={() => jumpToComment(c.reply_to_id as string)}
+          >
+            <span aria-hidden>↩</span>
+            <span className="truncate">@{replyLabel(c)}</span>
+          </button>
+        ) : null}
+        <p className="mb-0.5 text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</p>
+        <p className="whitespace-pre-wrap text-sm">{c.body}</p>
+        <p className="mt-2 text-xs text-slate-300">{formatDateTime(c.created_at)}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          {allowComment ? (
+            <button
+              type="button"
+              className="text-xs font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+              disabled={action.pending}
+              onClick={() => startReply(c)}
+            >
+              返信
+            </button>
+          ) : null}
+          {c.mine ? (
+            <>
+              <button
+                type="button"
+                className="text-xs text-blue-400 transition active:scale-95 disabled:opacity-50"
+                disabled={action.pending}
+                onClick={() => editComment(c)}
+              >
+                編集
+              </button>
+              <button
+                type="button"
+                className="text-xs text-red-400 transition active:scale-95 disabled:opacity-50"
+                disabled={action.pending}
+                onClick={() => deleteComment(c.id)}
+              >
+                削除
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className={
+                reportedComments.has(c.id)
+                  ? "inline-flex items-center gap-1 text-xs font-semibold text-amber-300"
+                  : "text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
+              }
+              disabled={action.pending || reportedComments.has(c.id)}
+              onClick={() => report("comment", c.id)}
+            >
+              {reportedComments.has(c.id) ? "通報済み" : "通報"}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -330,43 +422,16 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
         <h2 className="text-xl font-semibold">コメント</h2>
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
-        {comments.map((c) => (
-          <div key={c.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-slate-200">
-            <p className="whitespace-pre-wrap text-sm">{c.body}</p>
-            <p className="mt-2 text-xs text-slate-300">{formatDateTime(c.created_at)}</p>
-            {c.mine ? (
-              <div className="mt-1 flex gap-3">
-                <button
-                  type="button"
-                  className="text-xs text-blue-400 transition active:scale-95 disabled:opacity-50"
-                  disabled={action.pending}
-                  onClick={() => editComment(c)}
-                >
-                  編集
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-red-400 transition active:scale-95 disabled:opacity-50"
-                  disabled={action.pending}
-                  onClick={() => deleteComment(c.id)}
-                >
-                  削除
-                </button>
-              </div>
+        {buildCommentThreads(comments).map((thread) => (
+          <div key={thread.top?.id ?? thread.replies[0].id} className="space-y-2">
+            {thread.top ? (
+              renderComment(thread.top, false)
             ) : (
-              <button
-                type="button"
-                className={
-                  reportedComments.has(c.id)
-                    ? "mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-300"
-                    : "mt-1 text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
-                }
-                disabled={action.pending || reportedComments.has(c.id)}
-                onClick={() => report("comment", c.id)}
-              >
-                {reportedComments.has(c.id) ? "通報済み" : "通報"}
-              </button>
+              <p className="rounded-xl border border-dashed border-white/20 p-3 text-xs text-slate-300">削除されたコメント</p>
             )}
+            {thread.replies.length > 0 ? (
+              <div className="ml-4 space-y-2 border-l-2 border-blue-400/40 pl-3">{thread.replies.map((r) => renderComment(r, true))}</div>
+            ) : null}
           </div>
         ))}
         {allowComment ? (
@@ -380,6 +445,16 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             }}
             className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] [body[data-comment-typing]_&]:bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:bottom-auto lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
+            {replyTo ? (
+              <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中: {replyTo.body}
+                </span>
+                <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
+                  ×
+                </button>
+              </div>
+            ) : null}
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
               <Textarea rows={2} className="min-h-11 flex-1 glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500" placeholder="コメントを書く" {...form.register("body")} />
               <Button type="submit" className="shrink-0 lg:w-full" disabled={commentLock.pending}>

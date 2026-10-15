@@ -12,6 +12,7 @@ import { useAuth } from "./auth-provider";
 const labels: Record<NotificationKind, string> = {
   recruitment_post: "新しい募集",
   comment: "コメントがありました",
+  comment_reply: "あなたのコメントに返信がありました",
   practice_application: "参加申請がありました",
   practice_accepted: "参加が承認されました",
   practice_rate: "解散しました。評価しあってください",

@@ -28,25 +28,29 @@ func (q *Queries) CountComments(ctx context.Context, postID uuid.UUID) (int64, e
 }
 
 const createComment = `-- name: CreateComment :one
-INSERT INTO comments (id, post_id, author_id, body)
-VALUES ($1, $2, $3, $4)
-RETURNING id, post_id, author_id, body, created_at, updated_at
+INSERT INTO comments (id, post_id, author_id, body, parent_id, reply_to_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id
 `
 
 type CreateCommentParams struct {
-	ID       uuid.UUID `json:"id"`
-	PostID   uuid.UUID `json:"post_id"`
-	AuthorID uuid.UUID `json:"author_id"`
-	Body     string    `json:"body"`
+	ID        uuid.UUID  `json:"id"`
+	PostID    uuid.UUID  `json:"post_id"`
+	AuthorID  uuid.UUID  `json:"author_id"`
+	Body      string     `json:"body"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 type CreateCommentRow struct {
-	ID        uuid.UUID `json:"id"`
-	PostID    uuid.UUID `json:"post_id"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID  `json:"id"`
+	PostID    uuid.UUID  `json:"post_id"`
+	AuthorID  uuid.UUID  `json:"author_id"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (CreateCommentRow, error) {
@@ -55,6 +59,8 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		arg.PostID,
 		arg.AuthorID,
 		arg.Body,
+		arg.ParentID,
+		arg.ReplyToID,
 	)
 	var i CreateCommentRow
 	err := row.Scan(
@@ -64,12 +70,14 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		&i.Body,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.ReplyToID,
 	)
 	return i, err
 }
 
 const getComment = `-- name: GetComment :one
-SELECT id, post_id, author_id, body, created_at, updated_at
+SELECT id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id
 FROM comments
 WHERE id = $1
   AND deleted_at IS NULL
@@ -77,12 +85,14 @@ WHERE id = $1
 `
 
 type GetCommentRow struct {
-	ID        uuid.UUID `json:"id"`
-	PostID    uuid.UUID `json:"post_id"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID  `json:"id"`
+	PostID    uuid.UUID  `json:"post_id"`
+	AuthorID  uuid.UUID  `json:"author_id"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (GetCommentRow, error) {
@@ -95,6 +105,8 @@ func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (GetCommentRow, 
 		&i.Body,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.ReplyToID,
 	)
 	return i, err
 }
@@ -122,8 +134,19 @@ SELECT
     c.author_id,
     c.body,
     c.created_at,
-    c.updated_at
+    c.updated_at,
+    c.parent_id,
+    c.reply_to_id,
+    t.author_id AS reply_to_author_id,
+    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed,
+    tp.nickname AS reply_to_nickname,
+    COALESCE(tp.nickname_public, false)::boolean AS reply_to_nickname_public,
+    ap.nickname AS author_nickname,
+    COALESCE(ap.nickname_public, false)::boolean AS author_nickname_public
 FROM comments c
+LEFT JOIN profiles ap ON ap.id = c.author_id
+LEFT JOIN comments t ON t.id = c.reply_to_id
+LEFT JOIN profiles tp ON tp.id = t.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL
@@ -138,12 +161,20 @@ type ListCommentsParams struct {
 }
 
 type ListCommentsRow struct {
-	ID        uuid.UUID `json:"id"`
-	PostID    uuid.UUID `json:"post_id"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                    uuid.UUID  `json:"id"`
+	PostID                uuid.UUID  `json:"post_id"`
+	AuthorID              uuid.UUID  `json:"author_id"`
+	Body                  string     `json:"body"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	ParentID              *uuid.UUID `json:"parent_id"`
+	ReplyToID             *uuid.UUID `json:"reply_to_id"`
+	ReplyToAuthorID       *uuid.UUID `json:"reply_to_author_id"`
+	ReplyToRemoved        bool       `json:"reply_to_removed"`
+	ReplyToNickname       *string    `json:"reply_to_nickname"`
+	ReplyToNicknamePublic bool       `json:"reply_to_nickname_public"`
+	AuthorNickname        *string    `json:"author_nickname"`
+	AuthorNicknamePublic  bool       `json:"author_nickname_public"`
 }
 
 func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
@@ -162,6 +193,14 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]L
 			&i.Body,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentID,
+			&i.ReplyToID,
+			&i.ReplyToAuthorID,
+			&i.ReplyToRemoved,
+			&i.ReplyToNickname,
+			&i.ReplyToNicknamePublic,
+			&i.AuthorNickname,
+			&i.AuthorNicknamePublic,
 		); err != nil {
 			return nil, err
 		}
@@ -201,7 +240,7 @@ WHERE id = $1
   AND author_id = $2
   AND deleted_at IS NULL
   AND hidden_at IS NULL
-RETURNING id, post_id, author_id, body, created_at, updated_at
+RETURNING id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id
 `
 
 type UpdateCommentParams struct {
@@ -211,12 +250,14 @@ type UpdateCommentParams struct {
 }
 
 type UpdateCommentRow struct {
-	ID        uuid.UUID `json:"id"`
-	PostID    uuid.UUID `json:"post_id"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID  `json:"id"`
+	PostID    uuid.UUID  `json:"post_id"`
+	AuthorID  uuid.UUID  `json:"author_id"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (UpdateCommentRow, error) {
@@ -229,6 +270,8 @@ func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (U
 		&i.Body,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.ReplyToID,
 	)
 	return i, err
 }

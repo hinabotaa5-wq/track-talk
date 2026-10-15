@@ -5,8 +5,19 @@ SELECT
     c.author_id,
     c.body,
     c.created_at,
-    c.updated_at
+    c.updated_at,
+    c.parent_id,
+    c.reply_to_id,
+    t.author_id AS reply_to_author_id,
+    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed,
+    tp.nickname AS reply_to_nickname,
+    COALESCE(tp.nickname_public, false)::boolean AS reply_to_nickname_public,
+    ap.nickname AS author_nickname,
+    COALESCE(ap.nickname_public, false)::boolean AS author_nickname_public
 FROM comments c
+LEFT JOIN profiles ap ON ap.id = c.author_id
+LEFT JOIN comments t ON t.id = c.reply_to_id
+LEFT JOIN profiles tp ON tp.id = t.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL
@@ -21,16 +32,16 @@ WHERE post_id = $1
   AND hidden_at IS NULL;
 
 -- name: GetComment :one
-SELECT id, post_id, author_id, body, created_at, updated_at
+SELECT id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id
 FROM comments
 WHERE id = $1
   AND deleted_at IS NULL
   AND hidden_at IS NULL;
 
 -- name: CreateComment :one
-INSERT INTO comments (id, post_id, author_id, body)
-VALUES ($1, $2, $3, $4)
-RETURNING id, post_id, author_id, body, created_at, updated_at;
+INSERT INTO comments (id, post_id, author_id, body, parent_id, reply_to_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id;
 
 -- name: UpdateComment :one
 UPDATE comments
@@ -39,7 +50,7 @@ WHERE id = $1
   AND author_id = $2
   AND deleted_at IS NULL
   AND hidden_at IS NULL
-RETURNING id, post_id, author_id, body, created_at, updated_at;
+RETURNING id, post_id, author_id, body, created_at, updated_at, parent_id, reply_to_id;
 
 -- name: SoftDeleteComment :execrows
 UPDATE comments

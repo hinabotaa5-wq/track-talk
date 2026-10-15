@@ -839,15 +839,32 @@ func (s *Server) unlikePost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, created, updated interface{}) map[string]any {
+func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, created, updated interface{}, parentID, replyToID *uuid.UUID) map[string]any {
 	uid, ok := UserID(r.Context())
 	return map[string]any{
-		"id":         id,
-		"post_id":    postID,
-		"body":       body,
-		"mine":       ok && uid == authorID,
-		"created_at": created,
-		"updated_at": updated,
+		"id":          id,
+		"post_id":     postID,
+		"body":        body,
+		"mine":        ok && uid == authorID,
+		"parent_id":   parentID,
+		"reply_to_id": replyToID,
+		"created_at":  created,
+		"updated_at":  updated,
+	}
+}
+
+// replyToName は返信先コメントの投稿者を表示用の名前にする。
+// 投稿者は「投稿者」、閲覧者本人は「あなた」、それ以外は公開ニックネーム(非公開なら「匿名」)。
+func replyToName(viewer uuid.UUID, viewerOK bool, postAuthor, target uuid.UUID, nickname *string, public bool) string {
+	switch {
+	case viewerOK && target == viewer:
+		return "あなた"
+	case target == postAuthor:
+		return "投稿者"
+	case public && nickname != nil && *nickname != "":
+		return *nickname
+	default:
+		return "匿名"
 	}
 }
 
@@ -856,7 +873,8 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, ok := s.getReadablePost(w, r, id); !ok {
+	post, ok := s.getReadablePost(w, r, id)
+	if !ok {
 		return
 	}
 	page, per, offset := s.queryPage(r)
@@ -870,15 +888,28 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	viewer, viewerOK := UserID(r.Context())
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, commentJSON(r, row.ID, row.PostID, row.AuthorID, row.Body, row.CreatedAt, row.UpdatedAt))
+		c := commentJSON(r, row.ID, row.PostID, row.AuthorID, row.Body, row.CreatedAt, row.UpdatedAt, row.ParentID, row.ReplyToID)
+		c["author_name"] = replyToName(viewer, viewerOK, post.AuthorID, row.AuthorID, row.AuthorNickname, row.AuthorNicknamePublic)
+		if row.ReplyToID != nil {
+			if row.ReplyToRemoved || row.ReplyToAuthorID == nil {
+				c["reply_to_name"] = nil
+				c["reply_to_removed"] = true
+			} else {
+				c["reply_to_name"] = replyToName(viewer, viewerOK, post.AuthorID, *row.ReplyToAuthorID, row.ReplyToNickname, row.ReplyToNicknamePublic)
+				c["reply_to_removed"] = false
+			}
+		}
+		out = append(out, c)
 	}
 	JSON(w, http.StatusOK, map[string]any{"comments": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
 
 type commentReq struct {
-	Body string `json:"body"`
+	Body      string     `json:"body"`
+	ReplyToID *uuid.UUID `json:"reply_to_id"`
 }
 
 func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
@@ -919,11 +950,32 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
+	// 返信は1階層に固定する。親は常に最上位コメント、宛先は返信先のコメント。
+	var parentID *uuid.UUID
+	var replyAuthor *uuid.UUID
+	if req.ReplyToID != nil {
+		target, err := q.GetComment(r.Context(), *req.ReplyToID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && target.PostID != postID) {
+			Error(w, http.StatusBadRequest, "validation_error", "返信先のコメントが見つかりません")
+			return
+		}
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		parentID = target.ParentID
+		if parentID == nil {
+			parentID = &target.ID
+		}
+		replyAuthor = &target.AuthorID
+	}
 	c, err := q.CreateComment(r.Context(), db.CreateCommentParams{
-		ID:       uuid.New(),
-		PostID:   postID,
-		AuthorID: p.ID,
-		Body:     strings.TrimSpace(req.Body),
+		ID:        uuid.New(),
+		PostID:    postID,
+		AuthorID:  p.ID,
+		Body:      strings.TrimSpace(req.Body),
+		ParentID:  parentID,
+		ReplyToID: req.ReplyToID,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -933,7 +985,15 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if post.AuthorID != p.ID {
+	// 返信先のコメント主には comment_reply、投稿者には comment を通知する。
+	// 同一人物が両方に当たる場合は comment_reply だけにして二重通知を避ける。
+	if replyAuthor != nil && *replyAuthor != p.ID {
+		if err := insertNotification(r.Context(), q, *replyAuthor, "comment_reply", postID, &c.ID, nil); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
+	if post.AuthorID != p.ID && (replyAuthor == nil || *replyAuthor != post.AuthorID) {
 		if err := insertNotification(r.Context(), q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
@@ -943,7 +1003,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
+	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt, c.ParentID, c.ReplyToID))
 }
 
 func (s *Server) updateComment(w http.ResponseWriter, r *http.Request) {
@@ -977,7 +1037,7 @@ func (s *Server) updateComment(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt))
+	JSON(w, http.StatusOK, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt, c.ParentID, c.ReplyToID))
 }
 
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
