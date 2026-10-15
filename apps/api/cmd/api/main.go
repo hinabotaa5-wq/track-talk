@@ -59,16 +59,19 @@ func main() {
 		slog.Error("jwt", "err", err)
 		os.Exit(1)
 	}
-	presetCtx, presetCancel := context.WithTimeout(ctx, 15*time.Second)
-	defer presetCancel()
-	if err := (cloudinary.Client{
-		Cloud:   cfg.CloudName,
-		Key:     cfg.CloudAPIKey,
-		Secret:  cfg.CloudAPISecret,
-		APIBase: cfg.CloudAPIBase,
-	}).EnsureUploadPresets(presetCtx); err != nil {
-		slog.Error("cloudinary presets", "err", err)
-	}
+	// Cloud Run は 0 台から起動するたびにここを通るので、Cloudinary の確認は待たずに受け付けを始める。
+	go func() {
+		presetCtx, presetCancel := context.WithTimeout(ctx, 15*time.Second)
+		defer presetCancel()
+		if err := (cloudinary.Client{
+			Cloud:   cfg.CloudName,
+			Key:     cfg.CloudAPIKey,
+			Secret:  cfg.CloudAPISecret,
+			APIBase: cfg.CloudAPIBase,
+		}).EnsureUploadPresets(presetCtx); err != nil {
+			slog.Error("cloudinary presets", "err", err)
+		}
+	}()
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           httpx.New(cfg, pool, verifier),

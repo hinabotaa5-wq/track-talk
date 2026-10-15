@@ -1,0 +1,45 @@
+name: Deploy API
+
+# main の API が変わったら Cloud Run（東京）へ送る。
+# 初回の作成と環境変数の登録は deploy/cloud-run/setup.sh で行い、ここではイメージだけを差し替える。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # setup.sh を流して Variables を登録するまでは何もしない。
+    if: vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGION: asia-northeast1
+      IMAGE: asia-northeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/track-talk/api:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE" apps/api
+          docker push "$IMAGE"
+      # 予算超過で API を止める budget-stop も同じイメージなので、古いイメージが掃除されても動くよう一緒に差し替える。
+      - name: Deploy
+        run: |
+          gcloud run deploy track-talk-api --image "$IMAGE" --region "$REGION" --project "${{ vars.GCP_PROJECT_ID }}" --quiet
+          gcloud run deploy track-talk-budget-stop --image "$IMAGE" --region "$REGION" --project "${{ vars.GCP_PROJECT_ID }}" --quiet

@@ -202,7 +202,7 @@ CI（`.github/workflows/ci.yml`）は push／PR ごとに API テスト（Postgr
 
 ## デプロイ
 
-- **API**: Render。`render.yaml` の Docker サービスが `main` をビルドする。公開 URL は `https://track-talk-api.onrender.com`（ヘルスチェックは `/health`）。無料プランのため、使われないと停止し、次のリクエストが 50 秒以上遅れることがある。初回は Render でこのリポジトリの Blueprint を作る。
+- **API**: Cloud Run（東京）。`main` の `apps/api` が変わると `.github/workflows/deploy-api.yml` がデプロイする。予算を超えると自動で API を止める。初回の作り方は [docs/cloud-run-deploy.md](docs/cloud-run-deploy.md)。切り替えが済むまでは Render（`render.yaml`、`https://track-talk-api.onrender.com`）も動いている。
 - **Web**: Vercel（`apps/web`）。`main` への push で本番が更新される。
 - **DB / Auth**: Supabase
 

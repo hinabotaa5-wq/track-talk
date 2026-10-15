@@ -12,20 +12,20 @@
 - 標準SMTPは低レートのため、公開前にカスタムSMTP（Resend 等）を設定する
 - 無料プランは非アクティブで一時停止する可能性がある
 
-## Render（Go API）
+## Cloud Run（Go API）
 
-- `render.yaml` を Blueprint にしてサービスを作る。以降は `main` への push でデプロイされる
+- 初回は [Cloud Run で動かす手順](cloud-run-deploy.md) の `deploy/cloud-run/setup.sh` で作る。以降は `main` への push でデプロイされる
 - 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- `CORS_ORIGINS` は Vercel の本番 URL
+- `CORS_ORIGINS` は画面の本番 URL
 - ヘルスチェック: `/health`
-- 無料の Web サービスはスリープすることがある
-- VM に移す場合の手順は [Oracle Cloud で動かす手順](oracle-deploy.md)。いまの公開先は Render
+- 予算（既定は月100円）を超えると API が止まる。再開は手作業
+- VM に移す場合の手順は [Oracle Cloud で動かす手順](oracle-deploy.md)
 
 ## Vercel（Next.js）
 
 - リポジトリの `main` が本番。`apps/web` をビルドする
 - `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`
-- `NEXT_PUBLIC_API_BASE_URL` は Render の API の URL
+- `NEXT_PUBLIC_API_BASE_URL` は Cloud Run の API の URL
 
 ## 管理者
 
