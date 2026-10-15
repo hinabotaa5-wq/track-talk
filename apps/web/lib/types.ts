@@ -185,7 +185,7 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment";
+  target_type: "post" | "comment" | "injury_note";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;
@@ -196,6 +196,8 @@ export type AdminReport = {
   target_title: string;
   target_body: string;
   target_hidden: boolean;
+  // ケガ部の一言のとき、どのグループの一言か。
+  injury_part: string;
 };
 
 export type Profile = {

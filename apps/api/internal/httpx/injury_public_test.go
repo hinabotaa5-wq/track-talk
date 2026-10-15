@@ -119,3 +119,53 @@ func TestInjuryPublicGroupShowsAggregatesFromFivePeople(t *testing.T) {
 		t.Fatalf("public page leaks: %s", raw)
 	}
 }
+
+func TestInjuryPublicNoteCanBeReportedAndHidden(t *testing.T) {
+	h := setup(t)
+	writer, reader, adminID := token(t, uuid.New()), token(t, uuid.New()), uuid.New()
+	admin := token(t, adminID)
+	doJSON(t, h, http.MethodGet, "/v1/me", admin, nil)
+	setAdmin(t, adminID)
+
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/elbow/join", writer, joinBody("rehab"))
+	doJSON(t, h, http.MethodPatch, "/v1/injury/groups/elbow/me", writer, map[string]any{
+		"stage": "jogging", "actions": []string{"icing"}, "note": "不適切な一言", "note_public": true,
+	})
+	g, _ := getPublicGroup(t, h, "elbow")
+	if len(g.Notes) != 1 {
+		t.Fatalf("notes %+v", g.Notes)
+	}
+	id, _ := g.Notes[0]["id"].(string)
+
+	report := func(target string) int {
+		return doJSON(t, h, http.MethodPost, "/v1/reports", reader, map[string]any{
+			"target_type": "injury_note", "target_id": target, "reason": "harassment", "detail": "",
+		}).Code
+	}
+	if code := report(uuid.NewString()); code != http.StatusNotFound {
+		t.Fatalf("unknown note %d", code)
+	}
+	if code := report(id); code != http.StatusCreated {
+		t.Fatalf("report %d", code)
+	}
+	list := doJSON(t, h, http.MethodGet, "/v1/admin/reports", admin, nil)
+	if !strings.Contains(list.Body.String(), "不適切な一言") || !strings.Contains(list.Body.String(), `"injury_part":"elbow"`) {
+		t.Fatalf("admin list %s", list.Body.String())
+	}
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/injury-notes/"+id+"/hide", reader, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-admin hide %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/injury-notes/"+id+"/hide", admin, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("hide %d %s", rec.Code, rec.Body.String())
+	}
+	if g, _ := getPublicGroup(t, h, "elbow"); len(g.Notes) != 0 {
+		t.Fatalf("hidden note still public %+v", g.Notes)
+	}
+	if code := report(id); code != http.StatusNotFound {
+		t.Fatalf("report hidden note %d", code)
+	}
+	if !strings.Contains(doJSON(t, h, http.MethodGet, "/v1/admin/reports", admin, nil).Body.String(), `"target_hidden":true`) {
+		t.Fatal("admin list should show the note as hidden")
+	}
+}

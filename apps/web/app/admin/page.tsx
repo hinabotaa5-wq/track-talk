@@ -24,7 +24,44 @@ const statusLabels: Record<AdminReport["status"], string> = {
   dismissed: "却下",
 };
 
+const targetLabels: Record<AdminReport["target_type"], string> = {
+  post: "投稿",
+  comment: "コメント",
+  injury_note: "ケガ部の一言",
+};
+
 const perPage = 20;
+
+// ケガ部の一言は投稿ページがないので、ここから公開ページを開いたり非表示にしたりする。
+function InjuryNoteActions({ report, token }: { report: AdminReport; token: string | null }) {
+  const [hidden, setHidden] = useState(report.target_hidden);
+  const [error, setError] = useState("");
+  async function hide() {
+    if (!confirm("この一言を公開ページから外しますか？")) return;
+    try {
+      await apiFetch(`/v1/admin/injury-notes/${report.target_id}/hide`, { method: "POST", token });
+      setHidden(true);
+      setError("");
+    } catch {
+      setError("非表示にできませんでした");
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      <Link href={`/injury/${report.injury_part}`} className="text-blue-300 underline">
+        公開ページを見る
+      </Link>
+      {hidden ? (
+        <span className="text-slate-300">非表示済み</span>
+      ) : (
+        <button type="button" onClick={() => void hide()} className="text-red-300 underline">
+          非表示にする
+        </button>
+      )}
+      {error ? <span className="text-red-400">{error}</span> : null}
+    </div>
+  );
+}
 
 type Tab = "reports" | "feedback" | "contact" | "requests" | "products";
 
@@ -281,7 +318,7 @@ export default function AdminPage() {
           {reports.items.map((r) => (
             <li key={r.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
               <p className="text-xs text-slate-200">
-                {r.target_type === "post" ? "投稿" : "コメント"} · {reasonLabels[r.reason]} · {statusLabels[r.status]} ·{" "}
+                {targetLabels[r.target_type]} · {reasonLabels[r.reason]} · {statusLabels[r.status]} ·{" "}
                 {formatDateTime(r.created_at)}
                 {r.target_hidden ? " · 非表示済み" : ""}
               </p>
@@ -293,11 +330,13 @@ export default function AdminPage() {
               )}
               {r.detail ? <p className="whitespace-pre-wrap text-sm">通報内容: {r.detail}</p> : null}
               <p className="text-xs text-slate-300">通報者: {r.reporter_nickname ?? "名前なし"}</p>
-              {r.target_body ? (
+              {!r.target_body ? null : r.target_type === "injury_note" ? (
+                <InjuryNoteActions report={r} token={token} />
+              ) : (
                 <Link href={`/posts/${r.post_id}`} className="text-sm text-blue-300 underline">
                   投稿を見る
                 </Link>
-              ) : null}
+              )}
             </li>
           ))}
         </ul>

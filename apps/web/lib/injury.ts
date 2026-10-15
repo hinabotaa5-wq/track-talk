@@ -449,7 +449,7 @@ export type InjuryPublicGroup = {
   pre_changes: InjuryTally;
   events: InjuryTally;
   actions: InjuryTally;
-  notes: { note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
+  notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
 };
 
 // 復帰の目安は幅で出す。2か月までは週、それより長いと月で言う。

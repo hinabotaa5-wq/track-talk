@@ -47,6 +47,8 @@ type injuryRecoveryDTO struct {
 }
 
 type injuryPublicNoteDTO struct {
+	// ID is what a report points at; it is not the stage log's own id.
+	ID         uuid.UUID `json:"id"`
 	Note       string    `json:"note"`
 	Stage      string    `json:"stage"`
 	StageLabel string    `json:"stage_label"`
@@ -187,7 +189,7 @@ func buildPublicInjuryGroup(
 	}
 
 	for _, n := range notes {
-		dto := injuryPublicNoteDTO{Note: n.Note, Stage: n.Stage, StageLabel: injuryStageLabel(n.Stage), CreatedAt: n.CreatedAt}
+		dto := injuryPublicNoteDTO{ID: n.NoteID, Note: n.Note, Stage: n.Stage, StageLabel: injuryStageLabel(n.Stage), CreatedAt: n.CreatedAt}
 		if n.Event != nil {
 			dto.Event = *n.Event
 			dto.EventLabel = injuryOptionLabel(injuryEvents, *n.Event)
@@ -222,4 +224,25 @@ func injuryMiddleHalf(days []float64) (int, int) {
 		return int(math.Max(0, math.Round(v)))
 	}
 	return at(0.25), at(0.75)
+}
+
+// hideInjuryNote takes a reported note off the public page. The stage change itself still counts in the aggregates.
+func (s *Server) hideInjuryNote(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	n, err := s.q.HideInjuryNote(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if n == 0 {
+		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

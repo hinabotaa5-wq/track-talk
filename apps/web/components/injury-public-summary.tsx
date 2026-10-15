@@ -1,3 +1,4 @@
+import { InjuryNoteReport } from "./injury-note-report";
 import { injuryPercent, injuryRecoveryRangeText, type InjuryPublicGroup, type InjuryTally } from "@/lib/injury";
 
 const panel = "space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4";
@@ -102,12 +103,15 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
           <p className="text-sm text-slate-300">まだありません。段階を変えるときに書いた一言のうち、公開してよいと選ばれたものが載ります。</p>
         ) : (
           <ul className="space-y-2">
-            {group.notes.map((n, i) => (
-              <li key={`${n.created_at}-${i}`} className="rounded-xl border border-white/15 bg-white/5 p-3">
+            {group.notes.map((n) => (
+              <li key={n.id} className="rounded-xl border border-white/15 bg-white/5 p-3">
                 <p className="whitespace-pre-wrap text-sm">{n.note}</p>
-                <p className="mt-1.5 text-xs text-slate-300">
-                  {n.stage_label}になったとき{n.event_label ? `・${n.event_label}` : ""}
-                </p>
+                <div className="mt-1.5 flex items-center justify-between gap-3">
+                  <p className="text-xs text-slate-300">
+                    {n.stage_label}になったとき{n.event_label ? `・${n.event_label}` : ""}
+                  </p>
+                  <InjuryNoteReport id={n.id} part={group.body_part} />
+                </div>
               </li>
             ))}
           </ul>

@@ -82,14 +82,16 @@ type InjuryGroupMember struct {
 }
 
 type InjuryGroupStageLog struct {
-	ID         int64     `json:"id"`
-	UserID     uuid.UUID `json:"user_id"`
-	BodyPart   string    `json:"body_part"`
-	Stage      string    `json:"stage"`
-	CreatedAt  time.Time `json:"created_at"`
-	Actions    []string  `json:"actions"`
-	Note       *string   `json:"note"`
-	NotePublic bool      `json:"note_public"`
+	ID         int64      `json:"id"`
+	UserID     uuid.UUID  `json:"user_id"`
+	BodyPart   string     `json:"body_part"`
+	Stage      string     `json:"stage"`
+	CreatedAt  time.Time  `json:"created_at"`
+	Actions    []string   `json:"actions"`
+	Note       *string    `json:"note"`
+	NotePublic bool       `json:"note_public"`
+	NoteID     uuid.UUID  `json:"note_id"`
+	HiddenAt   *time.Time `json:"hidden_at"`
 }
 
 type InjuryUpdate struct {
