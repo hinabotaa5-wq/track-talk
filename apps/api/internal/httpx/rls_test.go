@@ -2,7 +2,6 @@ package httpx_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
@@ -10,10 +9,7 @@ import (
 )
 
 func TestRecruitmentAndPracticeTablesHaveRLS(t *testing.T) {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {

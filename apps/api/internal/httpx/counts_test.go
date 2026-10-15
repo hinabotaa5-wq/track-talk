@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -182,10 +181,7 @@ func installTrigger(t *testing.T, create, drop string) {
 
 func execSQL(t *testing.T, query string) {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {

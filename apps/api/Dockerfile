@@ -17,4 +17,7 @@ COPY --from=build /importmajors /app/importmajors
 COPY --from=build /importcompetitions /app/importcompetitions
 EXPOSE 8080
 ENV API_ADDR=:8080
+# このイメージは Render・Oracle VM などの本番で動かす前提なので、ローカル以外の DB への接続を許可する。
+# go run で直接起動する開発時はこの値が無く、ローカル DB 以外には接続できない。
+ENV ALLOW_REMOTE_DB=1
 CMD ["/app/api"]
