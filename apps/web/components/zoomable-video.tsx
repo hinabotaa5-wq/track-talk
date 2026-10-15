@@ -14,6 +14,10 @@ export function ZoomableVideo({ src, poster, className }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const zoomed = view.scale > 1;
 
   useEffect(() => {
     viewRef.current = view;
@@ -74,9 +78,22 @@ export function ZoomableVideo({ src, poster, className }: Props) {
     };
   }, []);
 
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) void v.play();
+    else v.pause();
+  };
+  const skip = (sec: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.min(v.duration || 0, Math.max(0, v.currentTime + sec));
+  };
+
   return (
     <div ref={wrapRef} className="relative overflow-hidden rounded-xl bg-black">
       <video
+        ref={videoRef}
         className={className}
         style={{
           transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
@@ -85,11 +102,42 @@ export function ZoomableVideo({ src, poster, className }: Props) {
         }}
         src={src}
         poster={poster ?? undefined}
-        controls
+        controls={!zoomed}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onClick={zoomed ? () => setShowControls((v) => !v) : undefined}
         playsInline
         preload="metadata"
       />
-      {view.scale > 1 ? (
+      {zoomed && showControls ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-6">
+          <button
+            type="button"
+            onClick={() => skip(-10)}
+            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-white"
+            aria-label="10秒戻る"
+          >
+            -10
+          </button>
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="pointer-events-auto rounded-full bg-black/60 px-4 py-2 text-sm text-white"
+            aria-label={playing ? "一時停止" : "再生"}
+          >
+            {playing ? "❚❚" : "▶"}
+          </button>
+          <button
+            type="button"
+            onClick={() => skip(10)}
+            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-white"
+            aria-label="10秒進む"
+          >
+            +10
+          </button>
+        </div>
+      ) : null}
+      {zoomed ? (
         <button
           type="button"
           onClick={() => setView({ scale: 1, x: 0, y: 0 })}
