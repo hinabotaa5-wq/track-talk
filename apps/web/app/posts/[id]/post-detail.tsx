@@ -448,7 +448,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
             {replyTo ? (
               <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中:{replyTo.body}
+                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中: {replyTo.body}
                 </span>
                 <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
                   ×
