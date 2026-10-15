@@ -12,6 +12,7 @@ import {
   injuryBodyPartLabel,
   injuryJoinPayload,
   injuryJoinPlaceMaxLength,
+  injuryJoinOtherPlace,
   injuryJoinPlaces,
   injuryJoinSituationMaxLength,
   injuryJoinStepError,
@@ -49,6 +50,7 @@ export function InjuryJoinWizard({
   const [answers, setAnswers] = useState<InjuryJoinAnswers>(
     emptyInjuryJoinAnswers,
   );
+  const [otherPlace, setOtherPlace] = useState(false);
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
   const { setDirty } = useLeaveGuard();
@@ -139,20 +141,25 @@ export function InjuryJoinWizard({
                 <button
                   key={item}
                   type="button"
-                  onClick={() => change({ place: item })}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${answers.place === item ? optionActive : optionIdle}`}
+                  onClick={() => {
+                    const other = item === injuryJoinOtherPlace;
+                    setOtherPlace(other);
+                    change({ place: other ? "" : item });
+                  }}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${(item === injuryJoinOtherPlace ? otherPlace : answers.place === item) ? optionActive : optionIdle}`}
                 >
                   {item}
                 </button>
               ))}
             </div>
-            <Input
-              aria-label="痛めた場所"
-              maxLength={injuryJoinPlaceMaxLength}
-              placeholder="例: 土曜の河川敷のジョグ中"
-              value={answers.place}
-              onChange={(e) => change({ place: e.target.value })}
-            />
+            {otherPlace ? (
+              <Input
+                aria-label="痛めた場所"
+                maxLength={injuryJoinPlaceMaxLength}
+                value={answers.place}
+                onChange={(e) => change({ place: e.target.value })}
+              />
+            ) : null}
           </div>
         ) : null}
 
