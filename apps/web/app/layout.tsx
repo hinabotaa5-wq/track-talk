@@ -11,6 +11,7 @@ import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
+import { siteDescription, siteName, siteUrl } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +19,23 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "TrackTalk",
-  description: "陸上競技を、もっと深く楽しむコミュニティ",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${siteName}｜陸上競技の匿名コミュニティ`,
+    template: `%s｜${siteName}`,
+  },
+  description: siteDescription,
+  applicationName: siteName,
+  openGraph: {
+    type: "website",
+    siteName,
+    locale: "ja_JP",
+    title: `${siteName}｜陸上競技の匿名コミュニティ`,
+    description: siteDescription,
+  },
+  twitter: {
+    card: "summary",
+  },
   appleWebApp: {
     capable: true,
     title: "TrackTalk",
