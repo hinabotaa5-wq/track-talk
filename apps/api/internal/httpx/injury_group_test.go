@@ -1,8 +1,10 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,6 +15,10 @@ func joinBody(stage string) map[string]any {
 		"severity": "moderate", "saw_doctor": true, "injured_month": "2026-09", "place": "tartan",
 		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "event": "sprint", "stage": stage,
 	}
+}
+
+func stageBody(stage string) map[string]any {
+	return map[string]any{"stage": stage, "actions": []string{"stretch"}}
 }
 
 func joinBodyWith(stage string, patch map[string]any) map[string]any {
@@ -167,14 +173,14 @@ func TestInjuryGroupStagesMoveForwardAndBack(t *testing.T) {
 
 	// 段階を飛ばして進めることも、戻すこともできる。
 	for _, stage := range []string{"race", "rehab"} {
-		if rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", a, map[string]any{"stage": stage}); rec.Code != http.StatusOK {
+		if rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", a, stageBody(stage)); rec.Code != http.StatusOK {
 			t.Fatalf("move to %s: %d %s", stage, rec.Code, rec.Body.String())
 		}
 		if got := getGroup(t, h, "jumpers-knee", a).Me.Stage; got != stage {
 			t.Fatalf("stage after move: %s want %s", got, stage)
 		}
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", a, map[string]any{"stage": "sprint"}); rec.Code != http.StatusUnprocessableEntity {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", a, stageBody("sprint")); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("bad stage %d", rec.Code)
 	}
 	// 他の部位のグループには入っていない。
@@ -239,7 +245,7 @@ func TestInjuryGroupPostsStayInTheirStage(t *testing.T) {
 	}
 
 	// 段階を戻しても、書いた投稿は書いた時点の段階のまま。
-	doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", b, map[string]any{"stage": "rehab"})
+	doJSON(t, h, http.MethodPatch, "/v1/injury/groups/jumpers-knee/me", b, stageBody("rehab"))
 	if jog := listInjury(t, h, "/v1/injury/groups/jumpers-knee/posts?stage=jogging", a); jog.Meta.Total != 1 {
 		t.Fatalf("post moved with its writer %+v", jog)
 	}
@@ -301,5 +307,50 @@ func TestInjuryGroupCanBeLeftAndJoinedAgain(t *testing.T) {
 	}
 	if g := getGroup(t, h, "jumpers-knee", a); g.Members != 2 || g.Me.Stage != "resting" {
 		t.Fatalf("after joining again %+v", g)
+	}
+}
+
+func TestInjuryGroupStageChangeAnswers(t *testing.T) {
+	h := setup(t)
+	pool := openPool(t)
+	id := uuid.New()
+	a := token(t, id)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/sprain/join", a, joinBody("resting")); rec.Code != http.StatusOK {
+		t.Fatalf("join %d %s", rec.Code, rec.Body.String())
+	}
+
+	for name, c := range map[string]struct {
+		body  map[string]any
+		field string
+	}{
+		"no actions":          {map[string]any{"stage": "rehab"}, "actions"},
+		"unknown action":      {map[string]any{"stage": "rehab", "actions": []string{"yoga"}}, "actions"},
+		"nothing with others": {map[string]any{"stage": "rehab", "actions": []string{"nothing", "icing"}}, "actions"},
+		"public without note": {map[string]any{"stage": "rehab", "actions": []string{"icing"}, "note_public": true}, "note_public"},
+		"note too long":       {map[string]any{"stage": "rehab", "actions": []string{"icing"}, "note": strings.Repeat("あ", 301)}, "note"},
+		"same stage":          {map[string]any{"stage": "resting", "actions": []string{"icing"}}, "stage"},
+	} {
+		rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/sprain/me", a, c.body)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+c.field+`"`) {
+			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := doJSON(t, h, http.MethodPatch, "/v1/injury/groups/sprain/me", a, map[string]any{
+		"stage": "rehab", "actions": []string{"icing", "rest", "icing"}, "note": "  最初の3日は冷やすだけにした  ", "note_public": true,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("change %d %s", rec.Code, rec.Body.String())
+	}
+	var actions []string
+	var note *string
+	var public bool
+	if err := pool.QueryRow(context.Background(), `
+		SELECT actions, note, note_public FROM injury_group_stage_log
+		WHERE user_id = $1 AND body_part = 'sprain' ORDER BY created_at DESC LIMIT 1`, id).Scan(&actions, &note, &public); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(actions, ",") != "icing,rest" || note == nil || *note != "最初の3日は冷やすだけにした" || !public {
+		t.Fatalf("log %v %v %v", actions, note, public)
 	}
 }

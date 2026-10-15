@@ -25,3 +25,17 @@ func TestNormalizeInjuryJoinMonth(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeInjuryStageChange(t *testing.T) {
+	got, fields := normalizeInjuryStageChange(injuryGroupStageReq{Stage: " jogging ", Actions: []string{"stretch", "bath", "stretch"}, Note: "  "})
+	if len(fields) != 0 || got.Stage != "jogging" || len(got.Actions) != 2 || got.Note != nil || got.NotePublic {
+		t.Fatalf("got %+v %v", got, fields)
+	}
+	got, fields = normalizeInjuryStageChange(injuryGroupStageReq{Stage: "race", Actions: []string{"nothing"}, Note: "焦らない", NotePublic: true})
+	if len(fields) != 0 || got.Note == nil || *got.Note != "焦らない" || !got.NotePublic {
+		t.Fatalf("got %+v %v", got, fields)
+	}
+	if _, fields = normalizeInjuryStageChange(injuryGroupStageReq{}); fields["stage"] == "" || fields["actions"] == "" {
+		t.Fatalf("empty request should ask for stage and actions: %v", fields)
+	}
+}

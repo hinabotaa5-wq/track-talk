@@ -3,7 +3,6 @@ package httpx
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -53,10 +52,6 @@ type injuryGroupDTO struct {
 	Members       int64                 `json:"members"`
 	Stages        []injuryGroupStageDTO `json:"stages"`
 	Me            injuryGroupMemberDTO  `json:"me"`
-}
-
-type injuryGroupStageReq struct {
-	Stage string `json:"stage"`
 }
 
 func injuryGroupMemberFromRow(row db.InjuryGroupMember) injuryGroupMemberDTO {
@@ -243,7 +238,7 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: in.Stage}); err != nil {
+	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: in.Stage, Actions: []string{}}); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -254,7 +249,8 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, injuryGroupMemberFromRow(row))
 }
 
-// updateInjuryGroupStage lets a member move to any stage, forward or back (a relapse, a second surgery).
+// updateInjuryGroupStage lets a member move to any stage, forward or back (a relapse, a second surgery),
+// recording what they consciously did during the stage they are leaving and an optional note for the next person.
 // Posts already written keep the stage they were written in.
 func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) {
 	p, part, member, ok := s.injuryGroupMember(w, r)
@@ -266,15 +262,15 @@ func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	stage := strings.TrimSpace(req.Stage)
-	if !validInjuryStage(stage) {
-		FieldError(w, map[string]string{"stage": "いまの状況を選んでください"})
+	in, fields := normalizeInjuryStageChange(req)
+	if len(fields) == 0 && in.Stage == member.Stage {
+		fields["stage"] = "いまと同じ段階です。変わった段階を選んでください"
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
 		return
 	}
-	if stage == member.Stage {
-		JSON(w, http.StatusOK, injuryGroupMemberFromRow(member))
-		return
-	}
+	stage := in.Stage
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
@@ -287,7 +283,9 @@ func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: stage}); err != nil {
+	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{
+		UserID: p.ID, BodyPart: part, Stage: stage, Actions: in.Actions, Note: in.Note, NotePublic: in.NotePublic,
+	}); err != nil {
 		MapDBError(w, err)
 		return
 	}

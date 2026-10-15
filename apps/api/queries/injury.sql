@@ -160,7 +160,8 @@ WHERE user_id = $1 AND body_part = $2
 RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event;
 
 -- name: AddInjuryGroupStageLog :exec
-INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3);
+INSERT INTO injury_group_stage_log (user_id, body_part, stage, actions, note, note_public)
+VALUES (sqlc.arg('user_id'), sqlc.arg('body_part'), sqlc.arg('stage'), sqlc.arg('actions')::text[], sqlc.narg('note'), sqlc.arg('note_public'));
 
 -- name: CountInjuryGroupMembers :many
 SELECT body_part, count(*)::bigint AS members

@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { InjuryMeCards } from "@/components/injury-me-cards";
 import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -82,6 +83,7 @@ export default function MePage() {
 
   return (
     <div className="space-y-4 md:grid md:grid-cols-[18rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
+      <InjuryMeCards token={token} />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass()}>
           <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />

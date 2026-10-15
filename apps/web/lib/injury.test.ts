@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -161,5 +161,42 @@ describe("injury group roadmap", () => {
   it("counts the members the faces leave out", () => {
     expect(injuryFaceOverflow(23, 5)).toBe(18);
     expect(injuryFaceOverflow(3, 5)).toBe(0);
+  });
+});
+
+describe("injury stage change", () => {
+  const answers = { ...emptyInjuryStageChangeAnswers, stage: "jogging" as const, actions: ["stretch" as const] };
+
+  it("needs a new stage and at least one thing done", () => {
+    expect(injuryStageChangeError(emptyInjuryStageChangeAnswers, "rehab")).toBe("新しい段階を選んでください");
+    expect(injuryStageChangeError({ ...answers, stage: "rehab" }, "rehab")).toContain("いまと同じ段階");
+    expect(injuryStageChangeError({ ...answers, actions: [] }, "rehab")).toContain("1つ以上");
+    expect(injuryStageChangeError({ ...answers, note: "あ".repeat(301) }, "rehab")).toContain("300文字");
+    expect(injuryStageChangeError({ ...answers, note: "あ".repeat(300) }, "rehab")).toBe("");
+  });
+
+  it("keeps 何もしなかった apart from the other choices", () => {
+    expect(toggleInjuryAction(["stretch", "bath"], "nothing")).toEqual(["nothing"]);
+    expect(toggleInjuryAction(["nothing"], "icing")).toEqual(["icing"]);
+    expect(toggleInjuryAction(["icing", "bath"], "icing")).toEqual(["bath"]);
+  });
+
+  it("publishes a note only when there is one", () => {
+    expect(injuryStageChangePayload({ ...answers, note: "  焦らない  ", notePublic: true })).toEqual({
+      stage: "jogging",
+      actions: ["stretch"],
+      note: "焦らない",
+      note_public: true,
+    });
+    expect(injuryStageChangePayload({ ...answers, note: "  ", notePublic: true }).note_public).toBe(false);
+  });
+
+  it("says roughly how long ago the injury was, by month", () => {
+    const now = new Date(2026, 9, 15);
+    expect(injuryElapsedText("2026-10", now)).toBe("今月ケガ");
+    expect(injuryElapsedText("2026-08", now)).toBe("ケガから約2か月");
+    expect(injuryElapsedText("2025-10", now)).toBe("ケガから約1年");
+    expect(injuryElapsedText("2024-07", now)).toBe("ケガから約2年3か月");
+    expect(injuryElapsedText("", now)).toBe("");
   });
 });

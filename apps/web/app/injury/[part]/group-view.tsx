@@ -10,6 +10,7 @@ import { useGuardedLinkClick } from "@/components/leave-guard";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
+import { InjuryStageChange } from "@/components/injury-stage-change";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -17,30 +18,13 @@ import type { PostsPage } from "@/lib/fetch-posts";
 import {
   canPostInStage,
   injuryBodyPartLabel,
-  injuryCelebrationKey,
   injuryStages,
-  shouldCelebrate,
   type InjuryGroup,
+  type InjuryGroupMember,
   type InjuryStage,
 } from "@/lib/injury";
 
 type Load = { kind: "loading" } | { kind: "joined"; group: InjuryGroup } | { kind: "not-joined" } | { kind: "failed" };
-
-function celebrated(part: string) {
-  try {
-    return localStorage.getItem(injuryCelebrationKey(part)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markCelebrated(part: string) {
-  try {
-    localStorage.setItem(injuryCelebrationKey(part), "1");
-  } catch {
-    // 保存できなくても、祝うのが1回余計に出るだけ。
-  }
-}
 
 export function GroupView({ part }: { part: string }) {
   const { session, token, loading } = useAuth();
@@ -50,10 +34,8 @@ export function GroupView({ part }: { part: string }) {
   const router = useRouter();
   const guardedClick = useGuardedLinkClick();
   const [changing, setChanging] = useState(false);
-  const [applying, setApplying] = useState<InjuryStage | null>(null);
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
-  const [changeError, setChangeError] = useState("");
   const [celebrate, setCelebrate] = useState(false);
 
   const applyGroup = useCallback((group: InjuryGroup) => {
@@ -94,29 +76,12 @@ export function GroupView({ part }: { part: string }) {
     return () => controller.abort();
   }, [joined, part, token, selected, myStage]);
 
-  async function changeStage(stage: InjuryStage) {
-    if (load.kind !== "joined" || stage === load.group.me.stage) {
-      setChanging(false);
-      return;
-    }
-    if (applying) return;
-    setChangeError("");
-    setApplying(stage);
-    try {
-      await apiFetch(`/v1/injury/groups/${part}/me`, { method: "PATCH", token, body: JSON.stringify({ stage }) });
-      setChanging(false);
-      setSelected(stage);
-      setPosts(null);
-      await fetchGroup();
-      if (shouldCelebrate(stage, celebrated(part))) {
-        markCelebrated(part);
-        setCelebrate(true);
-      }
-    } catch (e) {
-      setChangeError(e instanceof ApiRequestError ? e.message : "段階を変えられませんでした");
-    } finally {
-      setApplying(null);
-    }
+  async function onStageChanged(member: InjuryGroupMember, celebrate: boolean) {
+    setChanging(false);
+    setSelected(member.stage);
+    setPosts(null);
+    if (celebrate) setCelebrate(true);
+    await fetchGroup();
   }
 
   async function leaveGroup() {
@@ -213,34 +178,13 @@ export function GroupView({ part }: { part: string }) {
       {celebrate ? <InjuryGoalCelebration onClose={() => setCelebrate(false)} /> : null}
 
       {changing ? (
-        <div className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3" role="radiogroup" aria-label="いまの段階">
-          {injuryStages.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={item.value === mine}
-              onClick={() => void changeStage(item.value)}
-              disabled={applying !== null}
-              className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition active:scale-[0.98] disabled:cursor-wait ${
-                item.value === applying
-                  ? "border-blue-400 bg-blue-950/60 text-white"
-                  : item.value === mine
-                    ? "border-blue-400 bg-blue-950/60 text-white"
-                    : "border-white/20 bg-white/8 text-slate-100 hover:bg-white/14"
-              } ${applying !== null && item.value !== applying ? "opacity-50" : ""}`}
-            >
-              {item.label}
-              {item.value === applying ? "に変更しています…" : item.value === mine ? "(いま)" : ""}
-            </button>
-          ))}
-          {applying ? (
-            <p role="status" className="text-sm text-slate-300">
-              段階を変えています。少し待ってください。
-            </p>
-          ) : null}
-          {changeError ? <p className="text-sm text-red-400">{changeError}</p> : null}
-        </div>
+        <InjuryStageChange
+          part={part}
+          token={token}
+          member={group.me}
+          onChanged={(member, celebrate) => void onStageChanged(member, celebrate)}
+          onCancel={() => setChanging(false)}
+        />
       ) : null}
 
       <InjuryRoadmap stages={group.stages} mine={mine} selected={selected} onSelect={setSelected} />

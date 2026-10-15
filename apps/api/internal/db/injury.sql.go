@@ -13,17 +13,28 @@ import (
 )
 
 const addInjuryGroupStageLog = `-- name: AddInjuryGroupStageLog :exec
-INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3)
+INSERT INTO injury_group_stage_log (user_id, body_part, stage, actions, note, note_public)
+VALUES ($1, $2, $3, $4::text[], $5, $6)
 `
 
 type AddInjuryGroupStageLogParams struct {
-	UserID   uuid.UUID `json:"user_id"`
-	BodyPart string    `json:"body_part"`
-	Stage    string    `json:"stage"`
+	UserID     uuid.UUID `json:"user_id"`
+	BodyPart   string    `json:"body_part"`
+	Stage      string    `json:"stage"`
+	Actions    []string  `json:"actions"`
+	Note       *string   `json:"note"`
+	NotePublic bool      `json:"note_public"`
 }
 
 func (q *Queries) AddInjuryGroupStageLog(ctx context.Context, arg AddInjuryGroupStageLogParams) error {
-	_, err := q.db.Exec(ctx, addInjuryGroupStageLog, arg.UserID, arg.BodyPart, arg.Stage)
+	_, err := q.db.Exec(ctx, addInjuryGroupStageLog,
+		arg.UserID,
+		arg.BodyPart,
+		arg.Stage,
+		arg.Actions,
+		arg.Note,
+		arg.NotePublic,
+	)
 	return err
 }
 
