@@ -258,23 +258,6 @@ export function GroupView({ part }: { part: string }) {
         </div>
       )}
 
-      <div className="sticky bottom-20 space-y-1.5">
-        {own ? (
-          <Link
-            href={`/injury/${part}/new`}
-            className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
-          >
-            {selectedLabel}に投稿
-          </Link>
-        ) : (
-          <>
-            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-              この段階には投稿できません
-            </span>
-            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
-          </>
-        )}
-      </div>
       <div className="space-y-2 border-t border-white/15 pt-4">
         {leaving === "idle" ? (
           <button
@@ -299,6 +282,23 @@ export function GroupView({ part }: { part: string }) {
             </div>
             {leaveError ? <p className="text-red-400">{leaveError}</p> : null}
           </div>
+        )}
+      </div>
+      <div className="sticky bottom-20 z-10 space-y-1.5 md:bottom-4">
+        {own ? (
+          <Link
+            href={`/injury/${part}/new`}
+            className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+          >
+            {selectedLabel}に投稿
+          </Link>
+        ) : (
+          <>
+            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
+              この段階には投稿できません
+            </span>
+            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+          </>
         )}
       </div>
     </div>
