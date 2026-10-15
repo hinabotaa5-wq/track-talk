@@ -5,6 +5,7 @@ import {
   commentSchema,
   hasTextPostContent,
   inquirySchema,
+  isYouTubeUrl,
   loginSchema,
   nicknameSchema,
   postSchema,
@@ -13,6 +14,20 @@ import {
 } from "./validators";
 
 describe("validators", () => {
+  it("accepts YouTube watch, short link and Shorts URLs", () => {
+    expect(isYouTubeUrl("https://www.youtube.com/watch?v=abcdefghijk")).toBe(true);
+    expect(isYouTubeUrl("https://youtu.be/abcdefghijk")).toBe(true);
+    expect(isYouTubeUrl("https://www.youtube.com/shorts/abcdefghijk")).toBe(true);
+    expect(isYouTubeUrl("https://youtube.com/shorts/abcdefghijk?feature=share")).toBe(true);
+    expect(isYouTubeUrl("https://m.youtube.com/shorts/abcdefghijk")).toBe(true);
+  });
+
+  it("rejects non-YouTube URLs and bare Shorts paths", () => {
+    expect(isYouTubeUrl("https://example.com/shorts/abcdefghijk")).toBe(false);
+    expect(isYouTubeUrl("https://www.youtube.com/shorts/")).toBe(false);
+    expect(isYouTubeUrl("https://www.youtube.com/")).toBe(false);
+  });
+
   it("accepts a valid post", () => {
     const parsed = postSchema.parse({
       title: "100m決勝",
