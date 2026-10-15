@@ -20,12 +20,18 @@ export function YouTubePlayer({
     return (
       <iframe
         className="aspect-video w-full rounded-xl shadow-sm"
-        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`}
+        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`}
         title={title}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
-        loading="lazy"
         referrerPolicy="strict-origin-when-cross-origin"
+        onLoad={(e) => {
+          // autoplay が効かない環境でも、ポスターを押した1回で再生が始まるようにする
+          e.currentTarget.contentWindow?.postMessage(
+            JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+            "https://www.youtube-nocookie.com"
+          );
+        }}
       />
     );
   }
