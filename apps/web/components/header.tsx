@@ -74,7 +74,10 @@ export function Header() {
   const current = activeMainTab(pathname);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/20 glass bg-white/8 backdrop-blur-md">
+    <header
+      className="sticky top-0 z-40 border-b border-white/20 glass bg-white/8 backdrop-blur-md"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-4">
           {showBack ? (

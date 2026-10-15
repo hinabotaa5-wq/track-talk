@@ -132,7 +132,7 @@ export function ZoomableImage({ src, alt, wrapperClassName, imageClassName, size
             type="button"
             aria-label="閉じる"
             onClick={() => setOpen(false)}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-2xl text-white"
+            className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-2xl text-white"
           >
             ×
           </button>
