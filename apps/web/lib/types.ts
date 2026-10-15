@@ -22,7 +22,7 @@ export type DomesticMajor = {
   slug: string;
   year: number;
   name: string;
-  category: "youth" | "student" | "open";
+  category: "youth" | "student" | "open" | "distance";
   venue: string;
   starts_on: string;
   ends_on: string;

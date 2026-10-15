@@ -13,8 +13,9 @@ type CompetitionList = {
 const cache = new Map<string, CompetitionList>();
 const inflight = new Map<string, Promise<CompetitionList>>();
 
+// month 0 means the whole season.
 export function competitionCacheKey(prefecture: string, month: number) {
-  return `${prefecture}:${month}`;
+  return `${prefecture}:${month || "season"}`;
 }
 
 export function readCompetitions(prefecture: string, month: number) {
@@ -34,10 +35,8 @@ export function loadCompetitions(prefecture: string, month: number, token: strin
   const pending = inflight.get(key);
   if (pending) return pending;
 
-  const request = apiFetch<{ competitions: Competition[] }>(
-    `/v1/competitions?prefecture=${prefecture}&month=${month}`,
-    { token },
-  )
+  const query = month ? `prefecture=${prefecture}&month=${month}` : `prefecture=${prefecture}`;
+  const request = apiFetch<{ competitions: Competition[] }>(`/v1/competitions?${query}`, { token })
     .then((data) => {
       const entry = { items: data.competitions ?? [], error: "", at: Date.now() };
       cache.set(key, entry);

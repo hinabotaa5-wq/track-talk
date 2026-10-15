@@ -1,10 +1,6 @@
-import type { Metadata } from "next";
-import { MajorDomesticPage } from "./major-domestic-page";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "国内主要大会",
-};
-
+// 国内主要大会 is the main competitions tab now.
 export default function Page() {
-  return <MajorDomesticPage />;
+  redirect("/competitions");
 }

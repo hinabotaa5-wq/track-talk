@@ -1,11 +1,10 @@
 -- name: ListDomesticMajors :many
--- One edition per meet: the next one that has not ended, else the latest one that has.
-SELECT DISTINCT ON (slug) slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
+-- Every edition that starts inside the season [season_start, season_end).
+SELECT slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors
-ORDER BY slug,
-    (ends_on < sqlc.arg(today)::date),
-    CASE WHEN ends_on >= sqlc.arg(today)::date THEN starts_on END ASC,
-    ends_on DESC;
+WHERE starts_on >= sqlc.arg(season_start)::date
+  AND starts_on < sqlc.arg(season_end)::date
+ORDER BY starts_on ASC, slug ASC;
 
 -- name: UpsertDomesticMajor :exec
 INSERT INTO domestic_majors (

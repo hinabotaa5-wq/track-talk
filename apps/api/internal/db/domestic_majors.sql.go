@@ -11,13 +11,17 @@ import (
 )
 
 const listDomesticMajors = `-- name: ListDomesticMajors :many
-SELECT DISTINCT ON (slug) slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
+SELECT slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors
-ORDER BY slug,
-    (ends_on < $1::date),
-    CASE WHEN ends_on >= $1::date THEN starts_on END ASC,
-    ends_on DESC
+WHERE starts_on >= $1::date
+  AND starts_on < $2::date
+ORDER BY starts_on ASC, slug ASC
 `
+
+type ListDomesticMajorsParams struct {
+	SeasonStart time.Time `json:"season_start"`
+	SeasonEnd   time.Time `json:"season_end"`
+}
 
 type ListDomesticMajorsRow struct {
 	Slug          string    `json:"slug"`
@@ -31,9 +35,9 @@ type ListDomesticMajorsRow struct {
 	SiteUrl       string    `json:"site_url"`
 }
 
-// One edition per meet: the next one that has not ended, else the latest one that has.
-func (q *Queries) ListDomesticMajors(ctx context.Context, today time.Time) ([]ListDomesticMajorsRow, error) {
-	rows, err := q.db.Query(ctx, listDomesticMajors, today)
+// Every edition that starts inside the season [season_start, season_end).
+func (q *Queries) ListDomesticMajors(ctx context.Context, arg ListDomesticMajorsParams) ([]ListDomesticMajorsRow, error) {
+	rows, err := q.db.Query(ctx, listDomesticMajors, arg.SeasonStart, arg.SeasonEnd)
 	if err != nil {
 		return nil, err
 	}

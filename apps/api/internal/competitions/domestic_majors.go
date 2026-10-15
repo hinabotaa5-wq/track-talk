@@ -15,6 +15,8 @@ const (
 	DomesticYouth   = "youth"
 	DomesticStudent = "student"
 	DomesticOpen    = "open"
+	// DomesticDistance is the ekiden and marathon meets of the off-season.
+	DomesticDistance = "distance"
 
 	jaafOrigin = "https://www.jaaf.or.jp"
 )
@@ -70,6 +72,22 @@ var DomesticMeets = []DomesticMeet{
 		Skip:     regexp.MustCompile(`リレー|10000m|競歩|混成|マラソン|駅伝|クロスカントリー`),
 	},
 	{Slug: "jitsugyodan", Category: DomesticOpen, Title: regexp.MustCompile(`全日本実業団対抗陸上競技選手権大会$`)},
+	{Slug: "izumo-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`出雲全日本大学選抜駅伝`)},
+	{Slug: "univ-women-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全日本大学女子駅伝対校選手権大会`)},
+	{Slug: "univ-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全日本大学駅伝対校選手権大会`)},
+	{Slug: "queens-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全日本実業団対抗女子駅伝競走大会`)},
+	{Slug: "junior-high-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全国中学駅伝大会`)},
+	{Slug: "high-school-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全国高等学校駅伝競走大会`)},
+	{Slug: "fukuoka-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`福岡国際マラソン`)},
+	{Slug: "fujisan-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全日本大学女子選抜駅伝`)},
+	{Slug: "new-year-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全日本実業団対抗駅伝競走大会`)},
+	{Slug: "prefectural-women-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全国都道府県対抗女子駅伝`)},
+	{Slug: "prefectural-men-ekiden", Category: DomesticDistance, Title: regexp.MustCompile(`全国都道府県対抗男子駅伝`)},
+	{Slug: "osaka-women-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`大阪国際女子マラソン`)},
+	{Slug: "beppu-oita-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`別府大分毎日マラソン`)},
+	{Slug: "osaka-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`大阪マラソン`)},
+	{Slug: "tokyo-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`東京マラソン\d{4}`)},
+	{Slug: "nagoya-women-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`名古屋ウィメンズマラソン`)},
 }
 
 // JAAFListEntry is one line of a monthly list on the JAAF competition page.
@@ -165,11 +183,18 @@ func ParseJAAFDetail(r io.Reader, detailURL string) (DomesticMajor, error) {
 	return major, nil
 }
 
-var alsoPattern = regexp.MustCompile(`\s*兼\s.*$`)
+var (
+	alsoPattern      = regexp.MustCompile(`\s*兼\s.*$`)
+	mgcPrefixPattern = regexp.MustCompile(`^\d{4}-\d{4}\s*MGCシリーズ\s*`)
+	mgcSuffixPattern = regexp.MustCompile(`\s*[～〜][^～〜]*MGCシリーズ[^～〜]*[～〜]$`)
+)
 
-// baseMeetName drops the "兼 …" tail that JAAF adds when a meet doubles as a team-selection meet.
+// baseMeetName drops the "兼 …" tail that JAAF adds when a meet doubles as a team-selection meet,
+// and the MGC series labels around marathon names.
 func baseMeetName(raw string) string {
-	return alsoPattern.ReplaceAllString(cleanText(raw), "")
+	name := alsoPattern.ReplaceAllString(cleanText(raw), "")
+	name = mgcPrefixPattern.ReplaceAllString(name, "")
+	return mgcSuffixPattern.ReplaceAllString(name, "")
 }
 
 // MatchDomesticMeet returns the card a JAAF list title belongs to.

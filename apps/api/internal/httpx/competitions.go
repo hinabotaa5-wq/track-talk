@@ -30,7 +30,11 @@ func (s *Server) listMajorHosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listDomesticMajors(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.q.ListDomesticMajors(r.Context(), tokyoToday())
+	start, end := seasonRange(currentSeasonYear(time.Now()))
+	rows, err := s.q.ListDomesticMajors(r.Context(), db.ListDomesticMajorsParams{
+		SeasonStart: start,
+		SeasonEnd:   end,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -48,9 +52,13 @@ func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		fields["prefecture"] = "地域を選んでください"
 	}
-	month, ok := parseMonth(q.Get("month"))
-	if !ok {
-		fields["month"] = "月を選んでください"
+	// Without month the whole season comes back, for the month-grouped list on the main tab.
+	month := 0
+	if raw := q.Get("month"); raw != "" {
+		month, ok = parseMonth(raw)
+		if !ok {
+			fields["month"] = "月を選んでください"
+		}
 	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
@@ -58,7 +66,10 @@ func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	season := currentSeasonYear(time.Now())
-	start, end := seasonMonthRange(season, month)
+	start, end := seasonRange(season)
+	if month != 0 {
+		start, end = seasonMonthRange(season, month)
+	}
 	rows, err := s.q.ListCompetitions(r.Context(), db.ListCompetitionsParams{
 		Prefecture: prefecture,
 		MonthStart: start,
@@ -102,6 +113,12 @@ func currentSeasonYear(now time.Time) int {
 		return t.Year()
 	}
 	return t.Year() - 1
+}
+
+// seasonRange returns the half-open date range [start, end) of a whole athletics season, April through March.
+func seasonRange(seasonYear int) (start, end time.Time) {
+	start = time.Date(seasonYear, time.April, 1, 0, 0, 0, 0, time.UTC)
+	return start, start.AddDate(1, 0, 0)
 }
 
 // seasonMonthRange returns the half-open date range [start, end) for a month

@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { BackButton } from "@/components/major-hosts-panel";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { formatDate } from "@/lib/format";
 import { competitionCacheKey, loadCompetitions, readCompetitions } from "@/lib/competition-list";
-import { saveCompetitionPrefecture } from "@/lib/competition-prefecture";
-import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, prefectureCode } from "@/lib/prefectures";
+import { regionalPrefecture, saveCompetitionPrefecture } from "@/lib/competition-prefecture";
+import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber } from "@/lib/prefectures";
 import type { Competition } from "@/lib/types";
-import { RequireSession } from "./require-session";
+import { RequireSession } from "../require-session";
 
-function destination(competition: Competition, prefecture: string) {
+export function destination(competition: Competition, prefecture: string) {
   // 新着から補った最新の要項を優先し、無ければ年間表の要項を出す。
   if (competition.guidelines_url) return { href: competition.guidelines_url, label: "要項" };
   if (competition.link_label === "要項") return { href: competition.organizer_url, label: "要項" };
@@ -26,19 +26,18 @@ function destination(competition: Competition, prefecture: string) {
   return { href: competition.organizer_url, label: "要項" };
 }
 
-function competitionDates(startsOn: string, endsOn: string | null) {
+export function competitionDates(startsOn: string, endsOn: string | null) {
   const start = formatDate(startsOn);
   if (!endsOn) return start;
   const end = formatDate(endsOn);
   return start === end ? start : `${start} 〜 ${end}`;
 }
 
-export function CompetitionsView() {
+export function RegionalCompetitionsView() {
   const { token } = useAuth();
   const sp = useSearchParams();
   const month = monthNumber(sp.get("month") ?? undefined) || currentMonthInTokyo();
-  const fromUrl = prefectureCode(sp.get("prefecture") ?? undefined);
-  const prefecture = fromUrl || INTERNATIONAL;
+  const prefecture = regionalPrefecture(sp.get("prefecture") ?? undefined);
   const key = competitionCacheKey(prefecture, month);
   const cached = readCompetitions(prefecture, month);
   const [loadedKey, setLoadedKey] = useState(cached ? key : "");
@@ -50,11 +49,11 @@ export function CompetitionsView() {
   const loading = !ready && !cached;
 
   useEffect(() => {
-    if (fromUrl) saveCompetitionPrefecture(fromUrl);
-  }, [fromUrl]);
+    if (prefecture) saveCompetitionPrefecture(prefecture);
+  }, [prefecture]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !prefecture) return;
     let active = true;
     loadCompetitions(prefecture, month, token).then((entry) => {
       if (!active) return;
@@ -70,30 +69,15 @@ export function CompetitionsView() {
   return (
     <RequireSession>
       <div className="space-y-4">
-        <div className="flex flex-col gap-2 md:flex-row">
-          {[
-            { href: "/competitions/major-domestic", label: "国内主要大会" },
-            { href: "/competitions/major-hosts", label: "今後の世界陸上・オリンピック" },
-          ].map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4.5 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95 md:w-fit"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
+        <h1 className="text-2xl font-bold text-slate-100">都道府県の大会</h1>
         <CompetitionFilters month={month} prefecture={prefecture} />
-        {loading ? <CompetitionLoadingFrame /> : null}
-        {!loading && shownError ? <ErrorState message={shownError} /> : null}
-        {!loading && !shownError && shownItems.length === 0 ? (
-          <EmptyState
-            title="この月の大会はありません"
-            body={prefecture === INTERNATIONAL ? "別の月を選ぶと、他の国際大会を表示します。" : "別の月か都道府県を選んでください。"}
-          />
+        {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}
+        {prefecture && loading ? <CompetitionLoadingFrame /> : null}
+        {prefecture && !loading && shownError ? <ErrorState message={shownError} /> : null}
+        {prefecture && !loading && !shownError && shownItems.length === 0 ? (
+          <EmptyState title="この月の大会はありません" body="別の月か都道府県を選んでください。" />
         ) : null}
-        {!loading && shownItems.length > 0 ? (
+        {prefecture && !loading && shownItems.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
             {shownItems.map((c) => {
               const link = destination(c, prefecture);
@@ -114,6 +98,7 @@ export function CompetitionsView() {
             })}
           </div>
         ) : null}
+        <BackButton />
       </div>
     </RequireSession>
   );
