@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { useGuardedLinkClick } from "@/components/leave-guard";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
@@ -47,6 +48,7 @@ export function GroupView({ part }: { part: string }) {
   const [selected, setSelected] = useState<InjuryStage | null>(null);
   const [posts, setPosts] = useState<{ stage: string; page: PostsPage } | null>(null);
   const router = useRouter();
+  const guardedClick = useGuardedLinkClick();
   const [changing, setChanging] = useState(false);
   const [applying, setApplying] = useState<InjuryStage | null>(null);
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
@@ -130,7 +132,11 @@ export function GroupView({ part }: { part: string }) {
   }
 
   const back = (
-    <Link href="/injury" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
+    <Link
+      href="/injury"
+      onClick={(event) => guardedClick(event, "/injury")}
+      className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline"
+    >
       ← ケガ
     </Link>
   );
