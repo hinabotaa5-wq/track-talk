@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { AmbientBackground } from "@/components/ambient-background";
+import { InstallGuide } from "@/components/install-guide";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,6 +20,11 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "TrackTalk",
   description: "陸上競技を、もっと深く楽しむコミュニティ",
+  appleWebApp: {
+    capable: true,
+    title: "TrackTalk",
+    statusBarStyle: "black-translucent",
+  },
   verification: {
     google: "erl1lifh6-0oXq1ecreI-JSTA70vLV_03V2Cwx4b8_k",
   },
@@ -28,6 +34,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#16243a",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -52,6 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
           <BottomNav />
+          <InstallGuide />
           </LeaveGuardProvider>
         </AuthProvider>
       </body>

@@ -7,9 +7,10 @@ import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bookmark, ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
+import { Bookmark, ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, Smartphone, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { installGuideOpenEvent } from "@/lib/install-guide";
 
 const menuLinks = [
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
@@ -35,6 +36,15 @@ export default function MePage() {
   const [sort, setSort] = useState<"popular" | "new">("popular");
 
   const logoutLock = useActionLock();
+  const [installed, setInstalled] = useState(true);
+
+  useEffect(() => {
+    function sync() {
+      const nav = navigator as Navigator & { standalone?: boolean };
+      setInstalled(nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches);
+    }
+    sync();
+  }, []);
 
   async function logout() {
     if (!confirm("ログアウトしますか？")) return;
@@ -77,6 +87,13 @@ export default function MePage() {
           <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
           <span className="flex-1">ログアウト</span>
         </button>
+        {installed ? null : (
+          <button type="button" onClick={() => window.dispatchEvent(new Event(installGuideOpenEvent))} className={menuRowClass()}>
+            <Smartphone className="size-4 shrink-0 text-slate-300" aria-hidden />
+            <span className="flex-1">ホーム画面に追加して使う</span>
+            <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+          </button>
+        )}
         {menuLinks.map((item) => {
           const Icon = item.icon;
           return (
