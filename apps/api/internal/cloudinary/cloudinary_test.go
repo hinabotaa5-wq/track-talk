@@ -156,3 +156,81 @@ func TestValidPublicID(t *testing.T) {
 		t.Fatal("expected invalid")
 	}
 }
+
+func TestCoachingUploadIsAuthenticated(t *testing.T) {
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
+	signed, err := c.SignedCoachingUpload(time.Unix(1700000000, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ValidCoachingPublicID(signed.PublicID) || ValidPublicID(signed.PublicID) {
+		t.Fatalf("public id %q", signed.PublicID)
+	}
+	if signed.Type != "authenticated" || signed.ResourceType != "video" {
+		t.Fatalf("signed %+v", signed)
+	}
+	want := Sign(map[string]string{
+		"allowed_formats": VideoFormats,
+		"public_id":       signed.PublicID,
+		"timestamp":       "1700000000",
+		"type":            "authenticated",
+		"upload_preset":   VideoPreset,
+	}, "secret")
+	if signed.Signature != want {
+		t.Fatalf("signature %s want %s", signed.Signature, want)
+	}
+	if _, err := (Client{}).SignedCoachingUpload(time.Now()); err != ErrNotConfigured {
+		t.Fatalf("unconfigured: %v", err)
+	}
+}
+
+func TestCoachingURLsAreSigned(t *testing.T) {
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
+	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
+	// 期待値は Cloudinary の公式 SDK と同じ手順（SHA-1 → URL 用 Base64 の先頭8文字）で別に計算したもの。
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--EPOGrjzG--/q_auto,du_30/v1/"+id+".mp4"; got != want {
+		t.Fatalf("playback\n got %s\nwant %s", got, want)
+	}
+	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--BA2BgQjp--/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"; got != want {
+		t.Fatalf("thumbnail\n got %s\nwant %s", got, want)
+	}
+	if c.CoachingPlaybackURL("track-talk/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11") != "" {
+		t.Fatal("public folder must not be signed as coaching")
+	}
+}
+
+func TestCoachingVideoReadyChecksTypeAndLength(t *testing.T) {
+	var payload, path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret", APIBase: srv.URL}
+	id := "track-talk-coaching/11111111-1111-4111-8111-111111111111"
+	ctx := context.Background()
+
+	payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":1024,"duration":29.9}`
+	if err := c.CoachingVideoReady(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(path, "/resources/video/authenticated/track-talk-coaching/") {
+		t.Fatalf("path %s", path)
+	}
+	payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":1024,"duration":31}`
+	if err := c.CoachingVideoReady(ctx, id); err != ErrTooLong {
+		t.Fatalf("length: %v", err)
+	}
+	payload = `{"resource_type":"video","type":"upload","format":"mp4","bytes":1024,"duration":10}`
+	if err := c.CoachingVideoReady(ctx, id); err != ErrRejected {
+		t.Fatalf("public type: %v", err)
+	}
+	payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":104857601,"duration":10}`
+	if err := c.CoachingVideoReady(ctx, id); err != ErrTooLarge {
+		t.Fatalf("size: %v", err)
+	}
+	if err := c.CoachingVideoReady(ctx, "track-talk/11111111-1111-4111-8111-111111111111"); err != ErrInvalid {
+		t.Fatalf("folder: %v", err)
+	}
+}

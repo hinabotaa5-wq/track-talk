@@ -57,6 +57,21 @@ type DomesticMajor struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type GuardianConsent struct {
+	MinorID         uuid.UUID  `json:"minor_id"`
+	TokenHash       string     `json:"token_hash"`
+	Status          string     `json:"status"`
+	GuardianName    *string    `json:"guardian_name"`
+	Relationship    *string    `json:"relationship"`
+	MonthlyLimitYen *int32     `json:"monthly_limit_yen"`
+	AllowPublish    bool       `json:"allow_publish"`
+	ConsentedAt     *time.Time `json:"consented_at"`
+	DeclinedAt      *time.Time `json:"declined_at"`
+	RevokedAt       *time.Time `json:"revoked_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
 type InjuryDetail struct {
 	PostID     uuid.UUID `json:"post_id"`
 	BodyPart   string    `json:"body_part"`
@@ -212,12 +227,22 @@ type ProductReview struct {
 }
 
 type Profile struct {
-	ID             uuid.UUID `json:"id"`
-	IsAdmin        bool      `json:"is_admin"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	Nickname       *string   `json:"nickname"`
-	NicknamePublic bool      `json:"nickname_public"`
+	ID             uuid.UUID  `json:"id"`
+	IsAdmin        bool       `json:"is_admin"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	Nickname       *string    `json:"nickname"`
+	NicknamePublic bool       `json:"nickname_public"`
+	BirthMonth     *time.Time `json:"birth_month"`
+}
+
+type PushSubscription struct {
+	ID        uuid.UUID `json:"id"`
+	ProfileID uuid.UUID `json:"profile_id"`
+	Endpoint  string    `json:"endpoint"`
+	P256dh    string    `json:"p256dh"`
+	Auth      string    `json:"auth"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type RecruitmentDetail struct {

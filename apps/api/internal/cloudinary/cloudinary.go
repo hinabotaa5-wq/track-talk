@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -26,6 +27,13 @@ const (
 	VideoFormats  = "mov,mp4,webm"
 	MaxImageBytes = 10 << 20
 	MaxVideoBytes = 100 << 20
+
+	// 添削の動画は顔や体が写るので、公開 URL では配信しない（type=authenticated）。
+	// 署名付きの URL を知っている人だけが見られる。
+	CoachingFolder      = "track-talk-coaching"
+	CoachingVideoType   = "authenticated"
+	MaxCoachingSeconds  = 30
+	coachingSecondsSlop = 0.5
 )
 
 var (
@@ -34,6 +42,7 @@ var (
 	ErrNotFound      = errors.New("video not found")
 	ErrRejected      = errors.New("asset rejected")
 	ErrTooLarge      = errors.New("asset too large")
+	ErrTooLong       = errors.New("video too long")
 	ErrUnavailable   = errors.New("cloudinary unavailable")
 )
 
@@ -72,6 +81,7 @@ type UploadSignature struct {
 	UploadPreset   string `json:"upload_preset"`
 	AllowedFormats string `json:"allowed_formats"`
 	ResourceType   string `json:"resource_type"`
+	Type           string `json:"type,omitempty"`
 }
 
 func NewPublicID() string {
@@ -80,6 +90,19 @@ func NewPublicID() string {
 
 func ValidPublicID(publicID string) bool {
 	rest, ok := strings.CutPrefix(publicID, Folder+"/")
+	if !ok || strings.Contains(rest, "/") {
+		return false
+	}
+	_, err := uuid.Parse(rest)
+	return err == nil
+}
+
+func NewCoachingPublicID() string {
+	return CoachingFolder + "/" + uuid.NewString()
+}
+
+func ValidCoachingPublicID(publicID string) bool {
+	rest, ok := strings.CutPrefix(publicID, CoachingFolder+"/")
 	if !ok || strings.Contains(rest, "/") {
 		return false
 	}
@@ -140,6 +163,34 @@ func (c Client) SignedUpload(now time.Time, resource string) (UploadSignature, e
 		UploadPreset:   preset,
 		AllowedFormats: formats,
 		ResourceType:   resource,
+	}, nil
+}
+
+// SignedCoachingUpload は添削の動画を非公開（authenticated）でアップロードする署名を返す。
+// type も署名に含めるので、ブラウザ側で公開に書き換えると Cloudinary が受け付けない。
+func (c Client) SignedCoachingUpload(now time.Time) (UploadSignature, error) {
+	if !c.Configured() {
+		return UploadSignature{}, ErrNotConfigured
+	}
+	publicID := NewCoachingPublicID()
+	ts := now.Unix()
+	params := map[string]string{
+		"allowed_formats": VideoFormats,
+		"public_id":       publicID,
+		"timestamp":       fmt.Sprintf("%d", ts),
+		"type":            CoachingVideoType,
+		"upload_preset":   VideoPreset,
+	}
+	return UploadSignature{
+		CloudName:      c.Cloud,
+		APIKey:         c.Key,
+		Timestamp:      ts,
+		PublicID:       publicID,
+		Signature:      Sign(params, c.Secret),
+		UploadPreset:   VideoPreset,
+		AllowedFormats: VideoFormats,
+		ResourceType:   "video",
+		Type:           CoachingVideoType,
 	}, nil
 }
 
@@ -229,6 +280,30 @@ func (c Client) ImageURL(publicID string) string {
 	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_1600,q_auto,f_auto/" + deliveryPath(publicID)
 }
 
+// CoachingPlaybackURL は非公開の添削動画を再生する署名付き URL を返す。
+// du_30 で、万一長い動画が入っていても30秒までしか配信しない。
+func (c Client) CoachingPlaybackURL(publicID string) string {
+	return c.signedVideoURL("q_auto,du_"+fmt.Sprint(MaxCoachingSeconds), publicID, "mp4")
+}
+
+// CoachingThumbnailURL は非公開の添削動画のサムネイルの署名付き URL を返す。
+func (c Client) CoachingThumbnailURL(publicID string) string {
+	return c.signedVideoURL("so_auto,c_limit,w_800,f_jpg", publicID, "jpg")
+}
+
+// signedVideoURL は Cloudinary の配信 URL の署名（s--XXXXXXXX--）を付ける。
+// 署名は「変換/public_id.拡張子」に API シークレットを足した SHA-1 を URL 用の Base64 にした先頭8文字。
+// バージョン（v1）は署名に含めない。
+func (c Client) signedVideoURL(transformation, publicID, ext string) string {
+	if c.Cloud == "" || c.Secret == "" || !ValidCoachingPublicID(publicID) {
+		return ""
+	}
+	source := deliveryPath(publicID) + "." + ext
+	sum := sha1.Sum([]byte(transformation + "/" + source + c.Secret))
+	signature := "s--" + base64.URLEncoding.EncodeToString(sum[:])[:8] + "--"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/" + CoachingVideoType + "/" + signature + "/" + transformation + "/v1/" + source
+}
+
 func deliveryPath(publicID string) string {
 	parts := strings.Split(publicID, "/")
 	for i, part := range parts {
@@ -286,6 +361,54 @@ func (c Client) ready(ctx context.Context, resource, publicID string) error {
 	}
 	if info.Bytes <= 0 || info.Bytes > maxBytes {
 		return ErrTooLarge
+	}
+	return nil
+}
+
+// CoachingVideoReady は、非公開でアップロードされた添削の動画が、形式・大きさ・長さの条件を満たすか確かめる。
+func (c Client) CoachingVideoReady(ctx context.Context, publicID string) error {
+	if !ValidCoachingPublicID(publicID) {
+		return ErrInvalid
+	}
+	if !c.Configured() {
+		return ErrNotConfigured
+	}
+	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/video/" + CoachingVideoType + "/" + deliveryPath(publicID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return ErrUnavailable
+	}
+	req.SetBasicAuth(c.Key, c.Secret)
+	resp, err := c.httpClient().Do(req)
+	if err != nil {
+		return ErrUnavailable
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return ErrUnavailable
+	}
+	var info struct {
+		Bytes        int64   `json:"bytes"`
+		Format       string  `json:"format"`
+		ResourceType string  `json:"resource_type"`
+		Type         string  `json:"type"`
+		Duration     float64 `json:"duration"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&info); err != nil {
+		return ErrUnavailable
+	}
+	if info.ResourceType != "video" || info.Type != CoachingVideoType || !formatAllowed(info.Format, VideoFormats) {
+		return ErrRejected
+	}
+	if info.Bytes <= 0 || info.Bytes > MaxVideoBytes {
+		return ErrTooLarge
+	}
+	// 長さが返ってこないときは配信側の du_30 に任せる。
+	if info.Duration > MaxCoachingSeconds+coachingSecondsSlop {
+		return ErrTooLong
 	}
 	return nil
 }

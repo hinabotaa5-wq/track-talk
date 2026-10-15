@@ -153,6 +153,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `SUPABASE_URL` / `SUPABASE_JWT_SECRET` / `SUPABASE_JWT_AUD` | API | JWT の検証（URL か secret のどちらかが必須） |
 | `SUPABASE_SERVICE_ROLE_KEY` | API | 退会時に Auth ユーザーを削除する |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | API | アップロード署名 |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | API | フォーム添削の Web Push 通知（空なら通知は送らない）。`VAPID_SUBJECT` は `mailto:` の連絡先 |
 | `API_ADDR` / `CORS_ORIGINS` / `LOG_LEVEL` | API | 既定は `:8080` / `http://localhost:3000` / `info` |
 | `GEMINI_API_KEY` | 大会取り込み | 都道府県の取り込みに必要 |
 | `GEMINI_DAILY_REQUESTS` | 大会取り込み | 1回の実行で使う Gemini リクエストの上限（既定 15） |

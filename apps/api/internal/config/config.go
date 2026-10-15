@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -23,6 +24,11 @@ type Config struct {
 	CloudAPIKey            string
 	CloudAPISecret         string
 	CloudAPIBase           string
+	VAPIDPublicKey         string
+	VAPIDPrivateKey        string
+	VAPIDSubject           string
+	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
+	PushHTTP *http.Client
 }
 
 func Load() (Config, error) {
@@ -42,6 +48,9 @@ func Load() (Config, error) {
 		CloudAPIKey:            os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret:         os.Getenv("CLOUDINARY_API_SECRET"),
 		CloudAPIBase:           os.Getenv("CLOUDINARY_API_BASE"),
+		VAPIDPublicKey:         os.Getenv("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:        os.Getenv("VAPID_PRIVATE_KEY"),
+		VAPIDSubject:           os.Getenv("VAPID_SUBJECT"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
