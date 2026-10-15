@@ -1,8 +1,8 @@
-export type HomeSort = "popular" | "new" | "recruitment" | "review" | "saved";
+export type HomeSort = "popular" | "new" | "recruitment" | "review";
 export type ProductKind = "shoe" | "spike";
 
 export function parseHomeSort(value: string | null | undefined): HomeSort {
-  if (value === "new" || value === "recruitment" || value === "review" || value === "saved") return value;
+  if (value === "new" || value === "recruitment" || value === "review") return value;
   return "popular";
 }
 

@@ -7,11 +7,12 @@ import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
+import { Bookmark, ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 
 const menuLinks = [
+  { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
   { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
   { href: "/me/contact", label: "お問い合わせ", icon: Mail },

@@ -34,7 +34,7 @@ export default async function HomePage({
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, Number(sp.page) || 1);
 
-  if (sort === "saved" || sort === "review") return <HomeView initialPath="" initial={null} />;
+  if (sort === "review") return <HomeView initialPath="" initial={null} />;
 
   const path = homeFeedPath(sort, q, page);
   return (
