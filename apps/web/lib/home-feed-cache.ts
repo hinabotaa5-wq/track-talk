@@ -2,7 +2,7 @@ import { apiFetch } from "./api";
 import { fetchPostsRetrying, type PostsPage } from "./fetch-posts";
 import type { HomeSort } from "./home-sort";
 
-export type FeedSort = Exclude<HomeSort, "saved">;
+export type FeedSort = HomeSort;
 
 const freshForMs = 60_000;
 const prefetchSorts: FeedSort[] = ["popular", "new", "recruitment"];
@@ -93,10 +93,4 @@ export function prefetchHomeFeeds(q: string) {
     if (isFeedFresh(path) || inflight.has(path)) continue;
     loadHomeFeed(path).catch(() => {});
   }
-}
-
-export function prefetchSavedFeed(q: string, token: string) {
-  const path = savedFeedPath(q, 1);
-  if (isFeedFresh(path) || inflight.has(path)) return;
-  loadSavedFeed(path, token).catch(() => {});
 }
