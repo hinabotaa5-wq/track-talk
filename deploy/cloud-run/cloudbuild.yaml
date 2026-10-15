@@ -1,8 +1,0 @@
-# Cloud Build でイメージを作る設定。Dockerfile が BuildKit 専用の書き方（--platform=$BUILDPLATFORM）なので、
-# 古い方式の `gcloud builds submit --tag` ではなく BuildKit を有効にして作る。
-# 使い方: gcloud builds submit apps/api --config deploy/cloud-run/cloudbuild.yaml --substitutions _IMAGE=<イメージ名> --region <リージョン>
-steps:
-  - name: gcr.io/cloud-builders/docker
-    env: ["DOCKER_BUILDKIT=1"]
-    args: ["build", "-t", "${_IMAGE}", "."]
-images: ["${_IMAGE}"]

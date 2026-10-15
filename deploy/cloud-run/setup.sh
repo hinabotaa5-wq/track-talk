@@ -15,7 +15,9 @@ BUDGET_AMOUNT="${BUDGET_AMOUNT:-100JPY}"
 API=track-talk-api
 STOPPER=track-talk-budget-stop
 REPO=track-talk
-IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:initial"
+# 最初は Google の見本イメージで立て、本物の API は GitHub Actions がビルドして差し替える。
+# Cloud Shell の docker や Cloud Build は、新しいプロジェクトだとネットワークや権限で失敗しやすいため。
+PLACEHOLDER=us-docker.pkg.dev/cloudrun/container/hello
 
 gcloud config set project "$PROJECT_ID"
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -56,42 +58,31 @@ ensure_sa track-talk-api "TrackTalk API (runtime)"
 ensure_sa budget-stop "TrackTalk budget stop (runtime)"
 ensure_sa github-deploy "TrackTalk deploy from GitHub Actions"
 
-echo "== 初回のイメージを作って送る"
-gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-if gcloud artifacts docker images describe "$IMAGE" >/dev/null 2>&1; then
-  echo "初回のイメージは作成済みなので飛ばします"
-# Cloud Shell の docker は、ビルド中に Go のモジュール取得が "connection refused" で失敗することがある。
-# ホストのネットワークで試し、それでも駄目なら Cloud Build に任せる。
-elif docker build --network host -t "$IMAGE" apps/api; then
-  docker push "$IMAGE"
-else
-  echo "docker でのビルドに失敗したので、Cloud Build で作り直します"
-  gcloud services enable cloudbuild.googleapis.com
-  # 新しいプロジェクトでは、ビルドを動かすサービスアカウントに権限が無く、
-  # "storage.objects.get" の 403 で止まることがある。その場合は docs/cloud-run-deploy.md の「トラブル」を見る。
-  gcloud builds submit apps/api --config deploy/cloud-run/cloudbuild.yaml \
-    --substitutions "_IMAGE=$IMAGE" --region "$REGION"
-fi
-
 echo "== API を立てる"
 # 最大1台: 回数制限がメモリ上にあるのと、急なアクセスで費用が膨らまないようにするため。
+exists() { gcloud run services describe "$1" --region "$REGION" >/dev/null 2>&1; }
+# 2回目以降は、GitHub Actions が入れた本物のイメージを見本で上書きしないよう、作成済みなら飛ばす。
+if ! exists "$API"; then
 gcloud run deploy "$API" \
-  --image "$IMAGE" --region "$REGION" \
+  --image "$PLACEHOLDER" --region "$REGION" \
   --service-account "$(sa track-talk-api)" \
   --env-vars-file "$ENV_FILE" \
   --port 8080 --cpu 1 --memory 512Mi \
   --min-instances 0 --max-instances 1 \
   --cpu-boost --allow-unauthenticated --quiet
+fi
 API_URL=$(gcloud run services describe "$API" --region "$REGION" --format='value(status.url)')
 
 echo "== 予算超過で API を止める budget-stop を立てる"
+# 起動コマンド（/app/budgetstop）は、本物のイメージに差し替えるときに GitHub Actions が付ける。
+if ! exists "$STOPPER"; then
 gcloud run deploy "$STOPPER" \
-  --image "$IMAGE" --region "$REGION" \
+  --image "$PLACEHOLDER" --region "$REGION" \
   --service-account "$(sa budget-stop)" \
-  --command /app/budgetstop \
   --set-env-vars "TARGET_SERVICE=projects/$PROJECT_ID/locations/$REGION/services/$API" \
   --cpu 1 --memory 128Mi --min-instances 0 --max-instances 1 \
   --no-allow-unauthenticated --quiet
+fi
 STOPPER_URL=$(gcloud run services describe "$STOPPER" --region "$REGION" --format='value(status.url)')
 # budget-stop が API の設定を変えられるようにする。
 gcloud run services add-iam-policy-binding "$API" --region "$REGION" \
@@ -143,9 +134,9 @@ cat <<EOF
 完了しました。
 
 API の URL: $API_URL
-  確認: curl $API_URL/health
+（いまは見本の画面が出ます。本物の API は、GitHub Actions の「Deploy API」が流れると差し替わります）
 
-GitHub の Settings → Secrets and variables → Actions → Variables に登録する値:
+GitHub Actions は次の値で、このプロジェクトに送ります（.github/workflows/deploy-api.yml に書いてある値と同じか確認）:
   GCP_PROJECT_ID                  $PROJECT_ID
   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github
   GCP_SERVICE_ACCOUNT             $(sa github-deploy)

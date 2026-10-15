@@ -53,17 +53,12 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/setup.sh deploy/cloud-ru
 
 最後に API の URL と、GitHub に登録する値が表示されます。
 
-## 4. GitHub に登録する（手作業）
+## 4. 本物の API に差し替える
 
-リポジトリの Settings → Secrets and variables → Actions → **Variables** に、表示された3つを登録します（Secret ではなく Variable）。
+setup.sh は、まず Google の見本イメージでサービスを立てます（Cloud Shell の docker や Cloud Build は、新しいプロジェクトだとネットワークや権限で失敗しやすいため）。
+本物の API は GitHub Actions の「Deploy API」がビルドして差し替えます。`main` の `apps/api` が変わると流れ、Actions の画面から Run workflow でも流せます。
 
-| Variable | 値 |
-| --- | --- |
-| `GCP_PROJECT_ID` | プロジェクト ID |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<番号>/locations/global/workloadIdentityPools/github/providers/github` |
-| `GCP_SERVICE_ACCOUNT` | `github-deploy@<プロジェクトID>.iam.gserviceaccount.com` |
-
-登録後、Actions の「Deploy API」を Run workflow で一度流し、成功することを確認します。
+送り先は `.github/workflows/deploy-api.yml` の `env` に書いてあります（`GCP_PROJECT_ID` など。秘密の値ではない）。別のプロジェクトに作り直したら、setup.sh の最後に表示される値に書き換えます。
 
 ## 5. 切り替え
 
@@ -84,13 +79,3 @@ gcloud run services describe track-talk-api --region asia-northeast1            
 - **予算を変える**: コンソールの「お支払い → 予算とアラート」で `track-talk` を編集する
 - **ロールバック**: コンソールの Cloud Run → `track-talk-api` → リビジョンで、前のリビジョンにトラフィックを戻す
 
-## トラブル
-
-- **docker のビルドで `go mod download` が `connection refused` になる**: Cloud Shell の docker のネットワークの問題。setup.sh は自動で Cloud Build に切り替える
-- **Cloud Build が `storage.objects.get` の 403 で止まる**: 新しいプロジェクトでは、ビルドを動かすアカウント（`<プロジェクト番号>-compute@developer.gserviceaccount.com`）に権限が無い。次を実行する（このアカウントに、Cloud Build の作業に必要な権限を与える）
-
-  ```bash
-  gcloud projects add-iam-policy-binding <プロジェクトID> \
-    --member="serviceAccount:<プロジェクト番号>-compute@developer.gserviceaccount.com" \
-    --role="roles/cloudbuild.builds.builder"
-  ```
