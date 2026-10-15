@@ -58,8 +58,15 @@ ensure_sa github-deploy "TrackTalk deploy from GitHub Actions"
 
 echo "== 初回のイメージを作って送る"
 gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-docker build -t "$IMAGE" apps/api
-docker push "$IMAGE"
+# Cloud Shell の docker は、ビルド中に Go のモジュール取得が "connection refused" で失敗することがある。
+# ホストのネットワークで試し、それでも駄目なら Cloud Build に任せる。
+if docker build --network host -t "$IMAGE" apps/api; then
+  docker push "$IMAGE"
+else
+  echo "docker でのビルドに失敗したので、Cloud Build で作り直します"
+  gcloud services enable cloudbuild.googleapis.com
+  gcloud builds submit apps/api --tag "$IMAGE" --region "$REGION"
+fi
 
 echo "== API を立てる"
 # 最大1台: 回数制限がメモリ上にあるのと、急なアクセスで費用が膨らまないようにするため。
