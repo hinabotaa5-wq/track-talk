@@ -35,10 +35,6 @@ export function InjuryView() {
         <p className="mt-1 text-sm text-slate-200">痛めた部位のグループに入って、同じ仲間と一緒に乗り越えよう。</p>
       </div>
 
-      <Link href="/injury/stats" className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline">
-        みんなの復帰データを見る →
-      </Link>
-
       {failed ? (
         <ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />
       ) : sorted === null ? (

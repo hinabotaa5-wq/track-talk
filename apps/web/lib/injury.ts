@@ -183,14 +183,10 @@ export function injuryGroupPath(part: string) {
   return `/injury/${part}`;
 }
 
-// 一覧の並び: 参加中のグループを先に、そのあとは人の多い順(同数なら部位の並び順)。
+// 一覧の並び: 体の下(足裏)から上(首)の順で固定し、その他は最後。
 export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
   const order = new Map<string, number>(injuryBodyParts.map((item, index) => [item.value, index]));
-  return [...groups].sort((a, b) => {
-    if (!!a.me !== !!b.me) return a.me ? -1 : 1;
-    if (a.members !== b.members) return b.members - a.members;
-    return (order.get(a.body_part) ?? 0) - (order.get(b.body_part) ?? 0);
-  });
+  return [...groups].sort((a, b) => (order.get(a.body_part) ?? 0) - (order.get(b.body_part) ?? 0));
 }
 
 // ロードマップ上の自分の段階だけ投稿できる。ほかの段階は読むだけ。
