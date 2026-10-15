@@ -233,6 +233,7 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }
 
   async function deleteComment(cid: string) {
+    if (!confirm("このコメントを削除しますか？")) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
