@@ -68,7 +68,7 @@ export default function OwnVideoPage() {
         }),
       });
       clearHomeFeeds();
-      router.push("/");
+      router.push("/?sort=new");
     } catch (err) {
       if (err instanceof ApiRequestError) {
         const field = err.fields ? Object.values(err.fields)[0] : "";

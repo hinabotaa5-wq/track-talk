@@ -150,7 +150,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             body: JSON.stringify(payload),
           });
       clearHomeFeeds();
-      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
+      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
     } catch (e) {
       if (e instanceof ApiRequestError) {
         const field = e.fields ? Object.values(e.fields)[0] : "";
