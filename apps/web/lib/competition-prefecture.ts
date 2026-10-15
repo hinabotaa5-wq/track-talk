@@ -31,25 +31,39 @@ export function saveCompetitionPrefecture(code: string) {
   window.dispatchEvent(new Event(competitionPrefectureEvent));
 }
 
-export function competitionsRedirectTarget(
+export const regionalCompetitionsPath = "/competitions/regional";
+
+// Sends a bare regional visit back to the saved prefecture.
+export function regionalRedirectTarget(
   prefectureParam: string | undefined,
   saved: string | undefined,
   monthParam: string | undefined,
 ) {
-  if (prefectureParam && prefectureCode(prefectureParam)) return "";
-  if (!saved) return "";
-  const code = prefectureCode(saved);
-  if (!code || code === INTERNATIONAL) return "";
-  const params = new URLSearchParams();
-  const month = monthNumber(monthParam);
-  if (month) params.set("month", String(month));
-  params.set("prefecture", code);
-  return `/competitions?${params.toString()}`;
+  if (prefectureParam && regionalPrefecture(prefectureParam)) return "";
+  const code = regionalPrefecture(saved);
+  if (!code) return "";
+  return regionalUrl(code, monthNumber(monthParam));
 }
 
-export function competitionsPath(prefecture: string) {
-  if (!prefecture) return "/competitions";
-  const code = prefectureCode(prefecture);
-  if (!code) return "/competitions";
-  return `/competitions?prefecture=${code}`;
+// The main tab used to take ?prefecture= for the yearly lists. 国際 now lives on the main tab and
+// each prefecture on the regional page.
+export function legacyCompetitionsTarget(prefectureParam: string | undefined, monthParam: string | undefined) {
+  if (!prefectureParam) return "";
+  const code = prefectureCode(prefectureParam);
+  if (!code) return "";
+  if (code === INTERNATIONAL) return "/competitions?view=international";
+  return regionalUrl(code, monthNumber(monthParam));
+}
+
+// A prefecture for the regional page. 国際 is not one of them.
+export function regionalPrefecture(raw: string | undefined) {
+  const code = prefectureCode(raw);
+  return code && code !== INTERNATIONAL ? code : "";
+}
+
+function regionalUrl(code: string, month: number) {
+  const params = new URLSearchParams();
+  if (month) params.set("month", String(month));
+  params.set("prefecture", code);
+  return `${regionalCompetitionsPath}?${params.toString()}`;
 }

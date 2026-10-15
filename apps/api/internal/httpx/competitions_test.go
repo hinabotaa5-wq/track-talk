@@ -53,3 +53,10 @@ func TestSeasonMonthRange(t *testing.T) {
 		t.Fatalf("january range: %s %s", start, end)
 	}
 }
+
+func TestSeasonRange(t *testing.T) {
+	start, end := seasonRange(2026)
+	if !start.Equal(time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)) || !end.Equal(time.Date(2027, time.April, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("season range: %s %s", start, end)
+	}
+}

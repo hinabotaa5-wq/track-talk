@@ -5,7 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { FeedbackBox } from "./feedback-box";
 import { NotificationBell } from "./notification-bell";
-import { activeMainTab, mainTabHref, mainTabs, showsBackButton, useRememberedCompetitionPrefecture } from "./bottom-nav";
+import { activeMainTab, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -58,7 +58,6 @@ export function Header() {
   const { session } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const competitionPrefecture = useRememberedCompetitionPrefecture();
   const showBack = showsBackButton(pathname);
   const { confirmLeave } = useLeaveGuard();
   const guardedClick = useGuardedLinkClick();
@@ -103,8 +102,8 @@ export function Header() {
               return (
                 <Link
                   key={tab.id}
-                  href={mainTabHref(tab.id, !!session, competitionPrefecture)}
-                  onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session, competitionPrefecture))}
+                  href={mainTabHref(tab.id, !!session)}
+                  onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
                     active

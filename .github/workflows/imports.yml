@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "0 21 * * *"
     - cron: "0 0 1 4,10 *"
+    # 国内主要大会は日程の発表を早く拾えるよう毎月取り込む
+    - cron: "0 0 1 * *"
   workflow_dispatch:
     inputs:
       job:
@@ -54,7 +56,7 @@ jobs:
         run: go run ./cmd/importmajors
 
   domestic-majors:
-    if: github.event.schedule == '0 0 1 4,10 *' || inputs.job == 'domestic-majors'
+    if: github.event.schedule == '0 0 1 * *' || inputs.job == 'domestic-majors'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

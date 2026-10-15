@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  competitionsPath,
-  competitionsRedirectTarget,
+  legacyCompetitionsTarget,
+  regionalPrefecture,
+  regionalRedirectTarget,
   readSavedCompetitionPrefecture,
   saveCompetitionPrefecture,
 } from "./competition-prefecture";
@@ -51,17 +52,24 @@ describe("competition prefecture memory", () => {
     expect(readSavedCompetitionPrefecture()).toBe(INTERNATIONAL);
   });
 
-  it("builds the competitions tab url from the saved region", () => {
-    expect(competitionsPath("")).toBe("/competitions");
-    expect(competitionsPath("13")).toBe("/competitions?prefecture=13");
-    expect(competitionsPath(INTERNATIONAL)).toBe("/competitions?prefecture=00");
+  it("sends a bare regional visit back to the saved prefecture", () => {
+    expect(regionalRedirectTarget(undefined, "13", undefined)).toBe("/competitions/regional?prefecture=13");
+    expect(regionalRedirectTarget(undefined, "13", "4")).toBe("/competitions/regional?month=4&prefecture=13");
+    expect(regionalRedirectTarget("27", "13", undefined)).toBe("");
+    expect(regionalRedirectTarget(undefined, INTERNATIONAL, undefined)).toBe("");
+    expect(regionalRedirectTarget(undefined, undefined, undefined)).toBe("");
   });
 
-  it("sends a bare competitions visit back to the saved region", () => {
-    expect(competitionsRedirectTarget(undefined, "13", undefined)).toBe("/competitions?prefecture=13");
-    expect(competitionsRedirectTarget(undefined, "13", "4")).toBe("/competitions?month=4&prefecture=13");
-    expect(competitionsRedirectTarget("27", "13", undefined)).toBe("");
-    expect(competitionsRedirectTarget(undefined, INTERNATIONAL, undefined)).toBe("");
-    expect(competitionsRedirectTarget(undefined, undefined, undefined)).toBe("");
+  it("moves old main tab urls to their new place", () => {
+    expect(legacyCompetitionsTarget(undefined, "4")).toBe("");
+    expect(legacyCompetitionsTarget("00", "4")).toBe("/competitions?view=international");
+    expect(legacyCompetitionsTarget("13", "4")).toBe("/competitions/regional?month=4&prefecture=13");
+    expect(legacyCompetitionsTarget("99", undefined)).toBe("");
+  });
+
+  it("does not treat 国際 as a prefecture", () => {
+    expect(regionalPrefecture("13")).toBe("13");
+    expect(regionalPrefecture(INTERNATIONAL)).toBe("");
+    expect(regionalPrefecture(undefined)).toBe("");
   });
 });

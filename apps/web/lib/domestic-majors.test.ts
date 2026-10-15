@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DOMESTIC_CATEGORIES,
-  domesticMeetCards,
-  domesticMeetsOf,
-  isDomesticMajorOver,
-} from "./domestic-majors";
+import { undecidedDomesticMeets } from "./domestic-majors";
 import type { DomesticMajor } from "./types";
 
 const zenchu: DomesticMajor = {
@@ -20,25 +15,11 @@ const zenchu: DomesticMajor = {
 };
 
 describe("domestic majors", () => {
-  it("always lists all sixteen meets and fills in the ones the API returned", () => {
-    const cards = domesticMeetCards([zenchu]);
-    expect(cards).toHaveLength(16);
-    expect(cards.find((card) => card.slug === "zenchu")?.major).toBe(zenchu);
-    expect(cards.find((card) => card.slug === "incare-kanto")?.major).toBeNull();
-  });
-
-  it("ignores a slug the page does not know", () => {
-    expect(domesticMeetCards([{ ...zenchu, slug: "unknown" }]).every((card) => card.major === null)).toBe(true);
-  });
-
-  it("groups the cards by category in page order", () => {
-    const cards = domesticMeetCards([]);
-    expect(DOMESTIC_CATEGORIES.map((c) => domesticMeetsOf(cards, c.key).length)).toEqual([5, 9, 2]);
-    expect(domesticMeetsOf(cards, "student").at(-1)?.slug).toBe("nihon-incare");
-  });
-
-  it("treats a meet as over only after its last day", () => {
-    expect(isDomesticMajorOver(zenchu, "2026-08-23")).toBe(false);
-    expect(isDomesticMajorOver(zenchu, "2026-08-24")).toBe(true);
+  it("lists the meets that have no edition this season as undecided", () => {
+    expect(undecidedDomesticMeets([])).toHaveLength(32);
+    const undecided = undecidedDomesticMeets([zenchu]);
+    expect(undecided).toHaveLength(31);
+    expect(undecided.some((meet) => meet.slug === "zenchu")).toBe(false);
+    expect(undecided.some((meet) => meet.slug === "new-year-ekiden")).toBe(true);
   });
 });

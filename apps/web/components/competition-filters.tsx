@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { saveCompetitionPrefecture } from "@/lib/competition-prefecture";
-import { INTERNATIONAL, PREFECTURES } from "@/lib/prefectures";
+import { regionalCompetitionsPath, saveCompetitionPrefecture } from "@/lib/competition-prefecture";
+import { PREFECTURES } from "@/lib/prefectures";
 
 export function CompetitionFilters({
   month,
@@ -14,12 +14,13 @@ export function CompetitionFilters({
   const router = useRouter();
 
   function apply(nextMonth: string, nextPrefecture: string) {
-    const code = nextPrefecture || INTERNATIONAL;
-    saveCompetitionPrefecture(code);
     const params = new URLSearchParams();
     params.set("month", nextMonth);
-    params.set("prefecture", code);
-    router.push(`/competitions?${params.toString()}`);
+    if (nextPrefecture) {
+      saveCompetitionPrefecture(nextPrefecture);
+      params.set("prefecture", nextPrefecture);
+    }
+    router.push(`${regionalCompetitionsPath}?${params.toString()}`);
   }
 
   return (
@@ -40,14 +41,18 @@ export function CompetitionFilters({
         </select>
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-200">地域</span>
+        <span className="mb-1 block text-slate-200">都道府県</span>
         <select
           name="prefecture"
           value={prefecture}
           onChange={(e) => apply(String(month), e.target.value)}
           className="h-11 w-full rounded-md border border-white/25 glass bg-white/10 px-3 text-base text-slate-100 outline-none focus:border-blue-400"
         >
-          <option value={INTERNATIONAL}>国際</option>
+          {prefecture ? null : (
+            <option value="" disabled>
+              選んでください
+            </option>
+          )}
           {PREFECTURES.map((p) => (
             <option key={p.code} value={p.code}>
               {p.name}

@@ -1,8 +1,7 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { competitionPrefectureCookie, competitionsRedirectTarget } from "@/lib/competition-prefecture";
-import { CompetitionsView } from "./competitions-view";
+import { legacyCompetitionsTarget } from "@/lib/competition-prefecture";
+import { CompetitionsHome } from "./competitions-home";
 
 export default async function CompetitionsPage({
   searchParams,
@@ -10,17 +9,12 @@ export default async function CompetitionsPage({
   searchParams: Promise<{ month?: string; prefecture?: string }>;
 }) {
   const sp = await searchParams;
-  const jar = await cookies();
-  const target = competitionsRedirectTarget(
-    sp.prefecture,
-    jar.get(competitionPrefectureCookie)?.value,
-    sp.month,
-  );
+  const target = legacyCompetitionsTarget(sp.prefecture, sp.month);
   if (target) redirect(target);
 
   return (
     <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
-      <CompetitionsView />
+      <CompetitionsHome />
     </Suspense>
   );
 }
