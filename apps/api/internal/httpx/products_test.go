@@ -99,3 +99,63 @@ func TestProductReviewFlow(t *testing.T) {
 		t.Fatalf("hidden product %d", rec.Code)
 	}
 }
+
+func TestProductLinkAndRequest(t *testing.T) {
+	h := setup(t)
+	adminID := uuid.New()
+	admin := token(t, adminID)
+	user := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("admin profile %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", user, nil); rec.Code != http.StatusOK {
+		t.Fatalf("user profile %d", rec.Code)
+	}
+	setAdmin(t, adminID)
+
+	name := "リンク確認 " + uuid.NewString()
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/products", admin, map[string]string{"kind": "spike", "brand": "Zzz", "name": name, "product_url": "http://example.com"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("http url %d", rec.Code)
+	}
+	rec := doJSON(t, h, http.MethodPost, "/v1/admin/products", admin, map[string]string{"kind": "spike", "brand": "Zzz", "name": name, "product_url": "https://example.com/a"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var product struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &product)
+	path := "/v1/admin/products/" + product.ID
+
+	if rec := doJSON(t, h, http.MethodPatch, path, user, map[string]any{"product_url": "https://example.com/b"}); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-admin update %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPatch, path, admin, map[string]any{"product_url": "javascript:alert(1)"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad url %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPatch, path, admin, map[string]any{"product_url": "https://example.com/b", "discontinued": true}); rec.Code != http.StatusNoContent {
+		t.Fatalf("update %d", rec.Code)
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/products/"+product.ID, "", nil)
+	var got struct {
+		ProductURL   string `json:"product_url"`
+		Discontinued bool   `json:"discontinued"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if got.ProductURL != "https://example.com/b" || !got.Discontinued {
+		t.Fatalf("get %s", rec.Body.String())
+	}
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/product-requests", "", map[string]string{"kind": "shoe", "brand": "B", "name": "N"}); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous request %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/product-requests", user, map[string]string{"kind": "boot", "brand": "B", "name": "N"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad kind %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/product-requests", user, map[string]string{"kind": "shoe", "brand": "B", "name": "N", "url": "https://example.com/n"}); rec.Code != http.StatusCreated {
+		t.Fatalf("request %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/inquiries?source=product_request", admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("admin list %d %s", rec.Code, rec.Body.String())
+	}
+}

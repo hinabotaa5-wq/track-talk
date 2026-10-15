@@ -46,17 +46,18 @@ func (q *Queries) CountProducts(ctx context.Context, arg CountProductsParams) (i
 }
 
 const createProduct = `-- name: CreateProduct :one
-INSERT INTO products (id, kind, brand, name, image_url)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO products (id, kind, brand, name, image_url, product_url)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id
 `
 
 type CreateProductParams struct {
-	ID       uuid.UUID `json:"id"`
-	Kind     string    `json:"kind"`
-	Brand    string    `json:"brand"`
-	Name     string    `json:"name"`
-	ImageUrl string    `json:"image_url"`
+	ID         uuid.UUID `json:"id"`
+	Kind       string    `json:"kind"`
+	Brand      string    `json:"brand"`
+	Name       string    `json:"name"`
+	ImageUrl   string    `json:"image_url"`
+	ProductUrl string    `json:"product_url"`
 }
 
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (uuid.UUID, error) {
@@ -66,6 +67,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (u
 		arg.Brand,
 		arg.Name,
 		arg.ImageUrl,
+		arg.ProductUrl,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -122,6 +124,8 @@ SELECT
     p.brand,
     p.name,
     p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
     COALESCE(s.review_count, 0)::bigint AS review_count,
     COALESCE(s.avg_rating, 0)::float8 AS avg_rating
 FROM products p
@@ -135,13 +139,15 @@ WHERE p.id = $1 AND p.hidden_at IS NULL
 `
 
 type GetProductRow struct {
-	ID          uuid.UUID `json:"id"`
-	Kind        string    `json:"kind"`
-	Brand       string    `json:"brand"`
-	Name        string    `json:"name"`
-	ImageUrl    string    `json:"image_url"`
-	ReviewCount int64     `json:"review_count"`
-	AvgRating   float64   `json:"avg_rating"`
+	ID           uuid.UUID `json:"id"`
+	Kind         string    `json:"kind"`
+	Brand        string    `json:"brand"`
+	Name         string    `json:"name"`
+	ImageUrl     string    `json:"image_url"`
+	ProductUrl   string    `json:"product_url"`
+	Discontinued bool      `json:"discontinued"`
+	ReviewCount  int64     `json:"review_count"`
+	AvgRating    float64   `json:"avg_rating"`
 }
 
 func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (GetProductRow, error) {
@@ -153,6 +159,8 @@ func (q *Queries) GetProduct(ctx context.Context, id uuid.UUID) (GetProductRow, 
 		&i.Brand,
 		&i.Name,
 		&i.ImageUrl,
+		&i.ProductUrl,
+		&i.Discontinued,
 		&i.ReviewCount,
 		&i.AvgRating,
 	)
@@ -242,6 +250,8 @@ SELECT
     p.brand,
     p.name,
     p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
     COALESCE(s.review_count, 0)::bigint AS review_count,
     COALESCE(s.avg_rating, 0)::float8 AS avg_rating
 FROM products p
@@ -254,7 +264,7 @@ LEFT JOIN (
 WHERE p.hidden_at IS NULL
   AND p.kind = $1
   AND ($2::text IS NULL OR p.name ILIKE '%' || $2::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || $2::text || '%' ESCAPE '\')
-ORDER BY COALESCE(s.review_count, 0) DESC, COALESCE(s.avg_rating, 0) DESC, p.created_at DESC
+ORDER BY (p.discontinued_at IS NOT NULL) ASC, COALESCE(s.review_count, 0) DESC, COALESCE(s.avg_rating, 0) DESC, p.created_at DESC
 LIMIT $4 OFFSET $3
 `
 
@@ -266,13 +276,15 @@ type ListProductsParams struct {
 }
 
 type ListProductsRow struct {
-	ID          uuid.UUID `json:"id"`
-	Kind        string    `json:"kind"`
-	Brand       string    `json:"brand"`
-	Name        string    `json:"name"`
-	ImageUrl    string    `json:"image_url"`
-	ReviewCount int64     `json:"review_count"`
-	AvgRating   float64   `json:"avg_rating"`
+	ID           uuid.UUID `json:"id"`
+	Kind         string    `json:"kind"`
+	Brand        string    `json:"brand"`
+	Name         string    `json:"name"`
+	ImageUrl     string    `json:"image_url"`
+	ProductUrl   string    `json:"product_url"`
+	Discontinued bool      `json:"discontinued"`
+	ReviewCount  int64     `json:"review_count"`
+	AvgRating    float64   `json:"avg_rating"`
 }
 
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]ListProductsRow, error) {
@@ -295,6 +307,8 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 			&i.Brand,
 			&i.Name,
 			&i.ImageUrl,
+			&i.ProductUrl,
+			&i.Discontinued,
 			&i.ReviewCount,
 			&i.AvgRating,
 		); err != nil {
@@ -321,6 +335,27 @@ type SoftDeleteProductReviewParams struct {
 
 func (q *Queries) SoftDeleteProductReview(ctx context.Context, arg SoftDeleteProductReviewParams) (int64, error) {
 	result, err := q.db.Exec(ctx, softDeleteProductReview, arg.ID, arg.AuthorID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateProduct = `-- name: UpdateProduct :execrows
+UPDATE products
+SET product_url = $1,
+    discontinued_at = CASE WHEN $2::boolean THEN COALESCE(discontinued_at, now()) ELSE NULL END
+WHERE id = $3 AND hidden_at IS NULL
+`
+
+type UpdateProductParams struct {
+	ProductUrl   string    `json:"product_url"`
+	Discontinued bool      `json:"discontinued"`
+	ID           uuid.UUID `json:"id"`
+}
+
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateProduct, arg.ProductUrl, arg.Discontinued, arg.ID)
 	if err != nil {
 		return 0, err
 	}
