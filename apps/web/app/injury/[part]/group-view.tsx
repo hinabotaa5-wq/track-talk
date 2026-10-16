@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -10,6 +10,7 @@ import { useGuardedLinkClick } from "@/components/leave-guard";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
+import { InjuryStageChange } from "@/components/injury-stage-change";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -17,32 +18,17 @@ import type { PostsPage } from "@/lib/fetch-posts";
 import {
   canPostInStage,
   injuryBodyPartLabel,
-  injuryCelebrationKey,
+  injuryGroupDescriptions,
+  injuryGroupTitle,
   injuryStages,
-  shouldCelebrate,
   type InjuryGroup,
+  type InjuryGroupMember,
   type InjuryStage,
 } from "@/lib/injury";
 
 type Load = { kind: "loading" } | { kind: "joined"; group: InjuryGroup } | { kind: "not-joined" } | { kind: "failed" };
 
-function celebrated(part: string) {
-  try {
-    return localStorage.getItem(injuryCelebrationKey(part)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markCelebrated(part: string) {
-  try {
-    localStorage.setItem(injuryCelebrationKey(part), "1");
-  } catch {
-    // 保存できなくても、祝うのが1回余計に出るだけ。
-  }
-}
-
-export function GroupView({ part }: { part: string }) {
+export function GroupView({ part, members, summary }: { part: string; members: number | null; summary: ReactNode }) {
   const { session, token, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
@@ -50,11 +36,10 @@ export function GroupView({ part }: { part: string }) {
   const router = useRouter();
   const guardedClick = useGuardedLinkClick();
   const [changing, setChanging] = useState(false);
-  const [applying, setApplying] = useState<InjuryStage | null>(null);
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
-  const [changeError, setChangeError] = useState("");
   const [celebrate, setCelebrate] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const applyGroup = useCallback((group: InjuryGroup) => {
     setLoad({ kind: "joined", group });
@@ -94,29 +79,12 @@ export function GroupView({ part }: { part: string }) {
     return () => controller.abort();
   }, [joined, part, token, selected, myStage]);
 
-  async function changeStage(stage: InjuryStage) {
-    if (load.kind !== "joined" || stage === load.group.me.stage) {
-      setChanging(false);
-      return;
-    }
-    if (applying) return;
-    setChangeError("");
-    setApplying(stage);
-    try {
-      await apiFetch(`/v1/injury/groups/${part}/me`, { method: "PATCH", token, body: JSON.stringify({ stage }) });
-      setChanging(false);
-      setSelected(stage);
-      setPosts(null);
-      await fetchGroup();
-      if (shouldCelebrate(stage, celebrated(part))) {
-        markCelebrated(part);
-        setCelebrate(true);
-      }
-    } catch (e) {
-      setChangeError(e instanceof ApiRequestError ? e.message : "段階を変えられませんでした");
-    } finally {
-      setApplying(null);
-    }
+  async function onStageChanged(member: InjuryGroupMember, celebrate: boolean) {
+    setChanging(false);
+    setSelected(member.stage);
+    setPosts(null);
+    if (celebrate) setCelebrate(true);
+    await fetchGroup();
   }
 
   async function leaveGroup() {
@@ -141,28 +109,44 @@ export function GroupView({ part }: { part: string }) {
     </Link>
   );
 
-  if (!loading && !session) {
-    return (
-      <div className="space-y-4">
-        {back}
-        <EmptyState title="ログインすると入れます" body="グループの中は、参加した人だけが読めます。" />
-        <Link href="/login" className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white">
-          ログイン
-        </Link>
+  // 入っていない人(ログインしていない人や検索から来た人も)には、グループの紹介と公開の集計を見せる。
+  // サーバーで描くときはまだログインがわからないので、最初はこの形で描く。
+  const intro = (cta: ReactNode) => (
+    <div className="space-y-4">
+      {back}
+      <div>
+        <h1 className="text-2xl font-bold">
+          {injuryGroupTitle(part)}
+          {members !== null ? <span className="text-lg font-semibold text-slate-200"> · {members}人</span> : null}
+        </h1>
+        <p className="mt-2 text-sm text-slate-200">{injuryGroupDescriptions[part]}</p>
       </div>
+      {cta}
+      {summary}
+    </div>
+  );
+  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95";
+
+  if (!loading && !session) {
+    return intro(
+      <Link href={`/login?next=${encodeURIComponent(`/injury/${part}`)}`} className={ctaClass}>
+        ログインしてグループに入る
+      </Link>,
     );
   }
 
   if (load.kind === "failed") {
-    return (
-      <div className="space-y-4">
-        {back}
-        <ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />
-      </div>
-    );
+    return intro(<ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />);
   }
 
   if (load.kind === "not-joined") {
+    if (!joining) {
+      return intro(
+        <button type="button" onClick={() => setJoining(true)} className={ctaClass}>
+          このグループに入る
+        </button>,
+      );
+    }
     return (
       <div className="space-y-4">
         {back}
@@ -173,6 +157,7 @@ export function GroupView({ part }: { part: string }) {
             setLoad({ kind: "loading" });
             setSelected(null);
             setPosts(null);
+            setJoining(false);
             void fetchGroup();
           }}
         />
@@ -181,12 +166,7 @@ export function GroupView({ part }: { part: string }) {
   }
 
   if (load.kind === "loading" || !selected) {
-    return (
-      <div className="space-y-4">
-        {back}
-        <FeedLoadingFrame />
-      </div>
-    );
+    return intro(<div className="h-11" aria-hidden />);
   }
 
   const { group } = load;
@@ -201,9 +181,9 @@ export function GroupView({ part }: { part: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">
-            {injuryBodyPartLabel(group.body_part)}の仲間 · {group.members}人
+            {injuryGroupTitle(part)} · {group.members}人
           </h1>
-          <p className="mt-1 text-sm text-slate-200">一緒に乗り越えよう。どの段階もタップして読めます。</p>
+          <p className="mt-1 text-sm text-slate-200">段階をタップで読めます</p>
         </div>
         <Button variant="secondary" className="shrink-0" onClick={() => setChanging((v) => !v)} aria-expanded={changing}>
           段階を変える
@@ -213,34 +193,13 @@ export function GroupView({ part }: { part: string }) {
       {celebrate ? <InjuryGoalCelebration onClose={() => setCelebrate(false)} /> : null}
 
       {changing ? (
-        <div className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3" role="radiogroup" aria-label="いまの段階">
-          {injuryStages.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={item.value === mine}
-              onClick={() => void changeStage(item.value)}
-              disabled={applying !== null}
-              className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition active:scale-[0.98] disabled:cursor-wait ${
-                item.value === applying
-                  ? "border-blue-400 bg-blue-950/60 text-white"
-                  : item.value === mine
-                    ? "border-blue-400 bg-blue-950/60 text-white"
-                    : "border-white/20 bg-white/8 text-slate-100 hover:bg-white/14"
-              } ${applying !== null && item.value !== applying ? "opacity-50" : ""}`}
-            >
-              {item.label}
-              {item.value === applying ? "に変更しています…" : item.value === mine ? "(いま)" : ""}
-            </button>
-          ))}
-          {applying ? (
-            <p role="status" className="text-sm text-slate-300">
-              段階を変えています。少し待ってください。
-            </p>
-          ) : null}
-          {changeError ? <p className="text-sm text-red-400">{changeError}</p> : null}
-        </div>
+        <InjuryStageChange
+          part={part}
+          token={token}
+          member={group.me}
+          onChanged={(member, celebrate) => void onStageChanged(member, celebrate)}
+          onCancel={() => setChanging(false)}
+        />
       ) : null}
 
       <InjuryRoadmap stages={group.stages} mine={mine} selected={selected} onSelect={setSelected} />
@@ -258,6 +217,38 @@ export function GroupView({ part }: { part: string }) {
         </div>
       )}
 
+      {summary ? (
+        <section className="space-y-3 border-t border-white/15 pt-4" aria-label="みんなのデータ">
+          <div>
+            <h2 className="text-base font-bold">みんなのデータ</h2>
+            <p className="mt-1 text-xs text-slate-300">グループ外の人も見られます</p>
+          </div>
+          {summary}
+        </section>
+      ) : null}
+
+      {/* 投稿ボタンはスクロールしているあいだ下のメニューのすぐ上に貼りつき、いちばん下まで来ると
+          「このグループを抜ける」の上に収まる。段階を変えるフォームを書いているあいだは、入力の邪魔になるので出さない。 */}
+      {changing ? null : (
+        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 space-y-1.5 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {own ? (
+            <Link
+              href={`/injury/${part}/new`}
+              className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+            >
+              {selectedLabel}に投稿
+            </Link>
+          ) : (
+            <>
+              <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
+                この段階には投稿できません
+              </span>
+              <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2 border-t border-white/15 pt-4">
         {leaving === "idle" ? (
           <button
@@ -270,7 +261,7 @@ export function GroupView({ part }: { part: string }) {
         ) : (
           <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/8 p-3 text-sm text-slate-200">
             <p>
-              {injuryBodyPartLabel(group.body_part)}のグループを抜けます。段階の記録は消えて、グループの中は読めなくなります。書いた投稿は残ります(投稿ごとに削除できます)。あとで、もう一度入れます。
+              {injuryBodyPartLabel(group.body_part)}のグループを抜けますか?段階の記録は消えます。投稿は残ります。
             </p>
             <div className="flex gap-2">
               <Button type="button" variant="danger" disabled={leaving === "busy"} onClick={() => void leaveGroup()}>
@@ -282,25 +273,6 @@ export function GroupView({ part }: { part: string }) {
             </div>
             {leaveError ? <p className="text-red-400">{leaveError}</p> : null}
           </div>
-        )}
-      </div>
-      {/* 投稿ボタンは下のメニューのすぐ上に固定する。その分だけ余白を空けて、最後の行が隠れないようにする。 */}
-      <div className={own ? "h-12" : "h-16"} aria-hidden />
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-5xl space-y-1.5 px-4 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {own ? (
-          <Link
-            href={`/injury/${part}/new`}
-            className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
-          >
-            {selectedLabel}に投稿
-          </Link>
-        ) : (
-          <>
-            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-              この段階には投稿できません
-            </span>
-            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
-          </>
         )}
       </div>
     </div>

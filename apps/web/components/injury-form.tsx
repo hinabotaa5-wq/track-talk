@@ -15,7 +15,7 @@ import { useAuth } from "./auth-provider";
 const selectClass =
   "mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
-// groupPart を渡すと、その部位のグループへ、いまの段階として投稿する(部位は固定)。
+// groupPart を渡すと、そのケガのグループへ、いまの段階として投稿する(ケガは固定)。
 export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; returnTo?: "me"; groupPart?: string }) {
   const { token, session } = useAuth();
   const router = useRouter();
@@ -33,7 +33,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
     }
     setError("");
     if (!isInjuryBodyPart(part)) {
-      setError("部位を選んでください");
+      setError("ケガを選んでください");
       return;
     }
     if (body.trim() === "") {
@@ -64,10 +64,10 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {groupPart ? (
-        <p className="text-sm font-medium">部位: {injuryBodyPartLabel(groupPart)}</p>
+        <p className="text-sm font-medium">ケガ: {injuryBodyPartLabel(groupPart)}</p>
       ) : (
         <label className="block text-sm font-medium">
-          部位
+          ケガ
           <select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
             <option value="">選んでください</option>
             {injuryBodyParts.map((item) => (

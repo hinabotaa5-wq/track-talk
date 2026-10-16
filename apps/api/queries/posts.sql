@@ -461,3 +461,15 @@ UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id 
 
 -- name: DecrementCommentCount :exec
 UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1;
+
+-- name: ListMediaInUse :many
+SELECT p.cloudinary_public_id::text AS public_id
+FROM posts p
+WHERE p.deleted_at IS NULL
+  AND p.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[])
+UNION
+SELECT rp.cloudinary_public_id AS public_id
+FROM recruitment_photos rp
+JOIN posts p ON p.id = rp.post_id
+WHERE p.deleted_at IS NULL
+  AND rp.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[]);

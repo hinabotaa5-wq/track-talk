@@ -79,22 +79,34 @@ type InjuryDetail struct {
 }
 
 type InjuryGroupMember struct {
-	UserID    uuid.UUID `json:"user_id"`
-	BodyPart  string    `json:"body_part"`
-	InjuredOn time.Time `json:"injured_on"`
-	Place     string    `json:"place"`
-	Situation string    `json:"situation"`
-	Stage     string    `json:"stage"`
-	JoinedAt  time.Time `json:"joined_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	UserID        uuid.UUID `json:"user_id"`
+	BodyPart      string    `json:"body_part"`
+	InjuredOn     time.Time `json:"injured_on"`
+	PlaceNote     *string   `json:"place_note"`
+	SituationNote *string   `json:"situation_note"`
+	Stage         string    `json:"stage"`
+	JoinedAt      time.Time `json:"joined_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Diagnosis     *string   `json:"diagnosis"`
+	Severity      *string   `json:"severity"`
+	SawDoctor     *bool     `json:"saw_doctor"`
+	Place         *string   `json:"place"`
+	Activity      *string   `json:"activity"`
+	PreChanges    []string  `json:"pre_changes"`
+	Event         *string   `json:"event"`
 }
 
 type InjuryGroupStageLog struct {
-	ID        int64     `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	BodyPart  string    `json:"body_part"`
-	Stage     string    `json:"stage"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int64      `json:"id"`
+	UserID     uuid.UUID  `json:"user_id"`
+	BodyPart   string     `json:"body_part"`
+	Stage      string     `json:"stage"`
+	CreatedAt  time.Time  `json:"created_at"`
+	Actions    []string   `json:"actions"`
+	Note       *string    `json:"note"`
+	NotePublic bool       `json:"note_public"`
+	NoteID     uuid.UUID  `json:"note_id"`
+	HiddenAt   *time.Time `json:"hidden_at"`
 }
 
 type InjuryUpdate struct {

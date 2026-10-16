@@ -659,6 +659,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	media := s.postMediaOf(r.Context(), id)
 	n, err := s.q.SoftDeletePost(r.Context(), db.SoftDeletePostParams{ID: id, AuthorID: p.ID})
 	if err != nil {
 		MapDBError(w, err)
@@ -668,6 +669,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusForbidden, "forbidden", "削除できません")
 		return
 	}
+	s.purgeMedia(media)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1117,6 +1119,17 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
+	}
+	if req.TargetType == "injury_note" {
+		public, err := s.q.InjuryNoteIsPublic(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !public {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
 	}
 	row, err := s.q.CreateReport(r.Context(), db.CreateReportParams{
 		ID:         uuid.New(),

@@ -13,17 +13,28 @@ import (
 )
 
 const addInjuryGroupStageLog = `-- name: AddInjuryGroupStageLog :exec
-INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3)
+INSERT INTO injury_group_stage_log (user_id, body_part, stage, actions, note, note_public)
+VALUES ($1, $2, $3, $4::text[], $5, $6)
 `
 
 type AddInjuryGroupStageLogParams struct {
-	UserID   uuid.UUID `json:"user_id"`
-	BodyPart string    `json:"body_part"`
-	Stage    string    `json:"stage"`
+	UserID     uuid.UUID `json:"user_id"`
+	BodyPart   string    `json:"body_part"`
+	Stage      string    `json:"stage"`
+	Actions    []string  `json:"actions"`
+	Note       *string   `json:"note"`
+	NotePublic bool      `json:"note_public"`
 }
 
 func (q *Queries) AddInjuryGroupStageLog(ctx context.Context, arg AddInjuryGroupStageLogParams) error {
-	_, err := q.db.Exec(ctx, addInjuryGroupStageLog, arg.UserID, arg.BodyPart, arg.Stage)
+	_, err := q.db.Exec(ctx, addInjuryGroupStageLog,
+		arg.UserID,
+		arg.BodyPart,
+		arg.Stage,
+		arg.Actions,
+		arg.Note,
+		arg.NotePublic,
+	)
 	return err
 }
 
@@ -220,7 +231,7 @@ func (q *Queries) GetInjuryDetail(ctx context.Context, postID uuid.UUID) (Injury
 }
 
 const getInjuryGroupMember = `-- name: GetInjuryGroupMember :one
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1 AND body_part = $2
 `
@@ -237,13 +248,51 @@ func (q *Queries) GetInjuryGroupMember(ctx context.Context, arg GetInjuryGroupMe
 		&i.UserID,
 		&i.BodyPart,
 		&i.InjuredOn,
-		&i.Place,
-		&i.Situation,
+		&i.PlaceNote,
+		&i.SituationNote,
 		&i.Stage,
 		&i.JoinedAt,
 		&i.UpdatedAt,
+		&i.Diagnosis,
+		&i.Severity,
+		&i.SawDoctor,
+		&i.Place,
+		&i.Activity,
+		&i.PreChanges,
+		&i.Event,
 	)
 	return i, err
+}
+
+const hideInjuryNote = `-- name: HideInjuryNote :execrows
+UPDATE injury_group_stage_log
+SET hidden_at = now()
+WHERE note_id = $1
+  AND note IS NOT NULL
+  AND hidden_at IS NULL
+`
+
+func (q *Queries) HideInjuryNote(ctx context.Context, noteID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, hideInjuryNote, noteID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const injuryNoteIsPublic = `-- name: InjuryNoteIsPublic :one
+SELECT EXISTS (
+    SELECT 1 FROM injury_group_stage_log
+    WHERE note_id = $1 AND note_public AND note IS NOT NULL AND hidden_at IS NULL
+)
+`
+
+// 通報できるのは、公開ページに載っている一言だけ。
+func (q *Queries) InjuryNoteIsPublic(ctx context.Context, noteID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, injuryNoteIsPublic, noteID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const injuryStageStats = `-- name: InjuryStageStats :many
@@ -337,6 +386,48 @@ func (q *Queries) ListInjuryDetails(ctx context.Context, postIds []uuid.UUID) ([
 	return items, nil
 }
 
+const listInjuryGroupAnswers = `-- name: ListInjuryGroupAnswers :many
+SELECT severity, place, activity, pre_changes, event
+FROM injury_group_members
+WHERE body_part = $1
+  AND severity IS NOT NULL
+`
+
+type ListInjuryGroupAnswersRow struct {
+	Severity   *string  `json:"severity"`
+	Place      *string  `json:"place"`
+	Activity   *string  `json:"activity"`
+	PreChanges []string `json:"pre_changes"`
+	Event      *string  `json:"event"`
+}
+
+// 公開ページの予防の集計に使う、入るときの答え。選択式になる前に入った人は数えない。
+func (q *Queries) ListInjuryGroupAnswers(ctx context.Context, bodyPart string) ([]ListInjuryGroupAnswersRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryGroupAnswers, bodyPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryGroupAnswersRow
+	for rows.Next() {
+		var i ListInjuryGroupAnswersRow
+		if err := rows.Scan(
+			&i.Severity,
+			&i.Place,
+			&i.Activity,
+			&i.PreChanges,
+			&i.Event,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInjuryGroupFaces = `-- name: ListInjuryGroupFaces :many
 SELECT stage, COALESCE(nickname, '')::text AS nickname
 FROM (
@@ -371,6 +462,56 @@ func (q *Queries) ListInjuryGroupFaces(ctx context.Context, arg ListInjuryGroupF
 	for rows.Next() {
 		var i ListInjuryGroupFacesRow
 		if err := rows.Scan(&i.Stage, &i.Nickname); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInjuryGroupStageChanges = `-- name: ListInjuryGroupStageChanges :many
+SELECT
+    l.user_id,
+    l.stage,
+    l.actions,
+    m.severity,
+    (EXTRACT(EPOCH FROM (l.created_at - m.injured_on::timestamptz)) / 86400.0)::float8 AS days
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND cardinality(l.actions) > 0
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at
+`
+
+type ListInjuryGroupStageChangesRow struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Stage    string    `json:"stage"`
+	Actions  []string  `json:"actions"`
+	Severity *string   `json:"severity"`
+	Days     float64   `json:"days"`
+}
+
+// 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした月の1日からその記録までの日数。
+func (q *Queries) ListInjuryGroupStageChanges(ctx context.Context, bodyPart string) ([]ListInjuryGroupStageChangesRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryGroupStageChanges, bodyPart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryGroupStageChangesRow
+	for rows.Next() {
+		var i ListInjuryGroupStageChangesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Stage,
+			&i.Actions,
+			&i.Severity,
+			&i.Days,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -483,7 +624,7 @@ func (q *Queries) ListMyInjuryFirstReports(ctx context.Context, authorID uuid.UU
 }
 
 const listMyInjuryGroupMembers = `-- name: ListMyInjuryGroupMembers :many
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1
 `
@@ -501,11 +642,18 @@ func (q *Queries) ListMyInjuryGroupMembers(ctx context.Context, userID uuid.UUID
 			&i.UserID,
 			&i.BodyPart,
 			&i.InjuredOn,
-			&i.Place,
-			&i.Situation,
+			&i.PlaceNote,
+			&i.SituationNote,
 			&i.Stage,
 			&i.JoinedAt,
 			&i.UpdatedAt,
+			&i.Diagnosis,
+			&i.Severity,
+			&i.SawDoctor,
+			&i.Place,
+			&i.Activity,
+			&i.PreChanges,
+			&i.Event,
 		); err != nil {
 			return nil, err
 		}
@@ -559,6 +707,59 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 	return items, nil
 }
 
+const listPublicInjuryGroupNotes = `-- name: ListPublicInjuryGroupNotes :many
+SELECT l.note_id, l.note::text AS note, l.stage, m.event, l.created_at
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND l.note_public
+  AND l.note IS NOT NULL
+  AND l.hidden_at IS NULL
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at DESC
+LIMIT $2
+`
+
+type ListPublicInjuryGroupNotesParams struct {
+	BodyPart string `json:"body_part"`
+	Limit    int32  `json:"limit"`
+}
+
+type ListPublicInjuryGroupNotesRow struct {
+	NoteID    uuid.UUID `json:"note_id"`
+	Note      string    `json:"note"`
+	Stage     string    `json:"stage"`
+	Event     *string   `json:"event"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// 公開してよいと選ばれた一言。ニックネームは返さず、その時の段階と種目だけをつける。
+func (q *Queries) ListPublicInjuryGroupNotes(ctx context.Context, arg ListPublicInjuryGroupNotesParams) ([]ListPublicInjuryGroupNotesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicInjuryGroupNotes, arg.BodyPart, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicInjuryGroupNotesRow
+	for rows.Next() {
+		var i ListPublicInjuryGroupNotesRow
+		if err := rows.Scan(
+			&i.NoteID,
+			&i.Note,
+			&i.Stage,
+			&i.Event,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const notifyInjuryFollowers = `-- name: NotifyInjuryFollowers :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id)
 SELECT gen_random_uuid(), f.user_id, 'injury_update', $1::uuid
@@ -593,7 +794,7 @@ const setInjuryGroupStage = `-- name: SetInjuryGroupStage :one
 UPDATE injury_group_members
 SET stage = $3, updated_at = now()
 WHERE user_id = $1 AND body_part = $2
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 `
 
 type SetInjuryGroupStageParams struct {
@@ -609,11 +810,18 @@ func (q *Queries) SetInjuryGroupStage(ctx context.Context, arg SetInjuryGroupSta
 		&i.UserID,
 		&i.BodyPart,
 		&i.InjuredOn,
-		&i.Place,
-		&i.Situation,
+		&i.PlaceNote,
+		&i.SituationNote,
 		&i.Stage,
 		&i.JoinedAt,
 		&i.UpdatedAt,
+		&i.Diagnosis,
+		&i.Severity,
+		&i.SawDoctor,
+		&i.Place,
+		&i.Activity,
+		&i.PreChanges,
+		&i.Event,
 	)
 	return i, err
 }
@@ -676,33 +884,56 @@ func (q *Queries) UpsertInjuryDetail(ctx context.Context, arg UpsertInjuryDetail
 }
 
 const upsertInjuryGroupMember = `-- name: UpsertInjuryGroupMember :one
-INSERT INTO injury_group_members (user_id, body_part, injured_on, place, situation, stage)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO injury_group_members (
+    user_id, body_part, injured_on, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, stage
+)
+VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9::text[], $10, $11
+)
 ON CONFLICT (user_id, body_part) DO UPDATE SET
     injured_on = EXCLUDED.injured_on,
+    place_note = NULL,
+    situation_note = NULL,
+    diagnosis = EXCLUDED.diagnosis,
+    severity = EXCLUDED.severity,
+    saw_doctor = EXCLUDED.saw_doctor,
     place = EXCLUDED.place,
-    situation = EXCLUDED.situation,
+    activity = EXCLUDED.activity,
+    pre_changes = EXCLUDED.pre_changes,
+    event = EXCLUDED.event,
     stage = EXCLUDED.stage,
     updated_at = now()
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 `
 
 type UpsertInjuryGroupMemberParams struct {
-	UserID    uuid.UUID `json:"user_id"`
-	BodyPart  string    `json:"body_part"`
-	InjuredOn time.Time `json:"injured_on"`
-	Place     string    `json:"place"`
-	Situation string    `json:"situation"`
-	Stage     string    `json:"stage"`
+	UserID     uuid.UUID `json:"user_id"`
+	BodyPart   string    `json:"body_part"`
+	InjuredOn  time.Time `json:"injured_on"`
+	Diagnosis  *string   `json:"diagnosis"`
+	Severity   *string   `json:"severity"`
+	SawDoctor  *bool     `json:"saw_doctor"`
+	Place      *string   `json:"place"`
+	Activity   *string   `json:"activity"`
+	PreChanges []string  `json:"pre_changes"`
+	Event      *string   `json:"event"`
+	Stage      string    `json:"stage"`
 }
 
+// 入り直したときは答えを新しくし、前の自由記述は消す。
 func (q *Queries) UpsertInjuryGroupMember(ctx context.Context, arg UpsertInjuryGroupMemberParams) (InjuryGroupMember, error) {
 	row := q.db.QueryRow(ctx, upsertInjuryGroupMember,
 		arg.UserID,
 		arg.BodyPart,
 		arg.InjuredOn,
+		arg.Diagnosis,
+		arg.Severity,
+		arg.SawDoctor,
 		arg.Place,
-		arg.Situation,
+		arg.Activity,
+		arg.PreChanges,
+		arg.Event,
 		arg.Stage,
 	)
 	var i InjuryGroupMember
@@ -710,11 +941,18 @@ func (q *Queries) UpsertInjuryGroupMember(ctx context.Context, arg UpsertInjuryG
 		&i.UserID,
 		&i.BodyPart,
 		&i.InjuredOn,
-		&i.Place,
-		&i.Situation,
+		&i.PlaceNote,
+		&i.SituationNote,
 		&i.Stage,
 		&i.JoinedAt,
 		&i.UpdatedAt,
+		&i.Diagnosis,
+		&i.Severity,
+		&i.SawDoctor,
+		&i.Place,
+		&i.Activity,
+		&i.PreChanges,
+		&i.Event,
 	)
 	return i, err
 }

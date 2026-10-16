@@ -273,6 +273,11 @@ func (s *Server) updateRecruitment(w http.ResponseWriter, r *http.Request, autho
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
+	before, err := q.ListRecruitmentPhotos(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if _, err := q.UpdatePost(r.Context(), db.UpdatePostParams{
 		ID:       id,
 		AuthorID: author.ID,
@@ -294,6 +299,11 @@ func (s *Server) updateRecruitment(w http.ResponseWriter, r *http.Request, autho
 		MapDBError(w, err)
 		return
 	}
+	beforeIDs := make([]string, len(before))
+	for i, photo := range before {
+		beforeIDs[i] = photo.CloudinaryPublicID
+	}
+	s.purgeMedia(postMedia{Images: unused(beforeIDs, in.PhotoIDs)})
 	s.writePost(w, r, id, http.StatusOK)
 }
 

@@ -508,6 +508,39 @@ func (q *Queries) ListLikedPostIDs(ctx context.Context, arg ListLikedPostIDsPara
 	return items, nil
 }
 
+const listMediaInUse = `-- name: ListMediaInUse :many
+SELECT p.cloudinary_public_id::text AS public_id
+FROM posts p
+WHERE p.deleted_at IS NULL
+  AND p.cloudinary_public_id = ANY($1::text[])
+UNION
+SELECT rp.cloudinary_public_id AS public_id
+FROM recruitment_photos rp
+JOIN posts p ON p.id = rp.post_id
+WHERE p.deleted_at IS NULL
+  AND rp.cloudinary_public_id = ANY($1::text[])
+`
+
+func (q *Queries) ListMediaInUse(ctx context.Context, publicIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listMediaInUse, publicIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var public_id string
+		if err := rows.Scan(&public_id); err != nil {
+			return nil, err
+		}
+		items = append(items, public_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPostsNew = `-- name: ListPostsNew :many
 SELECT
     p.id,

@@ -120,23 +120,36 @@ WHERE u.id = sqlc.arg('id')
 RETURNING u.id, u.post_id, u.stage, u.body, u.created_at;
 
 -- name: UpsertInjuryGroupMember :one
-INSERT INTO injury_group_members (user_id, body_part, injured_on, place, situation, stage)
-VALUES ($1, $2, $3, $4, $5, $6)
+-- 入り直したときは答えを新しくし、前の自由記述は消す。
+INSERT INTO injury_group_members (
+    user_id, body_part, injured_on, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, stage
+)
+VALUES (
+    sqlc.arg('user_id'), sqlc.arg('body_part'), sqlc.arg('injured_on'), sqlc.narg('diagnosis'), sqlc.arg('severity'),
+    sqlc.arg('saw_doctor'), sqlc.arg('place'), sqlc.arg('activity'), sqlc.arg('pre_changes')::text[], sqlc.arg('event'), sqlc.arg('stage')
+)
 ON CONFLICT (user_id, body_part) DO UPDATE SET
     injured_on = EXCLUDED.injured_on,
+    place_note = NULL,
+    situation_note = NULL,
+    diagnosis = EXCLUDED.diagnosis,
+    severity = EXCLUDED.severity,
+    saw_doctor = EXCLUDED.saw_doctor,
     place = EXCLUDED.place,
-    situation = EXCLUDED.situation,
+    activity = EXCLUDED.activity,
+    pre_changes = EXCLUDED.pre_changes,
+    event = EXCLUDED.event,
     stage = EXCLUDED.stage,
     updated_at = now()
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event;
 
 -- name: GetInjuryGroupMember :one
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1 AND body_part = $2;
 
 -- name: ListMyInjuryGroupMembers :many
-SELECT user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
 FROM injury_group_members
 WHERE user_id = $1;
 
@@ -144,10 +157,11 @@ WHERE user_id = $1;
 UPDATE injury_group_members
 SET stage = $3, updated_at = now()
 WHERE user_id = $1 AND body_part = $2
-RETURNING user_id, body_part, injured_on, place, situation, stage, joined_at, updated_at;
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event;
 
 -- name: AddInjuryGroupStageLog :exec
-INSERT INTO injury_group_stage_log (user_id, body_part, stage) VALUES ($1, $2, $3);
+INSERT INTO injury_group_stage_log (user_id, body_part, stage, actions, note, note_public)
+VALUES (sqlc.arg('user_id'), sqlc.arg('body_part'), sqlc.arg('stage'), sqlc.arg('actions')::text[], sqlc.narg('note'), sqlc.arg('note_public'));
 
 -- name: CountInjuryGroupMembers :many
 SELECT body_part, count(*)::bigint AS members
@@ -178,3 +192,52 @@ SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = $1), false)::boolean A
 
 -- name: DeleteInjuryGroupMember :execrows
 DELETE FROM injury_group_members WHERE user_id = $1 AND body_part = $2;
+
+-- name: ListInjuryGroupAnswers :many
+-- 公開ページの予防の集計に使う、入るときの答え。選択式になる前に入った人は数えない。
+SELECT severity, place, activity, pre_changes, event
+FROM injury_group_members
+WHERE body_part = $1
+  AND severity IS NOT NULL;
+
+-- name: ListInjuryGroupStageChanges :many
+-- 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした月の1日からその記録までの日数。
+SELECT
+    l.user_id,
+    l.stage,
+    l.actions,
+    m.severity,
+    (EXTRACT(EPOCH FROM (l.created_at - m.injured_on::timestamptz)) / 86400.0)::float8 AS days
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND cardinality(l.actions) > 0
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at;
+
+-- name: ListPublicInjuryGroupNotes :many
+-- 公開してよいと選ばれた一言。ニックネームは返さず、その時の段階と種目だけをつける。
+SELECT l.note_id, l.note::text AS note, l.stage, m.event, l.created_at
+FROM injury_group_stage_log l
+JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
+WHERE l.body_part = $1
+  AND l.note_public
+  AND l.note IS NOT NULL
+  AND l.hidden_at IS NULL
+  AND l.created_at >= m.joined_at
+ORDER BY l.created_at DESC
+LIMIT $2;
+
+-- name: InjuryNoteIsPublic :one
+-- 通報できるのは、公開ページに載っている一言だけ。
+SELECT EXISTS (
+    SELECT 1 FROM injury_group_stage_log
+    WHERE note_id = $1 AND note_public AND note IS NOT NULL AND hidden_at IS NULL
+);
+
+-- name: HideInjuryNote :execrows
+UPDATE injury_group_stage_log
+SET hidden_at = now()
+WHERE note_id = $1
+  AND note IS NOT NULL
+  AND hidden_at IS NULL;

@@ -73,8 +73,10 @@ export function Header() {
   const current = activeMainTab(pathname);
 
   return (
+    // 1 割でも透けると、下に流れた文字が blur でにじんでヘッダーがぼやけて見える。
+    // blur は使わず、背景と同じ色で完全にふさぐ。
     <header
-      className="sticky top-0 z-40 border-b border-white/20 glass bg-white/8 backdrop-blur-md"
+      className="sticky top-0 z-40 border-b border-white/15 bg-[#16243a]"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
@@ -107,7 +109,7 @@ export function Header() {
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
                     active
-                      ? "border border-white/35 bg-white/20 font-semibold text-white backdrop-blur-xl"
+                      ? "border border-white/35 bg-white/20 font-semibold text-white"
                       : "text-slate-200 hover:bg-white/12 hover:text-white"
                   }`}
                 >

@@ -3,9 +3,7 @@ package httpx
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -18,9 +16,20 @@ const injuryGroupFaces = 5
 type injuryGroupMemberDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
-	InjuredOn  string `json:"injured_on"`
-	Place      string `json:"place"`
-	Situation  string `json:"situation"`
+	// InjuredMonth is "YYYY-MM": members are asked only roughly when they got hurt.
+	InjuredMonth string `json:"injured_month"`
+	// The answers below are empty for members who joined before the questions became multiple choice.
+	Diagnosis     string   `json:"diagnosis,omitempty"`
+	Severity      string   `json:"severity,omitempty"`
+	SeverityLabel string   `json:"severity_label,omitempty"`
+	SawDoctor     *bool    `json:"saw_doctor,omitempty"`
+	Place         string   `json:"place,omitempty"`
+	PlaceLabel    string   `json:"place_label,omitempty"`
+	Activity      string   `json:"activity,omitempty"`
+	ActivityLabel string   `json:"activity_label,omitempty"`
+	PreChanges    []string `json:"pre_changes"`
+	Event         string   `json:"event,omitempty"`
+	EventLabel    string   `json:"event_label,omitempty"`
 }
 
 type injuryGroupSummaryDTO struct {
@@ -45,32 +54,40 @@ type injuryGroupDTO struct {
 	Me            injuryGroupMemberDTO  `json:"me"`
 }
 
-type injuryJoinReq struct {
-	InjuredOn string `json:"injured_on"`
-	Place     string `json:"place"`
-	Situation string `json:"situation"`
-	Stage     string `json:"stage"`
-}
-
-type injuryGroupStageReq struct {
-	Stage string `json:"stage"`
-}
-
 func injuryGroupMemberFromRow(row db.InjuryGroupMember) injuryGroupMemberDTO {
-	return injuryGroupMemberDTO{
-		Stage:      row.Stage,
-		StageLabel: injuryStageLabel(row.Stage),
-		InjuredOn:  row.InjuredOn.Format("2006-01-02"),
-		Place:      row.Place,
-		Situation:  row.Situation,
+	dto := injuryGroupMemberDTO{
+		Stage:        row.Stage,
+		StageLabel:   injuryStageLabel(row.Stage),
+		InjuredMonth: row.InjuredOn.Format("2006-01"),
+		SawDoctor:    row.SawDoctor,
+		PreChanges:   row.PreChanges,
 	}
+	if dto.PreChanges == nil {
+		dto.PreChanges = []string{}
+	}
+	if row.Diagnosis != nil {
+		dto.Diagnosis = *row.Diagnosis
+	}
+	if row.Severity != nil {
+		dto.Severity, dto.SeverityLabel = *row.Severity, injuryOptionLabel(injurySeverities, *row.Severity)
+	}
+	if row.Place != nil {
+		dto.Place, dto.PlaceLabel = *row.Place, injuryOptionLabel(injuryPlaces, *row.Place)
+	}
+	if row.Activity != nil {
+		dto.Activity, dto.ActivityLabel = *row.Activity, injuryOptionLabel(injuryActivities, *row.Activity)
+	}
+	if row.Event != nil {
+		dto.Event, dto.EventLabel = *row.Event, injuryOptionLabel(injuryEvents, *row.Event)
+	}
+	return dto
 }
 
 // injuryGroupPart reads the {part} path parameter and rejects an unknown body part.
 func injuryGroupPart(w http.ResponseWriter, r *http.Request) (string, bool) {
 	part := chi.URLParam(r, "part")
 	if !validInjuryBodyPart(part) {
-		Error(w, http.StatusNotFound, "not_found", "その部位のグループはありません")
+		Error(w, http.StatusNotFound, "not_found", "そのケガのグループはありません")
 		return "", false
 	}
 	return part, true
@@ -178,32 +195,6 @@ func (s *Server) getInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
-func normalizeInjuryJoin(req injuryJoinReq) (injuredOn time.Time, place, situation, stage string, fields map[string]string) {
-	fields = map[string]string{}
-	day, err := time.Parse("2006-01-02", strings.TrimSpace(req.InjuredOn))
-	switch {
-	case err != nil:
-		fields["injured_on"] = "いつ痛めたかを選んでください"
-	case day.After(time.Now().AddDate(0, 0, 1)):
-		fields["injured_on"] = "未来の日付は選べません"
-	default:
-		injuredOn = day
-	}
-	place = strings.TrimSpace(req.Place)
-	if n := utf8.RuneCountInString(place); n < 1 || n > 100 {
-		fields["place"] = "どこで痛めたかを100文字以内で入力してください"
-	}
-	situation = strings.TrimSpace(req.Situation)
-	if n := utf8.RuneCountInString(situation); n < 1 || n > 500 {
-		fields["situation"] = "どんな状況だったかを500文字以内で入力してください"
-	}
-	stage = strings.TrimSpace(req.Stage)
-	if !validInjuryStage(stage) {
-		fields["stage"] = "いまの状況を選んでください"
-	}
-	return injuredOn, place, situation, stage, fields
-}
-
 func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -218,7 +209,7 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	injuredOn, place, situation, stage, fields := normalizeInjuryJoin(req)
+	in, fields := normalizeInjuryJoin(part, req, time.Now())
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -231,13 +222,23 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
 	row, err := q.UpsertInjuryGroupMember(r.Context(), db.UpsertInjuryGroupMemberParams{
-		UserID: p.ID, BodyPart: part, InjuredOn: injuredOn, Place: place, Situation: situation, Stage: stage,
+		UserID:     p.ID,
+		BodyPart:   part,
+		InjuredOn:  in.InjuredOn,
+		Diagnosis:  in.Diagnosis,
+		Severity:   &in.Severity,
+		SawDoctor:  &in.SawDoctor,
+		Place:      &in.Place,
+		Activity:   &in.Activity,
+		PreChanges: in.PreChanges,
+		Event:      &in.Event,
+		Stage:      in.Stage,
 	})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: stage}); err != nil {
+	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: in.Stage, Actions: []string{}}); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -248,7 +249,8 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, injuryGroupMemberFromRow(row))
 }
 
-// updateInjuryGroupStage lets a member move to any stage, forward or back (a relapse, a second surgery).
+// updateInjuryGroupStage lets a member move to any stage, forward or back (a relapse, a second surgery),
+// recording what they consciously did during the stage they are leaving and an optional note for the next person.
 // Posts already written keep the stage they were written in.
 func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) {
 	p, part, member, ok := s.injuryGroupMember(w, r)
@@ -260,15 +262,15 @@ func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	stage := strings.TrimSpace(req.Stage)
-	if !validInjuryStage(stage) {
-		FieldError(w, map[string]string{"stage": "いまの状況を選んでください"})
+	in, fields := normalizeInjuryStageChange(req)
+	if len(fields) == 0 && in.Stage == member.Stage {
+		fields["stage"] = "いまと同じ段階です。変わった段階を選んでください"
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
 		return
 	}
-	if stage == member.Stage {
-		JSON(w, http.StatusOK, injuryGroupMemberFromRow(member))
-		return
-	}
+	stage := in.Stage
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
@@ -281,7 +283,9 @@ func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: stage}); err != nil {
+	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{
+		UserID: p.ID, BodyPart: part, Stage: stage, Actions: in.Actions, Note: in.Note, NotePublic: in.NotePublic,
+	}); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -316,7 +320,7 @@ func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.BodyPart != part {
-		FieldError(w, map[string]string{"body_part": "グループの部位と投稿の部位が合っていません"})
+		FieldError(w, map[string]string{"body_part": "グループのケガと投稿のケガが合っていません"})
 		return
 	}
 	in.GroupStage = &member.Stage

@@ -27,14 +27,23 @@ import { LikeButton, ReportButton, SaveButton } from "@/components/action-button
 import { InjuryTypicalRecovery } from "@/components/injury-typical-recovery";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 
-export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
+export function PostDetail({
+  id,
+  returnTo,
+  initial,
+}: {
+  id: string;
+  returnTo?: "me";
+  // サーバーでログインなしに読めた投稿。最初からこれを描き、ログイン中ならいいね状態などを読み直す。
+  initial?: { post: Post; comments: Comment[] };
+}) {
   const { session, token } = useAuth();
   const router = useRouter();
-  const [post, setPost] = useState<Post | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [post, setPost] = useState<Post | null>(initial?.post ?? null);
+  const [comments, setComments] = useState<Comment[]>(initial?.comments ?? []);
   const [error, setError] = useState("");
   const [commentError, setCommentError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
   const action = useActionLock();
   const commentLock = useActionLock();
@@ -62,8 +71,8 @@ export function PostDetail({ id, returnTo }: { id: string; returnTo?: "me" }) {
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
       else if (e instanceof ApiRequestError && (e.status === 401 || e.code === "not_joined")) {
-        // ケガの投稿は、同じ部位のグループに参加した人だけが読める。
-        setError("この投稿は、同じ部位のグループに参加すると読めます");
+        // ケガの投稿は、同じケガのグループに参加した人だけが読める。
+        setError("この投稿は、同じケガのグループに参加すると読めます");
       } else setError("読み込みに失敗しました");
     } finally {
       setLoading(false);

@@ -170,7 +170,7 @@ func ReportReason(v string) string {
 
 func TargetType(v string) string {
 	switch v {
-	case "post", "comment":
+	case "post", "comment", "injury_note":
 		return ""
 	default:
 		return "対象が不正です"

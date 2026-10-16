@@ -8,14 +8,14 @@ import (
 
 func TestBuildInjuryStats(t *testing.T) {
 	parts := []db.CountInjuryPostsByPartRow{
-		{BodyPart: "knee", Posts: 7},
-		{BodyPart: "ankle", Posts: 2},
+		{BodyPart: "jumpers-knee", Posts: 7},
+		{BodyPart: "sprain", Posts: 2},
 	}
 	stages := []db.InjuryStageStatsRow{
-		{BodyPart: "knee", Stage: "jogging", Reached: 5, MedianDays: 41.6},
-		{BodyPart: "knee", Stage: "rehab", Reached: 6, MedianDays: 12.4},
-		{BodyPart: "knee", Stage: "race", Reached: 4, MedianDays: 90},
-		{BodyPart: "ankle", Stage: "rehab", Reached: 1, MedianDays: 3},
+		{BodyPart: "jumpers-knee", Stage: "jogging", Reached: 5, MedianDays: 41.6},
+		{BodyPart: "jumpers-knee", Stage: "rehab", Reached: 6, MedianDays: 12.4},
+		{BodyPart: "jumpers-knee", Stage: "race", Reached: 4, MedianDays: 90},
+		{BodyPart: "sprain", Stage: "rehab", Reached: 1, MedianDays: 3},
 	}
 	got := buildInjuryStats(parts, stages)
 
@@ -23,7 +23,7 @@ func TestBuildInjuryStats(t *testing.T) {
 		t.Fatalf("unexpected shape %+v", got)
 	}
 	// 部位は一覧の定義順(足首 → 膝)で返る。
-	if got.Parts[0].BodyPart != "ankle" || got.Parts[1].BodyPart != "knee" {
+	if got.Parts[0].BodyPart != "sprain" || got.Parts[1].BodyPart != "jumpers-knee" {
 		t.Fatalf("part order %+v", got.Parts)
 	}
 	ankle := got.Parts[0]

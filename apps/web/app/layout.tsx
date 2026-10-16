@@ -11,6 +11,8 @@ import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
+import { siteDescription, siteName, siteUrl } from "@/lib/site";
+import { JsonLd } from "@/components/json-ld";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,12 +20,29 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "TrackTalk",
-  description: "陸上競技を、もっと深く楽しむコミュニティ",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${siteName}｜陸上競技の匿名コミュニティ`,
+    template: `%s｜${siteName}`,
+  },
+  description: siteDescription,
+  applicationName: siteName,
+  openGraph: {
+    type: "website",
+    siteName,
+    locale: "ja_JP",
+    title: `${siteName}｜陸上競技の匿名コミュニティ`,
+    description: siteDescription,
+  },
+  twitter: {
+    card: "summary",
+  },
   appleWebApp: {
     capable: true,
     title: "TrackTalk",
-    statusBarStyle: "black-translucent",
+    // black-translucent だと iOS 26 のホーム画面アプリで、画面の下がステータスバーの高さ分だけ
+    // 描かれずに空き、下に固定したバーも浮く(WebKit bug 301108)。ステータスバーは iOS に描かせる。
+    statusBarStyle: "default",
   },
   verification: {
     google: "erl1lifh6-0oXq1ecreI-JSTA70vLV_03V2Cwx4b8_k",
@@ -44,6 +63,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
       <body className="isolate flex min-h-full flex-col">
+        <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
         <Script
           defer
           src="https://cloud.umami.is/script.js"

@@ -7,8 +7,7 @@ import { useEffect } from "react";
 
 const doors = [
   { href: "/posts/new", title: "文章", body: "タイトル・本文・写真のいずれかでスレッドを立てます。" },
-  { href: "/posts/youtube", title: "YouTubeのURL", body: "動画を引用して、そのスレッドに集まります。" },
-  { href: "/posts/instagram", title: "InstagramのURL", body: "公開の投稿やリールを引用して、そのスレッドに集まります。" },
+  { href: "/posts/url", title: "動画URL", body: "YouTubeやInstagramの動画を引用して、そのスレッドに集まります。" },
   { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。" },
   { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。" },
   { href: "/posts/practice", title: "練習相手募集", body: "練習場所と日時を書いて、一緒に練習する相手を募ります。" },
@@ -24,18 +23,26 @@ export default function UploadPage() {
 
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
+  // ホームの「＋」から開く詳細画面。下のメニューは出さないので、その分まで5つの入口で埋める。
+  // dvh だと、iPhone の Safari で画面を開いた直後に下のツールバーが出てきた分だけ高さが縮み、
+  // 5つの入口が上にギュッと詰まる。ツールバーが出ている時の高さ(svh)で固定して動かさない。
+  // 高さ = 画面 - ヘッダー(3.8125rem) - 上の余白(1.5rem) - 下の余白(0.75rem) - 上下のセーフエリア。
+  // main の下の余白(1.5rem)は -mb-6 で打ち消し、下の空きを 0.75rem だけにする。
   return (
-    <div className="grid h-[calc(100dvh-10.625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] grid-rows-[repeat(6,minmax(0,1fr))] gap-2 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
-      {doors.map((door) => (
-        <Link
-          key={door.href}
-          href={door.href}
-          className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
-        >
-          <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
-          <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
-        </Link>
-      ))}
+    <div className="-mb-6 flex h-[calc(100svh-6.0625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3 md:mb-0 md:h-auto">
+      <h1 className="text-xl font-bold">何を投稿しますか?</h1>
+      <div className="grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
+        {doors.map((door) => (
+          <Link
+            key={door.href}
+            href={door.href}
+            className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+          >
+            <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
+            <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

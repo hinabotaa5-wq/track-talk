@@ -8,7 +8,7 @@ Go API を Google Cloud Run の東京リージョン（`asia-northeast1`）で�
    └────── https://track-talk-api-xxxx.a.run.app ─ Cloud Run（東京、最大1台）─ Supabase（DB・Auth）
 ```
 
-- **デプロイ**: `main` の `apps/api` が変わると、`.github/workflows/deploy-api.yml` がイメージを作って Cloud Run に送る
+- **デプロイ**: マージしても自動では動かない。Actions の「Deploy API」を Run workflow で流すと、`.github/workflows/deploy-api.yml` が `main` からイメージを作って Cloud Run に送る
 - **費用の上限**: 予算（既定は月100円）を超えると `budget-stop` が API をインターネットから呼べなくする。費用の反映は数時間遅れるので、少しはみ出すことはある
 - **台数**: 最大1台。書き込みの回数制限がメモリ上にあるのと、急なアクセスで費用が膨らまないようにするため
 
@@ -56,7 +56,7 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/setup.sh deploy/cloud-ru
 ## 4. 本物の API に差し替える
 
 setup.sh は、まず Google の見本イメージでサービスを立てます（Cloud Shell の docker や Cloud Build は、新しいプロジェクトだとネットワークや権限で失敗しやすいため）。
-本物の API は GitHub Actions の「Deploy API」がビルドして差し替えます。`main` の `apps/api` が変わると流れ、Actions の画面から Run workflow でも流せます。
+本物の API は GitHub Actions の「Deploy API」がビルドして差し替えます。Actions の画面から Run workflow で流します（マージでは自動で流れません）。
 
 送り先は `.github/workflows/deploy-api.yml` の `env` に書いてあります（`GCP_PROJECT_ID` など。秘密の値ではない）。別のプロジェクトに作り直したら、setup.sh の最後に表示される値に書き換えます。
 
@@ -65,7 +65,7 @@ setup.sh は、まず Google の見本イメージでサービスを立てます
 1. `curl https://<API の URL>/health` が `{"status":"ok"}` を返すことを確認する
 2. 画面（Vercel、のちに Netlify）の `NEXT_PUBLIC_API_BASE_URL` を Cloud Run の URL にして再デプロイする
 3. 画面からログイン、投稿、画像のアップロードができることを確認する
-4. 問題なければ Render のサービスを削除し、`render.yaml` を消す
+4. 問題なければ、前に使っていた API のサービスを削除する
 
 ## 運用
 
@@ -79,3 +79,19 @@ gcloud run services describe track-talk-api --region asia-northeast1            
 - **予算を変える**: コンソールの「お支払い → 予算とアラート」で `track-talk` を編集する
 - **ロールバック**: コンソールの Cloud Run → `track-talk-api` → リビジョンで、前のリビジョンにトラフィックを戻す
 
+
+## トラブル
+
+- **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）
+
+  ```bash
+  gcloud run services update track-talk-api --region asia-northeast1 \
+    --update-env-vars CORS_ORIGINS=https://<サイトの URL>
+  ```
+
+  いまの値を見るには（ほかの値は表示されない）:
+
+  ```bash
+  gcloud run services describe track-talk-api --region asia-northeast1 --format=json \
+    | jq -r '.spec.template.spec.containers[0].env[] | select(.name=="CORS_ORIGINS") | .value'
+  ```
