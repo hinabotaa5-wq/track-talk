@@ -11,6 +11,7 @@ import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { shrinkImage } from "@/lib/shrink-image";
 import { useActionLock } from "@/lib/use-action-lock";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
@@ -114,22 +115,22 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         setError("写真ファイルを選んでください");
         return;
       }
-      if (item.file.size > maxPhotoBytes) {
-        setError("10MB以内の写真にしてください");
-        return;
-      }
     }
     if (!acquire()) return;
     try {
       const imageIDs = kept.map((photo) => photo.public_id);
       for (const [index, item] of files.entries()) {
         setStatus(`写真を準備しています（${index + 1}/${files.length}）`);
+        const sending = await shrinkImage(item.file);
+        if (sending.size > maxPhotoBytes) {
+          throw new Error("10MB以内の写真にしてください");
+        }
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         setStatus("");
         setUploadPhase("upload");
-        setUploadFile(item.file);
-        setUpload({ loaded: 0, total: item.file.size, percent: 0 });
-        const result = await uploadToCloudinary("image", item.file, signed, setUpload);
+        setUploadFile(sending);
+        setUpload({ loaded: 0, total: sending.size, percent: 0 });
+        const result = await uploadToCloudinary("image", sending, signed, setUpload);
         if (result.public_id !== signed.public_id) {
           throw new Error("写真のアップロードに失敗しました");
         }

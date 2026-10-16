@@ -11,6 +11,7 @@ import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { shrinkImage } from "@/lib/shrink-image";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useAuth } from "./auth-provider";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
@@ -64,17 +65,19 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
           release();
           return;
         }
-        if (photo.size > maxPhotoBytes) {
+        setStatus("アップロードの準備をしています…");
+        const sending = await shrinkImage(photo);
+        if (sending.size > maxPhotoBytes) {
           setError("10MB以内の写真にしてください");
+          setStatus("");
           release();
           return;
         }
-        setStatus("アップロードの準備をしています…");
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         setStatus("");
         setUploadPhase("upload");
-        setUpload({ loaded: 0, total: photo.size, percent: 0 });
-        const result = await uploadToCloudinary("image", photo, signed, setUpload);
+        setUpload({ loaded: 0, total: sending.size, percent: 0 });
+        const result = await uploadToCloudinary("image", sending, signed, setUpload);
         if (result.public_id !== signed.public_id) {
           throw new Error("写真のアップロードに失敗しました");
         }
