@@ -23,7 +23,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "TrackTalk",
-    statusBarStyle: "black-translucent",
+    // black-translucent だと iOS 26 のホーム画面アプリで、画面の下がステータスバーの高さ分だけ
+    // 描かれずに空き、下に固定したバーも浮く(WebKit bug 301108)。ステータスバーは iOS に描かせる。
+    statusBarStyle: "default",
   },
   verification: {
     google: "erl1lifh6-0oXq1ecreI-JSTA70vLV_03V2Cwx4b8_k",
