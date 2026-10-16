@@ -44,6 +44,8 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "対応していないファイル形式です")
 	case errors.Is(err, cloudinary.ErrTooLarge):
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"はサイズの上限を超えています")
+	case errors.Is(err, cloudinary.ErrTooLong):
+		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"は30秒以内にしてください")
 	default:
 		Error(w, http.StatusBadGateway, "unavailable", noun+"の確認に失敗しました")
 	}

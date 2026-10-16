@@ -9,6 +9,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +21,7 @@ type Server struct {
 	authAdmin auth.Admin
 	limit     *RateLimiter
 	cloud     cloudinary.Client
+	push      push.Sender
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -39,6 +41,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			Secret:  cfg.CloudAPISecret,
 			APIBase: cfg.CloudAPIBase,
 		},
+		push: push.Sender{
+			PublicKey:  cfg.VAPIDPublicKey,
+			PrivateKey: cfg.VAPIDPrivateKey,
+			Subject:    cfg.VAPIDSubject,
+		},
+	}
+	if cfg.PushHTTP != nil {
+		s.push.HTTP = cfg.PushHTTP
 	}
 	r := chi.NewRouter()
 	r.Use(SecurityHeaders)
@@ -65,6 +75,13 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products", s.listProducts)
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
+		r.Get("/push/public-key", s.pushPublicKey)
+		// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
+		r.Get("/guardian/{token}", s.getGuardian)
+		r.Post("/guardian/{token}/consent", s.consentGuardian)
+		r.Patch("/guardian/{token}", s.updateGuardian)
+		r.Post("/guardian/{token}/decline", s.declineGuardian)
+		r.Post("/guardian/{token}/revoke", s.revokeGuardian)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
@@ -83,11 +100,18 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/notifications", s.listNotifications)
 			r.Post("/me/notifications/read", s.markAllNotificationsRead)
 			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
+			r.Get("/me/coaching", s.coachingMe)
+			r.Put("/me/birth-month", s.setBirthMonth)
+			r.Post("/me/guardian-link", s.issueGuardianLink)
+			r.Post("/me/push-subscriptions", s.savePushSubscription)
+			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
+			r.Post("/me/push-subscriptions/test", s.testPush)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
 			r.Post("/uploads/video", s.signVideoUpload)
 			r.Post("/uploads/image", s.signImageUpload)
+			r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 			r.Patch("/posts/{id}", s.updatePost)
 			r.Delete("/posts/{id}", s.deletePost)
 			r.Post("/posts/{id}/likes", s.likePost)

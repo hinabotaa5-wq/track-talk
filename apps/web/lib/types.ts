@@ -237,3 +237,28 @@ export type ProductReview = {
   mine: boolean;
   created_at: string;
 };
+
+export type GuardianStatus = "pending" | "consented" | "declined" | "revoked";
+
+export type GuardianLimitYen = 1000 | 3000 | 5000 | null;
+
+export type CoachingGuardian = {
+  status: GuardianStatus;
+  monthly_limit_yen: GuardianLimitYen;
+  allow_publish: boolean;
+  consented_at: string | null;
+};
+
+export type CoachingMe = {
+  birth_month: string | null;
+  is_minor: boolean | null;
+  guardian: CoachingGuardian | null;
+  push_devices: number;
+};
+
+export type GuardianPublic = CoachingGuardian & {
+  guardian_name: string | null;
+  relationship: "father" | "mother" | "other" | null;
+  limit_options: GuardianLimitYen[];
+  default_limit_yen: number;
+};
