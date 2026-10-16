@@ -10,6 +10,20 @@ import (
 	"github.com/google/uuid"
 )
 
+type CoachProfile struct {
+	ProfileID    uuid.UUID  `json:"profile_id"`
+	Tier         string     `json:"tier"`
+	Events       []string   `json:"events"`
+	BestRecord   string     `json:"best_record"`
+	Achievements string     `json:"achievements"`
+	Years        int16      `json:"years"`
+	Status       string     `json:"status"`
+	AppliedAt    time.Time  `json:"applied_at"`
+	ReviewedAt   *time.Time `json:"reviewed_at"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
 type Comment struct {
 	ID        uuid.UUID  `json:"id"`
 	PostID    uuid.UUID  `json:"post_id"`

@@ -1,0 +1,250 @@
+package httpx
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/jackc/pgx/v5"
+)
+
+// コーチの担当種目。並びは画面に出す順。コードは練習相手募集の種目に合わせている。
+var coachEvents = []string{
+	"100m",
+	"200m",
+	"400m",
+	"800m",
+	"1500m",
+	"5000m",
+	"10000m",
+	"110mh",
+	"100mh",
+	"400mh",
+	"3000msc",
+	"high-jump",
+	"pole-vault",
+	"long-jump",
+	"triple-jump",
+	"shot-put",
+	"discus",
+	"hammer",
+	"javelin",
+	"race-walk",
+	"relay",
+}
+
+func validCoachTier(tier string) bool {
+	return tier == "coach" || tier == "senpai"
+}
+
+func validCoachStatus(status string) bool {
+	switch status {
+	case "pending", "approved", "rejected", "suspended":
+		return true
+	}
+	return false
+}
+
+// normalizeCoachEvents は、重複を除いて画面と同じ順に並べ直す。知らない値があれば false。
+func normalizeCoachEvents(events []string) ([]string, bool) {
+	picked := map[string]bool{}
+	for _, e := range events {
+		picked[e] = true
+	}
+	out := make([]string, 0, len(picked))
+	for _, g := range coachEvents {
+		if picked[g] {
+			out = append(out, g)
+			delete(picked, g)
+		}
+	}
+	return out, len(picked) == 0
+}
+
+func coachTextError(label, value string, max int) string {
+	n := utf8.RuneCountInString(value)
+	if n == 0 {
+		return label + "を入力してください"
+	}
+	if n > max {
+		return label + "は" + strconv.Itoa(max) + "文字以内で入力してください"
+	}
+	return ""
+}
+
+func coachProfileJSON(c db.CoachProfile) map[string]any {
+	return map[string]any{
+		"tier":         c.Tier,
+		"events":       c.Events,
+		"best_record":  c.BestRecord,
+		"achievements": c.Achievements,
+		"years":        c.Years,
+		"status":       c.Status,
+		"applied_at":   c.AppliedAt,
+		"reviewed_at":  c.ReviewedAt,
+	}
+}
+
+// coachMe は自分の応募を返す。まだ応募していなければ application は null。
+func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		JSON(w, http.StatusOK, map[string]any{"application": nil})
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+}
+
+type coachApplicationReq struct {
+	Tier         string   `json:"tier"`
+	Events       []string `json:"events"`
+	BestRecord   string   `json:"best_record"`
+	Achievements string   `json:"achievements"`
+	Years        *int     `json:"years"`
+}
+
+func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req coachApplicationReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	req.BestRecord = strings.TrimSpace(req.BestRecord)
+	req.Achievements = strings.TrimSpace(req.Achievements)
+	fields := map[string]string{}
+	if !validCoachTier(req.Tier) {
+		fields["tier"] = "応募する枠を選んでください"
+	}
+	events, known := normalizeCoachEvents(req.Events)
+	if !known || len(events) == 0 {
+		fields["events"] = "担当種目を1つ以上選んでください"
+	}
+	if e := coachTextError("記録", req.BestRecord, 200); e != "" {
+		fields["best_record"] = e
+	}
+	if e := coachTextError("成績", req.Achievements, 500); e != "" {
+		fields["achievements"] = e
+	}
+	if req.Years == nil || *req.Years < 0 || *req.Years > 60 {
+		fields["years"] = "競技年数は0〜60年で入力してください"
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	c, err := s.q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
+		ProfileID:    p.ID,
+		Tier:         req.Tier,
+		Events:       events,
+		BestRecord:   req.BestRecord,
+		Achievements: req.Achievements,
+		Years:        int16(*req.Years),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusConflict, "conflict", "審査が済んでいるため、応募内容は変えられません")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+}
+
+func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	status := r.URL.Query().Get("status")
+	if status == "" {
+		status = "pending"
+	}
+	if !validCoachStatus(status) {
+		FieldError(w, map[string]string{"status": "状態が不正です"})
+		return
+	}
+	page, per, offset := s.queryPage(r)
+	total, err := s.q.CountCoachApplications(r.Context(), status)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	rows, err := s.q.ListCoachApplications(r.Context(), db.ListCoachApplicationsParams{Status: status, Limit: per, Offset: offset})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if rows == nil {
+		rows = []db.ListCoachApplicationsRow{}
+	}
+	JSON(w, http.StatusOK, map[string]any{"applications": rows, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+}
+
+func (s *Server) approveCoachApplication(w http.ResponseWriter, r *http.Request) {
+	s.reviewCoachApplication(w, r, "approved")
+}
+
+func (s *Server) rejectCoachApplication(w http.ResponseWriter, r *http.Request) {
+	s.reviewCoachApplication(w, r, "rejected")
+}
+
+func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, status string) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	c, err := s.q.ReviewCoachApplication(r.Context(), db.ReviewCoachApplicationParams{Status: status, ProfileID: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, getErr := s.q.GetCoachProfile(r.Context(), id); errors.Is(getErr, pgx.ErrNoRows) {
+			Error(w, http.StatusNotFound, "not_found", "応募が見つかりません")
+			return
+		}
+		Error(w, http.StatusConflict, "conflict", "この応募は審査済みです")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	s.notifyCoachReviewed(r.Context(), c)
+	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+}
+
+// notifyCoachReviewed は、審査の結果を応募した人の端末に知らせる。
+// 届かなくても結果は応募の画面で見られるので、失敗は記録だけする。
+func (s *Server) notifyCoachReviewed(ctx context.Context, c db.CoachProfile) {
+	if !s.push.Configured() {
+		return
+	}
+	msg := push.Message{Title: "コーチの応募が承認されました", Body: "応募の画面から次の準備に進めます", URL: "/coach/apply", Tag: "coach-review"}
+	if c.Status == "rejected" {
+		msg = push.Message{Title: "コーチの応募の審査が終わりました", Body: "結果を応募の画面で確認してください", URL: "/coach/apply", Tag: "coach-review"}
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if _, err := s.sendPush(ctx, c.ProfileID, msg, 24*time.Hour); err != nil {
+		slog.Warn("coach review push", "err", err)
+	}
+}
