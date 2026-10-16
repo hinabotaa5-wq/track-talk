@@ -440,8 +440,10 @@ export function PostDetail({
 
   return (
     <article
-      className={`${allowComment ? "pb-[calc(12.5rem+env(safe-area-inset-bottom))] md:pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
+      className={`${allowComment ? "pb-[calc(12.5rem+env(safe-area-inset-bottom))] md:pb-36 lg:pb-0" : ""} ${activeThread ? "mx-auto max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8"}`}
     >
+      {/* コメントルーム(スレッド)の間は、投稿の動画・いいね・保存などを隠してチャットに集中させる。 */}
+      {activeThread ? null : (
       <div className="space-y-6">
       {post.kind === "practice" ? (
         <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
@@ -543,7 +545,8 @@ export function PostDetail({
         <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
       </div>
       </div>
-      <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
+      )}
+      <section className={`space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         <h2 className="text-xl font-semibold">コメント</h2>
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
