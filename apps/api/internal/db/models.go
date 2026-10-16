@@ -11,17 +11,27 @@ import (
 )
 
 type CoachProfile struct {
-	ProfileID    uuid.UUID  `json:"profile_id"`
-	Tier         string     `json:"tier"`
-	Events       []string   `json:"events"`
-	BestRecord   string     `json:"best_record"`
-	Achievements string     `json:"achievements"`
-	Years        int16      `json:"years"`
-	Status       string     `json:"status"`
-	AppliedAt    time.Time  `json:"applied_at"`
-	ReviewedAt   *time.Time `json:"reviewed_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ProfileID     uuid.UUID  `json:"profile_id"`
+	Tier          string     `json:"tier"`
+	Events        []string   `json:"events"`
+	BestRecord    string     `json:"best_record"`
+	Achievements  string     `json:"achievements"`
+	Years         int16      `json:"years"`
+	Status        string     `json:"status"`
+	AppliedAt     time.Time  `json:"applied_at"`
+	ReviewedAt    *time.Time `json:"reviewed_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	OnDuty        bool       `json:"on_duty"`
+	DailyCap      int16      `json:"daily_cap"`
+	LastOfferedAt *time.Time `json:"last_offered_at"`
+}
+
+type CoachingDemoCode struct {
+	Code      string     `json:"code"`
+	CreatedAt time.Time  `json:"created_at"`
+	UsedBy    *uuid.UUID `json:"used_by"`
+	UsedAt    *time.Time `json:"used_at"`
 }
 
 type Comment struct {
@@ -260,6 +270,7 @@ type Profile struct {
 	Nickname       *string    `json:"nickname"`
 	NicknamePublic bool       `json:"nickname_public"`
 	BirthMonth     *time.Time `json:"birth_month"`
+	CoachingDemo   bool       `json:"coaching_demo"`
 }
 
 type PushSubscription struct {
@@ -307,6 +318,20 @@ type Report struct {
 	Detail     string    `json:"detail"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ReviewRequest struct {
+	ID            uuid.UUID  `json:"id"`
+	RequesterID   uuid.UUID  `json:"requester_id"`
+	Tier          string     `json:"tier"`
+	Event         string     `json:"event"`
+	Focus         []string   `json:"focus"`
+	VideoPublicID string     `json:"video_public_id"`
+	Status        string     `json:"status"`
+	DueAt         time.Time  `json:"due_at"`
+	CoachID       *uuid.UUID `json:"coach_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 type SenseNote struct {

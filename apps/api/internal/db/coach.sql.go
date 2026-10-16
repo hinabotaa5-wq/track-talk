@@ -25,7 +25,7 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -44,6 +44,9 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.ReviewedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
 	)
 	return i, err
 }
@@ -124,7 +127,7 @@ SET status = $1,
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'pending'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at
 `
 
 type ReviewCoachApplicationParams struct {
@@ -148,6 +151,9 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.ReviewedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
 	)
 	return i, err
 }
@@ -166,7 +172,7 @@ SET tier = EXCLUDED.tier,
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at
 `
 
 type SubmitCoachApplicationParams struct {
@@ -202,6 +208,9 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.ReviewedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
 	)
 	return i, err
 }

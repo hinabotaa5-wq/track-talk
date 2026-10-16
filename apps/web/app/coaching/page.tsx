@@ -70,6 +70,13 @@ export default function CoachingPage() {
           ))}
         </ol>
         <p className={tag}>18歳未満は保護者の同意が必要です。</p>
+        <p className={tag}>
+          招待コードをお持ちの方は
+          <Link href="/coaching/new" className="text-blue-300 underline">
+            デモ版
+          </Link>
+          を使えます。
+        </p>
       </section>
 
       <section aria-labelledby="coaching-personal" className="space-y-1">

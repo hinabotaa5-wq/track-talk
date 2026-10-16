@@ -89,6 +89,8 @@ func coachProfileJSON(c db.CoachProfile) map[string]any {
 		"status":       c.Status,
 		"applied_at":   c.AppliedAt,
 		"reviewed_at":  c.ReviewedAt,
+		"on_duty":      c.OnDuty,
+		"daily_cap":    c.DailyCap,
 	}
 }
 
