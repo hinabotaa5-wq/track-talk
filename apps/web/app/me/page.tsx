@@ -5,16 +5,20 @@ import { InjuryMeCards } from "@/components/injury-me-cards";
 import { SenseNotesCard } from "@/components/sense-notes-card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { installGuideOpenEvent } from "@/lib/install-guide";
 
-const menuLinks = [
+const accountLinks = [
   { href: "/me/posts", label: "自分の投稿", icon: LayoutGrid },
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
   { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
+] as const;
+
+const infoLinks = [
   { href: "/me/contact", label: "お問い合わせ", icon: Mail },
   { href: "/guidelines", label: "ガイドライン", icon: ScrollText },
   { href: "/terms", label: "利用規約", icon: FileText },
@@ -24,10 +28,29 @@ const menuLinks = [
 const menuRowClass =
   "flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-100 transition hover:bg-white/12 active:scale-95 active:bg-white/16 disabled:opacity-50";
 
+function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
+  return (
+    <Link href={href} className={menuRowClass}>
+      <Icon className="size-4 shrink-0 text-slate-300" aria-hidden />
+      <span className="flex-1">{label}</span>
+      <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+    </Link>
+  );
+}
+
 export default function MePage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
   const logoutLock = useActionLock();
+  const [installed, setInstalled] = useState(true);
+
+  useEffect(() => {
+    function sync() {
+      const nav = navigator as Navigator & { standalone?: boolean };
+      setInstalled(nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches);
+    }
+    sync();
+  }, []);
 
   async function logout() {
     if (!confirm("ログアウトしますか？")) return;
@@ -51,16 +74,19 @@ export default function MePage() {
       <InjuryMeCards token={token} />
       <SenseNotesCard token={token} />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
-        {menuLinks.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.href} href={item.href} className={menuRowClass}>
-              <Icon className="size-4 shrink-0 text-slate-300" aria-hidden />
-              <span className="flex-1">{item.label}</span>
-              <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
-            </Link>
-          );
-        })}
+        {accountLinks.map((item) => (
+          <MenuLink key={item.href} {...item} />
+        ))}
+        {installed ? null : (
+          <button type="button" onClick={() => window.dispatchEvent(new Event(installGuideOpenEvent))} className={menuRowClass}>
+            <Smartphone className="size-4 shrink-0 text-slate-300" aria-hidden />
+            <span className="flex-1">ホーム画面に追加して使う</span>
+            <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+          </button>
+        )}
+        {infoLinks.map((item) => (
+          <MenuLink key={item.href} {...item} />
+        ))}
         <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass}>
           <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
           <span className="flex-1">ログアウト</span>
