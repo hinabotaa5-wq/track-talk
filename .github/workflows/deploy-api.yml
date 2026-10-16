@@ -1,14 +1,9 @@
 name: Deploy API
 
-# main の API が変わったら Cloud Run（東京）へ送る。
+# Cloud Run（東京）へ API を送る。マージしても自動では動かず、Actions の画面の Run workflow で手動で流す。
 # 初回の作成と環境変数の登録は deploy/cloud-run/setup.sh で行い、ここではイメージだけを差し替える。
 # 下の GCP_* は秘密ではない（鍵ではなく、どのプロジェクトに送るかの指定）。プロジェクトを変えたら書き換える。
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/api/**"
-      - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
 concurrency:
