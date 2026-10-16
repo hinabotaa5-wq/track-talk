@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CoachRecruitBanner } from "@/components/coach-recruit-banner";
 import { HomeFilters } from "@/components/home-filters";
 
 // The filters live in the layout so they stay mounted while loading.tsx replaces only the feed.
@@ -10,7 +11,10 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
       <Suspense>
         <HomeFilters />
       </Suspense>
-      <div className="space-y-4 px-4 pb-4 md:px-0">{children}</div>
+      <div className="space-y-4 px-4 pb-4 md:px-0">
+        <CoachRecruitBanner />
+        {children}
+      </div>
     </div>
   );
 }
