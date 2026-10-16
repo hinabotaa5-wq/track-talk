@@ -65,7 +65,7 @@ setup.sh は、まず Google の見本イメージでサービスを立てます
 1. `curl https://<API の URL>/health` が `{"status":"ok"}` を返すことを確認する
 2. 画面（Vercel、のちに Netlify）の `NEXT_PUBLIC_API_BASE_URL` を Cloud Run の URL にして再デプロイする
 3. 画面からログイン、投稿、画像のアップロードができることを確認する
-4. 問題なければ Render のサービスを削除し、`render.yaml` を消す
+4. 問題なければ、前に使っていた API のサービスを削除する
 
 ## 運用
 
