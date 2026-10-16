@@ -51,7 +51,3 @@ export function todayMeets(domestic: DomesticMajor[], international: Competition
   }
   return meets;
 }
-
-export function balloonMessage(meets: TodayMeet[]) {
-  return `今日は${meets.map((meet) => meet.name).join("、")}が開催されてるよ！`;
-}

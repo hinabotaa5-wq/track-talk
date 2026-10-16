@@ -6,7 +6,7 @@ import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
 import { loadDomesticMajors, peekDomesticMajors } from "@/lib/domestic-majors";
 import { INTERNATIONAL } from "@/lib/prefectures";
 import { todayInTokyo } from "@/lib/season-schedule";
-import { balloonMessage, todayMeets, type TodayMeet } from "@/lib/today-meets";
+import { todayMeets, type TodayMeet } from "@/lib/today-meets";
 import { AnchoredPanel } from "./anchored-panel";
 import { useAuth } from "./auth-provider";
 
@@ -110,7 +110,7 @@ export function TodayMeetBalloon() {
           >
             <X className="size-4" aria-hidden />
           </button>
-          <p className="pr-6 text-sm font-bold leading-relaxed">{balloonMessage(meets)}</p>
+          <p className="pr-6 text-sm font-bold leading-relaxed">今日は以下の大会が開催されてるよ！</p>
           <ul className="mt-3 space-y-2">
             {meets.map((meet) => {
               const external = !meet.href.startsWith("/");
@@ -123,9 +123,9 @@ export function TodayMeetBalloon() {
                     onClick={close}
                     className="block rounded-xl bg-white px-3 py-2 shadow-xs transition hover:bg-amber-100 active:scale-95"
                   >
-                    <span className="flex items-center gap-1 text-sm font-semibold text-blue-700">
-                      <span className="truncate">{meets.length > 1 ? meet.name : "大会ページ"}</span>
-                      <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                    <span className="flex items-start gap-1 text-sm font-semibold text-blue-700">
+                      <span className="line-clamp-2">{meet.name}</span>
+                      <ExternalLink className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                     </span>
                     <span className="block truncate text-xs text-slate-500">{shownURL(meet.href)}</span>
                   </a>

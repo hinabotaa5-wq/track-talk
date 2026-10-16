@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balloonMessage, isFeaturedInternational, todayMeets } from "./today-meets";
+import { isFeaturedInternational, todayMeets } from "./today-meets";
 import type { Competition, DomesticMajor } from "./types";
 
 const izumo: DomesticMajor = {
@@ -60,15 +60,5 @@ describe("today meets", () => {
 
   it("falls back to the competitions tab when a meet has no page", () => {
     expect(todayMeets([{ ...izumo, site_url: "" }], [], "2026-10-12")[0].href).toBe("/competitions");
-  });
-
-  it("names every meet in the message", () => {
-    expect(balloonMessage([{ key: "a", name: "世界陸上・北京", href: "" }])).toBe("今日は世界陸上・北京が開催されてるよ！");
-    expect(
-      balloonMessage([
-        { key: "a", name: "A", href: "" },
-        { key: "b", name: "B", href: "" },
-      ]),
-    ).toBe("今日はA、Bが開催されてるよ！");
   });
 });
