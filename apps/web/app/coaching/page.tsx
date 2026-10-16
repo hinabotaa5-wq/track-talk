@@ -69,6 +69,8 @@ export default function CoachingPage() {
             </li>
           ))}
         </ol>
+        <p className={tag}>夜に送れば、翌日の昼までに返ってきます。</p>
+        <p className={tag}>最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
         <p className={tag}>18歳未満は保護者の同意が必要です。</p>
         <p className={tag}>
           招待コードをお持ちの方は

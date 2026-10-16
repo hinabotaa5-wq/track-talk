@@ -331,6 +331,14 @@ type ReviewOffer struct {
 	AnsweredAt *time.Time `json:"answered_at"`
 }
 
+type ReviewRating struct {
+	RequestID uuid.UUID  `json:"request_id"`
+	Stars     *int16     `json:"stars"`
+	RatedAt   *time.Time `json:"rated_at"`
+	Helpful   *string    `json:"helpful"`
+	HelpfulAt *time.Time `json:"helpful_at"`
+}
+
 type ReviewRequest struct {
 	ID            uuid.UUID  `json:"id"`
 	RequesterID   uuid.UUID  `json:"requester_id"`
@@ -343,6 +351,23 @@ type ReviewRequest struct {
 	CoachID       *uuid.UUID `json:"coach_id"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	ReturnedAt    *time.Time `json:"returned_at"`
+}
+
+type ReviewResponse struct {
+	RequestID          uuid.UUID  `json:"request_id"`
+	CoachID            *uuid.UUID `json:"coach_id"`
+	GoodPoint          string     `json:"good_point"`
+	FixPoints          []string   `json:"fix_points"`
+	Drill              string     `json:"drill"`
+	DemoVideoPublicID  *string    `json:"demo_video_public_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	ClarifyReason      *string    `json:"clarify_reason"`
+	ClarifyRequestedAt *time.Time `json:"clarify_requested_at"`
+	Clarification      *string    `json:"clarification"`
+	ClarifiedAt        *time.Time `json:"clarified_at"`
+	HelpfulAskedAt     *time.Time `json:"helpful_asked_at"`
+	HiddenAt           *time.Time `json:"hidden_at"`
 }
 
 type SenseNote struct {

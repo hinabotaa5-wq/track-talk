@@ -6,14 +6,14 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
 import { reviewFocusLabels } from "@/lib/review";
-import type { CoachApplication, CoachingMe, CoachRequests, CoachReviewRequest } from "@/lib/types";
+import type { CoachApplication, CoachingMe, CoachRatingSummary, CoachRequests, CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 // コーチ画面。承認されたコーチが「受付中」と1日の上限本数を決め、届いた打診を引き受けるか見送る。
-// 返答を書く画面はこの後の PR で足す。
+// 返答と補足は、添削中の依頼から /coach/requests/{id} で書く。
 
 const capOptions = [1, 2, 3, 5, 8, 10, 15, 20];
 
@@ -130,7 +130,12 @@ function CoachRequestsSection({ token }: { token: string | null }) {
                   className="w-full rounded-lg bg-black"
                 />
               ) : null}
-              <p className="text-xs text-slate-300">返答を書く画面は準備中です。</p>
+              <Link
+                href={`/coach/requests/${request.id}`}
+                className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+              >
+                {request.status === "clarifying" ? "補足を書く" : "返答を書く"}
+              </Link>
             </li>
           ))}
         </ul>
@@ -144,6 +149,7 @@ export default function CoachPage() {
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
   const [devices, setDevices] = useState(0);
+  const [rating, setRating] = useState<CoachRatingSummary | null>(null);
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
 
@@ -157,12 +163,13 @@ export default function CoachPage() {
     if (!token) return;
     let cancelled = false;
     Promise.all([
-      apiFetch<{ application: CoachApplication | null }>("/v1/coach/me", { token }),
+      apiFetch<{ application: CoachApplication | null; rating?: CoachRatingSummary }>("/v1/coach/me", { token }),
       apiFetch<CoachingMe>("/v1/me/coaching", { token }),
     ])
       .then(([c, me]) => {
         if (cancelled) return;
         setCoach(c.application);
+        setRating(c.rating ?? null);
         setDevices(me.push_devices);
       })
       .catch(() => {
@@ -250,6 +257,16 @@ export default function CoachPage() {
           </select>
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        {rating && rating.count > 0 ? (
+          <p className="text-sm text-slate-200">
+            受けた評価: ★{rating.average.toFixed(1)}（{rating.count}件）
+          </p>
+        ) : null}
+        {rating?.paused ? (
+          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-white">
+            評価の平均が★3を下回ったため、いまは依頼が回ってきません。
+          </p>
+        ) : null}
       </section>
 
       <CoachRequestsSection token={token} />

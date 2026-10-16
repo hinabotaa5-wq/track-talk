@@ -5,7 +5,16 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { productKindLabels } from "@/lib/product";
-import type { AdminCoachApplication, AdminInquiry, AdminReport, CoachStatus, DemoCode, Meta, Product } from "@/lib/types";
+import type {
+  AdminCoachApplication,
+  AdminInquiry,
+  AdminReport,
+  CoachProbationResponse,
+  CoachStatus,
+  DemoCode,
+  Meta,
+  Product,
+} from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,18 +38,23 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
   post: "投稿",
   comment: "コメント",
   injury_note: "ケガ部の一言",
+  review_response: "添削の返答",
 };
 
 const perPage = 20;
 
-// ケガ部の一言は投稿ページがないので、ここから公開ページを開いたり非表示にしたりする。
+// ケガ部の一言と添削の返答は投稿ページがないので、ここから非表示にする。
 function InjuryNoteActions({ report, token }: { report: AdminReport; token: string | null }) {
   const [hidden, setHidden] = useState(report.target_hidden);
   const [error, setError] = useState("");
+  const isResponse = report.target_type === "review_response";
   async function hide() {
-    if (!confirm("この一言を公開ページから外しますか？")) return;
+    if (!confirm(isResponse ? "この返答を利用者から見えなくしますか？" : "この一言を公開ページから外しますか？")) return;
     try {
-      await apiFetch(`/v1/admin/injury-notes/${report.target_id}/hide`, { method: "POST", token });
+      const path = isResponse
+        ? `/v1/admin/coaching/responses/${report.target_id}/hide`
+        : `/v1/admin/injury-notes/${report.target_id}/hide`;
+      await apiFetch(path, { method: "POST", token });
       setHidden(true);
       setError("");
     } catch {
@@ -49,9 +63,11 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   }
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
-      <Link href={`/injury/${report.injury_part}`} className="text-blue-300 underline">
-        公開ページを見る
-      </Link>
+      {isResponse ? null : (
+        <Link href={`/injury/${report.injury_part}`} className="text-blue-300 underline">
+          公開ページを見る
+        </Link>
+      )}
       {hidden ? (
         <span className="text-slate-300">非表示済み</span>
       ) : (
@@ -316,6 +332,69 @@ function DemoCodesAdmin({ token }: { token: string | null }) {
   );
 }
 
+// 試用期間: 各コーチの最初の20本の返答を運営が読み、問題があれば隠す。
+function CoachProbationAdmin({ token }: { token: string | null }) {
+  const [items, setItems] = useState<CoachProbationResponse[]>([]);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch<{ responses: CoachProbationResponse[] }>("/v1/admin/coaching/probation", { token });
+      setItems(d.responses ?? []);
+    } catch {
+      setMessage("取得に失敗しました");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function hide(id: string) {
+    if (!window.confirm("この返答を利用者から見えなくしますか？")) return;
+    try {
+      await apiFetch(`/v1/admin/coaching/responses/${id}/hide`, { method: "POST", token });
+      setMessage("非表示にしました");
+      await load();
+    } catch {
+      setMessage("非表示にできませんでした");
+    }
+  }
+
+  return (
+    <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
+      <h2 className="text-sm font-semibold">試用期間の返答（各コーチの最初の20本）</h2>
+      {message ? <p className="text-sm text-slate-200">{message}</p> : null}
+      {items.length === 0 ? <p className="text-sm text-slate-300">まだありません</p> : null}
+      <ul className="space-y-3">
+        {items.map((r) => (
+          <li key={r.request_id} className="space-y-1 border-t border-white/10 pt-2 text-sm">
+            <p className="text-xs text-slate-300">
+              {r.coach_nickname ?? "名前なし"} · {r.nth}本目 · {coachTierLabels[r.tier]} · {coachEventLabels[r.event]} ·{" "}
+              {formatDateTime(r.created_at)}
+              {r.hidden_at ? " · 非表示済み" : ""}
+            </p>
+            <p className="whitespace-pre-wrap">良い点: {r.good_point}</p>
+            {r.fix_points.map((f, i) => (
+              <p key={i} className="whitespace-pre-wrap">
+                直す点{r.fix_points.length > 1 ? i + 1 : ""}: {f}
+              </p>
+            ))}
+            <p className="whitespace-pre-wrap">ドリル: {r.drill}</p>
+            {r.clarification ? <p className="whitespace-pre-wrap">補足: {r.clarification}</p> : null}
+            {r.hidden_at ? null : (
+              <button type="button" onClick={() => void hide(r.request_id)} className="text-red-300 underline">
+                非表示にする
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 // コーチの応募の審査。審査中の応募を承認か見送りにする。
 function CoachesAdmin({ token }: { token: string | null }) {
   const [status, setStatus] = useState<CoachStatus>("pending");
@@ -356,6 +435,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
+      <CoachProbationAdmin token={token} />
       <div className="flex flex-wrap gap-2">
         {(["pending", "approved", "rejected"] as const).map((s) => (
           <button
@@ -469,7 +549,7 @@ export default function AdminPage() {
               )}
               {r.detail ? <p className="whitespace-pre-wrap text-sm">通報内容: {r.detail}</p> : null}
               <p className="text-xs text-slate-300">通報者: {r.reporter_nickname ?? "名前なし"}</p>
-              {!r.target_body ? null : r.target_type === "injury_note" ? (
+              {!r.target_body ? null : r.target_type === "injury_note" || r.target_type === "review_response" ? (
                 <InjuryNoteActions report={r} token={token} />
               ) : (
                 <Link href={`/posts/${r.post_id}`} className="text-sm text-blue-300 underline">
