@@ -92,6 +92,7 @@ export function PostDetail({
   // 長押しで開く操作メニューの対象。
   const [menuComment, setMenuComment] = useState<Comment | null>(null);
   const longPress = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const pressFired = useRef(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const openThreadReplyCount = comments.filter((c) => c.parent_id === openThreadId).length;
   useEffect(() => {
@@ -300,11 +301,13 @@ export function PostDetail({
 
   function startPress(e: React.PointerEvent, c: Comment) {
     cancelPress();
+    pressFired.current = false;
     longPress.current = {
       x: e.clientX,
       y: e.clientY,
       timer: window.setTimeout(() => {
         longPress.current = null;
+        pressFired.current = true;
         setMenuComment(c);
       }, 450),
     };
@@ -329,7 +332,10 @@ export function PostDetail({
         type="button"
         className="mb-1.5 block w-full rounded-lg border-l-2 border-white/50 bg-black/20 px-2 py-1 text-left text-xs disabled:opacity-70"
         disabled={c.reply_to_removed}
-        onClick={() => jumpToComment(c.reply_to_id as string)}
+        onClick={(e) => {
+          e.stopPropagation();
+          jumpToComment(c.reply_to_id as string);
+        }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <span className="block truncate font-semibold">{replyLabel(c)}</span>
@@ -349,6 +355,14 @@ export function PostDetail({
             onPointerUp={cancelPress}
             onPointerCancel={cancelPress}
             onPointerLeave={cancelPress}
+            onClick={() => {
+              // 長押しでメニューを開いた直後のクリックは、返信として扱わない。
+              if (pressFired.current) {
+                pressFired.current = false;
+                return;
+              }
+              if (allowComment) startReply(c);
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
               cancelPress();
@@ -556,7 +570,7 @@ export function PostDetail({
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
           <div className="space-y-3">
-            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
+            <p className="text-center text-xs text-slate-300">タップでその発言に返信、長押しで編集・削除などができます</p>
             <div className="space-y-3">
               {renderBubble(activeThread.top)}
               {activeThread.replies.map((r) => renderBubble(r))}
