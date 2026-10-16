@@ -20,7 +20,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'offered'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
 `
 
 type AcceptReviewRequestParams struct {
@@ -43,6 +43,7 @@ func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewReque
 		&i.CoachID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
@@ -78,22 +79,38 @@ func (q *Queries) CountMyReviewRequests(ctx context.Context, requesterID uuid.UU
 }
 
 const countOnDutyCoaches = `-- name: CountOnDutyCoaches :one
-SELECT count(*) FROM coach_profiles
-WHERE status = 'approved'
-  AND on_duty
-  AND tier = $1
-  AND $2::text = ANY (events)
-  AND profile_id <> $3
+SELECT count(*) FROM coach_profiles c
+WHERE c.status = 'approved'
+  AND c.on_duty
+  AND c.tier = $1
+  AND $2::text = ANY (c.events)
+  AND c.profile_id <> $3
+  AND NOT EXISTS (
+    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
+    SELECT 1 FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+    HAVING count(rt.stars) >= $4::int
+       AND avg(rt.stars)::float8 < $5::float8
+  )
 `
 
 type CountOnDutyCoachesParams struct {
 	Tier        string    `json:"tier"`
 	Event       string    `json:"event"`
 	RequesterID uuid.UUID `json:"requester_id"`
+	MinRatings  int32     `json:"min_ratings"`
+	LowStars    float64   `json:"low_stars"`
 }
 
 func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoachesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countOnDutyCoaches, arg.Tier, arg.Event, arg.RequesterID)
+	row := q.db.QueryRow(ctx, countOnDutyCoaches,
+		arg.Tier,
+		arg.Event,
+		arg.RequesterID,
+		arg.MinRatings,
+		arg.LowStars,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -106,25 +123,6 @@ WHERE requester_id = $1
 
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countWaitingReviewRequests = `-- name: CountWaitingReviewRequests :one
-SELECT count(*) FROM review_requests
-WHERE status IN ('queued', 'offered')
-  AND tier = $1
-  AND event = $2
-`
-
-type CountWaitingReviewRequestsParams struct {
-	Tier  string `json:"tier"`
-	Event string `json:"event"`
-}
-
-func (q *Queries) CountWaitingReviewRequests(ctx context.Context, arg CountWaitingReviewRequestsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countWaitingReviewRequests, arg.Tier, arg.Event)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -184,7 +182,7 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 const createReviewRequest = `-- name: CreateReviewRequest :one
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
 `
 
 type CreateReviewRequestParams struct {
@@ -220,6 +218,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		&i.CoachID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
@@ -324,7 +323,7 @@ func (q *Queries) ExpireStaleReviewOffers(ctx context.Context) ([]uuid.UUID, err
 }
 
 const getReviewRequest = `-- name: GetReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
 WHERE id = $1
 `
 
@@ -343,12 +342,13 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.CoachID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
 
 const listCoachOpenOffers = `-- name: ListCoachOpenOffers :many
-SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at
+SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at
 FROM review_offers o
 JOIN review_requests r ON r.id = o.request_id
 WHERE o.coach_id = $1
@@ -386,6 +386,7 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 			&i.ReviewRequest.CoachID,
 			&i.ReviewRequest.CreatedAt,
 			&i.ReviewRequest.UpdatedAt,
+			&i.ReviewRequest.ReturnedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -398,9 +399,9 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 }
 
 const listCoachReviewing = `-- name: ListCoachReviewing :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
 WHERE coach_id = $1::uuid
-  AND status = 'in_review'
+  AND status IN ('in_review', 'clarifying')
 ORDER BY due_at
 `
 
@@ -425,6 +426,7 @@ func (q *Queries) ListCoachReviewing(ctx context.Context, coachID uuid.UUID) ([]
 			&i.CoachID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ReturnedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -477,7 +479,7 @@ func (q *Queries) ListDemoCodes(ctx context.Context) ([]ListDemoCodesRow, error)
 }
 
 const listMyReviewRequests = `-- name: ListMyReviewRequests :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
 WHERE requester_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -510,6 +512,7 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 			&i.CoachID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ReturnedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -578,7 +581,7 @@ func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOff
 }
 
 const lockQueuedReviewRequest = `-- name: LockQueuedReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
 WHERE id = $1
   AND status = 'queued'
   AND due_at > now()
@@ -600,6 +603,7 @@ func (q *Queries) LockQueuedReviewRequest(ctx context.Context, id uuid.UUID) (Re
 		&i.CoachID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
@@ -656,6 +660,14 @@ WHERE c.status = 'approved'
     WHERE o.coach_id = c.profile_id
       AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= $6::timestamptz))
   ) < c.daily_cap
+  AND NOT EXISTS (
+    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
+    SELECT 1 FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+    HAVING count(rt.stars) >= $7::int
+       AND avg(rt.stars)::float8 < $8::float8
+  )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
 LIMIT 1
 `
@@ -667,6 +679,8 @@ type PickCoachForRequestParams struct {
 	RequestID   uuid.UUID `json:"request_id"`
 	MaxActive   int32     `json:"max_active"`
 	DayStart    time.Time `json:"day_start"`
+	MinRatings  int32     `json:"min_ratings"`
+	LowStars    float64   `json:"low_stars"`
 }
 
 // 枠と種目が合う受付中のコーチのうち、最後に打診された時刻が一番古い人。
@@ -679,6 +693,8 @@ func (q *Queries) PickCoachForRequest(ctx context.Context, arg PickCoachForReque
 		arg.RequestID,
 		arg.MaxActive,
 		arg.DayStart,
+		arg.MinRatings,
+		arg.LowStars,
 	)
 	var profile_id uuid.UUID
 	err := row.Scan(&profile_id)

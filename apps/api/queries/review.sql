@@ -101,6 +101,14 @@ WHERE c.status = 'approved'
     WHERE o.coach_id = c.profile_id
       AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= sqlc.arg(day_start)::timestamptz))
   ) < c.daily_cap
+  AND NOT EXISTS (
+    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
+    SELECT 1 FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+    HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
+       AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
+  )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
 LIMIT 1;
 
@@ -200,18 +208,20 @@ WITH target AS (
 SELECT id, requester_id, coach_id, old_status FROM overdue;
 
 -- name: CountOnDutyCoaches :one
-SELECT count(*) FROM coach_profiles
-WHERE status = 'approved'
-  AND on_duty
-  AND tier = sqlc.arg(tier)
-  AND sqlc.arg(event)::text = ANY (events)
-  AND profile_id <> sqlc.arg(requester_id);
-
--- name: CountWaitingReviewRequests :one
-SELECT count(*) FROM review_requests
-WHERE status IN ('queued', 'offered')
-  AND tier = $1
-  AND event = $2;
+SELECT count(*) FROM coach_profiles c
+WHERE c.status = 'approved'
+  AND c.on_duty
+  AND c.tier = sqlc.arg(tier)
+  AND sqlc.arg(event)::text = ANY (c.events)
+  AND c.profile_id <> sqlc.arg(requester_id)
+  AND NOT EXISTS (
+    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
+    SELECT 1 FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+    HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
+       AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
+  );
 
 -- name: ListCoachOpenOffers :many
 SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, sqlc.embed(r)
@@ -225,5 +235,5 @@ ORDER BY o.offered_at;
 -- name: ListCoachReviewing :many
 SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
-  AND status = 'in_review'
+  AND status IN ('in_review', 'clarifying')
 ORDER BY due_at;

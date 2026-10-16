@@ -109,7 +109,25 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+	rating, err := s.q.GetCoachRatingSummary(r.Context(), &p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{
+		"application": coachProfileJSON(c),
+		"rating": map[string]any{
+			"count":   rating.Count,
+			"average": rating.Average,
+			// 評価が低く、いまは依頼が回ってこない状態か。
+			"paused": lowRated(rating.Count, rating.Average),
+		},
+	})
+}
+
+// lowRated は、評価が低くて打診の順番から外れているか。PickCoachForRequest と同じ基準。
+func lowRated(count int32, average float64) bool {
+	return count >= lowRatingMinCount && average < lowRatingStars
 }
 
 type coachApplicationReq struct {

@@ -29,13 +29,11 @@ const (
 // 招待コードに使う文字。読み違えやすい 0/O と 1/I は外す。
 const demoCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-func validCoachEvent(event string) bool {
-	for _, e := range coachEvents {
-		if e == event {
-			return true
-		}
-	}
-	return false
+// 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す。
+var reviewEvents = []string{"100m"}
+
+func validReviewEvent(event string) bool {
+	return oneOf(event, reviewEvents)
 }
 
 // normalizeFocus は、重複を除いて画面と同じ順に並べ直す。知らない値があれば false。
@@ -54,7 +52,7 @@ func normalizeFocus(focus []string) ([]string, bool) {
 	return out, len(picked) == 0
 }
 
-// reviewDueAt は、受付中のコーチがいないときの返却の目安。設計書の既定どおり、送った翌日の12時（日本時間）にする。
+// reviewDueAt は返却の目安。設計書の既定どおり、送った翌日の12時（日本時間）にする。
 func reviewDueAt(now time.Time) time.Time {
 	local := now.In(tokyo)
 	return time.Date(local.Year(), local.Month(), local.Day()+1, 12, 0, 0, 0, tokyo)
@@ -230,8 +228,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !validCoachTier(req.Tier) {
 		fields["tier"] = "枠を選んでください"
 	}
-	if !validCoachEvent(req.Event) {
-		fields["event"] = "種目を選んでください"
+	if !validReviewEvent(req.Event) {
+		fields["event"] = "いまは100mだけ受け付けています"
 	}
 	focus, known := normalizeFocus(req.Focus)
 	if !known || len(focus) == 0 {
@@ -367,7 +365,7 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 			rr = fresh
 		}
 	}
-	JSON(w, http.StatusOK, s.reviewRequestJSON(rr))
+	s.writeRequesterReview(w, r, rr)
 }
 
 func (s *Server) createDemoCode(w http.ResponseWriter, r *http.Request) {

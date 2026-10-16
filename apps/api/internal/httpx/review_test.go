@@ -56,7 +56,7 @@ func execSQLArgs(t *testing.T, sql string, args ...any) {
 func reviewBody() map[string]any {
 	return map[string]any{
 		"tier":            "coach",
-		"event":           "110mh",
+		"event":           "100m",
 		"focus":           []string{"rhythm", "start", "start"},
 		"video_public_id": "track-talk-coaching/" + uuid.NewString(),
 	}

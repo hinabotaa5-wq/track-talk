@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log/slog"
-	"math"
 	"net/http"
 	"time"
 
@@ -24,8 +23,10 @@ const (
 	offerWindow = 30 * time.Minute
 	// 1人のコーチが同時に持てる依頼（打診中・添削中の合計）。
 	maxActiveReviews = 2
-	// 返却目安の計算に使う、1本あたりの時間。実績がたまったら置き換える。
-	minutesPerReview = 60
+	// 評価が低いコーチを順番から外す基準。★の評価が lowRatingMinCount 件以上たまり、
+	// 平均が lowRatingStars 未満なら打診しない。
+	lowRatingMinCount = 5
+	lowRatingStars    = 3.0
 )
 
 // dayStart は日本時間の今日の0時。1日の上限本数はこの時刻から数える。
@@ -34,26 +35,20 @@ func dayStart(now time.Time) time.Time {
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, tokyo)
 }
 
-// estimateReviewDue は返却の目安。受付中のコーチがいれば
-// 「今 + (前に並んでいる本数 ÷ 人数 + 1) × 60分」を10分単位に切り上げ、いなければ翌日の12時にする。
+// estimateReviewDue は返却の目安。いつ送っても、送った翌日の12時（日本時間）までにする。
+// 2つ目の戻り値は、いま受付中のコーチがいるかどうか。
 func (s *Server) estimateReviewDue(ctx context.Context, requester uuid.UUID, tier, event string, now time.Time) (time.Time, bool, error) {
-	coaches, err := s.q.CountOnDutyCoaches(ctx, db.CountOnDutyCoachesParams{Tier: tier, Event: event, RequesterID: requester})
+	coaches, err := s.q.CountOnDutyCoaches(ctx, db.CountOnDutyCoachesParams{
+		Tier:        tier,
+		Event:       event,
+		RequesterID: requester,
+		MinRatings:  lowRatingMinCount,
+		LowStars:    lowRatingStars,
+	})
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	if coaches == 0 {
-		return reviewDueAt(now), false, nil
-	}
-	ahead, err := s.q.CountWaitingReviewRequests(ctx, db.CountWaitingReviewRequestsParams{Tier: tier, Event: event})
-	if err != nil {
-		return time.Time{}, false, err
-	}
-	minutes := (float64(ahead)/float64(coaches) + 1) * minutesPerReview
-	due := now.Add(time.Duration(math.Ceil(minutes)) * time.Minute)
-	if rounded := due.Truncate(10 * time.Minute); rounded.Before(due) {
-		due = rounded.Add(10 * time.Minute)
-	}
-	return due, true, nil
+	return reviewDueAt(now), coaches > 0, nil
 }
 
 // offerReview は、待ちの依頼を受付中のコーチ1人に打診する。打診する相手がいなければ待ちのまま。
@@ -82,6 +77,8 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 		RequestID:   rr.ID,
 		MaxActive:   maxActiveReviews,
 		DayStart:    dayStart(now),
+		MinRatings:  lowRatingMinCount,
+		LowStars:    lowRatingStars,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
@@ -151,12 +148,14 @@ func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, msg push.Message
 }
 
 type coachingTickResult struct {
-	Expired  int `json:"expired"`
-	Requeued int `json:"requeued"`
-	Offered  int `json:"offered"`
+	Expired    int `json:"expired"`
+	Requeued   int `json:"requeued"`
+	Offered    int `json:"offered"`
+	HelpfulAsk int `json:"helpful_ask"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
+// 返却から7日たった返答には「役に立ちましたか」を聞く。
 func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error) {
 	var out coachingTickResult
 	overdue, err := s.q.ExpireOverdueReviewRequests(ctx)
@@ -173,6 +172,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	}
 	out.Requeued = len(requeued)
 	out.Offered = s.dispatchQueuedReviews(ctx)
+	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -224,7 +226,7 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 	}
 	tier := r.URL.Query().Get("tier")
 	event := r.URL.Query().Get("event")
-	if !validCoachTier(tier) || !validCoachEvent(event) {
+	if !validCoachTier(tier) || !validReviewEvent(event) {
 		FieldError(w, map[string]string{"event": "枠と種目を選んでください"})
 		return
 	}

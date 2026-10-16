@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
@@ -89,13 +90,21 @@ func TestReviewOfferFlow(t *testing.T) {
 		t.Fatalf("birth month %d", rec.Code)
 	}
 
-	// 受付中のコーチがいるので、目安は翌日の12時ではなく今からの計算になる。
-	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=110mh", tu, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"coaches_on_duty":true`) {
+	// 目安はいつでも翌日の12時。受付中のコーチがいるかどうかも返す。
+	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil)
+	var est struct {
+		DueAt         time.Time `json:"due_at"`
+		CoachesOnDuty bool      `json:"coaches_on_duty"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &est)
+	if rec.Code != http.StatusOK || !est.CoachesOnDuty || !est.DueAt.Equal(tomorrowNoon()) {
 		t.Fatalf("estimate %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=marathon", tu, nil); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("estimate invalid %d", rec.Code)
+	// いまは100mだけ受け付ける。
+	for _, ev := range []string{"110mh", "marathon"} {
+		if rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event="+ev, tu, nil); rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("estimate %s %d", ev, rec.Code)
+		}
 	}
 
 	// 送るとすぐ、先に受付を始めたコーチ A に打診される。動画は引き受けるまで見せない。
@@ -223,4 +232,11 @@ func TestReviewOfferRespectsActiveLimit(t *testing.T) {
 	if got := coachRequests(t, h, tb).Offers; len(got) != 1 {
 		t.Fatalf("B offers on duty %+v", got)
 	}
+}
+
+// tomorrowNoon は、日本時間の翌日12時。
+func tomorrowNoon() time.Time {
+	tokyo := time.FixedZone("Asia/Tokyo", 9*60*60)
+	now := time.Now().In(tokyo)
+	return time.Date(now.Year(), now.Month(), now.Day()+1, 12, 0, 0, 0, tokyo)
 }

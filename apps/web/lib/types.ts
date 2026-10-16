@@ -161,7 +161,11 @@ export type NotificationKind =
   | "practice_rate"
   | "injury_update"
   | "review_offer"
-  | "review_expired";
+  | "review_expired"
+  | "review_returned"
+  | "review_clarify"
+  | "review_clarified"
+  | "review_helpful_ask";
 
 // 添削の通知（review_*）は投稿にひもづかないので post_id が null になる。
 export type AppNotification = {
@@ -189,7 +193,7 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment" | "injury_note";
+  target_type: "post" | "comment" | "injury_note" | "review_response";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;
@@ -309,6 +313,31 @@ export type CoachApplication = {
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
 export type ReviewStatus = "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired";
 
+export type ClarifyReason = "term" | "drill" | "fix" | "other";
+export type HelpfulAnswer = "yes" | "some" | "no";
+
+// コーチの返答。運営が隠したものは hidden だけが返る。
+export type ReviewResponse =
+  | { hidden: true; created_at: string }
+  | {
+      hidden: false;
+      good_point: string;
+      fix_points: string[];
+      drill: string;
+      demo_video_url: string | null;
+      created_at: string;
+      clarify_reason: ClarifyReason | null;
+      clarify_requested_at: string | null;
+      clarification: string | null;
+      clarified_at: string | null;
+      helpful_asked: boolean;
+    };
+
+export type ReviewRating = {
+  stars: number | null;
+  helpful: HelpfulAnswer | null;
+};
+
 export type ReviewRequest = {
   id: string;
   tier: CoachTier;
@@ -319,10 +348,30 @@ export type ReviewRequest = {
   created_at: string;
   video_url: string;
   thumbnail_url: string;
+  // 詳細を開いたときだけ付く。
+  response?: ReviewResponse | null;
+  rating?: ReviewRating | null;
+  // 返答が届いたあとにだけ入る。
+  coach?: ReviewCoach | null;
+};
+
+export type CoachProbationResponse = {
+  request_id: string;
+  coach_id: string;
+  coach_nickname: string | null;
+  nth: number;
+  tier: CoachTier;
+  event: CoachEvent;
+  good_point: string;
+  fix_points: string[];
+  drill: string;
+  clarification: string | null;
+  created_at: string;
+  hidden_at: string | null;
 };
 
 // コーチに見せる依頼。動画は引き受けたあとにだけ付く。
-export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url"> & {
+export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url" | "rating"> & {
   video_url?: string;
   thumbnail_url?: string;
 };
@@ -354,4 +403,21 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
   profile_id: string;
   status: CoachStatus;
   nickname: string | null;
+};
+
+// コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。
+export type CoachRatingSummary = {
+  count: number;
+  average: number;
+  paused: boolean;
+};
+
+// 返答と一緒に利用者へ見せるコーチのプロフィール。
+export type ReviewCoach = {
+  nickname: string | null;
+  tier: CoachTier;
+  events: CoachEvent[];
+  best_record: string;
+  achievements: string;
+  years: number;
 };

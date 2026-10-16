@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { coachEventLabels, coachEvents, coachTierLabels } from "@/lib/coach-recruit";
+import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
-import { maxReviewSeconds, reviewFocusLabels, reviewFocusOptions, tooLong, videoDuration } from "@/lib/review";
+import { maxReviewSeconds, reviewEvents, reviewFocusLabels, reviewFocusOptions, tooLong, videoDuration } from "@/lib/review";
 import { formatDateTime } from "@/lib/format";
 import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -70,7 +70,7 @@ export default function NewReviewRequestPage() {
   const [me, setMe] = useState<CoachingMe | null>(null);
   const [loadError, setLoadError] = useState("");
   const [tier, setTier] = useState<CoachTier>("coach");
-  const [event, setEvent] = useState<CoachEvent | "">("");
+  const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
   const [focus, setFocus] = useState<ReviewFocus[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
@@ -108,9 +108,9 @@ export default function NewReviewRequestPage() {
     };
   }, [token]);
 
-  // 枠と種目を選ぶと、返ってくる目安を出す。送るときも同じ計算で目安が決まる。
+  // 枠と種目を選ぶと、返ってくる目安（送った翌日の12時）と、いま受付中のコーチがいるかを出す。
   useEffect(() => {
-    if (!token || !event || !me?.demo) return;
+    if (!token || !me?.demo) return;
     let cancelled = false;
     apiFetch<ReviewEstimate>(`/v1/coaching/estimate?tier=${tier}&event=${encodeURIComponent(event)}`, { token })
       .then((d) => {
@@ -140,10 +140,6 @@ export default function NewReviewRequestPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!event) {
-      setError("種目を選んでください");
-      return;
-    }
     if (focus.length === 0) {
       setError("見てほしい点を1つ以上選んでください");
       return;
@@ -224,21 +220,17 @@ export default function NewReviewRequestPage() {
             </div>
           </fieldset>
 
-          <label className="block space-y-1 text-sm">
-            <span className="font-semibold">種目</span>
-            <select
-              className="w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
-              value={event}
-              onChange={(e) => setEvent(e.target.value as CoachEvent | "")}
-            >
-              <option value="">選んでください</option>
-              {coachEvents.map((value) => (
-                <option key={value} value={value}>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold">種目</legend>
+            <div className="flex flex-wrap gap-2">
+              {reviewEvents.map((value) => (
+                <button key={value} type="button" aria-pressed={event === value} onClick={() => setEvent(value)} className={chip(event === value)}>
                   {coachEventLabels[value]}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+            <p className="text-xs text-slate-300">最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
+          </fieldset>
 
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">見てほしい点(複数可)</legend>
@@ -275,10 +267,14 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          {event && estimate ? (
+          {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
               返ってくる目安: {formatDateTime(estimate.due_at)}まで
-              {estimate.coaches_on_duty ? "" : "（いま受付中のコーチがいないため）"}
+              <span className="block text-xs text-slate-300">
+                {estimate.coaches_on_duty
+                  ? "夜に送っても、翌日の昼までに返ってきます。"
+                  : "いま受付中のコーチはいません。誰かが受付を始めたら回ります。"}
+              </span>
             </p>
           ) : null}
           <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>

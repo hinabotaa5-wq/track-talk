@@ -1131,6 +1131,17 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.TargetType == "review_response" {
+		ok, err := s.q.ReviewResponseReportable(r.Context(), db.ReviewResponseReportableParams{RequestID: tid, RequesterID: p.ID})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !ok {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+	}
 	row, err := s.q.CreateReport(r.Context(), db.CreateReportParams{
 		ID:         uuid.New(),
 		ReporterID: p.ID,
