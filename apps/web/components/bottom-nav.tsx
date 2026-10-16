@@ -2,28 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HeartPulse, Home, Plus, Trophy, UserRound } from "lucide-react";
+import { GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "post", href: "/upload", label: "投稿", icon: Plus },
   { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
+  { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
 export function mainTabHref(id: (typeof mainTabs)[number]["id"], signedIn: boolean) {
   const tab = mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
-  if (id !== "home" && !signedIn) return "/login";
+  if (id !== "home" && id !== "coaching" && !signedIn) return "/login";
   return tab.href;
 }
 
 export function activeMainTab(pathname: string) {
   if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
-  if (pathname === "/upload") return "post";
+  if (pathname === "/coaching") return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
   if (pathname === "/me") return "me";
@@ -32,6 +32,7 @@ export function activeMainTab(pathname: string) {
 
 export function showsBackButton(pathname: string) {
   if (pathname === "/register" || pathname === "/reset-password") return true;
+  if (pathname === "/upload") return true;
   if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile" || pathname === "/me/injury" || pathname === "/me/saved") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
