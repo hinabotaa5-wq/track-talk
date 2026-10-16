@@ -75,13 +75,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products", s.listProducts)
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
-		r.Get("/push/public-key", s.pushPublicKey)
-		// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
-		r.Get("/guardian/{token}", s.getGuardian)
-		r.Post("/guardian/{token}/consent", s.consentGuardian)
-		r.Patch("/guardian/{token}", s.updateGuardian)
-		r.Post("/guardian/{token}/decline", s.declineGuardian)
-		r.Post("/guardian/{token}/revoke", s.revokeGuardian)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
@@ -100,18 +93,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/notifications", s.listNotifications)
 			r.Post("/me/notifications/read", s.markAllNotificationsRead)
 			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
-			r.Get("/me/coaching", s.coachingMe)
-			r.Put("/me/birth-month", s.setBirthMonth)
-			r.Post("/me/guardian-link", s.issueGuardianLink)
-			r.Post("/me/push-subscriptions", s.savePushSubscription)
-			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
-			r.Post("/me/push-subscriptions/test", s.testPush)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
 			r.Post("/uploads/video", s.signVideoUpload)
 			r.Post("/uploads/image", s.signImageUpload)
-			r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 			r.Patch("/posts/{id}", s.updatePost)
 			r.Delete("/posts/{id}", s.deletePost)
 			r.Post("/posts/{id}/likes", s.likePost)
@@ -150,8 +136,43 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/products/{id}/hide", s.hideProduct)
 			r.Post("/admin/product-reviews/{id}/hide", s.hideProductReview)
 		})
+
+		// オンラインコーチング（年齢・保護者の同意・プッシュ通知・添削動画）は提供前なので、
+		// COACHING_ENABLED が立っていないと 404 を返す。プライバシーポリシーもその前提で書いている。
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireCoaching)
+			r.Get("/push/public-key", s.pushPublicKey)
+			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
+			r.Get("/guardian/{token}", s.getGuardian)
+			r.Post("/guardian/{token}/consent", s.consentGuardian)
+			r.Patch("/guardian/{token}", s.updateGuardian)
+			r.Post("/guardian/{token}/decline", s.declineGuardian)
+			r.Post("/guardian/{token}/revoke", s.revokeGuardian)
+
+			r.Group(func(r chi.Router) {
+				r.Use(RequireAuth(v))
+				r.Get("/me/coaching", s.coachingMe)
+				r.Put("/me/birth-month", s.setBirthMonth)
+				r.Post("/me/guardian-link", s.issueGuardianLink)
+				r.Post("/me/push-subscriptions", s.savePushSubscription)
+				r.Delete("/me/push-subscriptions", s.deletePushSubscription)
+				r.Post("/me/push-subscriptions/test", s.testPush)
+				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
+			})
+		})
 	})
 	return r
+}
+
+// requireCoaching は、オンラインコーチングを提供していない間、その API を無いものとして扱う。
+func (s *Server) requireCoaching(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.CoachingEnabled {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) present(p postDTO) postDTO {

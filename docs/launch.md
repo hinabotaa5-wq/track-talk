@@ -16,6 +16,7 @@
 
 - 初回は [Cloud Run で動かす手順](cloud-run-deploy.md) の `deploy/cloud-run/setup.sh` で作る。以降は Actions の「Deploy API」を手動で流してデプロイする（マージでは自動デプロイしない）
 - 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- `COACHING_ENABLED` はオンラインコーチングを提供するまで設定しない（Web の `NEXT_PUBLIC_COACHING_ENABLED` も同じ）
 - `CORS_ORIGINS` は画面の本番 URL
 - ヘルスチェック: `/health`
 - 予算（既定は月100円）を超えると API が止まる。再開は手作業

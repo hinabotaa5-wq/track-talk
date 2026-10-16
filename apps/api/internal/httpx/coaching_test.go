@@ -39,12 +39,50 @@ type guardianView struct {
 	Token           string  `json:"token"`
 }
 
+// setupCoaching は、オンラインコーチングを有効にしたサーバーを作る。
+func setupCoaching(t *testing.T) http.Handler {
+	return setupConfig(t, func(cfg *config.Config) { cfg.CoachingEnabled = true })
+}
+
 func minorBirthMonth() string {
 	return time.Now().AddDate(-15, 0, 0).Format("2006-01")
 }
 
-func TestBirthMonthIsSetOnce(t *testing.T) {
+// 提供を始めるまでは、コーチングの API はどれも無いものとして 404 を返す。
+func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 	h := setup(t)
+	ta := token(t, uuid.New())
+	routes := []struct {
+		method, path, tok string
+	}{
+		{http.MethodGet, "/v1/push/public-key", ""},
+		{http.MethodGet, "/v1/guardian/abc", ""},
+		{http.MethodPost, "/v1/guardian/abc/consent", ""},
+		{http.MethodPatch, "/v1/guardian/abc", ""},
+		{http.MethodPost, "/v1/guardian/abc/decline", ""},
+		{http.MethodPost, "/v1/guardian/abc/revoke", ""},
+		{http.MethodGet, "/v1/me/coaching", ta},
+		{http.MethodGet, "/v1/me/coaching", ""},
+		{http.MethodPut, "/v1/me/birth-month", ta},
+		{http.MethodPost, "/v1/me/guardian-link", ta},
+		{http.MethodPost, "/v1/me/push-subscriptions", ta},
+		{http.MethodDelete, "/v1/me/push-subscriptions", ta},
+		{http.MethodPost, "/v1/me/push-subscriptions/test", ta},
+		{http.MethodPost, "/v1/uploads/coaching-video", ta},
+	}
+	for _, rt := range routes {
+		if rec := doJSON(t, h, rt.method, rt.path, rt.tok, map[string]any{}); rec.Code != http.StatusNotFound {
+			t.Errorf("%s %s (token=%v) = %d %s", rt.method, rt.path, rt.tok != "", rec.Code, rec.Body.String())
+		}
+	}
+	// ほかの API には影響しない。
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", ta, nil); rec.Code != http.StatusOK {
+		t.Fatalf("me %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBirthMonthIsSetOnce(t *testing.T) {
+	h := setupCoaching(t)
 	a := uuid.New()
 	ta := token(t, a)
 
@@ -93,7 +131,7 @@ func TestBirthMonthIsSetOnce(t *testing.T) {
 }
 
 func TestGuardianConsentFlow(t *testing.T) {
-	h := setup(t)
+	h := setupCoaching(t)
 	minor := uuid.New()
 	tm := token(t, minor)
 
@@ -210,7 +248,7 @@ func TestGuardianConsentFlow(t *testing.T) {
 }
 
 func TestGuardianCanDeclineBeforeConsenting(t *testing.T) {
-	h := setup(t)
+	h := setupCoaching(t)
 	minor := uuid.New()
 	tm := token(t, minor)
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
@@ -274,12 +312,13 @@ func TestPushSubscriptionsAndTestNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unconfigured := setup(t)
+	unconfigured := setupCoaching(t)
 	if rec := doJSON(t, unconfigured, http.MethodGet, "/v1/push/public-key", "", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unconfigured key %d", rec.Code)
 	}
 
 	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingEnabled = true
 		cfg.VAPIDPublicKey = pub
 		cfg.VAPIDPrivateKey = priv
 		cfg.VAPIDSubject = "mailto:test@example.com"
@@ -361,7 +400,7 @@ func TestCoachingVideoUploadIsPrivate(t *testing.T) {
 	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
 	t.Setenv("CLOUDINARY_API_KEY", "key")
 	t.Setenv("CLOUDINARY_API_SECRET", "secret")
-	h := setup(t)
+	h := setupCoaching(t)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/uploads/coaching-video", "", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous %d", rec.Code)
 	}
@@ -394,6 +433,7 @@ func TestGuardianConsentNotifiesTheMinor(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingEnabled = true
 		cfg.VAPIDPublicKey = pub
 		cfg.VAPIDPrivateKey = priv
 		cfg.VAPIDSubject = "mailto:test@example.com"
