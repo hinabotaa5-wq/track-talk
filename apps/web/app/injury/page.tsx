@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { InjuryView } from "./injury-view";
+
+export const metadata: Metadata = {
+  title: "ケガ部｜同じケガをした陸上選手が集まる場所",
+  description:
+    "肉離れ・捻挫・シンスプリント・ジャンパー膝など、同じケガをした陸上選手が集まるグループ。復帰までの目安や、みんなが意識的にやったこと、次の人への一言を見られます。",
+  alternates: { canonical: "/injury" },
+};
 
 export default function InjuryPage() {
   // 読み込み中に中身が1画面に収まると、ページがスクロールできなくなり、

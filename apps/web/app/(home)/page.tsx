@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { HomeView } from "@/components/home-view";
@@ -8,6 +9,17 @@ import { parseHomeSort } from "@/lib/home-sort";
 import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+type HomeSearchParams = Promise<{ sort?: string; q?: string; page?: string }>;
+
+// 並び替えやページ送りは同じ一覧の別表示なので "/" にまとめ、検索結果のページは検索エンジンに載せない。
+export async function generateMetadata({ searchParams }: { searchParams: HomeSearchParams }): Promise<Metadata> {
+  const sp = await searchParams;
+  return {
+    alternates: { canonical: "/" },
+    ...((sp.q ?? "").trim() ? { robots: { index: false, follow: true } } : {}),
+  };
+}
 
 async function ServerHomeFeed({ path }: { path: string }) {
   // On timeout or failure, HomeFeed retries from the browser when initial is null.
@@ -27,7 +39,7 @@ async function ServerHomeFeed({ path }: { path: string }) {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; q?: string; page?: string }>;
+  searchParams: HomeSearchParams;
 }) {
   const sp = await searchParams;
   const sort = parseHomeSort(sp.sort);

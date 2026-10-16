@@ -19,10 +19,10 @@ async function loadPublicGroup(part: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { part } = await params;
   if (!isInjuryBodyPart(part)) return {};
-  const title = `${injuryGroupTitle(part)} | ケガ部 | TrackTalk`;
+  const title = `${injuryGroupTitle(part)}｜ケガ部`;
   const subject = part === "other" ? "ケガ" : injuryBodyPartLabel(part);
   const description = `${subject}をした陸上選手が集まるグループ。復帰までの目安、ケガをしたときの状況、みんなが意識的にやったこと、次の人への一言を見られます。`;
-  return { title, description, openGraph: { title, description } };
+  return { title, description, alternates: { canonical: `/injury/${part}` }, openGraph: { title, description } };
 }
 
 export default async function InjuryGroupPage({ params }: Props) {
