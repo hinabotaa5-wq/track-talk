@@ -303,7 +303,7 @@ export type CoachApplication = {
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
-export type ReviewStatus = "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired" | "canceled";
+export type ReviewStatus = "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired";
 
 export type ReviewRequest = {
   id: string;
@@ -313,7 +313,6 @@ export type ReviewRequest = {
   status: ReviewStatus;
   due_at: string;
   created_at: string;
-  canceled_at: string | null;
   video_url: string;
   thumbnail_url: string;
 };

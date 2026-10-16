@@ -9,8 +9,8 @@ import { useAuth } from "./auth-provider";
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
   { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
+  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 

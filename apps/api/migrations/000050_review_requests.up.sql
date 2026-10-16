@@ -36,7 +36,6 @@ CREATE TABLE review_requests (
     status text NOT NULL DEFAULT 'queued',
     due_at timestamptz NOT NULL,
     coach_id uuid REFERENCES profiles (id) ON DELETE SET NULL,
-    canceled_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK (tier IN ('coach', 'senpai')),
@@ -50,8 +49,7 @@ CREATE TABLE review_requests (
         cardinality(focus) BETWEEN 1 AND 8
         AND focus <@ ARRAY['start', 'acceleration', 'top-speed', 'takeoff', 'arm', 'contact', 'rhythm', 'other']::text[]
     ),
-    CHECK (status IN ('queued', 'offered', 'in_review', 'returned', 'clarifying', 'expired', 'canceled')),
-    CHECK ((status = 'canceled') = (canceled_at IS NOT NULL))
+    CHECK (status IN ('queued', 'offered', 'in_review', 'returned', 'clarifying', 'expired'))
 );
 
 CREATE INDEX review_requests_requester_idx ON review_requests (requester_id, created_at DESC);

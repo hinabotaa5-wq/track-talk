@@ -163,23 +163,13 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 		t.Fatalf("same video %d", rec.Code)
 	}
 
-	// 他の人には見えず、取り消せない。
+	// 他の人には見えない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+created.ID, other, nil); rec.Code != http.StatusNotFound {
 		t.Fatalf("other get %d", rec.Code)
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/cancel", other, nil); rec.Code != http.StatusNotFound {
-		t.Fatalf("other cancel %d", rec.Code)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/coaching/requests", tu, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), created.ID) {
 		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
-	}
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/cancel", tu, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"canceled"`) {
-		t.Fatalf("cancel %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/cancel", tu, nil); rec.Code != http.StatusConflict {
-		t.Fatalf("cancel twice %d", rec.Code)
 	}
 }
 

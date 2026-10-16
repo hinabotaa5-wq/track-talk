@@ -36,10 +36,8 @@ SET coaching_demo = true,
 WHERE id = $1;
 
 -- name: CountReviewRequestsByRequester :one
--- 取り消したものは数えない。
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1
-  AND status <> 'canceled';
+WHERE requester_id = $1;
 
 -- name: CreateReviewRequest :one
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at)
@@ -59,14 +57,3 @@ WHERE requester_id = $1;
 -- name: GetReviewRequest :one
 SELECT * FROM review_requests
 WHERE id = $1;
-
--- name: CancelReviewRequest :one
--- まだコーチに回っていないものだけ取り消せる。
-UPDATE review_requests
-SET status = 'canceled',
-    canceled_at = now(),
-    updated_at = now()
-WHERE id = $1
-  AND requester_id = $2
-  AND status = 'queued'
-RETURNING *;

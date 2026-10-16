@@ -21,7 +21,6 @@ export const reviewStatusLabels: Record<ReviewStatus, string> = {
   returned: "返却済み",
   clarifying: "補足を待っています",
   expired: "期限切れ",
-  canceled: "取り消し",
 };
 
 // 添削の動画は30秒まで。少しの誤差はサーバーと同じく許す。

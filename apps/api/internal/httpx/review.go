@@ -81,7 +81,6 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"status":        rr.Status,
 		"due_at":        rr.DueAt,
 		"created_at":    rr.CreatedAt,
-		"canceled_at":   rr.CanceledAt,
 		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
 		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
 	}
@@ -333,32 +332,6 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 	rr, err := s.q.GetReviewRequest(r.Context(), id)
 	if err == nil && rr.RequesterID != p.ID {
 		err = pgx.ErrNoRows
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, s.reviewRequestJSON(rr))
-}
-
-func (s *Server) cancelReviewRequest(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
-	if !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	rr, err := s.q.CancelReviewRequest(r.Context(), db.CancelReviewRequestParams{ID: id, RequesterID: p.ID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		current, getErr := s.q.GetReviewRequest(r.Context(), id)
-		if getErr != nil || current.RequesterID != p.ID {
-			Error(w, http.StatusNotFound, "not_found", "依頼が見つかりません")
-			return
-		}
-		Error(w, http.StatusConflict, "conflict", "コーチに回った後は取り消せません")
-		return
 	}
 	if err != nil {
 		MapDBError(w, err)

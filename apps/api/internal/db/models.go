@@ -330,7 +330,6 @@ type ReviewRequest struct {
 	Status        string     `json:"status"`
 	DueAt         time.Time  `json:"due_at"`
 	CoachID       *uuid.UUID `json:"coach_id"`
-	CanceledAt    *time.Time `json:"canceled_at"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 }

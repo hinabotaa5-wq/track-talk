@@ -12,43 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const cancelReviewRequest = `-- name: CancelReviewRequest :one
-UPDATE review_requests
-SET status = 'canceled',
-    canceled_at = now(),
-    updated_at = now()
-WHERE id = $1
-  AND requester_id = $2
-  AND status = 'queued'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, canceled_at, created_at, updated_at
-`
-
-type CancelReviewRequestParams struct {
-	ID          uuid.UUID `json:"id"`
-	RequesterID uuid.UUID `json:"requester_id"`
-}
-
-// まだコーチに回っていないものだけ取り消せる。
-func (q *Queries) CancelReviewRequest(ctx context.Context, arg CancelReviewRequestParams) (ReviewRequest, error) {
-	row := q.db.QueryRow(ctx, cancelReviewRequest, arg.ID, arg.RequesterID)
-	var i ReviewRequest
-	err := row.Scan(
-		&i.ID,
-		&i.RequesterID,
-		&i.Tier,
-		&i.Event,
-		&i.Focus,
-		&i.VideoPublicID,
-		&i.Status,
-		&i.DueAt,
-		&i.CoachID,
-		&i.CanceledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const countMyReviewRequests = `-- name: CountMyReviewRequests :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1
@@ -64,10 +27,8 @@ func (q *Queries) CountMyReviewRequests(ctx context.Context, requesterID uuid.UU
 const countReviewRequestsByRequester = `-- name: CountReviewRequestsByRequester :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1
-  AND status <> 'canceled'
 `
 
-// 取り消したものは数えない。
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
 	var count int64
@@ -96,7 +57,7 @@ func (q *Queries) CreateDemoCode(ctx context.Context, code string) (CoachingDemo
 const createReviewRequest = `-- name: CreateReviewRequest :one
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, canceled_at, created_at, updated_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at
 `
 
 type CreateReviewRequestParams struct {
@@ -130,7 +91,6 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		&i.Status,
 		&i.DueAt,
 		&i.CoachID,
-		&i.CanceledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -138,7 +98,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 }
 
 const getReviewRequest = `-- name: GetReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, canceled_at, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
 WHERE id = $1
 `
 
@@ -155,7 +115,6 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.Status,
 		&i.DueAt,
 		&i.CoachID,
-		&i.CanceledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -203,7 +162,7 @@ func (q *Queries) ListDemoCodes(ctx context.Context) ([]ListDemoCodesRow, error)
 }
 
 const listMyReviewRequests = `-- name: ListMyReviewRequests :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, canceled_at, created_at, updated_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
 WHERE requester_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -234,7 +193,6 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 			&i.Status,
 			&i.DueAt,
 			&i.CoachID,
-			&i.CanceledAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

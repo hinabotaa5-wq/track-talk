@@ -1,13 +1,11 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
 import { reviewFocusLabels, reviewStatusLabels } from "@/lib/review";
 import type { ReviewRequest } from "@/lib/types";
-import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -19,7 +17,6 @@ export default function ReviewRequestPage() {
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<ReviewRequest | null>(null);
   const [error, setError] = useState("");
-  const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
     if (!loading && !session) {
@@ -42,19 +39,7 @@ export default function ReviewRequestPage() {
     };
   }, [token, id]);
 
-  async function onCancel() {
-    if (!request || !window.confirm("この依頼を取り消しますか？")) return;
-    if (!acquire()) return;
-    try {
-      setRequest(await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/cancel`, { method: "POST", token }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "取り消せませんでした");
-    } finally {
-      release();
-    }
-  }
-
-  if (error && !request) return <p className="text-sm text-red-400">{error}</p>;
+  if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (loading || !session || !request) return <p className="text-sm text-slate-200">読み込み中...</p>;
 
   const waiting = request.status === "queued" || request.status === "offered" || request.status === "in_review";
@@ -97,12 +82,6 @@ export default function ReviewRequestPage() {
         </div>
       </dl>
 
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      {request.status === "queued" ? (
-        <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void onCancel()}>
-          取り消す
-        </Button>
-      ) : null}
       <Link href="/me/coaching/requests" className="block text-center text-sm text-blue-300 underline">
         依頼の一覧へ
       </Link>

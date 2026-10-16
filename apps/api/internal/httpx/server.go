@@ -117,7 +117,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/coaching/requests", s.createReviewRequest)
 			r.Get("/me/coaching/requests", s.listMyReviewRequests)
 			r.Get("/coaching/requests/{id}", s.getReviewRequest)
-			r.Post("/coaching/requests/{id}/cancel", s.cancelReviewRequest)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
