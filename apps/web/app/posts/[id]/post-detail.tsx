@@ -11,7 +11,7 @@ import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
-import { buildCommentThreads, replyLabel } from "@/lib/comment-thread";
+import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,8 @@ export function PostDetail({
   const commentLock = useActionLock();
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  // コメントのカードをタップして開いたスレッド(null なら二列のカード一覧)。
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [reportedPost, setReportedPost] = useState(false);
   const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
@@ -212,6 +214,37 @@ export function PostDetail({
     return c.author_name ?? "匿名";
   }
 
+  function openThread(c: Comment) {
+    setOpenThreadId(c.id);
+    // スレッドの中で書いたコメントは、そのスレッドへの返信にする。
+    setReplyTo(c);
+    window.scrollTo({ top: 0 });
+  }
+
+  function closeThread() {
+    setOpenThreadId(null);
+    setReplyTo(null);
+  }
+
+  function renderCommentCard(thread: CommentThread & { top: Comment }) {
+    const c = thread.top;
+    return (
+      <button
+        key={c.id}
+        type="button"
+        onClick={() => openThread(c)}
+        className="flex min-h-28 flex-col rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
+      >
+        <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
+        <span className="line-clamp-4 whitespace-pre-wrap break-words text-sm">{c.body}</span>
+        <span className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-slate-300">
+          <span className={thread.replies.length > 0 ? "font-semibold text-blue-200" : ""}>💬 {thread.replies.length}</span>
+          <span className="truncate">{formatDateTime(c.created_at)}</span>
+        </span>
+      </button>
+    );
+  }
+
   function startReply(c: Comment) {
     setReplyTo(c);
     form.setFocus("body");
@@ -324,6 +357,10 @@ export function PostDetail({
     );
   }
 
+  const threads = buildCommentThreads(comments);
+  const openedThread = threads.find((t) => t.top?.id === openThreadId);
+  const activeThread = openedThread?.top ? { top: openedThread.top, replies: openedThread.replies } : null;
+
   return (
     <article
       className={`${allowComment ? "pb-[calc(12.5rem+env(safe-area-inset-bottom))] md:pb-36 lg:pb-0" : ""} lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8`}
@@ -432,18 +469,36 @@ export function PostDetail({
       <section className="mt-6 space-y-3 lg:sticky lg:top-4 lg:mt-0">
         <h2 className="text-xl font-semibold">コメント</h2>
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
-        {buildCommentThreads(comments).map((thread) => (
-          <div key={thread.top?.id ?? thread.replies[0].id} className="space-y-2">
-            {thread.top ? (
-              renderComment(thread.top, false)
+        {activeThread ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-blue-300 transition active:scale-95"
+              onClick={closeThread}
+            >
+              <span aria-hidden>←</span> コメント一覧へ
+            </button>
+            {renderComment(activeThread.top, false)}
+            <p className="text-xs font-semibold text-slate-300">返信 {activeThread.replies.length}件</p>
+            {activeThread.replies.length > 0 ? (
+              <div className="ml-4 space-y-2 border-l-2 border-blue-400/40 pl-3">{activeThread.replies.map((r) => renderComment(r, true))}</div>
             ) : (
-              <p className="rounded-xl border border-dashed border-white/20 p-3 text-xs text-slate-300">削除されたコメント</p>
+              <p className="text-sm text-slate-200">まだ返信はありません。</p>
             )}
-            {thread.replies.length > 0 ? (
-              <div className="ml-4 space-y-2 border-l-2 border-blue-400/40 pl-3">{thread.replies.map((r) => renderComment(r, true))}</div>
-            ) : null}
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            {threads.map((thread) =>
+              thread.top ? (
+                renderCommentCard({ ...thread, top: thread.top })
+              ) : (
+                <p key={thread.replies[0].id} className="rounded-xl border border-dashed border-white/20 p-3 text-xs text-slate-300">
+                  削除されたコメント（返信{thread.replies.length}件）
+                </p>
+              ),
+            )}
+          </div>
+        )}
         {allowComment ? (
           <form
             onSubmit={form.handleSubmit(onComment)}
