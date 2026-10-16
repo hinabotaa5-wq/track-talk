@@ -1,18 +1,143 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import type { CoachApplication, CoachingMe } from "@/lib/types";
+import { formatDateTime } from "@/lib/format";
+import { reviewFocusLabels } from "@/lib/review";
+import type { CoachApplication, CoachingMe, CoachRequests, CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-// コーチ画面。承認されたコーチが「受付中」と1日の上限本数を決める。
-// 依頼が回ってくる仕組み（打診と返答）はこの後の PR で足す。
+// コーチ画面。承認されたコーチが「受付中」と1日の上限本数を決め、届いた打診を引き受けるか見送る。
+// 返答を書く画面はこの後の PR で足す。
 
 const capOptions = [1, 2, 3, 5, 8, 10, 15, 20];
+
+function minutesLeft(iso: string, now: number) {
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 60000));
+}
+
+function RequestSummary({ request }: { request: CoachReviewRequest }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="font-semibold text-white">
+        {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
+      </p>
+      <p className="text-sm text-slate-200">見てほしい点: {request.focus.map((f) => reviewFocusLabels[f]).join("、")}</p>
+      <p className="text-xs text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
+    </div>
+  );
+}
+
+function CoachRequestsSection({ token }: { token: string | null }) {
+  const [data, setData] = useState<CoachRequests | null>(null);
+  const [error, setError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const [reload, setReload] = useState(0);
+  const { pending, acquire, release } = useActionLock();
+
+  const fetchRequests = useCallback(() => apiFetch<CoachRequests>("/v1/coach/requests", { token }), [token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchRequests()
+        .then((d) => {
+          if (cancelled) return;
+          setData(d);
+          setNow(Date.now());
+        })
+        .catch(() => {
+          if (!cancelled) setError("依頼を読み込めませんでした");
+        });
+    };
+    load();
+    // 打診の残り時間を出し直し、期限が過ぎた打診を消すため、30秒ごとに読み直す。
+    const timer = window.setInterval(load, 30000);
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [fetchRequests, reload]);
+
+  async function answer(offerID: string, action: "accept" | "decline") {
+    if (!acquire()) return;
+    setError("");
+    try {
+      await apiFetch(`/v1/coach/offers/${offerID}/${action}`, { method: "POST", token });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+    } finally {
+      release();
+      setReload((n) => n + 1);
+    }
+  }
+
+  if (!data) return error ? <p className="text-sm text-red-400">{error}</p> : null;
+
+  return (
+    <>
+      <section className="space-y-2">
+        <h2 className="font-bold">届いている依頼</h2>
+        {data.offers.length === 0 ? <p className="text-sm text-slate-300">いま届いている依頼はありません</p> : null}
+        <ul className="space-y-2">
+          {data.offers.map((offer) => (
+            <li key={offer.id} className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
+              <RequestSummary request={offer.request} />
+              <p className="text-sm font-semibold text-white">あと{minutesLeft(offer.expires_at, now)}分で次のコーチに回ります</p>
+              <div className="flex gap-2">
+                <Button type="button" className="flex-1" disabled={pending} onClick={() => void answer(offer.id, "accept")}>
+                  引き受ける
+                </Button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void answer(offer.id, "decline")}
+                  className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+                >
+                  見送る
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-bold">添削中</h2>
+        {data.reviewing.length === 0 ? <p className="text-sm text-slate-300">添削中の依頼はありません</p> : null}
+        <ul className="space-y-3">
+          {data.reviewing.map((request) => (
+            <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
+              <RequestSummary request={request} />
+              {request.video_url ? (
+                <video
+                  src={request.video_url}
+                  poster={request.thumbnail_url || undefined}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full rounded-lg bg-black"
+                />
+              ) : null}
+              <p className="text-xs text-slate-300">返答を書く画面は準備中です。</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
 
 export default function CoachPage() {
   const { session, token, loading } = useAuth();
@@ -126,6 +251,8 @@ export default function CoachPage() {
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
+
+      <CoachRequestsSection token={token} />
 
       <section className="space-y-2">
         <h2 className="font-bold">通知</h2>

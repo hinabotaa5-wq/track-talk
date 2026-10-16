@@ -12,6 +12,59 @@ import (
 	"github.com/google/uuid"
 )
 
+const acceptReviewRequest = `-- name: AcceptReviewRequest :one
+UPDATE review_requests
+SET status = 'in_review',
+    updated_at = now()
+WHERE id = $1
+  AND coach_id = $2
+  AND status = 'offered'
+  AND due_at > now()
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at
+`
+
+type AcceptReviewRequestParams struct {
+	ID      uuid.UUID  `json:"id"`
+	CoachID *uuid.UUID `json:"coach_id"`
+}
+
+func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewRequestParams) (ReviewRequest, error) {
+	row := q.db.QueryRow(ctx, acceptReviewRequest, arg.ID, arg.CoachID)
+	var i ReviewRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.Tier,
+		&i.Event,
+		&i.Focus,
+		&i.VideoPublicID,
+		&i.Status,
+		&i.DueAt,
+		&i.CoachID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const answerReviewOffer = `-- name: AnswerReviewOffer :exec
+UPDATE review_offers
+SET result = $1::text,
+    answered_at = now()
+WHERE id = $2
+  AND result IS NULL
+`
+
+type AnswerReviewOfferParams struct {
+	Result string    `json:"result"`
+	ID     uuid.UUID `json:"id"`
+}
+
+func (q *Queries) AnswerReviewOffer(ctx context.Context, arg AnswerReviewOfferParams) error {
+	_, err := q.db.Exec(ctx, answerReviewOffer, arg.Result, arg.ID)
+	return err
+}
+
 const countMyReviewRequests = `-- name: CountMyReviewRequests :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1
@@ -24,6 +77,28 @@ func (q *Queries) CountMyReviewRequests(ctx context.Context, requesterID uuid.UU
 	return count, err
 }
 
+const countOnDutyCoaches = `-- name: CountOnDutyCoaches :one
+SELECT count(*) FROM coach_profiles
+WHERE status = 'approved'
+  AND on_duty
+  AND tier = $1
+  AND $2::text = ANY (events)
+  AND profile_id <> $3
+`
+
+type CountOnDutyCoachesParams struct {
+	Tier        string    `json:"tier"`
+	Event       string    `json:"event"`
+	RequesterID uuid.UUID `json:"requester_id"`
+}
+
+func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoachesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOnDutyCoaches, arg.Tier, arg.Event, arg.RequesterID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countReviewRequestsByRequester = `-- name: CountReviewRequestsByRequester :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1
@@ -31,6 +106,25 @@ WHERE requester_id = $1
 
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countWaitingReviewRequests = `-- name: CountWaitingReviewRequests :one
+SELECT count(*) FROM review_requests
+WHERE status IN ('queued', 'offered')
+  AND tier = $1
+  AND event = $2
+`
+
+type CountWaitingReviewRequestsParams struct {
+	Tier  string `json:"tier"`
+	Event string `json:"event"`
+}
+
+func (q *Queries) CountWaitingReviewRequests(ctx context.Context, arg CountWaitingReviewRequestsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countWaitingReviewRequests, arg.Tier, arg.Event)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -50,6 +144,39 @@ func (q *Queries) CreateDemoCode(ctx context.Context, code string) (CoachingDemo
 		&i.CreatedAt,
 		&i.UsedBy,
 		&i.UsedAt,
+	)
+	return i, err
+}
+
+const createReviewOffer = `-- name: CreateReviewOffer :one
+INSERT INTO review_offers (id, request_id, coach_id, expires_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at
+`
+
+type CreateReviewOfferParams struct {
+	ID        uuid.UUID `json:"id"`
+	RequestID uuid.UUID `json:"request_id"`
+	CoachID   uuid.UUID `json:"coach_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferParams) (ReviewOffer, error) {
+	row := q.db.QueryRow(ctx, createReviewOffer,
+		arg.ID,
+		arg.RequestID,
+		arg.CoachID,
+		arg.ExpiresAt,
+	)
+	var i ReviewOffer
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.CoachID,
+		&i.OfferedAt,
+		&i.ExpiresAt,
+		&i.Result,
+		&i.AnsweredAt,
 	)
 	return i, err
 }
@@ -97,6 +224,105 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 	return i, err
 }
 
+const expireOverdueReviewRequests = `-- name: ExpireOverdueReviewRequests :many
+WITH target AS (
+    SELECT id, status AS old_status
+    FROM review_requests
+    WHERE status IN ('queued', 'offered', 'in_review')
+      AND due_at <= now()
+    FOR UPDATE
+), overdue AS (
+    UPDATE review_requests r
+    SET status = 'expired',
+        coach_id = CASE WHEN target.old_status = 'in_review' THEN r.coach_id END,
+        updated_at = now()
+    FROM target
+    WHERE r.id = target.id
+    RETURNING r.id, r.requester_id, r.coach_id, target.old_status
+), closed AS (
+    UPDATE review_offers o
+    SET result = 'expired',
+        answered_at = now()
+    FROM overdue
+    WHERE o.request_id = overdue.id
+      AND o.result IS NULL
+)
+SELECT id, requester_id, coach_id, old_status FROM overdue
+`
+
+type ExpireOverdueReviewRequestsRow struct {
+	ID          uuid.UUID  `json:"id"`
+	RequesterID uuid.UUID  `json:"requester_id"`
+	CoachID     *uuid.UUID `json:"coach_id"`
+	OldStatus   string     `json:"old_status"`
+}
+
+// 返却の目安を過ぎた依頼を expired にする。添削中だった依頼はコーチを残し、遵守率に使う。
+func (q *Queries) ExpireOverdueReviewRequests(ctx context.Context) ([]ExpireOverdueReviewRequestsRow, error) {
+	rows, err := q.db.Query(ctx, expireOverdueReviewRequests)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExpireOverdueReviewRequestsRow
+	for rows.Next() {
+		var i ExpireOverdueReviewRequestsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequesterID,
+			&i.CoachID,
+			&i.OldStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const expireStaleReviewOffers = `-- name: ExpireStaleReviewOffers :many
+WITH stale AS (
+    UPDATE review_offers
+    SET result = 'expired',
+        answered_at = now()
+    WHERE result IS NULL
+      AND expires_at <= now()
+    RETURNING request_id
+)
+UPDATE review_requests r
+SET status = 'queued',
+    coach_id = NULL,
+    updated_at = now()
+FROM stale
+WHERE r.id = stale.request_id
+  AND r.status = 'offered'
+RETURNING r.id
+`
+
+// 30分のうちに返事がなかった打診を閉じ、依頼を待ちに戻す。
+func (q *Queries) ExpireStaleReviewOffers(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, expireStaleReviewOffers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getReviewRequest = `-- name: GetReviewRequest :one
 SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
 WHERE id = $1
@@ -119,6 +345,95 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listCoachOpenOffers = `-- name: ListCoachOpenOffers :many
+SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at
+FROM review_offers o
+JOIN review_requests r ON r.id = o.request_id
+WHERE o.coach_id = $1
+  AND o.result IS NULL
+  AND o.expires_at > now()
+ORDER BY o.offered_at
+`
+
+type ListCoachOpenOffersRow struct {
+	OfferID        uuid.UUID     `json:"offer_id"`
+	OfferExpiresAt time.Time     `json:"offer_expires_at"`
+	ReviewRequest  ReviewRequest `json:"review_request"`
+}
+
+func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([]ListCoachOpenOffersRow, error) {
+	rows, err := q.db.Query(ctx, listCoachOpenOffers, coachID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCoachOpenOffersRow
+	for rows.Next() {
+		var i ListCoachOpenOffersRow
+		if err := rows.Scan(
+			&i.OfferID,
+			&i.OfferExpiresAt,
+			&i.ReviewRequest.ID,
+			&i.ReviewRequest.RequesterID,
+			&i.ReviewRequest.Tier,
+			&i.ReviewRequest.Event,
+			&i.ReviewRequest.Focus,
+			&i.ReviewRequest.VideoPublicID,
+			&i.ReviewRequest.Status,
+			&i.ReviewRequest.DueAt,
+			&i.ReviewRequest.CoachID,
+			&i.ReviewRequest.CreatedAt,
+			&i.ReviewRequest.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCoachReviewing = `-- name: ListCoachReviewing :many
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+WHERE coach_id = $1::uuid
+  AND status = 'in_review'
+ORDER BY due_at
+`
+
+func (q *Queries) ListCoachReviewing(ctx context.Context, coachID uuid.UUID) ([]ReviewRequest, error) {
+	rows, err := q.db.Query(ctx, listCoachReviewing, coachID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReviewRequest
+	for rows.Next() {
+		var i ReviewRequest
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequesterID,
+			&i.Tier,
+			&i.Event,
+			&i.Focus,
+			&i.VideoPublicID,
+			&i.Status,
+			&i.DueAt,
+			&i.CoachID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDemoCodes = `-- name: ListDemoCodes :many
@@ -206,6 +521,184 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 	return items, nil
 }
 
+const listQueuedReviewRequests = `-- name: ListQueuedReviewRequests :many
+SELECT id FROM review_requests
+WHERE status = 'queued'
+  AND due_at > now()
+ORDER BY created_at
+LIMIT 50
+`
+
+func (q *Queries) ListQueuedReviewRequests(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listQueuedReviewRequests)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockOpenReviewOffer = `-- name: LockOpenReviewOffer :one
+SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at FROM review_offers
+WHERE id = $1
+  AND coach_id = $2
+  AND result IS NULL
+FOR UPDATE
+`
+
+type LockOpenReviewOfferParams struct {
+	ID      uuid.UUID `json:"id"`
+	CoachID uuid.UUID `json:"coach_id"`
+}
+
+func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOfferParams) (ReviewOffer, error) {
+	row := q.db.QueryRow(ctx, lockOpenReviewOffer, arg.ID, arg.CoachID)
+	var i ReviewOffer
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.CoachID,
+		&i.OfferedAt,
+		&i.ExpiresAt,
+		&i.Result,
+		&i.AnsweredAt,
+	)
+	return i, err
+}
+
+const lockQueuedReviewRequest = `-- name: LockQueuedReviewRequest :one
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at FROM review_requests
+WHERE id = $1
+  AND status = 'queued'
+  AND due_at > now()
+FOR UPDATE
+`
+
+func (q *Queries) LockQueuedReviewRequest(ctx context.Context, id uuid.UUID) (ReviewRequest, error) {
+	row := q.db.QueryRow(ctx, lockQueuedReviewRequest, id)
+	var i ReviewRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.Tier,
+		&i.Event,
+		&i.Focus,
+		&i.VideoPublicID,
+		&i.Status,
+		&i.DueAt,
+		&i.CoachID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const lockReviewAssignment = `-- name: LockReviewAssignment :exec
+SELECT pg_advisory_xact_lock(7351002)
+`
+
+// 割り当ては1つずつ行い、同じコーチに上限を超えて回さないようにする。
+func (q *Queries) LockReviewAssignment(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockReviewAssignment)
+	return err
+}
+
+const markReviewRequestOffered = `-- name: MarkReviewRequestOffered :exec
+UPDATE review_requests
+SET status = 'offered',
+    coach_id = $2,
+    updated_at = now()
+WHERE id = $1
+  AND status = 'queued'
+`
+
+type MarkReviewRequestOfferedParams struct {
+	ID      uuid.UUID  `json:"id"`
+	CoachID *uuid.UUID `json:"coach_id"`
+}
+
+func (q *Queries) MarkReviewRequestOffered(ctx context.Context, arg MarkReviewRequestOfferedParams) error {
+	_, err := q.db.Exec(ctx, markReviewRequestOffered, arg.ID, arg.CoachID)
+	return err
+}
+
+const pickCoachForRequest = `-- name: PickCoachForRequest :one
+SELECT c.profile_id
+FROM coach_profiles c
+WHERE c.status = 'approved'
+  AND c.on_duty
+  AND c.tier = $1
+  AND $2::text = ANY (c.events)
+  AND c.profile_id <> $3
+  AND NOT EXISTS (
+    SELECT 1 FROM review_offers o
+    WHERE o.request_id = $4
+      AND o.coach_id = c.profile_id
+  )
+  AND (
+    SELECT count(*) FROM review_requests r
+    WHERE r.coach_id = c.profile_id
+      AND r.status IN ('offered', 'in_review')
+  ) < $5::int
+  AND (
+    SELECT count(*) FROM review_offers o
+    WHERE o.coach_id = c.profile_id
+      AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= $6::timestamptz))
+  ) < c.daily_cap
+ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
+LIMIT 1
+`
+
+type PickCoachForRequestParams struct {
+	Tier        string    `json:"tier"`
+	Event       string    `json:"event"`
+	RequesterID uuid.UUID `json:"requester_id"`
+	RequestID   uuid.UUID `json:"request_id"`
+	MaxActive   int32     `json:"max_active"`
+	DayStart    time.Time `json:"day_start"`
+}
+
+// 枠と種目が合う受付中のコーチのうち、最後に打診された時刻が一番古い人。
+// 同じ依頼をまだ打診しておらず、持っている依頼と今日の本数が上限に届いていない人だけ。
+func (q *Queries) PickCoachForRequest(ctx context.Context, arg PickCoachForRequestParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, pickCoachForRequest,
+		arg.Tier,
+		arg.Event,
+		arg.RequesterID,
+		arg.RequestID,
+		arg.MaxActive,
+		arg.DayStart,
+	)
+	var profile_id uuid.UUID
+	err := row.Scan(&profile_id)
+	return profile_id, err
+}
+
+const requeueReviewRequest = `-- name: RequeueReviewRequest :exec
+UPDATE review_requests
+SET status = 'queued',
+    coach_id = NULL,
+    updated_at = now()
+WHERE id = $1
+  AND status = 'offered'
+`
+
+func (q *Queries) RequeueReviewRequest(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, requeueReviewRequest, id)
+	return err
+}
+
 const setCoachingDemo = `-- name: SetCoachingDemo :exec
 UPDATE profiles
 SET coaching_demo = true,
@@ -215,6 +708,17 @@ WHERE id = $1
 
 func (q *Queries) SetCoachingDemo(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, setCoachingDemo, id)
+	return err
+}
+
+const touchCoachOffered = `-- name: TouchCoachOffered :exec
+UPDATE coach_profiles
+SET last_offered_at = now()
+WHERE profile_id = $1
+`
+
+func (q *Queries) TouchCoachOffered(ctx context.Context, profileID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchCoachOffered, profileID)
 	return err
 }
 

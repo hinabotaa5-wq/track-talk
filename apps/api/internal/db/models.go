@@ -168,14 +168,15 @@ type MajorHost struct {
 }
 
 type Notification struct {
-	ID            uuid.UUID  `json:"id"`
-	RecipientID   uuid.UUID  `json:"recipient_id"`
-	Kind          string     `json:"kind"`
-	PostID        uuid.UUID  `json:"post_id"`
-	CommentID     *uuid.UUID `json:"comment_id"`
-	ApplicationID *uuid.UUID `json:"application_id"`
-	ReadAt        *time.Time `json:"read_at"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID              uuid.UUID  `json:"id"`
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	Kind            string     `json:"kind"`
+	PostID          *uuid.UUID `json:"post_id"`
+	CommentID       *uuid.UUID `json:"comment_id"`
+	ApplicationID   *uuid.UUID `json:"application_id"`
+	ReadAt          *time.Time `json:"read_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
 }
 
 type Post struct {
@@ -318,6 +319,16 @@ type Report struct {
 	Detail     string    `json:"detail"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ReviewOffer struct {
+	ID         uuid.UUID  `json:"id"`
+	RequestID  uuid.UUID  `json:"request_id"`
+	CoachID    uuid.UUID  `json:"coach_id"`
+	OfferedAt  time.Time  `json:"offered_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	Result     *string    `json:"result"`
+	AnsweredAt *time.Time `json:"answered_at"`
 }
 
 type ReviewRequest struct {

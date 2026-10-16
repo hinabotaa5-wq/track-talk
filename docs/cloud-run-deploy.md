@@ -80,6 +80,18 @@ gcloud run services describe track-talk-api --region asia-northeast1            
 - **ロールバック**: コンソールの Cloud Run → `track-talk-api` → リビジョンで、前のリビジョンにトラフィックを戻す
 
 
+## フォーム添削の tick
+
+フォーム添削の打診（30分）と返却目安の期限切れは、Cloud Scheduler が1分ごとに API を呼んで片付けます。API は使われないときに0台まで縮むので、自分で時計を持てないためです。setup.sh のあと、Cloud Shell で一度だけ流します。
+
+```bash
+PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
+```
+
+秘密の値を作って API の `COACHING_TICK_SECRET` に入れ、同じ値をヘッダーに付けて `/internal/coaching/tick` を呼ぶジョブ `track-talk-coaching-tick` を作ります。Cloud Scheduler は月3ジョブまで無料です。止めるときは `gcloud scheduler jobs pause track-talk-coaching-tick --location asia-northeast1`。
+
+tick が止まっていても、依頼した人が依頼を開いたときに期限切れは片付き、期限の過ぎた打診は引き受けられません。ただ、時間切れの打診が次のコーチに回るのは tick だけです。
+
 ## トラブル
 
 - **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）

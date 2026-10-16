@@ -63,6 +63,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	}))
 	r.Use(s.limit.Middleware)
 	r.Get("/health", s.health)
+	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
+	r.Post("/internal/coaching/tick", s.coachingTick)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
@@ -113,6 +115,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/coach/me", s.coachMe)
 			r.Post("/coach/applications", s.submitCoachApplication)
 			r.Patch("/coach/me", s.updateCoachDuty)
+			r.Get("/coach/requests", s.listCoachRequests)
+			r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
+			r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
+			r.Get("/coaching/estimate", s.reviewEstimate)
 			r.Post("/coaching/demo", s.joinCoachingDemo)
 			r.Post("/coaching/requests", s.createReviewRequest)
 			r.Get("/me/coaching/requests", s.listMyReviewRequests)

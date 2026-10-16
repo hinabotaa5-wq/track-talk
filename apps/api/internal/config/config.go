@@ -27,6 +27,8 @@ type Config struct {
 	VAPIDPublicKey         string
 	VAPIDPrivateKey        string
 	VAPIDSubject           string
+	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
+	CoachingTickSecret string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
 }
@@ -51,6 +53,7 @@ func Load() (Config, error) {
 		VAPIDPublicKey:         os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:        os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:           os.Getenv("VAPID_SUBJECT"),
+		CoachingTickSecret:     os.Getenv("COACHING_TICK_SECRET"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

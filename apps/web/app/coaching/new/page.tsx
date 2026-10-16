@@ -8,7 +8,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachEvents, coachTierLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { maxReviewSeconds, reviewFocusLabels, reviewFocusOptions, tooLong, videoDuration } from "@/lib/review";
-import type { CoachEvent, CoachingMe, CoachTier, ReviewFocus, ReviewRequest } from "@/lib/types";
+import { formatDateTime } from "@/lib/format";
+import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,7 @@ export default function NewReviewRequestPage() {
   const [error, setError] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
+  const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -105,6 +107,22 @@ export default function NewReviewRequestPage() {
       cancelled = true;
     };
   }, [token]);
+
+  // 枠と種目を選ぶと、返ってくる目安を出す。送るときも同じ計算で目安が決まる。
+  useEffect(() => {
+    if (!token || !event || !me?.demo) return;
+    let cancelled = false;
+    apiFetch<ReviewEstimate>(`/v1/coaching/estimate?tier=${tier}&event=${encodeURIComponent(event)}`, { token })
+      .then((d) => {
+        if (!cancelled) setEstimate(d);
+      })
+      .catch(() => {
+        if (!cancelled) setEstimate(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, tier, event, me?.demo]);
 
   function toggleFocus(value: ReviewFocus) {
     setFocus((current) => (current.includes(value) ? current.filter((f) => f !== value) : [...current, value]));
@@ -257,7 +275,13 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          <p className="text-xs text-slate-300">デモ版のため料金はかかりません。返ってくる目安は送った翌日の12時です。</p>
+          {event && estimate ? (
+            <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
+              返ってくる目安: {formatDateTime(estimate.due_at)}まで
+              {estimate.coaches_on_duty ? "" : "（いま受付中のコーチがいないため）"}
+            </p>
+          ) : null}
+          <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           <Button type="submit" className="w-full" disabled={pending || !file}>
             {pending ? "送っています" : "送る"}
           </Button>
