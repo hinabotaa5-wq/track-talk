@@ -110,6 +110,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/me/push-subscriptions", s.savePushSubscription)
 			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
 			r.Post("/me/push-subscriptions/test", s.testPush)
+			r.Get("/coach/me", s.coachMe)
+			r.Post("/coach/applications", s.submitCoachApplication)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
@@ -153,6 +155,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Patch("/admin/products/{id}", s.updateProduct)
 			r.Post("/admin/products/{id}/hide", s.hideProduct)
 			r.Post("/admin/product-reviews/{id}/hide", s.hideProductReview)
+			r.Get("/admin/coach-applications", s.listCoachApplications)
+			r.Post("/admin/coach-applications/{id}/approve", s.approveCoachApplication)
+			r.Post("/admin/coach-applications/{id}/reject", s.rejectCoachApplication)
 		})
 	})
 	return r

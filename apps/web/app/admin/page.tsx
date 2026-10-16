@@ -3,8 +3,9 @@
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { productKindLabels } from "@/lib/product";
-import type { AdminInquiry, AdminReport, Meta, Product } from "@/lib/types";
+import type { AdminCoachApplication, AdminInquiry, AdminReport, CoachStatus, Meta, Product } from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,7 +64,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   );
 }
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   const [items, setItems] = useState<T[]>([]);
@@ -262,6 +263,87 @@ function ProductsAdmin({ token }: { token: string | null }) {
   );
 }
 
+// コーチの応募の審査。審査中の応募を承認か見送りにする。
+function CoachesAdmin({ token }: { token: string | null }) {
+  const [status, setStatus] = useState<CoachStatus>("pending");
+  const [items, setItems] = useState<AdminCoachApplication[]>([]);
+  const [total, setTotal] = useState(0);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch<{ applications: AdminCoachApplication[]; meta: Meta }>(
+        `/v1/admin/coach-applications?status=${status}&per_page=100`,
+        { token },
+      );
+      setItems(d.applications ?? []);
+      setTotal(d.meta.total);
+    } catch {
+      setMessage("取得に失敗しました");
+    }
+  }, [status, token]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function review(a: AdminCoachApplication, action: "approve" | "reject") {
+    const label = action === "approve" ? "承認" : "見送り";
+    if (!window.confirm(`この応募を${label}にしますか？`)) return;
+    try {
+      await apiFetch(`/v1/admin/coach-applications/${a.profile_id}/${action}`, { method: "POST", token });
+      setMessage(`${label}にしました`);
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : `${label}にできませんでした`);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {(["pending", "approved", "rejected"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatus(s)}
+            className={`rounded-full border px-4 py-1.5 text-sm ${status === s ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"}`}
+          >
+            {coachStatusLabels[s]}
+            {status === s ? ` (${total})` : ""}
+          </button>
+        ))}
+      </div>
+      {message ? <p className="text-sm text-slate-200">{message}</p> : null}
+      {items.length === 0 ? <p className="text-sm text-slate-200">まだありません</p> : null}
+      <ul className="space-y-3">
+        {items.map((a) => (
+          <li key={a.profile_id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+            <p className="text-xs text-slate-200">
+              {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
+            </p>
+            <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
+            <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
+            <p className="whitespace-pre-wrap">成績: {a.achievements}</p>
+            <p>競技年数: {a.years}年</p>
+            {a.status === "pending" ? (
+              <div className="flex gap-4 pt-1">
+                <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">
+                  承認する
+                </button>
+                <button type="button" onClick={() => void review(a, "reject")} className="text-red-300 underline">
+                  見送る
+                </button>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { session, profile, token, loading } = useAuth();
   const router = useRouter();
@@ -283,13 +365,15 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const list = tab === "products" ? contact : lists[tab];
+  const custom = tab === "products" || tab === "coaches";
+  const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
     { id: "feedback", label: "なんでも書いてね", total: feedback.total },
     { id: "contact", label: "お問い合わせ", total: contact.total },
     { id: "requests", label: "商品リクエスト", total: requests.total },
     { id: "products", label: "商品", total: -1 },
+    { id: "coaches", label: "コーチ", total: -1 },
   ];
 
   return (
@@ -312,8 +396,9 @@ export default function AdminPage() {
         ))}
       </div>
       {tab === "products" ? <ProductsAdmin token={token} /> : null}
-      {tab === "products" ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
-      {tab === "products" ? null : tab === "reports" ? (
+      {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
+      {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
+      {custom ? null : tab === "reports" ? (
         <ul className="space-y-3">
           {reports.items.map((r) => (
             <li key={r.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
@@ -354,10 +439,10 @@ export default function AdminPage() {
           ))}
         </ul>
       )}
-      {tab !== "products" && !list.loading && list.items.length === 0 && !list.error ? (
+      {!custom && !list.loading && list.items.length === 0 && !list.error ? (
         <p className="text-sm text-slate-200">まだありません</p>
       ) : null}
-      {tab !== "products" && list.more ? (
+      {!custom && list.more ? (
         <button
           type="button"
           onClick={list.loadMore}

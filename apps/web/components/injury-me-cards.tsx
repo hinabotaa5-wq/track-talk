@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/api";
 import {
   injuryElapsedText,
   injuryGroupPath,
+  isCurrentInjuryStage,
   sortInjuryGroups,
   type InjuryGroupMember,
   type InjuryGroupSummary,
@@ -18,6 +19,7 @@ import {
 type Joined = { part: string; label: string; me: InjuryGroupMember };
 
 // マイページの一番上に出す、いまのケガと段階。入っているグループごとに1枚。どこにも入っていなければ何も出さない。
+// 大会に復帰したケガはもう「いまのケガ」ではないので出さない。段階の記録はグループにそのまま残る。
 export function InjuryMeCards({ token }: { token: string | null }) {
   const [joined, setJoined] = useState<Joined[]>([]);
   const [changing, setChanging] = useState<string | null>(null);
@@ -38,12 +40,15 @@ export function InjuryMeCards({ token }: { token: string | null }) {
     return () => controller.abort();
   }, [token]);
 
-  if (joined.length === 0) return null;
+  const current = joined.filter((item) => isCurrentInjuryStage(item.me.stage));
+  if (current.length === 0 && celebrating === null) return null;
   const now = new Date();
 
   return (
     <section aria-label="いまのケガ" className="space-y-3 md:col-span-2">
-      {joined.map((item) => {
+      {/* お祝いは「大会に復帰」に変えた直後だけ。そのケガのカードは消えるので、カードの代わりにここへ出す。 */}
+      {celebrating !== null ? <InjuryGoalCelebration onClose={() => setCelebrating(null)} /> : null}
+      {current.map((item) => {
         const label = item.me.diagnosis ? `${item.label}(${item.me.diagnosis})` : item.label;
         const elapsed = injuryElapsedText(item.me.injured_month, now);
         return (
@@ -66,7 +71,6 @@ export function InjuryMeCards({ token }: { token: string | null }) {
                 段階を変える
               </Button>
             </div>
-            {celebrating === item.part ? <InjuryGoalCelebration onClose={() => setCelebrating(null)} /> : null}
             {changing === item.part ? (
               <InjuryStageChange
                 part={item.part}

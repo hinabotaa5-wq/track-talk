@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -148,6 +148,12 @@ describe("injury group roadmap", () => {
     expect(shouldCelebrate("race", true)).toBe(false);
     expect(shouldCelebrate("practice", false)).toBe(false);
     expect(injuryCelebrationKey("knee")).toBe("injury-celebrated:knee");
+  });
+
+  it("treats every stage before the race as a current injury", () => {
+    expect(isCurrentInjuryStage("practice")).toBe(true);
+    expect(isCurrentInjuryStage("resting")).toBe(true);
+    expect(isCurrentInjuryStage("race")).toBe(false);
   });
 
   it("gives the same name the same face", () => {

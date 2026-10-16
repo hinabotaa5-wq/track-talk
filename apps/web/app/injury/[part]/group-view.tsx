@@ -234,7 +234,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           {own ? (
             <Link
               href={`/injury/${part}/new`}
-              className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+              className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-95"
             >
               {selectedLabel}に投稿
             </Link>
