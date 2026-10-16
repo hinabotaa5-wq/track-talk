@@ -144,7 +144,7 @@ export function PostDetail({
     }
     clearHomeFeeds();
     clearSavedFeeds();
-    router.push(returnTo === "me" ? "/me" : current.kind === "injury" ? "/injury" : "/");
+    router.push(returnTo === "me" ? "/me/posts" : current.kind === "injury" ? "/injury" : "/");
     router.refresh();
   }
 

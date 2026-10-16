@@ -32,7 +32,7 @@ export function SenseNotesCard({ token }: { token: string | null }) {
   const current = stats ?? emptySenseNoteStats;
 
   return (
-    <section aria-labelledby="sense-notes-title" className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4 md:col-span-2">
+    <section aria-labelledby="sense-notes-title" className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-center gap-4">
         <SenseNoteJar total={current.total} dropLatest={dropped} className="h-28 w-21" />
         <div className="min-w-0 flex-1 space-y-2">
