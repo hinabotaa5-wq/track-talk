@@ -65,7 +65,7 @@ setup.sh は、まず Google の見本イメージでサービスを立てます
 1. `curl https://<API の URL>/health` が `{"status":"ok"}` を返すことを確認する
 2. 画面（Vercel、のちに Netlify）の `NEXT_PUBLIC_API_BASE_URL` を Cloud Run の URL にして再デプロイする
 3. 画面からログイン、投稿、画像のアップロードができることを確認する
-4. 問題なければ Render のサービスを削除し、`render.yaml` を消す
+4. 問題なければ、前に使っていた API のサービスを削除する
 
 ## 運用
 
@@ -79,3 +79,19 @@ gcloud run services describe track-talk-api --region asia-northeast1            
 - **予算を変える**: コンソールの「お支払い → 予算とアラート」で `track-talk` を編集する
 - **ロールバック**: コンソールの Cloud Run → `track-talk-api` → リビジョンで、前のリビジョンにトラフィックを戻す
 
+
+## トラブル
+
+- **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）
+
+  ```bash
+  gcloud run services update track-talk-api --region asia-northeast1 \
+    --update-env-vars CORS_ORIGINS=https://<サイトの URL>
+  ```
+
+  いまの値を見るには（ほかの値は表示されない）:
+
+  ```bash
+  gcloud run services describe track-talk-api --region asia-northeast1 --format=json \
+    | jq -r '.spec.template.spec.containers[0].env[] | select(.name=="CORS_ORIGINS") | .value'
+  ```

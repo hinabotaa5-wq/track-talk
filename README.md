@@ -202,7 +202,7 @@ CI（`.github/workflows/ci.yml`）は push／PR ごとに API テスト（Postgr
 
 ## デプロイ
 
-- **API**: Cloud Run（東京）。`main` の `apps/api` が変わると `.github/workflows/deploy-api.yml` がデプロイする。予算を超えると自動で API を止める。初回の作り方は [docs/cloud-run-deploy.md](docs/cloud-run-deploy.md)。切り替えが済むまでは Render（`render.yaml`、`https://track-talk-api.onrender.com`）も動いている。
+- **API**: Cloud Run（東京）。`main` の `apps/api` が変わると `.github/workflows/deploy-api.yml` がデプロイする。予算を超えると自動で API を止める。初回の作り方は [docs/cloud-run-deploy.md](docs/cloud-run-deploy.md)。
 - **Web**: Vercel（`apps/web`）。`main` への push で本番が更新される。
 - **DB / Auth**: Supabase
 
