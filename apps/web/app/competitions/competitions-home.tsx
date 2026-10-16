@@ -25,7 +25,7 @@ const views: { id: View; label: string }[] = [
 
 const entries = [
   { href: regionalCompetitionsPath, label: "都道府県の大会", icon: MapPin },
-  { href: "/competitions/major-hosts", label: "今後の世界陸上", icon: Globe },
+  { href: "/competitions/major-hosts", label: "今後の国際大会", icon: Globe },
 ];
 
 export function CompetitionsHome() {
@@ -36,7 +36,7 @@ export function CompetitionsHome() {
   return (
     <RequireSession>
       <div className="space-y-5">
-        {/* 国内主要大会の一覧が主役。都道府県の大会と今後の世界陸上は、いちばん上から入れるようにする。 */}
+        {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
         <nav aria-label="ほかの大会" className="grid grid-cols-2 gap-2 md:max-w-md">
           {entries.map((entry) => {
             const Icon = entry.icon;

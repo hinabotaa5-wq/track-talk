@@ -227,6 +227,28 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         </section>
       ) : null}
 
+      {/* 投稿ボタンはスクロールしているあいだ下のメニューのすぐ上に貼りつき、いちばん下まで来ると
+          「このグループを抜ける」の上に収まる。段階を変えるフォームを書いているあいだは、入力の邪魔になるので出さない。 */}
+      {changing ? null : (
+        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 space-y-1.5 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {own ? (
+            <Link
+              href={`/injury/${part}/new`}
+              className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+            >
+              {selectedLabel}に投稿
+            </Link>
+          ) : (
+            <>
+              <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
+                この段階には投稿できません
+              </span>
+              <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2 border-t border-white/15 pt-4">
         {leaving === "idle" ? (
           <button
@@ -253,30 +275,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           </div>
         )}
       </div>
-      {/* 投稿ボタンは下のメニューのすぐ上に固定する。その分だけ余白を空けて、最後の行が隠れないようにする。
-          段階を変えるフォームを書いているあいだは、入力の邪魔になるので出さない。 */}
-      {changing ? null : (
-        <>
-          <div className={own ? "h-12" : "h-16"} aria-hidden />
-          <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-5xl space-y-1.5 px-4 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {own ? (
-              <Link
-                href={`/injury/${part}/new`}
-                className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
-              >
-                {selectedLabel}に投稿
-              </Link>
-            ) : (
-              <>
-                <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-                  この段階には投稿できません
-                </span>
-                <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
-              </>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }
