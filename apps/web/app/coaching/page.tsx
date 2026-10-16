@@ -42,7 +42,7 @@ export default function CoachingPage() {
         <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-200">
           <li>動画1本ごとに報酬</li>
           <li>集客・支払いは運営におまかせ</li>
-          <li>大学生・社会人は「先輩」で応募OK</li>
+          <li>大学生・社会人は「先輩」として登録可能</li>
         </ul>
         <Link
           href={coachApplyPath}
@@ -53,12 +53,9 @@ export default function CoachingPage() {
       </section>
 
       <section aria-labelledby="coaching-review" className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 id="coaching-review" className="text-lg font-bold">
-            動画添削
-          </h2>
-          <span className="text-xs text-blue-300">最初に始めます</span>
-        </div>
+        <h2 id="coaching-review" className="text-lg font-bold">
+          動画添削
+        </h2>
         <ol className="grid grid-cols-3 gap-2">
           {reviewSteps.map((step, index) => (
             <li key={step} className="flex flex-col items-center gap-1.5 rounded-xl border border-white/20 glass bg-white/10 p-3 text-center">
@@ -76,12 +73,9 @@ export default function CoachingPage() {
       </section>
 
       <section aria-labelledby="coaching-personal" className="space-y-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 id="coaching-personal" className="text-lg font-bold">
-            パーソナル指導
-          </h2>
-          <span className={tag}>あとで始めます</span>
-        </div>
+        <h2 id="coaching-personal" className="text-lg font-bold">
+          パーソナル指導
+        </h2>
         <p className="text-sm text-slate-200">選んだコーチに、1対1で続けて見てもらえます。</p>
       </section>
 
@@ -97,7 +91,7 @@ export default function CoachingPage() {
             </div>
           ))}
         </dl>
-        <p className={tag}>返事が目安の時刻より遅れたら自動で返金。金額は始まる前にお知らせします。</p>
+        <p className={tag}>返事が目安の時刻より遅れたら自動で返金。</p>
       </section>
     </div>
   );
