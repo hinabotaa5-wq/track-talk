@@ -13,7 +13,7 @@ import (
 type CoachProfile struct {
 	ProfileID    uuid.UUID  `json:"profile_id"`
 	Tier         string     `json:"tier"`
-	EventGroups  []string   `json:"event_groups"`
+	Events       []string   `json:"events"`
 	BestRecord   string     `json:"best_record"`
 	Achievements string     `json:"achievements"`
 	Years        int16      `json:"years"`

@@ -11,7 +11,7 @@ import (
 
 type coachApplication struct {
 	Tier         string   `json:"tier"`
-	EventGroups  []string `json:"event_groups"`
+	Events       []string `json:"events"`
 	BestRecord   string   `json:"best_record"`
 	Achievements string   `json:"achievements"`
 	Years        int      `json:"years"`
@@ -26,7 +26,7 @@ type coachMeView struct {
 func coachApplicationBody() map[string]any {
 	return map[string]any{
 		"tier":         "senpai",
-		"event_groups": []string{"hurdles", "sprint", "sprint"},
+		"events":       []string{"110mh", "100m", "100m", "relay"},
 		"best_record":  "100m 10秒95（2025年）",
 		"achievements": "インターハイ 100m 準決勝",
 		"years":        8,
@@ -45,7 +45,7 @@ func TestCoachApplicationFlow(t *testing.T) {
 
 	bad := coachApplicationBody()
 	bad["tier"] = "pro"
-	bad["event_groups"] = []string{"relay"}
+	bad["events"] = []string{"sprint"}
 	bad["best_record"] = " "
 	bad["years"] = 61
 	delete(bad, "achievements")
@@ -53,7 +53,7 @@ func TestCoachApplicationFlow(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid %d %s", rec.Code, rec.Body.String())
 	}
-	for _, field := range []string{"tier", "event_groups", "best_record", "achievements", "years"} {
+	for _, field := range []string{"tier", "events", "best_record", "achievements", "years"} {
 		if !strings.Contains(rec.Body.String(), `"`+field+`"`) {
 			t.Fatalf("missing field error %s: %s", field, rec.Body.String())
 		}
@@ -65,7 +65,7 @@ func TestCoachApplicationFlow(t *testing.T) {
 	}
 	var me coachMeView
 	_ = json.Unmarshal(rec.Body.Bytes(), &me)
-	if me.Application == nil || me.Application.Status != "pending" || strings.Join(me.Application.EventGroups, ",") != "sprint,hurdles" {
+	if me.Application == nil || me.Application.Status != "pending" || strings.Join(me.Application.Events, ",") != "100m,110mh,relay" {
 		t.Fatalf("applied %+v", me.Application)
 	}
 

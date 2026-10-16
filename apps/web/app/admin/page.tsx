@@ -3,7 +3,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { coachEventGroupLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { productKindLabels } from "@/lib/product";
 import type { AdminCoachApplication, AdminInquiry, AdminReport, CoachStatus, Meta, Product } from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
@@ -323,7 +323,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
             <p className="text-xs text-slate-200">
               {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
             </p>
-            <p>担当種目: {a.event_groups.map((g) => coachEventGroupLabels[g]).join("、")}</p>
+            <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
             <p className="whitespace-pre-wrap">成績: {a.achievements}</p>
             <p>競技年数: {a.years}年</p>

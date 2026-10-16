@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { coachEventGroupLabels, coachEventGroups, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachEventLabels, coachEvents, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
-import type { CoachApplication, CoachEventGroup, CoachTier } from "@/lib/types";
+import type { CoachApplication, CoachEvent, CoachTier } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,13 +18,13 @@ import { useEffect, useState, type FormEvent } from "react";
 
 type Draft = {
   tier: CoachTier;
-  event_groups: CoachEventGroup[];
+  events: CoachEvent[];
   best_record: string;
   achievements: string;
   years: string;
 };
 
-const emptyDraft: Draft = { tier: "coach", event_groups: [], best_record: "", achievements: "", years: "" };
+const emptyDraft: Draft = { tier: "coach", events: [], best_record: "", achievements: "", years: "" };
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
@@ -41,7 +41,7 @@ const statusNotes: Record<CoachApplication["status"], string> = {
 function draftFrom(a: CoachApplication): Draft {
   return {
     tier: a.tier,
-    event_groups: a.event_groups,
+    events: a.events,
     best_record: a.best_record,
     achievements: a.achievements,
     years: String(a.years),
@@ -83,10 +83,10 @@ export default function CoachApplyPage() {
     };
   }, [token]);
 
-  function toggleGroup(group: CoachEventGroup) {
+  function toggleEvent(group: CoachEvent) {
     setDraft((d) => ({
       ...d,
-      event_groups: d.event_groups.includes(group) ? d.event_groups.filter((g) => g !== group) : [...d.event_groups, group],
+      events: d.events.includes(group) ? d.events.filter((g) => g !== group) : [...d.events, group],
     }));
   }
 
@@ -177,19 +177,19 @@ export default function CoachApplyPage() {
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">担当種目(複数可)</legend>
             <div className="flex flex-wrap gap-2">
-              {coachEventGroups.map((group) => (
+              {coachEvents.map((group) => (
                 <button
                   key={group}
                   type="button"
-                  aria-pressed={draft.event_groups.includes(group)}
-                  onClick={() => toggleGroup(group)}
-                  className={chip(draft.event_groups.includes(group))}
+                  aria-pressed={draft.events.includes(group)}
+                  onClick={() => toggleEvent(group)}
+                  className={chip(draft.events.includes(group))}
                 >
-                  {coachEventGroupLabels[group]}
+                  {coachEventLabels[group]}
                 </button>
               ))}
             </div>
-            {fieldError("event_groups")}
+            {fieldError("events")}
           </fieldset>
 
           <label className="block space-y-1 text-sm">
@@ -245,7 +245,7 @@ export default function CoachApplyPage() {
           </div>
           <div>
             <dt className="text-xs text-slate-300">担当種目</dt>
-            <dd>{application.event_groups.map((g) => coachEventGroupLabels[g]).join("、")}</dd>
+            <dd>{application.events.map((g) => coachEventLabels[g]).join("、")}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-300">記録</dt>

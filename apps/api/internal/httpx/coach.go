@@ -15,8 +15,30 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// コーチの担当種目のグループ。並びは画面に出す順。
-var coachEventGroups = []string{"sprint", "long_sprint", "hurdles", "distance", "jumps", "throws"}
+// コーチの担当種目。並びは画面に出す順。コードは練習相手募集の種目に合わせている。
+var coachEvents = []string{
+	"100m",
+	"200m",
+	"400m",
+	"800m",
+	"1500m",
+	"5000m",
+	"10000m",
+	"110mh",
+	"100mh",
+	"400mh",
+	"3000msc",
+	"high-jump",
+	"pole-vault",
+	"long-jump",
+	"triple-jump",
+	"shot-put",
+	"discus",
+	"hammer",
+	"javelin",
+	"race-walk",
+	"relay",
+}
 
 func validCoachTier(tier string) bool {
 	return tier == "coach" || tier == "senpai"
@@ -30,14 +52,14 @@ func validCoachStatus(status string) bool {
 	return false
 }
 
-// normalizeEventGroups は、重複を除いて画面と同じ順に並べ直す。知らない値があれば false。
-func normalizeEventGroups(groups []string) ([]string, bool) {
+// normalizeCoachEvents は、重複を除いて画面と同じ順に並べ直す。知らない値があれば false。
+func normalizeCoachEvents(events []string) ([]string, bool) {
 	picked := map[string]bool{}
-	for _, g := range groups {
-		picked[g] = true
+	for _, e := range events {
+		picked[e] = true
 	}
 	out := make([]string, 0, len(picked))
-	for _, g := range coachEventGroups {
+	for _, g := range coachEvents {
 		if picked[g] {
 			out = append(out, g)
 			delete(picked, g)
@@ -60,7 +82,7 @@ func coachTextError(label, value string, max int) string {
 func coachProfileJSON(c db.CoachProfile) map[string]any {
 	return map[string]any{
 		"tier":         c.Tier,
-		"event_groups": c.EventGroups,
+		"events":       c.Events,
 		"best_record":  c.BestRecord,
 		"achievements": c.Achievements,
 		"years":        c.Years,
@@ -90,7 +112,7 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 
 type coachApplicationReq struct {
 	Tier         string   `json:"tier"`
-	EventGroups  []string `json:"event_groups"`
+	Events       []string `json:"events"`
 	BestRecord   string   `json:"best_record"`
 	Achievements string   `json:"achievements"`
 	Years        *int     `json:"years"`
@@ -112,9 +134,9 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if !validCoachTier(req.Tier) {
 		fields["tier"] = "応募する枠を選んでください"
 	}
-	groups, known := normalizeEventGroups(req.EventGroups)
-	if !known || len(groups) == 0 {
-		fields["event_groups"] = "担当種目を1つ以上選んでください"
+	events, known := normalizeCoachEvents(req.Events)
+	if !known || len(events) == 0 {
+		fields["events"] = "担当種目を1つ以上選んでください"
 	}
 	if e := coachTextError("記録", req.BestRecord, 200); e != "" {
 		fields["best_record"] = e
@@ -132,7 +154,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	c, err := s.q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
 		ProfileID:    p.ID,
 		Tier:         req.Tier,
-		EventGroups:  groups,
+		Events:       events,
 		BestRecord:   req.BestRecord,
 		Achievements: req.Achievements,
 		Years:        int16(*req.Years),

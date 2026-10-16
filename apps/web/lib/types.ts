@@ -264,12 +264,33 @@ export type GuardianPublic = CoachingGuardian & {
 };
 
 export type CoachTier = "coach" | "senpai";
-export type CoachEventGroup = "sprint" | "long_sprint" | "hurdles" | "distance" | "jumps" | "throws";
+export type CoachEvent =
+  | "100m"
+  | "200m"
+  | "400m"
+  | "800m"
+  | "1500m"
+  | "5000m"
+  | "10000m"
+  | "110mh"
+  | "100mh"
+  | "400mh"
+  | "3000msc"
+  | "high-jump"
+  | "pole-vault"
+  | "long-jump"
+  | "triple-jump"
+  | "shot-put"
+  | "discus"
+  | "hammer"
+  | "javelin"
+  | "race-walk"
+  | "relay";
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {
   tier: CoachTier;
-  event_groups: CoachEventGroup[];
+  events: CoachEvent[];
   best_record: string;
   achievements: string;
   years: number;

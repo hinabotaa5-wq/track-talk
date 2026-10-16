@@ -25,7 +25,7 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, event_groups, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -35,7 +35,7 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 	err := row.Scan(
 		&i.ProfileID,
 		&i.Tier,
-		&i.EventGroups,
+		&i.Events,
 		&i.BestRecord,
 		&i.Achievements,
 		&i.Years,
@@ -52,7 +52,7 @@ const listCoachApplications = `-- name: ListCoachApplications :many
 SELECT
     c.profile_id,
     c.tier,
-    c.event_groups,
+    c.events,
     c.best_record,
     c.achievements,
     c.years,
@@ -76,7 +76,7 @@ type ListCoachApplicationsParams struct {
 type ListCoachApplicationsRow struct {
 	ProfileID    uuid.UUID  `json:"profile_id"`
 	Tier         string     `json:"tier"`
-	EventGroups  []string   `json:"event_groups"`
+	Events       []string   `json:"events"`
 	BestRecord   string     `json:"best_record"`
 	Achievements string     `json:"achievements"`
 	Years        int16      `json:"years"`
@@ -98,7 +98,7 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 		if err := rows.Scan(
 			&i.ProfileID,
 			&i.Tier,
-			&i.EventGroups,
+			&i.Events,
 			&i.BestRecord,
 			&i.Achievements,
 			&i.Years,
@@ -124,7 +124,7 @@ SET status = $1,
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'pending'
-RETURNING profile_id, tier, event_groups, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
 `
 
 type ReviewCoachApplicationParams struct {
@@ -139,7 +139,7 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 	err := row.Scan(
 		&i.ProfileID,
 		&i.Tier,
-		&i.EventGroups,
+		&i.Events,
 		&i.BestRecord,
 		&i.Achievements,
 		&i.Years,
@@ -153,11 +153,11 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 }
 
 const submitCoachApplication = `-- name: SubmitCoachApplication :one
-INSERT INTO coach_profiles (profile_id, tier, event_groups, best_record, achievements, years)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years)
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
-    event_groups = EXCLUDED.event_groups,
+    events = EXCLUDED.events,
     best_record = EXCLUDED.best_record,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
@@ -166,13 +166,13 @@ SET tier = EXCLUDED.tier,
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected')
-RETURNING profile_id, tier, event_groups, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at
 `
 
 type SubmitCoachApplicationParams struct {
 	ProfileID    uuid.UUID `json:"profile_id"`
 	Tier         string    `json:"tier"`
-	EventGroups  []string  `json:"event_groups"`
+	Events       []string  `json:"events"`
 	BestRecord   string    `json:"best_record"`
 	Achievements string    `json:"achievements"`
 	Years        int16     `json:"years"`
@@ -184,7 +184,7 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 	row := q.db.QueryRow(ctx, submitCoachApplication,
 		arg.ProfileID,
 		arg.Tier,
-		arg.EventGroups,
+		arg.Events,
 		arg.BestRecord,
 		arg.Achievements,
 		arg.Years,
@@ -193,7 +193,7 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 	err := row.Scan(
 		&i.ProfileID,
 		&i.Tier,
-		&i.EventGroups,
+		&i.Events,
 		&i.BestRecord,
 		&i.Achievements,
 		&i.Years,

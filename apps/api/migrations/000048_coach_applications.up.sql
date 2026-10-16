@@ -4,8 +4,8 @@ CREATE TABLE coach_profiles (
     profile_id uuid PRIMARY KEY REFERENCES profiles (id) ON DELETE CASCADE,
     -- coach: コーチ枠、senpai: 大学生・社会人の先輩枠。
     tier text NOT NULL,
-    -- 担当種目のグループ。sprint: 短短、long_sprint: 短長、hurdles: ハードル、distance: 中長距離、jumps: 跳躍、throws: 投擲。
-    event_groups text[] NOT NULL,
+    -- 担当種目。コードは練習相手募集の種目に合わせ、競歩(race-walk)とリレー(relay)を足したもの。
+    events text[] NOT NULL,
     best_record text NOT NULL,
     achievements text NOT NULL,
     years smallint NOT NULL,
@@ -16,8 +16,10 @@ CREATE TABLE coach_profiles (
     updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK (tier IN ('coach', 'senpai')),
     CHECK (
-        cardinality(event_groups) BETWEEN 1 AND 6
-        AND event_groups <@ ARRAY['sprint', 'long_sprint', 'hurdles', 'distance', 'jumps', 'throws']::text[]
+        cardinality(events) BETWEEN 1 AND 21
+        AND events <@ ARRAY[
+            '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh', '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump', 'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay'
+        ]::text[]
     ),
     CHECK (char_length(btrim(best_record)) BETWEEN 1 AND 200),
     CHECK (char_length(btrim(achievements)) BETWEEN 1 AND 500),

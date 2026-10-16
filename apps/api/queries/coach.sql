@@ -5,11 +5,11 @@ WHERE profile_id = $1;
 -- name: SubmitCoachApplication :one
 -- 審査待ちのうちは書き直せる。却下されたら出し直せて、また審査待ちに戻る。
 -- 承認済み・停止中は変えられない（行が返らない）。
-INSERT INTO coach_profiles (profile_id, tier, event_groups, best_record, achievements, years)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years)
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
-    event_groups = EXCLUDED.event_groups,
+    events = EXCLUDED.events,
     best_record = EXCLUDED.best_record,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
@@ -28,7 +28,7 @@ WHERE status = $1;
 SELECT
     c.profile_id,
     c.tier,
-    c.event_groups,
+    c.events,
     c.best_record,
     c.achievements,
     c.years,
