@@ -31,7 +31,7 @@ func TestVideoURLs(t *testing.T) {
 	if !strings.Contains(thumb, "/demo/video/upload/so_auto,c_limit,w_800,f_jpg/track-talk/") || !strings.HasSuffix(thumb, ".jpg") {
 		t.Fatal(thumb)
 	}
-	if !strings.Contains(play, "/demo/video/upload/q_auto/track-talk/") || !strings.HasSuffix(play, ".mp4") {
+	if !strings.Contains(play, "/demo/video/upload/c_limit,w_1280,h_1280,q_auto/track-talk/") || !strings.HasSuffix(play, ".mp4") {
 		t.Fatal(play)
 	}
 }
@@ -103,6 +103,7 @@ func TestReadyRejectsOversizedAndWrongFormat(t *testing.T) {
 
 func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 	var gotMethod string
+	transformations := map[string]string{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || user != "key" || pass != "secret" {
@@ -110,6 +111,9 @@ func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 			return
 		}
 		gotMethod = r.Method
+		if err := r.ParseForm(); err == nil && r.Method == http.MethodPut {
+			transformations[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] = r.PostForm.Get("transformation")
+		}
 		if r.Method == http.MethodPost {
 			http.Error(w, "already exists", http.StatusBadRequest)
 			return
@@ -127,6 +131,46 @@ func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 	}
 	if gotMethod != http.MethodPut {
 		t.Fatalf("method %s", gotMethod)
+	}
+	if transformations[ImagePreset] != ImageIncoming || transformations[VideoPreset] != VideoIncoming {
+		t.Fatalf("transformations %v", transformations)
+	}
+}
+
+func TestDeleteSendsPublicIDs(t *testing.T) {
+	var gotPath string
+	var gotIDs []string
+	var status = http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" || r.Method != http.MethodDelete {
+			http.Error(w, "bad", http.StatusBadRequest)
+			return
+		}
+		gotPath = r.URL.Path
+		gotIDs = r.URL.Query()["public_ids[]"]
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{"deleted":{}}`))
+	}))
+	defer srv.Close()
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret", APIBase: srv.URL}
+	ids := []string{"track-talk/11111111-1111-4111-8111-111111111111", "track-talk/22222222-2222-4222-8222-222222222222"}
+	ctx := context.Background()
+	if err := c.Delete(ctx, "image", ids); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/v1_1/demo/resources/image/upload" || len(gotIDs) != 2 || gotIDs[0] != ids[0] || gotIDs[1] != ids[1] {
+		t.Fatalf("path %s ids %v", gotPath, gotIDs)
+	}
+	if err := c.Delete(ctx, "video", []string{"other/sample"}); err != ErrInvalid {
+		t.Fatalf("invalid id: %v", err)
+	}
+	status = http.StatusInternalServerError
+	if err := c.Delete(ctx, "video", ids[:1]); err == nil {
+		t.Fatal("expected error")
+	}
+	if err := (Client{}).Delete(ctx, "image", ids); err != nil {
+		t.Fatalf("not configured: %v", err)
 	}
 }
 

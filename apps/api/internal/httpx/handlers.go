@@ -659,6 +659,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	media := s.postMediaOf(r.Context(), id)
 	n, err := s.q.SoftDeletePost(r.Context(), db.SoftDeletePostParams{ID: id, AuthorID: p.ID})
 	if err != nil {
 		MapDBError(w, err)
@@ -668,6 +669,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusForbidden, "forbidden", "削除できません")
 		return
 	}
+	s.purgeMedia(media)
 	w.WriteHeader(http.StatusNoContent)
 }
 

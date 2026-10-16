@@ -26,6 +26,11 @@ const (
 	VideoFormats  = "mov,mp4,webm"
 	MaxImageBytes = 10 << 20
 	MaxVideoBytes = 100 << 20
+
+	// 保存する前に Cloudinary 側で縮める。元ファイルは残らない。
+	// 写真は表示(長辺1600px)より少し大きい2048pxまで、動画は720p相当(長辺1280px)まで。
+	ImageIncoming = "c_limit,w_2048,h_2048"
+	VideoIncoming = "c_limit,w_1280,h_1280,q_auto"
 )
 
 var (
@@ -152,20 +157,28 @@ func (c Client) EnsureUploadPresets(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := c.ensurePreset(ctx, preset, formats); err != nil {
+		if err := c.ensurePreset(ctx, preset, formats, incomingFor(resource)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c Client) ensurePreset(ctx context.Context, name, formats string) error {
+func incomingFor(resource string) string {
+	if resource == "video" {
+		return VideoIncoming
+	}
+	return ImageIncoming
+}
+
+func (c Client) ensurePreset(ctx context.Context, name, formats, transformation string) error {
 	values := url.Values{
 		"name":            {name},
 		"unsigned":        {"false"},
 		"allowed_formats": {formats},
 		"overwrite":       {"false"},
 		"unique_filename": {"false"},
+		"transformation":  {transformation},
 	}
 	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/upload_presets"
 	status, body, err := c.form(ctx, http.MethodPost, endpoint, values)
@@ -219,7 +232,7 @@ func (c Client) PlaybackURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/q_auto/" + deliveryPath(publicID) + ".mp4"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/c_limit,w_1280,h_1280,q_auto/" + deliveryPath(publicID) + ".mp4"
 }
 
 func (c Client) ImageURL(publicID string) string {
@@ -235,6 +248,39 @@ func deliveryPath(publicID string) string {
 		parts[i] = url.PathEscape(part)
 	}
 	return strings.Join(parts, "/")
+}
+
+// Delete は投稿から外れた写真・動画を Cloudinary から消す。見つからないものは消えたものとして扱う。
+func (c Client) Delete(ctx context.Context, resource string, publicIDs []string) error {
+	if !c.Configured() || len(publicIDs) == 0 {
+		return nil
+	}
+	if resource != "image" && resource != "video" {
+		return ErrInvalid
+	}
+	values := url.Values{"invalidate": {"true"}}
+	for _, id := range publicIDs {
+		if !ValidPublicID(id) {
+			return ErrInvalid
+		}
+		values.Add("public_ids[]", id)
+	}
+	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/upload?" + values.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
+	if err != nil {
+		return ErrUnavailable
+	}
+	req.SetBasicAuth(c.Key, c.Secret)
+	resp, err := c.httpClient().Do(req)
+	if err != nil {
+		return ErrUnavailable
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("%w: delete %s (%d)", ErrUnavailable, resource, resp.StatusCode)
+	}
+	return nil
 }
 
 func (c Client) Ready(ctx context.Context, publicID string) error {
