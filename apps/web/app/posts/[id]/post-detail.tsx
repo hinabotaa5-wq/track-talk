@@ -15,7 +15,7 @@ import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comme
 import { commentSchema } from "@/lib/validators";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { ZoomableVideo } from "@/components/zoomable-video";
@@ -82,6 +82,16 @@ export function PostDetail({
   }
 
   useEffect(() => () => document.body.removeAttribute("data-comment-typing"), []);
+
+  // 長押しで開く操作メニューの対象。
+  const [menuComment, setMenuComment] = useState<Comment | null>(null);
+  const longPress = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const chatEnd = useRef<HTMLDivElement>(null);
+  const openThreadReplyCount = comments.filter((c) => c.parent_id === openThreadId).length;
+  useEffect(() => {
+    // チャットのように、スレッドを開いたときと返信が増えたときは一番下を見せる。
+    if (openThreadId) chatEnd.current?.scrollIntoView({ block: "end" });
+  }, [openThreadId, openThreadReplyCount]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -287,34 +297,93 @@ export function PostDetail({
     }
   }
 
-  function renderComment(c: Comment, isReply: boolean) {
+  function startPress(e: React.PointerEvent, c: Comment) {
+    cancelPress();
+    longPress.current = {
+      x: e.clientX,
+      y: e.clientY,
+      timer: window.setTimeout(() => {
+        longPress.current = null;
+        setMenuComment(c);
+      }, 450),
+    };
+  }
+
+  function movePress(e: React.PointerEvent) {
+    const p = longPress.current;
+    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancelPress();
+  }
+
+  function cancelPress() {
+    if (longPress.current) window.clearTimeout(longPress.current.timer);
+    longPress.current = null;
+  }
+
+  // 返信元を吹き出しの中に小さく引用する。本文は手元のコメントから引く。
+  function renderQuote(c: Comment) {
+    if (!c.reply_to_id) return null;
+    const target = comments.find((x) => x.id === c.reply_to_id);
     return (
-      <div
-        key={c.id}
-        id={`comment-${c.id}`}
-        className={`rounded-3xl border glass px-4 py-3.5 text-slate-200 transition-colors ${highlightId === c.id ? "border-blue-400 bg-blue-400/20" : "border-white/20 bg-white/10"}`}
+      <button
+        type="button"
+        className="mb-1.5 block w-full rounded-lg border-l-2 border-white/50 bg-black/20 px-2 py-1 text-left text-xs disabled:opacity-70"
+        disabled={c.reply_to_removed}
+        onClick={() => jumpToComment(c.reply_to_id as string)}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        {isReply && c.reply_to_id ? (
-          <button
-            type="button"
-            className="mb-1 inline-flex max-w-full items-center gap-1 rounded-full bg-blue-400/20 px-2 py-0.5 text-xs font-semibold text-blue-200 disabled:opacity-60"
-            disabled={c.reply_to_removed}
-            onClick={() => jumpToComment(c.reply_to_id as string)}
+        <span className="block truncate font-semibold">{replyLabel(c)}</span>
+        <span className="line-clamp-2 break-words opacity-80">{target && !c.reply_to_removed ? target.body : "削除されたコメント"}</span>
+      </button>
+    );
+  }
+
+  function renderBubble(c: Comment) {
+    return (
+      <div key={c.id} id={`comment-${c.id}`} className={`flex flex-col ${c.mine ? "items-end" : "items-start"}`}>
+        {c.mine ? null : <span className="mb-0.5 ml-3 text-xs font-semibold text-slate-200">{c.author_name ?? "匿名"}</span>}
+        <div className={`flex max-w-[85%] items-end gap-1.5 ${c.mine ? "flex-row-reverse" : ""}`}>
+          <div
+            onPointerDown={(e) => startPress(e, c)}
+            onPointerMove={movePress}
+            onPointerUp={cancelPress}
+            onPointerCancel={cancelPress}
+            onPointerLeave={cancelPress}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              cancelPress();
+              setMenuComment(c);
+            }}
+            className={`select-none rounded-3xl px-4 py-2.5 text-sm text-white transition-colors [-webkit-touch-callout:none] ${
+              c.mine ? "rounded-br-md bg-blue-500/70" : "rounded-bl-md border border-white/20 bg-white/15"
+            } ${highlightId === c.id ? "ring-2 ring-blue-300" : ""}`}
           >
-            <span aria-hidden>↩</span>
-            <span className="truncate">@{replyLabel(c)}</span>
-          </button>
-        ) : null}
-        <p className="mb-0.5 text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</p>
-        <p className="whitespace-pre-wrap text-sm">{c.body}</p>
-        <p className="mt-2 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
+            {renderQuote(c)}
+            <p className="whitespace-pre-wrap break-words">{c.body}</p>
+          </div>
+          <span className="shrink-0 pb-0.5 text-[11px] text-slate-300">{formatRelativeTime(c.created_at)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  function renderMenu(c: Comment) {
+    const item = "w-full px-4 py-3.5 text-center text-base font-semibold transition active:bg-white/10 disabled:opacity-50";
+    const close = () => setMenuComment(null);
+    return (
+      <div className="fixed inset-0 z-40 flex items-end bg-black/50" onClick={close}>
+        <div
+          className="mx-auto w-full max-w-md divide-y divide-white/15 overflow-hidden rounded-t-3xl border border-white/20 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] text-slate-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="truncate px-4 py-3 text-center text-xs text-slate-300">{c.body}</p>
           {allowComment ? (
             <button
               type="button"
-              className="text-xs font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
-              disabled={action.pending}
-              onClick={() => startReply(c)}
+              className={item}
+              onClick={() => {
+                close();
+                startReply(c);
+              }}
             >
               返信
             </button>
@@ -323,17 +392,23 @@ export function PostDetail({
             <>
               <button
                 type="button"
-                className="text-xs text-blue-400 transition active:scale-95 disabled:opacity-50"
+                className={`${item} text-blue-300`}
                 disabled={action.pending}
-                onClick={() => editComment(c)}
+                onClick={() => {
+                  close();
+                  void editComment(c);
+                }}
               >
                 編集
               </button>
               <button
                 type="button"
-                className="text-xs text-red-400 transition active:scale-95 disabled:opacity-50"
+                className={`${item} text-red-400`}
                 disabled={action.pending}
-                onClick={() => deleteComment(c.id)}
+                onClick={() => {
+                  close();
+                  void deleteComment(c.id);
+                }}
               >
                 削除
               </button>
@@ -341,17 +416,19 @@ export function PostDetail({
           ) : (
             <button
               type="button"
-              className={
-                reportedComments.has(c.id)
-                  ? "inline-flex items-center gap-1 text-xs font-semibold text-amber-300"
-                  : "text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"
-              }
+              className={item}
               disabled={action.pending || reportedComments.has(c.id)}
-              onClick={() => report("comment", c.id)}
+              onClick={() => {
+                close();
+                void report("comment", c.id);
+              }}
             >
               {reportedComments.has(c.id) ? "通報済み" : "通報"}
             </button>
           )}
+          <button type="button" className={`${item} text-slate-300`} onClick={close}>
+            キャンセル
+          </button>
         </div>
       </div>
     );
@@ -478,13 +555,12 @@ export function PostDetail({
             >
               <span aria-hidden>←</span> コメント一覧へ
             </button>
-            {renderComment(activeThread.top, false)}
-            <p className="text-xs font-semibold text-slate-300">返信 {activeThread.replies.length}件</p>
-            {activeThread.replies.length > 0 ? (
-              <div className="ml-4 space-y-2 border-l-2 border-blue-400/40 pl-3">{activeThread.replies.map((r) => renderComment(r, true))}</div>
-            ) : (
-              <p className="text-sm text-slate-200">まだ返信はありません。</p>
-            )}
+            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
+            <div className="space-y-3 rounded-3xl border border-white/15 bg-black/10 p-3">
+              {renderBubble(activeThread.top)}
+              {activeThread.replies.map((r) => renderBubble(r))}
+              <div ref={chatEnd} className="scroll-mb-44" />
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5">
@@ -532,6 +608,7 @@ export function PostDetail({
           <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">募集は終了しています。</p>
         )}
       </section>
+      {menuComment ? renderMenu(menuComment) : null}
     </article>
   );
 }
