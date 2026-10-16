@@ -88,9 +88,8 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>Supabase: ログイン認証と、投稿などを保存するデータベース</li>
           <li>Cloudinary: 利用者がアップロードした画像と動画の保管、配信</li>
-          <li>Vercel、Netlify: 画面のホスティング</li>
+          <li>Netlify: 画面のホスティング</li>
           <li>Google: API のホスティング（Google Cloud）、Google アカウントによるログイン、利用者が指定した YouTube 動画の埋め込み表示</li>
-          <li>Render: API のホスティング</li>
           <li>Meta: 利用者が指定した Instagram 投稿の埋め込み表示</li>
           <li>Umami: 画面を開いた人数と回数の計測</li>
         </ul>
