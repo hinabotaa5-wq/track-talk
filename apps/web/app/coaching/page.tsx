@@ -27,6 +27,30 @@ export default function CoachingPage() {
         </p>
       </div>
 
+      <section
+        aria-labelledby="coach-recruit-title"
+        className="space-y-3 rounded-2xl border border-blue-400/40 glass bg-blue-500/15 p-4"
+      >
+        <h2 id="coach-recruit-title" className="text-lg font-bold text-white">
+          コーチを募集しています
+        </h2>
+        <p className="text-sm leading-7 text-slate-200">
+          動画添削やオンライン指導をしてくれる方を探しています。YouTube や SNS で教えている方も歓迎です。競技経験のある大学生・社会人の方は「先輩」として応募できます。
+        </p>
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-6 text-slate-200">
+          <li>受け付けたい時間だけ「受付中」にして、届いた動画にアドバイスを返します。1本ごとに報酬があります。</li>
+          <li>集客、支払い、保護者とのやりとりは TrackTalk が引き受けます。</li>
+          <li>運営が一人ずつ確認してから参加していただきます。</li>
+        </ul>
+        <Link
+          href={coachApplyPath}
+          className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"
+        >
+          応募する
+        </Link>
+        <p className="text-xs text-slate-300">お問い合わせフォームから応募できます(ログインが必要です)。</p>
+      </section>
+
       <section aria-labelledby="coaching-review" className="space-y-3">
         <div className="flex items-baseline justify-between gap-2">
           <h2 id="coaching-review" className="text-lg font-bold">
@@ -72,30 +96,6 @@ export default function CoachingPage() {
         <p className="text-sm leading-7 text-slate-200">
           コーチのプロフィールを見比べて自分で選び、一定の期間、1対1で継続して見てもらうサービスです。料金はコーチごとに決まります。18歳未満の人のやりとりは、保護者も見られます。
         </p>
-      </section>
-
-      <section
-        aria-labelledby="coach-recruit-title"
-        className="space-y-3 rounded-2xl border border-blue-400/40 glass bg-blue-500/15 p-4"
-      >
-        <h2 id="coach-recruit-title" className="text-lg font-bold text-white">
-          コーチを募集しています
-        </h2>
-        <p className="text-sm leading-7 text-slate-200">
-          動画添削やオンライン指導をしてくれる方を探しています。YouTube や SNS で教えている方も歓迎です。競技経験のある大学生・社会人の方は「先輩」として応募できます。
-        </p>
-        <ul className="list-disc space-y-1 pl-5 text-xs leading-6 text-slate-200">
-          <li>受け付けたい時間だけ「受付中」にして、届いた動画にアドバイスを返します。1本ごとに報酬があります。</li>
-          <li>集客、支払い、保護者とのやりとりは TrackTalk が引き受けます。</li>
-          <li>運営が一人ずつ確認してから参加していただきます。</li>
-        </ul>
-        <Link
-          href={coachApplyPath}
-          className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"
-        >
-          応募する
-        </Link>
-        <p className="text-xs text-slate-300">お問い合わせフォームから応募できます(ログインが必要です)。</p>
       </section>
     </div>
   );
