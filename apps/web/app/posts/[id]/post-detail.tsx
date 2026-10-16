@@ -92,7 +92,6 @@ export function PostDetail({
   // 長押しで開く操作メニューの対象。
   const [menuComment, setMenuComment] = useState<Comment | null>(null);
   const longPress = useRef<{ timer: number; x: number; y: number } | null>(null);
-  const pressFired = useRef(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const openThreadReplyCount = comments.filter((c) => c.parent_id === openThreadId).length;
   useEffect(() => {
@@ -301,13 +300,11 @@ export function PostDetail({
 
   function startPress(e: React.PointerEvent, c: Comment) {
     cancelPress();
-    pressFired.current = false;
     longPress.current = {
       x: e.clientX,
       y: e.clientY,
       timer: window.setTimeout(() => {
         longPress.current = null;
-        pressFired.current = true;
         setMenuComment(c);
       }, 450),
     };
@@ -325,7 +322,8 @@ export function PostDetail({
 
   // 返信元を吹き出しの中に小さく引用する。本文は手元のコメントから引く。
   function renderQuote(c: Comment) {
-    if (!c.reply_to_id) return null;
+    // 最初のコメント(スレッドの親)宛ての返信には、引用を付けない。
+    if (!c.reply_to_id || c.reply_to_id === c.parent_id) return null;
     const target = comments.find((x) => x.id === c.reply_to_id);
     return (
       <button
@@ -355,14 +353,6 @@ export function PostDetail({
             onPointerUp={cancelPress}
             onPointerCancel={cancelPress}
             onPointerLeave={cancelPress}
-            onClick={() => {
-              // 長押しでメニューを開いた直後のクリックは、返信として扱わない。
-              if (pressFired.current) {
-                pressFired.current = false;
-                return;
-              }
-              if (allowComment) startReply(c);
-            }}
             onContextMenu={(e) => {
               e.preventDefault();
               cancelPress();
@@ -570,7 +560,7 @@ export function PostDetail({
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
           <div className="space-y-3">
-            <p className="text-center text-xs text-slate-300">タップでその発言に返信、長押しで編集・削除などができます</p>
+            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
             <div className="space-y-3">
               {renderBubble(activeThread.top)}
               {activeThread.replies.map((r) => renderBubble(r))}
@@ -601,10 +591,10 @@ export function PostDetail({
             }}
             className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] [body[data-comment-typing]_&]:bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:bottom-auto lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
-            {replyTarget ? (
+            {replyTo ? (
               <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold">@{replyTargetName(replyTarget)}</span> に返信中: {replyTarget.body}
+                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中: {replyTo.body}
                 </span>
                 <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
                   ×
