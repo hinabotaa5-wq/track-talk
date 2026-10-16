@@ -243,13 +243,13 @@ export function PostDetail({
         key={c.id}
         type="button"
         onClick={() => openThread(c)}
-        className="flex aspect-square flex-col items-center justify-center gap-1 rounded-full border border-white/20 glass bg-white/10 px-7 py-6 text-center text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
+        className="flex min-h-28 flex-col rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
       >
-        <span className="max-w-full truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
-        <span className="line-clamp-3 whitespace-pre-wrap break-words text-sm">{c.body}</span>
-        <span className="flex items-center gap-2 text-xs text-slate-300">
+        <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
+        <span className="line-clamp-4 whitespace-pre-wrap break-words text-sm">{c.body}</span>
+        <span className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-slate-300">
           <span className={thread.replies.length > 0 ? "font-semibold text-blue-200" : ""}>💬 {thread.replies.length}</span>
-          <span>{formatRelativeTime(c.created_at)}</span>
+          <span className="truncate">{formatRelativeTime(c.created_at)}</span>
         </span>
       </button>
     );
@@ -547,7 +547,11 @@ export function PostDetail({
       </div>
       )}
       <section className={`space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
-        <h2 className="text-xl font-semibold">コメント</h2>
+        {activeThread ? (
+          <h2 className="truncate text-xl font-semibold">{feedTitle(post.title)}</h2>
+        ) : (
+          <h2 className="text-xl font-semibold">コメント</h2>
+        )}
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
           <div className="space-y-3">
@@ -559,7 +563,7 @@ export function PostDetail({
               <span aria-hidden>←</span> コメント一覧へ
             </button>
             <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
-            <div className="space-y-3 rounded-3xl border border-white/15 bg-black/10 p-3">
+            <div className="space-y-3">
               {renderBubble(activeThread.top)}
               {activeThread.replies.map((r) => renderBubble(r))}
               <div ref={chatEnd} className="scroll-mb-44" />
