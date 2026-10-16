@@ -3,6 +3,7 @@ package httpx
 import (
 	"crypto/rand"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -53,11 +54,15 @@ func normalizeFocus(focus []string) ([]string, bool) {
 	return out, len(picked) == 0
 }
 
-// reviewDueAt は返却の目安。割り当ての仕組みができるまでは、設計書の「受付中のコーチがいない」ときの
-// 既定どおり、送った翌日の12時（日本時間）にする。
+// reviewDueAt は、受付中のコーチがいないときの返却の目安。設計書の既定どおり、送った翌日の12時（日本時間）にする。
 func reviewDueAt(now time.Time) time.Time {
 	local := now.In(tokyo)
 	return time.Date(local.Year(), local.Month(), local.Day()+1, 12, 0, 0, 0, tokyo)
+}
+
+// reviewWaiting は、まだ返却を待っている状態か。
+func reviewWaiting(status string) bool {
+	return status == "queued" || status == "offered" || status == "in_review"
 }
 
 func newDemoCode() (string, error) {
@@ -143,6 +148,10 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	// 受付を始めたり上限を上げたりしたら、待っている依頼をすぐ回す。
+	if c.OnDuty && (!current.OnDuty || c.DailyCap > current.DailyCap) {
+		s.dispatchQueuedReviews(r.Context())
 	}
 	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
 }
@@ -249,6 +258,12 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		writeAssetReadyError(w, err, "動画")
 		return
 	}
+	// 目安は送る画面に出したものと同じ計算で決め、依頼に保存する。これを過ぎたら expired になる。
+	due, _, err := s.estimateReviewDue(r.Context(), p.ID, req.Tier, req.Event, time.Now())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	rr, err := s.q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
 		ID:            uuid.New(),
 		RequesterID:   p.ID,
@@ -256,7 +271,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Event:         req.Event,
 		Focus:         focus,
 		VideoPublicID: req.VideoPublicID,
-		DueAt:         reviewDueAt(time.Now()),
+		DueAt:         due,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -266,6 +281,13 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if offered, err := s.offerReview(r.Context(), rr.ID); err != nil {
+		slog.Warn("review offer after create", "err", err)
+	} else if offered {
+		if fresh, err := s.q.GetReviewRequest(r.Context(), rr.ID); err == nil {
+			rr = fresh
+		}
 	}
 	JSON(w, http.StatusCreated, s.reviewRequestJSON(rr))
 }
@@ -336,6 +358,14 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	// tick が遅れていても、目安を過ぎた依頼は開いた時点で片付ける。
+	if reviewWaiting(rr.Status) && !time.Now().Before(rr.DueAt) {
+		if _, err := s.runCoachingTick(r.Context()); err != nil {
+			slog.Warn("review tick on read", "err", err)
+		} else if fresh, err := s.q.GetReviewRequest(r.Context(), id); err == nil {
+			rr = fresh
+		}
 	}
 	JSON(w, http.StatusOK, s.reviewRequestJSON(rr))
 }

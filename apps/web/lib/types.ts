@@ -159,13 +159,17 @@ export type NotificationKind =
   | "practice_application"
   | "practice_accepted"
   | "practice_rate"
-  | "injury_update";
+  | "injury_update"
+  | "review_offer"
+  | "review_expired";
 
+// 添削の通知（review_*）は投稿にひもづかないので post_id が null になる。
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
-  post_id: string;
-  post_title: string;
+  post_id: string | null;
+  post_title: string | null;
+  review_request_id: string | null;
   read: boolean;
   created_at: string;
 };
@@ -315,6 +319,28 @@ export type ReviewRequest = {
   created_at: string;
   video_url: string;
   thumbnail_url: string;
+};
+
+// コーチに見せる依頼。動画は引き受けたあとにだけ付く。
+export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url"> & {
+  video_url?: string;
+  thumbnail_url?: string;
+};
+
+export type ReviewOffer = {
+  id: string;
+  expires_at: string;
+  request: CoachReviewRequest;
+};
+
+export type CoachRequests = {
+  offers: ReviewOffer[];
+  reviewing: CoachReviewRequest[];
+};
+
+export type ReviewEstimate = {
+  due_at: string;
+  coaches_on_duty: boolean;
 };
 
 export type DemoCode = {

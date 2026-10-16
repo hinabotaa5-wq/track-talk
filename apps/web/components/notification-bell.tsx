@@ -17,7 +17,16 @@ const labels: Record<NotificationKind, string> = {
   practice_accepted: "参加が承認されました",
   practice_rate: "解散しました。評価しあってください",
   injury_update: "復帰の経過が更新されました",
+  review_offer: "フォーム添削の依頼が届きました",
+  review_expired: "フォーム添削の依頼が期限を過ぎました",
 };
+
+// 通知を開いたときの行き先。添削の通知は投稿ではなく、コーチ画面か依頼の画面へ。
+function hrefFor(item: AppNotification) {
+  if (item.kind === "review_offer") return "/coach";
+  if (item.review_request_id) return `/coaching/requests/${item.review_request_id}`;
+  return `/posts/${item.post_id}`;
+}
 
 function labelFor(kind: string) {
   return kind in labels ? labels[kind as NotificationKind] : "通知";
@@ -141,7 +150,7 @@ export function NotificationBell() {
               {items.map((item) => (
                 <li key={item.id} className={item.read ? "" : "bg-blue-950/40"}>
                   <Link
-                    href={`/posts/${item.post_id}`}
+                    href={hrefFor(item)}
                     onClick={() => {
                       setOpen(false);
                       if (!item.read) void markRead(item.id);
@@ -149,7 +158,8 @@ export function NotificationBell() {
                     className="block px-3 py-3 transition hover:bg-white/16 active:scale-95"
                   >
                     <p className="text-sm text-slate-100">
-                      {labelFor(item.kind)}: {item.post_title}
+                      {labelFor(item.kind)}
+                      {item.post_title ? `: ${item.post_title}` : ""}
                     </p>
                     <p className="mt-1 text-xs text-slate-200">{formatRelativeTime(item.created_at)}</p>
                   </Link>
