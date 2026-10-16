@@ -262,3 +262,24 @@ export type GuardianPublic = CoachingGuardian & {
   limit_options: GuardianLimitYen[];
   default_limit_yen: number;
 };
+
+export type CoachTier = "coach" | "senpai";
+export type CoachEventGroup = "sprint" | "long_sprint" | "hurdles" | "distance" | "jumps" | "throws";
+export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
+
+export type CoachApplication = {
+  tier: CoachTier;
+  event_groups: CoachEventGroup[];
+  best_record: string;
+  achievements: string;
+  years: number;
+  status: CoachStatus;
+  applied_at: string;
+  reviewed_at: string | null;
+};
+
+export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
+  profile_id: string;
+  status: CoachStatus;
+  nickname: string | null;
+};

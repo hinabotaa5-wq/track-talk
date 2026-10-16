@@ -5,26 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { coachApplyDraft, coachApplyTopic } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import type { Inquiry, Meta } from "@/lib/types";
 import { inquiryCategories, inquiryCategoryLabels, inquirySchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
 type Values = z.infer<typeof inquirySchema>;
-
-function noSubscribe() {
-  return () => {};
-}
-
-function isCoachApply() {
-  return new URLSearchParams(window.location.search).get("topic") === coachApplyTopic;
-}
 
 export default function ContactPage() {
   const { session, token, loading } = useAuth();
@@ -32,7 +23,6 @@ export default function ContactPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
-  const coachApply = useSyncExternalStore(noSubscribe, isCoachApply, () => false);
   const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
     resolver: zodResolver(inquirySchema),
@@ -45,12 +35,6 @@ export default function ContactPage() {
       router.replace(`/login?next=${encodeURIComponent(here)}`);
     }
   }, [loading, session, router]);
-
-  // ホームのコーチ募集の告知から来たときは、応募の下書きを入れておく。
-  useEffect(() => {
-    if (!coachApply) return;
-    form.reset({ ...form.getValues(), ...coachApplyDraft });
-  }, [coachApply, form]);
 
   useEffect(() => {
     if (!token) return;
@@ -105,11 +89,6 @@ export default function ContactPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">お問い合わせ</h1>
         <p className="text-sm text-slate-200">不具合やアカウントの相談を運営へ送れます。</p>
-        {coachApply ? (
-          <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
-            下の項目を埋めて送ってください。運営から、返信先のメールアドレスにご連絡します。
-          </p>
-        ) : null}
       </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <label className="block space-y-1 text-sm">
