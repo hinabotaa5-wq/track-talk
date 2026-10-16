@@ -14,7 +14,7 @@ import { canCommentOnPost } from "@/lib/practice-comments";
 import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ZoomableImage } from "@/components/zoomable-image";
@@ -50,7 +50,9 @@ export function PostDetail({
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   // コメントのカードをタップして開いたスレッド(null なら二列のカード一覧)。
-  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  // URL の ?room= に持たせるので、ヘッダーの戻る(＜)やブラウザの戻るで一覧に戻れる。
+  const searchParams = useSearchParams();
+  const openThreadId = searchParams.get("room");
   const [reportedPost, setReportedPost] = useState(false);
   const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
@@ -82,6 +84,10 @@ export function PostDetail({
   }
 
   useEffect(() => () => document.body.removeAttribute("data-comment-typing"), []);
+
+  // コメントルームの中では、返信先を選ばなければそのスレッドの最初のコメントへの返信になる。
+  const roomTop = openThreadId ? (comments.find((c) => c.id === openThreadId && !c.parent_id) ?? null) : null;
+  const replyTarget = roomTop ? (replyTo ?? roomTop) : null;
 
   // 長押しで開く操作メニューの対象。
   const [menuComment, setMenuComment] = useState<Comment | null>(null);
@@ -206,7 +212,7 @@ export function PostDetail({
       await apiFetch(`/v1/posts/${current.id}/comments`, {
         method: "POST",
         token,
-        body: JSON.stringify(replyTo ? { ...values, reply_to_id: replyTo.id } : values),
+        body: JSON.stringify(replyTarget ? { ...values, reply_to_id: replyTarget.id } : values),
       });
       form.reset();
       setReplyTo(null);
@@ -225,14 +231,9 @@ export function PostDetail({
   }
 
   function openThread(c: Comment) {
-    setOpenThreadId(c.id);
-    // スレッドの中で書いたコメントは、そのスレッドへの返信にする。
-    setReplyTo(c);
-    window.scrollTo({ top: 0 });
-  }
-
-  function closeThread() {
-    setOpenThreadId(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("room", c.id);
+    window.history.pushState(null, "", `?${params.toString()}`);
     setReplyTo(null);
   }
 
@@ -555,13 +556,6 @@ export function PostDetail({
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
           <div className="space-y-3">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-blue-300 transition active:scale-95"
-              onClick={closeThread}
-            >
-              <span aria-hidden>←</span> コメント一覧へ
-            </button>
             <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
             <div className="space-y-3">
               {renderBubble(activeThread.top)}
@@ -593,10 +587,10 @@ export function PostDetail({
             }}
             className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] [body[data-comment-typing]_&]:bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:bottom-auto lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
-            {replyTo ? (
+            {replyTarget ? (
               <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中: {replyTo.body}
+                  <span className="font-semibold">@{replyTargetName(replyTarget)}</span> に返信中: {replyTarget.body}
                 </span>
                 <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
                   ×
