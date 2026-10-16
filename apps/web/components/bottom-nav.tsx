@@ -54,8 +54,6 @@ const bottomNavHidden = new Set([
   "/posts/video",
   "/posts/recruit",
   "/posts/practice",
-  "/posts/youtube",
-  "/posts/instagram",
 ]);
 
 export function hidesBottomNav(pathname: string) {
