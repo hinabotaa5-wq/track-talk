@@ -23,18 +23,22 @@ export default function UploadPage() {
 
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
+  // ホームの「＋」から開く詳細画面。下のメニューは出さないので、その分まで5つの入口で埋める。
   return (
-    <div className="grid h-[calc(100dvh-10.625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:h-auto md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
-      {doors.map((door) => (
-        <Link
-          key={door.href}
-          href={door.href}
-          className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
-        >
-          <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
-          <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
-        </Link>
-      ))}
+    <div className="flex h-[calc(100dvh-7.125rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3 md:h-auto">
+      <h1 className="text-xl font-bold">何を投稿しますか?</h1>
+      <div className="grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
+        {doors.map((door) => (
+          <Link
+            key={door.href}
+            href={door.href}
+            className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+          >
+            <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
+            <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

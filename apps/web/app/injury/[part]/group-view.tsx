@@ -120,7 +120,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           {members !== null ? <span className="text-lg font-semibold text-slate-200"> · {members}人</span> : null}
         </h1>
         <p className="mt-2 text-sm text-slate-200">{injuryGroupDescriptions[part]}</p>
-        <p className="mt-1 text-sm text-slate-200">同じケガをした仲間が集まる場所です。グループの中の会話は、参加した人だけが読めます。</p>
       </div>
       {cta}
       {summary}
@@ -184,7 +183,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           <h1 className="text-2xl font-bold">
             {injuryGroupTitle(part)} · {group.members}人
           </h1>
-          <p className="mt-1 text-sm text-slate-200">一緒に乗り越えよう。どの段階もタップして読めます。</p>
+          <p className="mt-1 text-sm text-slate-200">段階をタップで読めます</p>
         </div>
         <Button variant="secondary" className="shrink-0" onClick={() => setChanging((v) => !v)} aria-expanded={changing}>
           段階を変える
@@ -222,7 +221,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         <section className="space-y-3 border-t border-white/15 pt-4" aria-label="みんなのデータ">
           <div>
             <h2 className="text-base font-bold">みんなのデータ</h2>
-            <p className="mt-1 text-sm text-slate-300">この部分は、グループに入っていない人も見られます。</p>
+            <p className="mt-1 text-xs text-slate-300">グループ外の人も見られます</p>
           </div>
           {summary}
         </section>
@@ -240,7 +239,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         ) : (
           <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/8 p-3 text-sm text-slate-200">
             <p>
-              {injuryBodyPartLabel(group.body_part)}のグループを抜けます。段階の記録は消えて、グループの中は読めなくなります。書いた投稿は残ります(投稿ごとに削除できます)。あとで、もう一度入れます。
+              {injuryBodyPartLabel(group.body_part)}のグループを抜けますか?段階の記録は消えます。投稿は残ります。
             </p>
             <div className="flex gap-2">
               <Button type="button" variant="danger" disabled={leaving === "busy"} onClick={() => void leaveGroup()}>
@@ -254,25 +253,30 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           </div>
         )}
       </div>
-      {/* 投稿ボタンは下のメニューのすぐ上に固定する。その分だけ余白を空けて、最後の行が隠れないようにする。 */}
-      <div className={own ? "h-12" : "h-16"} aria-hidden />
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-5xl space-y-1.5 px-4 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {own ? (
-          <Link
-            href={`/injury/${part}/new`}
-            className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
-          >
-            {selectedLabel}に投稿
-          </Link>
-        ) : (
-          <>
-            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-              この段階には投稿できません
-            </span>
-            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
-          </>
-        )}
-      </div>
+      {/* 投稿ボタンは下のメニューのすぐ上に固定する。その分だけ余白を空けて、最後の行が隠れないようにする。
+          段階を変えるフォームを書いているあいだは、入力の邪魔になるので出さない。 */}
+      {changing ? null : (
+        <>
+          <div className={own ? "h-12" : "h-16"} aria-hidden />
+          <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-5xl space-y-1.5 px-4 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {own ? (
+              <Link
+                href={`/injury/${part}/new`}
+                className="block rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 active:scale-95"
+              >
+                {selectedLabel}に投稿
+              </Link>
+            ) : (
+              <>
+                <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
+                  この段階には投稿できません
+                </span>
+                <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
