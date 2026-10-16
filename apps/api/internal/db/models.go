@@ -308,3 +308,12 @@ type Report struct {
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 }
+
+type SenseNote struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
