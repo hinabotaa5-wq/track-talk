@@ -433,6 +433,17 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  async function removePhoto(a: AdminCoachApplication) {
+    if (!window.confirm("この顔写真を外しますか？コーチはまた別の写真を登録できます。")) return;
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/photo`, { method: "DELETE", token });
+      setMessage("写真を外しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "外せませんでした");
+    }
+  }
+
   async function resetRating(a: AdminCoachApplication) {
     if (!window.confirm("このコーチを順番に戻しますか？これまでの★は、外す判定に数えなくなります。")) return;
     try {
@@ -472,6 +483,11 @@ function CoachesAdmin({ token }: { token: string | null }) {
                 {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
               </p>
             </div>
+            {a.photo_url ? (
+              <button type="button" onClick={() => void removePhoto(a)} className="text-sm text-red-300 underline">
+                写真を外す
+              </button>
+            ) : null}
             <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
             <p className="whitespace-pre-wrap">成績: {a.achievements}</p>

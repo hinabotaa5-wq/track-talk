@@ -300,6 +300,28 @@ func (s *Server) resetCoachRating(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
+// removeCoachPhoto は、運営がコーチの顔写真を外す。写真は Cloudinary からも消す。コーチはまた別の写真を登録できる。
+func (s *Server) removeCoachPhoto(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	old, err := s.q.RemoveCoachPhoto(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if old != nil {
+		if err := s.cloud.Delete(r.Context(), "image", []string{*old}); err != nil {
+			slog.Warn("delete removed coach photo", "err", err)
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // listCoaches は、依頼する前に見られるコーチ一覧。ログインしなくても見られる。
 func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.q.ListPublicCoaches(r.Context())

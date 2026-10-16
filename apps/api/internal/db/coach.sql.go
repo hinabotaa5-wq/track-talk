@@ -208,6 +208,23 @@ func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow
 	return items, nil
 }
 
+const removeCoachPhoto = `-- name: RemoveCoachPhoto :one
+UPDATE coach_profiles c
+SET photo_public_id = NULL,
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $1) o
+WHERE c.profile_id = $1
+RETURNING o.old_photo_public_id
+`
+
+// 運営が顔写真を外す。外した写真の ID を返すので、Cloudinary から消す。
+func (q *Queries) RemoveCoachPhoto(ctx context.Context, profileID uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, removeCoachPhoto, profileID)
+	var old_photo_public_id *string
+	err := row.Scan(&old_photo_public_id)
+	return old_photo_public_id, err
+}
+
 const resetCoachRating = `-- name: ResetCoachRating :one
 UPDATE coach_profiles
 SET rating_reset_at = now(),

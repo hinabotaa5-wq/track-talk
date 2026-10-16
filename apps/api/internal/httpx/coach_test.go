@@ -221,4 +221,22 @@ func TestCoachPhoto(t *testing.T) {
 	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); !strings.Contains(body, second) {
 		t.Fatalf("public list %s", body)
 	}
+
+	// 運営は写真を外せる。コーチ本人は外せず、外すと Cloudinary からも消える。
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/admin/coaching/coaches/"+applicant.String()+"/photo", ta, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("remove by coach %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/admin/coaching/coaches/"+uuid.NewString()+"/photo", tadmin, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("remove unknown %d", rec.Code)
+	}
+	deleted = nil
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/admin/coaching/coaches/"+applicant.String()+"/photo", tadmin, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("remove %d", rec.Code)
+	}
+	if len(deleted) != 1 || deleted[0] != second {
+		t.Fatalf("deleted after remove %v", deleted)
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); strings.Contains(body, second) || !strings.Contains(body, `"photo_url":""`) {
+		t.Fatalf("photo still listed %s", body)
+	}
 }

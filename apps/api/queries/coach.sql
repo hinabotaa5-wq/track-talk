@@ -105,3 +105,12 @@ FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE pr
 WHERE c.profile_id = sqlc.arg(profile_id)
   AND c.status IN ('pending', 'approved')
 RETURNING o.old_photo_public_id;
+
+-- name: RemoveCoachPhoto :one
+-- 運営が顔写真を外す。外した写真の ID を返すので、Cloudinary から消す。
+UPDATE coach_profiles c
+SET photo_public_id = NULL,
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $1) o
+WHERE c.profile_id = $1
+RETURNING o.old_photo_public_id;

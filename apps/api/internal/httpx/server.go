@@ -182,6 +182,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/coaching/probation", s.listCoachProbation)
 			r.Post("/admin/coaching/responses/{id}/hide", s.hideReviewResponse)
 			r.Post("/admin/coaching/coaches/{id}/reset-rating", s.resetCoachRating)
+			r.Delete("/admin/coaching/coaches/{id}/photo", s.removeCoachPhoto)
 		})
 	})
 	return r
