@@ -49,6 +49,7 @@ export const config = {
     "/me/:path*",
     "/posts/new/:path*",
     "/posts/video/:path*",
+    "/posts/url/:path*",
     "/posts/youtube/:path*",
     "/posts/instagram/:path*",
     "/posts/practice/:path*",
