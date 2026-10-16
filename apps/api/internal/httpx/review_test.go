@@ -219,6 +219,7 @@ func TestCoachDuty(t *testing.T) {
 		t.Fatalf("pending %d", rec.Code)
 	}
 	tadmin := adminToken(t, h)
+	withCoachPhoto(t, coach)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("approve %d", rec.Code)
 	}
@@ -240,4 +241,10 @@ func TestCoachDuty(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"on_duty":true`) {
 		t.Fatalf("me %s", rec.Body.String())
 	}
+}
+
+// withCoachPhoto は、承認の前提になる顔写真を、応募中のコーチに直接つける。
+func withCoachPhoto(t *testing.T, id uuid.UUID) {
+	t.Helper()
+	execSQLArgs(t, `UPDATE coach_profiles SET photo_public_id = $2 WHERE profile_id = $1`, id, "track-talk/"+uuid.NewString())
 }

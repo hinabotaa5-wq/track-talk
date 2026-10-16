@@ -29,6 +29,29 @@ export function CoachAvatar({ url, name, size = 56 }: { url: string; name: strin
   );
 }
 
+// uploadCoachPhoto は、選んだ写真を縮めて上げ、コーチの顔写真として登録する。失敗したら理由を Error で投げる。
+export async function uploadCoachPhoto(file: File, token: string | null): Promise<CoachApplication> {
+  if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
+    throw new Error("写真ファイルを選んでください");
+  }
+  const sending = await shrinkImage(file);
+  if (sending.size > maxPhotoBytes) throw new Error("10MB以内の写真にしてください");
+  try {
+    const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
+    const uploaded = await uploadToCloudinary("image", sending, signed, () => {});
+    if (uploaded.public_id !== signed.public_id) throw new Error("写真のアップロードに失敗しました");
+    const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/photo", {
+      method: "PUT",
+      token,
+      body: JSON.stringify({ photo_public_id: uploaded.public_id }),
+    });
+    return d.application;
+  } catch (err) {
+    if (err instanceof ApiRequestError) throw new Error(err.fields?.photo_public_id || err.message);
+    throw err;
+  }
+}
+
 // CoachPhotoForm は、応募中か承認済みのコーチが顔写真を選んで登録する。
 export function CoachPhotoForm({
   application,
@@ -49,27 +72,10 @@ export function CoachPhotoForm({
     if (!file || !acquire()) return;
     setError("");
     try {
-      if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
-        setError("写真ファイルを選んでください");
-        return;
-      }
       setStatus("アップロードしています…");
-      const sending = await shrinkImage(file);
-      if (sending.size > maxPhotoBytes) {
-        setError("10MB以内の写真にしてください");
-        return;
-      }
-      const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
-      const uploaded = await uploadToCloudinary("image", sending, signed, () => {});
-      if (uploaded.public_id !== signed.public_id) throw new Error("写真のアップロードに失敗しました");
-      const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/photo", {
-        method: "PUT",
-        token,
-        body: JSON.stringify({ photo_public_id: uploaded.public_id }),
-      });
-      onSaved(d.application);
+      onSaved(await uploadCoachPhoto(file, token));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.photo_public_id || err.message : "写真を登録できませんでした");
+      setError(err instanceof Error ? err.message : "写真を登録できませんでした");
     } finally {
       setStatus("");
       release();
@@ -94,7 +100,10 @@ export function CoachPhotoForm({
             }}
           />
         </label>
-        <p className="text-xs text-slate-300">顔がはっきり写った写真にしてください。コーチ一覧に載ります。</p>
+        <p className="text-xs text-slate-300">
+          顔がはっきり写った写真にしてください。コーチ一覧に載ります。
+          {application.photo_url ? "" : "写真がないと承認されません。"}
+        </p>
         {status ? <p className="text-xs text-slate-200">{status}</p> : null}
         {error ? <p className="text-xs text-red-400">{error}</p> : null}
       </div>

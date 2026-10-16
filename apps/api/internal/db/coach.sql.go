@@ -266,6 +266,7 @@ SET status = $1,
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'pending'
+  AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
 RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id
 `
 
@@ -274,7 +275,7 @@ type ReviewCoachApplicationParams struct {
 	ProfileID uuid.UUID `json:"profile_id"`
 }
 
-// 審査待ちのものだけ承認・却下できる。
+// 審査待ちのものだけ承認・却下できる。顔写真がないと承認できない。
 func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApplicationParams) (CoachProfile, error) {
 	row := q.db.QueryRow(ctx, reviewCoachApplication, arg.Status, arg.ProfileID)
 	var i CoachProfile

@@ -30,6 +30,7 @@ func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, body); rec.Code != http.StatusOK {
 		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
 	}
+	withCoachPhoto(t, id)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+id.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("approve %d", rec.Code)
 	}

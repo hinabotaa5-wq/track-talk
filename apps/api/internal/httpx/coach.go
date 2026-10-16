@@ -365,8 +365,13 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 	}
 	c, err := s.q.ReviewCoachApplication(r.Context(), db.ReviewCoachApplicationParams{Status: status, ProfileID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
-		if _, getErr := s.q.GetCoachProfile(r.Context(), id); errors.Is(getErr, pgx.ErrNoRows) {
+		current, getErr := s.q.GetCoachProfile(r.Context(), id)
+		if errors.Is(getErr, pgx.ErrNoRows) {
 			Error(w, http.StatusNotFound, "not_found", "応募が見つかりません")
+			return
+		}
+		if getErr == nil && current.Status == "pending" && current.PhotoPublicID == nil {
+			Error(w, http.StatusConflict, "conflict", "顔写真がまだ登録されていないため、承認できません")
 			return
 		}
 		Error(w, http.StatusConflict, "conflict", "この応募は審査済みです")

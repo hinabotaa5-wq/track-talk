@@ -123,6 +123,12 @@ func TestCoachApplicationFlow(t *testing.T) {
 		t.Fatalf("reapply %d %s", rec.Code, rec.Body.String())
 	}
 
+	// 顔写真がないと承認できない。
+	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "顔写真") {
+		t.Fatalf("approve without photo %d %s", rec.Code, rec.Body.String())
+	}
+	withCoachPhoto(t, applicant)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"approved"`) {
 		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())

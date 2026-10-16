@@ -54,13 +54,14 @@ ORDER BY c.applied_at ASC
 LIMIT $2 OFFSET $3;
 
 -- name: ReviewCoachApplication :one
--- 審査待ちのものだけ承認・却下できる。
+-- 審査待ちのものだけ承認・却下できる。顔写真がないと承認できない。
 UPDATE coach_profiles
 SET status = sqlc.arg(status),
     reviewed_at = now(),
     updated_at = now()
 WHERE profile_id = sqlc.arg(profile_id)
   AND status = 'pending'
+  AND (sqlc.arg(status)::text <> 'approved' OR photo_public_id IS NOT NULL)
 RETURNING *;
 
 -- name: ResetCoachRating :one

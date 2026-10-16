@@ -507,9 +507,13 @@ function CoachesAdmin({ token }: { token: string | null }) {
             ) : null}
             {a.status === "pending" ? (
               <div className="flex gap-4 pt-1">
-                <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">
-                  承認する
-                </button>
+                {a.photo_url ? (
+                  <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">
+                    承認する
+                  </button>
+                ) : (
+                  <span className="text-xs text-amber-300">顔写真がないため、承認できません</span>
+                )}
                 <button type="button" onClick={() => void review(a, "reject")} className="text-red-300 underline">
                   見送る
                 </button>
