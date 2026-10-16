@@ -8,7 +8,7 @@ Go API を Google Cloud Run の東京リージョン（`asia-northeast1`）で�
    └────── https://track-talk-api-xxxx.a.run.app ─ Cloud Run（東京、最大1台）─ Supabase（DB・Auth）
 ```
 
-- **デプロイ**: `main` の `apps/api` が変わると、`.github/workflows/deploy-api.yml` がイメージを作って Cloud Run に送る
+- **デプロイ**: マージしても自動では動かない。Actions の「Deploy API」を Run workflow で流すと、`.github/workflows/deploy-api.yml` が `main` からイメージを作って Cloud Run に送る
 - **費用の上限**: 予算（既定は月100円）を超えると `budget-stop` が API をインターネットから呼べなくする。費用の反映は数時間遅れるので、少しはみ出すことはある
 - **台数**: 最大1台。書き込みの回数制限がメモリ上にあるのと、急なアクセスで費用が膨らまないようにするため
 
@@ -56,7 +56,7 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/setup.sh deploy/cloud-ru
 ## 4. 本物の API に差し替える
 
 setup.sh は、まず Google の見本イメージでサービスを立てます（Cloud Shell の docker や Cloud Build は、新しいプロジェクトだとネットワークや権限で失敗しやすいため）。
-本物の API は GitHub Actions の「Deploy API」がビルドして差し替えます。`main` の `apps/api` が変わると流れ、Actions の画面から Run workflow でも流せます。
+本物の API は GitHub Actions の「Deploy API」がビルドして差し替えます。Actions の画面から Run workflow で流します（マージでは自動で流れません）。
 
 送り先は `.github/workflows/deploy-api.yml` の `env` に書いてあります（`GCP_PROJECT_ID` など。秘密の値ではない）。別のプロジェクトに作り直したら、setup.sh の最後に表示される値に書き換えます。
 

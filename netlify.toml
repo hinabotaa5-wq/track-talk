@@ -2,6 +2,9 @@
   base = "apps/web"
   command = "npm run build"
   publish = ".next"
+  # Git の push（マージ）では作らない。本番に出すときは Actions の「Deploy Web」がビルドフックで呼ぶ。
+  # ビルドフックからのビルドはこの ignore を通らない（Netlify の仕様）。
+  ignore = "exit 0"
 
 [build.environment]
   NODE_VERSION = "22"
