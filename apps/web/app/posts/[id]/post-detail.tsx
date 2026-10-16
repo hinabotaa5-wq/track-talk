@@ -1,7 +1,7 @@
 "use client";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
@@ -233,13 +233,13 @@ export function PostDetail({
         key={c.id}
         type="button"
         onClick={() => openThread(c)}
-        className="flex min-h-28 flex-col rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
+        className="flex aspect-square flex-col items-center justify-center gap-1 rounded-full border border-white/20 glass bg-white/10 px-7 py-6 text-center text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
       >
-        <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
-        <span className="line-clamp-4 whitespace-pre-wrap break-words text-sm">{c.body}</span>
-        <span className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-slate-300">
+        <span className="max-w-full truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
+        <span className="line-clamp-3 whitespace-pre-wrap break-words text-sm">{c.body}</span>
+        <span className="flex items-center gap-2 text-xs text-slate-300">
           <span className={thread.replies.length > 0 ? "font-semibold text-blue-200" : ""}>💬 {thread.replies.length}</span>
-          <span className="truncate">{formatDateTime(c.created_at)}</span>
+          <span>{formatRelativeTime(c.created_at)}</span>
         </span>
       </button>
     );
@@ -292,7 +292,7 @@ export function PostDetail({
       <div
         key={c.id}
         id={`comment-${c.id}`}
-        className={`rounded-xl border glass p-3.5 text-slate-200 transition-colors ${highlightId === c.id ? "border-blue-400 bg-blue-400/20" : "border-white/20 bg-white/10"}`}
+        className={`rounded-3xl border glass px-4 py-3.5 text-slate-200 transition-colors ${highlightId === c.id ? "border-blue-400 bg-blue-400/20" : "border-white/20 bg-white/10"}`}
       >
         {isReply && c.reply_to_id ? (
           <button
@@ -307,7 +307,7 @@ export function PostDetail({
         ) : null}
         <p className="mb-0.5 text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</p>
         <p className="whitespace-pre-wrap text-sm">{c.body}</p>
-        <p className="mt-2 text-xs text-slate-300">{formatDateTime(c.created_at)}</p>
+        <p className="mt-2 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</p>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           {allowComment ? (
             <button
