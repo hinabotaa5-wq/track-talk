@@ -59,7 +59,9 @@ const getCoachRatingSummary = `-- name: GetCoachRatingSummary :one
 SELECT count(rt.stars)::int AS count, coalesce(avg(rt.stars), 0)::float8 AS average
 FROM review_ratings rt
 JOIN review_responses rs ON rs.request_id = rt.request_id
-WHERE rs.coach_id = $1
+JOIN coach_profiles c ON c.profile_id = rs.coach_id
+WHERE rs.coach_id = $1::uuid
+  AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
 `
 
 type GetCoachRatingSummaryRow struct {
@@ -67,8 +69,8 @@ type GetCoachRatingSummaryRow struct {
 	Average float64 `json:"average"`
 }
 
-// コーチが受けた★の件数と平均。
-func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID *uuid.UUID) (GetCoachRatingSummaryRow, error) {
+// コーチが受けた★の件数と平均。運営が順番に戻したあとの★だけを数える。
+func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID uuid.UUID) (GetCoachRatingSummaryRow, error) {
 	row := q.db.QueryRow(ctx, getCoachRatingSummary, coachID)
 	var i GetCoachRatingSummaryRow
 	err := row.Scan(&i.Count, &i.Average)

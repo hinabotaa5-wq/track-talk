@@ -77,6 +77,11 @@ func TestCoachApplicationFlow(t *testing.T) {
 		t.Fatalf("edit %d %s", rec.Code, rec.Body.String())
 	}
 
+	// 審査待ちのうちはコーチ一覧に出ない。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); strings.Contains(body, applicant.String()) {
+		t.Fatalf("pending in public list %s", body)
+	}
+
 	// 管理者でなければ一覧も審査もできない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications", ta, nil); rec.Code != http.StatusForbidden {
 		t.Fatalf("non-admin list %d", rec.Code)
@@ -123,6 +128,12 @@ func TestCoachApplicationFlow(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil); !strings.Contains(rec.Body.String(), applicant.String()) {
 		t.Fatalf("approved list %s", rec.Body.String())
+	}
+
+	// 承認されるとコーチ一覧に出る。ログインしなくても見られる。
+	rec = doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), applicant.String()) || !strings.Contains(rec.Body.String(), `"best_record":"100m 10秒95（2025年）"`) {
+		t.Fatalf("public list %d %s", rec.Code, rec.Body.String())
 	}
 
 	// 承認された後は応募内容を変えられない。

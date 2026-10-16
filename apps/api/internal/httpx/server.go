@@ -78,6 +78,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/push/public-key", s.pushPublicKey)
+		r.Get("/coaches", s.listCoaches)
 		// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
 		r.Get("/guardian/{token}", s.getGuardian)
 		r.Post("/guardian/{token}/consent", s.consentGuardian)
@@ -179,6 +180,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/coaching/demo-codes", s.createDemoCode)
 			r.Get("/admin/coaching/probation", s.listCoachProbation)
 			r.Post("/admin/coaching/responses/{id}/hide", s.hideReviewResponse)
+			r.Post("/admin/coaching/coaches/{id}/reset-rating", s.resetCoachRating)
 		})
 	})
 	return r

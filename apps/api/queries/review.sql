@@ -106,6 +106,7 @@ WHERE c.status = 'approved'
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
     HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
        AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
   )
@@ -219,6 +220,7 @@ WHERE c.status = 'approved'
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
     HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
        AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
   );

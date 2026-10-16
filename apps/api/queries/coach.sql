@@ -35,9 +35,19 @@ SELECT
     c.status,
     c.applied_at,
     c.reviewed_at,
-    p.nickname
+    p.nickname,
+    r.rating_count,
+    r.rating_average
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
+CROSS JOIN LATERAL (
+    -- 打診の順番から外す判定に使う★（運営が戻したあとのものだけ）。
+    SELECT count(rt.stars)::int AS rating_count, coalesce(avg(rt.stars), 0)::float8 AS rating_average
+    FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
+) r
 WHERE c.status = $1
 ORDER BY c.applied_at ASC
 LIMIT $2 OFFSET $3;
@@ -51,3 +61,35 @@ SET status = sqlc.arg(status),
 WHERE profile_id = sqlc.arg(profile_id)
   AND status = 'pending'
 RETURNING *;
+
+-- name: ResetCoachRating :one
+-- 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
+UPDATE coach_profiles
+SET rating_reset_at = now(),
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'approved'
+RETURNING *;
+
+-- name: ListPublicCoaches :many
+-- 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部。
+SELECT
+    c.profile_id,
+    p.nickname,
+    c.tier,
+    c.events,
+    c.best_record,
+    c.achievements,
+    c.years,
+    r.rating_count,
+    r.rating_average
+FROM coach_profiles c
+JOIN profiles p ON p.id = c.profile_id
+CROSS JOIN LATERAL (
+    SELECT count(rt.stars)::int AS rating_count, coalesce(avg(rt.stars), 0)::float8 AS rating_average
+    FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+) r
+WHERE c.status = 'approved'
+ORDER BY c.tier, c.reviewed_at, c.profile_id;

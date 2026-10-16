@@ -432,6 +432,17 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  async function resetRating(a: AdminCoachApplication) {
+    if (!window.confirm("このコーチを順番に戻しますか？これまでの★は、外す判定に数えなくなります。")) return;
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/reset-rating`, { method: "POST", token });
+      setMessage("順番に戻しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "戻せませんでした");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
@@ -461,6 +472,19 @@ function CoachesAdmin({ token }: { token: string | null }) {
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
             <p className="whitespace-pre-wrap">成績: {a.achievements}</p>
             <p>競技年数: {a.years}年</p>
+            {a.status === "approved" ? (
+              <p className="text-xs text-slate-200">
+                評価: {a.rating_count > 0 ? `★${a.rating_average.toFixed(1)}（${a.rating_count}件）` : "まだありません"}
+              </p>
+            ) : null}
+            {a.status === "approved" && a.rating_paused ? (
+              <div className="space-y-1 rounded-lg border border-amber-400/40 bg-amber-500/15 p-2">
+                <p className="text-xs text-white">評価が低いため、依頼が回っていません。</p>
+                <button type="button" onClick={() => void resetRating(a)} className="text-sm text-blue-300 underline">
+                  順番に戻す
+                </button>
+              </div>
+            ) : null}
             {a.status === "pending" ? (
               <div className="flex gap-4 pt-1">
                 <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">

@@ -109,7 +109,7 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rating, err := s.q.GetCoachRatingSummary(r.Context(), &p.ID)
+	rating, err := s.q.GetCoachRatingSummary(r.Context(), p.ID)
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -213,10 +213,59 @@ func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if rows == nil {
-		rows = []db.ListCoachApplicationsRow{}
+	type application struct {
+		db.ListCoachApplicationsRow
+		// 評価が低くて打診の順番から外れているか。
+		RatingPaused bool `json:"rating_paused"`
 	}
-	JSON(w, http.StatusOK, map[string]any{"applications": rows, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+	out := make([]application, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, application{row, lowRated(row.RatingCount, row.RatingAverage)})
+	}
+	JSON(w, http.StatusOK, map[string]any{"applications": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+}
+
+// resetCoachRating は、評価で打診の順番から外れたコーチを戻す。それより前の★は外す判定に数えなくなる。
+func (s *Server) resetCoachRating(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	c, err := s.q.ResetCoachRating(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	// 待ちの依頼があれば、戻したコーチにも回す。
+	s.dispatchQueuedReviews(r.Context())
+	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+}
+
+// listCoaches は、依頼する前に見られるコーチ一覧。ログインしなくても見られる。
+func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.q.ListPublicCoaches(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, c := range rows {
+		out = append(out, map[string]any{
+			"id":             c.ProfileID,
+			"nickname":       c.Nickname,
+			"tier":           c.Tier,
+			"events":         c.Events,
+			"best_record":    c.BestRecord,
+			"achievements":   c.Achievements,
+			"years":          c.Years,
+			"rating_count":   c.RatingCount,
+			"rating_average": c.RatingAverage,
+		})
+	}
+	JSON(w, http.StatusOK, map[string]any{"coaches": out})
 }
 
 func (s *Server) approveCoachApplication(w http.ResponseWriter, r *http.Request) {

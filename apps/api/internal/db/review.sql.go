@@ -90,6 +90,7 @@ WHERE c.status = 'approved'
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
     HAVING count(rt.stars) >= $4::int
        AND avg(rt.stars)::float8 < $5::float8
   )
@@ -665,6 +666,7 @@ WHERE c.status = 'approved'
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
     HAVING count(rt.stars) >= $7::int
        AND avg(rt.stars)::float8 < $8::float8
   )
@@ -745,7 +747,7 @@ SET on_duty = $1,
     updated_at = now()
 WHERE profile_id = $3
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at
 `
 
 type UpdateCoachDutyParams struct {
@@ -773,6 +775,7 @@ func (q *Queries) UpdateCoachDuty(ctx context.Context, arg UpdateCoachDutyParams
 		&i.OnDuty,
 		&i.DailyCap,
 		&i.LastOfferedAt,
+		&i.RatingResetAt,
 	)
 	return i, err
 }

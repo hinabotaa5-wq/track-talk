@@ -220,7 +220,7 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setupConfig(t, func(cfg *config.Config) { cfg.CoachingTickSecret = "tick-secret" })
 	tadmin := adminToken(t, h)
-	_, ta := onDutyCoach(t, h, tadmin)
+	aID, ta := onDutyCoach(t, h, tadmin)
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", ta, map[string]any{"daily_cap": 10}); rec.Code != http.StatusOK {
 		t.Fatalf("daily cap %d", rec.Code)
 	}
@@ -265,9 +265,23 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 		t.Fatal("low-rated coach got an offer")
 	}
 
-	// ほかのコーチが受付を始めると、そちらに回る。
-	_, tb := onDutyCoach(t, h, tadmin)
-	if offers := coachRequests(t, h, tb).Offers; len(offers) != 1 || offers[0].Request.ID != created.ID {
-		t.Fatalf("B offers %+v", offers)
+	// 運営の画面では外れていることがわかり、戻すと待っていた依頼が回る。
+	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil).Body.String(); !strings.Contains(body, `"rating_paused":true`) {
+		t.Fatalf("admin list %s", body)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+uuid.NewString()+"/reset-rating", tadmin, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("reset unknown %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+aID.String()+"/reset-rating", ta, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("reset by coach %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+aID.String()+"/reset-rating", tadmin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("reset %d %s", rec.Code, rec.Body.String())
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
+		t.Fatalf("still paused %s", body)
+	}
+	if offers := coachRequests(t, h, ta).Offers; len(offers) != 1 || offers[0].Request.ID != created.ID {
+		t.Fatalf("A offers after reset %+v", offers)
 	}
 }

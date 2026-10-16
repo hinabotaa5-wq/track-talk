@@ -237,6 +237,9 @@ export default function CoachApplyPage() {
             {fieldError("years")}
           </label>
 
+          <p className="text-xs text-slate-300">
+            承認されると、ニックネーム・枠・担当種目・記録・成績・競技年数が、誰でも見られるコーチ一覧に載ります。
+          </p>
           {message ? <p className="text-sm text-blue-400">{message}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>
             {application?.status === "pending" ? "応募内容を更新する" : "応募する"}
