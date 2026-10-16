@@ -4,17 +4,19 @@ import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { InjuryMeCards } from "@/components/injury-me-cards";
+import { SenseNotesCard } from "@/components/sense-notes-card";
 import type { Meta, Post } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bookmark, ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, Smartphone, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
+import { Bookmark, ChevronRight, ClipboardList, FileText, HeartPulse, LogOut, Mail, NotebookPen, Smartphone, ScrollText, Shield, UserRoundPen, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { installGuideOpenEvent } from "@/lib/install-guide";
 
 const menuLinks = [
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
+  { href: "/me/sense", label: "感覚メモ", icon: NotebookPen },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
   { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
   { href: "/me/contact", label: "お問い合わせ", icon: Mail },
@@ -84,6 +86,7 @@ export default function MePage() {
   return (
     <div className="space-y-4 md:grid md:grid-cols-[18rem_minmax(0,1fr)] md:items-start md:gap-8 md:space-y-0">
       <InjuryMeCards token={token} />
+      <SenseNotesCard token={token} />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass()}>
           <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
