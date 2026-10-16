@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { FeedbackBox } from "./feedback-box";
 import { NotificationBell } from "./notification-bell";
+import { TodayMeetBalloon } from "./today-meet-balloon";
 import { activeMainTab, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
@@ -121,6 +122,7 @@ export function Header() {
           </nav>
           {session && !showBack ? (
             <>
+              {pathname === "/" ? <TodayMeetBalloon /> : null}
               <FeedbackBox />
               <NotificationBell />
             </>
