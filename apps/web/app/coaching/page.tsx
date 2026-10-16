@@ -13,6 +13,14 @@ const reviewSteps = [
   { title: "アドバイスが届く", body: "良いところ、直すところ、おすすめの練習を、決まった形で返します。" },
 ] as const;
 
+// メニューは決まっているが、金額はまだ決めていないので載せない。
+const prices = [
+  { menu: "動画添削(コーチ)", price: "1本ごと・一律", note: "どのコーチに回っても同じ値段です。" },
+  { menu: "動画添削(先輩)", price: "1本ごと・一律", note: "コーチより安くします。" },
+  { menu: "急ぎ", price: "動画添削に追加", note: "追加料金で、先に回してもらえます。" },
+  { menu: "パーソナル指導", price: "コーチごと", note: "値段はそれぞれのコーチが決めます。" },
+] as const;
+
 // オンラインコーチングを始める前に、中身の説明とコーチの募集だけを出す。機能そのものはまだ置かない。
 export default function CoachingPage() {
   return (
@@ -38,7 +46,7 @@ export default function CoachingPage() {
           動画添削やオンライン指導をしてくれる方を探しています。YouTube や SNS で教えている方も歓迎です。競技経験のある大学生・社会人の方は「先輩」として応募できます。
         </p>
         <ul className="list-disc space-y-1 pl-5 text-xs leading-6 text-slate-200">
-          <li>受け付けたい時間だけ「受付中」にして、届いた動画にアドバイスを返します。1本ごとに報酬があります。</li>
+          <li>受け付けたい時間だけ「受付中」にして、届いた動画にアドバイスを返します。1本ごとに報酬があり、動画が多い夕方から夜は報酬が上がります。</li>
           <li>集客、支払い、保護者とのやりとりは TrackTalk が引き受けます。</li>
           <li>運営が一人ずつ確認してから参加していただきます。</li>
         </ul>
@@ -96,6 +104,27 @@ export default function CoachingPage() {
         <p className="text-sm leading-7 text-slate-200">
           コーチのプロフィールを見比べて自分で選び、一定の期間、1対1で継続して見てもらうサービスです。料金はコーチごとに決まります。18歳未満の人のやりとりは、保護者も見られます。
         </p>
+      </section>
+
+      <section aria-labelledby="coaching-price" className="space-y-3">
+        <h2 id="coaching-price" className="text-lg font-bold">
+          料金
+        </h2>
+        <dl className="divide-y divide-white/15 overflow-hidden rounded-xl border border-white/20 glass bg-white/10">
+          {prices.map((item) => (
+            <div key={item.menu} className="space-y-0.5 px-3 py-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-sm font-semibold text-white">{item.menu}</dt>
+                <dd className="shrink-0 text-sm text-blue-300">{item.price}</dd>
+              </div>
+              <dd className="text-xs text-slate-300">{item.note}</dd>
+            </div>
+          ))}
+        </dl>
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-6 text-slate-300">
+          <li>送る前に、アドバイスが返ってくる目安の時刻を表示します。その時刻を過ぎたら、自動で返金します。</li>
+          <li>具体的な金額は、始まる前にお知らせします。</li>
+        </ul>
       </section>
     </div>
   );
