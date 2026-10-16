@@ -43,7 +43,20 @@ export function showsBackButton(pathname: string) {
   return false;
 }
 
-const bottomNavHidden = new Set(["/login", "/register", "/reset-password"]);
+// 投稿はホームの「＋」から開く詳細画面なので、そこから先の作成画面でも下のメニューは出さない。
+const bottomNavHidden = new Set([
+  "/login",
+  "/register",
+  "/reset-password",
+  "/upload",
+  "/posts/new",
+  "/posts/url",
+  "/posts/video",
+  "/posts/recruit",
+  "/posts/practice",
+  "/posts/youtube",
+  "/posts/instagram",
+]);
 
 export function hidesBottomNav(pathname: string) {
   return bottomNavHidden.has(pathname);

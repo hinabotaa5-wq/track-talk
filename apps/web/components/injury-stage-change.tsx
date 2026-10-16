@@ -89,8 +89,8 @@ export function InjuryStageChange({
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">{member.stage_label}のあいだ、意識的にやったことは?</h3>
-          <p className="text-sm text-slate-300">いくつでも選べます。次の人のヒントになります。</p>
+          <h3 className="text-base font-bold">{member.stage_label}のあいだ、やったことは?</h3>
+          <p className="text-sm text-slate-300">いくつでも</p>
           <InjuryChoices
             label="意識的にやったこと"
             options={injuryActions}
@@ -122,7 +122,7 @@ export function InjuryStageChange({
             />
             <span>
               グループの紹介ページに載せてよい
-              <span className="block text-xs text-slate-300">ニックネームは出ず、段階と種目だけが表示されます。</span>
+              <span className="block text-xs text-slate-300">名前は出ません</span>
             </span>
           </label>
         </section>

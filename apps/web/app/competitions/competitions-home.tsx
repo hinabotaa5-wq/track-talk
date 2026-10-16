@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { ChevronRight, Globe, MapPin } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -22,6 +23,11 @@ const views: { id: View; label: string }[] = [
   { id: "international", label: "国際大会" },
 ];
 
+const entries = [
+  { href: regionalCompetitionsPath, label: "都道府県の大会", icon: MapPin },
+  { href: "/competitions/major-hosts", label: "今後の国際大会", icon: Globe },
+];
+
 export function CompetitionsHome() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -30,6 +36,23 @@ export function CompetitionsHome() {
   return (
     <RequireSession>
       <div className="space-y-5">
+        {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
+        <nav aria-label="ほかの大会" className="grid grid-cols-2 gap-2 md:max-w-md">
+          {entries.map((entry) => {
+            const Icon = entry.icon;
+            return (
+              <Link
+                key={entry.href}
+                href={entry.href}
+                className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95"
+              >
+                <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
+                <span className="truncate">{entry.label}</span>
+                <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+              </Link>
+            );
+          })}
+        </nav>
         <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
           {views.map((item) => {
             const active = item.id === view;
@@ -49,20 +72,6 @@ export function CompetitionsHome() {
           })}
         </div>
         {view === "domestic" ? <DomesticSchedule /> : <InternationalSchedule />}
-        <div className="flex flex-col gap-2 md:flex-row">
-          {[
-            { href: regionalCompetitionsPath, label: "都道府県の大会" },
-            { href: "/competitions/major-hosts", label: "今後の世界陸上・オリンピック" },
-          ].map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4.5 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95 md:w-fit"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
       </div>
     </RequireSession>
   );

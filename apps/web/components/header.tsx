@@ -73,8 +73,10 @@ export function Header() {
   const current = activeMainTab(pathname);
 
   return (
+    // ほぼ透明だと、下に流れた文字が強い blur でにじんで、画面の上がぼやけて見える。
+    // 背景と同じ色で 9 割ふさいで、下の文字はほとんど透けないようにする。
     <header
-      className="sticky top-0 z-40 border-b border-white/20 glass bg-white/8 backdrop-blur-md"
+      className="sticky top-0 z-40 border-b border-white/15 glass bg-[#16243a]/90"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
