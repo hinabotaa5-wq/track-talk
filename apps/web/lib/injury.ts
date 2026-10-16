@@ -22,6 +22,13 @@ export const injuryStages = [
 
 export type InjuryStage = (typeof injuryStages)[number]["value"];
 
+// ゴールの段階。ここまで来たケガは、マイページの「いまのケガ」に出さない。
+export const injuryGoalStage: InjuryStage = "race";
+
+export function isCurrentInjuryStage(stage: string) {
+  return stage !== injuryGoalStage;
+}
+
 export function isInjuryStage(value: string | null | undefined): value is InjuryStage {
   return injuryStages.some((item) => item.value === value);
 }
@@ -376,7 +383,7 @@ export function injuryCelebrationKey(part: string) {
 
 // 初めてゴール(大会に復帰)に着いたときだけ祝う。戻ってからの2回目は出さない。
 export function shouldCelebrate(stage: string, alreadyCelebrated: boolean) {
-  return stage === "race" && !alreadyCelebrated;
+  return stage === injuryGoalStage && !alreadyCelebrated;
 }
 
 function hasCelebrated(part: string) {

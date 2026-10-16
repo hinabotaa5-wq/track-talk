@@ -107,7 +107,7 @@ export default function ContactPage() {
         <p className="text-sm text-slate-200">不具合やアカウントの相談を運営へ送れます。</p>
         {coachApply ? (
           <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
-            コーチへの応募ありがとうございます。下の項目を埋めて送ってください。運営から、返信先のメールアドレスにご連絡します。
+            下の項目を埋めて送ってください。運営から、返信先のメールアドレスにご連絡します。
           </p>
         ) : null}
       </div>

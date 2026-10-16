@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { FileText, Handshake, Link2, Users, Video } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+// 5つが同じ色だと見分けにくいので、種類ごとにアイコンと色を分ける。
 const doors = [
-  { href: "/posts/new", title: "文章", body: "タイトル・本文・写真のいずれかでスレッドを立てます。" },
-  { href: "/posts/url", title: "動画URL", body: "YouTubeやInstagramの動画を引用して、そのスレッドに集まります。" },
-  { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。" },
-  { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。" },
-  { href: "/posts/practice", title: "練習相手募集", body: "練習場所と日時を書いて、一緒に練習する相手を募ります。" },
+  { href: "/posts/new", title: "文章", body: "タイトル・本文・写真のいずれかでスレッドを立てます。", icon: FileText, border: "border-l-sky-400", tile: "bg-sky-500/20 text-sky-300" },
+  { href: "/posts/url", title: "動画URL", body: "YouTubeやInstagramの動画を引用して、そのスレッドに集まります。", icon: Link2, border: "border-l-violet-400", tile: "bg-violet-500/20 text-violet-300" },
+  { href: "/posts/video", title: "自分の動画", body: "撮った動画を投稿します。", icon: Video, border: "border-l-rose-400", tile: "bg-rose-500/20 text-rose-300" },
+  { href: "/posts/recruit", title: "クラブチームの募集", body: "チーム名や活動場所を書いて、メンバーを募ります。", icon: Users, border: "border-l-emerald-400", tile: "bg-emerald-500/20 text-emerald-300" },
+  { href: "/posts/practice", title: "練習相手募集", body: "練習場所と日時を書いて、一緒に練習する相手を募ります。", icon: Handshake, border: "border-l-amber-400", tile: "bg-amber-500/20 text-amber-300" },
 ] as const;
 
 export default function UploadPage() {
@@ -36,10 +38,15 @@ export default function UploadPage() {
           <Link
             key={door.href}
             href={door.href}
-            className="flex min-h-0 flex-col justify-center overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 px-3 py-2 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+            className={`flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl border border-l-4 border-white/20 glass bg-white/10 px-3 py-2 transition hover:bg-white/16 active:scale-95 ${door.border}`}
           >
-            <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
-            <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
+            <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${door.tile}`}>
+              <door.icon className="size-5" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-semibold leading-tight text-slate-100">{door.title}</span>
+              <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-200">{door.body}</span>
+            </span>
           </Link>
         ))}
       </div>
