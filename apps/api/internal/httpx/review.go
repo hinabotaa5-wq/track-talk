@@ -151,7 +151,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	if c.OnDuty && (!current.OnDuty || c.DailyCap > current.DailyCap) {
 		s.dispatchQueuedReviews(r.Context())
 	}
-	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
 type demoCodeReq struct {

@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -144,5 +145,80 @@ func TestCoachApplicationFlow(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &me)
 	if me.Application == nil || me.Application.Status != "approved" || me.Application.Years != 8 {
 		t.Fatalf("me after approve %+v", me.Application)
+	}
+}
+
+func TestCoachPhoto(t *testing.T) {
+	var deleted []string
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = append(deleted, r.URL.Query()["public_ids[]"]...)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/image/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+	upload := func() string {
+		t.Helper()
+		rec := doJSON(t, h, http.MethodPost, "/v1/uploads/image", ta, map[string]any{})
+		var signed struct {
+			PublicID string `json:"public_id"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &signed)
+		if rec.Code != http.StatusOK || signed.PublicID == "" {
+			t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
+		}
+		return signed.PublicID
+	}
+
+	// 応募する前は写真を登録できない。
+	first := upload()
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": first}); rec.Code != http.StatusConflict {
+		t.Fatalf("before apply %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": "../x"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad id %d", rec.Code)
+	}
+	rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": first})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "c_fill,g_face") {
+		t.Fatalf("photo %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 差し替えると、前の写真は Cloudinary から消す。
+	second := upload()
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": second}); rec.Code != http.StatusOK {
+		t.Fatalf("replace %d", rec.Code)
+	}
+	if len(deleted) != 1 || deleted[0] != first {
+		t.Fatalf("deleted %v", deleted)
+	}
+
+	// 承認されると、コーチ一覧に写真が出る。
+	admin := uuid.New()
+	tadmin := token(t, admin)
+	doJSON(t, h, http.MethodGet, "/v1/me", tadmin, nil)
+	setAdmin(t, admin)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d", rec.Code)
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); !strings.Contains(body, second) {
+		t.Fatalf("public list %s", body)
 	}
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { CoachAvatar } from "@/components/coach-photo";
 import { apiFetch } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import type { CoachTier, PublicCoach } from "@/lib/types";
@@ -50,14 +51,15 @@ export function CoachList() {
       <ul className="space-y-3">
         {shown.map((c) => (
           <li key={c.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="font-bold text-white">
-                {c.nickname ?? "名前なし"}
-                <span className="ml-2 text-xs font-normal text-slate-300">{coachTierLabels[c.tier]}</span>
-              </p>
-              <p className="shrink-0 text-xs text-slate-200">
-                {c.rating_count > 0 ? `★${c.rating_average.toFixed(1)}（${c.rating_count}件）` : "評価はまだありません"}
-              </p>
+            <div className="flex items-center gap-3">
+              <CoachAvatar url={c.photo_url} name={c.nickname} />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-white">{c.nickname ?? "名前なし"}</p>
+                <p className="text-xs text-slate-300">{coachTierLabels[c.tier]}</p>
+                <p className="text-xs text-slate-200">
+                  {c.rating_count > 0 ? `★${c.rating_average.toFixed(1)}（${c.rating_count}件）` : "評価はまだありません"}
+                </p>
+              </div>
             </div>
             <dl className="space-y-1.5">
               <div>

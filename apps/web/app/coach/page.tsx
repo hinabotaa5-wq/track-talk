@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachPhotoForm } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -145,7 +146,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
 }
 
 export default function CoachPage() {
-  const { session, token, loading } = useAuth();
+  const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
   const [devices, setDevices] = useState(0);
@@ -222,7 +223,8 @@ export default function CoachPage() {
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-        <div className="flex items-center justify-between gap-3">
+        <CoachPhotoForm application={coach} nickname={profile?.nickname ?? null} token={token} onSaved={setCoach} />
+        <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-3">
           <div>
             <p className="text-lg font-bold">{coach.on_duty ? "受付中" : "受付停止中"}</p>
             <p className="text-xs text-slate-300">受付中の間だけ、添削の依頼が通知で届きます。</p>

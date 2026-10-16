@@ -110,19 +110,20 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 }
 
 const getReviewCoach = `-- name: GetReviewCoach :one
-SELECT p.nickname, c.tier, c.events, c.best_record, c.achievements, c.years
+SELECT p.nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 WHERE c.profile_id = $1
 `
 
 type GetReviewCoachRow struct {
-	Nickname     *string  `json:"nickname"`
-	Tier         string   `json:"tier"`
-	Events       []string `json:"events"`
-	BestRecord   string   `json:"best_record"`
-	Achievements string   `json:"achievements"`
-	Years        int16    `json:"years"`
+	Nickname      *string  `json:"nickname"`
+	PhotoPublicID *string  `json:"photo_public_id"`
+	Tier          string   `json:"tier"`
+	Events        []string `json:"events"`
+	BestRecord    string   `json:"best_record"`
+	Achievements  string   `json:"achievements"`
+	Years         int16    `json:"years"`
 }
 
 // 返答と一緒に利用者へ見せるコーチのプロフィール。
@@ -131,6 +132,7 @@ func (q *Queries) GetReviewCoach(ctx context.Context, profileID uuid.UUID) (GetR
 	var i GetReviewCoachRow
 	err := row.Scan(
 		&i.Nickname,
+		&i.PhotoPublicID,
 		&i.Tier,
 		&i.Events,
 		&i.BestRecord,

@@ -1,5 +1,6 @@
 "use client";
 
+import { CoachAvatar } from "@/components/coach-photo";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -465,9 +466,12 @@ function CoachesAdmin({ token }: { token: string | null }) {
       <ul className="space-y-3">
         {items.map((a) => (
           <li key={a.profile_id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-            <p className="text-xs text-slate-200">
-              {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
-            </p>
+            <div className="flex items-center gap-3">
+              <CoachAvatar url={a.photo_url} name={a.nickname} size={48} />
+              <p className="text-xs text-slate-200">
+                {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
+              </p>
+            </div>
             <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
             <p className="whitespace-pre-wrap">成績: {a.achievements}</p>

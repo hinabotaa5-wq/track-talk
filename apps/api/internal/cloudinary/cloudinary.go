@@ -293,6 +293,14 @@ func (c Client) ImageURL(publicID string) string {
 	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_1600,q_auto,f_auto/" + deliveryPath(publicID)
 }
 
+// AvatarURL は顔写真を正方形に切り抜いた URL を返す。顔が真ん中に来るように切る。
+func (c Client) AvatarURL(publicID string) string {
+	if c.Cloud == "" || publicID == "" {
+		return ""
+	}
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_fill,g_face,w_320,h_320,q_auto,f_auto/" + deliveryPath(publicID)
+}
+
 // CoachingPlaybackURL は非公開の添削動画を再生する署名付き URL を返す。
 // du_30 で、万一長い動画が入っていても30秒までしか配信しない。
 func (c Client) CoachingPlaybackURL(publicID string) string {

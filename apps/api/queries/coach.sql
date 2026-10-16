@@ -36,6 +36,7 @@ SELECT
     c.applied_at,
     c.reviewed_at,
     p.nickname,
+    c.photo_public_id,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -76,6 +77,7 @@ RETURNING *;
 SELECT
     c.profile_id,
     p.nickname,
+    c.photo_public_id,
     c.tier,
     c.events,
     c.best_record,
@@ -93,3 +95,13 @@ CROSS JOIN LATERAL (
 ) r
 WHERE c.status = 'approved'
 ORDER BY c.tier, c.reviewed_at, c.profile_id;
+
+-- name: SetCoachPhoto :one
+-- 顔写真を差し替える。前の写真の ID を返すので、Cloudinary から消す。
+UPDATE coach_profiles c
+SET photo_public_id = sqlc.arg(photo_public_id)::text,
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = sqlc.arg(profile_id)) o
+WHERE c.profile_id = sqlc.arg(profile_id)
+  AND c.status IN ('pending', 'approved')
+RETURNING o.old_photo_public_id;

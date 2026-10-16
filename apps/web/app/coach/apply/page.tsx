@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachPhotoForm } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,7 +50,7 @@ function draftFrom(a: CoachApplication): Draft {
 }
 
 export default function CoachApplyPage() {
-  const { session, token, loading } = useAuth();
+  const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const [application, setApplication] = useState<CoachApplication | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -155,6 +156,10 @@ export default function CoachApplyPage() {
             </p>
           ) : null}
         </section>
+      ) : null}
+
+      {application && (application.status === "pending" || application.status === "approved") ? (
+        <CoachPhotoForm application={application} nickname={profile?.nickname ?? null} token={token} onSaved={setApplication} />
       ) : null}
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
