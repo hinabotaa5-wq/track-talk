@@ -31,6 +31,8 @@ type Config struct {
 	CoachingTickSecret string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
+	// Clock はテストで現在時刻を差し替えるためのもの。nil なら time.Now。
+	Clock func() time.Time
 }
 
 func Load() (Config, error) {
