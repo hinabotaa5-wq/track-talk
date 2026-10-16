@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { productKindLabels } from "@/lib/product";
-import type { AdminCoachApplication, AdminInquiry, AdminReport, CoachStatus, Meta, Product } from "@/lib/types";
+import type { AdminCoachApplication, AdminInquiry, AdminReport, CoachStatus, DemoCode, Meta, Product } from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -263,6 +263,59 @@ function ProductsAdmin({ token }: { token: string | null }) {
   );
 }
 
+// フォーム添削のデモの招待コード。決済ができるまでは、コードを入れた人だけが依頼できる。
+function DemoCodesAdmin({ token }: { token: string | null }) {
+  const [codes, setCodes] = useState<DemoCode[]>([]);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch<{ codes: DemoCode[] }>("/v1/admin/coaching/demo-codes", { token });
+      setCodes(d.codes ?? []);
+    } catch {
+      setMessage("取得に失敗しました");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function create() {
+    try {
+      const created = await apiFetch<DemoCode>("/v1/admin/coaching/demo-codes", { method: "POST", token });
+      setCodes((current) => [created, ...current]);
+      setMessage("");
+    } catch {
+      setMessage("作れませんでした");
+    }
+  }
+
+  return (
+    <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">添削デモの招待コード</h2>
+        <button type="button" onClick={() => void create()} className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+          コードを作る
+        </button>
+      </div>
+      <p className="text-xs text-slate-300">1つのコードは1人だけが使えます。相手に送り、「フォーム添削を頼む」の画面で入れてもらいます。</p>
+      {message ? <p className="text-sm text-slate-200">{message}</p> : null}
+      <ul className="space-y-1 text-sm">
+        {codes.map((c) => (
+          <li key={c.code} className="flex items-center justify-between gap-3">
+            <span className="font-mono tracking-wider">{c.code}</span>
+            <span className="text-xs text-slate-300">
+              {c.used_at ? `使用済み · ${c.used_by_nickname ?? "名前なし"} · ${formatDateTime(c.used_at)}` : "未使用"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 // コーチの応募の審査。審査中の応募を承認か見送りにする。
 function CoachesAdmin({ token }: { token: string | null }) {
   const [status, setStatus] = useState<CoachStatus>("pending");
@@ -302,6 +355,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
 
   return (
     <div className="space-y-3">
+      <DemoCodesAdmin token={token} />
       <div className="flex flex-wrap gap-2">
         {(["pending", "approved", "rejected"] as const).map((s) => (
           <button

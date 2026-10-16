@@ -33,7 +33,7 @@ const chip = (on: boolean) =>
 
 const statusNotes: Record<CoachApplication["status"], string> = {
   pending: "運営が内容を確認しています。審査中は内容を書き直せます。",
-  approved: "応募が承認されました。添削を受け付ける準備ができたら、運営からご案内します。",
+  approved: "応募が承認されました。コーチ画面で受付を始められます。",
   rejected: "今回は見送りになりました。内容を見直して、もう一度応募できます。",
   suspended: "コーチの活動を停止しています。詳しくはお問い合わせください。",
 };
@@ -140,6 +140,11 @@ export default function CoachApplyPage() {
             <span className="ml-2 text-xs font-normal text-slate-300">応募日 {formatDateTime(application.applied_at)}</span>
           </p>
           <p className="text-sm text-slate-100">{statusNotes[application.status]}</p>
+          {application.status === "approved" ? (
+            <Link href="/coach" className="text-sm text-blue-300 underline">
+              コーチ画面へ
+            </Link>
+          ) : null}
           {application.status === "pending" ? (
             <p className="text-xs text-slate-300">
               結果を通知で受け取るには、

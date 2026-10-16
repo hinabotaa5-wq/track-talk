@@ -254,6 +254,7 @@ export type CoachingMe = {
   is_minor: boolean | null;
   guardian: CoachingGuardian | null;
   push_devices: number;
+  demo: boolean;
 };
 
 export type GuardianPublic = CoachingGuardian & {
@@ -297,6 +298,31 @@ export type CoachApplication = {
   status: CoachStatus;
   applied_at: string;
   reviewed_at: string | null;
+  on_duty: boolean;
+  daily_cap: number;
+};
+
+export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
+export type ReviewStatus = "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired" | "canceled";
+
+export type ReviewRequest = {
+  id: string;
+  tier: CoachTier;
+  event: CoachEvent;
+  focus: ReviewFocus[];
+  status: ReviewStatus;
+  due_at: string;
+  created_at: string;
+  canceled_at: string | null;
+  video_url: string;
+  thumbnail_url: string;
+};
+
+export type DemoCode = {
+  code: string;
+  created_at: string;
+  used_at: string | null;
+  used_by_nickname: string | null;
 };
 
 export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
