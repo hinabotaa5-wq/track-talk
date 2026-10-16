@@ -3,7 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Globe, MapPin } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { motion, MotionConfig } from "motion/react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
@@ -29,9 +30,17 @@ const entries = [
 ];
 
 export function CompetitionsHome() {
-  const router = useRouter();
   const sp = useSearchParams();
   const view: View = sp.get("view") === "international" ? "international" : "domestic";
+  // 一度開いた一覧は消さずに隠しておき、行き来しても読み込み直さない。
+  const [opened, setOpened] = useState<Set<View>>(() => new Set([view]));
+
+  // router.replace だとサーバーまで取りに行って「読み込み中」が挟まるので、URL だけ書き換えてその場で切り替える。
+  function select(next: View) {
+    if (next === view) return;
+    setOpened((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
+    window.history.replaceState(null, "", next === "domestic" ? "/competitions" : "/competitions?view=international");
+  }
 
   return (
     <RequireSession>
@@ -53,25 +62,47 @@ export function CompetitionsHome() {
             );
           })}
         </nav>
-        <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
-          {views.map((item) => {
-            const active = item.id === view;
-            return (
-              <button
+        <MotionConfig reducedMotion="user">
+          <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
+            {views.map((item) => {
+              const active = item.id === view;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => select(item.id)}
+                  className={`relative h-10 rounded-full text-sm font-semibold transition-colors duration-200 active:scale-95 ${
+                    active ? "text-white" : "text-slate-200 hover:text-white"
+                  }`}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="competition-view-pill"
+                      className="absolute inset-0 rounded-full bg-white/25"
+                      transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <span className="relative">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {views.map((item) =>
+            opened.has(item.id) || item.id === view ? (
+              <motion.div
                 key={item.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => router.replace(item.id === "domestic" ? "/competitions" : "/competitions?view=international")}
-                className={`h-10 rounded-full text-sm font-semibold transition active:scale-95 ${
-                  active ? "bg-white/25 text-white" : "text-slate-200 hover:text-white"
-                }`}
+                hidden={item.id !== view}
+                initial={{ opacity: 0, y: 8 }}
+                animate={item.id === view ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-        {view === "domestic" ? <DomesticSchedule /> : <InternationalSchedule />}
+                {item.id === "domestic" ? <DomesticSchedule /> : <InternationalSchedule />}
+              </motion.div>
+            ) : null,
+          )}
+        </MotionConfig>
       </div>
     </RequireSession>
   );

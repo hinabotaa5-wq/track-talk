@@ -24,8 +24,10 @@ export default function UploadPage() {
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中…</p>;
 
   // ホームの「＋」から開く詳細画面。下のメニューは出さないので、その分まで5つの入口で埋める。
+  // dvh だと、iPhone の Safari で画面を開いた直後に下のツールバーが出てきた分だけ高さが縮み、
+  // 5つの入口が上にギュッと詰まる。ツールバーが出ている時の高さ(svh)で固定して動かさない。
   return (
-    <div className="flex h-[calc(100dvh-7.125rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3 md:h-auto">
+    <div className="flex h-[calc(100svh-7.125rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3 md:h-auto">
       <h1 className="text-xl font-bold">何を投稿しますか?</h1>
       <div className="grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
         {doors.map((door) => (
