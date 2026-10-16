@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -79,6 +80,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/push/public-key", s.pushPublicKey)
 		r.Get("/coaches", s.listCoaches)
+		r.Get("/menu-contest", s.getMenuContest)
 		// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
 		r.Get("/guardian/{token}", s.getGuardian)
 		r.Post("/guardian/{token}/consent", s.consentGuardian)
@@ -101,6 +103,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/me/sense-notes", s.createSenseNote)
 			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)
+			r.Put("/menu-contest/entry", s.saveMenuContestEntry)
+			r.Delete("/menu-contest/entry", s.deleteMenuContestEntry)
+			r.Put("/menu-contest/vote", s.voteMenuContest)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)
@@ -183,9 +188,19 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/coaching/responses/{id}/hide", s.hideReviewResponse)
 			r.Post("/admin/coaching/coaches/{id}/reset-rating", s.resetCoachRating)
 			r.Delete("/admin/coaching/coaches/{id}/photo", s.removeCoachPhoto)
+			r.Get("/admin/menu-contest", s.adminMenuContest)
+			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
 		})
 	})
 	return r
+}
+
+// now は現在時刻。テストでは設定の Clock で差し替える。
+func (s *Server) now() time.Time {
+	if s.cfg.Clock != nil {
+		return s.cfg.Clock()
+	}
+	return time.Now()
 }
 
 func (s *Server) present(p postDTO) postDTO {

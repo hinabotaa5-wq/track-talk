@@ -40,6 +40,9 @@ func TestRecruitmentAndPracticeTablesHaveRLS(t *testing.T) {
 		"review_responses",
 		"review_ratings",
 		"sense_notes",
+		"menu_contest_entries",
+		"menu_contest_finalists",
+		"menu_contest_votes",
 	}
 	rows, err := pool.Query(ctx, `
 		SELECT c.relname

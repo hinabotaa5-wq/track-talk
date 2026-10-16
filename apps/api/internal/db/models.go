@@ -169,6 +169,29 @@ type MajorHost struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type MenuContestEntry struct {
+	ID         uuid.UUID `json:"id"`
+	RoundStart time.Time `json:"round_start"`
+	AuthorID   uuid.UUID `json:"author_id"`
+	Body       string    `json:"body"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type MenuContestFinalist struct {
+	RoundStart time.Time `json:"round_start"`
+	EntryID    uuid.UUID `json:"entry_id"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type MenuContestVote struct {
+	RoundStart time.Time `json:"round_start"`
+	VoterID    uuid.UUID `json:"voter_id"`
+	EntryID    uuid.UUID `json:"entry_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type Notification struct {
 	ID              uuid.UUID  `json:"id"`
 	RecipientID     uuid.UUID  `json:"recipient_id"`

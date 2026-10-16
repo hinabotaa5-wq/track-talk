@@ -37,6 +37,7 @@ export function showsBackButton(pathname: string) {
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
   if (pathname === "/competitions/regional") return true;
+  if (pathname === "/menu-contest") return true;
   if (/^\/injury\/[^/]+\/new$/.test(pathname)) return true;
   if (pathname.startsWith("/posts/")) return true;
   if (pathname.startsWith("/reviews/")) return true;

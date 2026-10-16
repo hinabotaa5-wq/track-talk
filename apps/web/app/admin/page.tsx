@@ -2,6 +2,7 @@
 
 import { CoachAvatar } from "@/components/coach-photo";
 import { useAuth } from "@/components/auth-provider";
+import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -81,7 +82,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   );
 }
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "menu";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   const [items, setItems] = useState<T[]>([]);
@@ -547,7 +548,7 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const custom = tab === "products" || tab === "coaches";
+  const custom = tab === "products" || tab === "coaches" || tab === "menu";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
@@ -556,6 +557,7 @@ export default function AdminPage() {
     { id: "requests", label: "商品リクエスト", total: requests.total },
     { id: "products", label: "商品", total: -1 },
     { id: "coaches", label: "コーチ", total: -1 },
+    { id: "menu", label: "エグ練", total: -1 },
   ];
 
   return (
@@ -579,6 +581,7 @@ export default function AdminPage() {
       </div>
       {tab === "products" ? <ProductsAdmin token={token} /> : null}
       {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
+      {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
       {custom ? null : tab === "reports" ? (
         <ul className="space-y-3">
