@@ -83,9 +83,10 @@ export default function DeleteAccountPage() {
         <p className="text-sm text-slate-300">退会すると、次のデータが削除され、元に戻せません。</p>
       </div>
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
-        <li>あなたの投稿、コメント、いいね、保存、通知</li>
+        <li>あなたの投稿、コメント、レビュー、いいね、保存、通知</li>
+        <li>ケガのグループへの参加、回答、段階の記録と一言</li>
         <li>練習への参加と評価。あなたが作った練習の投稿も削除されます</li>
-        <li>お問い合わせと、あなたが送った通報</li>
+        <li>お問い合わせ（コーチの応募と商品のリクエストを含みます）と、あなたが送った通報</li>
         <li>ログインに使うアカウント</li>
       </ul>
       <p className="text-sm text-slate-300">
