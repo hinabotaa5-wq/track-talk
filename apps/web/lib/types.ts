@@ -351,8 +351,25 @@ export type CoachingContract = {
   ends_at: string | null;
   created_at: string;
   role?: "requester" | "coach";
+  rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };
   requester?: { nickname: string | null };
+};
+
+// コーチが送る練習メニュー。
+export type PlanMenu = { title: string; days: { day: string; content: string }[] };
+
+// パーソナル指導のやりとり欄の1通。
+export type CoachingMessage = {
+  id: string;
+  sender_role: "requester" | "coach" | "guardian";
+  mine: boolean;
+  sender_active: boolean;
+  body: string;
+  video_url: string | null;
+  thumbnail_url: string | null;
+  menu: PlanMenu | null;
+  created_at: string;
 };
 
 // 申し込む画面に出すプランとコーチ。

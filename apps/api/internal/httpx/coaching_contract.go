@@ -303,6 +303,13 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 	c["role"] = role
 	c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 	c["requester"] = map[string]any{"nickname": row.RequesterNickname}
+	c["rating"] = nil
+	if rt, err := s.q.GetCoachingContractRating(r.Context(), row.ID); err == nil {
+		c["rating"] = map[string]any{"stars": rt.Stars, "rated_at": rt.RatedAt}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{"contract": c})
 }
 

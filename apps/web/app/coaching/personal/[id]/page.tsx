@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
+import { CoachingMessages } from "@/components/coaching-messages";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabels } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
@@ -12,7 +13,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// パーソナル指導の1件。申し込んだ人とコーチが見る。やりとり欄は次の段階で足す。
+// パーソナル指導の1件。申し込んだ人とコーチが見る。期間中と終わったあとは、やりとり欄を出す。
 export default function CoachingContractPage() {
   const { id } = useParams<{ id: string }>();
   const { session, token, loading } = useAuth();
@@ -83,11 +84,8 @@ export default function CoachingContractPage() {
         {contract.starts_at ? <p className="text-sm text-slate-200">期間: {contractPeriod(contract)}</p> : null}
       </section>
 
-      {contract.status === "active" ? (
-        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">
-          {contract.minor ? "保護者も参加しています。" : "このやりとりは、あなたとコーチだけが見られます。通報があったときだけ運営が確認します。"}
-          やりとり欄はもうすぐ使えるようになります。
-        </p>
+      {contract.status === "active" || contract.status === "ended" ? (
+        <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
       ) : null}
 
       {!isCoach && contract.status === "applied" ? (
