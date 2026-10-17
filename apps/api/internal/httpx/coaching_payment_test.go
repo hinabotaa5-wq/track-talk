@@ -23,6 +23,15 @@ type fakeStripe struct {
 	mu       sync.Mutex
 	sessions []url.Values
 	refunds  []url.Values
+	// 仮押さえの確定・取り消しを受けた PaymentIntent。
+	captured []string
+	canceled []string
+}
+
+func (f *fakeStripe) calls() (captured, canceled []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.captured...), append([]string(nil), f.canceled...)
 }
 
 func (f *fakeStripe) lastSession() url.Values {
@@ -48,15 +57,31 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 		_ = r.ParseForm()
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		switch r.URL.Path {
-		case "/v1/checkout/sessions":
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/payment_intents/"):
+			// テストでは、pi_card で始まるものを仮押さえ済み、それ以外を確定済みとして答える。
+			id := strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/")
+			status := "succeeded"
+			if strings.HasPrefix(id, "pi_card") {
+				status = "requires_capture"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": status})
+		case strings.HasSuffix(r.URL.Path, "/capture"):
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/"), "/capture")
+			f.captured = append(f.captured, id)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "succeeded"})
+		case strings.HasSuffix(r.URL.Path, "/cancel"):
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/"), "/cancel")
+			f.canceled = append(f.canceled, id)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
+		case r.URL.Path == "/v1/checkout/sessions":
 			f.sessions = append(f.sessions, r.PostForm)
 			n := len(f.sessions)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": fmt.Sprintf("cs_test_%d_%s", n, r.PostForm.Get("client_reference_id")), "url": fmt.Sprintf("https://checkout.stripe.test/%d", n),
 				"expires_at": json.Number(r.PostForm.Get("expires_at")),
 			})
-		case "/v1/refunds":
+		case r.URL.Path == "/v1/refunds":
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
 		default:

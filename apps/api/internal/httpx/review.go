@@ -208,6 +208,8 @@ type reviewRequestReq struct {
 	Event         string   `json:"event"`
 	Focus         []string `json:"focus"`
 	VideoPublicID string   `json:"video_public_id"`
+	// 支払い方法（card か paypay）。Stripe の鍵があるときだけ使う。
+	Method string `json:"method"`
 }
 
 func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
@@ -238,6 +240,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
+	payments := s.stripe.Configured()
+	if payments && !validReviewPayMethod(req.Method) {
+		fields["method"] = "支払い方法を選んでください"
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -250,6 +256,17 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		if code, message := s.minorRequestBlock(r, p.ID); code != "" {
 			Error(w, http.StatusUnprocessableEntity, code, message)
 			return
+		}
+		if payments {
+			msg, err := s.minorMonthlyBlock(r.Context(), p.ID, uuid.Nil, reviewPrices[req.Tier])
+			if err != nil {
+				MapDBError(w, err)
+				return
+			}
+			if msg != "" {
+				Error(w, http.StatusUnprocessableEntity, "monthly_limit", msg)
+				return
+			}
 		}
 	}
 	if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
@@ -270,14 +287,31 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Focus:         focus,
 		VideoPublicID: req.VideoPublicID,
 		DueAt:         due,
+		// 支払いがあるときは、支払いが届いてから割り当てを始める。
+		Status: map[bool]string{true: "awaiting_payment", false: "queued"}[payments],
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		Error(w, http.StatusConflict, "conflict", "この動画はもう送っています")
+		Error(w, http.StatusConflict, "conflict", "この動画はもう送っています（お支払いがまだなら、送った依頼の一覧から払えます）")
 		return
 	}
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	if payments {
+		url, err := s.reviewCheckoutURL(r.Context(), rr, req.Method)
+		if err != nil {
+			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
+			if derr := s.q.DeleteAwaitingReviewRequest(r.Context(), rr.ID); derr != nil {
+				slog.Warn("delete unpaid review request", "err", derr)
+			}
+			writeCheckoutError(w, err)
+			return
+		}
+		out := s.reviewRequestJSON(rr)
+		out["checkout_url"] = url
+		JSON(w, http.StatusCreated, out)
 		return
 	}
 	if offered, err := s.offerReview(r.Context(), rr.ID); err != nil {

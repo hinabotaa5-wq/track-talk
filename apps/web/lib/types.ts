@@ -461,7 +461,7 @@ export type PublicCoachingPlan = {
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
-export type ReviewStatus = "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired";
+export type ReviewStatus = "awaiting_payment" | "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired";
 
 export type ClarifyReason = "term" | "drill" | "fix" | "other";
 export type HelpfulAnswer = "yes" | "some" | "no";
@@ -503,6 +503,23 @@ export type ReviewRequest = {
   rating?: ReviewRating | null;
   // 返答が届いたあとにだけ入る。
   coach?: ReviewCoach | null;
+  // 詳細を開いたときだけ付く。支払い画面を開いただけのものは含まない。
+  payment?: ReviewPayment | null;
+  // 送った直後と、支払い画面を開き直したときだけ付く。
+  checkout_url?: string;
+};
+
+// 支払い方法。card は Apple Pay・Google Pay を含む（仮押さえして返却で確定）。paypay はその場で払う。
+export type ReviewPayMethod = "card" | "paypay";
+
+export type ReviewPayment = {
+  method: ReviewPayMethod;
+  amount_yen: number;
+  // authorized: 仮押さえ中。captured: 確定。canceled: 取り消し。refunded: 返金。
+  status: "authorized" | "captured" | "canceled" | "refunded";
+  captured_at: string | null;
+  canceled_at: string | null;
+  refunded_at: string | null;
 };
 
 export type CoachProbationResponse = {
@@ -540,6 +557,9 @@ export type CoachRequests = {
 export type ReviewEstimate = {
   due_at: string;
   coaches_on_duty: boolean;
+  // false のあいだは支払いなしのデモ版。
+  payments: boolean;
+  price_yen: number;
 };
 
 export type DemoCode = {
