@@ -118,7 +118,7 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, vie
 
 // messagesVisible は、やりとり欄を読める状態か。止めている間も、それまでのものは読める。
 func messagesVisible(status string) bool {
-	return status == "active" || status == "suspended" || status == "ended"
+	return status == "active" || status == "suspended" || status == "ended" || status == "refunded"
 }
 
 func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, viewer uuid.UUID, viewerRole string) {

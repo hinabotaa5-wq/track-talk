@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { SuspendToggle } from "@/components/coaching-admin";
 import { ContractDetails, contractPeriod } from "@/components/coaching-contracts";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabels } from "@/lib/coaching-plan";
+import { contractStatusLabel } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
 import type { CoachingAccessLog, CoachingContract, CoachingMessage } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -82,7 +82,7 @@ function OpenContract() {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">パーソナル指導のやりとり</h1>
         <p className="text-sm font-semibold text-blue-300">
-          {contractStatusLabels[c.status]}
+          {contractStatusLabel(c)}
           {c.minor ? " · 18歳未満" : ""}
         </p>
       </div>

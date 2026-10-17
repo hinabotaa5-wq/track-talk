@@ -155,6 +155,8 @@ type coachingTickResult struct {
 	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
 	ContractsExpired int `json:"contracts_expired"`
 	ContractsEnded   int `json:"contracts_ended"`
+	// 支払い: 自動で返金したもの（コーチが72時間書かなかった、始まらなかった）。
+	PaymentsRefunded int `json:"payments_refunded"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
@@ -179,6 +181,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.ContractsExpired, out.ContractsEnded, err = s.closeCoachingContracts(ctx); err != nil {
+		return out, err
+	}
+	if out.PaymentsRefunded, err = s.refundCoachingPayments(ctx); err != nil {
 		return out, err
 	}
 	return out, nil

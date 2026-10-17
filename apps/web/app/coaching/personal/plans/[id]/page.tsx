@@ -16,8 +16,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-// パーソナル指導に申し込む。決済ができるまではデモ版で、招待コードを入れた人だけが申し込める。
-// コーチが48時間以内に承諾すると期間が始まる。
+// パーソナル指導に申し込む。いまは招待コードを入れた人だけが申し込める。
+// コーチが48時間以内に承諾し、72時間以内に支払う（18歳未満は保護者が同意して支払う）と期間が始まる。
+// Stripe の鍵がない間は支払いなしのデモ版で、承諾したら始まる。
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
@@ -111,9 +112,11 @@ export default function ApplyCoachingPlanPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
-          デモ版
-        </p>
+        {data.payments ? null : (
+          <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+            デモ版
+          </p>
+        )}
         <h1 className="text-2xl font-bold">パーソナル指導に申し込む</h1>
       </div>
 
@@ -196,7 +199,11 @@ export default function ApplyCoachingPlanPage() {
           </label>
           <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
           <p className="text-xs text-slate-300">
-            コーチが48時間以内に引き受けると、その時から期間が始まります。デモ版なので支払いはありません。
+            {!data.payments
+              ? "コーチが48時間以内に引き受けると、その時から期間が始まります。デモ版なので支払いはありません。"
+              : me.is_minor
+                ? "コーチが48時間以内に引き受けたら、保護者が72時間以内に同意してお支払いをすると、その時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"
+                : "コーチが48時間以内に引き受けたら、72時間以内にお支払いください（カード・Apple Pay・Google Pay・PayPay）。支払った時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"}
           </p>
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           <Button

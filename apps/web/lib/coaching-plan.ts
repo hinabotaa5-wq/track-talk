@@ -47,11 +47,21 @@ export const contractStatusLabels: Record<CoachingContractStatus, string> = {
   active: "期間中",
   suspended: "運営が止めています",
   ended: "終わりました",
+  refunded: "返金して終了しました",
   declined: "今回は受けられませんでした",
   guardian_declined: "保護者が同意しませんでした",
-  expired: "返事がないまま期限が過ぎました",
+  expired: "期限が過ぎました",
   cancelled: "取り下げました",
 };
+
+// contractStatusLabel は、支払いがあるかと年齢で変わる「承諾済み・始まる前」の表示を含めた状態の名前。
+export function contractStatusLabel(c: { status: CoachingContractStatus; minor: boolean; payment_required: boolean }): string {
+  if (c.status === "accepted") {
+    if (c.minor && c.payment_required) return "保護者の同意とお支払い待ち";
+    if (c.payment_required) return "お支払い待ち";
+  }
+  return contractStatusLabels[c.status];
+}
 
 // 契約を始めるときの同意。利用者は申し込みで、コーチは承諾で、それぞれ別にチェックする。
 // 文面を変えたら API の contractConsentVersion を上げる。

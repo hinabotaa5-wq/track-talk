@@ -61,15 +61,17 @@ UNION ALL
 ORDER BY created_at DESC;
 
 -- name: AcceptCoachingContract :one
--- 返事待ちで期限内のものだけ承諾できる。デモ版なので、大人は承諾したらそのまま期間が始まる。
--- 18歳未満は、保護者が72時間以内にこの契約に同意したら始まる。
+-- 返事待ちで期限内のものだけ承諾できる。
+-- 支払いがあるとき（payment_required）は、72時間以内に支払いが済んだら始まる（18歳未満は保護者が同意して払う）。
+-- デモ版（支払いなし）は、大人は承諾したらそのまま期間が始まり、18歳未満は保護者が72時間以内に同意したら始まる。
 -- 同じプランで枠を使っている人数が上限に届いていたら承諾できない（行が返らない）。
 UPDATE coaching_contracts ct
-SET status = CASE WHEN ct.minor THEN 'accepted' ELSE 'active' END,
+SET status = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN 'accepted' ELSE 'active' END,
+    payment_required = sqlc.arg(payment_required)::boolean,
     responded_at = now(),
-    start_by = CASE WHEN ct.minor THEN now() + interval '72 hours' END,
-    starts_at = CASE WHEN ct.minor THEN NULL ELSE now() END,
-    ends_at = CASE WHEN ct.minor THEN NULL ELSE now() + make_interval(days => ct.duration_days) END,
+    start_by = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN now() + interval '72 hours' END,
+    starts_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() END,
+    ends_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days) END,
     updated_at = now()
 FROM coaching_plans pl
 WHERE ct.id = sqlc.arg(id)
@@ -105,7 +107,7 @@ WHERE status = 'applied' AND respond_by <= now()
 RETURNING *;
 
 -- name: ExpireCoachingStarts :many
--- 承諾から72時間のうちに保護者が同意しなかったものを閉じる。
+-- 承諾から72時間のうちに保護者の同意（支払いがあるときは支払い）がなかったものを閉じる。
 UPDATE coaching_contracts
 SET status = 'expired',
     updated_at = now()
@@ -143,14 +145,14 @@ ORDER BY ct.created_at DESC
 LIMIT 50;
 
 -- name: GuardianStartCoachingContract :one
--- 保護者がこの契約に同意したら、その時から期間が始まる。
+-- デモ版（支払いなし）では、保護者がこの契約に同意したら、その時から期間が始まる。
 UPDATE coaching_contracts
 SET status = 'active',
     starts_at = now(),
     ends_at = now() + make_interval(days => duration_days),
     start_by = NULL,
     updated_at = now()
-WHERE id = $1 AND requester_id = $2 AND minor AND status = 'accepted' AND start_by > now()
+WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now()
 RETURNING *;
 
 -- name: GuardianDeclineCoachingContract :one
@@ -184,7 +186,10 @@ RETURNING *;
 -- 運営の契約一覧。会話の中身は含めない。通報の数と、連絡先の検出で止めた回数だけ数える。
 SELECT
     ct.id, ct.plan_title, ct.plan_kind, ct.duration_days, ct.price_yen, ct.minor, ct.status,
-    ct.starts_at, ct.ends_at, ct.created_at,
+    ct.starts_at, ct.ends_at, ct.created_at, ct.payment_required,
+    COALESCE((SELECT pay.status FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status <> 'pending'
+     ORDER BY pay.refund_reason IS NOT DISTINCT FROM 'not_started', pay.paid_at DESC LIMIT 1), '')::text AS payment_status,
+    COALESCE((SELECT sum(pay.refunded_yen) FROM coaching_payments pay WHERE pay.contract_id = ct.id), 0)::int AS refunded_yen,
     rp.nickname AS requester_nickname,
     cp.nickname AS coach_nickname,
     (SELECT count(*) FROM reports r JOIN coaching_messages m ON m.id = r.target_id

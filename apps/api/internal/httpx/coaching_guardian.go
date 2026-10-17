@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -68,30 +69,56 @@ func (s *Server) listGuardianContracts(w http.ResponseWriter, r *http.Request) {
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
+		c["guardian_consented"] = false
+		if row.Status == "accepted" {
+			consented, err := s.q.HasGuardianContractConsent(r.Context(), row.ID)
+			if err != nil {
+				MapDBError(w, err)
+				return
+			}
+			c["guardian_consented"] = consented
+		}
 		out = append(out, c)
 	}
 	JSON(w, http.StatusOK, map[string]any{"contracts": out})
 }
 
-func (s *Server) writeGuardianContract(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	row, err := s.q.GetCoachingContractDetail(r.Context(), id)
+// guardianContractJSON は、保護者に見せる契約。保護者がこの契約に同意したかと、支払いをつける。
+func (s *Server) guardianContractJSON(ctx context.Context, id uuid.UUID) (map[string]any, error) {
+	row, err := s.q.GetCoachingContractDetail(ctx, id)
 	if err != nil {
-		MapDBError(w, err)
-		return
+		return nil, err
 	}
 	c := s.contractJSON(db.CoachingContract{
 		ID: row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
+		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired,
 	})
 	c["role"] = "guardian"
 	c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 	c["requester"] = map[string]any{"nickname": row.RequesterNickname}
+	consented, err := s.q.HasGuardianContractConsent(ctx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	c["guardian_consented"] = consented
+	if err := s.attachPayment(ctx, c, row.ID); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *Server) writeGuardianContract(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	c, err := s.guardianContractJSON(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{"contract": c})
 }
 
@@ -116,6 +143,10 @@ func (s *Server) consentGuardianContract(w http.ResponseWriter, r *http.Request)
 	}
 	if fields := req.fields(); len(fields) > 0 {
 		FieldError(w, fields)
+		return
+	}
+	if ct.PaymentRequired {
+		s.consentAndCheckoutGuardian(w, r, ct)
 		return
 	}
 	var started db.CoachingContract
@@ -246,4 +277,36 @@ func (s *Server) reportGuardianMessage(w http.ResponseWriter, r *http.Request) {
 	s.notifyAdminsMinorReport(r.Context())
 	// 通報の行には子の ID が入るので返さない。
 	JSON(w, http.StatusCreated, map[string]any{"reported": true})
+}
+
+// consentAndCheckoutGuardian は、支払いがある契約で、保護者が同意して支払い画面へ進む。
+// 期間は支払いが済んだ時から始まる。同意は1回だけ記録し、支払い画面は開き直せる。
+func (s *Server) consentAndCheckoutGuardian(w http.ResponseWriter, r *http.Request, ct db.CoachingContract) {
+	if !checkoutOpen(w, ct) {
+		return
+	}
+	consented, err := s.q.HasGuardianContractConsent(r.Context(), ct.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if !consented {
+		if err := s.q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
+			ContractID: ct.ID, Party: "guardian", ProfileID: nil, Version: contractConsentVersion,
+		}); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
+	url, err := s.guardianCheckoutURL(r.Context(), ct)
+	if err != nil {
+		writeCheckoutError(w, err)
+		return
+	}
+	c, err := s.guardianContractJSON(r.Context(), ct.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"contract": c, "checkout_url": url})
 }

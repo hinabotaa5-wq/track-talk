@@ -1,9 +1,9 @@
 "use client";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabels, formatPlanPrice } from "@/lib/coaching-plan";
+import { contractStatusLabel, formatPlanPrice } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
-import type { AdminCoachingContract, CoachingBlockedAccount, CoachingContractStatus } from "@/lib/types";
+import type { AdminCoachingContract, CoachingBlockedAccount, CoachingContractStatus, CoachingPayment } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useState } from "react";
 
@@ -53,6 +53,64 @@ export function SuspendToggle({
   );
 }
 
+const paymentLabels: Record<AdminCoachingContract["payment_status"], string> = {
+  "": "まだ払われていません",
+  paid: "支払い済み",
+  refunded: "全額返金済み",
+  partially_refunded: "一部返金済み",
+};
+
+// RefundButtons は、運営の返金。全額か、期間中なら残りの日数分。返金すると期間中のものは終わる。
+function RefundButtons({
+  contract,
+  token,
+  onChange,
+}: {
+  contract: AdminCoachingContract;
+  token: string | null;
+  onChange: (c: Partial<AdminCoachingContract>) => void;
+}) {
+  const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
+  if (contract.payment_status !== "paid") return null;
+  const running = contract.status === "active" || contract.status === "suspended";
+
+  async function refund(kind: "full" | "remaining") {
+    const ask =
+      kind === "full"
+        ? `${formatPlanPrice(contract.price_yen)}を全額返金しますか？${running ? "期間中のものは、ここで終わります。" : ""}`
+        : "残りの日数分を返金して、ここで終わりにしますか？";
+    if (!window.confirm(ask)) return;
+    if (!acquire()) return;
+    setError("");
+    try {
+      const d = await apiFetch<{ contract: { status: CoachingContractStatus }; payment: CoachingPayment }>(
+        `/v1/admin/coaching/contracts/${contract.id}/refund`,
+        { method: "POST", token, body: JSON.stringify({ kind }) },
+      );
+      onChange({ status: d.contract.status, payment_status: d.payment.status, refunded_yen: d.payment.refunded_yen });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "返金できませんでした");
+    } finally {
+      release();
+    }
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-3">
+      <button type="button" disabled={pending} onClick={() => void refund("full")} className="text-sm text-red-300 underline">
+        全額を返金
+      </button>
+      {running ? (
+        <button type="button" disabled={pending} onClick={() => void refund("remaining")} className="text-sm text-red-300 underline">
+          残りの日数分を返金
+        </button>
+      ) : null}
+      {error ? <span className="text-xs text-red-400">{error}</span> : null}
+    </span>
+  );
+}
+
 export function CoachingContractsAdmin({ token }: { token: string | null }) {
   const [data, setData] = useState<{ contracts: AdminCoachingContract[]; blocked_accounts: CoachingBlockedAccount[] } | null>(null);
   const [error, setError] = useState("");
@@ -82,8 +140,8 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (!data) return <p className="text-sm text-slate-200">読み込み中...</p>;
 
-  function setStatus(id: string, status: CoachingContractStatus) {
-    setData((d) => (d ? { ...d, contracts: d.contracts.map((c) => (c.id === id ? { ...c, status } : c)) } : d));
+  function patch(id: string, change: Partial<AdminCoachingContract>) {
+    setData((d) => (d ? { ...d, contracts: d.contracts.map((c) => (c.id === id ? { ...c, ...change } : c)) } : d));
   }
 
   return (
@@ -98,7 +156,7 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
           {data.contracts.map((c) => (
             <li key={c.id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
               <p className="text-xs text-slate-200">
-                {contractStatusLabels[c.status]} · {formatPlanPrice(c.price_yen)} · 申し込み {formatDateTime(c.created_at)}
+                {contractStatusLabel(c)} · {formatPlanPrice(c.price_yen)} · 申し込み {formatDateTime(c.created_at)}
                 {c.minor ? " · 18歳未満" : ""}
               </p>
               <p className="font-semibold text-white">{c.plan_title}</p>
@@ -113,7 +171,16 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
               <p className={`text-xs ${c.report_count > 0 ? "text-amber-200" : "text-slate-300"}`}>
                 通報 {c.report_count}件 · 連絡先で止めた回数 利用者 {c.requester_blocked} / コーチ {c.coach_blocked}
               </p>
-              <SuspendToggle id={c.id} status={c.status} token={token} onChange={(s) => setStatus(c.id, s)} />
+              {c.payment_required ? (
+                <p className="text-xs text-slate-300">
+                  {paymentLabels[c.payment_status]}
+                  {c.refunded_yen > 0 ? `（返金 ${formatPlanPrice(c.refunded_yen)}）` : ""}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                <SuspendToggle id={c.id} status={c.status} token={token} onChange={(status) => patch(c.id, { status })} />
+                <RefundButtons contract={c} token={token} onChange={(change) => patch(c.id, change)} />
+              </div>
             </li>
           ))}
         </ul>

@@ -11,6 +11,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,6 +24,7 @@ type Server struct {
 	limit     *RateLimiter
 	cloud     cloudinary.Client
 	push      push.Sender
+	stripe    stripe.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -47,6 +49,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			PrivateKey: cfg.VAPIDPrivateKey,
 			Subject:    cfg.VAPIDSubject,
 		},
+		stripe: stripe.Client{
+			Secret:  cfg.StripeSecretKey,
+			APIBase: cfg.StripeAPIBase,
+		},
 	}
 	if cfg.PushHTTP != nil {
 		s.push.HTTP = cfg.PushHTTP
@@ -66,6 +72,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.Get("/health", s.health)
 	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
 	r.Post("/internal/coaching/tick", s.coachingTick)
+	r.Post("/webhooks/stripe", s.stripeWebhook)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
@@ -92,6 +99,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/guardian/{token}/contracts/{id}", s.getGuardianContract)
 		r.Post("/guardian/{token}/contracts/{id}/consent", s.consentGuardianContract)
 		r.Post("/guardian/{token}/contracts/{id}/decline", s.declineGuardianContract)
+		r.Post("/guardian/{token}/contracts/{id}/checkout", s.checkoutGuardianContract)
 		r.Get("/guardian/{token}/contracts/{id}/messages", s.listGuardianMessages)
 		r.Post("/guardian/{token}/contracts/{id}/messages", s.createGuardianMessage)
 		r.Post("/guardian/{token}/messages/{mid}/report", s.reportGuardianMessage)
@@ -140,6 +148,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/coaching/contracts", s.createCoachingContract)
 			r.Get("/coaching/contracts/{id}", s.getCoachingContract)
 			r.Post("/coaching/contracts/{id}/cancel", s.cancelCoachingContract)
+			r.Post("/coaching/contracts/{id}/checkout", s.checkoutCoachingContract)
 			r.Get("/coaching/contracts/{id}/messages", s.listCoachingMessages)
 			r.Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
 			r.Post("/coaching/contracts/{id}/rating", s.rateCoachingContract)
@@ -214,6 +223,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/coaching/contracts/{id}", s.adminOpenCoachingContract)
 			r.Post("/admin/coaching/contracts/{id}/suspend", s.adminSuspendCoachingContract)
 			r.Post("/admin/coaching/contracts/{id}/resume", s.adminResumeCoachingContract)
+			r.Post("/admin/coaching/contracts/{id}/refund", s.adminRefundCoachingContract)
 			r.Get("/admin/menu-contest", s.adminMenuContest)
 			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
 		})

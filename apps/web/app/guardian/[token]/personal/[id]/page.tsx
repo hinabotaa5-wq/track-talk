@@ -4,7 +4,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { ContractDetails, contractPeriod } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabels } from "@/lib/coaching-plan";
+import { contractStatusLabel } from "@/lib/coaching-plan";
 import type { CoachingContract } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -37,7 +37,7 @@ export default function GuardianContractPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">パーソナル指導（保護者）</h1>
-        <p className="text-sm font-semibold text-blue-300">{contractStatusLabels[contract.status]}</p>
+        <p className="text-sm font-semibold text-blue-300">{contractStatusLabel(contract)}</p>
       </div>
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
         {contract.coach ? (
@@ -49,7 +49,7 @@ export default function GuardianContractPage() {
         <ContractDetails contract={contract} />
         {contract.starts_at ? <p className="text-sm text-slate-200">期間: {contractPeriod(contract)}</p> : null}
       </section>
-      {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" ? (
+      {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={null} guardianToken={token} onContractChange={setContract} />
       ) : null}
       <Link href={`/guardian/${encodeURIComponent(token)}`} className="block text-center text-sm text-blue-300 underline">

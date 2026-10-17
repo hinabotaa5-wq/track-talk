@@ -61,7 +61,9 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
 	JSON(w, http.StatusOK, map[string]any{
-		"plan": plan,
+		// payments が false のあいだは、支払いなしのデモ版。
+		"payments": s.stripe.Configured(),
+		"plan":     plan,
 		"coach": map[string]any{
 			"id":        p.CoachID,
 			"nickname":  p.CoachNickname,
@@ -203,25 +205,26 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 // contractJSON は、申し込みの中身。相手の名前などは呼ぶ側で足す。
 func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 	return map[string]any{
-		"id":             ct.ID,
-		"plan_id":        ct.PlanID,
-		"plan_kind":      ct.PlanKind,
-		"plan_title":     ct.PlanTitle,
-		"duration_days":  ct.DurationDays,
-		"price_yen":      ct.PriceYen,
-		"event":          ct.Event,
-		"goal":           ct.Goal,
-		"current_record": ct.CurrentRecord,
-		"message":        ct.Message,
-		"minor":          ct.Minor,
-		"status":         ct.Status,
-		"respond_by":     ct.RespondBy,
-		"start_by":       ct.StartBy,
-		"suspended_at":   ct.SuspendedAt,
-		"responded_at":   ct.RespondedAt,
-		"starts_at":      ct.StartsAt,
-		"ends_at":        ct.EndsAt,
-		"created_at":     ct.CreatedAt,
+		"id":               ct.ID,
+		"plan_id":          ct.PlanID,
+		"plan_kind":        ct.PlanKind,
+		"plan_title":       ct.PlanTitle,
+		"duration_days":    ct.DurationDays,
+		"price_yen":        ct.PriceYen,
+		"event":            ct.Event,
+		"goal":             ct.Goal,
+		"current_record":   ct.CurrentRecord,
+		"message":          ct.Message,
+		"minor":            ct.Minor,
+		"payment_required": ct.PaymentRequired,
+		"status":           ct.Status,
+		"respond_by":       ct.RespondBy,
+		"start_by":         ct.StartBy,
+		"suspended_at":     ct.SuspendedAt,
+		"responded_at":     ct.RespondedAt,
+		"starts_at":        ct.StartsAt,
+		"ends_at":          ct.EndsAt,
+		"created_at":       ct.CreatedAt,
 	}
 }
 
@@ -242,7 +245,7 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		out = append(out, c)
@@ -267,7 +270,7 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired,
 		})
 		// コーチには利用者のニックネームだけを見せる。
 		c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -300,7 +303,7 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
+		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired,
 	})
 	role := "requester"
 	if row.CoachID == me.ID {
@@ -309,6 +312,10 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 	c["role"] = role
 	c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 	c["requester"] = map[string]any{"nickname": row.RequesterNickname}
+	if err := s.attachPayment(r.Context(), c, row.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	c["rating"] = nil
 	if rt, err := s.q.GetCoachingContractRating(r.Context(), row.ID); err == nil {
 		c["rating"] = map[string]any{"stars": rt.Stars, "rated_at": rt.RatedAt}
@@ -340,7 +347,10 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 	var ct db.CoachingContract
 	err := s.tx(r.Context(), func(q *db.Queries) error {
 		var err error
-		ct, err = q.AcceptCoachingContract(r.Context(), db.AcceptCoachingContractParams{ID: id, CoachID: coach.ProfileID})
+		// Stripe の鍵があるときは、支払いが済んでから始まる。
+		ct, err = q.AcceptCoachingContract(r.Context(), db.AcceptCoachingContractParams{
+			ID: id, CoachID: coach.ProfileID, PaymentRequired: s.stripe.Configured(),
+		})
 		if err != nil {
 			return err
 		}
@@ -364,7 +374,14 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	if ct.Status == "accepted" {
 		msg.Title = "コーチが申し込みを承諾しました"
-		msg.Body = "保護者が72時間以内に同意すると始まります。保護者に知らせてください"
+		switch {
+		case ct.Minor && ct.PaymentRequired:
+			msg.Body = "保護者が72時間以内に同意してお支払いをすると始まります。保護者に知らせてください"
+		case ct.Minor:
+			msg.Body = "保護者が72時間以内に同意すると始まります。保護者に知らせてください"
+		default:
+			msg.Body = "72時間以内にお支払いを済ませると始まります"
+		}
 	}
 	s.pushQuietly(r.Context(), ct.RequesterID, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
@@ -451,7 +468,14 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 		return len(ex), 0, err
 	}
 	for _, ct := range starts {
-		msg := push.Message{Title: "パーソナル指導は始まりませんでした", Body: "72時間のうちに保護者の同意がありませんでした", Tag: "contract-" + ct.ID.String()}
+		body := "72時間のうちに保護者の同意がありませんでした"
+		switch {
+		case ct.Minor && ct.PaymentRequired:
+			body = "72時間のうちに保護者の同意とお支払いがありませんでした"
+		case ct.PaymentRequired:
+			body = "72時間のうちにお支払いがありませんでした"
+		}
+		msg := push.Message{Title: "パーソナル指導は始まりませんでした", Body: body, Tag: "contract-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
 		s.pushQuietly(ctx, ct.RequesterID, msg, 24*time.Hour)
 		msg.URL = "/coach"

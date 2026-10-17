@@ -2,20 +2,41 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
+import { Button } from "@/components/ui/button";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabels } from "@/lib/coaching-plan";
+import { contractStatusLabel, formatPlanPrice } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+
+// 支払いのあと戻ってきたとき、Stripe からの知らせが届いて期間が始まるまで、何回か読み直す。
+const paidPolls = 10;
+
+// 始まる前の案内。支払いがあるか、18歳未満か、見ているのがコーチかで変わる。
+function waitingText(contract: CoachingContract, isCoach: boolean): string {
+  const by = formatDateTime(contract.start_by ?? "");
+  if (isCoach) {
+    if (contract.minor && contract.payment_required) return `保護者の同意とお支払いを待っています。${by}までに済むと始まります。`;
+    if (contract.payment_required) return `お支払いを待っています。${by}までに支払いがあると始まります。`;
+    return `保護者の同意を待っています。${by}までに同意があると始まります。`;
+  }
+  if (contract.minor && contract.payment_required) {
+    return `コーチが引き受けました。保護者が${by}までに、保護者のページからこの申し込みに同意してお支払いをすると始まります。保護者に知らせてください。`;
+  }
+  if (contract.payment_required) return `コーチが引き受けました。${by}までにお支払いください。支払った時から期間が始まります。`;
+  return `コーチが引き受けました。保護者が${by}までに、同意のページからこの申し込みに同意すると始まります。保護者に知らせてください。`;
+}
 
 // パーソナル指導の1件。申し込んだ人とコーチが見る。期間中と終わったあとは、やりとり欄を出す。
-export default function CoachingContractPage() {
+function CoachingContractView() {
   const { id } = useParams<{ id: string }>();
+  const paid = useSearchParams().get("paid") === "1";
+  const [polls, setPolls] = useState(0);
   const { session, token, loading } = useAuth();
   const router = useRouter();
   const [contract, setContract] = useState<CoachingContract | null>(null);
@@ -41,7 +62,27 @@ export default function CoachingContractPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, token]);
+  }, [id, token, polls]);
+
+  // 支払いから戻ってきたのにまだ始まっていなければ、少し待って読み直す。
+  const waitingForPayment = paid && contract?.status === "accepted" && polls < paidPolls;
+  useEffect(() => {
+    if (!waitingForPayment) return;
+    const t = window.setTimeout(() => setPolls((n) => n + 1), 2000);
+    return () => window.clearTimeout(t);
+  }, [waitingForPayment, polls]);
+
+  async function pay() {
+    if (!acquire()) return;
+    setError("");
+    try {
+      const d = await apiFetch<{ checkout_url: string }>(`/v1/coaching/contracts/${id}/checkout`, { method: "POST", token });
+      window.location.href = d.checkout_url;
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "お支払いの画面を開けませんでした");
+      release();
+    }
+  }
 
   async function cancel() {
     if (!window.confirm("申し込みを取り下げますか？")) return;
@@ -65,7 +106,7 @@ export default function CoachingContractPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">パーソナル指導</h1>
-        <p className="text-sm font-semibold text-blue-300">{contractStatusLabels[contract.status]}</p>
+        <p className="text-sm font-semibold text-blue-300">{contractStatusLabel(contract)}</p>
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
@@ -82,16 +123,37 @@ export default function CoachingContractPage() {
           <p className="text-sm text-slate-200">{formatDateTime(contract.respond_by)}までにコーチから返事が届きます。</p>
         ) : null}
         {contract.status === "accepted" && contract.start_by ? (
-          <p className="text-sm text-slate-200">
-            {isCoach
-              ? `保護者の同意を待っています。${formatDateTime(contract.start_by)}までに同意があると始まります。`
-              : `コーチが引き受けました。保護者が${formatDateTime(contract.start_by)}までに、同意のページからこの申し込みに同意すると始まります。保護者に知らせてください。`}
-          </p>
+          <p className="text-sm text-slate-200">{waitingText(contract, isCoach)}</p>
         ) : null}
         {contract.starts_at ? <p className="text-sm text-slate-200">期間: {contractPeriod(contract)}</p> : null}
+        {!isCoach && contract.payment ? (
+          <p className="text-xs text-slate-300">
+            お支払い {formatPlanPrice(contract.payment.amount_yen)}（{formatDateTime(contract.payment.paid_at)}）
+            {contract.payment.refunded_yen > 0 && contract.payment.refunded_at
+              ? ` · 返金 ${formatPlanPrice(contract.payment.refunded_yen)}（${formatDateTime(contract.payment.refunded_at)}）`
+              : ""}
+          </p>
+        ) : null}
       </section>
 
-      {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" ? (
+      {!isCoach && !contract.minor && contract.payment_required && contract.status === "accepted" ? (
+        waitingForPayment ? (
+          <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
+            お支払いを確かめています。このままお待ちください。
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
+              お支払いへ進む（{formatPlanPrice(contract.price_yen)}）
+            </Button>
+            <p className="text-xs text-slate-300">
+              カード・Apple Pay・Google Pay・PayPay で払えます。始まってから72時間コーチの書き込みがなければ、全額を返金します。
+            </p>
+          </div>
+        )
+      ) : null}
+
+      {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
       ) : null}
 
@@ -111,5 +173,13 @@ export default function CoachingContractPage() {
         {isCoach ? "コーチ画面へ" : "申し込みの一覧へ"}
       </Link>
     </div>
+  );
+}
+
+export default function CoachingContractPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+      <CoachingContractView />
+    </Suspense>
   );
 }

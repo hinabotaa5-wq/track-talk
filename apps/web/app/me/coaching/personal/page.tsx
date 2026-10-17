@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
-import { contractStatusLabels } from "@/lib/coaching-plan";
+import { contractStatusLabel } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import Link from "next/link";
@@ -65,7 +65,7 @@ export default function MyCoachingContractsPage() {
                   {c.coach?.nickname ?? "名前なし"} · {formatDateTime(c.created_at)}
                 </span>
               </span>
-              <span className="shrink-0 text-xs text-blue-300">{contractStatusLabels[c.status]}</span>
+              <span className="shrink-0 text-xs text-blue-300">{contractStatusLabel(c)}</span>
             </Link>
           </li>
         ))}
