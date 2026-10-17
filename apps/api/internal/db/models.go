@@ -27,6 +27,8 @@ type CoachProfile struct {
 	LastOfferedAt *time.Time `json:"last_offered_at"`
 	RatingResetAt *time.Time `json:"rating_reset_at"`
 	PhotoPublicID *string    `json:"photo_public_id"`
+	PledgedAt     *time.Time `json:"pledged_at"`
+	PledgeVersion *int16     `json:"pledge_version"`
 }
 
 type CoachingDemoCode struct {
@@ -34,6 +36,20 @@ type CoachingDemoCode struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UsedBy    *uuid.UUID `json:"used_by"`
 	UsedAt    *time.Time `json:"used_at"`
+}
+
+type CoachingPlan struct {
+	ID           uuid.UUID `json:"id"`
+	CoachID      uuid.UUID `json:"coach_id"`
+	Kind         string    `json:"kind"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	DurationDays int16     `json:"duration_days"`
+	PriceYen     int32     `json:"price_yen"`
+	Capacity     int16     `json:"capacity"`
+	Published    bool      `json:"published"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Comment struct {

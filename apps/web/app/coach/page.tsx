@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm } from "@/components/coach-photo";
+import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -272,6 +273,8 @@ export default function CoachPage() {
       </section>
 
       <CoachRequestsSection token={token} />
+
+      <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 
       <section className="space-y-2">
         <h2 className="font-bold">通知</h2>

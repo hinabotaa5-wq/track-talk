@@ -1,6 +1,7 @@
 "use client";
 
 import { CoachAvatar } from "@/components/coach-photo";
+import { PublicPlanList } from "@/components/coaching-plans";
 import { apiFetch } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import type { CoachTier, PublicCoach } from "@/lib/types";
@@ -79,6 +80,7 @@ export function CoachList() {
                 <dd className="text-slate-100">{c.years}年</dd>
               </div>
             </dl>
+            <PublicPlanList plans={c.plans ?? []} />
           </li>
         ))}
       </ul>

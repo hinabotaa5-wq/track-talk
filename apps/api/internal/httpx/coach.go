@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
@@ -92,6 +93,8 @@ func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 		"on_duty":      c.OnDuty,
 		"daily_cap":    c.DailyCap,
 		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
+		// いまの版のパーソナル指導の誓約をしたか。
+		"pledged": pledged(c),
 	}
 }
 
@@ -329,6 +332,15 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	plans, err := s.q.ListPublicCoachingPlans(r.Context(), coachPledgeVersion)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	plansByCoach := map[uuid.UUID][]map[string]any{}
+	for _, p := range plans {
+		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], coachingPlanJSON(p))
+	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
 		out = append(out, map[string]any{
@@ -342,9 +354,18 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			"years":          c.Years,
 			"rating_count":   c.RatingCount,
 			"rating_average": c.RatingAverage,
+			// パーソナル指導のプラン。安い順。
+			"plans": nonNilPlans(plansByCoach[c.ProfileID]),
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{"coaches": out})
+}
+
+func nonNilPlans(p []map[string]any) []map[string]any {
+	if p == nil {
+		return []map[string]any{}
+	}
+	return p
 }
 
 func (s *Server) approveCoachApplication(w http.ResponseWriter, r *http.Request) {
