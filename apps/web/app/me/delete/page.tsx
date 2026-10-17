@@ -84,13 +84,14 @@ export default function DeleteAccountPage() {
       </div>
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
         <li>あなたの投稿、コメント、レビュー、いいね、保存、通知</li>
+        <li>感覚メモと競技会の記録、エグ練大会のエントリーと投票</li>
         <li>ケガのグループへの参加、回答、段階の記録と一言</li>
         <li>練習への参加と評価。あなたが作った練習の投稿も削除されます</li>
-        <li>お問い合わせ（コーチの応募と商品のリクエストを含みます）と、あなたが送った通報</li>
+        <li>お問い合わせ（商品のリクエストを含みます）、コーチの応募と顔写真、あなたが送った通報</li>
         <li>ログインに使うアカウント</li>
       </ul>
       <p className="text-sm text-slate-300">
-        他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。
+        他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます。
       </p>
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
