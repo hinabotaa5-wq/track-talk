@@ -13,7 +13,7 @@ func insertNotification(ctx context.Context, q *db.Queries, recipient uuid.UUID,
 		ID:            uuid.New(),
 		RecipientID:   recipient,
 		Kind:          kind,
-		PostID:        postID,
+		PostID:        &postID,
 		CommentID:     commentID,
 		ApplicationID: applicationID,
 	})
@@ -21,12 +21,13 @@ func insertNotification(ctx context.Context, q *db.Queries, recipient uuid.UUID,
 
 func notificationJSON(row db.ListMyNotificationsRow) map[string]any {
 	return map[string]any{
-		"id":         row.ID,
-		"kind":       row.Kind,
-		"post_id":    row.PostID,
-		"post_title": row.PostTitle,
-		"read":       row.ReadAt != nil,
-		"created_at": row.CreatedAt,
+		"id":                row.ID,
+		"kind":              row.Kind,
+		"post_id":           row.PostID,
+		"post_title":        row.PostTitle,
+		"review_request_id": row.ReviewRequestID,
+		"read":              row.ReadAt != nil,
+		"created_at":        row.CreatedAt,
 	}
 }
 

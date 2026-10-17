@@ -1,8 +1,5 @@
-import { coachingEnabled } from "@/lib/features";
-import { notFound } from "next/navigation";
+import { CoachingGate } from "@/components/coaching-gate";
 
-// オンラインコーチングを提供するまでは、URL を直接開いても使えないようにする。
 export default function CoachingSetupLayout({ children }: { children: React.ReactNode }) {
-  if (!coachingEnabled) notFound();
-  return children;
+  return <CoachingGate>{children}</CoachingGate>;
 }

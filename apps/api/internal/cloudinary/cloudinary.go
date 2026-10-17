@@ -293,6 +293,14 @@ func (c Client) ImageURL(publicID string) string {
 	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_1600,q_auto,f_auto/" + deliveryPath(publicID)
 }
 
+// AvatarURL は顔写真を正方形に切り抜いた URL を返す。顔が真ん中に来るように切る。
+func (c Client) AvatarURL(publicID string) string {
+	if c.Cloud == "" || publicID == "" {
+		return ""
+	}
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_fill,g_face,w_320,h_320,q_auto,f_auto/" + deliveryPath(publicID)
+}
+
 // CoachingPlaybackURL は非公開の添削動画を再生する署名付き URL を返す。
 // du_30 で、万一長い動画が入っていても30秒までしか配信しない。
 func (c Client) CoachingPlaybackURL(publicID string) string {
@@ -333,14 +341,33 @@ func (c Client) Delete(ctx context.Context, resource string, publicIDs []string)
 	if resource != "image" && resource != "video" {
 		return ErrInvalid
 	}
-	values := url.Values{"invalidate": {"true"}}
 	for _, id := range publicIDs {
 		if !ValidPublicID(id) {
 			return ErrInvalid
 		}
+	}
+	return c.deleteResources(ctx, resource, "upload", publicIDs)
+}
+
+// DeleteCoachingVideos は、非公開の添削・やりとりの動画を Cloudinary から消す。見つからないものは消えたものとして扱う。
+func (c Client) DeleteCoachingVideos(ctx context.Context, publicIDs []string) error {
+	if !c.Configured() || len(publicIDs) == 0 {
+		return nil
+	}
+	for _, id := range publicIDs {
+		if !ValidCoachingPublicID(id) {
+			return ErrInvalid
+		}
+	}
+	return c.deleteResources(ctx, "video", CoachingVideoType, publicIDs)
+}
+
+func (c Client) deleteResources(ctx context.Context, resource, deliveryType string, publicIDs []string) error {
+	values := url.Values{"invalidate": {"true"}}
+	for _, id := range publicIDs {
 		values.Add("public_ids[]", id)
 	}
-	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/upload?" + values.Encode()
+	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/" + deliveryType + "?" + values.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return ErrUnavailable

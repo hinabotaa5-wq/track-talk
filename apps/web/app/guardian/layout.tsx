@@ -1,6 +1,5 @@
-import { coachingEnabled } from "@/lib/features";
+import { CoachingGate } from "@/components/coaching-gate";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 // 保護者の同意ページはリンクを知っている人だけが開く。検索に載せない。
 export const metadata: Metadata = {
@@ -8,8 +7,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// オンラインコーチングを提供するまでは、URL を直接開いても使えないようにする。
 export default function GuardianLayout({ children }: { children: React.ReactNode }) {
-  if (!coachingEnabled) notFound();
-  return children;
+  return <CoachingGate>{children}</CoachingGate>;
 }

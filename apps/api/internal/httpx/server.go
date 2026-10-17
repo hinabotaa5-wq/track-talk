@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -10,6 +11,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,6 +24,7 @@ type Server struct {
 	limit     *RateLimiter
 	cloud     cloudinary.Client
 	push      push.Sender
+	stripe    stripe.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -46,6 +49,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			PrivateKey: cfg.VAPIDPrivateKey,
 			Subject:    cfg.VAPIDSubject,
 		},
+		stripe: stripe.Client{
+			Secret:  cfg.StripeSecretKey,
+			APIBase: cfg.StripeAPIBase,
+		},
 	}
 	if cfg.PushHTTP != nil {
 		s.push.HTTP = cfg.PushHTTP
@@ -63,6 +70,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	}))
 	r.Use(s.limit.Middleware)
 	r.Get("/health", s.health)
+	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
+	// コーチングを提供していない間は、tick も無いものとして扱う。
+	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
+	r.Post("/webhooks/stripe", s.stripeWebhook)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
@@ -75,24 +86,43 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products", s.listProducts)
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
+		r.Get("/menu-contest", s.getMenuContest)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
 			r.Get("/competitions", s.listCompetitions)
 			r.Get("/major-hosts", s.listMajorHosts)
 			r.Get("/domestic-majors", s.listDomesticMajors)
+			r.Get("/prefectures/{code}", s.getPrefecturePage)
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Delete("/me", s.deleteAccount)
 			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/injury-history", s.myInjuryHistory)
+			r.Get("/injury/me/progress", s.myInjuryProgress)
+			r.Get("/me/sense-notes", s.listSenseNotes)
+			r.Post("/me/sense-notes", s.createSenseNote)
+			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
+			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)
+			r.Get("/me/race-records", s.listRaceRecords)
+			r.Post("/me/race-records", s.createRaceRecord)
+			r.Patch("/me/race-records/{id}", s.updateRaceRecord)
+			r.Delete("/me/race-records/{id}", s.deleteRaceRecord)
+			r.Put("/menu-contest/entry", s.saveMenuContestEntry)
+			r.Delete("/menu-contest/entry", s.deleteMenuContestEntry)
+			r.Put("/menu-contest/vote", s.voteMenuContest)
 			r.Get("/me/saves", s.listSaves)
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)
 			r.Get("/me/notifications", s.listNotifications)
 			r.Post("/me/notifications/read", s.markAllNotificationsRead)
 			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
+			// コーチの応募は提供前の準備にも使うので閉じない。応募の状態は /coach/me で読み、
+			// 顔写真は審査に必要なので応募の一部分として開けておく。
+			r.Get("/coach/me", s.coachMe)
+			r.Post("/coach/applications", s.submitCoachApplication)
+			r.Put("/coach/me/photo", s.setCoachPhoto)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
@@ -127,6 +157,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/reports", s.createReport)
 			r.Get("/posts/{id}/my-reports", s.myReports)
 			r.Get("/admin/reports", s.listReports)
+			r.Post("/admin/reports/{id}/close", s.closeReport)
 			r.Get("/admin/inquiries", s.listInquiries)
 			r.Post("/admin/posts/{id}/hide", s.hidePost)
 			r.Post("/admin/comments/{id}/hide", s.hideComment)
@@ -135,22 +166,53 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Patch("/admin/products/{id}", s.updateProduct)
 			r.Post("/admin/products/{id}/hide", s.hideProduct)
 			r.Post("/admin/product-reviews/{id}/hide", s.hideProductReview)
+			r.Get("/admin/coach-applications", s.listCoachApplications)
+			r.Post("/admin/coach-applications/{id}/approve", s.approveCoachApplication)
+			r.Post("/admin/coach-applications/{id}/reject", s.rejectCoachApplication)
+			r.Get("/admin/coaching/demo-codes", s.listDemoCodes)
+			r.Post("/admin/coaching/demo-codes", s.createDemoCode)
+			r.Get("/admin/coaching/probation", s.listCoachProbation)
+			r.Post("/admin/coaching/responses/{id}/hide", s.hideReviewResponse)
+			r.Post("/admin/coaching/coaches/{id}/reset-rating", s.resetCoachRating)
+			r.Delete("/admin/coaching/coaches/{id}/photo", s.removeCoachPhoto)
+			r.Get("/admin/coaching/contracts", s.adminListCoachingContracts)
+			r.Get("/admin/coaching/contracts/{id}", s.adminOpenCoachingContract)
+			r.Post("/admin/coaching/contracts/{id}/suspend", s.adminSuspendCoachingContract)
+			r.Post("/admin/coaching/contracts/{id}/resume", s.adminResumeCoachingContract)
+			r.Post("/admin/coaching/coaches/{id}/reduced-fee", s.adminSetReducedFee)
+			r.Get("/admin/menu-contest", s.adminMenuContest)
+			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
 		})
 
-		// オンラインコーチング（年齢・保護者の同意・プッシュ通知・添削動画）は提供前なので、
-		// COACHING_ENABLED が立っていないと 404 を返す。プライバシーポリシーもその前提で書いている。
+		// オンラインコーチング（年齢・保護者の同意・プッシュ通知・添削動画・パーソナル指導・
+		// フォーム添削・コーチの報酬と送金）は提供前なので、COACHING_ENABLED が立っていないと
+		// 404 を返す。プライバシーポリシーもその前提で書いている。
+		// 閉じないもの: コーチの応募（POST /coach/applications、GET /coach/me、審査に必要な顔写真）と、
+		// 運営の審査・準備に使う /admin/coach-applications、/admin/coaching の閲覧系。
+		// お金の動き（送金・返金）は閉じる。
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
 			r.Get("/push/public-key", s.pushPublicKey)
+			r.Get("/coaches", s.listCoaches)
+			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
 			r.Get("/guardian/{token}", s.getGuardian)
 			r.Post("/guardian/{token}/consent", s.consentGuardian)
 			r.Patch("/guardian/{token}", s.updateGuardian)
 			r.Post("/guardian/{token}/decline", s.declineGuardian)
 			r.Post("/guardian/{token}/revoke", s.revokeGuardian)
+			r.Get("/guardian/{token}/contracts", s.listGuardianContracts)
+			r.Get("/guardian/{token}/contracts/{id}", s.getGuardianContract)
+			r.Post("/guardian/{token}/contracts/{id}/consent", s.consentGuardianContract)
+			r.Post("/guardian/{token}/contracts/{id}/decline", s.declineGuardianContract)
+			r.Post("/guardian/{token}/contracts/{id}/checkout", s.checkoutGuardianContract)
+			r.Get("/guardian/{token}/contracts/{id}/messages", s.listGuardianMessages)
+			r.Post("/guardian/{token}/contracts/{id}/messages", s.createGuardianMessage)
+			r.Post("/guardian/{token}/messages/{mid}/report", s.reportGuardianMessage)
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireAuth(v))
+				// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
 				r.Get("/me/coaching", s.coachingMe)
 				r.Put("/me/birth-month", s.setBirthMonth)
 				r.Post("/me/guardian-link", s.issueGuardianLink)
@@ -158,6 +220,47 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Delete("/me/push-subscriptions", s.deletePushSubscription)
 				r.Post("/me/push-subscriptions/test", s.testPush)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
+				// パーソナル指導（利用者側）
+				r.Post("/coaching/contracts", s.createCoachingContract)
+				r.Get("/coaching/contracts/{id}", s.getCoachingContract)
+				r.Post("/coaching/contracts/{id}/cancel", s.cancelCoachingContract)
+				r.Post("/coaching/contracts/{id}/checkout", s.checkoutCoachingContract)
+				r.Get("/coaching/contracts/{id}/messages", s.listCoachingMessages)
+				r.Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
+				r.Post("/coaching/contracts/{id}/rating", s.rateCoachingContract)
+				r.Get("/me/coaching/contracts", s.listMyCoachingContracts)
+				// フォーム添削（利用者側）
+				r.Get("/coaching/estimate", s.reviewEstimate)
+				r.Post("/coaching/demo", s.joinCoachingDemo)
+				r.Post("/coaching/requests", s.createReviewRequest)
+				r.Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
+				r.Get("/me/coaching/requests", s.listMyReviewRequests)
+				r.Get("/coaching/requests/{id}", s.getReviewRequest)
+				r.Post("/coaching/requests/{id}/clarify", s.clarifyReview)
+				r.Post("/coaching/requests/{id}/rating", s.rateReview)
+				r.Post("/coaching/requests/{id}/helpful", s.answerHelpful)
+				// コーチ側（プロフィール・報酬・プラン・契約・添削の返却）
+				// 顔写真（PUT /coach/me/photo）は応募の審査に使うので、閉じない方に置いてある。
+				r.Patch("/coach/me", s.updateCoachDuty)
+				r.Post("/coach/me/pledge", s.pledgeCoach)
+				r.Get("/coach/me/earnings", s.coachEarnings)
+				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
+				r.Get("/coach/me/plans", s.listMyCoachingPlans)
+				r.Post("/coach/me/plans", s.createCoachingPlan)
+				r.Patch("/coach/me/plans/{id}", s.updateCoachingPlan)
+				r.Get("/coach/contracts", s.listCoachContracts)
+				r.Post("/coach/contracts/{id}/accept", s.acceptCoachingContract)
+				r.Post("/coach/contracts/{id}/decline", s.declineCoachingContract)
+				r.Get("/coach/requests", s.listCoachRequests)
+				r.Get("/coach/requests/{id}", s.getCoachReviewRequest)
+				r.Post("/coaching/requests/{id}/response", s.submitReviewResponse)
+				r.Post("/coaching/requests/{id}/clarification", s.submitClarification)
+				r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
+				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
+				// 運営のお金の動き（送金と返金）
+				r.Get("/admin/coaching/payouts", s.adminCoachPayouts)
+				r.Post("/admin/coaching/payouts/run", s.adminRunCoachPayouts)
+				r.Post("/admin/coaching/contracts/{id}/refund", s.adminRefundCoachingContract)
 			})
 		})
 	})
@@ -173,6 +276,14 @@ func (s *Server) requireCoaching(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// now は現在時刻。テストでは設定の Clock で差し替える。
+func (s *Server) now() time.Time {
+	if s.cfg.Clock != nil {
+		return s.cfg.Clock()
+	}
+	return time.Now()
 }
 
 func (s *Server) present(p postDTO) postDTO {

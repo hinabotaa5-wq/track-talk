@@ -39,9 +39,9 @@ type guardianView struct {
 	Token           string  `json:"token"`
 }
 
-// setupCoaching は、オンラインコーチングを有効にしたサーバーを作る。
-func setupCoaching(t *testing.T) http.Handler {
-	return setupConfig(t, func(cfg *config.Config) { cfg.CoachingEnabled = true })
+// setupNoCoaching は、オンラインコーチングを閉じたサーバーを作る（本番の既定はこれ）。
+func setupNoCoaching(t *testing.T) http.Handler {
+	return setupConfig(t, func(cfg *config.Config) { cfg.CoachingEnabled = false })
 }
 
 func minorBirthMonth() string {
@@ -50,17 +50,15 @@ func minorBirthMonth() string {
 
 // 提供を始めるまでは、コーチングの API はどれも無いものとして 404 を返す。
 func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
-	h := setup(t)
 	ta := token(t, uuid.New())
+	id := uuid.NewString()
 	routes := []struct {
 		method, path, tok string
 	}{
+		// 定期実行（Cloud Scheduler）
+		{http.MethodPost, "/internal/coaching/tick", ""},
+		// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
 		{http.MethodGet, "/v1/push/public-key", ""},
-		{http.MethodGet, "/v1/guardian/abc", ""},
-		{http.MethodPost, "/v1/guardian/abc/consent", ""},
-		{http.MethodPatch, "/v1/guardian/abc", ""},
-		{http.MethodPost, "/v1/guardian/abc/decline", ""},
-		{http.MethodPost, "/v1/guardian/abc/revoke", ""},
 		{http.MethodGet, "/v1/me/coaching", ta},
 		{http.MethodGet, "/v1/me/coaching", ""},
 		{http.MethodPut, "/v1/me/birth-month", ta},
@@ -69,20 +67,95 @@ func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 		{http.MethodDelete, "/v1/me/push-subscriptions", ta},
 		{http.MethodPost, "/v1/me/push-subscriptions/test", ta},
 		{http.MethodPost, "/v1/uploads/coaching-video", ta},
+		// 保護者の同意と、保護者から見える契約・やりとり
+		{http.MethodGet, "/v1/guardian/abc", ""},
+		{http.MethodPost, "/v1/guardian/abc/consent", ""},
+		{http.MethodPatch, "/v1/guardian/abc", ""},
+		{http.MethodPost, "/v1/guardian/abc/decline", ""},
+		{http.MethodPost, "/v1/guardian/abc/revoke", ""},
+		{http.MethodGet, "/v1/guardian/abc/contracts", ""},
+		{http.MethodGet, "/v1/guardian/abc/contracts/" + id, ""},
+		{http.MethodPost, "/v1/guardian/abc/contracts/" + id + "/consent", ""},
+		{http.MethodPost, "/v1/guardian/abc/contracts/" + id + "/decline", ""},
+		{http.MethodPost, "/v1/guardian/abc/contracts/" + id + "/checkout", ""},
+		{http.MethodGet, "/v1/guardian/abc/contracts/" + id + "/messages", ""},
+		{http.MethodPost, "/v1/guardian/abc/contracts/" + id + "/messages", ""},
+		{http.MethodPost, "/v1/guardian/abc/messages/" + id + "/report", ""},
+		// 公開のコーチ一覧とプラン
+		{http.MethodGet, "/v1/coaches", ""},
+		{http.MethodGet, "/v1/coaching/plans/" + id, ""},
+		// パーソナル指導（利用者側）
+		{http.MethodPost, "/v1/coaching/contracts", ta},
+		{http.MethodGet, "/v1/coaching/contracts/" + id, ta},
+		{http.MethodPost, "/v1/coaching/contracts/" + id + "/cancel", ta},
+		{http.MethodPost, "/v1/coaching/contracts/" + id + "/checkout", ta},
+		{http.MethodGet, "/v1/coaching/contracts/" + id + "/messages", ta},
+		{http.MethodPost, "/v1/coaching/contracts/" + id + "/messages", ta},
+		{http.MethodPost, "/v1/coaching/contracts/" + id + "/rating", ta},
+		{http.MethodGet, "/v1/me/coaching/contracts", ta},
+		// フォーム添削（利用者側とコーチの返却）
+		{http.MethodGet, "/v1/coaching/estimate", ta},
+		{http.MethodPost, "/v1/coaching/demo", ta},
+		{http.MethodPost, "/v1/coaching/requests", ta},
+		{http.MethodGet, "/v1/coaching/requests/" + id, ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/checkout", ta},
+		{http.MethodGet, "/v1/me/coaching/requests", ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarify", ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/rating", ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/helpful", ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/response", ta},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification", ta},
+		// コーチ側（プロフィール・報酬・プラン・契約・打診）。顔写真は応募の審査に必要なので閉じない。
+		{http.MethodPatch, "/v1/coach/me", ta},
+		{http.MethodPost, "/v1/coach/me/pledge", ta},
+		{http.MethodGet, "/v1/coach/me/earnings", ta},
+		{http.MethodPost, "/v1/coach/stripe/onboarding", ta},
+		{http.MethodGet, "/v1/coach/me/plans", ta},
+		{http.MethodPost, "/v1/coach/me/plans", ta},
+		{http.MethodPatch, "/v1/coach/me/plans/" + id, ta},
+		{http.MethodGet, "/v1/coach/contracts", ta},
+		{http.MethodPost, "/v1/coach/contracts/" + id + "/accept", ta},
+		{http.MethodPost, "/v1/coach/contracts/" + id + "/decline", ta},
+		{http.MethodGet, "/v1/coach/requests", ta},
+		{http.MethodGet, "/v1/coach/requests/" + id, ta},
+		{http.MethodPost, "/v1/coach/offers/" + id + "/accept", ta},
+		{http.MethodPost, "/v1/coach/offers/" + id + "/decline", ta},
+		// 運営のお金の動き（送金と返金）
+		{http.MethodGet, "/v1/admin/coaching/payouts", ta},
+		{http.MethodPost, "/v1/admin/coaching/payouts/run", ta},
+		{http.MethodPost, "/v1/admin/coaching/contracts/" + id + "/refund", ta},
 	}
-	for _, rt := range routes {
-		if rec := doJSON(t, h, rt.method, rt.path, rt.tok, map[string]any{}); rec.Code != http.StatusNotFound {
-			t.Errorf("%s %s (token=%v) = %d %s", rt.method, rt.path, rt.tok != "", rec.Code, rec.Body.String())
+	// 書き込みは IP ごとに1分30件の制限があるので、制限にかからないように区切って確かめる。
+	const batch = 20
+	for start := 0; start < len(routes); start += batch {
+		h := setupNoCoaching(t)
+		for _, rt := range routes[start:min(start+batch, len(routes))] {
+			if rec := doJSON(t, h, rt.method, rt.path, rt.tok, map[string]any{}); rec.Code != http.StatusNotFound {
+				t.Errorf("%s %s (token=%v) = %d %s", rt.method, rt.path, rt.tok != "", rec.Code, rec.Body.String())
+			}
 		}
 	}
-	// ほかの API には影響しない。
+	h := setupNoCoaching(t)
+	// 閉じないもの: コーチの応募と運営の審査は、提供前の準備に使うので 404 にしない。
+	for _, rt := range []struct{ method, path string }{
+		{http.MethodGet, "/v1/coach/me"},
+		{http.MethodPost, "/v1/coach/applications"},
+		{http.MethodPut, "/v1/coach/me/photo"},
+		{http.MethodGet, "/v1/admin/coach-applications"},
+		{http.MethodGet, "/v1/admin/coaching/demo-codes"},
+	} {
+		if rec := doJSON(t, h, rt.method, rt.path, ta, map[string]any{}); rec.Code == http.StatusNotFound {
+			t.Errorf("%s %s = 404（閉じないはず）%s", rt.method, rt.path, rec.Body.String())
+		}
+	}
+	// ほかの API にも影響しない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me", ta, nil); rec.Code != http.StatusOK {
 		t.Fatalf("me %d %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestBirthMonthIsSetOnce(t *testing.T) {
-	h := setupCoaching(t)
+	h := setup(t)
 	a := uuid.New()
 	ta := token(t, a)
 
@@ -131,7 +204,7 @@ func TestBirthMonthIsSetOnce(t *testing.T) {
 }
 
 func TestGuardianConsentFlow(t *testing.T) {
-	h := setupCoaching(t)
+	h := setup(t)
 	minor := uuid.New()
 	tm := token(t, minor)
 
@@ -248,7 +321,7 @@ func TestGuardianConsentFlow(t *testing.T) {
 }
 
 func TestGuardianCanDeclineBeforeConsenting(t *testing.T) {
-	h := setupCoaching(t)
+	h := setup(t)
 	minor := uuid.New()
 	tm := token(t, minor)
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
@@ -312,13 +385,12 @@ func TestPushSubscriptionsAndTestNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unconfigured := setupCoaching(t)
+	unconfigured := setup(t)
 	if rec := doJSON(t, unconfigured, http.MethodGet, "/v1/push/public-key", "", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unconfigured key %d", rec.Code)
 	}
 
 	h := setupConfig(t, func(cfg *config.Config) {
-		cfg.CoachingEnabled = true
 		cfg.VAPIDPublicKey = pub
 		cfg.VAPIDPrivateKey = priv
 		cfg.VAPIDSubject = "mailto:test@example.com"
@@ -400,7 +472,7 @@ func TestCoachingVideoUploadIsPrivate(t *testing.T) {
 	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
 	t.Setenv("CLOUDINARY_API_KEY", "key")
 	t.Setenv("CLOUDINARY_API_SECRET", "secret")
-	h := setupCoaching(t)
+	h := setup(t)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/uploads/coaching-video", "", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous %d", rec.Code)
 	}
@@ -433,7 +505,6 @@ func TestGuardianConsentNotifiesTheMinor(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := setupConfig(t, func(cfg *config.Config) {
-		cfg.CoachingEnabled = true
 		cfg.VAPIDPublicKey = pub
 		cfg.VAPIDPrivateKey = priv
 		cfg.VAPIDSubject = "mailto:test@example.com"

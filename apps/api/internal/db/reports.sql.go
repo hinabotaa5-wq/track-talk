@@ -12,6 +12,41 @@ import (
 	"github.com/google/uuid"
 )
 
+const closeReport = `-- name: CloseReport :one
+UPDATE reports
+SET status = 'reviewed'
+WHERE id = $1 AND status = 'open'
+RETURNING id, reporter_id, target_type, target_id, reason, detail, status, created_at
+`
+
+type CloseReportRow struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// 運営が通報の対応を終える。やりとり欄の通報は、終えるまで保存期間を過ぎても会話を消さない。
+func (q *Queries) CloseReport(ctx context.Context, id uuid.UUID) (CloseReportRow, error) {
+	row := q.db.QueryRow(ctx, closeReport, id)
+	var i CloseReportRow
+	err := row.Scan(
+		&i.ID,
+		&i.ReporterID,
+		&i.TargetType,
+		&i.TargetID,
+		&i.Reason,
+		&i.Detail,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const countReports = `-- name: CountReports :one
 SELECT count(*) FROM reports
 `
@@ -21,6 +56,54 @@ func (q *Queries) CountReports(ctx context.Context) (int64, error) {
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createGuardianReport = `-- name: CreateGuardianReport :one
+INSERT INTO reports (id, reporter_id, by_guardian, target_type, target_id, reason, detail)
+VALUES ($1, $2, true, 'coaching_message', $3, $4, $5)
+RETURNING id, reporter_id, target_type, target_id, reason, detail, status, created_at
+`
+
+type CreateGuardianReportParams struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+}
+
+type CreateGuardianReportRow struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// 保護者からの通報。保護者はアカウントを持たないので、子のアカウントで by_guardian を立てる。
+func (q *Queries) CreateGuardianReport(ctx context.Context, arg CreateGuardianReportParams) (CreateGuardianReportRow, error) {
+	row := q.db.QueryRow(ctx, createGuardianReport,
+		arg.ID,
+		arg.ReporterID,
+		arg.TargetID,
+		arg.Reason,
+		arg.Detail,
+	)
+	var i CreateGuardianReportRow
+	err := row.Scan(
+		&i.ID,
+		&i.ReporterID,
+		&i.TargetType,
+		&i.TargetID,
+		&i.Reason,
+		&i.Detail,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const createReport = `-- name: CreateReport :one
@@ -38,7 +121,18 @@ type CreateReportParams struct {
 	Detail     string    `json:"detail"`
 }
 
-func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (Report, error) {
+type CreateReportRow struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (CreateReportRow, error) {
 	row := q.db.QueryRow(ctx, createReport,
 		arg.ID,
 		arg.ReporterID,
@@ -47,7 +141,7 @@ func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (Rep
 		arg.Reason,
 		arg.Detail,
 	)
-	var i Report
+	var i CreateReportRow
 	err := row.Scan(
 		&i.ID,
 		&i.ReporterID,
@@ -71,16 +165,21 @@ SELECT
     r.status,
     r.created_at,
     rp.nickname AS reporter_nickname,
+    r.by_guardian,
+    -- やりとり欄の通報は中身を出さず、契約の ID だけ返す（開くと記録が残る）。
+    COALESCE(cm.contract_id, '00000000-0000-0000-0000-000000000000'::uuid)::uuid AS coaching_contract_id,
     COALESCE(p.id, c.post_id, '00000000-0000-0000-0000-000000000000'::uuid)::uuid AS post_id,
     COALESCE(p.title, ''::text)::text AS target_title,
-    COALESCE(p.body, c.body, n.note, ''::text)::text AS target_body,
-    (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at) IS NOT NULL)::boolean AS target_hidden,
+    COALESCE(p.body, c.body, n.note, rr.good_point, ''::text)::text AS target_body,
+    (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at, rr.hidden_at) IS NOT NULL)::boolean AS target_hidden,
     COALESCE(n.body_part, ''::text)::text AS injury_part
 FROM reports r
 JOIN profiles rp ON rp.id = r.reporter_id
 LEFT JOIN posts p ON r.target_type = 'post' AND p.id = r.target_id
 LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
 LEFT JOIN injury_group_stage_log n ON r.target_type = 'injury_note' AND n.note_id = r.target_id
+LEFT JOIN review_responses rr ON r.target_type = 'review_response' AND rr.request_id = r.target_id
+LEFT JOIN coaching_messages cm ON r.target_type = 'coaching_message' AND cm.id = r.target_id
 ORDER BY r.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -91,19 +190,21 @@ type ListAdminReportsParams struct {
 }
 
 type ListAdminReportsRow struct {
-	ID               uuid.UUID `json:"id"`
-	TargetType       string    `json:"target_type"`
-	TargetID         uuid.UUID `json:"target_id"`
-	Reason           string    `json:"reason"`
-	Detail           string    `json:"detail"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"created_at"`
-	ReporterNickname *string   `json:"reporter_nickname"`
-	PostID           uuid.UUID `json:"post_id"`
-	TargetTitle      string    `json:"target_title"`
-	TargetBody       string    `json:"target_body"`
-	TargetHidden     bool      `json:"target_hidden"`
-	InjuryPart       string    `json:"injury_part"`
+	ID                 uuid.UUID `json:"id"`
+	TargetType         string    `json:"target_type"`
+	TargetID           uuid.UUID `json:"target_id"`
+	Reason             string    `json:"reason"`
+	Detail             string    `json:"detail"`
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"created_at"`
+	ReporterNickname   *string   `json:"reporter_nickname"`
+	ByGuardian         bool      `json:"by_guardian"`
+	CoachingContractID uuid.UUID `json:"coaching_contract_id"`
+	PostID             uuid.UUID `json:"post_id"`
+	TargetTitle        string    `json:"target_title"`
+	TargetBody         string    `json:"target_body"`
+	TargetHidden       bool      `json:"target_hidden"`
+	InjuryPart         string    `json:"injury_part"`
 }
 
 func (q *Queries) ListAdminReports(ctx context.Context, arg ListAdminReportsParams) ([]ListAdminReportsRow, error) {
@@ -124,6 +225,8 @@ func (q *Queries) ListAdminReports(ctx context.Context, arg ListAdminReportsPara
 			&i.Status,
 			&i.CreatedAt,
 			&i.ReporterNickname,
+			&i.ByGuardian,
+			&i.CoachingContractID,
 			&i.PostID,
 			&i.TargetTitle,
 			&i.TargetBody,
@@ -192,15 +295,26 @@ type ListReportsParams struct {
 	Offset int32 `json:"offset"`
 }
 
-func (q *Queries) ListReports(ctx context.Context, arg ListReportsParams) ([]Report, error) {
+type ListReportsRow struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListReports(ctx context.Context, arg ListReportsParams) ([]ListReportsRow, error) {
 	rows, err := q.db.Query(ctx, listReports, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []ListReportsRow
 	for rows.Next() {
-		var i Report
+		var i ListReportsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ReporterID,
