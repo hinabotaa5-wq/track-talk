@@ -8,21 +8,22 @@ import (
 
 func TestIsFeaturedInternational(t *testing.T) {
 	cases := []struct {
-		name     string
+		name      string
 		organizer string
-		source   string
-		want     bool
+		source    string
+		want      bool
 	}{
 		{name: "オリンピック・ロサンゼルス", want: true},
 		{name: "世界陸上・北京", want: true},
 		{name: "U20世界陸上・ユージーン", want: true},
+		{name: "世界室内陸上", want: true},
+		{name: "World Athletics Indoor Championships", want: true},
 		{name: "ダイヤモンドリーグ・ファイナル", want: true},
 		{name: "第21回アジア競技大会", want: true},
 		{name: "Asian Games", want: true},
 		{name: "ゴールデンガラ", organizer: "http://rome.diamondleague.com/", want: true},
 		{name: "", want: false},
 		{name: "コンチネンタルツアー・ゴールド", want: false},
-		{name: "世界室内陸上", want: false},
 		{name: "U18世界陸上", want: false},
 		{name: "冬季オリンピック", want: false},
 	}

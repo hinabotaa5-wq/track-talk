@@ -37,7 +37,7 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM domestic_majors WHERE slug IN ('izumo-ekiden', 'all-japan')`)
-		_, _ = pool.Exec(ctx, `DELETE FROM competitions WHERE prefecture = '00' AND name IN ('ダイヤモンドリーグ・ファイナル', '世界室内陸上')`)
+		_, _ = pool.Exec(ctx, `DELETE FROM competitions WHERE prefecture = '00' AND name IN ('ダイヤモンドリーグ・ファイナル', 'コンチネンタルツアー・ゴールド')`)
 	})
 
 	insertMajor := func(slug, name, starts, ends string) {
@@ -63,8 +63,8 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 		}
 	}
 	// 開催中の featured 国際大会と、開催中だが featured でない国際大会。
-	insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13") )
-	insertComp("世界室内陸上", "2026-10-12", nil)
+	insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13"))
+	insertComp("コンチネンタルツアー・ゴールド", "2026-10-12", nil)
 
 	// ログイン不要で読める。
 	rec := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil)

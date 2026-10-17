@@ -43,11 +43,12 @@ type meetTarget struct {
 var featuredInternationalPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^オリンピック`),
 	regexp.MustCompile(`^世界陸上`),
+	regexp.MustCompile(`^世界室内陸上`),
 	regexp.MustCompile(`^U20世界陸上`),
 	regexp.MustCompile(`ダイヤモンドリーグ`),
 	regexp.MustCompile(`アジア(競技)?大会`),
 	regexp.MustCompile(`(?i)^(Summer )?Olympic Games`),
-	regexp.MustCompile(`(?i)^World Athletics (U20 )?Championships`),
+	regexp.MustCompile(`(?i)^World Athletics (U20 |Indoor )?Championships`),
 	regexp.MustCompile(`(?i)Diamond League`),
 	regexp.MustCompile(`(?i)Asian Games`),
 }
