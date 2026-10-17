@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -325,6 +325,13 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
   );
 }
 
+// やりとりは、期間の終わりから1年たつと文章も動画も消える（未解決の通報があるものは運営の対応が終わるまで残る）。
+function purgeDate(endsAt: string): string {
+  const d = new Date(endsAt);
+  d.setFullYear(d.getFullYear() + 1);
+  return formatDate(d.toISOString());
+}
+
 // CoachingMessages は、期間中・止めている間・終わったあとの契約に出すやりとり欄。
 // guardianToken を渡すと、保護者のページとしてリンクのトークンで読み書きする。
 export function CoachingMessages({
@@ -374,6 +381,23 @@ export function CoachingMessages({
   }, [fetchMessages, contract.status]);
 
   const access: Access = { token, guardianToken };
+  if (contract.messages_purged_at) {
+    return (
+      <div className="space-y-4">
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">
+          期間の終わりから1年たったので、やりとり（文章と動画）は消しました。
+        </p>
+        {contract.status === "ended" && contract.role === "requester" ? (
+          <RatingForm
+            contract={contract}
+            token={token}
+            onRated={(stars) => onContractChange({ ...contract, rating: { stars, rated_at: new Date().toISOString() } })}
+          />
+        ) : null}
+      </div>
+    );
+  }
+  const readOnlyNote = contract.ends_at ? `${purgeDate(contract.ends_at)}ごろに、やりとりは消えます。` : "";
   return (
     <div className="space-y-4">
       <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
@@ -406,9 +430,9 @@ export function CoachingMessages({
           運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
         </p>
       ) : contract.status === "refunded" ? (
-        <p className="text-sm text-slate-300">返金して終了したので、読むだけになりました。</p>
+        <p className="text-sm text-slate-300">返金して終了したので、読むだけになりました。{readOnlyNote}</p>
       ) : (
-        <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。</p>
+        <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。{readOnlyNote}</p>
       )}
       {contract.status === "ended" && contract.role === "requester" ? (
         <RatingForm

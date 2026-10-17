@@ -54,3 +54,10 @@ WHERE reporter_id = sqlc.arg(reporter_id)
     (target_type = 'post' AND target_id = sqlc.arg(post_id)::uuid)
     OR (target_type = 'comment' AND target_id IN (SELECT c.id FROM comments c WHERE c.post_id = sqlc.arg(post_id)::uuid))
   );
+
+-- name: CloseReport :one
+-- 運営が通報の対応を終える。やりとり欄の通報は、終えるまで保存期間を過ぎても会話を消さない。
+UPDATE reports
+SET status = 'reviewed'
+WHERE id = $1 AND status = 'open'
+RETURNING id, reporter_id, target_type, target_id, reason, detail, status, created_at;
