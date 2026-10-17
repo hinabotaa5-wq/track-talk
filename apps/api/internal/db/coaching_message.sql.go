@@ -70,6 +70,19 @@ func (q *Queries) CreateCoachingMessage(ctx context.Context, arg CreateCoachingM
 	return i, err
 }
 
+const deleteContractMessages = `-- name: DeleteContractMessages :execrows
+DELETE FROM coaching_messages
+WHERE contract_id = $1
+`
+
+func (q *Queries) DeleteContractMessages(ctx context.Context, contractID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteContractMessages, contractID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getCoachingContractRating = `-- name: GetCoachingContractRating :one
 SELECT contract_id, stars, rated_at FROM coaching_contract_ratings
 WHERE contract_id = $1
@@ -150,6 +163,76 @@ func (q *Queries) ListCoachingMessages(ctx context.Context, contractID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const listContractMessageVideos = `-- name: ListContractMessageVideos :many
+SELECT video_public_id::text FROM coaching_messages
+WHERE contract_id = $1 AND video_public_id IS NOT NULL
+`
+
+func (q *Queries) ListContractMessageVideos(ctx context.Context, contractID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listContractMessageVideos, contractID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var video_public_id string
+		if err := rows.Scan(&video_public_id); err != nil {
+			return nil, err
+		}
+		items = append(items, video_public_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listContractsToPurge = `-- name: ListContractsToPurge :many
+SELECT ct.id FROM coaching_contracts ct
+WHERE ct.status IN ('ended', 'refunded')
+  AND ct.ends_at <= now() - interval '1 year'
+  AND ct.messages_purged_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM reports rp
+      JOIN coaching_messages m ON m.id = rp.target_id
+      WHERE rp.target_type = 'coaching_message' AND rp.status = 'open' AND m.contract_id = ct.id)
+ORDER BY ct.ends_at
+LIMIT 20
+`
+
+// 期間が終わって1年たち、やりとりを消す契約。未解決の通報があるものは除く。
+func (q *Queries) ListContractsToPurge(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listContractsToPurge)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markContractMessagesPurged = `-- name: MarkContractMessagesPurged :exec
+UPDATE coaching_contracts
+SET messages_purged_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) MarkContractMessagesPurged(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markContractMessagesPurged, id)
+	return err
 }
 
 const rateCoachingContract = `-- name: RateCoachingContract :one

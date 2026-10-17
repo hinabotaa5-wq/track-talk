@@ -161,6 +161,8 @@ type coachingTickResult struct {
 	ReviewPaymentsReleased int `json:"review_payments_released"`
 	// コーチの報酬として記録したもの（返却した添削、終わったパーソナル指導）。
 	EarningsRecorded int `json:"earnings_recorded"`
+	// 期間が終わって1年たち、やりとりを消した契約。
+	MessagesPurged int `json:"messages_purged"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
@@ -194,6 +196,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.EarningsRecorded, err = s.recordCoachEarnings(ctx); err != nil {
+		return out, err
+	}
+	if out.MessagesPurged, err = s.purgeCoachingMessages(ctx); err != nil {
 		return out, err
 	}
 	return out, nil

@@ -12,6 +12,41 @@ import (
 	"github.com/google/uuid"
 )
 
+const closeReport = `-- name: CloseReport :one
+UPDATE reports
+SET status = 'reviewed'
+WHERE id = $1 AND status = 'open'
+RETURNING id, reporter_id, target_type, target_id, reason, detail, status, created_at
+`
+
+type CloseReportRow struct {
+	ID         uuid.UUID `json:"id"`
+	ReporterID uuid.UUID `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Detail     string    `json:"detail"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// 運営が通報の対応を終える。やりとり欄の通報は、終えるまで保存期間を過ぎても会話を消さない。
+func (q *Queries) CloseReport(ctx context.Context, id uuid.UUID) (CloseReportRow, error) {
+	row := q.db.QueryRow(ctx, closeReport, id)
+	var i CloseReportRow
+	err := row.Scan(
+		&i.ID,
+		&i.ReporterID,
+		&i.TargetType,
+		&i.TargetID,
+		&i.Reason,
+		&i.Detail,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const countReports = `-- name: CountReports :one
 SELECT count(*) FROM reports
 `

@@ -429,6 +429,8 @@ export type CoachingContract = {
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
+  // 保存期間（期間の終わりから1年）を過ぎて、やりとりを消した日時。
+  messages_purged_at: string | null;
   role?: "requester" | "coach" | "guardian";
   rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };

@@ -341,14 +341,33 @@ func (c Client) Delete(ctx context.Context, resource string, publicIDs []string)
 	if resource != "image" && resource != "video" {
 		return ErrInvalid
 	}
-	values := url.Values{"invalidate": {"true"}}
 	for _, id := range publicIDs {
 		if !ValidPublicID(id) {
 			return ErrInvalid
 		}
+	}
+	return c.deleteResources(ctx, resource, "upload", publicIDs)
+}
+
+// DeleteCoachingVideos は、非公開の添削・やりとりの動画を Cloudinary から消す。見つからないものは消えたものとして扱う。
+func (c Client) DeleteCoachingVideos(ctx context.Context, publicIDs []string) error {
+	if !c.Configured() || len(publicIDs) == 0 {
+		return nil
+	}
+	for _, id := range publicIDs {
+		if !ValidCoachingPublicID(id) {
+			return ErrInvalid
+		}
+	}
+	return c.deleteResources(ctx, "video", CoachingVideoType, publicIDs)
+}
+
+func (c Client) deleteResources(ctx context.Context, resource, deliveryType string, publicIDs []string) error {
+	values := url.Values{"invalidate": {"true"}}
+	for _, id := range publicIDs {
 		values.Add("public_ids[]", id)
 	}
-	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/upload?" + values.Encode()
+	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/resources/" + resource + "/" + deliveryType + "?" + values.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return ErrUnavailable

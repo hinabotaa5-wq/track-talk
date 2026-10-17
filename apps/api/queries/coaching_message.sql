@@ -37,3 +37,29 @@ SELECT m.id, m.sender_id, m.sender_role, ct.id AS contract_id, ct.requester_id, 
 FROM coaching_messages m
 JOIN coaching_contracts ct ON ct.id = m.contract_id
 WHERE m.id = $1;
+
+-- name: ListContractsToPurge :many
+-- 期間が終わって1年たち、やりとりを消す契約。未解決の通報があるものは除く。
+SELECT ct.id FROM coaching_contracts ct
+WHERE ct.status IN ('ended', 'refunded')
+  AND ct.ends_at <= now() - interval '1 year'
+  AND ct.messages_purged_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM reports rp
+      JOIN coaching_messages m ON m.id = rp.target_id
+      WHERE rp.target_type = 'coaching_message' AND rp.status = 'open' AND m.contract_id = ct.id)
+ORDER BY ct.ends_at
+LIMIT 20;
+
+-- name: ListContractMessageVideos :many
+SELECT video_public_id::text FROM coaching_messages
+WHERE contract_id = $1 AND video_public_id IS NOT NULL;
+
+-- name: DeleteContractMessages :execrows
+DELETE FROM coaching_messages
+WHERE contract_id = $1;
+
+-- name: MarkContractMessagesPurged :exec
+UPDATE coaching_contracts
+SET messages_purged_at = now()
+WHERE id = $1;

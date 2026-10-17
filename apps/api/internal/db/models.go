@@ -75,29 +75,30 @@ type CoachingBlockedCount struct {
 }
 
 type CoachingContract struct {
-	ID              uuid.UUID  `json:"id"`
-	PlanID          uuid.UUID  `json:"plan_id"`
-	CoachID         uuid.UUID  `json:"coach_id"`
-	RequesterID     uuid.UUID  `json:"requester_id"`
-	PlanKind        string     `json:"plan_kind"`
-	PlanTitle       string     `json:"plan_title"`
-	DurationDays    int16      `json:"duration_days"`
-	PriceYen        int32      `json:"price_yen"`
-	Event           string     `json:"event"`
-	Goal            string     `json:"goal"`
-	CurrentRecord   string     `json:"current_record"`
-	Message         string     `json:"message"`
-	Minor           bool       `json:"minor"`
-	Status          string     `json:"status"`
-	RespondBy       time.Time  `json:"respond_by"`
-	RespondedAt     *time.Time `json:"responded_at"`
-	StartsAt        *time.Time `json:"starts_at"`
-	EndsAt          *time.Time `json:"ends_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	StartBy         *time.Time `json:"start_by"`
-	SuspendedAt     *time.Time `json:"suspended_at"`
-	PaymentRequired bool       `json:"payment_required"`
+	ID               uuid.UUID  `json:"id"`
+	PlanID           uuid.UUID  `json:"plan_id"`
+	CoachID          uuid.UUID  `json:"coach_id"`
+	RequesterID      uuid.UUID  `json:"requester_id"`
+	PlanKind         string     `json:"plan_kind"`
+	PlanTitle        string     `json:"plan_title"`
+	DurationDays     int16      `json:"duration_days"`
+	PriceYen         int32      `json:"price_yen"`
+	Event            string     `json:"event"`
+	Goal             string     `json:"goal"`
+	CurrentRecord    string     `json:"current_record"`
+	Message          string     `json:"message"`
+	Minor            bool       `json:"minor"`
+	Status           string     `json:"status"`
+	RespondBy        time.Time  `json:"respond_by"`
+	RespondedAt      *time.Time `json:"responded_at"`
+	StartsAt         *time.Time `json:"starts_at"`
+	EndsAt           *time.Time `json:"ends_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	StartBy          *time.Time `json:"start_by"`
+	SuspendedAt      *time.Time `json:"suspended_at"`
+	PaymentRequired  bool       `json:"payment_required"`
+	MessagesPurgedAt *time.Time `json:"messages_purged_at"`
 }
 
 type CoachingContractConsent struct {

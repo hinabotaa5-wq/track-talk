@@ -530,6 +530,44 @@ function CoachesAdmin({ token }: { token: string | null }) {
   );
 }
 
+const noContract = "00000000-0000-0000-0000-000000000000";
+
+// やりとり欄の通報。中身は記録が残る画面で開き、確かめたら対応を終える。
+// 対応を終えるまで、そのやりとりは保存期間（期間の終わりから1年）を過ぎても消えない。
+function CoachingReportActions({ report, token }: { report: AdminReport; token: string | null }) {
+  const [status, setStatus] = useState(report.status);
+  const [error, setError] = useState("");
+
+  async function close() {
+    if (!window.confirm("この通報の対応を終えますか？保存期間を過ぎたやりとりは、このあと消えます。")) return;
+    setError("");
+    try {
+      await apiFetch(`/v1/admin/reports/${report.id}/close`, { method: "POST", token });
+      setStatus("reviewed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "できませんでした");
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {report.coaching_contract_id !== noContract ? (
+        <Link href={`/admin/coaching/${report.coaching_contract_id}?report=${report.id}`} className="text-sm text-blue-300 underline">
+          やりとりを開く
+        </Link>
+      ) : (
+        <span className="text-sm text-slate-400">やりとりは消えています</span>
+      )}
+      {status === "open" ? (
+        <button type="button" onClick={() => void close()} className="text-sm text-blue-300 underline">
+          対応を終える
+        </button>
+      ) : null}
+      {error ? <span className="text-sm text-red-400">{error}</span> : null}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { session, profile, token, loading } = useAuth();
   const router = useRouter();
@@ -612,9 +650,7 @@ export default function AdminPage() {
                 通報者: {r.by_guardian ? `保護者（${r.reporter_nickname ?? "名前なし"}さんの）` : (r.reporter_nickname ?? "名前なし")}
               </p>
               {r.target_type === "coaching_message" ? (
-                <Link href={`/admin/coaching/${r.coaching_contract_id}?report=${r.id}`} className="text-sm text-blue-300 underline">
-                  やりとりを開く
-                </Link>
+                <CoachingReportActions report={r} token={token} />
               ) : !r.target_body ? null : r.target_type === "injury_note" || r.target_type === "review_response" ? (
                 <InjuryNoteActions report={r} token={token} />
               ) : (
