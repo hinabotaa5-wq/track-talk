@@ -39,7 +39,7 @@ WHERE p.deleted_at IS NULL
     ) = $3
   )
   AND (
-    ($4::text IS NULL AND (p.kind <> 'injury' OR $1::uuid IS NOT NULL))
+    ($4::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR $1::uuid IS NOT NULL))
     OR (
       $4 = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -582,7 +582,7 @@ WHERE p.deleted_at IS NULL
     ) = $3
   )
   AND (
-    ($4::text IS NULL AND (p.kind <> 'injury' OR $1::uuid IS NOT NULL))
+    ($4::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR $1::uuid IS NOT NULL))
     OR (
       $4 = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -742,7 +742,7 @@ WHERE p.deleted_at IS NULL
     ) = $4
   )
   AND (
-    ($5::text IS NULL AND (p.kind <> 'injury' OR $2::uuid IS NOT NULL))
+    ($5::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR $2::uuid IS NOT NULL))
     OR (
       $5 = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')

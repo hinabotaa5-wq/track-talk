@@ -1,14 +1,13 @@
 "use client";
 
-import { ExternalLink, Trophy, X } from "lucide-react";
+import { MessageCircle, Trophy, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
-import { loadDomesticMajors, peekDomesticMajors } from "@/lib/domestic-majors";
-import { INTERNATIONAL } from "@/lib/prefectures";
-import { todayInTokyo } from "@/lib/season-schedule";
-import { todayMeets, type TodayMeet } from "@/lib/today-meets";
-import { AnchoredPanel } from "./anchored-panel";
 import { useAuth } from "./auth-provider";
+import { AnchoredPanel } from "./anchored-panel";
+import { fetchTodayMeetThreads } from "@/lib/meet-threads";
+import { todayInTokyo } from "@/lib/season-schedule";
+import type { MeetThread } from "@/lib/types";
 
 // 閉じた日を覚えておく。アプリを開き直す(タブやホーム画面アプリを起動し直す)とまた出る。
 const closedKey = "today-meet-balloon:closed";
@@ -29,35 +28,21 @@ function rememberClosed(today: string) {
   }
 }
 
-function shownURL(href: string) {
-  if (href.startsWith("/")) return "TrackTalk の大会タブ";
-  return href.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
-
 export function TodayMeetBalloon() {
   const { token } = useAuth();
   const panelID = useId();
   // 開いた状態で初めて描くとき、外側の div より先にこのボタンの ref が付くので、位置合わせはボタンに合わせる。
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [meets, setMeets] = useState<TodayMeet[]>([]);
+  const [meets, setMeets] = useState<MeetThread[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     let active = true;
-    const today = todayInTokyo();
-    // 大会タブと同じ取得とキャッシュを使う。どちらかが取れなくても、取れた方だけで出す。
-    Promise.all([
-      loadDomesticMajors(token).catch(() => peekDomesticMajors() ?? []),
-      loadCompetitions(INTERNATIONAL, 0, token).then(
-        (entry) => entry.items,
-        () => readCompetitions(INTERNATIONAL, 0)?.items ?? [],
-      ),
-    ]).then(([domestic, international]) => {
+    fetchTodayMeetThreads(token).then((next) => {
       if (!active) return;
-      const next = todayMeets(domestic, international, today);
       setMeets(next);
-      if (next.length > 0 && !closedToday(today)) setOpen(true);
+      if (next.length > 0 && !closedToday(todayInTokyo())) setOpen(true);
     });
     return () => {
       active = false;
@@ -112,26 +97,26 @@ export function TodayMeetBalloon() {
           </button>
           <p className="pr-6 text-sm font-bold leading-relaxed">今日は以下の大会が開催されてるよ！</p>
           <ul className="mt-3 space-y-2">
-            {meets.map((meet) => {
-              const external = !meet.href.startsWith("/");
-              return (
-                <li key={meet.key}>
-                  <a
-                    href={meet.href}
-                    target={external ? "_blank" : undefined}
-                    rel={external ? "noopener noreferrer" : undefined}
-                    onClick={close}
-                    className="block rounded-xl bg-white px-3 py-2 shadow-xs transition hover:bg-amber-100 active:scale-95"
-                  >
-                    <span className="flex items-start gap-1 text-sm font-semibold text-blue-700">
-                      <span className="line-clamp-2">{meet.name}</span>
-                      <ExternalLink className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            {meets.map((meet) => (
+              <li key={meet.meet_key}>
+                <Link
+                  href={meet.href}
+                  onClick={close}
+                  className="block rounded-xl bg-white px-3 py-2 shadow-xs transition hover:bg-amber-100 active:scale-95"
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-blue-700">{meet.name}</span>
+                      <span className="block text-xs text-slate-500">{meet.date_label}</span>
                     </span>
-                    <span className="block truncate text-xs text-slate-500">{shownURL(meet.href)}</span>
-                  </a>
-                </li>
-              );
-            })}
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                      <MessageCircle className="size-3.5" aria-hidden />
+                      {meet.comment_count}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </AnchoredPanel>

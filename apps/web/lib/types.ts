@@ -54,7 +54,7 @@ export type Post = {
   comment_count: number;
   liked_by_me: boolean;
   saved_by_me: boolean;
-  kind: "text" | "youtube" | "instagram" | "video" | "recruitment" | "practice" | "injury";
+  kind: "text" | "youtube" | "instagram" | "video" | "recruitment" | "practice" | "injury" | "meet";
   thumbnail_url?: string;
   youtube_video_id?: string;
   instagram_type?: "p" | "reel";
@@ -67,6 +67,16 @@ export type Post = {
   injury?: Injury;
   created_at: string;
   updated_at: string;
+};
+
+// 今日開催中の大会の実況スレッド。API /v1/meet-threads/today が返す。
+export type MeetThread = {
+  meet_key: string;
+  name: string;
+  date_label: string;
+  post_id: string;
+  comment_count: number;
+  href: string;
 };
 
 export type Injury = {

@@ -300,6 +300,12 @@ type MajorHost struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type MeetThread struct {
+	MeetKey   string    `json:"meet_key"`
+	PostID    uuid.UUID `json:"post_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type MenuContestEntry struct {
 	ID         uuid.UUID `json:"id"`
 	RoundStart time.Time `json:"round_start"`

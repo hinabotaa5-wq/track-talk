@@ -39,7 +39,7 @@ WHERE p.deleted_at IS NULL
     ) = sqlc.narg('stage')
   )
   AND (
-    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
+    (sqlc.narg('kind')::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -126,7 +126,7 @@ WHERE p.deleted_at IS NULL
     ) = sqlc.narg('stage')
   )
   AND (
-    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
+    (sqlc.narg('kind')::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
@@ -198,7 +198,7 @@ WHERE p.deleted_at IS NULL
     ) = sqlc.narg('stage')
   )
   AND (
-    (sqlc.narg('kind')::text IS NULL AND (p.kind <> 'injury' OR sqlc.narg('author_id')::uuid IS NOT NULL))
+    (sqlc.narg('kind')::text IS NULL AND (p.kind NOT IN ('injury', 'meet') OR sqlc.narg('author_id')::uuid IS NOT NULL))
     OR (
       sqlc.narg('kind') = 'recruitment'
       AND p.kind IN ('recruitment', 'practice')
