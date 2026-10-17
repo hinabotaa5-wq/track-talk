@@ -10,6 +10,7 @@ import {
   isDismissed,
   type InstallPlatform,
 } from "@/lib/install-guide";
+import { AppIconMark } from "./app-icon-mark";
 import { Button } from "./ui/button";
 import { hidesBottomNav } from "./bottom-nav";
 import {
@@ -156,9 +157,7 @@ export function InstallGuide() {
           }}
         >
           <div className="mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/25 glass bg-slate-900/80 p-3 shadow-lg backdrop-blur-xl">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-extrabold text-white" aria-hidden>
-              TT
-            </span>
+            <AppIconMark className="size-10" />
             <p className="min-w-0 flex-1 text-xs leading-snug text-slate-100">
               ホーム画面に追加すると、アプリのようにすぐ開けます
             </p>
