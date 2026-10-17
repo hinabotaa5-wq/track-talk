@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { apiFetch } from "@/lib/api";
+import { coachingEnabled } from "@/lib/features";
 import { injuryBodyParts } from "@/lib/injury";
 import { siteUrl } from "@/lib/site";
 import type { Meta, Post } from "@/lib/types";
@@ -14,7 +15,8 @@ const staticPages = [
   ...injuryBodyParts.map((part) => `/injury/${part.value}`),
   "/injury/stats",
   "/coaching",
-  "/coaches",
+  // コーチ一覧は提供を始めるまで 404 なので載せない。
+  ...(coachingEnabled ? ["/coaches"] : []),
   "/guidelines",
   "/terms",
   "/privacy",

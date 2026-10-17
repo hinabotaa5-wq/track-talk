@@ -187,6 +187,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `SUPABASE_SERVICE_ROLE_KEY` | API | 退会時に Auth ユーザーを削除する |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | API | アップロード署名 |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | API | フォーム添削の Web Push 通知（空なら通知は送らない）。`VAPID_SUBJECT` は `mailto:` の連絡先 |
+| `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | API / Web | オンラインコーチング（生年月・保護者の同意・プッシュ通知・添削動画・パーソナル指導・コーチの報酬と送金）を使えるようにする。提供前なので本番では空のまま（空なら API は 404、画面は Not Found） |
 | `COACHING_TICK_SECRET` | API | Cloud Scheduler が `POST /internal/coaching/tick` を呼ぶときに `X-Coaching-Tick-Secret` ヘッダーで送る値（空なら tick は使えない） |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | API | パーソナル指導の支払い（空なら支払いなしのデモ版）。Webhook の送り先は `POST /webhooks/stripe` |
 | `WEB_BASE_URL` | API | 支払い画面から戻ってくる画面の URL（空なら `CORS_ORIGINS` の最初のもの） |

@@ -54,14 +54,17 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		CORSOrigins:    []string{"http://localhost:3000"},
-		JWTSecret:      secret,
-		JWTAUD:         "authenticated",
-		DatabaseURL:    dsn,
-		CloudName:      os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:   os.Getenv("CLOUDINARY_API_BASE"),
+		CORSOrigins: []string{"http://localhost:3000"},
+		JWTSecret:   secret,
+		JWTAUD:      "authenticated",
+		DatabaseURL: dsn,
+		// 本番は空（コーチングを閉じた状態）が既定だが、テストはコーチングの機能を
+		// 確かめるものがほとんどなので開けておく。閉じたときの 404 は coaching_test.go で確かめる。
+		CoachingEnabled: true,
+		CloudName:       os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:     os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:  os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:    os.Getenv("CLOUDINARY_API_BASE"),
 	}
 	if mutate != nil {
 		mutate(&cfg)

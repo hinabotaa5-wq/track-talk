@@ -8,6 +8,7 @@ import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachingEnabled } from "@/lib/features";
 import { productKindLabels } from "@/lib/product";
 import type {
   AdminCoachApplication,
@@ -599,7 +600,8 @@ export default function AdminPage() {
     { id: "products", label: "商品", total: -1 },
     { id: "coaches", label: "コーチ", total: -1 },
     { id: "personal", label: "パーソナル", total: -1 },
-    { id: "payouts", label: "送金", total: -1 },
+    // 送金の API はコーチングを提供するまで 404 なので、タブも出さない。
+    ...(coachingEnabled ? ([{ id: "payouts", label: "送金", total: -1 }] as { id: Tab; label: string; total: number }[]) : []),
     { id: "menu", label: "エグ練", total: -1 },
   ];
 

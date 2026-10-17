@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachEvents, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachingEnabled } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import type { CoachApplication, CoachEvent, CoachTier } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -154,12 +155,13 @@ export default function CoachApplyPage() {
             <span className="ml-2 text-xs font-normal text-slate-300">応募日 {formatDateTime(application.applied_at)}</span>
           </p>
           <p className="text-sm text-slate-100">{statusNotes[application.status]}</p>
-          {application.status === "approved" ? (
+          {/* 承認後のコーチ画面と通知の設定は、コーチングを提供するまで 404 なので案内しない。 */}
+          {application.status === "approved" && coachingEnabled ? (
             <Link href="/coach" className="text-sm text-blue-300 underline">
               コーチ画面へ
             </Link>
           ) : null}
-          {application.status === "pending" ? (
+          {application.status === "pending" && coachingEnabled ? (
             <p className="text-xs text-slate-300">
               結果を通知で受け取るには、
               <Link href="/me/coaching" className="text-blue-300 underline">

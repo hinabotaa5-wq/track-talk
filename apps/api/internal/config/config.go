@@ -27,6 +27,10 @@ type Config struct {
 	VAPIDPublicKey         string
 	VAPIDPrivateKey        string
 	VAPIDSubject           string
+	// CoachingEnabled が false の間は、オンラインコーチングの API（年齢・保護者の同意・
+	// プッシュ通知・添削動画・パーソナル指導・コーチの報酬）を 404 にする。
+	// 提供を始めるまで本番では立てない。
+	CoachingEnabled bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
@@ -62,6 +66,7 @@ func Load() (Config, error) {
 		VAPIDPublicKey:         os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:        os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:           os.Getenv("VAPID_SUBJECT"),
+		CoachingEnabled:        enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingTickSecret:     os.Getenv("COACHING_TICK_SECRET"),
 		StripeSecretKey:        os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret:    os.Getenv("STRIPE_WEBHOOK_SECRET"),
@@ -91,4 +96,12 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func enabled(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

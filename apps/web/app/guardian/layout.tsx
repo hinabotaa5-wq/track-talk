@@ -1,3 +1,4 @@
+import { CoachingGate } from "@/components/coaching-gate";
 import type { Metadata } from "next";
 
 // 保護者の同意ページはリンクを知っている人だけが開く。検索に載せない。
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function GuardianLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <CoachingGate>{children}</CoachingGate>;
 }
