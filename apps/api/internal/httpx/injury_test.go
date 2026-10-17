@@ -424,6 +424,79 @@ func TestMyInjuryHistoryIsPrivateToTheAuthor(t *testing.T) {
 	}
 }
 
+func TestMyInjuryProgressComparesOnlyMyPosts(t *testing.T) {
+	h := setup(t)
+	mine := token(t, uuid.New())
+	other := token(t, uuid.New())
+
+	create := func(tok string) string {
+		t.Helper()
+		rec := postInjury(t, h, tok, map[string]any{
+			"kind": "injury", "title": "肩", "body": "本文", "body_part": "shoulder",
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+		}
+		var post struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &post); err != nil {
+			t.Fatal(err)
+		}
+		return post.ID
+	}
+	id := create(mine)
+	otherID := create(other)
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+id+"/injury/updates", mine, map[string]any{"stage": "rehab", "body": "動かせる"}); r.Code != http.StatusCreated {
+		t.Fatalf("update %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+otherID+"/injury/updates", other, map[string]any{"stage": "jogging", "body": "走れた"}); r.Code != http.StatusCreated {
+		t.Fatalf("other update %d %s", r.Code, r.Body.String())
+	}
+
+	if r := doJSON(t, h, http.MethodGet, "/v1/injury/me/progress", "", nil); r.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status %d", r.Code)
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/injury/me/progress", mine, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("progress %d %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		MinSample int `json:"min_sample"`
+		Posts     []struct {
+			PostID   string `json:"post_id"`
+			BodyPart string `json:"body_part"`
+			Stages   []struct {
+				Stage      string `json:"stage"`
+				MyDays     *int   `json:"my_days"`
+				MedianDays *int   `json:"median_days"`
+			} `json:"stages"`
+		} `json:"posts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.MinSample != 5 || len(got.Posts) != 1 || got.Posts[0].PostID != id || len(got.Posts[0].Stages) != 5 {
+		t.Fatalf("progress %s", rec.Body.String())
+	}
+	for _, s := range got.Posts[0].Stages {
+		// 報告は1人ずつなので、どの段階も中央値は出ない。
+		if s.MedianDays != nil {
+			t.Fatalf("median below the sample minimum: %s", rec.Body.String())
+		}
+		reached := s.Stage == "resting" || s.Stage == "rehab"
+		if reached != (s.MyDays != nil) {
+			t.Fatalf("my_days for %s: %s", s.Stage, rec.Body.String())
+		}
+	}
+
+	// ケガの投稿が無い人は空の一覧。
+	none := doJSON(t, h, http.MethodGet, "/v1/injury/me/progress", token(t, uuid.New()), nil)
+	if none.Code != http.StatusOK || !strings.Contains(none.Body.String(), `"posts":[]`) {
+		t.Fatalf("empty progress %d %s", none.Code, none.Body.String())
+	}
+}
+
 func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	h := setup(t)
 	author := token(t, uuid.New())

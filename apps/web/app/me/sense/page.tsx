@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteItem, SenseNoteStatsRow } from "@/components/sense-notes";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,8 @@ export default function MySenseNotesPage() {
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [dropped, setDropped] = useState(false);
+  // 感覚メモと、競技会の記録(グラフ)を切り替える。
+  const [tab, setTab] = useState<"sense" | "records">("sense");
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/me/sense");
@@ -64,7 +67,29 @@ export default function MySenseNotesPage() {
         <p className="mt-1 text-sm text-slate-200">練習で体を動かして感じたことを書き溜めます。あなただけに表示されます。</p>
       </div>
 
-      {failed ? (
+      <div role="tablist" aria-label="表示の切り替え" className="grid grid-cols-2 gap-1 rounded-xl border border-white/20 bg-white/10 p-1">
+        {(
+          [
+            ["sense", "感覚"],
+            ["records", "記録"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            onClick={() => setTab(value)}
+            className={`rounded-lg py-1.5 text-sm font-semibold ${tab === value ? "bg-white/20 text-white" : "text-slate-300"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "records" ? (
+        <RaceRecordsPanel token={token} />
+      ) : failed ? (
         <ErrorState message="感覚メモの取得に失敗しました。APIの起動を確認してください。" />
       ) : notes === null || stats === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>

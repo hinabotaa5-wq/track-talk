@@ -415,6 +415,18 @@ type PushSubscription struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type RaceRecord struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	RacedOn   time.Time `json:"raced_on"`
+	Event     string    `json:"event"`
+	Mark      int32     `json:"mark"`
+	Wind      *int16    `json:"wind"`
+	Memo      string    `json:"memo"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type RecruitmentDetail struct {
 	PostID      uuid.UUID `json:"post_id"`
 	Venue       string    `json:"venue"`
