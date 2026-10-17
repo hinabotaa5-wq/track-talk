@@ -87,6 +87,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/menu-contest", s.getMenuContest)
+		r.Get("/meet-threads/today", s.todayMeetThreads)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))

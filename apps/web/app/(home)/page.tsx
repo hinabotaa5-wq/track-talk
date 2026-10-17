@@ -3,9 +3,11 @@ import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { HomeView } from "@/components/home-view";
 import { FeedLoadingFrame } from "@/components/loading-frame";
+import { TodayMeetsSection } from "@/components/today-meets-section";
 import { homeFeedServerTimeoutMs, type PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath } from "@/lib/home-feed-cache";
 import { parseHomeSort } from "@/lib/home-sort";
+import { fetchTodayMeetThreads } from "@/lib/meet-threads";
 import type { Meta, Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +51,14 @@ export default async function HomePage({
   if (sort === "review") return <HomeView initialPath="" initial={null} />;
 
   const path = homeFeedPath(sort, q, page);
+  // 検索結果や2ページ目には出さない。対象大会が無い日は空配列になり、セクションごと消える。
+  const meets = q || page > 1 ? [] : await fetchTodayMeetThreads();
   return (
-    <Suspense key={path} fallback={<FeedLoadingFrame />}>
-      <ServerHomeFeed path={path} />
-    </Suspense>
+    <>
+      <TodayMeetsSection meets={meets} />
+      <Suspense key={path} fallback={<FeedLoadingFrame />}>
+        <ServerHomeFeed path={path} />
+      </Suspense>
+    </>
   );
 }
