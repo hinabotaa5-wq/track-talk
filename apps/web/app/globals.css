@@ -110,3 +110,48 @@ select:-webkit-autofill {
     display: none;
   }
 }
+
+/* 感覚メモのビンに、書いたばかりの粒が落ちてくる */
+@keyframes sense-grain-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-110px);
+  }
+  15% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sense-grain-drop {
+  transform-box: fill-box;
+  animation: sense-grain-drop 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+
+@keyframes sense-cheer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sense-cheer {
+  animation: sense-cheer-in 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sense-grain-drop,
+  .sense-cheer {
+    animation: none;
+  }
+}

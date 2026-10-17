@@ -4,7 +4,9 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { FeedbackBox } from "./feedback-box";
+import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
+import { TodayMeetBalloon } from "./today-meet-balloon";
 import { activeMainTab, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
@@ -121,12 +123,15 @@ export function Header() {
           </nav>
           {session && !showBack ? (
             <>
+              {pathname === "/" ? <TodayMeetBalloon /> : null}
               <FeedbackBox />
               <NotificationBell />
             </>
           ) : null}
         </div>
       </div>
+      {/* エグ練大会の開催中だけ、ホームのヘッダーに締め切りまでの残り時間を出す。 */}
+      {pathname === "/" ? <MenuContestBar /> : null}
     </header>
   );
 }

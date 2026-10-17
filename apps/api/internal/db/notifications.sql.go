@@ -15,7 +15,7 @@ import (
 const countMyNotifications = `-- name: CountMyNotifications :one
 SELECT count(*)
 FROM notifications n
-JOIN posts p ON p.id = n.post_id
+LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
   AND p.deleted_at IS NULL
@@ -36,7 +36,7 @@ func (q *Queries) CountMyNotifications(ctx context.Context, recipientID uuid.UUI
 const countUnreadNotifications = `-- name: CountUnreadNotifications :one
 SELECT count(*)
 FROM notifications n
-JOIN posts p ON p.id = n.post_id
+LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
   AND n.read_at IS NULL
@@ -64,7 +64,7 @@ type InsertNotificationParams struct {
 	ID            uuid.UUID  `json:"id"`
 	RecipientID   uuid.UUID  `json:"recipient_id"`
 	Kind          string     `json:"kind"`
-	PostID        uuid.UUID  `json:"post_id"`
+	PostID        *uuid.UUID `json:"post_id"`
 	CommentID     *uuid.UUID `json:"comment_id"`
 	ApplicationID *uuid.UUID `json:"application_id"`
 }
@@ -83,7 +83,7 @@ func (q *Queries) InsertNotification(ctx context.Context, arg InsertNotification
 
 const insertRecruitmentPostNotifications = `-- name: InsertRecruitmentPostNotifications :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id)
-SELECT gen_random_uuid(), profiles.id, 'recruitment_post', $1
+SELECT gen_random_uuid(), profiles.id, 'recruitment_post', $1::uuid
 FROM profiles
 WHERE profiles.id <> $2
 `
@@ -98,16 +98,39 @@ func (q *Queries) InsertRecruitmentPostNotifications(ctx context.Context, arg In
 	return err
 }
 
+const insertReviewNotification = `-- name: InsertReviewNotification :exec
+INSERT INTO notifications (id, recipient_id, kind, review_request_id)
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertReviewNotificationParams struct {
+	ID              uuid.UUID  `json:"id"`
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	Kind            string     `json:"kind"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+}
+
+func (q *Queries) InsertReviewNotification(ctx context.Context, arg InsertReviewNotificationParams) error {
+	_, err := q.db.Exec(ctx, insertReviewNotification,
+		arg.ID,
+		arg.RecipientID,
+		arg.Kind,
+		arg.ReviewRequestID,
+	)
+	return err
+}
+
 const listMyNotifications = `-- name: ListMyNotifications :many
 SELECT
     n.id,
     n.kind,
     n.post_id,
+    n.review_request_id,
     n.read_at,
     n.created_at,
     p.title AS post_title
 FROM notifications n
-JOIN posts p ON p.id = n.post_id
+LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
   AND p.deleted_at IS NULL
@@ -127,12 +150,13 @@ type ListMyNotificationsParams struct {
 }
 
 type ListMyNotificationsRow struct {
-	ID        uuid.UUID  `json:"id"`
-	Kind      string     `json:"kind"`
-	PostID    uuid.UUID  `json:"post_id"`
-	ReadAt    *time.Time `json:"read_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	PostTitle string     `json:"post_title"`
+	ID              uuid.UUID  `json:"id"`
+	Kind            string     `json:"kind"`
+	PostID          *uuid.UUID `json:"post_id"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ReadAt          *time.Time `json:"read_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	PostTitle       *string    `json:"post_title"`
 }
 
 func (q *Queries) ListMyNotifications(ctx context.Context, arg ListMyNotificationsParams) ([]ListMyNotificationsRow, error) {
@@ -148,6 +172,7 @@ func (q *Queries) ListMyNotifications(ctx context.Context, arg ListMyNotificatio
 			&i.ID,
 			&i.Kind,
 			&i.PostID,
+			&i.ReviewRequestID,
 			&i.ReadAt,
 			&i.CreatedAt,
 			&i.PostTitle,

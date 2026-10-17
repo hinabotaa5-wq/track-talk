@@ -7,6 +7,8 @@ export type CloudinarySignature = {
   upload_preset: string;
   allowed_formats: string;
   resource_type: "image" | "video";
+  // 添削の動画は非公開（authenticated）で上げる。署名に含まれるので、そのまま送る。
+  type?: "authenticated";
 };
 
 export type CloudinaryUploadProgress = {
@@ -50,6 +52,7 @@ export function uploadToCloudinary(
   body.append("upload_preset", signed.upload_preset);
   body.append("allowed_formats", signed.allowed_formats);
   body.append("signature", signed.signature);
+  if (signed.type) body.append("type", signed.type);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

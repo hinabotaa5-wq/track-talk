@@ -172,6 +172,19 @@ func TestDeleteSendsPublicIDs(t *testing.T) {
 	if err := (Client{}).Delete(ctx, "image", ids); err != nil {
 		t.Fatalf("not configured: %v", err)
 	}
+
+	// 非公開の動画は authenticated から消す。公開側の ID は受け付けない。
+	status = http.StatusOK
+	coaching := []string{CoachingFolder + "/33333333-3333-4333-8333-333333333333"}
+	if err := c.DeleteCoachingVideos(ctx, coaching); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/v1_1/demo/resources/video/authenticated" || len(gotIDs) != 1 || gotIDs[0] != coaching[0] {
+		t.Fatalf("coaching path %s ids %v", gotPath, gotIDs)
+	}
+	if err := c.DeleteCoachingVideos(ctx, ids[:1]); err != ErrInvalid {
+		t.Fatalf("public id as coaching: %v", err)
+	}
 }
 
 func TestEnsureUploadPresetsLive(t *testing.T) {

@@ -10,6 +10,163 @@ import (
 	"github.com/google/uuid"
 )
 
+type CoachEarning struct {
+	ID              uuid.UUID  `json:"id"`
+	CoachID         *uuid.UUID `json:"coach_id"`
+	Source          string     `json:"source"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ContractID      *uuid.UUID `json:"contract_id"`
+	GrossYen        int32      `json:"gross_yen"`
+	SharePercent    int16      `json:"share_percent"`
+	AmountYen       int32      `json:"amount_yen"`
+	PayoutID        *uuid.UUID `json:"payout_id"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type CoachPayout struct {
+	ID               uuid.UUID  `json:"id"`
+	CoachID          *uuid.UUID `json:"coach_id"`
+	Month            time.Time  `json:"month"`
+	AmountYen        int32      `json:"amount_yen"`
+	Status           string     `json:"status"`
+	StripeTransferID *string    `json:"stripe_transfer_id"`
+	Failure          *string    `json:"failure"`
+	CreatedAt        time.Time  `json:"created_at"`
+	PaidAt           *time.Time `json:"paid_at"`
+}
+
+type CoachProfile struct {
+	ProfileID       uuid.UUID  `json:"profile_id"`
+	Tier            string     `json:"tier"`
+	Events          []string   `json:"events"`
+	BestRecord      string     `json:"best_record"`
+	Achievements    string     `json:"achievements"`
+	Years           int16      `json:"years"`
+	Status          string     `json:"status"`
+	AppliedAt       time.Time  `json:"applied_at"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	OnDuty          bool       `json:"on_duty"`
+	DailyCap        int16      `json:"daily_cap"`
+	LastOfferedAt   *time.Time `json:"last_offered_at"`
+	RatingResetAt   *time.Time `json:"rating_reset_at"`
+	PhotoPublicID   *string    `json:"photo_public_id"`
+	PledgedAt       *time.Time `json:"pledged_at"`
+	PledgeVersion   *int16     `json:"pledge_version"`
+	StripeAccountID *string    `json:"stripe_account_id"`
+	PayoutsEnabled  bool       `json:"payouts_enabled"`
+	ReducedFeeUntil *time.Time `json:"reduced_fee_until"`
+}
+
+type CoachingAccessLog struct {
+	ID         uuid.UUID `json:"id"`
+	AdminID    uuid.UUID `json:"admin_id"`
+	ContractID uuid.UUID `json:"contract_id"`
+	ReportID   uuid.UUID `json:"report_id"`
+	OpenedAt   time.Time `json:"opened_at"`
+}
+
+type CoachingBlockedCount struct {
+	ContractID    uuid.UUID `json:"contract_id"`
+	ProfileID     uuid.UUID `json:"profile_id"`
+	Count         int32     `json:"count"`
+	LastBlockedAt time.Time `json:"last_blocked_at"`
+}
+
+type CoachingContract struct {
+	ID               uuid.UUID  `json:"id"`
+	PlanID           uuid.UUID  `json:"plan_id"`
+	CoachID          uuid.UUID  `json:"coach_id"`
+	RequesterID      uuid.UUID  `json:"requester_id"`
+	PlanKind         string     `json:"plan_kind"`
+	PlanTitle        string     `json:"plan_title"`
+	DurationDays     int16      `json:"duration_days"`
+	PriceYen         int32      `json:"price_yen"`
+	Event            string     `json:"event"`
+	Goal             string     `json:"goal"`
+	CurrentRecord    string     `json:"current_record"`
+	Message          string     `json:"message"`
+	Minor            bool       `json:"minor"`
+	Status           string     `json:"status"`
+	RespondBy        time.Time  `json:"respond_by"`
+	RespondedAt      *time.Time `json:"responded_at"`
+	StartsAt         *time.Time `json:"starts_at"`
+	EndsAt           *time.Time `json:"ends_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	StartBy          *time.Time `json:"start_by"`
+	SuspendedAt      *time.Time `json:"suspended_at"`
+	PaymentRequired  bool       `json:"payment_required"`
+	MessagesPurgedAt *time.Time `json:"messages_purged_at"`
+}
+
+type CoachingContractConsent struct {
+	ContractID       uuid.UUID  `json:"contract_id"`
+	Party            string     `json:"party"`
+	ProfileID        *uuid.UUID `json:"profile_id"`
+	Version          int16      `json:"version"`
+	ReportReview     bool       `json:"report_review"`
+	ContactDetection bool       `json:"contact_detection"`
+	AgreedAt         time.Time  `json:"agreed_at"`
+}
+
+type CoachingContractRating struct {
+	ContractID uuid.UUID `json:"contract_id"`
+	Stars      int16     `json:"stars"`
+	RatedAt    time.Time `json:"rated_at"`
+}
+
+type CoachingDemoCode struct {
+	Code      string     `json:"code"`
+	CreatedAt time.Time  `json:"created_at"`
+	UsedBy    *uuid.UUID `json:"used_by"`
+	UsedAt    *time.Time `json:"used_at"`
+}
+
+type CoachingMessage struct {
+	ID            uuid.UUID  `json:"id"`
+	ContractID    uuid.UUID  `json:"contract_id"`
+	SenderID      *uuid.UUID `json:"sender_id"`
+	SenderRole    string     `json:"sender_role"`
+	Body          string     `json:"body"`
+	VideoPublicID *string    `json:"video_public_id"`
+	Menu          []byte     `json:"menu"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+type CoachingPayment struct {
+	ID                uuid.UUID  `json:"id"`
+	ContractID        *uuid.UUID `json:"contract_id"`
+	Payer             string     `json:"payer"`
+	AmountYen         int32      `json:"amount_yen"`
+	CheckoutSessionID string     `json:"checkout_session_id"`
+	CheckoutUrl       string     `json:"checkout_url"`
+	SessionExpiresAt  time.Time  `json:"session_expires_at"`
+	PaymentIntentID   *string    `json:"payment_intent_id"`
+	Status            string     `json:"status"`
+	RefundedYen       int32      `json:"refunded_yen"`
+	RefundReason      *string    `json:"refund_reason"`
+	PaidAt            *time.Time `json:"paid_at"`
+	RefundedAt        *time.Time `json:"refunded_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type CoachingPlan struct {
+	ID           uuid.UUID `json:"id"`
+	CoachID      uuid.UUID `json:"coach_id"`
+	Kind         string    `json:"kind"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	DurationDays int16     `json:"duration_days"`
+	PriceYen     int32     `json:"price_yen"`
+	Capacity     int16     `json:"capacity"`
+	Published    bool      `json:"published"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type Comment struct {
 	ID        uuid.UUID  `json:"id"`
 	PostID    uuid.UUID  `json:"post_id"`
@@ -143,15 +300,39 @@ type MajorHost struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type MenuContestEntry struct {
+	ID         uuid.UUID `json:"id"`
+	RoundStart time.Time `json:"round_start"`
+	AuthorID   uuid.UUID `json:"author_id"`
+	Body       string    `json:"body"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type MenuContestFinalist struct {
+	RoundStart time.Time `json:"round_start"`
+	EntryID    uuid.UUID `json:"entry_id"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type MenuContestVote struct {
+	RoundStart time.Time `json:"round_start"`
+	VoterID    uuid.UUID `json:"voter_id"`
+	EntryID    uuid.UUID `json:"entry_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type Notification struct {
-	ID            uuid.UUID  `json:"id"`
-	RecipientID   uuid.UUID  `json:"recipient_id"`
-	Kind          string     `json:"kind"`
-	PostID        uuid.UUID  `json:"post_id"`
-	CommentID     *uuid.UUID `json:"comment_id"`
-	ApplicationID *uuid.UUID `json:"application_id"`
-	ReadAt        *time.Time `json:"read_at"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID              uuid.UUID  `json:"id"`
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	Kind            string     `json:"kind"`
+	PostID          *uuid.UUID `json:"post_id"`
+	CommentID       *uuid.UUID `json:"comment_id"`
+	ApplicationID   *uuid.UUID `json:"application_id"`
+	ReadAt          *time.Time `json:"read_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
 }
 
 type Post struct {
@@ -236,6 +417,11 @@ type ProductReview struct {
 	CreatedAt time.Time  `json:"created_at"`
 	DeletedAt *time.Time `json:"deleted_at"`
 	HiddenAt  *time.Time `json:"hidden_at"`
+	Event     *string    `json:"event"`
+	Level     *string    `json:"level"`
+	FootSize  *int16     `json:"foot_size"`
+	FootWidth *string    `json:"foot_width"`
+	Usage     *string    `json:"usage"`
 }
 
 type Profile struct {
@@ -246,6 +432,7 @@ type Profile struct {
 	Nickname       *string    `json:"nickname"`
 	NicknamePublic bool       `json:"nickname_public"`
 	BirthMonth     *time.Time `json:"birth_month"`
+	CoachingDemo   bool       `json:"coaching_demo"`
 }
 
 type PushSubscription struct {
@@ -255,6 +442,18 @@ type PushSubscription struct {
 	P256dh    string    `json:"p256dh"`
 	Auth      string    `json:"auth"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type RaceRecord struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	RacedOn   time.Time `json:"raced_on"`
+	Event     string    `json:"event"`
+	Mark      int32     `json:"mark"`
+	Wind      *int16    `json:"wind"`
+	Memo      string    `json:"memo"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type RecruitmentDetail struct {
@@ -293,4 +492,82 @@ type Report struct {
 	Detail     string    `json:"detail"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+	ByGuardian bool      `json:"by_guardian"`
+}
+
+type ReviewOffer struct {
+	ID         uuid.UUID  `json:"id"`
+	RequestID  uuid.UUID  `json:"request_id"`
+	CoachID    uuid.UUID  `json:"coach_id"`
+	OfferedAt  time.Time  `json:"offered_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	Result     *string    `json:"result"`
+	AnsweredAt *time.Time `json:"answered_at"`
+}
+
+type ReviewPayment struct {
+	ID                uuid.UUID  `json:"id"`
+	RequestID         *uuid.UUID `json:"request_id"`
+	PayerID           *uuid.UUID `json:"payer_id"`
+	Method            string     `json:"method"`
+	AmountYen         int32      `json:"amount_yen"`
+	CheckoutSessionID string     `json:"checkout_session_id"`
+	CheckoutUrl       string     `json:"checkout_url"`
+	SessionExpiresAt  time.Time  `json:"session_expires_at"`
+	PaymentIntentID   *string    `json:"payment_intent_id"`
+	Status            string     `json:"status"`
+	AuthorizedAt      *time.Time `json:"authorized_at"`
+	CapturedAt        *time.Time `json:"captured_at"`
+	CanceledAt        *time.Time `json:"canceled_at"`
+	RefundedAt        *time.Time `json:"refunded_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type ReviewRating struct {
+	RequestID uuid.UUID  `json:"request_id"`
+	Stars     *int16     `json:"stars"`
+	RatedAt   *time.Time `json:"rated_at"`
+	Helpful   *string    `json:"helpful"`
+	HelpfulAt *time.Time `json:"helpful_at"`
+}
+
+type ReviewRequest struct {
+	ID            uuid.UUID  `json:"id"`
+	RequesterID   uuid.UUID  `json:"requester_id"`
+	Tier          string     `json:"tier"`
+	Event         string     `json:"event"`
+	Focus         []string   `json:"focus"`
+	VideoPublicID string     `json:"video_public_id"`
+	Status        string     `json:"status"`
+	DueAt         time.Time  `json:"due_at"`
+	CoachID       *uuid.UUID `json:"coach_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	ReturnedAt    *time.Time `json:"returned_at"`
+}
+
+type ReviewResponse struct {
+	RequestID          uuid.UUID  `json:"request_id"`
+	CoachID            *uuid.UUID `json:"coach_id"`
+	GoodPoint          string     `json:"good_point"`
+	FixPoints          []string   `json:"fix_points"`
+	Drill              string     `json:"drill"`
+	DemoVideoPublicID  *string    `json:"demo_video_public_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	ClarifyReason      *string    `json:"clarify_reason"`
+	ClarifyRequestedAt *time.Time `json:"clarify_requested_at"`
+	Clarification      *string    `json:"clarification"`
+	ClarifiedAt        *time.Time `json:"clarified_at"`
+	HelpfulAskedAt     *time.Time `json:"helpful_asked_at"`
+	HiddenAt           *time.Time `json:"hidden_at"`
+}
+
+type SenseNote struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

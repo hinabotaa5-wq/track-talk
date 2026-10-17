@@ -1,0 +1,336 @@
+package httpx
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/hinata/track-talk/apps/api/internal/stripe"
+	"github.com/jackc/pgx/v5"
+)
+
+// フォーム添削の支払い（Stripe Checkout）。Stripe の鍵があるときだけ使い、なければ支払いなしのデモ版。
+// 送ると支払い画面に進み、支払いが届いたら割り当てが始まる。
+// カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
+// PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する。
+
+// reviewPrices は、1本の値段（円）。online-coaching/design-review.md の送る画面の案のとおり。
+var reviewPrices = map[string]int32{"coach": 1000, "senpai": 500}
+
+// 保護者が月の上限を選ぶ前の上限（design-review.md「18歳未満の支払い」）。
+const defaultMinorMonthlyLimit = 3000
+
+func validReviewPayMethod(m string) bool { return m == "card" || m == "paypay" }
+
+func reviewPaymentJSON(p db.ReviewPayment) map[string]any {
+	return map[string]any{
+		"method":      p.Method,
+		"amount_yen":  p.AmountYen,
+		"status":      p.Status,
+		"captured_at": p.CapturedAt,
+		"canceled_at": p.CanceledAt,
+		"refunded_at": p.RefundedAt,
+	}
+}
+
+// attachReviewPayment は、依頼の JSON に支払いを足す。支払いがなければ null。
+func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id uuid.UUID) error {
+	out["payment"] = nil
+	p, err := s.q.GetLatestReviewPayment(ctx, &id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	out["payment"] = reviewPaymentJSON(p)
+	return nil
+}
+
+// minorMonthlyBlock は、18歳未満がこの値段を払うと月の上限を超えるときの文言を返す。超えないなら空。
+func (s *Server) minorMonthlyBlock(ctx context.Context, minorID uuid.UUID, requestID uuid.UUID, price int32) (string, error) {
+	limit := int32(defaultMinorMonthlyLimit)
+	consent, err := s.q.GetGuardianConsentByMinor(ctx, minorID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+	if err == nil && consent.Status == "consented" {
+		if consent.MonthlyLimitYen == nil {
+			return "", nil
+		}
+		limit = *consent.MonthlyLimitYen
+	}
+	used, err := s.q.SumMonthlyReviewPayments(ctx, db.SumMonthlyReviewPaymentsParams{PayerID: &minorID, ExcludeRequestID: requestID})
+	if err != nil {
+		return "", err
+	}
+	if used+price <= limit {
+		return "", nil
+	}
+	return fmt.Sprintf("今月の上限（%s円）を超えるため送れません。今月はあと%s円です。上限は保護者が変えられます（毎月1日にリセットされます）",
+		formatYenNumber(limit), formatYenNumber(max(limit-used, 0))), nil
+}
+
+// reviewCheckoutURL は、依頼の支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。
+func (s *Server) reviewCheckoutURL(ctx context.Context, rr db.ReviewRequest, method string) (string, error) {
+	p, err := s.q.GetReusableReviewPayment(ctx, db.GetReusableReviewPaymentParams{RequestID: &rr.ID, Method: method})
+	if err == nil {
+		return p.CheckoutUrl, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+	price := reviewPrices[rr.Tier]
+	id := uuid.New()
+	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
+	name := "フォーム添削（コーチ）"
+	if rr.Tier == "senpai" {
+		name = "フォーム添削（先輩・上司）"
+	}
+	params := stripe.CheckoutParams{
+		Name:           name,
+		AmountYen:      int(price),
+		SuccessURL:     page + "?paid=1",
+		CancelURL:      page,
+		Reference:      id.String(),
+		Metadata:       map[string]string{"kind": "review", "request_id": rr.ID.String(), "payment_id": id.String()},
+		ExpiresAt:      time.Now().Add(checkoutMinLife),
+		IdempotencyKey: "checkout-" + id.String(),
+	}
+	if method == "card" {
+		// Apple Pay・Google Pay はカードとして出る。
+		params.PaymentMethodTypes = []string{"card"}
+		params.CaptureManual = true
+	} else {
+		params.PaymentMethodTypes = []string{"paypay"}
+	}
+	sess, err := s.stripe.CreateCheckoutSession(ctx, params)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errStripe, err)
+	}
+	expires := params.ExpiresAt
+	if sess.ExpiresAt > 0 {
+		expires = time.Unix(sess.ExpiresAt, 0)
+	}
+	if _, err := s.q.CreateReviewPayment(ctx, db.CreateReviewPaymentParams{
+		ID: id, RequestID: &rr.ID, PayerID: &rr.RequesterID, Method: method, AmountYen: price,
+		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires,
+	}); err != nil {
+		return "", err
+	}
+	return sess.URL, nil
+}
+
+// checkoutReviewRequest は、支払いがまだの依頼の支払い画面を開き直す。
+func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
+	rr, ok := s.requesterReview(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Method string `json:"method"`
+	}
+	if err := DecodeJSON(r, &req); err != nil || !validReviewPayMethod(req.Method) {
+		FieldError(w, map[string]string{"method": "支払い方法を選んでください"})
+		return
+	}
+	if rr.Status != "awaiting_payment" || !rr.DueAt.After(time.Now().Add(checkoutMinLife)) {
+		Error(w, http.StatusConflict, "conflict", "この依頼はお支払いを待っていません")
+		return
+	}
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	s.writeReviewCheckout(w, r, rr, p, req.Method, http.StatusOK)
+}
+
+// writeReviewCheckout は、月の上限を確かめてから支払い画面を作り、依頼と一緒に返す。
+func (s *Server) writeReviewCheckout(w http.ResponseWriter, r *http.Request, rr db.ReviewRequest, p db.Profile, method string, status int) {
+	if p.BirthMonth != nil && isMinor(*p.BirthMonth, time.Now()) {
+		msg, err := s.minorMonthlyBlock(r.Context(), p.ID, rr.ID, reviewPrices[rr.Tier])
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if msg != "" {
+			Error(w, http.StatusUnprocessableEntity, "monthly_limit", msg)
+			return
+		}
+	}
+	url, err := s.reviewCheckoutURL(r.Context(), rr, method)
+	if err != nil {
+		writeCheckoutError(w, err)
+		return
+	}
+	out := s.reviewRequestJSON(rr)
+	out["checkout_url"] = url
+	JSON(w, status, out)
+}
+
+// completeReviewCheckout は、添削の支払い（カードは仮押さえ）が届いたら依頼を割り当ての待ち行列に入れる。
+// 入れられないもの（目安を過ぎた、二重の支払い）は取り消すか返金する。
+func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.CheckoutSession) error {
+	if sess.PaymentIntent == "" {
+		return nil
+	}
+	pay, err := s.q.GetReviewPaymentBySession(ctx, sess.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && pay.Status != "pending") {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	status := "captured"
+	if pay.Method == "card" {
+		// 仮押さえのときは payment_status が unpaid のまま届くので、支払いそのものの状態を確かめる。
+		pi, err := s.stripe.GetPaymentIntent(ctx, sess.PaymentIntent)
+		if err != nil {
+			return err
+		}
+		switch pi.Status {
+		case "requires_capture":
+			status = "authorized"
+		case "succeeded":
+		default:
+			return nil
+		}
+	} else if sess.PaymentStatus != "paid" {
+		return nil
+	}
+	var started *db.ReviewRequest
+	err = s.tx(ctx, func(q *db.Queries) error {
+		var err error
+		pay, err = q.MarkReviewPaymentPaid(ctx, db.MarkReviewPaymentPaidParams{
+			Status: status, PaymentIntentID: &sess.PaymentIntent, CheckoutSessionID: sess.ID,
+		})
+		if err != nil {
+			return err
+		}
+		if pay.RequestID == nil {
+			return nil
+		}
+		rr, err := q.StartPaidReviewRequest(ctx, *pay.RequestID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		started = &rr
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if started == nil {
+		if err := s.releaseReviewPayment(ctx, pay); err != nil {
+			// 取り消せなかったものは tick が拾い直す。
+			slog.Error("release unstarted review payment", "payment", pay.ID, "err", err)
+		}
+		return nil
+	}
+	if _, err := s.offerReview(ctx, started.ID); err != nil {
+		slog.Warn("review offer after payment", "err", err)
+	}
+	return nil
+}
+
+// releaseReviewPayment は、仮押さえを取り消すか、確定済み（PayPay）なら全額を返金する。
+func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment) error {
+	if pay.PaymentIntentID == nil {
+		return errors.New("payment has no payment intent")
+	}
+	var err error
+	if pay.Status == "authorized" {
+		_, err = s.stripe.CancelPaymentIntent(ctx, *pay.PaymentIntentID, "cancel-"+pay.ID.String())
+	} else {
+		_, err = s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(pay.AmountYen), "refund-"+pay.ID.String())
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", errStripe, err)
+	}
+	_, err = s.q.MarkReviewPaymentReleased(ctx, pay.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
+// captureReviewPayment は、返却された依頼の仮押さえを確定する。
+func (s *Server) captureReviewPayment(ctx context.Context, pay db.ReviewPayment) error {
+	if pay.PaymentIntentID == nil {
+		return errors.New("payment has no payment intent")
+	}
+	if _, err := s.stripe.CapturePaymentIntent(ctx, *pay.PaymentIntentID, "capture-"+pay.ID.String()); err != nil {
+		return fmt.Errorf("%w: %w", errStripe, err)
+	}
+	_, err := s.q.MarkReviewPaymentCaptured(ctx, pay.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
+// captureReturnedReview は、返答を出したあとに呼ぶ。確定できなかったものは tick が拾い直す。
+func (s *Server) captureReturnedReview(ctx context.Context, requestID uuid.UUID) {
+	if !s.stripe.Configured() {
+		return
+	}
+	pay, err := s.q.GetLatestReviewPayment(ctx, &requestID)
+	if err != nil || pay.Status != "authorized" {
+		return
+	}
+	if err := s.captureReviewPayment(ctx, pay); err != nil {
+		slog.Error("capture review payment", "payment", pay.ID, "err", err)
+	}
+}
+
+// settleReviewPayments は tick から呼ぶ。返却されたものを確定し、目安を過ぎたもの・始められなかったものを
+// 取り消すか返金し、払わないまま支払い画面が閉じた依頼を消す。
+func (s *Server) settleReviewPayments(ctx context.Context) (released int, err error) {
+	if !s.stripe.Configured() {
+		return 0, nil
+	}
+	capture, err := s.q.ListReviewPaymentsToCapture(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, pay := range capture {
+		if err := s.captureReviewPayment(ctx, pay); err != nil {
+			slog.Error("capture review payment", "payment", pay.ID, "err", err)
+		}
+	}
+	release, err := s.q.ListReviewPaymentsToRelease(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, pay := range release {
+		if err := s.releaseReviewPayment(ctx, pay); err != nil {
+			slog.Error("release review payment", "payment", pay.ID, "err", err)
+			continue
+		}
+		released++
+		if pay.PayerID != nil && pay.Status == "captured" {
+			s.pushQuietly(ctx, *pay.PayerID, push.Message{
+				Title: "フォーム添削の代金を返金しました",
+				Body:  "返却の目安までに返せなかったため、全額を返金しました",
+				URL:   "/me/coaching/requests",
+				Tag:   "review-refund-" + pay.ID.String(),
+			}, 24*time.Hour)
+		}
+	}
+	if _, err := s.q.DeleteUnpaidReviewRequests(ctx); err != nil {
+		return released, err
+	}
+	return released, nil
+}

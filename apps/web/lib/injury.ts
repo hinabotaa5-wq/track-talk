@@ -83,6 +83,37 @@ export function injuryHistoryStageText(stage: { stage_label: string; days: numbe
   return stage.days === 0 ? `${stage.stage_label}（投稿の当日）` : `${stage.stage_label}（${stage.days}日後）`;
 }
 
+export type InjuryProgressStage = {
+  stage: InjuryStage;
+  stage_label: string;
+  my_days: number | null;
+  median_days: number | null;
+};
+
+export type InjuryProgressPost = {
+  post_id: string;
+  body_part: string;
+  body_part_label: string;
+  posted_on: string;
+  stages: InjuryProgressStage[];
+};
+
+export type InjuryProgress = { posts: InjuryProgressPost[]; min_sample: number };
+
+// 自分の経過の列。最初の段階(安静中)は投稿日そのもの。
+export function injuryProgressMyText(stage: InjuryProgressStage) {
+  if (stage.my_days === null) return "まだ";
+  if (stage.stage === injuryStages[0].value) return "投稿日（0日目）";
+  return stage.my_days === 0 ? "投稿の当日に到達" : `${stage.my_days}日目に到達`;
+}
+
+// みんなの中央値の列。報告が足りない段階は日数を出さない(1人の日数が目安に見えないように)。
+export function injuryProgressMedianText(stage: InjuryProgressStage, minSample: number) {
+  if (stage.stage === injuryStages[0].value) return "−";
+  if (stage.median_days === null) return `${minSample}人未満のため非表示`;
+  return stage.median_days === 0 ? "当日" : `${stage.median_days}日`;
+}
+
 // 同じ部位のケガが複数あるとき、その部位名と件数を返す（再発の振り返り用）。
 export function injuryRepeatedParts(items: { body_part: string; body_part_label: string }[]) {
   const counts = new Map<string, { label: string; count: number }>();

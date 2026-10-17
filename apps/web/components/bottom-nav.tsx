@@ -9,8 +9,8 @@ import { useAuth } from "./auth-provider";
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
   { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
+  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
   { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
@@ -37,6 +37,7 @@ export function showsBackButton(pathname: string) {
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
   if (pathname === "/competitions/regional") return true;
+  if (pathname === "/menu-contest") return true;
   if (/^\/injury\/[^/]+\/new$/.test(pathname)) return true;
   if (pathname.startsWith("/posts/")) return true;
   if (pathname.startsWith("/reviews/")) return true;

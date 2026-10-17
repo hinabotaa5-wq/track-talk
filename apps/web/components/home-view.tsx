@@ -7,6 +7,7 @@ import { ReviewHome } from "@/components/review-home";
 import type { PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, readFeed, seedFeed } from "@/lib/home-feed-cache";
 import { parseHomeSort, parseProductKind } from "@/lib/home-sort";
+import { parseReviewFilters, reviewFiltersQuery } from "@/lib/review-filters";
 
 // The filter chips change the URL with history.pushState, so this reads the tab from the URL
 // instead of server props and switches without a server round trip.
@@ -22,7 +23,8 @@ export function HomeView({ initialPath, initial }: { initialPath: string; initia
 
   if (sort === "review") {
     const kind = parseProductKind(sp.get("type"));
-    return <ReviewHome key={`${kind}:${q}:${page}`} kind={kind} q={q} page={page} />;
+    const filters = parseReviewFilters(sp);
+    return <ReviewHome key={`${kind}:${q}:${page}:${reviewFiltersQuery(filters)}`} kind={kind} q={q} page={page} filters={filters} />;
   }
 
   const path = homeFeedPath(sort, q, page);
