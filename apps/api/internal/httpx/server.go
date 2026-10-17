@@ -100,6 +100,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/injury-history", s.myInjuryHistory)
+			r.Get("/injury/me/progress", s.myInjuryProgress)
 			r.Get("/me/sense-notes", s.listSenseNotes)
 			r.Post("/me/sense-notes", s.createSenseNote)
 			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)

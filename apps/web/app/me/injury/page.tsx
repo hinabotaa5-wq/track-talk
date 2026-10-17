@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { InjuryProgressCompare } from "@/components/injury-progress-compare";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
@@ -111,6 +112,7 @@ export default function MyInjuryHistoryPage() {
               </li>
             ))}
           </ul>
+          {token ? <InjuryProgressCompare token={token} /> : null}
         </>
       )}
     </div>
