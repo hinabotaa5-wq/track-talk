@@ -5,12 +5,13 @@ import { ReviewCoachCard, ReviewResponseView } from "@/components/review-respons
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
-import { clarifyReasonLabels, helpfulLabels, reviewFocusLabels, reviewStatusLabels } from "@/lib/review";
-import type { ClarifyReason, HelpfulAnswer, ReviewRequest } from "@/lib/types";
+import { clarifyReasonLabels, helpfulLabels, reviewFocusLabels, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
+import { formatPlanPrice } from "@/lib/coaching-plan";
+import type { ClarifyReason, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 disabled:opacity-50 ${
@@ -127,11 +128,70 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
   );
 }
 
+// 支払いのあと戻ってきたとき、Stripe からの知らせが届いてコーチを探し始めるまで、何回か読み直す。
+const paidPolls = 10;
+
+function paymentText(p: ReviewPayment): string {
+  const price = formatPlanPrice(p.amount_yen);
+  switch (p.status) {
+    case "authorized":
+      return `${price}を仮押さえしています（${reviewPayMethodLabels[p.method]}）。返ってきた時に確定し、目安までに返ってこなければ取り消します。`;
+    case "captured":
+      return `${price}をお支払い済みです（${reviewPayMethodLabels[p.method]}）。`;
+    case "canceled":
+      return `目安までに返ってこなかったため、${price}の仮押さえを取り消しました。代金はかかりません。`;
+    case "refunded":
+      return `目安までに返ってこなかったため、${price}を返金しました。`;
+  }
+}
+
+// お支払いがまだの依頼。支払い方法を選んで、支払い画面を開き直す。
+function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
+  const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
+
+  async function pay(method: ReviewPayMethod) {
+    if (!acquire()) return;
+    setError("");
+    try {
+      const d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/checkout`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ method }),
+      });
+      if (d.checkout_url) window.location.assign(d.checkout_url);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "お支払いの画面を開けませんでした");
+      release();
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <p className="text-sm text-slate-200">お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。</p>
+      {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
+        <button
+          key={m}
+          type="button"
+          disabled={pending}
+          onClick={() => void pay(m)}
+          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-50"
+        >
+          {reviewPayMethodLabels[m]}で払う
+        </button>
+      ))}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+    </section>
+  );
+}
+
 // 送った添削の依頼と、届いた返答。
-export default function ReviewRequestPage() {
+function ReviewRequestView() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const paid = useSearchParams().get("paid") === "1";
+  const [polls, setPolls] = useState(0);
   const [request, setRequest] = useState<ReviewRequest | null>(null);
   const [error, setError] = useState("");
 
@@ -154,7 +214,14 @@ export default function ReviewRequestPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, id]);
+  }, [token, id, polls]);
+
+  const waitingForPayment = paid && request?.status === "awaiting_payment" && polls < paidPolls;
+  useEffect(() => {
+    if (!waitingForPayment) return;
+    const t = window.setTimeout(() => setPolls((n) => n + 1), 2000);
+    return () => window.clearTimeout(t);
+  }, [waitingForPayment, polls]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (loading || !session || !request) return <p className="text-sm text-slate-200">読み込み中...</p>;
@@ -170,8 +237,19 @@ export default function ReviewRequestPage() {
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
         <p className="text-sm font-semibold text-white">{reviewStatusLabels[request.status]}</p>
-        {waiting ? <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p> : null}
+        {waiting || request.status === "awaiting_payment" ? (
+          <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p>
+        ) : null}
+        {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
       </section>
+
+      {request.status === "awaiting_payment" ? (
+        waitingForPayment ? (
+          <p className="text-sm text-slate-100">お支払いを確かめています。このままお待ちください。</p>
+        ) : (
+          <PayAgain request={request} token={token} />
+        )
+      ) : null}
 
       {request.video_url ? (
         <video
@@ -211,5 +289,13 @@ export default function ReviewRequestPage() {
         依頼の一覧へ
       </Link>
     </div>
+  );
+}
+
+export default function ReviewRequestPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+      <ReviewRequestView />
+    </Suspense>
   );
 }

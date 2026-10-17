@@ -1,4 +1,4 @@
-import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewStatus } from "./types";
+import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewPayMethod, ReviewStatus } from "./types";
 
 // 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す（API の reviewEvents と合わせる）。
 export const reviewEvents: CoachEvent[] = ["100m"];
@@ -18,12 +18,18 @@ export const reviewFocusLabels: Record<ReviewFocus, string> = {
 export const reviewFocusOptions = Object.keys(reviewFocusLabels) as ReviewFocus[];
 
 export const reviewStatusLabels: Record<ReviewStatus, string> = {
+  awaiting_payment: "お支払い待ち",
   queued: "コーチを探しています",
   offered: "コーチを探しています",
   in_review: "添削中",
   returned: "返却済み",
   clarifying: "補足を待っています",
   expired: "期限切れ",
+};
+
+export const reviewPayMethodLabels: Record<ReviewPayMethod, string> = {
+  card: "カード・Apple Pay・Google Pay",
+  paypay: "PayPay",
 };
 
 // 「ここがわからなかった」の選択肢。自由記述は置かない（やりとりは一方通行のまま）。

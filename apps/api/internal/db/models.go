@@ -471,6 +471,25 @@ type ReviewOffer struct {
 	AnsweredAt *time.Time `json:"answered_at"`
 }
 
+type ReviewPayment struct {
+	ID                uuid.UUID  `json:"id"`
+	RequestID         *uuid.UUID `json:"request_id"`
+	PayerID           *uuid.UUID `json:"payer_id"`
+	Method            string     `json:"method"`
+	AmountYen         int32      `json:"amount_yen"`
+	CheckoutSessionID string     `json:"checkout_session_id"`
+	CheckoutUrl       string     `json:"checkout_url"`
+	SessionExpiresAt  time.Time  `json:"session_expires_at"`
+	PaymentIntentID   *string    `json:"payment_intent_id"`
+	Status            string     `json:"status"`
+	AuthorizedAt      *time.Time `json:"authorized_at"`
+	CapturedAt        *time.Time `json:"captured_at"`
+	CanceledAt        *time.Time `json:"canceled_at"`
+	RefundedAt        *time.Time `json:"refunded_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
 type ReviewRating struct {
 	RequestID uuid.UUID  `json:"request_id"`
 	Stars     *int16     `json:"stars"`

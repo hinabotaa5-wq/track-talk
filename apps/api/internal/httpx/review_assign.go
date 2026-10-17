@@ -157,6 +157,8 @@ type coachingTickResult struct {
 	ContractsEnded   int `json:"contracts_ended"`
 	// 支払い: 自動で返金したもの（コーチが72時間書かなかった、始まらなかった）。
 	PaymentsRefunded int `json:"payments_refunded"`
+	// 添削の支払い: 目安を過ぎたなどで取り消し・返金したもの。
+	ReviewPaymentsReleased int `json:"review_payments_released"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
@@ -186,6 +188,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.PaymentsRefunded, err = s.refundCoachingPayments(ctx); err != nil {
 		return out, err
 	}
+	if out.ReviewPaymentsReleased, err = s.settleReviewPayments(ctx); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -196,6 +201,9 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	body := "返却の目安までに引き受けるコーチが見つかりませんでした"
 	if rr.OldStatus == "in_review" {
 		body = "返却の目安までにコーチの返答が届きませんでした"
+	}
+	if s.stripe.Configured() {
+		body += "。お支払いは取り消します（PayPay は返金します）"
 	}
 	s.pushQuietly(ctx, rr.RequesterID, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",
@@ -246,7 +254,11 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"due_at": due, "coaches_on_duty": onDuty})
+	JSON(w, http.StatusOK, map[string]any{
+		"due_at": due, "coaches_on_duty": onDuty,
+		// payments が false のあいだは支払いなしのデモ版。
+		"payments": s.stripe.Configured(), "price_yen": reviewPrices[tier],
+	})
 }
 
 // coachRequestJSON は、コーチに見せる依頼。依頼した人がわかる情報は出さない。
