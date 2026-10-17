@@ -36,6 +36,8 @@ func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string
 	}
 	execSQLArgs(t, `INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, 'key', 'auth')`,
 		uuid.New(), id, "https://push.example.com/"+uuid.NewString())
+	// 支払いのあるテストでも受付を始められるように、受け取り口座の登録を済ませておく。
+	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, id, "acct_"+id.String())
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
 		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
 	}

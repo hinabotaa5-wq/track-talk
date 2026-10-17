@@ -25,7 +25,7 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -51,6 +51,9 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.PhotoPublicID,
 		&i.PledgedAt,
 		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ReducedFeeUntil,
 	)
 	return i, err
 }
@@ -233,7 +236,7 @@ SET rating_reset_at = now(),
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
 `
 
 // 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
@@ -259,6 +262,9 @@ func (q *Queries) ResetCoachRating(ctx context.Context, profileID uuid.UUID) (Co
 		&i.PhotoPublicID,
 		&i.PledgedAt,
 		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ReducedFeeUntil,
 	)
 	return i, err
 }
@@ -271,7 +277,7 @@ SET status = $1,
 WHERE profile_id = $2
   AND status = 'pending'
   AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
 `
 
 type ReviewCoachApplicationParams struct {
@@ -302,6 +308,9 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.PhotoPublicID,
 		&i.PledgedAt,
 		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ReducedFeeUntil,
 	)
 	return i, err
 }
@@ -343,7 +352,7 @@ SET tier = EXCLUDED.tier,
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
 `
 
 type SubmitCoachApplicationParams struct {
@@ -386,6 +395,9 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.PhotoPublicID,
 		&i.PledgedAt,
 		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ReducedFeeUntil,
 	)
 	return i, err
 }

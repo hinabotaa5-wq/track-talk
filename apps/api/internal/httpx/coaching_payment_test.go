@@ -26,6 +26,30 @@ type fakeStripe struct {
 	// 仮押さえの確定・取り消しを受けた PaymentIntent。
 	captured []string
 	canceled []string
+	// Connect: 作ったアカウント、受け取りの準備ができたアカウント、送金。
+	accounts  []url.Values
+	enabled   map[string]bool
+	transfers []url.Values
+	// 送金を断らせるときの数。
+	failTransfers int
+}
+
+func (f *fakeStripe) transferList() []url.Values {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]url.Values(nil), f.transfers...)
+}
+
+func (f *fakeStripe) enable(account string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.enabled[account] = true
+}
+
+func (f *fakeStripe) failNextTransfers(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failTransfers = n
 }
 
 func (f *fakeStripe) calls() (captured, canceled []string) {
@@ -48,7 +72,7 @@ func (f *fakeStripe) refundList() []url.Values {
 
 func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 	t.Helper()
-	f := &fakeStripe{}
+	f := &fakeStripe{enabled: map[string]bool{}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user, _, _ := r.BasicAuth(); user != "sk_test_x" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -81,6 +105,23 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 				"id": fmt.Sprintf("cs_test_%d_%s", n, r.PostForm.Get("client_reference_id")), "url": fmt.Sprintf("https://checkout.stripe.test/%d", n),
 				"expires_at": json.Number(r.PostForm.Get("expires_at")),
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/accounts":
+			f.accounts = append(f.accounts, r.PostForm)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "acct_" + r.PostForm.Get("metadata[profile_id]")})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/accounts/"):
+			id := strings.TrimPrefix(r.URL.Path, "/v1/accounts/")
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "payouts_enabled": f.enabled[id], "details_submitted": f.enabled[id]})
+		case r.URL.Path == "/v1/account_links":
+			_ = json.NewEncoder(w).Encode(map[string]any{"url": "https://connect.stripe.test/" + r.PostForm.Get("account")})
+		case r.URL.Path == "/v1/transfers":
+			if f.failTransfers > 0 {
+				f.failTransfers--
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "invalid_request_error", "code": "balance_insufficient", "message": "insufficient funds"}})
+				return
+			}
+			f.transfers = append(f.transfers, r.PostForm)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
 		case r.URL.Path == "/v1/refunds":
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})

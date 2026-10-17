@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachEarningsSection } from "@/components/coach-payouts";
 import { CoachPhotoForm } from "@/components/coach-photo";
 import { CoachContractsSection } from "@/components/coaching-contracts";
 import { CoachPlansSection } from "@/components/coaching-plans";
@@ -156,6 +157,8 @@ export default function CoachPage() {
   const [rating, setRating] = useState<CoachRatingSummary | null>(null);
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  // Stripe で口座の登録が済んだと分かったら、受付を始められるようにする。
+  const onPayoutsReady = useCallback(() => setCoach((c) => (c && !c.payouts_ready ? { ...c, payouts_ready: true } : c)), []);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -273,6 +276,8 @@ export default function CoachPage() {
           </p>
         ) : null}
       </section>
+
+      <CoachEarningsSection token={token} onReady={onPayoutsReady} />
 
       <CoachRequestsSection token={token} />
 
