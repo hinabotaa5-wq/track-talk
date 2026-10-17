@@ -1,6 +1,7 @@
 "use client";
 
 import { CoachAvatar } from "@/components/coach-photo";
+import { CoachingContractsAdmin } from "@/components/coaching-admin";
 import { useAuth } from "@/components/auth-provider";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { apiFetch } from "@/lib/api";
@@ -41,6 +42,7 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
   comment: "コメント",
   injury_note: "ケガ部の一言",
   review_response: "添削の返答",
+  coaching_message: "パーソナル指導のやりとり",
 };
 
 const perPage = 20;
@@ -82,7 +84,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   );
 }
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "menu";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "menu";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   const [items, setItems] = useState<T[]>([]);
@@ -548,7 +550,7 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const custom = tab === "products" || tab === "coaches" || tab === "menu";
+  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "menu";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
@@ -557,6 +559,7 @@ export default function AdminPage() {
     { id: "requests", label: "商品リクエスト", total: requests.total },
     { id: "products", label: "商品", total: -1 },
     { id: "coaches", label: "コーチ", total: -1 },
+    { id: "personal", label: "パーソナル", total: -1 },
     { id: "menu", label: "エグ練", total: -1 },
   ];
 
@@ -581,6 +584,7 @@ export default function AdminPage() {
       </div>
       {tab === "products" ? <ProductsAdmin token={token} /> : null}
       {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
+      {tab === "personal" ? <CoachingContractsAdmin token={token} /> : null}
       {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
       {custom ? null : tab === "reports" ? (
@@ -593,14 +597,22 @@ export default function AdminPage() {
                 {r.target_hidden ? " · 非表示済み" : ""}
               </p>
               {r.target_title ? <p className="font-medium">{r.target_title}</p> : null}
-              {r.target_body ? (
+              {r.target_type === "coaching_message" ? (
+                <p className="text-sm text-slate-300">中身は、開くと記録が残る画面で確認します。</p>
+              ) : r.target_body ? (
                 <p className="line-clamp-4 whitespace-pre-wrap text-sm text-slate-300">{r.target_body}</p>
               ) : (
                 <p className="text-sm text-slate-400">対象は削除されています</p>
               )}
               {r.detail ? <p className="whitespace-pre-wrap text-sm">通報内容: {r.detail}</p> : null}
-              <p className="text-xs text-slate-300">通報者: {r.reporter_nickname ?? "名前なし"}</p>
-              {!r.target_body ? null : r.target_type === "injury_note" || r.target_type === "review_response" ? (
+              <p className="text-xs text-slate-300">
+                通報者: {r.by_guardian ? `保護者（${r.reporter_nickname ?? "名前なし"}さんの）` : (r.reporter_nickname ?? "名前なし")}
+              </p>
+              {r.target_type === "coaching_message" ? (
+                <Link href={`/admin/coaching/${r.coaching_contract_id}?report=${r.id}`} className="text-sm text-blue-300 underline">
+                  やりとりを開く
+                </Link>
+              ) : !r.target_body ? null : r.target_type === "injury_note" || r.target_type === "review_response" ? (
                 <InjuryNoteActions report={r} token={token} />
               ) : (
                 <Link href={`/posts/${r.post_id}`} className="text-sm text-blue-300 underline">

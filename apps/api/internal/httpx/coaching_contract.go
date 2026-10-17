@@ -143,7 +143,8 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	minor := isMinor(*me.BirthMonth, time.Now())
 	if minor {
-		// いまは添削と同じ保護者の同意を使う。契約ごとの保護者の同意は、保護者の参加と一緒に足す。
+		// 保護者のリンクが使える（添削と同じ同意が済んでいる）人だけ申し込める。
+		// 契約ごとの同意は、コーチが承諾したあとに保護者がそのリンクから行う。
 		consent, err := s.q.GetGuardianConsentByMinor(r.Context(), me.ID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			MapDBError(w, err)
@@ -178,7 +179,7 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 			return err
 		}
 		return q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
-			ContractID: ct.ID, Party: "requester", ProfileID: me.ID, Version: contractConsentVersion,
+			ContractID: ct.ID, Party: "requester", ProfileID: &me.ID, Version: contractConsentVersion,
 		})
 	})
 	var pgErr *pgconn.PgError
@@ -215,6 +216,8 @@ func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 		"minor":          ct.Minor,
 		"status":         ct.Status,
 		"respond_by":     ct.RespondBy,
+		"start_by":       ct.StartBy,
+		"suspended_at":   ct.SuspendedAt,
 		"responded_at":   ct.RespondedAt,
 		"starts_at":      ct.StartsAt,
 		"ends_at":        ct.EndsAt,
@@ -239,6 +242,7 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		out = append(out, c)
@@ -263,6 +267,7 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
 		})
 		// コーチには利用者のニックネームだけを見せる。
 		c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -295,6 +300,7 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
+		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt,
 	})
 	role := "requester"
 	if row.CoachID == me.ID {
@@ -339,7 +345,7 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 			return err
 		}
 		return q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
-			ContractID: ct.ID, Party: "coach", ProfileID: coach.ProfileID, Version: contractConsentVersion,
+			ContractID: ct.ID, Party: "coach", ProfileID: &coach.ProfileID, Version: contractConsentVersion,
 		})
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -350,12 +356,17 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	s.pushQuietly(r.Context(), ct.RequesterID, push.Message{
+	msg := push.Message{
 		Title: "パーソナル指導が始まりました",
 		Body:  "コーチが「" + ct.PlanTitle + "」の申し込みを承諾しました",
 		URL:   "/coaching/personal/" + ct.ID.String(),
 		Tag:   "contract-" + ct.ID.String(),
-	}, 24*time.Hour)
+	}
+	if ct.Status == "accepted" {
+		msg.Title = "コーチが申し込みを承諾しました"
+		msg.Body = "保護者が72時間以内に同意すると始まります。保護者に知らせてください"
+	}
+	s.pushQuietly(r.Context(), ct.RequesterID, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
 }
 
@@ -428,11 +439,23 @@ func (s *Server) cancelCoachingContract(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
 }
 
-// closeCoachingContracts は、返事のないまま48時間たった申し込みと、期間が終わったものを閉じる。
+// closeCoachingContracts は、返事のないまま48時間たった申し込み、保護者が72時間同意しなかったもの、
+// 期間が終わったものを閉じる。
 func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int, err error) {
 	ex, err := s.q.ExpireCoachingApplications(ctx)
 	if err != nil {
 		return 0, 0, err
+	}
+	starts, err := s.q.ExpireCoachingStarts(ctx)
+	if err != nil {
+		return len(ex), 0, err
+	}
+	for _, ct := range starts {
+		msg := push.Message{Title: "パーソナル指導は始まりませんでした", Body: "72時間のうちに保護者の同意がありませんでした", Tag: "contract-" + ct.ID.String()}
+		msg.URL = "/coaching/personal/" + ct.ID.String()
+		s.pushQuietly(ctx, ct.RequesterID, msg, 24*time.Hour)
+		msg.URL = "/coach"
+		s.pushQuietly(ctx, ct.CoachID, msg, 24*time.Hour)
 	}
 	for _, ct := range ex {
 		s.pushQuietly(ctx, ct.RequesterID, push.Message{
@@ -444,7 +467,7 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 	}
 	en, err := s.q.EndCoachingContracts(ctx)
 	if err != nil {
-		return len(ex), 0, err
+		return len(ex) + len(starts), 0, err
 	}
 	for _, ct := range en {
 		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました", Tag: "contract-" + ct.ID.String()}
@@ -453,7 +476,7 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 		msg.URL = "/coach"
 		s.pushQuietly(ctx, ct.CoachID, msg, 24*time.Hour)
 	}
-	return len(ex), len(en), nil
+	return len(ex) + len(starts), len(en), nil
 }
 
 // tx は、fn を1つのトランザクションで行う。fn がエラーを返したら巻き戻す。

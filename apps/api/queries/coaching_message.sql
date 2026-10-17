@@ -30,3 +30,10 @@ RETURNING *;
 -- name: GetCoachingContractRating :one
 SELECT * FROM coaching_contract_ratings
 WHERE contract_id = $1;
+
+-- name: GetCoachingMessageContract :one
+-- 通報する1通と、その契約。
+SELECT m.id, m.sender_id, m.sender_role, ct.id AS contract_id, ct.requester_id, ct.coach_id, ct.minor
+FROM coaching_messages m
+JOIN coaching_contracts ct ON ct.id = m.contract_id
+WHERE m.id = $1;

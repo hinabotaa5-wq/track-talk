@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// パーソナル指導のやりとり欄。申し込んだ人とコーチだけが読み書きする（保護者の参加は後の PR で足す）。
+// パーソナル指導のやりとり欄。申し込んだ人とコーチが読み書きし、18歳未満のときは保護者もリンクから参加する。
 // 期間中だけ送れて、終わったあとは読むだけ。リアルタイムにはせず、送ったら相手に Web Push で知らせる。
 // 文章とメニューは、利用者からもコーチからも連絡先らしい文字を止める。止めた文章は保存せず、回数だけ数える。
 
@@ -88,13 +88,18 @@ func (s *Server) contractParty(w http.ResponseWriter, r *http.Request) (db.Profi
 	return me, ct, role, true
 }
 
-func (s *Server) coachingMessageJSON(m db.CoachingMessage, me uuid.UUID) map[string]any {
+// coachingMessageJSON は1通を返す。viewerRole が guardian のときは、保護者が送ったものを mine にする。
+func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, viewerRole string) map[string]any {
+	mine := m.SenderID != nil && *m.SenderID == viewer
+	if viewerRole == "guardian" {
+		mine = m.SenderRole == "guardian"
+	}
 	out := map[string]any{
 		"id":          m.ID,
 		"sender_role": m.SenderRole,
-		"mine":        m.SenderID != nil && *m.SenderID == me,
-		// 送った人が退会していれば false。
-		"sender_active": m.SenderID != nil,
+		"mine":        mine,
+		// 送った人が退会していれば false。保護者はアカウントを持たないので常に true。
+		"sender_active": m.SenderID != nil || m.SenderRole == "guardian",
 		"body":          m.Body,
 		"video_url":     nil,
 		"thumbnail_url": nil,
@@ -111,12 +116,13 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, me uuid.UUID) map[str
 	return out
 }
 
-func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
-	me, ct, _, ok := s.contractParty(w, r)
-	if !ok {
-		return
-	}
-	if ct.Status != "active" && ct.Status != "ended" {
+// messagesVisible は、やりとり欄を読める状態か。止めている間も、それまでのものは読める。
+func messagesVisible(status string) bool {
+	return status == "active" || status == "suspended" || status == "ended"
+}
+
+func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, viewer uuid.UUID, viewerRole string) {
+	if !messagesVisible(ct.Status) {
 		JSON(w, http.StatusOK, map[string]any{"messages": []any{}})
 		return
 	}
@@ -127,9 +133,17 @@ func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
-		out = append(out, s.coachingMessageJSON(m, me.ID))
+		out = append(out, s.coachingMessageJSON(m, viewer, viewerRole))
 	}
 	JSON(w, http.StatusOK, map[string]any{"messages": out})
+}
+
+func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
+	me, ct, role, ok := s.contractParty(w, r)
+	if !ok {
+		return
+	}
+	s.writeCoachingMessages(w, r, ct, me.ID, role)
 }
 
 type coachingMessageReq struct {
@@ -143,7 +157,17 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if ct.Status != "active" {
+	s.sendCoachingMessage(w, r, ct, &me.ID, role)
+}
+
+// sendCoachingMessage は1通を送る。保護者は sender が nil で、動画は送れない（アップロードにログインが要るため）。
+func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, sender *uuid.UUID, role string) {
+	switch ct.Status {
+	case "active":
+	case "suspended":
+		Error(w, http.StatusConflict, "conflict", "運営が確認のため、やりとりを止めています")
+		return
+	default:
 		Error(w, http.StatusConflict, "conflict", "期間中だけ送れます")
 		return
 	}
@@ -164,8 +188,12 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 			fields["menu"] = e
 		}
 	}
-	if req.VideoPublicID != "" && !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
-		fields["video_public_id"] = "動画を選び直してください"
+	if req.VideoPublicID != "" {
+		if role == "guardian" {
+			fields["video_public_id"] = "保護者のページからは動画を送れません"
+		} else if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
+			fields["video_public_id"] = "動画を選び直してください"
+		}
 	}
 	if req.Body == "" && req.VideoPublicID == "" && req.Menu == nil {
 		fields["body"] = "メッセージを入力してください"
@@ -179,9 +207,12 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 		text += "\n" + req.Menu.text()
 	}
 	if looksLikeContact(text) {
-		if err := s.q.CountBlockedContact(r.Context(), db.CountBlockedContactParams{ContractID: ct.ID, ProfileID: me.ID}); err != nil {
-			MapDBError(w, err)
-			return
+		// 回数はアカウントごとに数える。保護者はアカウントがないので数えない。
+		if sender != nil {
+			if err := s.q.CountBlockedContact(r.Context(), db.CountBlockedContactParams{ContractID: ct.ID, ProfileID: *sender}); err != nil {
+				MapDBError(w, err)
+				return
+			}
 		}
 		Error(w, http.StatusUnprocessableEntity, "contact_blocked", "連絡先（URL・メールアドレス・SNS の ID・電話番号など）は送れません。TrackTalk の外でのやりとりは規約で禁止されています")
 		return
@@ -205,7 +236,7 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 	m, err := s.q.CreateCoachingMessage(r.Context(), db.CreateCoachingMessageParams{
 		ID:            uuid.New(),
 		ContractID:    ct.ID,
-		SenderID:      &me.ID,
+		SenderID:      sender,
 		SenderRole:    role,
 		Body:          req.Body,
 		VideoPublicID: videoID,
@@ -220,14 +251,27 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	// 中身は通知に載せない。
-	to, title := ct.CoachID, "パーソナル指導に新しいメッセージ"
-	if role == "coach" {
-		to, title = ct.RequesterID, "コーチからメッセージが届きました"
+	// 中身は通知に載せない。保護者にはメッセージごとの通知はしない。
+	body := "「" + ct.PlanTitle + "」のやりとり欄を開いてください"
+	tag := "contract-msg-" + ct.ID.String()
+	toRequester := push.Message{Title: "コーチからメッセージが届きました", Body: body, URL: "/coaching/personal/" + ct.ID.String(), Tag: tag}
+	toCoach := push.Message{Title: "パーソナル指導に新しいメッセージ", Body: body, URL: "/coaching/personal/" + ct.ID.String(), Tag: tag}
+	switch role {
+	case "requester":
+		s.pushQuietly(r.Context(), ct.CoachID, toCoach, 24*time.Hour)
+	case "coach":
+		s.pushQuietly(r.Context(), ct.RequesterID, toRequester, 24*time.Hour)
+	case "guardian":
+		toRequester.Title = "保護者がメッセージを送りました"
+		toCoach.Title = "保護者からメッセージが届きました"
+		s.pushQuietly(r.Context(), ct.RequesterID, toRequester, 24*time.Hour)
+		s.pushQuietly(r.Context(), ct.CoachID, toCoach, 24*time.Hour)
 	}
-	url := "/coaching/personal/" + ct.ID.String()
-	s.pushQuietly(r.Context(), to, push.Message{Title: title, Body: "「" + ct.PlanTitle + "」のやりとり欄を開いてください", URL: url, Tag: "contract-msg-" + ct.ID.String()}, 24*time.Hour)
-	JSON(w, http.StatusCreated, map[string]any{"message": s.coachingMessageJSON(m, me.ID)})
+	viewer := uuid.Nil
+	if sender != nil {
+		viewer = *sender
+	}
+	JSON(w, http.StatusCreated, map[string]any{"message": s.coachingMessageJSON(m, viewer, role)})
 }
 
 func (s *Server) rateCoachingContract(w http.ResponseWriter, r *http.Request) {

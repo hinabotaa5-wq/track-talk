@@ -81,10 +81,17 @@ export default function CoachingContractPage() {
         {contract.status === "applied" ? (
           <p className="text-sm text-slate-200">{formatDateTime(contract.respond_by)}までにコーチから返事が届きます。</p>
         ) : null}
+        {contract.status === "accepted" && contract.start_by ? (
+          <p className="text-sm text-slate-200">
+            {isCoach
+              ? `保護者の同意を待っています。${formatDateTime(contract.start_by)}までに同意があると始まります。`
+              : `コーチが引き受けました。保護者が${formatDateTime(contract.start_by)}までに、同意のページからこの申し込みに同意すると始まります。保護者に知らせてください。`}
+          </p>
+        ) : null}
         {contract.starts_at ? <p className="text-sm text-slate-200">期間: {contractPeriod(contract)}</p> : null}
       </section>
 
-      {contract.status === "active" || contract.status === "ended" ? (
+      {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" ? (
         <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
       ) : null}
 

@@ -31,6 +31,14 @@ type CoachProfile struct {
 	PledgeVersion *int16     `json:"pledge_version"`
 }
 
+type CoachingAccessLog struct {
+	ID         uuid.UUID `json:"id"`
+	AdminID    uuid.UUID `json:"admin_id"`
+	ContractID uuid.UUID `json:"contract_id"`
+	ReportID   uuid.UUID `json:"report_id"`
+	OpenedAt   time.Time `json:"opened_at"`
+}
+
 type CoachingBlockedCount struct {
 	ContractID    uuid.UUID `json:"contract_id"`
 	ProfileID     uuid.UUID `json:"profile_id"`
@@ -59,16 +67,18 @@ type CoachingContract struct {
 	EndsAt        *time.Time `json:"ends_at"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	StartBy       *time.Time `json:"start_by"`
+	SuspendedAt   *time.Time `json:"suspended_at"`
 }
 
 type CoachingContractConsent struct {
-	ContractID       uuid.UUID `json:"contract_id"`
-	Party            string    `json:"party"`
-	ProfileID        uuid.UUID `json:"profile_id"`
-	Version          int16     `json:"version"`
-	ReportReview     bool      `json:"report_review"`
-	ContactDetection bool      `json:"contact_detection"`
-	AgreedAt         time.Time `json:"agreed_at"`
+	ContractID       uuid.UUID  `json:"contract_id"`
+	Party            string     `json:"party"`
+	ProfileID        *uuid.UUID `json:"profile_id"`
+	Version          int16      `json:"version"`
+	ReportReview     bool       `json:"report_review"`
+	ContactDetection bool       `json:"contact_detection"`
+	AgreedAt         time.Time  `json:"agreed_at"`
 }
 
 type CoachingContractRating struct {
@@ -417,6 +427,7 @@ type Report struct {
 	Detail     string    `json:"detail"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+	ByGuardian bool      `json:"by_guardian"`
 }
 
 type ReviewOffer struct {
