@@ -5,7 +5,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import {
   contractConsentItems,
-  contractStatusLabels,
+  contractStatusLabel,
   formatPlanPrice,
   planDurationLabel,
   planKindLabels,
@@ -208,7 +208,7 @@ export function CoachContractsSection({ token }: { token: string | null }) {
                   {c.requester?.nickname ?? "名前なし"}さん · {c.plan_title}
                 </span>
                 <span className="block text-xs text-slate-300">
-                  {c.status === "active" ? contractPeriod(c) : contractStatusLabels[c.status]}
+                  {c.status === "active" ? contractPeriod(c) : contractStatusLabel(c)}
                 </span>
               </Link>
             </li>

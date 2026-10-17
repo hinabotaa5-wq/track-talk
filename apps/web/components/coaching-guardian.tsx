@@ -4,7 +4,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, ContractDetails, contractPeriod, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabels } from "@/lib/coaching-plan";
+import { contractStatusLabel, formatPlanPrice } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 // 保護者のページの「パーソナル指導」。コーチが引き受けた申し込みに契約ごとに同意し、期間中はやりとりに参加する。
+// 支払いがある申し込みは、同意したら Stripe の支払い画面へ進み、支払いが済んだ時から期間が始まる。
 
 function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; token: string; onDone: () => void }) {
   const [consents, setConsents] = useState<ContractConsents>(noConsents);
@@ -25,10 +26,14 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
     setError("");
     setFields({});
     try {
-      await apiFetch(`/v1/guardian/${encodeURIComponent(token)}/contracts/${contract.id}/${action}`, {
+      const d = await apiFetch<{ checkout_url?: string }>(`/v1/guardian/${encodeURIComponent(token)}/contracts/${contract.id}/${action}`, {
         method: "POST",
         body: action === "consent" ? JSON.stringify(consents) : undefined,
       });
+      if (d.checkout_url) {
+        window.location.href = d.checkout_url;
+        return;
+      }
       onDone();
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
@@ -38,16 +43,54 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
     }
   }
 
+  async function pay() {
+    if (!acquire()) return;
+    setError("");
+    try {
+      const d = await apiFetch<{ checkout_url: string }>(`/v1/guardian/${encodeURIComponent(token)}/contracts/${contract.id}/checkout`, {
+        method: "POST",
+      });
+      window.location.href = d.checkout_url;
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "お支払いの画面を開けませんでした");
+      release();
+    }
+  }
+
+  const by = contract.start_by ? formatDateTime(contract.start_by) : "";
+  if (contract.payment_required && contract.guardian_consented) {
+    return (
+      <div className="space-y-3">
+        <ContractDetails contract={contract} />
+        <p className="text-sm font-semibold text-white">同意は済んでいます。{by}までにお支払いを済ませると、その時から期間が始まります。</p>
+        <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
+          お支払いへ進む（{formatPlanPrice(contract.price_yen)}）
+        </Button>
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <ContractDetails contract={contract} />
-      {contract.start_by ? (
-        <p className="text-sm font-semibold text-white">{formatDateTime(contract.start_by)}までに同意すると、その時から期間が始まります。</p>
+      {by ? (
+        <p className="text-sm font-semibold text-white">
+          {contract.payment_required
+            ? `${by}までに同意してお支払いを済ませると、その時から期間が始まります。`
+            : `${by}までに同意すると、その時から期間が始まります。`}
+        </p>
       ) : null}
       <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
         <li>期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。新しいメッセージの通知は届きません。</li>
         <li>連絡先の交換と、直接会う約束は禁止です。気になるメッセージは「通報する」から運営に知らせてください。</li>
-        <li>いまはお試し期間のため、お支払いはありません。</li>
+        {contract.payment_required ? (
+          <li>
+            料金は{formatPlanPrice(contract.price_yen)}で、同意のあとお支払いの画面（カード・Apple Pay・Google Pay・PayPay）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
+          </li>
+        ) : (
+          <li>いまはお試し期間のため、お支払いはありません。</li>
+        )}
       </ul>
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
       <div className="flex gap-2">
@@ -57,7 +100,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
           disabled={pending || !consents.agree_report || !consents.agree_detection}
           onClick={() => void answer("consent")}
         >
-          同意して始める
+          {contract.payment_required ? "同意してお支払いへ進む" : "同意して始める"}
         </Button>
         <button
           type="button"
@@ -116,7 +159,7 @@ export function GuardianPersonalSection({ token }: { token: string }) {
               {c.coach ? <CoachAvatar url={c.coach.photo_url} name={c.coach.nickname} size={44} /> : null}
               <div className="min-w-0">
                 <p className="font-semibold text-white">{c.coach?.nickname ?? "コーチ"}</p>
-                <p className="text-xs text-blue-300">{contractStatusLabels[c.status]}</p>
+                <p className="text-xs text-blue-300">{contractStatusLabel(c)}</p>
               </div>
             </div>
             {c.status === "accepted" ? (
@@ -125,7 +168,7 @@ export function GuardianPersonalSection({ token }: { token: string }) {
               <>
                 <p className="text-sm text-slate-100">{c.plan_title}</p>
                 {c.starts_at ? <p className="text-xs text-slate-300">期間: {contractPeriod(c)}</p> : null}
-                {c.status === "active" || c.status === "suspended" || c.status === "ended" ? (
+                {c.status === "active" || c.status === "suspended" || c.status === "ended" || c.status === "refunded" ? (
                   <Link
                     href={`/guardian/${encodeURIComponent(token)}/personal/${c.id}`}
                     className="block text-sm text-blue-300 underline"

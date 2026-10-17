@@ -405,6 +405,8 @@ export function CoachingMessages({
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
           運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
         </p>
+      ) : contract.status === "refunded" ? (
+        <p className="text-sm text-slate-300">返金して終了したので、読むだけになりました。</p>
       ) : (
         <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。</p>
       )}

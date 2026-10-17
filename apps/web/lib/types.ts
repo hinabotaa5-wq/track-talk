@@ -334,13 +334,15 @@ export type CoachingPlan = {
 };
 
 // パーソナル指導の申し込み。applied: コーチの返事待ち、active: 期間中、ended: 終わった、
-// declined: コーチが断った、expired: 48時間返事がなかった、cancelled: 返事の前に取り下げた。
+// declined: コーチが断った、expired: 返事・同意・支払いがないまま期限が過ぎた、cancelled: 返事の前に取り下げた、
+// refunded: 返金して途中で終わった。
 export type CoachingContractStatus =
   | "applied"
   | "accepted"
   | "active"
   | "suspended"
   | "ended"
+  | "refunded"
   | "declined"
   | "guardian_declined"
   | "expired"
@@ -357,10 +359,12 @@ export type CoachingContract = {
   current_record: string;
   message: string;
   minor: boolean;
+  // Stripe の支払いがある申し込み。false はデモ版（支払いなし）。
+  payment_required: boolean;
   status: CoachingContractStatus;
   respond_by: string;
   responded_at: string | null;
-  // 18歳未満のとき、保護者が同意する期限（コーチが承諾したあと）。
+  // コーチが承諾したあと、保護者の同意や支払いを済ませる期限。
   start_by: string | null;
   suspended_at: string | null;
   starts_at: string | null;
@@ -370,6 +374,18 @@ export type CoachingContract = {
   rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };
   requester?: { nickname: string | null };
+  // 支払い画面を開いただけのものは含まない。
+  payment?: CoachingPayment | null;
+  // 保護者のページだけ: 保護者がこの申し込みに同意したか。
+  guardian_consented?: boolean;
+};
+
+export type CoachingPayment = {
+  status: "paid" | "refunded" | "partially_refunded";
+  amount_yen: number;
+  refunded_yen: number;
+  paid_at: string;
+  refunded_at: string | null;
 };
 
 // 運営のパーソナル指導の一覧。会話の中身は含まない。
@@ -384,6 +400,10 @@ export type AdminCoachingContract = {
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
+  payment_required: boolean;
+  // 空文字はまだ支払いがない。
+  payment_status: "" | CoachingPayment["status"];
+  refunded_yen: number;
   requester_nickname: string | null;
   coach_nickname: string | null;
   report_count: number;
@@ -424,6 +444,8 @@ export type CoachingMessage = {
 
 // 申し込む画面に出すプランとコーチ。
 export type PublicCoachingPlan = {
+  // false のあいだは支払いなしのデモ版。
+  payments: boolean;
   plan: CoachingPlan;
   coach: { id: string; nickname: string | null; photo_url: string; tier: CoachTier; events: CoachEvent[] };
 };
