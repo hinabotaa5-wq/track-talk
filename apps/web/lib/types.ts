@@ -248,6 +248,16 @@ export type ProductReview = {
   body: string;
   mine: boolean;
   created_at: string;
+  // 書いた人の属性(任意)。足のサイズは「25.0〜25.5cm」のような幅でだけ返る。
+  event?: string | null;
+  event_label?: string | null;
+  level?: string | null;
+  level_label?: string | null;
+  foot_size_label?: string | null;
+  foot_width?: string | null;
+  foot_width_label?: string | null;
+  usage?: string | null;
+  usage_label?: string | null;
 };
 
 export type GuardianStatus = "pending" | "consented" | "declined" | "revoked";

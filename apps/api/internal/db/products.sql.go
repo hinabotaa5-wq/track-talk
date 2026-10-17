@@ -12,34 +12,51 @@ import (
 	"github.com/google/uuid"
 )
 
-const countProductReviews = `-- name: CountProductReviews :one
-SELECT count(*)
-FROM product_reviews
-WHERE product_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL
-`
-
-func (q *Queries) CountProductReviews(ctx context.Context, productID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countProductReviews, productID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countProducts = `-- name: CountProducts :one
 SELECT count(*)
 FROM products p
 WHERE p.hidden_at IS NULL
-  AND p.kind = $1
-  AND ($2::text IS NULL OR p.name ILIKE '%' || $2::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || $2::text || '%' ESCAPE '\')
+  AND (
+      NOT $1::boolean
+      OR EXISTS (
+          SELECT 1 FROM product_reviews r
+          WHERE r.product_id = p.id AND r.deleted_at IS NULL AND r.hidden_at IS NULL
+          AND ($2::text IS NULL OR r.event = $2::text)
+          AND ($3::text IS NULL OR r.level = $3::text)
+          AND ($4::smallint IS NULL OR r.foot_size >= $4::smallint)
+          AND ($5::smallint IS NULL OR r.foot_size <= $5::smallint)
+          AND ($6::text IS NULL OR r.foot_width = $6::text)
+          AND ($7::text IS NULL OR r.usage = $7::text)
+      )
+  )
+  AND p.kind = $8
+  AND ($9::text IS NULL OR p.name ILIKE '%' || $9::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || $9::text || '%' ESCAPE '\')
 `
 
 type CountProductsParams struct {
-	Kind string  `json:"kind"`
-	Q    *string `json:"q"`
+	Filtered    bool    `json:"filtered"`
+	Event       *string `json:"event"`
+	Level       *string `json:"level"`
+	FootSizeMin *int16  `json:"foot_size_min"`
+	FootSizeMax *int16  `json:"foot_size_max"`
+	FootWidth   *string `json:"foot_width"`
+	Usage       *string `json:"usage"`
+	Kind        string  `json:"kind"`
+	Q           *string `json:"q"`
 }
 
 func (q *Queries) CountProducts(ctx context.Context, arg CountProductsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countProducts, arg.Kind, arg.Q)
+	row := q.db.QueryRow(ctx, countProducts,
+		arg.Filtered,
+		arg.Event,
+		arg.Level,
+		arg.FootSizeMin,
+		arg.FootSizeMax,
+		arg.FootWidth,
+		arg.Usage,
+		arg.Kind,
+		arg.Q,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -75,9 +92,12 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (u
 }
 
 const createProductReview = `-- name: CreateProductReview :one
-INSERT INTO product_reviews (id, product_id, author_id, rating, body)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, product_id, author_id, rating, body, created_at
+INSERT INTO product_reviews (id, product_id, author_id, rating, body, event, level, foot_size, foot_width, usage)
+VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10
+)
+RETURNING id, product_id, author_id, rating, body, event, level, foot_size, foot_width, usage, created_at
 `
 
 type CreateProductReviewParams struct {
@@ -86,6 +106,11 @@ type CreateProductReviewParams struct {
 	AuthorID  uuid.UUID `json:"author_id"`
 	Rating    int16     `json:"rating"`
 	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	Level     *string   `json:"level"`
+	FootSize  *int16    `json:"foot_size"`
+	FootWidth *string   `json:"foot_width"`
+	Usage     *string   `json:"usage"`
 }
 
 type CreateProductReviewRow struct {
@@ -94,6 +119,11 @@ type CreateProductReviewRow struct {
 	AuthorID  uuid.UUID `json:"author_id"`
 	Rating    int16     `json:"rating"`
 	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	Level     *string   `json:"level"`
+	FootSize  *int16    `json:"foot_size"`
+	FootWidth *string   `json:"foot_width"`
+	Usage     *string   `json:"usage"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -104,6 +134,11 @@ func (q *Queries) CreateProductReview(ctx context.Context, arg CreateProductRevi
 		arg.AuthorID,
 		arg.Rating,
 		arg.Body,
+		arg.Event,
+		arg.Level,
+		arg.FootSize,
+		arg.FootWidth,
+		arg.Usage,
 	)
 	var i CreateProductReviewRow
 	err := row.Scan(
@@ -112,6 +147,11 @@ func (q *Queries) CreateProductReview(ctx context.Context, arg CreateProductRevi
 		&i.AuthorID,
 		&i.Rating,
 		&i.Body,
+		&i.Event,
+		&i.Level,
+		&i.FootSize,
+		&i.FootWidth,
+		&i.Usage,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -194,17 +234,29 @@ func (q *Queries) HideProductReview(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const listProductReviews = `-- name: ListProductReviews :many
-SELECT id, product_id, author_id, rating, body, created_at
-FROM product_reviews
-WHERE product_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
+SELECT r.id, r.product_id, r.author_id, r.rating, r.body, r.event, r.level, r.foot_size, r.foot_width, r.usage, r.created_at
+FROM product_reviews r
+WHERE r.product_id = $1 AND r.deleted_at IS NULL AND r.hidden_at IS NULL
+  AND ($2::text IS NULL OR r.event = $2::text)
+  AND ($3::text IS NULL OR r.level = $3::text)
+  AND ($4::smallint IS NULL OR r.foot_size >= $4::smallint)
+  AND ($5::smallint IS NULL OR r.foot_size <= $5::smallint)
+  AND ($6::text IS NULL OR r.foot_width = $6::text)
+  AND ($7::text IS NULL OR r.usage = $7::text)
+ORDER BY r.created_at DESC
+LIMIT $9 OFFSET $8
 `
 
 type ListProductReviewsParams struct {
-	ProductID uuid.UUID `json:"product_id"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
+	ProductID   uuid.UUID `json:"product_id"`
+	Event       *string   `json:"event"`
+	Level       *string   `json:"level"`
+	FootSizeMin *int16    `json:"foot_size_min"`
+	FootSizeMax *int16    `json:"foot_size_max"`
+	FootWidth   *string   `json:"foot_width"`
+	Usage       *string   `json:"usage"`
+	RowOffset   int32     `json:"row_offset"`
+	RowLimit    int32     `json:"row_limit"`
 }
 
 type ListProductReviewsRow struct {
@@ -213,11 +265,26 @@ type ListProductReviewsRow struct {
 	AuthorID  uuid.UUID `json:"author_id"`
 	Rating    int16     `json:"rating"`
 	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	Level     *string   `json:"level"`
+	FootSize  *int16    `json:"foot_size"`
+	FootWidth *string   `json:"foot_width"`
+	Usage     *string   `json:"usage"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) ListProductReviews(ctx context.Context, arg ListProductReviewsParams) ([]ListProductReviewsRow, error) {
-	rows, err := q.db.Query(ctx, listProductReviews, arg.ProductID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listProductReviews,
+		arg.ProductID,
+		arg.Event,
+		arg.Level,
+		arg.FootSizeMin,
+		arg.FootSizeMax,
+		arg.FootWidth,
+		arg.Usage,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +298,11 @@ func (q *Queries) ListProductReviews(ctx context.Context, arg ListProductReviews
 			&i.AuthorID,
 			&i.Rating,
 			&i.Body,
+			&i.Event,
+			&i.Level,
+			&i.FootSize,
+			&i.FootWidth,
+			&i.Usage,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -256,23 +328,37 @@ SELECT
     COALESCE(s.avg_rating, 0)::float8 AS avg_rating
 FROM products p
 LEFT JOIN (
-    SELECT product_id, count(*) AS review_count, avg(rating) AS avg_rating
-    FROM product_reviews
-    WHERE deleted_at IS NULL AND hidden_at IS NULL
-    GROUP BY product_id
+    SELECT r.product_id, count(*) AS review_count, avg(r.rating) AS avg_rating
+    FROM product_reviews r
+    WHERE r.deleted_at IS NULL AND r.hidden_at IS NULL
+      AND ($1::text IS NULL OR r.event = $1::text)
+      AND ($2::text IS NULL OR r.level = $2::text)
+      AND ($3::smallint IS NULL OR r.foot_size >= $3::smallint)
+      AND ($4::smallint IS NULL OR r.foot_size <= $4::smallint)
+      AND ($5::text IS NULL OR r.foot_width = $5::text)
+      AND ($6::text IS NULL OR r.usage = $6::text)
+    GROUP BY r.product_id
 ) s ON s.product_id = p.id
 WHERE p.hidden_at IS NULL
-  AND p.kind = $1
-  AND ($2::text IS NULL OR p.name ILIKE '%' || $2::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || $2::text || '%' ESCAPE '\')
+  AND p.kind = $7
+  AND ($8::text IS NULL OR p.name ILIKE '%' || $8::text || '%' ESCAPE '\' OR p.brand ILIKE '%' || $8::text || '%' ESCAPE '\')
+  AND (NOT $9::boolean OR s.review_count > 0)
 ORDER BY (p.discontinued_at IS NOT NULL) ASC, COALESCE(s.review_count, 0) DESC, COALESCE(s.avg_rating, 0) DESC, p.created_at DESC
-LIMIT $4 OFFSET $3
+LIMIT $11 OFFSET $10
 `
 
 type ListProductsParams struct {
-	Kind      string  `json:"kind"`
-	Q         *string `json:"q"`
-	RowOffset int32   `json:"row_offset"`
-	RowLimit  int32   `json:"row_limit"`
+	Event       *string `json:"event"`
+	Level       *string `json:"level"`
+	FootSizeMin *int16  `json:"foot_size_min"`
+	FootSizeMax *int16  `json:"foot_size_max"`
+	FootWidth   *string `json:"foot_width"`
+	Usage       *string `json:"usage"`
+	Kind        string  `json:"kind"`
+	Q           *string `json:"q"`
+	Filtered    bool    `json:"filtered"`
+	RowOffset   int32   `json:"row_offset"`
+	RowLimit    int32   `json:"row_limit"`
 }
 
 type ListProductsRow struct {
@@ -287,10 +373,19 @@ type ListProductsRow struct {
 	AvgRating    float64   `json:"avg_rating"`
 }
 
+// 絞り込み(種目・レベル・足のサイズ・足幅・使い方)を付けたときは、合うレビューだけで件数と平均★を数え直し、
+// 合うレビューが1件もない商品は出さない。
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]ListProductsRow, error) {
 	rows, err := q.db.Query(ctx, listProducts,
+		arg.Event,
+		arg.Level,
+		arg.FootSizeMin,
+		arg.FootSizeMax,
+		arg.FootWidth,
+		arg.Usage,
 		arg.Kind,
 		arg.Q,
+		arg.Filtered,
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -339,6 +434,49 @@ func (q *Queries) SoftDeleteProductReview(ctx context.Context, arg SoftDeletePro
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const summarizeProductReviews = `-- name: SummarizeProductReviews :one
+SELECT count(*)::bigint AS review_count, COALESCE(avg(r.rating), 0)::float8 AS avg_rating
+FROM product_reviews r
+WHERE r.product_id = $1 AND r.deleted_at IS NULL AND r.hidden_at IS NULL
+  AND ($2::text IS NULL OR r.event = $2::text)
+  AND ($3::text IS NULL OR r.level = $3::text)
+  AND ($4::smallint IS NULL OR r.foot_size >= $4::smallint)
+  AND ($5::smallint IS NULL OR r.foot_size <= $5::smallint)
+  AND ($6::text IS NULL OR r.foot_width = $6::text)
+  AND ($7::text IS NULL OR r.usage = $7::text)
+`
+
+type SummarizeProductReviewsParams struct {
+	ProductID   uuid.UUID `json:"product_id"`
+	Event       *string   `json:"event"`
+	Level       *string   `json:"level"`
+	FootSizeMin *int16    `json:"foot_size_min"`
+	FootSizeMax *int16    `json:"foot_size_max"`
+	FootWidth   *string   `json:"foot_width"`
+	Usage       *string   `json:"usage"`
+}
+
+type SummarizeProductReviewsRow struct {
+	ReviewCount int64   `json:"review_count"`
+	AvgRating   float64 `json:"avg_rating"`
+}
+
+// 絞り込みに合うレビューの件数と平均★。
+func (q *Queries) SummarizeProductReviews(ctx context.Context, arg SummarizeProductReviewsParams) (SummarizeProductReviewsRow, error) {
+	row := q.db.QueryRow(ctx, summarizeProductReviews,
+		arg.ProductID,
+		arg.Event,
+		arg.Level,
+		arg.FootSizeMin,
+		arg.FootSizeMax,
+		arg.FootWidth,
+		arg.Usage,
+	)
+	var i SummarizeProductReviewsRow
+	err := row.Scan(&i.ReviewCount, &i.AvgRating)
+	return i, err
 }
 
 const updateProduct = `-- name: UpdateProduct :execrows

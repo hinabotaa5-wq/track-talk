@@ -1,16 +1,28 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { ProductImage } from "@/components/product-image";
+import { ReviewAttrChips, ReviewAttrsFields, ReviewFilterBar } from "@/components/review-filters";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { productKindLabels, ratingText } from "@/lib/product";
+import {
+  activeReviewFilterCount,
+  emptyReviewAttrs,
+  loadReviewAttrs,
+  parseReviewFilters,
+  reviewAttrsPayload,
+  reviewFiltersApiQuery,
+  saveReviewAttrs,
+  withReviewFilters,
+} from "@/lib/review-filters";
 import type { Meta, Product, ProductReview } from "@/lib/types";
 
 function Stars({ value }: { value: number }) {
@@ -27,6 +39,12 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   const { session, token } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [summary, setSummary] = useState<{ review_count: number; avg_rating: number } | null>(null);
+  const sp = useSearchParams();
+  const filters = parseReviewFilters(sp);
+  const filterQuery = reviewFiltersApiQuery(filters).toString();
+  const filtered = activeReviewFilterCount(filters) > 0;
+  const [attrs, setAttrs] = useState(emptyReviewAttrs);
   const [error, setError] = useState("");
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
@@ -37,17 +55,27 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
     try {
       const [p, r] = await Promise.all([
         apiFetch<Product>(`/v1/products/${id}`),
-        apiFetch<{ reviews: ProductReview[]; meta: Meta }>(`/v1/products/${id}/reviews?per_page=50`, { token }),
+        apiFetch<{ reviews: ProductReview[]; meta: Meta; summary: { review_count: number; avg_rating: number } }>(
+          `/v1/products/${id}/reviews?per_page=50${filterQuery ? `&${filterQuery}` : ""}`,
+          { token },
+        ),
       ]);
       setProduct(p);
       setReviews(r.reviews ?? []);
+      setSummary(r.summary ?? null);
       setError("");
     } catch (e) {
       setError(e instanceof ApiRequestError && e.status === 404 ? "商品が見つかりませんでした。" : "取得に失敗しました。");
     }
-  }, [id, token]);
+  }, [id, token, filterQuery]);
 
   useEffect(() => () => document.body.removeAttribute("data-comment-typing"), []);
+
+  useEffect(() => {
+    // 前回レビューを書いたときの属性を初期値にする(端末に覚えたもの。サーバーでは読めないので表示後に読む)。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAttrs(loadReviewAttrs());
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -62,7 +90,12 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
     setPending(true);
     setFormError("");
     try {
-      await apiFetch(`/v1/products/${id}/reviews`, { method: "POST", token, body: JSON.stringify({ rating, body }) });
+      await apiFetch(`/v1/products/${id}/reviews`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ rating, body, ...reviewAttrsPayload(attrs) }),
+      });
+      saveReviewAttrs(attrs);
       setRating(0);
       setBody("");
       await load();
@@ -125,10 +158,23 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
 
       <section className="space-y-3">
         <h2 className="font-semibold">レビュー {product.review_count}件</h2>
-        {reviews.length === 0 ? <EmptyState title="まだレビューがありません" body="最初のレビューを書いてみましょう。" /> : null}
+        <ReviewFilterBar filters={filters} onChange={(next) => window.history.pushState(null, "", withReviewFilters(`/reviews/${id}`, next))} />
+        {filtered && summary ? (
+          <p className="text-sm text-slate-200">
+            条件に合うレビュー <span className="text-amber-300">{ratingText(summary.avg_rating, summary.review_count)}</span>
+          </p>
+        ) : null}
+        {reviews.length === 0 ? (
+          filtered ? (
+            <EmptyState title="条件に合うレビューがありません" body="絞り込みを変えるか、解除してください。" />
+          ) : (
+            <EmptyState title="まだレビューがありません" body="最初のレビューを書いてみましょう。" />
+          )
+        ) : null}
         {reviews.map((r) => (
           <div key={r.id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3.5">
             <Stars value={r.rating} />
+            <ReviewAttrChips review={r} />
             <p className="whitespace-pre-wrap text-sm text-slate-100">{r.body}</p>
             <div className="flex items-center justify-between text-xs text-slate-300">
               <span>{formatDateTime(r.created_at)}</span>
@@ -145,6 +191,10 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
       {!session ? (
         <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
           レビューを書くには<Link href="/login" className="text-blue-300 underline">ログイン</Link>してください。
+        </p>
+      ) : filtered ? (
+        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
+          レビューを書くときは、絞り込みを解除してください。
         </p>
       ) : mineExists ? (
         <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
@@ -185,6 +235,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
             placeholder="履き心地、反発、フィット感など"
             className="glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500"
           />
+          <ReviewAttrsFields value={attrs} onChange={setAttrs} />
           {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "送っています" : "投稿する"}

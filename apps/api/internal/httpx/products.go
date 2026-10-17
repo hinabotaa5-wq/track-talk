@@ -38,14 +38,26 @@ func (s *Server) listProducts(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"kind": "シューズかスパイクを選んでください"})
 		return
 	}
+	fields := map[string]string{}
+	f := parseReviewFilter(r.URL.Query(), fields)
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
 	q := likeContains(r.URL.Query().Get("q"))
 	page, per, offset := s.queryPage(r)
-	total, err := s.q.CountProducts(r.Context(), db.CountProductsParams{Kind: kind, Q: q})
+	total, err := s.q.CountProducts(r.Context(), db.CountProductsParams{
+		Kind: kind, Q: q, Filtered: f.active(),
+		Event: f.Event, Level: f.Level, FootSizeMin: f.FootSizeMin, FootSizeMax: f.FootSizeMax, FootWidth: f.FootWidth, Usage: f.Usage,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	rows, err := s.q.ListProducts(r.Context(), db.ListProductsParams{Kind: kind, Q: q, RowLimit: per, RowOffset: offset})
+	rows, err := s.q.ListProducts(r.Context(), db.ListProductsParams{
+		Kind: kind, Q: q, Filtered: f.active(), RowLimit: per, RowOffset: offset,
+		Event: f.Event, Level: f.Level, FootSizeMin: f.FootSizeMin, FootSizeMax: f.FootSizeMax, FootWidth: f.FootWidth, Usage: f.Usage,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -75,17 +87,29 @@ func (s *Server) listProductReviews(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	fields := map[string]string{}
+	f := parseReviewFilter(r.URL.Query(), fields)
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
 	if _, err := s.q.GetProduct(r.Context(), id); err != nil {
 		MapDBError(w, err)
 		return
 	}
 	page, per, offset := s.queryPage(r)
-	total, err := s.q.CountProductReviews(r.Context(), id)
+	summary, err := s.q.SummarizeProductReviews(r.Context(), db.SummarizeProductReviewsParams{
+		ProductID: id,
+		Event:     f.Event, Level: f.Level, FootSizeMin: f.FootSizeMin, FootSizeMax: f.FootSizeMax, FootWidth: f.FootWidth, Usage: f.Usage,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	rows, err := s.q.ListProductReviews(r.Context(), db.ListProductReviewsParams{ProductID: id, Limit: per, Offset: offset})
+	rows, err := s.q.ListProductReviews(r.Context(), db.ListProductReviewsParams{
+		ProductID: id, RowLimit: per, RowOffset: offset,
+		Event: f.Event, Level: f.Level, FootSizeMin: f.FootSizeMin, FootSizeMax: f.FootSizeMax, FootWidth: f.FootWidth, Usage: f.Usage,
+	})
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -93,21 +117,29 @@ func (s *Server) listProductReviews(w http.ResponseWriter, r *http.Request) {
 	uid, authed := UserID(r.Context())
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, map[string]any{
+		item := map[string]any{
 			"id":         row.ID,
 			"product_id": row.ProductID,
 			"rating":     row.Rating,
 			"body":       row.Body,
 			"mine":       authed && uid == row.AuthorID,
 			"created_at": row.CreatedAt,
-		})
+		}
+		reviewAttrsJSON(item, reviewAttrs{Event: row.Event, Level: row.Level, FootSize: row.FootSize, FootWidth: row.FootWidth, Usage: row.Usage})
+		out = append(out, item)
 	}
-	JSON(w, http.StatusOK, map[string]any{"reviews": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+	JSON(w, http.StatusOK, map[string]any{
+		"reviews": out,
+		// summary は絞り込みに合うレビューの件数と平均★(絞り込みなしなら全体)。
+		"summary": map[string]any{"review_count": summary.ReviewCount, "avg_rating": summary.AvgRating, "filtered": f.active()},
+		"meta":    meta{Page: int(page), PerPage: int(per), Total: summary.ReviewCount},
+	})
 }
 
 type productReviewReq struct {
 	Rating int    `json:"rating"`
 	Body   string `json:"body"`
+	reviewAttrsReq
 }
 
 func (s *Server) createProductReview(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +163,7 @@ func (s *Server) createProductReview(w http.ResponseWriter, r *http.Request) {
 	if e := Body(req.Body, 2000); e != "" {
 		fields["body"] = e
 	}
+	attrs := normalizeReviewAttrs(req.reviewAttrsReq, fields)
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
@@ -145,6 +178,11 @@ func (s *Server) createProductReview(w http.ResponseWriter, r *http.Request) {
 		AuthorID:  p.ID,
 		Rating:    int16(req.Rating),
 		Body:      strings.TrimSpace(req.Body),
+		Event:     attrs.Event,
+		Level:     attrs.Level,
+		FootSize:  attrs.FootSize,
+		FootWidth: attrs.FootWidth,
+		Usage:     attrs.Usage,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -155,14 +193,16 @@ func (s *Server) createProductReview(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, map[string]any{
+	out := map[string]any{
 		"id":         row.ID,
 		"product_id": row.ProductID,
 		"rating":     row.Rating,
 		"body":       row.Body,
 		"mine":       true,
 		"created_at": row.CreatedAt,
-	})
+	}
+	reviewAttrsJSON(out, reviewAttrs{Event: row.Event, Level: row.Level, FootSize: row.FootSize, FootWidth: row.FootWidth, Usage: row.Usage})
+	JSON(w, http.StatusCreated, out)
 }
 
 func (s *Server) deleteProductReview(w http.ResponseWriter, r *http.Request) {

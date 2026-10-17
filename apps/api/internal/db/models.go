@@ -388,6 +388,11 @@ type ProductReview struct {
 	CreatedAt time.Time  `json:"created_at"`
 	DeletedAt *time.Time `json:"deleted_at"`
 	HiddenAt  *time.Time `json:"hidden_at"`
+	Event     *string    `json:"event"`
+	Level     *string    `json:"level"`
+	FootSize  *int16     `json:"foot_size"`
+	FootWidth *string    `json:"foot_width"`
+	Usage     *string    `json:"usage"`
 }
 
 type Profile struct {
