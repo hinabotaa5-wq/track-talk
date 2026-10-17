@@ -165,6 +165,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/coaching/estimate", s.reviewEstimate)
 			r.Post("/coaching/demo", s.joinCoachingDemo)
 			r.Post("/coaching/requests", s.createReviewRequest)
+			r.Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
 			r.Get("/me/coaching/requests", s.listMyReviewRequests)
 			r.Get("/coaching/requests/{id}", s.getReviewRequest)
 			r.Post("/posts", s.createPost)

@@ -255,6 +255,8 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 返却したので、仮押さえしていた代金を確定する。
+	s.captureReturnedReview(r.Context(), rr.ID)
 	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_returned", push.Message{
 		Title: "フォーム添削の返答が届きました",
 		Body:  "コーチからのアドバイスを見てみましょう",
@@ -454,6 +456,10 @@ func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr
 		return
 	}
 	out["coach"] = coach
+	if err := s.attachReviewPayment(r.Context(), out, rr.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, out)
 }
 

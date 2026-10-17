@@ -77,6 +77,11 @@ func (c Client) post(ctx context.Context, path string, form url.Values, idempote
 	if idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
+	return c.do(req, out)
+}
+
+// do は、リクエストを送って JSON を out に読む。2xx 以外は APIError。
+func (c Client) do(req *http.Request, out any) error {
 	res, err := c.httpClient().Do(req)
 	if err != nil {
 		return err
@@ -112,6 +117,10 @@ type CheckoutParams struct {
 	ExpiresAt time.Time
 	// 同じ値で送り直しても、支払い画面は1つしか作られない。
 	IdempotencyKey string
+	// 空なら、ダッシュボードで有効にした支払い方法が出る。
+	PaymentMethodTypes []string
+	// true なら仮押さえだけして、あとで CapturePaymentIntent で確定する（カードだけ）。
+	CaptureManual bool
 }
 
 type CheckoutSession struct {
@@ -143,6 +152,12 @@ func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (Ch
 		form.Set("metadata["+k+"]", v)
 		form.Set("payment_intent_data[metadata]["+k+"]", v)
 	}
+	for i, t := range p.PaymentMethodTypes {
+		form.Set("payment_method_types["+strconv.Itoa(i)+"]", t)
+	}
+	if p.CaptureManual {
+		form.Set("payment_intent_data[capture_method]", "manual")
+	}
 	var s CheckoutSession
 	err := c.post(ctx, "/v1/checkout/sessions", form, p.IdempotencyKey, &s)
 	return s, err
@@ -162,6 +177,42 @@ func (c Client) CreateRefund(ctx context.Context, paymentIntent string, amountYe
 	var r Refund
 	err := c.post(ctx, "/v1/refunds", form, idempotencyKey, &r)
 	return r, err
+}
+
+type PaymentIntent struct {
+	ID string `json:"id"`
+	// requires_capture: 仮押さえ済み。succeeded: 確定済み。canceled: 取り消し済み。
+	Status string `json:"status"`
+	Amount int    `json:"amount"`
+}
+
+// GetPaymentIntent は、支払いの今の状態を読む。
+func (c Client) GetPaymentIntent(ctx context.Context, id string) (PaymentIntent, error) {
+	if !c.Configured() {
+		return PaymentIntent{}, ErrNotConfigured
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/payment_intents/"+url.PathEscape(id), nil)
+	if err != nil {
+		return PaymentIntent{}, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var pi PaymentIntent
+	err = c.do(req, &pi)
+	return pi, err
+}
+
+// CapturePaymentIntent は、仮押さえした支払いを確定する。
+func (c Client) CapturePaymentIntent(ctx context.Context, id, idempotencyKey string) (PaymentIntent, error) {
+	var pi PaymentIntent
+	err := c.post(ctx, "/v1/payment_intents/"+url.PathEscape(id)+"/capture", url.Values{}, idempotencyKey, &pi)
+	return pi, err
+}
+
+// CancelPaymentIntent は、仮押さえを取り消す。確定前なので手数料はかからない。
+func (c Client) CancelPaymentIntent(ctx context.Context, id, idempotencyKey string) (PaymentIntent, error) {
+	var pi PaymentIntent
+	err := c.post(ctx, "/v1/payment_intents/"+url.PathEscape(id)+"/cancel", url.Values{}, idempotencyKey, &pi)
+	return pi, err
 }
 
 type Event struct {

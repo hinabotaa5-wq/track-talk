@@ -119,9 +119,10 @@ func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoaches
 
 const countReviewRequestsByRequester = `-- name: CountReviewRequestsByRequester :one
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1
+WHERE requester_id = $1 AND status <> 'awaiting_payment'
 `
 
+// 送った依頼の数。支払いがまだのものは数えない。
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
 	var count int64
@@ -181,8 +182,8 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 }
 
 const createReviewRequest = `-- name: CreateReviewRequest :one
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
 `
 
@@ -194,8 +195,10 @@ type CreateReviewRequestParams struct {
 	Focus         []string  `json:"focus"`
 	VideoPublicID string    `json:"video_public_id"`
 	DueAt         time.Time `json:"due_at"`
+	Status        string    `json:"status"`
 }
 
+// status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
 func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewRequestParams) (ReviewRequest, error) {
 	row := q.db.QueryRow(ctx, createReviewRequest,
 		arg.ID,
@@ -205,6 +208,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		arg.Focus,
 		arg.VideoPublicID,
 		arg.DueAt,
+		arg.Status,
 	)
 	var i ReviewRequest
 	err := row.Scan(

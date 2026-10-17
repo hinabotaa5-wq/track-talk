@@ -7,15 +7,26 @@ import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
-import { maxReviewSeconds, reviewEvents, reviewFocusLabels, reviewFocusOptions, tooLong, videoDuration } from "@/lib/review";
+import {
+  maxReviewSeconds,
+  reviewEvents,
+  reviewFocusLabels,
+  reviewFocusOptions,
+  reviewPayMethodLabels,
+  tooLong,
+  videoDuration,
+} from "@/lib/review";
+import { formatPlanPrice } from "@/lib/coaching-plan";
 import { formatDateTime } from "@/lib/format";
-import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
-// フォーム添削の依頼を送る。決済ができるまではデモ版で、招待コードを入れた人だけが使える。
+// フォーム添削の依頼を送る。いまは招待コードを入れた人だけが使える。
+// Stripe の鍵があるときは、送るとそのまま支払い画面へ進み、支払いが済んだらコーチを探し始める。
+// 鍵がない間は支払いなしのデモ版。
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -37,6 +48,7 @@ export default function NewReviewRequestPage() {
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
+  const [method, setMethod] = useState<ReviewPayMethod>("card");
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -124,8 +136,12 @@ export default function NewReviewRequestPage() {
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
-        body: JSON.stringify({ tier, event, focus, video_public_id: payload.public_id }),
+        body: JSON.stringify({ tier, event, focus, video_public_id: payload.public_id, method }),
       });
+      if (created.checkout_url) {
+        window.location.href = created.checkout_url;
+        return;
+      }
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       if (err instanceof ApiRequestError) {
@@ -149,9 +165,11 @@ export default function NewReviewRequestPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
-          デモ版
-        </p>
+        {estimate?.payments ? null : (
+          <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+            デモ版
+          </p>
+        )}
         <h1 className="text-2xl font-bold">フォーム添削を頼む</h1>
       </div>
 
@@ -244,9 +262,27 @@ export default function NewReviewRequestPage() {
               </span>
             </p>
           ) : null}
-          <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
+          {estimate?.payments ? (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-semibold">お支払い（1本 {formatPlanPrice(estimate.price_yen)}）</legend>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
+                  <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
+                    {reviewPayMethodLabels[m]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-300">
+                {method === "card"
+                  ? "送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。"
+                  : "送るとお支払いの画面に進み、その場でお支払いが済みます。目安までに返ってこなければ全額を返金します。"}
+              </p>
+            </fieldset>
+          ) : (
+            <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
+          )}
           <Button type="submit" className="w-full" disabled={pending || !file}>
-            {pending ? "送っています" : "送る"}
+            {pending ? "送っています" : estimate?.payments ? `送ってお支払いへ進む（${formatPlanPrice(estimate.price_yen)}）` : "送る"}
           </Button>
         </form>
       )}
