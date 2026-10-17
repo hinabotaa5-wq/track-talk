@@ -14,6 +14,7 @@ const staticPages = [
   ...injuryBodyParts.map((part) => `/injury/${part.value}`),
   "/injury/stats",
   "/coaching",
+  "/coaches",
   "/guidelines",
   "/terms",
   "/privacy",

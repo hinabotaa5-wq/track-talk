@@ -1,5 +1,6 @@
 "use client";
 
+import { CoachAvatar } from "@/components/coach-photo";
 import { useAuth } from "@/components/auth-provider";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { apiFetch } from "@/lib/api";
@@ -433,6 +434,28 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  async function removePhoto(a: AdminCoachApplication) {
+    if (!window.confirm("この顔写真を外しますか？コーチはまた別の写真を登録できます。")) return;
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/photo`, { method: "DELETE", token });
+      setMessage("写真を外しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "外せませんでした");
+    }
+  }
+
+  async function resetRating(a: AdminCoachApplication) {
+    if (!window.confirm("このコーチを順番に戻しますか？これまでの★は、外す判定に数えなくなります。")) return;
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/reset-rating`, { method: "POST", token });
+      setMessage("順番に戻しました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "戻せませんでした");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
@@ -455,18 +478,43 @@ function CoachesAdmin({ token }: { token: string | null }) {
       <ul className="space-y-3">
         {items.map((a) => (
           <li key={a.profile_id} className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-            <p className="text-xs text-slate-200">
-              {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
-            </p>
+            <div className="flex items-center gap-3">
+              <CoachAvatar url={a.photo_url} name={a.nickname} size={48} />
+              <p className="text-xs text-slate-200">
+                {coachTierLabels[a.tier]} · {a.nickname ?? "名前なし"} · 応募 {formatDateTime(a.applied_at)}
+              </p>
+            </div>
+            {a.photo_url ? (
+              <button type="button" onClick={() => void removePhoto(a)} className="text-sm text-red-300 underline">
+                写真を外す
+              </button>
+            ) : null}
             <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
             <p className="whitespace-pre-wrap">成績: {a.achievements}</p>
             <p>競技年数: {a.years}年</p>
+            {a.status === "approved" ? (
+              <p className="text-xs text-slate-200">
+                評価: {a.rating_count > 0 ? `★${a.rating_average.toFixed(1)}（${a.rating_count}件）` : "まだありません"}
+              </p>
+            ) : null}
+            {a.status === "approved" && a.rating_paused ? (
+              <div className="space-y-1 rounded-lg border border-amber-400/40 bg-amber-500/15 p-2">
+                <p className="text-xs text-white">評価が低いため、依頼が回っていません。</p>
+                <button type="button" onClick={() => void resetRating(a)} className="text-sm text-blue-300 underline">
+                  順番に戻す
+                </button>
+              </div>
+            ) : null}
             {a.status === "pending" ? (
               <div className="flex gap-4 pt-1">
-                <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">
-                  承認する
-                </button>
+                {a.photo_url ? (
+                  <button type="button" onClick={() => void review(a, "approve")} className="text-blue-300 underline">
+                    承認する
+                  </button>
+                ) : (
+                  <span className="text-xs text-amber-300">顔写真がないため、承認できません</span>
+                )}
                 <button type="button" onClick={() => void review(a, "reject")} className="text-red-300 underline">
                   見送る
                 </button>

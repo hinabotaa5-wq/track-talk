@@ -79,7 +79,7 @@ func coachTextError(label, value string, max int) string {
 	return ""
 }
 
-func coachProfileJSON(c db.CoachProfile) map[string]any {
+func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 	return map[string]any{
 		"tier":         c.Tier,
 		"events":       c.Events,
@@ -91,7 +91,62 @@ func coachProfileJSON(c db.CoachProfile) map[string]any {
 		"reviewed_at":  c.ReviewedAt,
 		"on_duty":      c.OnDuty,
 		"daily_cap":    c.DailyCap,
+		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
 	}
+}
+
+// coachPhotoURL は、コーチの顔写真の URL。登録していなければ空。
+func (s *Server) coachPhotoURL(publicID *string) string {
+	if publicID == nil {
+		return ""
+	}
+	return s.cloud.AvatarURL(*publicID)
+}
+
+type coachPhotoReq struct {
+	PhotoPublicID string `json:"photo_public_id"`
+}
+
+// setCoachPhoto は、応募中か承認済みのコーチの顔写真を差し替える。写真は /v1/uploads/image で先に上げておく。
+func (s *Server) setCoachPhoto(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req coachPhotoReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	id := strings.TrimSpace(req.PhotoPublicID)
+	if e := ImagePublicID(id); e != "" {
+		FieldError(w, map[string]string{"photo_public_id": e})
+		return
+	}
+	if err := s.cloud.ImageReady(r.Context(), id); err != nil {
+		writeAssetReadyError(w, err, "写真")
+		return
+	}
+	old, err := s.q.SetCoachPhoto(r.Context(), db.SetCoachPhotoParams{PhotoPublicID: id, ProfileID: p.ID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusConflict, "conflict", "応募してから写真を登録してください")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if old != nil && *old != id {
+		if err := s.cloud.Delete(r.Context(), "image", []string{*old}); err != nil {
+			slog.Warn("delete old coach photo", "err", err)
+		}
+	}
+	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
 // coachMe は自分の応募を返す。まだ応募していなければ application は null。
@@ -109,13 +164,13 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rating, err := s.q.GetCoachRatingSummary(r.Context(), &p.ID)
+	rating, err := s.q.GetCoachRatingSummary(r.Context(), p.ID)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{
-		"application": coachProfileJSON(c),
+		"application": s.coachProfileJSON(c),
 		"rating": map[string]any{
 			"count":   rating.Count,
 			"average": rating.Average,
@@ -187,7 +242,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
 func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
@@ -213,10 +268,83 @@ func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if rows == nil {
-		rows = []db.ListCoachApplicationsRow{}
+	type application struct {
+		db.ListCoachApplicationsRow
+		// 評価が低くて打診の順番から外れているか。
+		RatingPaused bool   `json:"rating_paused"`
+		PhotoURL     string `json:"photo_url"`
 	}
-	JSON(w, http.StatusOK, map[string]any{"applications": rows, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+	out := make([]application, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, application{row, lowRated(row.RatingCount, row.RatingAverage), s.coachPhotoURL(row.PhotoPublicID)})
+	}
+	JSON(w, http.StatusOK, map[string]any{"applications": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+}
+
+// resetCoachRating は、評価で打診の順番から外れたコーチを戻す。それより前の★は外す判定に数えなくなる。
+func (s *Server) resetCoachRating(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	c, err := s.q.ResetCoachRating(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	// 待ちの依頼があれば、戻したコーチにも回す。
+	s.dispatchQueuedReviews(r.Context())
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
+}
+
+// removeCoachPhoto は、運営がコーチの顔写真を外す。写真は Cloudinary からも消す。コーチはまた別の写真を登録できる。
+func (s *Server) removeCoachPhoto(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	old, err := s.q.RemoveCoachPhoto(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if old != nil {
+		if err := s.cloud.Delete(r.Context(), "image", []string{*old}); err != nil {
+			slog.Warn("delete removed coach photo", "err", err)
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// listCoaches は、依頼する前に見られるコーチ一覧。ログインしなくても見られる。
+func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.q.ListPublicCoaches(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, c := range rows {
+		out = append(out, map[string]any{
+			"id":             c.ProfileID,
+			"nickname":       c.Nickname,
+			"photo_url":      s.coachPhotoURL(c.PhotoPublicID),
+			"tier":           c.Tier,
+			"events":         c.Events,
+			"best_record":    c.BestRecord,
+			"achievements":   c.Achievements,
+			"years":          c.Years,
+			"rating_count":   c.RatingCount,
+			"rating_average": c.RatingAverage,
+		})
+	}
+	JSON(w, http.StatusOK, map[string]any{"coaches": out})
 }
 
 func (s *Server) approveCoachApplication(w http.ResponseWriter, r *http.Request) {
@@ -237,8 +365,13 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 	}
 	c, err := s.q.ReviewCoachApplication(r.Context(), db.ReviewCoachApplicationParams{Status: status, ProfileID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
-		if _, getErr := s.q.GetCoachProfile(r.Context(), id); errors.Is(getErr, pgx.ErrNoRows) {
+		current, getErr := s.q.GetCoachProfile(r.Context(), id)
+		if errors.Is(getErr, pgx.ErrNoRows) {
 			Error(w, http.StatusNotFound, "not_found", "応募が見つかりません")
+			return
+		}
+		if getErr == nil && current.Status == "pending" && current.PhotoPublicID == nil {
+			Error(w, http.StatusConflict, "conflict", "顔写真がまだ登録されていないため、承認できません")
 			return
 		}
 		Error(w, http.StatusConflict, "conflict", "この応募は審査済みです")
@@ -249,7 +382,7 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	s.notifyCoachReviewed(r.Context(), c)
-	JSON(w, http.StatusOK, map[string]any{"application": coachProfileJSON(c)})
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
 // notifyCoachReviewed は、審査の結果を応募した人の端末に知らせる。

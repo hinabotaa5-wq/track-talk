@@ -25,7 +25,7 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -47,6 +47,8 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.OnDuty,
 		&i.DailyCap,
 		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
 	)
 	return i, err
 }
@@ -62,9 +64,20 @@ SELECT
     c.status,
     c.applied_at,
     c.reviewed_at,
-    p.nickname
+    p.nickname,
+    c.photo_public_id,
+    r.rating_count,
+    r.rating_average
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
+CROSS JOIN LATERAL (
+    -- 打診の順番から外す判定に使う★（運営が戻したあとのものだけ）。
+    SELECT count(rt.stars)::int AS rating_count, coalesce(avg(rt.stars), 0)::float8 AS rating_average
+    FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
+) r
 WHERE c.status = $1
 ORDER BY c.applied_at ASC
 LIMIT $2 OFFSET $3
@@ -77,16 +90,19 @@ type ListCoachApplicationsParams struct {
 }
 
 type ListCoachApplicationsRow struct {
-	ProfileID    uuid.UUID  `json:"profile_id"`
-	Tier         string     `json:"tier"`
-	Events       []string   `json:"events"`
-	BestRecord   string     `json:"best_record"`
-	Achievements string     `json:"achievements"`
-	Years        int16      `json:"years"`
-	Status       string     `json:"status"`
-	AppliedAt    time.Time  `json:"applied_at"`
-	ReviewedAt   *time.Time `json:"reviewed_at"`
-	Nickname     *string    `json:"nickname"`
+	ProfileID     uuid.UUID  `json:"profile_id"`
+	Tier          string     `json:"tier"`
+	Events        []string   `json:"events"`
+	BestRecord    string     `json:"best_record"`
+	Achievements  string     `json:"achievements"`
+	Years         int16      `json:"years"`
+	Status        string     `json:"status"`
+	AppliedAt     time.Time  `json:"applied_at"`
+	ReviewedAt    *time.Time `json:"reviewed_at"`
+	Nickname      *string    `json:"nickname"`
+	PhotoPublicID *string    `json:"photo_public_id"`
+	RatingCount   int32      `json:"rating_count"`
+	RatingAverage float64    `json:"rating_average"`
 }
 
 func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplicationsParams) ([]ListCoachApplicationsRow, error) {
@@ -109,6 +125,9 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.AppliedAt,
 			&i.ReviewedAt,
 			&i.Nickname,
+			&i.PhotoPublicID,
+			&i.RatingCount,
+			&i.RatingAverage,
 		); err != nil {
 			return nil, err
 		}
@@ -120,6 +139,126 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 	return items, nil
 }
 
+const listPublicCoaches = `-- name: ListPublicCoaches :many
+SELECT
+    c.profile_id,
+    p.nickname,
+    c.photo_public_id,
+    c.tier,
+    c.events,
+    c.best_record,
+    c.achievements,
+    c.years,
+    r.rating_count,
+    r.rating_average
+FROM coach_profiles c
+JOIN profiles p ON p.id = c.profile_id
+CROSS JOIN LATERAL (
+    SELECT count(rt.stars)::int AS rating_count, coalesce(avg(rt.stars), 0)::float8 AS rating_average
+    FROM review_ratings rt
+    JOIN review_responses rs ON rs.request_id = rt.request_id
+    WHERE rs.coach_id = c.profile_id
+) r
+WHERE c.status = 'approved'
+ORDER BY c.tier, c.reviewed_at, c.profile_id
+`
+
+type ListPublicCoachesRow struct {
+	ProfileID     uuid.UUID `json:"profile_id"`
+	Nickname      *string   `json:"nickname"`
+	PhotoPublicID *string   `json:"photo_public_id"`
+	Tier          string    `json:"tier"`
+	Events        []string  `json:"events"`
+	BestRecord    string    `json:"best_record"`
+	Achievements  string    `json:"achievements"`
+	Years         int16     `json:"years"`
+	RatingCount   int32     `json:"rating_count"`
+	RatingAverage float64   `json:"rating_average"`
+}
+
+// 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部。
+func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicCoaches)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicCoachesRow
+	for rows.Next() {
+		var i ListPublicCoachesRow
+		if err := rows.Scan(
+			&i.ProfileID,
+			&i.Nickname,
+			&i.PhotoPublicID,
+			&i.Tier,
+			&i.Events,
+			&i.BestRecord,
+			&i.Achievements,
+			&i.Years,
+			&i.RatingCount,
+			&i.RatingAverage,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeCoachPhoto = `-- name: RemoveCoachPhoto :one
+UPDATE coach_profiles c
+SET photo_public_id = NULL,
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $1) o
+WHERE c.profile_id = $1
+RETURNING o.old_photo_public_id
+`
+
+// 運営が顔写真を外す。外した写真の ID を返すので、Cloudinary から消す。
+func (q *Queries) RemoveCoachPhoto(ctx context.Context, profileID uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, removeCoachPhoto, profileID)
+	var old_photo_public_id *string
+	err := row.Scan(&old_photo_public_id)
+	return old_photo_public_id, err
+}
+
+const resetCoachRating = `-- name: ResetCoachRating :one
+UPDATE coach_profiles
+SET rating_reset_at = now(),
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'approved'
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id
+`
+
+// 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
+func (q *Queries) ResetCoachRating(ctx context.Context, profileID uuid.UUID) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, resetCoachRating, profileID)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+	)
+	return i, err
+}
+
 const reviewCoachApplication = `-- name: ReviewCoachApplication :one
 UPDATE coach_profiles
 SET status = $1,
@@ -127,7 +266,8 @@ SET status = $1,
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'pending'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at
+  AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id
 `
 
 type ReviewCoachApplicationParams struct {
@@ -135,7 +275,7 @@ type ReviewCoachApplicationParams struct {
 	ProfileID uuid.UUID `json:"profile_id"`
 }
 
-// 審査待ちのものだけ承認・却下できる。
+// 審査待ちのものだけ承認・却下できる。顔写真がないと承認できない。
 func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApplicationParams) (CoachProfile, error) {
 	row := q.db.QueryRow(ctx, reviewCoachApplication, arg.Status, arg.ProfileID)
 	var i CoachProfile
@@ -154,8 +294,33 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.OnDuty,
 		&i.DailyCap,
 		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
 	)
 	return i, err
+}
+
+const setCoachPhoto = `-- name: SetCoachPhoto :one
+UPDATE coach_profiles c
+SET photo_public_id = $1::text,
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $2) o
+WHERE c.profile_id = $2
+  AND c.status IN ('pending', 'approved')
+RETURNING o.old_photo_public_id
+`
+
+type SetCoachPhotoParams struct {
+	PhotoPublicID string    `json:"photo_public_id"`
+	ProfileID     uuid.UUID `json:"profile_id"`
+}
+
+// 顔写真を差し替える。前の写真の ID を返すので、Cloudinary から消す。
+func (q *Queries) SetCoachPhoto(ctx context.Context, arg SetCoachPhotoParams) (*string, error) {
+	row := q.db.QueryRow(ctx, setCoachPhoto, arg.PhotoPublicID, arg.ProfileID)
+	var old_photo_public_id *string
+	err := row.Scan(&old_photo_public_id)
+	return old_photo_public_id, err
 }
 
 const submitCoachApplication = `-- name: SubmitCoachApplication :one
@@ -172,7 +337,7 @@ SET tier = EXCLUDED.tier,
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id
 `
 
 type SubmitCoachApplicationParams struct {
@@ -211,6 +376,8 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.OnDuty,
 		&i.DailyCap,
 		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
 	)
 	return i, err
 }

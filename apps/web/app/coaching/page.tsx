@@ -73,6 +73,13 @@ export default function CoachingPage() {
         <p className={tag}>最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
         <p className={tag}>18歳未満は保護者の同意が必要です。</p>
         <p className={tag}>
+          どんなコーチがいるかは
+          <Link href="/coaches" className="text-blue-300 underline">
+            コーチ一覧
+          </Link>
+          で見られます。
+        </p>
+        <p className={tag}>
           招待コードをお持ちの方は
           <Link href="/coaching/new" className="text-blue-300 underline">
             デモ版
@@ -86,6 +93,9 @@ export default function CoachingPage() {
           パーソナル指導
         </h2>
         <p className="text-sm text-slate-200">選んだコーチに、1対1で続けて見てもらえます。</p>
+        <Link href="/coaches" className="text-sm text-blue-300 underline">
+          コーチ一覧を見る
+        </Link>
       </section>
 
       <section aria-labelledby="coaching-price" className="space-y-3">

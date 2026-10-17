@@ -308,6 +308,8 @@ export type CoachApplication = {
   reviewed_at: string | null;
   on_duty: boolean;
   daily_cap: number;
+  // 顔写真。登録していなければ空。
+  photo_url: string;
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
@@ -403,6 +405,25 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
   profile_id: string;
   status: CoachStatus;
   nickname: string | null;
+  // 打診の順番から外す判定に使う★（運営が戻したあとのものだけ）。
+  rating_count: number;
+  rating_average: number;
+  rating_paused: boolean;
+  photo_url: string;
+};
+
+// 依頼する前に見られるコーチ一覧の1人。★はこれまでの全部。
+export type PublicCoach = {
+  id: string;
+  nickname: string | null;
+  photo_url: string;
+  tier: CoachTier;
+  events: CoachEvent[];
+  best_record: string;
+  achievements: string;
+  years: number;
+  rating_count: number;
+  rating_average: number;
 };
 
 // コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。
@@ -415,6 +436,7 @@ export type CoachRatingSummary = {
 // 返答と一緒に利用者へ見せるコーチのプロフィール。
 export type ReviewCoach = {
   nickname: string | null;
+  photo_url: string;
   tier: CoachTier;
   events: CoachEvent[];
   best_record: string;

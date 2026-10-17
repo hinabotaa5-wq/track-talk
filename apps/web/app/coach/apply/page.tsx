@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachPhotoForm, uploadCoachPhoto } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,7 +50,7 @@ function draftFrom(a: CoachApplication): Draft {
 }
 
 export default function CoachApplyPage() {
-  const { session, token, loading } = useAuth();
+  const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const [application, setApplication] = useState<CoachApplication | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -83,6 +84,8 @@ export default function CoachApplyPage() {
     };
   }, [token]);
 
+  const [photo, setPhoto] = useState<File | null>(null);
+
   function toggleEvent(group: CoachEvent) {
     setDraft((d) => ({
       ...d,
@@ -105,7 +108,18 @@ export default function CoachApplyPage() {
       });
       setApplication(d.application);
       setDraft(draftFrom(d.application));
-      setMessage(application?.status === "pending" ? "応募内容を更新しました" : "応募しました。審査の結果をお待ちください。");
+      const done = application?.status === "pending" ? "応募内容を更新しました" : "応募しました。審査の結果をお待ちください。";
+      if (photo) {
+        try {
+          setApplication(await uploadCoachPhoto(photo, token));
+          setPhoto(null);
+          setMessage(done);
+        } catch (err) {
+          setMessage(`応募は受け付けましたが、顔写真を登録できませんでした（${err instanceof Error ? err.message : "エラー"}）。下の「顔写真」からもう一度選んでください。`);
+        }
+      } else {
+        setMessage(done);
+      }
     } catch (err) {
       if (err instanceof ApiRequestError) {
         if (err.fields) setFieldErrors(err.fields);
@@ -155,6 +169,10 @@ export default function CoachApplyPage() {
             </p>
           ) : null}
         </section>
+      ) : null}
+
+      {application && (application.status === "pending" || application.status === "approved") ? (
+        <CoachPhotoForm application={application} nickname={profile?.nickname ?? null} token={token} onSaved={setApplication} />
       ) : null}
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -237,8 +255,24 @@ export default function CoachApplyPage() {
             {fieldError("years")}
           </label>
 
+          {!application?.photo_url ? (
+            <label className="block space-y-1 text-sm">
+              <span className="font-semibold">顔写真（必須）</span>
+              <input
+                className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                disabled={pending}
+              />
+              <span className="block text-xs text-slate-300">顔がはっきり写った写真にしてください。コーチ一覧に載ります。</span>
+            </label>
+          ) : null}
+          <p className="text-xs text-slate-300">
+            承認されると、ニックネーム・枠・担当種目・記録・成績・競技年数が、誰でも見られるコーチ一覧に載ります。
+          </p>
           {message ? <p className="text-sm text-blue-400">{message}</p> : null}
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending || (!photo && !application?.photo_url)}>
             {application?.status === "pending" ? "応募内容を更新する" : "応募する"}
           </Button>
         </form>

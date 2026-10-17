@@ -1,3 +1,4 @@
+import { CoachAvatar } from "@/components/coach-photo";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { clarifyReasonLabels } from "@/lib/review";
 import type { ReviewCoach, ReviewResponse } from "@/lib/types";
@@ -7,10 +8,13 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
   return (
     <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <h2 className="text-xs font-semibold text-slate-300">見てくれたコーチ</h2>
-      <p className="font-bold text-white">
-        {coach.nickname ?? "退会したユーザー"}
-        <span className="ml-2 text-xs font-normal text-slate-300">{coachTierLabels[coach.tier]}</span>
-      </p>
+      <div className="flex items-center gap-3">
+        <CoachAvatar url={coach.photo_url} name={coach.nickname} />
+        <p className="font-bold text-white">
+          {coach.nickname ?? "退会したユーザー"}
+          <span className="ml-2 text-xs font-normal text-slate-300">{coachTierLabels[coach.tier]}</span>
+        </p>
+      </div>
       <dl className="space-y-1.5">
         <div>
           <dt className="text-xs text-slate-300">担当種目</dt>

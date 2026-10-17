@@ -25,6 +25,8 @@ type CoachProfile struct {
 	OnDuty        bool       `json:"on_duty"`
 	DailyCap      int16      `json:"daily_cap"`
 	LastOfferedAt *time.Time `json:"last_offered_at"`
+	RatingResetAt *time.Time `json:"rating_reset_at"`
+	PhotoPublicID *string    `json:"photo_public_id"`
 }
 
 type CoachingDemoCode struct {

@@ -473,6 +473,7 @@ func (s *Server) reviewCoachJSON(ctx context.Context, out map[string]any, rr db.
 	}
 	return map[string]any{
 		"nickname":     c.Nickname,
+		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
 		"tier":         c.Tier,
 		"events":       c.Events,
 		"best_record":  c.BestRecord,

@@ -138,14 +138,16 @@ LIMIT 100;
 
 -- name: GetReviewCoach :one
 -- 返答と一緒に利用者へ見せるコーチのプロフィール。
-SELECT p.nickname, c.tier, c.events, c.best_record, c.achievements, c.years
+SELECT p.nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 WHERE c.profile_id = $1;
 
 -- name: GetCoachRatingSummary :one
--- コーチが受けた★の件数と平均。
+-- コーチが受けた★の件数と平均。運営が順番に戻したあとの★だけを数える。
 SELECT count(rt.stars)::int AS count, coalesce(avg(rt.stars), 0)::float8 AS average
 FROM review_ratings rt
 JOIN review_responses rs ON rs.request_id = rt.request_id
-WHERE rs.coach_id = $1;
+JOIN coach_profiles c ON c.profile_id = rs.coach_id
+WHERE rs.coach_id = sqlc.arg(coach_id)::uuid
+  AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity');

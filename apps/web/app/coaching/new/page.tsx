@@ -211,6 +211,9 @@ export default function NewReviewRequestPage() {
         <form onSubmit={onSubmit} className="space-y-5">
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">誰に見てもらうか</legend>
+            <Link href="/coaches" className="text-xs text-blue-300 underline">
+              コーチ一覧を見る
+            </Link>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(coachTierLabels) as CoachTier[]).map((t) => (
                 <button key={t} type="button" aria-pressed={tier === t} onClick={() => setTier(t)} className={chip(tier === t)}>
