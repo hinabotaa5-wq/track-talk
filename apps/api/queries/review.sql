@@ -36,12 +36,14 @@ SET coaching_demo = true,
 WHERE id = $1;
 
 -- name: CountReviewRequestsByRequester :one
+-- 送った依頼の数。支払いがまだのものは数えない。
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1;
+WHERE requester_id = $1 AND status <> 'awaiting_payment';
 
 -- name: CreateReviewRequest :one
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+-- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: ListMyReviewRequests :many

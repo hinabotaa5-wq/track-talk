@@ -217,7 +217,11 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, "validation_error", "読めませんでした")
 			return
 		}
-		if err := s.completeCoachingCheckout(r.Context(), sess); err != nil {
+		complete := s.completeCoachingCheckout
+		if sess.Metadata["kind"] == "review" {
+			complete = s.completeReviewCheckout
+		}
+		if err := complete(r.Context(), sess); err != nil {
 			slog.Error("stripe webhook", "event", ev.ID, "err", err)
 			Error(w, http.StatusInternalServerError, "internal_error", "処理できませんでした")
 			return
