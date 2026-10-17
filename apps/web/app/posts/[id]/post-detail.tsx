@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
 import { DetailLoadingFrame } from "@/components/loading-frame";
 import { PracticeReputationSummary } from "@/components/practice-reputation";
+import { prefecturePageHref } from "@/lib/prefecture-page";
 import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -876,6 +877,15 @@ function RecruitmentFacts({ post }: { post: Post }) {
           </div>
         ) : null}
       </dl>
+      {info.prefectures.length > 0 ? (
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          {info.prefectures.map((code) => (
+            <Link key={code} href={prefecturePageHref(code)} className="text-blue-300 underline">
+              {prefectureName(code)}の大会と募集
+            </Link>
+          ))}
+        </p>
+      ) : null}
     </div>
   );
 }
