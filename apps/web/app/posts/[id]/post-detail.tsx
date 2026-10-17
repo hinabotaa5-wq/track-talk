@@ -87,7 +87,9 @@ export function PostDetail({
 
   // コメントルームの中では、返信先を選ばなければそのスレッドの最初のコメントへの返信になる。
   const roomTop = openThreadId ? (comments.find((c) => c.id === openThreadId && !c.parent_id) ?? null) : null;
-  const replyTarget = roomTop ? (replyTo ?? roomTop) : null;
+  // 選んだ返信先は、開いているルームのものだけ使う(＜で一覧に戻ったら「返信中」を出さない)。
+  const roomReplyTo = roomTop && replyTo && (replyTo.id === roomTop.id || replyTo.parent_id === roomTop.id) ? replyTo : null;
+  const replyTarget = roomTop ? (roomReplyTo ?? roomTop) : null;
 
   // 長押しで開く操作メニューの対象。
   const [menuComment, setMenuComment] = useState<Comment | null>(null);
@@ -591,10 +593,10 @@ export function PostDetail({
             }}
             className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] [body[data-comment-typing]_&]:bottom-0 z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:bottom-auto lg:rounded-xl lg:border lg:p-3 lg:pb-3"
           >
-            {replyTo ? (
+            {roomReplyTo ? (
               <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold">@{replyTargetName(replyTo)}</span> に返信中: {replyTo.body}
+                  <span className="font-semibold">@{replyTargetName(roomReplyTo)}</span> に返信中: {roomReplyTo.body}
                 </span>
                 <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
                   ×
