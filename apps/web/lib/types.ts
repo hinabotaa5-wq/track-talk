@@ -310,6 +310,21 @@ export type CoachApplication = {
   daily_cap: number;
   // 顔写真。登録していなければ空。
   photo_url: string;
+  // いまの版のパーソナル指導の誓約をしたか。
+  pledged: boolean;
+};
+
+// パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発。
+export type CoachingPlanKind = "period" | "single";
+export type CoachingPlan = {
+  id: string;
+  kind: CoachingPlanKind;
+  title: string;
+  description: string;
+  duration_days: number;
+  price_yen: number;
+  capacity: number;
+  published: boolean;
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
@@ -424,6 +439,8 @@ export type PublicCoach = {
   years: number;
   rating_count: number;
   rating_average: number;
+  // パーソナル指導の公開中のプラン。安い順。
+  plans: CoachingPlan[];
 };
 
 // コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。
