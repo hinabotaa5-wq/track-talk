@@ -31,6 +31,13 @@ type CoachProfile struct {
 	PledgeVersion *int16     `json:"pledge_version"`
 }
 
+type CoachingBlockedCount struct {
+	ContractID    uuid.UUID `json:"contract_id"`
+	ProfileID     uuid.UUID `json:"profile_id"`
+	Count         int32     `json:"count"`
+	LastBlockedAt time.Time `json:"last_blocked_at"`
+}
+
 type CoachingContract struct {
 	ID            uuid.UUID  `json:"id"`
 	PlanID        uuid.UUID  `json:"plan_id"`
@@ -64,11 +71,28 @@ type CoachingContractConsent struct {
 	AgreedAt         time.Time `json:"agreed_at"`
 }
 
+type CoachingContractRating struct {
+	ContractID uuid.UUID `json:"contract_id"`
+	Stars      int16     `json:"stars"`
+	RatedAt    time.Time `json:"rated_at"`
+}
+
 type CoachingDemoCode struct {
 	Code      string     `json:"code"`
 	CreatedAt time.Time  `json:"created_at"`
 	UsedBy    *uuid.UUID `json:"used_by"`
 	UsedAt    *time.Time `json:"used_at"`
+}
+
+type CoachingMessage struct {
+	ID            uuid.UUID  `json:"id"`
+	ContractID    uuid.UUID  `json:"contract_id"`
+	SenderID      *uuid.UUID `json:"sender_id"`
+	SenderRole    string     `json:"sender_role"`
+	Body          string     `json:"body"`
+	VideoPublicID *string    `json:"video_public_id"`
+	Menu          []byte     `json:"menu"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 type CoachingPlan struct {
