@@ -82,6 +82,39 @@ func (q *Queries) GetCoachingContractRating(ctx context.Context, contractID uuid
 	return i, err
 }
 
+const getCoachingMessageContract = `-- name: GetCoachingMessageContract :one
+SELECT m.id, m.sender_id, m.sender_role, ct.id AS contract_id, ct.requester_id, ct.coach_id, ct.minor
+FROM coaching_messages m
+JOIN coaching_contracts ct ON ct.id = m.contract_id
+WHERE m.id = $1
+`
+
+type GetCoachingMessageContractRow struct {
+	ID          uuid.UUID  `json:"id"`
+	SenderID    *uuid.UUID `json:"sender_id"`
+	SenderRole  string     `json:"sender_role"`
+	ContractID  uuid.UUID  `json:"contract_id"`
+	RequesterID uuid.UUID  `json:"requester_id"`
+	CoachID     uuid.UUID  `json:"coach_id"`
+	Minor       bool       `json:"minor"`
+}
+
+// 通報する1通と、その契約。
+func (q *Queries) GetCoachingMessageContract(ctx context.Context, id uuid.UUID) (GetCoachingMessageContractRow, error) {
+	row := q.db.QueryRow(ctx, getCoachingMessageContract, id)
+	var i GetCoachingMessageContractRow
+	err := row.Scan(
+		&i.ID,
+		&i.SenderID,
+		&i.SenderRole,
+		&i.ContractID,
+		&i.RequesterID,
+		&i.CoachID,
+		&i.Minor,
+	)
+	return i, err
+}
+
 const listCoachingMessages = `-- name: ListCoachingMessages :many
 SELECT id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at FROM coaching_messages
 WHERE contract_id = $1

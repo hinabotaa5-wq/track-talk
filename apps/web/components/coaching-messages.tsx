@@ -13,6 +13,7 @@ import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 // パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも送れる。終わったあとは読むだけ。
+// 18歳未満のときは保護者もリンクから参加する（保護者は文章だけ）。相手の1通ごとに通報できる。
 // リアルタイムではないので、開いている間は30秒ごとと、画面に戻ったときに読み直す。
 
 const maxVideoBytes = 100 * 1024 * 1024;
@@ -43,7 +44,52 @@ function MenuCard({ menu }: { menu: PlanMenu }) {
   );
 }
 
-function MessageItem({ message, contract }: { message: CoachingMessage; contract: CoachingContract }) {
+// やりとり欄の API の場所。保護者はリンクのトークンで読み書きする。
+type Access = { token: string | null; guardianToken?: string };
+
+function contractPath(contract: CoachingContract, access: Access): string {
+  return access.guardianToken
+    ? `/v1/guardian/${access.guardianToken}/contracts/${contract.id}`
+    : `/v1/coaching/contracts/${contract.id}`;
+}
+
+function ReportButton({ message, access }: { message: CoachingMessage; access: Access }) {
+  const [state, setState] = useState<"idle" | "done" | "error">("idle");
+  const { pending, acquire, release } = useActionLock();
+
+  async function report() {
+    if (!window.confirm("このメッセージを運営に通報しますか？通報すると、運営がこのやりとりを確認します。")) return;
+    if (!acquire()) return;
+    try {
+      if (access.guardianToken) {
+        await apiFetch(`/v1/guardian/${access.guardianToken}/messages/${message.id}/report`, {
+          method: "POST",
+          body: JSON.stringify({ reason: "other", detail: "" }),
+        });
+      } else {
+        await apiFetch("/v1/reports", {
+          method: "POST",
+          token: access.token,
+          body: JSON.stringify({ target_type: "coaching_message", target_id: message.id, reason: "other", detail: "" }),
+        });
+      }
+      setState("done");
+    } catch (err) {
+      setState(err instanceof ApiRequestError && err.status === 409 ? "done" : "error");
+    } finally {
+      release();
+    }
+  }
+
+  if (state === "done") return <p className="text-xs text-slate-300">通報しました。運営が確認します。</p>;
+  return (
+    <button type="button" onClick={() => void report()} disabled={pending} className="text-xs text-slate-300 underline">
+      {state === "error" ? "通報できませんでした。もう一度" : "通報する"}
+    </button>
+  );
+}
+
+function MessageItem({ message, contract, access }: { message: CoachingMessage; contract: CoachingContract; access: Access }) {
   return (
     <li className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
       <div
@@ -66,6 +112,7 @@ function MessageItem({ message, contract }: { message: CoachingMessage; contract
           />
         ) : null}
         {message.menu ? <MenuCard menu={message.menu} /> : null}
+        {message.mine ? null : <ReportButton message={message} access={access} />}
       </div>
     </li>
   );
@@ -75,13 +122,16 @@ const emptyMenu = (): PlanMenu => ({ title: "", days: [{ day: "", content: "" }]
 
 function Composer({
   contract,
-  token,
+  access,
   onSent,
 }: {
   contract: CoachingContract;
-  token: string | null;
+  access: Access;
   onSent: (m: CoachingMessage) => void;
 }) {
+  const token = access.token;
+  // 保護者はログインしないので、動画のアップロードはできない。
+  const canVideo = !access.guardianToken;
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [menu, setMenu] = useState<PlanMenu | null>(null);
@@ -125,7 +175,7 @@ function Composer({
         videoPublicID = payload.public_id;
         setUploadPhase("saving");
       }
-      const d = await apiFetch<{ message: CoachingMessage }>(`/v1/coaching/contracts/${contract.id}/messages`, {
+      const d = await apiFetch<{ message: CoachingMessage }>(`${contractPath(contract, access)}/messages`, {
         method: "POST",
         token,
         body: JSON.stringify({ body, video_public_id: videoPublicID, menu }),
@@ -155,7 +205,13 @@ function Composer({
         value={body}
         maxLength={maxBodyChars}
         onChange={(e) => setBody(e.target.value)}
-        placeholder={isCoach ? "練習の様子への返事や、次にやることを書きます" : "練習の様子や、聞きたいことを書きます"}
+        placeholder={
+          isCoach
+            ? "練習の様子への返事や、次にやることを書きます"
+            : access.guardianToken
+              ? "コーチへの質問や、家での様子を書きます"
+              : "練習の様子や、聞きたいことを書きます"
+        }
         aria-label="メッセージ"
       />
       {menu ? (
@@ -198,16 +254,18 @@ function Composer({
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <label className="cursor-pointer text-blue-300 underline">
-          {file ? `動画: ${file.name}` : `動画をつける（${maxReviewSeconds}秒まで）`}
-          <input
-            key={fileKey}
-            type="file"
-            accept="video/*"
-            className="sr-only"
-            onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
-          />
-        </label>
+        {canVideo ? (
+          <label className="cursor-pointer text-blue-300 underline">
+            {file ? `動画: ${file.name}` : `動画をつける（${maxReviewSeconds}秒まで）`}
+            <input
+              key={fileKey}
+              type="file"
+              accept="video/*"
+              className="sr-only"
+              onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        ) : null}
         {isCoach && !menu ? (
           <button type="button" className="text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>
             メニューをつける
@@ -267,23 +325,24 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
   );
 }
 
-// CoachingMessages は、期間中と終わったあとの契約に出すやりとり欄。
+// CoachingMessages は、期間中・止めている間・終わったあとの契約に出すやりとり欄。
+// guardianToken を渡すと、保護者のページとしてリンクのトークンで読み書きする。
 export function CoachingMessages({
   contract,
   token,
+  guardianToken,
   onContractChange,
 }: {
   contract: CoachingContract;
   token: string | null;
+  guardianToken?: string;
   onContractChange: (c: CoachingContract) => void;
 }) {
   const [messages, setMessages] = useState<CoachingMessage[] | null>(null);
   const [error, setError] = useState("");
+  const path = contractPath(contract, { token, guardianToken });
 
-  const fetchMessages = useCallback(
-    () => apiFetch<{ messages: CoachingMessage[] }>(`/v1/coaching/contracts/${contract.id}/messages`, { token }),
-    [contract.id, token],
-  );
+  const fetchMessages = useCallback(() => apiFetch<{ messages: CoachingMessage[] }>(`${path}/messages`, { token }), [path, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,6 +373,7 @@ export function CoachingMessages({
     };
   }, [fetchMessages, contract.status]);
 
+  const access: Access = { token, guardianToken };
   return (
     <div className="space-y-4">
       <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
@@ -325,18 +385,26 @@ export function CoachingMessages({
         {messages === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
         {messages?.length === 0 ? (
           <p className="text-sm text-slate-300">
-            {contract.role === "coach" ? "まずはあいさつと、最初に送ってほしい動画を伝えましょう。" : "まずはあいさつと、いまの練習の様子を送りましょう。"}
+            {contract.role === "coach"
+              ? "まずはあいさつと、最初に送ってほしい動画を伝えましょう。"
+              : contract.role === "guardian"
+                ? "まだやりとりはありません。"
+                : "まずはあいさつと、いまの練習の様子を送りましょう。"}
           </p>
         ) : null}
         <ul className="space-y-3">
           {messages?.map((m) => (
-            <MessageItem key={m.id} message={m} contract={contract} />
+            <MessageItem key={m.id} message={m} contract={contract} access={access} />
           ))}
         </ul>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
       {contract.status === "active" ? (
-        <Composer contract={contract} token={token} onSent={(m) => setMessages((list) => [...(list ?? []), m])} />
+        <Composer contract={contract} access={access} onSent={(m) => setMessages((list) => [...(list ?? []), m])} />
+      ) : contract.status === "suspended" ? (
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
+          運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
+        </p>
       ) : (
         <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。</p>
       )}

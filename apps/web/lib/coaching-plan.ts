@@ -43,9 +43,12 @@ export const coachPledgeItems = [
 
 export const contractStatusLabels: Record<CoachingContractStatus, string> = {
   applied: "コーチの返事待ち",
+  accepted: "保護者の同意待ち",
   active: "期間中",
+  suspended: "運営が止めています",
   ended: "終わりました",
   declined: "今回は受けられませんでした",
+  guardian_declined: "保護者が同意しませんでした",
   expired: "返事がないまま期限が過ぎました",
   cancelled: "取り下げました",
 };

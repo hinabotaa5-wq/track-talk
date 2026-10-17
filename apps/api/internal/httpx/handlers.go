@@ -1142,6 +1142,20 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	minorContract := false
+	if req.TargetType == "coaching_message" {
+		m, err := s.q.GetCoachingMessageContract(r.Context(), tid)
+		// 自分の契約のやりとり欄の、相手が送った1通だけ通報できる。
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && ((m.RequesterID != p.ID && m.CoachID != p.ID) || (m.SenderID != nil && *m.SenderID == p.ID))) {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		minorContract = m.Minor
+	}
 	row, err := s.q.CreateReport(r.Context(), db.CreateReportParams{
 		ID:         uuid.New(),
 		ReporterID: p.ID,
@@ -1153,6 +1167,9 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if minorContract {
+		s.notifyAdminsMinorReport(r.Context())
 	}
 	JSON(w, http.StatusCreated, row)
 }

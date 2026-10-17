@@ -193,13 +193,17 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment" | "injury_note" | "review_response";
+  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;
   status: "open" | "reviewed" | "actioned" | "dismissed";
   created_at: string;
   reporter_nickname: string | null;
+  // 保護者のページからの通報。reporter_nickname は子のニックネーム。
+  by_guardian: boolean;
+  // やりとり欄の通報のとき、その契約。中身は返らないので、開いて確かめる。
+  coaching_contract_id: string;
   post_id: string;
   target_title: string;
   target_body: string;
@@ -331,7 +335,16 @@ export type CoachingPlan = {
 
 // パーソナル指導の申し込み。applied: コーチの返事待ち、active: 期間中、ended: 終わった、
 // declined: コーチが断った、expired: 48時間返事がなかった、cancelled: 返事の前に取り下げた。
-export type CoachingContractStatus = "applied" | "active" | "ended" | "declined" | "expired" | "cancelled";
+export type CoachingContractStatus =
+  | "applied"
+  | "accepted"
+  | "active"
+  | "suspended"
+  | "ended"
+  | "declined"
+  | "guardian_declined"
+  | "expired"
+  | "cancelled";
 export type CoachingContract = {
   id: string;
   plan_id: string;
@@ -347,13 +360,50 @@ export type CoachingContract = {
   status: CoachingContractStatus;
   respond_by: string;
   responded_at: string | null;
+  // 18歳未満のとき、保護者が同意する期限（コーチが承諾したあと）。
+  start_by: string | null;
+  suspended_at: string | null;
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
-  role?: "requester" | "coach";
+  role?: "requester" | "coach" | "guardian";
   rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };
   requester?: { nickname: string | null };
+};
+
+// 運営のパーソナル指導の一覧。会話の中身は含まない。
+export type AdminCoachingContract = {
+  id: string;
+  plan_title: string;
+  plan_kind: CoachingPlanKind;
+  duration_days: number;
+  price_yen: number;
+  minor: boolean;
+  status: CoachingContractStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  requester_nickname: string | null;
+  coach_nickname: string | null;
+  report_count: number;
+  requester_blocked: number;
+  coach_blocked: number;
+};
+
+export type CoachingBlockedAccount = {
+  profile_id: string;
+  nickname: string | null;
+  blocked: number;
+  last_blocked_at: string;
+};
+
+export type CoachingAccessLog = {
+  id: string;
+  admin_id: string;
+  report_id: string;
+  opened_at: string;
+  admin_nickname: string | null;
 };
 
 // コーチが送る練習メニュー。

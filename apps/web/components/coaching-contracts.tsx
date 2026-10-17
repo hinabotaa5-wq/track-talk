@@ -5,6 +5,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import {
   contractConsentItems,
+  contractStatusLabels,
   formatPlanPrice,
   planDurationLabel,
   planKindLabels,
@@ -124,7 +125,9 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
       <ContractDetails contract={contract} />
       <p className="text-sm font-semibold text-white">{formatDateTime(contract.respond_by)}までに返事をしてください</p>
       {contract.minor ? (
-        <p className="text-xs text-slate-200">18歳未満の人です。保護者の同意を得て申し込んでいます。</p>
+        <p className="text-xs text-slate-200">
+          18歳未満の人です。引き受けたあと、保護者が72時間以内にこの申し込みに同意すると始まります。保護者もやりとりに参加します。
+        </p>
       ) : null}
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
       <div className="flex gap-2">
@@ -178,7 +181,7 @@ export function CoachContractsSection({ token }: { token: string | null }) {
   if (!contracts) return error ? <p className="text-sm text-red-400">{error}</p> : null;
 
   const applied = contracts.filter((c) => c.status === "applied");
-  const active = contracts.filter((c) => c.status === "active");
+  const active = contracts.filter((c) => c.status === "accepted" || c.status === "active" || c.status === "suspended");
 
   return (
     <>
@@ -204,7 +207,9 @@ export function CoachContractsSection({ token }: { token: string | null }) {
                 <span className="block text-sm font-semibold text-white">
                   {c.requester?.nickname ?? "名前なし"}さん · {c.plan_title}
                 </span>
-                <span className="block text-xs text-slate-300">{contractPeriod(c)}</span>
+                <span className="block text-xs text-slate-300">
+                  {c.status === "active" ? contractPeriod(c) : contractStatusLabels[c.status]}
+                </span>
               </Link>
             </li>
           ))}
