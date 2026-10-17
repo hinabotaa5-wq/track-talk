@@ -276,3 +276,72 @@ func Sign(payload []byte, secret string, ts int64) []byte {
 	mac.Write(payload)
 	return mac.Sum(nil)
 }
+
+// Account は、コーチの Stripe Connect のアカウント（Express）。
+type Account struct {
+	ID               string `json:"id"`
+	PayoutsEnabled   bool   `json:"payouts_enabled"`
+	DetailsSubmitted bool   `json:"details_submitted"`
+}
+
+// CreateAccount は、コーチの受け取り用のアカウントを作る。本人確認と口座の登録は Stripe の画面で行う。
+func (c Client) CreateAccount(ctx context.Context, metadata map[string]string, idempotencyKey string) (Account, error) {
+	form := url.Values{}
+	form.Set("type", "express")
+	form.Set("country", "JP")
+	form.Set("capabilities[transfers][requested]", "true")
+	for k, v := range metadata {
+		form.Set("metadata["+k+"]", v)
+	}
+	var a Account
+	err := c.post(ctx, "/v1/accounts", form, idempotencyKey, &a)
+	return a, err
+}
+
+// GetAccount は、アカウントの今の状態（送金を受け取れるか）を読む。
+func (c Client) GetAccount(ctx context.Context, id string) (Account, error) {
+	if !c.Configured() {
+		return Account{}, ErrNotConfigured
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/accounts/"+url.PathEscape(id), nil)
+	if err != nil {
+		return Account{}, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var a Account
+	err = c.do(req, &a)
+	return a, err
+}
+
+// CreateAccountLink は、口座登録の画面の URL を作る。URL は数分で切れるので、開くたびに作る。
+func (c Client) CreateAccountLink(ctx context.Context, account, refreshURL, returnURL string) (string, error) {
+	form := url.Values{}
+	form.Set("account", account)
+	form.Set("refresh_url", refreshURL)
+	form.Set("return_url", returnURL)
+	form.Set("type", "account_onboarding")
+	var out struct {
+		URL string `json:"url"`
+	}
+	err := c.post(ctx, "/v1/account_links", form, "", &out)
+	return out.URL, err
+}
+
+type Transfer struct {
+	ID     string `json:"id"`
+	Amount int    `json:"amount"`
+}
+
+// CreateTransfer は、TrackTalk の残高からコーチのアカウントへ送金する。
+func (c Client) CreateTransfer(ctx context.Context, account string, amountYen int, metadata map[string]string, idempotencyKey string) (Transfer, error) {
+	form := url.Values{}
+	form.Set("amount", strconv.Itoa(amountYen))
+	form.Set("currency", "jpy")
+	form.Set("destination", account)
+	for k, v := range metadata {
+		form.Set("metadata["+k+"]", v)
+	}
+	var t Transfer
+	err := c.post(ctx, "/v1/transfers", form, idempotencyKey, &t)
+	return t, err
+}

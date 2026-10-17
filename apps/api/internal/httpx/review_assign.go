@@ -159,6 +159,8 @@ type coachingTickResult struct {
 	PaymentsRefunded int `json:"payments_refunded"`
 	// 添削の支払い: 目安を過ぎたなどで取り消し・返金したもの。
 	ReviewPaymentsReleased int `json:"review_payments_released"`
+	// コーチの報酬として記録したもの（返却した添削、終わったパーソナル指導）。
+	EarningsRecorded int `json:"earnings_recorded"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
@@ -189,6 +191,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.ReviewPaymentsReleased, err = s.settleReviewPayments(ctx); err != nil {
+		return out, err
+	}
+	if out.EarningsRecorded, err = s.recordCoachEarnings(ctx); err != nil {
 		return out, err
 	}
 	return out, nil

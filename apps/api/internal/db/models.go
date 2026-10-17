@@ -10,25 +10,53 @@ import (
 	"github.com/google/uuid"
 )
 
+type CoachEarning struct {
+	ID              uuid.UUID  `json:"id"`
+	CoachID         *uuid.UUID `json:"coach_id"`
+	Source          string     `json:"source"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ContractID      *uuid.UUID `json:"contract_id"`
+	GrossYen        int32      `json:"gross_yen"`
+	SharePercent    int16      `json:"share_percent"`
+	AmountYen       int32      `json:"amount_yen"`
+	PayoutID        *uuid.UUID `json:"payout_id"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type CoachPayout struct {
+	ID               uuid.UUID  `json:"id"`
+	CoachID          *uuid.UUID `json:"coach_id"`
+	Month            time.Time  `json:"month"`
+	AmountYen        int32      `json:"amount_yen"`
+	Status           string     `json:"status"`
+	StripeTransferID *string    `json:"stripe_transfer_id"`
+	Failure          *string    `json:"failure"`
+	CreatedAt        time.Time  `json:"created_at"`
+	PaidAt           *time.Time `json:"paid_at"`
+}
+
 type CoachProfile struct {
-	ProfileID     uuid.UUID  `json:"profile_id"`
-	Tier          string     `json:"tier"`
-	Events        []string   `json:"events"`
-	BestRecord    string     `json:"best_record"`
-	Achievements  string     `json:"achievements"`
-	Years         int16      `json:"years"`
-	Status        string     `json:"status"`
-	AppliedAt     time.Time  `json:"applied_at"`
-	ReviewedAt    *time.Time `json:"reviewed_at"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	OnDuty        bool       `json:"on_duty"`
-	DailyCap      int16      `json:"daily_cap"`
-	LastOfferedAt *time.Time `json:"last_offered_at"`
-	RatingResetAt *time.Time `json:"rating_reset_at"`
-	PhotoPublicID *string    `json:"photo_public_id"`
-	PledgedAt     *time.Time `json:"pledged_at"`
-	PledgeVersion *int16     `json:"pledge_version"`
+	ProfileID       uuid.UUID  `json:"profile_id"`
+	Tier            string     `json:"tier"`
+	Events          []string   `json:"events"`
+	BestRecord      string     `json:"best_record"`
+	Achievements    string     `json:"achievements"`
+	Years           int16      `json:"years"`
+	Status          string     `json:"status"`
+	AppliedAt       time.Time  `json:"applied_at"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	OnDuty          bool       `json:"on_duty"`
+	DailyCap        int16      `json:"daily_cap"`
+	LastOfferedAt   *time.Time `json:"last_offered_at"`
+	RatingResetAt   *time.Time `json:"rating_reset_at"`
+	PhotoPublicID   *string    `json:"photo_public_id"`
+	PledgedAt       *time.Time `json:"pledged_at"`
+	PledgeVersion   *int16     `json:"pledge_version"`
+	StripeAccountID *string    `json:"stripe_account_id"`
+	PayoutsEnabled  bool       `json:"payouts_enabled"`
+	ReducedFeeUntil *time.Time `json:"reduced_fee_until"`
 }
 
 type CoachingAccessLog struct {

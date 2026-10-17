@@ -23,6 +23,7 @@ func planCoach(t *testing.T, h http.Handler, capacity int) (uuid.UUID, string, s
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", adminToken(t, h), nil); rec.Code != http.StatusOK {
 		t.Fatalf("approve %d", rec.Code)
 	}
+	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, coach, "acct_"+coach.String())
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tc, map[string]any{"agree": true}); rec.Code != http.StatusOK {
 		t.Fatalf("pledge %d", rec.Code)
 	}

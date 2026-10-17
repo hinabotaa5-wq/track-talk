@@ -344,6 +344,10 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 		FieldError(w, fields)
 		return
 	}
+	if !s.payoutsReady(s.refreshPayoutsEnabled(r.Context(), coach)) {
+		Error(w, http.StatusUnprocessableEntity, "payouts_required", payoutsNotReadyMessage)
+		return
+	}
 	var ct db.CoachingContract
 	err := s.tx(r.Context(), func(q *db.Queries) error {
 		var err error

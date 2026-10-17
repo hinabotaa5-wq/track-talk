@@ -127,6 +127,10 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"daily_cap": "1日の上限は1〜20本で選んでください"})
 		return
 	}
+	if onDuty && !current.OnDuty && !s.payoutsReady(s.refreshPayoutsEnabled(r.Context(), current)) {
+		Error(w, http.StatusUnprocessableEntity, "payouts_required", payoutsNotReadyMessage)
+		return
+	}
 	if onDuty && !current.OnDuty {
 		devices, err := s.q.CountPushSubscriptions(r.Context(), p.ID)
 		if err != nil {

@@ -316,6 +316,55 @@ export type CoachApplication = {
   photo_url: string;
   // いまの版のパーソナル指導の誓約をしたか。
   pledged: boolean;
+  // 報酬の受け取り口座の登録が済み、受付やパーソナル指導の承諾ができるか。
+  payouts_ready: boolean;
+};
+
+// コーチへの報酬と、月ごとの送金。
+export type CoachPayoutStatus = "pending" | "paid" | "failed";
+export type CoachPayout = {
+  id: string;
+  month: string;
+  amount_yen: number;
+  status: CoachPayoutStatus;
+  paid_at: string | null;
+};
+export type CoachEarning = {
+  id: string;
+  source: "review" | "personal";
+  gross_yen: number;
+  share_percent: number;
+  amount_yen: number;
+  paid: boolean;
+  created_at: string;
+};
+export type CoachEarnings = {
+  // false のあいだは支払いなしのデモ版。
+  payments: boolean;
+  stripe_linked: boolean;
+  payouts_enabled: boolean;
+  reduced_fee_until: string | null;
+  review_share: number;
+  personal_fee: number;
+  this_month_yen: number;
+  unpaid_yen: number;
+  payouts: CoachPayout[];
+  earnings: CoachEarning[];
+};
+export type AdminPayoutCoach = {
+  profile_id: string;
+  nickname: string | null;
+  tier: CoachTier;
+  stripe_linked: boolean;
+  payouts_enabled: boolean;
+  reduced_fee_until: string | null;
+  unpaid_yen: number;
+};
+export type AdminCoachPayout = CoachPayout & {
+  coach_id: string | null;
+  nickname: string | null;
+  failure: string | null;
+  created_at: string;
 };
 
 // パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発。

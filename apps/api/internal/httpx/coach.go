@@ -95,6 +95,8 @@ func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
 		// いまの版のパーソナル指導の誓約をしたか。
 		"pledged": pledged(c),
+		// 報酬の受け取り口座（Stripe）の登録が済み、受付やパーソナル指導の承諾ができるか。
+		"payouts_ready": s.payoutsReady(c),
 	}
 }
 
