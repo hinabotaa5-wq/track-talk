@@ -152,10 +152,13 @@ type coachingTickResult struct {
 	Requeued   int `json:"requeued"`
 	Offered    int `json:"offered"`
 	HelpfulAsk int `json:"helpful_ask"`
+	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
+	ContractsExpired int `json:"contracts_expired"`
+	ContractsEnded   int `json:"contracts_ended"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
-// 返却から7日たった返答には「役に立ちましたか」を聞く。
+// 返却から7日たった返答には「役に立ちましたか」を聞く。パーソナル指導の申し込みの期限切れと、期間の終わりも片付ける。
 func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error) {
 	var out coachingTickResult
 	overdue, err := s.q.ExpireOverdueReviewRequests(ctx)
@@ -173,6 +176,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	out.Requeued = len(requeued)
 	out.Offered = s.dispatchQueuedReviews(ctx)
 	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
+		return out, err
+	}
+	if out.ContractsExpired, out.ContractsEnded, err = s.closeCoachingContracts(ctx); err != nil {
 		return out, err
 	}
 	return out, nil

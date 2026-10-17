@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm } from "@/components/coach-photo";
+import { CoachContractsSection } from "@/components/coaching-contracts";
 import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -16,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 
 // コーチ画面。承認されたコーチが「受付中」と1日の上限本数を決め、届いた打診を引き受けるか見送る。
 // 返答と補足は、添削中の依頼から /coach/requests/{id} で書く。
+// パーソナル指導の申し込みへの返事と、プランの作成も同じ画面でする。
 
 const capOptions = [1, 2, 3, 5, 8, 10, 15, 20];
 
@@ -273,6 +275,8 @@ export default function CoachPage() {
       </section>
 
       <CoachRequestsSection token={token} />
+
+      <CoachContractsSection token={token} />
 
       <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 

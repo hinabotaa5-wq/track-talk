@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -138,7 +139,9 @@ func (q *Queries) ListMyCoachingPlans(ctx context.Context, coachID uuid.UUID) ([
 }
 
 const listPublicCoachingPlans = `-- name: ListPublicCoachingPlans :many
-SELECT pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at FROM coaching_plans pl
+SELECT pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at,
+    (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status = 'active')::int AS active_count
+FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 WHERE pl.published
   AND c.status = 'approved'
@@ -146,16 +149,31 @@ WHERE pl.published
 ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id
 `
 
-// コーチ一覧に出すプラン。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
-func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int16) ([]CoachingPlan, error) {
+type ListPublicCoachingPlansRow struct {
+	ID           uuid.UUID `json:"id"`
+	CoachID      uuid.UUID `json:"coach_id"`
+	Kind         string    `json:"kind"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	DurationDays int16     `json:"duration_days"`
+	PriceYen     int32     `json:"price_yen"`
+	Capacity     int16     `json:"capacity"`
+	Published    bool      `json:"published"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	ActiveCount  int32     `json:"active_count"`
+}
+
+// コーチ一覧に出すプラン。期間中の人数をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
+func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int16) ([]ListPublicCoachingPlansRow, error) {
 	rows, err := q.db.Query(ctx, listPublicCoachingPlans, pledgeVersion)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CoachingPlan
+	var items []ListPublicCoachingPlansRow
 	for rows.Next() {
-		var i CoachingPlan
+		var i ListPublicCoachingPlansRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CoachID,
@@ -168,6 +186,7 @@ func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int
 			&i.Published,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ActiveCount,
 		); err != nil {
 			return nil, err
 		}

@@ -325,6 +325,40 @@ export type CoachingPlan = {
   price_yen: number;
   capacity: number;
   published: boolean;
+  // コーチ一覧と申し込む画面だけ: 期間中の人数が上限に届いているか。
+  full?: boolean;
+};
+
+// パーソナル指導の申し込み。applied: コーチの返事待ち、active: 期間中、ended: 終わった、
+// declined: コーチが断った、expired: 48時間返事がなかった、cancelled: 返事の前に取り下げた。
+export type CoachingContractStatus = "applied" | "active" | "ended" | "declined" | "expired" | "cancelled";
+export type CoachingContract = {
+  id: string;
+  plan_id: string;
+  plan_kind: CoachingPlanKind;
+  plan_title: string;
+  duration_days: number;
+  price_yen: number;
+  event: CoachEvent;
+  goal: string;
+  current_record: string;
+  message: string;
+  minor: boolean;
+  status: CoachingContractStatus;
+  respond_by: string;
+  responded_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  role?: "requester" | "coach";
+  coach?: { id: string; nickname: string | null; photo_url: string };
+  requester?: { nickname: string | null };
+};
+
+// 申し込む画面に出すプランとコーチ。
+export type PublicCoachingPlan = {
+  plan: CoachingPlan;
+  coach: { id: string; nickname: string | null; photo_url: string; tier: CoachTier; events: CoachEvent[] };
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";

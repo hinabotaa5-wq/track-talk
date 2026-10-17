@@ -16,6 +16,7 @@ import {
 } from "@/lib/coaching-plan";
 import type { CoachApplication, CoachingPlan, CoachingPlanKind } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 // パーソナル指導のプラン。コーチ画面では誓約と、プランの作成・編集をする。コーチ一覧では公開中のプランを見せる。
@@ -294,7 +295,7 @@ export function CoachPlansSection({
     <section className="space-y-3">
       <div className="space-y-1">
         <h2 className="font-bold">パーソナル指導のプラン</h2>
-        <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出ます。申し込みの受付はこれから始まります。</p>
+        <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
       </div>
       {!coach.pledged ? (
         <div className="rounded-xl border border-white/20 glass bg-white/10 p-3">
@@ -372,6 +373,16 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
             <p className="font-semibold text-white">{p.title}</p>
             <p className="text-xs text-slate-300">{planSummary(p)}</p>
             <p className="mt-1 whitespace-pre-wrap text-slate-200">{p.description}</p>
+            {p.full ? (
+              <p className="mt-2 text-xs font-semibold text-amber-300">いまは満員です</p>
+            ) : (
+              <Link
+                href={`/coaching/personal/plans/${p.id}`}
+                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+              >
+                このプランに申し込む
+              </Link>
+            )}
           </li>
         ))}
       </ul>
