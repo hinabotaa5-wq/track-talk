@@ -109,6 +109,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/competitions", s.listCompetitions)
 			r.Get("/major-hosts", s.listMajorHosts)
 			r.Get("/domestic-majors", s.listDomesticMajors)
+			r.Get("/prefectures/{code}", s.getPrefecturePage)
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Delete("/me", s.deleteAccount)
