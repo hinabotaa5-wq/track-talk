@@ -7,6 +7,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatYen, pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 // フォーム添削を始める前の準備（生まれた年月、保護者の同意、通知）。
@@ -205,7 +206,7 @@ export default function CoachingSetupPage() {
       <section className="space-y-3">
         <h2 className="font-bold">通知</h2>
         <p className="text-sm text-slate-300">
-          添削が返ってきたときに、この端末へ通知します。通知を受け取れる端末: {me.push_devices}台
+          添削が返ってきたときや、パーソナル指導の申し込みに返事が来たときに、この端末へ通知します。通知を受け取れる端末: {me.push_devices}台
         </p>
         <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={() => void onEnablePush()}>
           この端末で通知を受け取る
@@ -217,6 +218,18 @@ export default function CoachingSetupPage() {
         ) : null}
         {pushMessage ? <p className="text-sm text-slate-300">{pushMessage}</p> : null}
       </section>
+
+      {me.demo ? (
+        <section className="space-y-2">
+          <h2 className="font-bold">申し込んだもの</h2>
+          <Link href="/me/coaching/requests" className="block text-sm text-blue-300 underline">
+            フォーム添削の依頼
+          </Link>
+          <Link href="/me/coaching/personal" className="block text-sm text-blue-300 underline">
+            パーソナル指導の申し込み
+          </Link>
+        </section>
+      ) : null}
     </div>
   );
 }

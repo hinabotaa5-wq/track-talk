@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { DemoCodeForm } from "@/components/coaching-demo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -23,46 +23,6 @@ const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
-
-function DemoCodeForm({ token, onJoined }: { token: string | null; onJoined: () => void }) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const { pending, acquire, release } = useActionLock();
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!acquire()) return;
-    setError("");
-    try {
-      await apiFetch("/v1/coaching/demo", { method: "POST", token, body: JSON.stringify({ code }) });
-      onJoined();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.code || err.message : "送信に失敗しました");
-    } finally {
-      release();
-    }
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <p className="text-sm text-slate-200">
-        フォーム添削は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。
-      </p>
-      <Input
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        placeholder="招待コード(8文字)"
-        autoCapitalize="characters"
-        autoComplete="off"
-        aria-label="招待コード"
-      />
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending || code.trim() === ""}>
-        デモに参加する
-      </Button>
-    </form>
-  );
-}
 
 export default function NewReviewRequestPage() {
   const { session, token, loading } = useAuth();
@@ -196,7 +156,11 @@ export default function NewReviewRequestPage() {
       </div>
 
       {!me.demo ? (
-        <DemoCodeForm token={token} onJoined={() => void loadMe()} />
+        <DemoCodeForm
+          intro="フォーム添削は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。"
+          token={token}
+          onJoined={() => void loadMe()}
+        />
       ) : !me.birth_month ? (
         <div className="space-y-3">
           <p className="text-sm text-slate-200">先に生まれた年月を登録してください。18歳未満の人は保護者の同意が必要です。</p>

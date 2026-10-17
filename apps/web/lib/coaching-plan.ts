@@ -1,4 +1,4 @@
-import type { CoachingPlan, CoachingPlanKind } from "./types";
+import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind } from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
@@ -40,3 +40,21 @@ export const coachPledgeItems = [
   "通報があったときは、安全の確認のために運営がやりとりを読むことに同意します。",
   "守らなかったときは、利用停止と報酬の没収になることに同意します。",
 ];
+
+export const contractStatusLabels: Record<CoachingContractStatus, string> = {
+  applied: "コーチの返事待ち",
+  active: "期間中",
+  ended: "終わりました",
+  declined: "今回は受けられませんでした",
+  expired: "返事がないまま期限が過ぎました",
+  cancelled: "取り下げました",
+};
+
+// 契約を始めるときの同意。利用者は申し込みで、コーチは承諾で、それぞれ別にチェックする。
+// 文面を変えたら API の contractConsentVersion を上げる。
+export const contractConsentItems = {
+  agree_report: "通報があったとき、安全の確認のために TrackTalk の運営がこのやりとりを読むことに同意します。普段は運営も読みません。",
+  agree_detection:
+    "外部の連絡先（URL・電話番号・SNS の ID など）を送ろうとしたとき、機械で検出して送信を止めることに同意します。",
+} as const;
+export type ContractConsentKey = keyof typeof contractConsentItems;

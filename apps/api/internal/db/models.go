@@ -31,6 +31,39 @@ type CoachProfile struct {
 	PledgeVersion *int16     `json:"pledge_version"`
 }
 
+type CoachingContract struct {
+	ID            uuid.UUID  `json:"id"`
+	PlanID        uuid.UUID  `json:"plan_id"`
+	CoachID       uuid.UUID  `json:"coach_id"`
+	RequesterID   uuid.UUID  `json:"requester_id"`
+	PlanKind      string     `json:"plan_kind"`
+	PlanTitle     string     `json:"plan_title"`
+	DurationDays  int16      `json:"duration_days"`
+	PriceYen      int32      `json:"price_yen"`
+	Event         string     `json:"event"`
+	Goal          string     `json:"goal"`
+	CurrentRecord string     `json:"current_record"`
+	Message       string     `json:"message"`
+	Minor         bool       `json:"minor"`
+	Status        string     `json:"status"`
+	RespondBy     time.Time  `json:"respond_by"`
+	RespondedAt   *time.Time `json:"responded_at"`
+	StartsAt      *time.Time `json:"starts_at"`
+	EndsAt        *time.Time `json:"ends_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+type CoachingContractConsent struct {
+	ContractID       uuid.UUID `json:"contract_id"`
+	Party            string    `json:"party"`
+	ProfileID        uuid.UUID `json:"profile_id"`
+	Version          int16     `json:"version"`
+	ReportReview     bool      `json:"report_review"`
+	ContactDetection bool      `json:"contact_detection"`
+	AgreedAt         time.Time `json:"agreed_at"`
+}
+
 type CoachingDemoCode struct {
 	Code      string     `json:"code"`
 	CreatedAt time.Time  `json:"created_at"`

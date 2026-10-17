@@ -339,7 +339,12 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 	}
 	plansByCoach := map[uuid.UUID][]map[string]any{}
 	for _, p := range plans {
-		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], coachingPlanJSON(p))
+		plan := coachingPlanJSON(db.CoachingPlan{
+			ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
+			DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
+		})
+		plan["full"] = p.ActiveCount >= int32(p.Capacity)
+		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
