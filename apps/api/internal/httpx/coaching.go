@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
@@ -30,8 +31,8 @@ const defaultGuardianLimitYen int32 = 3000
 // isMinor は、生まれた年月から18歳未満かを判定する。
 // 誕生日が分からないので、生まれた月の翌月1日を18歳の誕生日とみなす（大人として扱うのが遅れる側に倒す）。
 func isMinor(birthMonth, now time.Time) bool {
-	adult := time.Date(birthMonth.Year()+18, birthMonth.Month()+1, 1, 0, 0, 0, 0, tokyo)
-	return now.In(tokyo).Before(adult)
+	adult := time.Date(birthMonth.Year()+18, birthMonth.Month()+1, 1, 0, 0, 0, 0, jst.Zone)
+	return now.In(jst.Zone).Before(adult)
 }
 
 // parseBirthMonth は "2009-04" の形を受け取り、その月の1日を返す。
@@ -44,7 +45,7 @@ func parseBirthMonth(raw string, now time.Time) (time.Time, string) {
 	if err != nil {
 		return time.Time{}, "生まれた年月が不正です"
 	}
-	today := now.In(tokyo)
+	today := now.In(jst.Zone)
 	thisMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
 	if month.After(thisMonth) {
 		return time.Time{}, "生まれた年月が不正です"

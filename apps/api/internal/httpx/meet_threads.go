@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -58,7 +59,7 @@ var featuredInternationalPatterns = []*regexp.Regexp{
 func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	now := s.now()
-	today := now.In(tokyo).Format("2006-01-02")
+	today := now.In(jst.Zone).Format("2006-01-02")
 	start, end := seasonRange(currentSeasonYear(now))
 
 	targets, err := s.todayMeetTargets(ctx, start, end, today)

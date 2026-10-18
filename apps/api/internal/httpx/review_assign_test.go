@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type coachRequestsView struct {
@@ -239,7 +240,6 @@ func TestReviewOfferRespectsActiveLimit(t *testing.T) {
 
 // tomorrowNoon は、日本時間の翌日12時。
 func tomorrowNoon() time.Time {
-	tokyo := time.FixedZone("Asia/Tokyo", 9*60*60)
-	now := time.Now().In(tokyo)
-	return time.Date(now.Year(), now.Month(), now.Day()+1, 12, 0, 0, 0, tokyo)
+	now := time.Now().In(jst.Zone)
+	return time.Date(now.Year(), now.Month(), now.Day()+1, 12, 0, 0, 0, jst.Zone)
 }

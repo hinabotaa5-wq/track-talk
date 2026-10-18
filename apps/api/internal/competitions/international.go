@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"golang.org/x/net/html"
 )
 
@@ -23,11 +24,9 @@ const (
 	diamondLeagueCalendar  = "https://www.diamondleague.com/calendar/"
 )
 
-var tokyoZone = time.FixedZone("Asia/Tokyo", 9*60*60)
-
 // SeasonYear is the athletics season containing now. A season starts in April.
 func SeasonYear(now time.Time) int {
-	t := now.In(tokyoZone)
+	t := now.In(jst.Zone)
 	if t.Month() >= time.April {
 		return t.Year()
 	}

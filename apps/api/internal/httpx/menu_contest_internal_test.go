@@ -3,6 +3,8 @@ package httpx
 import (
 	"testing"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func TestMenuContestSeasonRunsNovemberThroughMarch(t *testing.T) {
@@ -36,7 +38,7 @@ func TestMenuContestSeasonRunsNovemberThroughMarch(t *testing.T) {
 
 func TestCurrentMenuContestRound(t *testing.T) {
 	at := func(s string) time.Time {
-		v, err := time.ParseInLocation(time.DateTime, s, tokyo)
+		v, err := time.ParseInLocation(time.DateTime, s, jst.Zone)
 		if err != nil {
 			t.Fatal(err)
 		}

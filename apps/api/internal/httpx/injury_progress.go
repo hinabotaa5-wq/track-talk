@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type injuryProgressDTO struct {
@@ -59,7 +60,7 @@ func buildInjuryProgress(posts []db.ListMyInjuryPostsRow, reports []db.ListMyInj
 			PostID:        post.ID,
 			BodyPart:      post.BodyPart,
 			BodyPartLabel: injuryBodyPartLabel(post.BodyPart),
-			PostedOn:      post.CreatedAt.In(tokyo).Format("2006-01-02"),
+			PostedOn:      post.CreatedAt.In(jst.Zone).Format("2006-01-02"),
 			Stages:        make([]injuryProgressStageDTO, 0, len(injuryStages)),
 		}
 		for i, stage := range injuryStages {

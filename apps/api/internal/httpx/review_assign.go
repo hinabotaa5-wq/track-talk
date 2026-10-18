@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
@@ -31,8 +32,8 @@ const (
 
 // dayStart は日本時間の今日の0時。1日の上限本数はこの時刻から数える。
 func dayStart(now time.Time) time.Time {
-	local := now.In(tokyo)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, tokyo)
+	local := now.In(jst.Zone)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, jst.Zone)
 }
 
 // estimateReviewDue は返却の目安。いつ送っても、送った翌日の12時（日本時間）までにする。

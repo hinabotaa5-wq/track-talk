@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
-var tokyo = time.FixedZone("Asia/Tokyo", 9*60*60)
-
 func tokyoToday() time.Time {
-	now := time.Now().In(tokyo)
+	now := time.Now().In(jst.Zone)
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 }
 
@@ -108,7 +107,7 @@ func parseMonth(raw string) (int, bool) {
 // currentSeasonYear is the athletics season that contains now.
 // A season starts in April and runs through March of the next calendar year.
 func currentSeasonYear(now time.Time) int {
-	t := now.In(tokyo)
+	t := now.In(jst.Zone)
 	if t.Month() >= time.April {
 		return t.Year()
 	}

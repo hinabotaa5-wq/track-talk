@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type menuContestView struct {
@@ -51,8 +52,7 @@ func (c *fakeClock) Now() time.Time {
 }
 
 func (c *fakeClock) Set(s string) {
-	tokyo, _ := time.LoadLocation("Asia/Tokyo")
-	v, err := time.ParseInLocation(time.DateTime, s, tokyo)
+	v, err := time.ParseInLocation(time.DateTime, s, jst.Zone)
 	if err != nil {
 		panic(err)
 	}

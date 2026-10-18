@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -48,7 +49,7 @@ func senseNoteFrom(id uuid.UUID, body string, event *string, createdAt, updatedA
 		ID:        id,
 		Body:      body,
 		Event:     event,
-		Day:       createdAt.In(tokyo).Format(time.DateOnly),
+		Day:       createdAt.In(jst.Zone).Format(time.DateOnly),
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}
@@ -80,7 +81,7 @@ func normalizeSenseNote(req senseNoteReq) (body string, event *string, fields ma
 
 // senseNoteStreak counts consecutive days ending today or yesterday. days must be newest first and unique.
 func senseNoteStreak(days []time.Time, now time.Time) int {
-	today := dateOnly(now.In(tokyo))
+	today := dateOnly(now.In(jst.Zone))
 	streak := 0
 	var expect time.Time
 	for i, day := range days {
@@ -109,8 +110,8 @@ func dateOnly(t time.Time) time.Time {
 }
 
 func startOfTokyoDay(now time.Time) time.Time {
-	y, m, d := now.In(tokyo).Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, tokyo)
+	y, m, d := now.In(jst.Zone).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, jst.Zone)
 }
 
 func (s *Server) senseNoteStats(r *http.Request, authorID uuid.UUID) (senseNoteStatsDTO, error) {

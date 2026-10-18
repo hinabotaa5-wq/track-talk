@@ -3,6 +3,8 @@ package competitions
 import (
 	"sort"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 // DailyRequestLimit is the default number of Gemini requests one daily run may make.
@@ -14,17 +16,15 @@ const DailyRequestLimit = 15
 // October 1 (Japan time) not after now. Prefectures publish the year's table in spring and some revise it
 // in autumn, so each prefecture is imported once per window and then left alone.
 func ImportWindowStart(now time.Time) time.Time {
-	local := now.In(japanTime)
+	local := now.In(jst.Zone)
 	year := local.Year()
 	for _, month := range []time.Month{time.October, time.April} {
-		if start := time.Date(year, month, 1, 0, 0, 0, 0, japanTime); !start.After(local) {
+		if start := time.Date(year, month, 1, 0, 0, 0, 0, jst.Zone); !start.After(local) {
 			return start
 		}
 	}
-	return time.Date(year-1, time.October, 1, 0, 0, 0, 0, japanTime)
+	return time.Date(year-1, time.October, 1, 0, 0, 0, 0, jst.Zone)
 }
-
-var japanTime = time.FixedZone("JST", 9*60*60)
 
 // InternationalRefreshAfter is shorter because international meets are read without Gemini.
 const InternationalRefreshAfter = 7 * 24 * time.Hour

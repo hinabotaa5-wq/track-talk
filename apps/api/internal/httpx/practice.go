@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -72,11 +73,7 @@ func practiceLabel(event, other string) string {
 }
 
 func practiceTitle(event, other string, starts time.Time) string {
-	loc, err := time.LoadLocation("Asia/Tokyo")
-	if err != nil {
-		loc = time.FixedZone("JST", 9*60*60)
-	}
-	return practiceLabel(event, other) + " " + starts.In(loc).Format("1月2日 15:04")
+	return practiceLabel(event, other) + " " + starts.In(jst.Zone).Format("1月2日 15:04")
 }
 
 func normalizePractice(req postReq) (practiceInput, map[string]string) {
