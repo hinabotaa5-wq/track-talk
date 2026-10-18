@@ -1,8 +1,8 @@
 const displayWidth = 960;
 const imageHosts = new Set(["upload.wikimedia.org", "thumb.wikimedia.org"]);
 
-// Wikimedia serves a 1200px request as a 1280px file. The card only needs 960,
-// which is one of the sizes their CDN already keeps.
+// Wikimedia は 1200px を頼むと 1280px のファイルを返す。カードには 960 あれば足り、
+// これは CDN がもともと持っているサイズの1つ。
 export function cityPhotoSrc(raw: string): string {
   let parsed: URL;
   try {

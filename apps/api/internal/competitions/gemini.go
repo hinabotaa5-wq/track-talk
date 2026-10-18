@@ -40,7 +40,7 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 	return parseDrafts(text)
 }
 
-// generate sends one request to Gemini and returns the JSON text it answers with.
+// generate は、Gemini にリクエストを1回送り、返ってきた JSON の文字列を返す。
 func (c Client) generate(ctx context.Context, parts []map[string]any) (string, error) {
 	model := c.Model
 	if model == "" {
@@ -102,14 +102,14 @@ func extractionPrompt(page Page) string {
 	return prompt
 }
 
-// pdfNote is added when the schedule is the attached PDF instead of page text.
+// pdfNote は、日程表がページの文字ではなく添付の PDF のときに付け足す。
 const pdfNote = `注意: 大会一覧は添付のPDFです。PDFの中の大会をすべて読んでください。PDFにURLは無いので guidelines_url と district_url は空文字にしてください。
 PDFが複数あるときは、同じ大会が複数のPDFに載っていても1件だけ返してください。
 回数が大会名とは別の列にあるときや、「81宍道湖一周駅伝」のように大会名の先頭に数字だけが付いているときは、「第81回宍道湖一周駅伝」のように書いてください。
 GP や ① などの区分記号は大会名に入れないでください。
 理事会、講習会、会議、合宿などの行事と、中止、延期の大会は返さないでください。`
 
-// plainTextNote is added when the page is plain lines of text instead of table rows.
+// plainTextNote は、ページが表の行ではなく、ただの文字の行のときに付け足す。
 const plainTextNote = `注意: 次の本文は表ではなく、ページの文字を行ごとに並べたものです。リンクは「文字 URL」の形です。大会名、日付、会場、要項のリンクは近い行にあります。
 会場の欄が無ければ location は空文字にし、大会名の括弧内の数字や語を会場にしないでください。
 中止、延期になった大会は返さないでください。大会以外のお知らせ、リンク集、過去の年度は返さないでください。`

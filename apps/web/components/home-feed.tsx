@@ -42,7 +42,7 @@ export function HomeFeed({
   useEffect(() => {
     let active = true;
     function refresh(retry: boolean) {
-      // Without data, keep retrying while the API wakes up; with stale data, refresh quietly.
+      // データがなければ API が起きるまで読み直し続ける。古いデータがあれば、目立たないように更新する。
       loadHomeFeed(path, retry)
         .then((data) => {
           if (!active) return;

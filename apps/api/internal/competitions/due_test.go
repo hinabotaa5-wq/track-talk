@@ -130,13 +130,13 @@ func TestDueSourcesImportsOncePerWindowAndRetriesFailures(t *testing.T) {
 			t.Fatalf("at %v due %v", now, codes)
 		}
 	}
-	// In November nothing new opened, and 02 imported in October is no longer due.
+	// 11月には新しい期間は始まっていないので、10月に取り込んだ 02 はもう対象ではない。
 	updated["02"] = time.Date(2026, 10, 5, 9, 0, 0, 0, jst.Zone)
 	updated["03"] = time.Date(2026, 10, 6, 9, 0, 0, 0, jst.Zone)
 	if due := DueSources(sources, updated, time.Date(2026, 11, 1, 0, 0, 0, 0, jst.Zone), 15); len(due) != 0 {
 		t.Fatalf("due %v", due)
 	}
-	// The next spring everything is due again.
+	// 次の春には、すべてがまた対象になる。
 	if due := DueSources(sources, updated, time.Date(2027, 4, 1, 0, 0, 0, 0, jst.Zone), 15); len(due) != 3 {
 		t.Fatalf("due %v", due)
 	}

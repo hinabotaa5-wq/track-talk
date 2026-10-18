@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Admin deletes Supabase Auth users with the service role key.
+// Admin は、service role キーで Supabase Auth のユーザーを削除する。
 type Admin struct {
 	BaseURL string
 	APIKey  string

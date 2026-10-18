@@ -70,9 +70,8 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]bool{"auth_deleted": authDeleted})
 }
 
-// finishWithdraw commits the purge before deleting the Auth user. A commit
-// failure leaves the Auth user in place. An Auth failure after commit is
-// returned as errAuthDelete so the caller can retry that deletion.
+// finishWithdraw は、Auth のユーザーを消す前に、データの削除をコミットする。コミットに失敗したら Auth のユーザーは残す。
+// コミットのあとで Auth の削除に失敗したら errAuthDelete を返し、呼び出し側がその削除だけをやり直せるようにする。
 func finishWithdraw(commit func() error, deleteAuth func() error) (bool, error) {
 	if err := commit(); err != nil {
 		return false, err

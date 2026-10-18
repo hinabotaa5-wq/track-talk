@@ -24,11 +24,11 @@ type injuryHistoryItemDTO struct {
 type injuryHistoryStageDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
-	// Days is whole days from the post to the first report of this stage.
+	// Days は、投稿からこの段階の最初の報告までの日数（日単位で切り捨て）。
 	Days int `json:"days"`
 }
 
-// buildInjuryHistory attaches each post's first report per stage, in the order of the stage list.
+// buildInjuryHistory は、各投稿に段階ごとの最初の報告を、段階の一覧の順に付ける。
 func buildInjuryHistory(posts []db.ListMyInjuryPostsRow, reports []db.ListMyInjuryFirstReportsRow) injuryHistoryDTO {
 	byPost := make(map[uuid.UUID]map[string]time.Time)
 	for _, row := range reports {

@@ -41,8 +41,8 @@ func FetchPage(ctx context.Context, pageURL string) (Page, error) {
 	return ParsePage(io.LimitReader(reader, 8<<20), finalURL)
 }
 
-// FindPDFLink returns the newest-year PDF linked from pageURL whose file name or link text matches pattern.
-// Associations rename the PDF on every revision, so the page that links to it is what stays put.
+// FindPDFLink は、pageURL からリンクされた PDF のうち、ファイル名かリンクの文字が pattern に合う、いちばん新しい年のものを返す。
+// 協会は改訂のたびに PDF の名前を変えるので、変わらないのはリンクしているページの方。
 func FindPDFLink(ctx context.Context, pageURL, pattern string) (string, error) {
 	match, err := regexp.Compile(pattern)
 	if err != nil {
@@ -93,7 +93,7 @@ type pdfCandidate struct {
 	label string
 }
 
-// pdfLinks lists matching PDF links. Old years' schedules often stay linked next to the current one.
+// pdfLinks は、合う PDF のリンクを並べる。前の年の日程表が、今年のものの隣にリンクされたまま残っていることが多い。
 func pdfLinks(n *html.Node, base *url.URL, match *regexp.Regexp) []pdfCandidate {
 	var out []pdfCandidate
 	if n.Type == html.ElementNode && n.Data == "a" {
@@ -146,8 +146,8 @@ func isPDFResponse(res *http.Response, pageURL string) bool {
 	return err == nil && strings.HasSuffix(strings.ToLower(parsed.Path), ".pdf")
 }
 
-// PDFPage wraps a yearly schedule PDF. The season comes from the file name, or the current April-to-March
-// season when the name has no year. Directory years are ignored because they are upload dates (uploads/2026/10/).
+// PDFPage は、年間の日程表の PDF を包む。シーズンはファイル名から取り、名前に年がなければ今の4月〜3月のシーズンにする。
+// ディレクトリの年はアップロードした日付（uploads/2026/10/）なので見ない。
 func PDFPage(data []byte, pageURL string, now time.Time) (Page, error) {
 	if !strings.HasPrefix(string(data), "%PDF") {
 		return Page{}, fmt.Errorf("pdf %s: not a pdf", pageURL)

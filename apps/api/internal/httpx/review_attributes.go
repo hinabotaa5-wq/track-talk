@@ -44,7 +44,7 @@ func reviewOptionLabel(options []struct{ Code, Label string }, code string) (str
 	return "", false
 }
 
-// reviewAttrs are the optional attributes of a review, as stored.
+// reviewAttrs は、保存したままのレビューの任意の属性。
 type reviewAttrs struct {
 	Event     *string
 	Level     *string
@@ -72,7 +72,7 @@ func optionalCode(raw *string) *string {
 	return &v
 }
 
-// normalizeReviewAttrs checks the optional attributes; an empty value means "not given".
+// normalizeReviewAttrs は任意の属性を確かめる。空の値は「答えていない」の意味。
 func normalizeReviewAttrs(req reviewAttrsReq, fields map[string]string) reviewAttrs {
 	var out reviewAttrs
 	if v := optionalCode(req.Event); v != nil {
@@ -115,7 +115,7 @@ func normalizeReviewAttrs(req reviewAttrsReq, fields map[string]string) reviewAt
 	return out
 }
 
-// reviewFilter narrows products and reviews by the reviewers' attributes.
+// reviewFilter は、レビューを書いた人の属性で商品とレビューを絞り込む。
 type reviewFilter struct {
 	Event       *string
 	Level       *string
@@ -146,7 +146,7 @@ func parseFootSizeParam(raw string) (*int16, bool) {
 	return &v, true
 }
 
-// parseReviewFilter reads the filter from the query; an unknown value is a field error.
+// parseReviewFilter は、クエリから絞り込みを読む。知らない値はフィールドのエラーにする。
 func parseReviewFilter(q url.Values, fields map[string]string) reviewFilter {
 	attrs := normalizeReviewAttrs(reviewAttrsReq{
 		Event:     ptrIfSet(q, "event"),
@@ -173,13 +173,13 @@ func ptrIfSet(q url.Values, key string) *string {
 	return &v
 }
 
-// footSizeRangeLabel shows a size as the 1cm band it falls in, not the exact size.
+// footSizeRangeLabel は、サイズを正確な値ではなく、それが入る 1cm の幅で表す。
 func footSizeRangeLabel(mm int16) string {
 	low := int(mm) / 10
 	return fmt.Sprintf("%d.0〜%d.5cm", low, low)
 }
 
-// reviewAttrsJSON adds the attributes, with labels, to a review's JSON.
+// reviewAttrsJSON は、属性をラベルつきでレビューの JSON に足す。
 func reviewAttrsJSON(out map[string]any, a reviewAttrs) {
 	var eventLabel, levelLabel, sizeLabel, widthLabel, usageLabel *string
 	if a.Event != nil {

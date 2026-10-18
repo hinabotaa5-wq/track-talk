@@ -51,7 +51,7 @@ func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		fields["prefecture"] = "地域を選んでください"
 	}
-	// Without month the whole season comes back, for the month-grouped list on the main tab.
+	// month がなければシーズン全体を返す。メインタブの、月ごとに分けた一覧に使う。
 	month := 0
 	if raw := q.Get("month"); raw != "" {
 		month, ok = parseMonth(raw)
@@ -104,8 +104,8 @@ func parseMonth(raw string) (int, bool) {
 	return n, true
 }
 
-// currentSeasonYear is the athletics season that contains now.
-// A season starts in April and runs through March of the next calendar year.
+// currentSeasonYear は、now を含む陸上のシーズン。
+// シーズンは4月に始まり、次の年の3月まで続く。
 func currentSeasonYear(now time.Time) int {
 	t := now.In(jst.Zone)
 	if t.Month() >= time.April {
@@ -114,14 +114,14 @@ func currentSeasonYear(now time.Time) int {
 	return t.Year() - 1
 }
 
-// seasonRange returns the half-open date range [start, end) of a whole athletics season, April through March.
+// seasonRange は、4月から3月までの陸上のシーズン全体の日付の範囲 [start, end) を返す。
 func seasonRange(seasonYear int) (start, end time.Time) {
 	start = time.Date(seasonYear, time.April, 1, 0, 0, 0, 0, time.UTC)
 	return start, start.AddDate(1, 0, 0)
 }
 
-// seasonMonthRange returns the half-open date range [start, end) for a month
-// inside an athletics season. January through March belong to the next calendar year.
+// seasonMonthRange は、陸上のシーズンの中の1か月の日付の範囲 [start, end) を返す。
+// 1月から3月は次の年になる。
 func seasonMonthRange(seasonYear, month int) (start, end time.Time) {
 	year := seasonYear
 	if month < 4 {

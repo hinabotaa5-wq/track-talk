@@ -7,8 +7,8 @@ import (
 	"unicode"
 )
 
-// localizeMeetName translates a known series, meeting, or road race into Japanese.
-// Titles that are not in the table stay as written.
+// localizeMeetName は、知っているシリーズ・大会・ロードレースの名前を日本語にする。
+// 表にない名前は書かれたままにする。
 func localizeMeetName(name string) string {
 	original := strings.TrimSpace(name)
 	normalized := normalizeTitle(original)

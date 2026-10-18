@@ -70,7 +70,7 @@ func validInjuryOption(options []injuryOption, code string) bool {
 }
 
 type injuryJoinReq struct {
-	// Diagnosis is asked only in the "other" group, where the group itself does not name the injury.
+	// Diagnosis を聞くのは "other" のグループだけ。そこではグループ自体がケガの名前を表していないから。
 	Diagnosis    string   `json:"diagnosis"`
 	Severity     string   `json:"severity"`
 	SawDoctor    *bool    `json:"saw_doctor"`
@@ -94,7 +94,7 @@ type injuryJoin struct {
 	Stage      string
 }
 
-// normalizeInjuryJoin checks the answers. The month is stored as its first day; "now" is passed in so tests can pin it.
+// normalizeInjuryJoin は答えを確かめる。月はその月の1日として保存する。テストで固定できるよう、now は引数で受け取る。
 func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJoin, map[string]string) {
 	fields := map[string]string{}
 	out := injuryJoin{}

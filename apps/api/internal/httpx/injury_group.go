@@ -10,15 +10,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// injuryGroupFaces is how many members' nicknames each stage shows on the roadmap.
+// injuryGroupFaces は、ロードマップの段階ごとにニックネームを出すメンバーの数。
 const injuryGroupFaces = 5
 
 type injuryGroupMemberDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
-	// InjuredMonth is "YYYY-MM": members are asked only roughly when they got hurt.
+	// InjuredMonth は "YYYY-MM"。ケガをした時期は大まかにしか聞かない。
 	InjuredMonth string `json:"injured_month"`
-	// The answers below are empty for members who joined before the questions became multiple choice.
+	// 質問が選択式になる前に入ったメンバーは、下の答えが空になっている。
 	Diagnosis     string   `json:"diagnosis,omitempty"`
 	Severity      string   `json:"severity,omitempty"`
 	SeverityLabel string   `json:"severity_label,omitempty"`
@@ -83,7 +83,7 @@ func injuryGroupMemberFromRow(row db.InjuryGroupMember) injuryGroupMemberDTO {
 	return dto
 }
 
-// injuryGroupPart reads the {part} path parameter and rejects an unknown body part.
+// injuryGroupPart は、パスの {part} を読み、知らない部位なら断る。
 func injuryGroupPart(w http.ResponseWriter, r *http.Request) (string, bool) {
 	part := chi.URLParam(r, "part")
 	if !validInjuryBodyPart(part) {
@@ -93,7 +93,7 @@ func injuryGroupPart(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return part, true
 }
 
-// injuryGroupMember loads the caller's membership in the part's group, answering 403 when they have not joined.
+// injuryGroupMember は、その部位のグループでの呼び出した本人のメンバー情報を読み込む。入っていなければ 403 を返す。
 func (s *Server) injuryGroupMember(w http.ResponseWriter, r *http.Request) (db.Profile, string, db.InjuryGroupMember, bool) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -249,9 +249,9 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, injuryGroupMemberFromRow(row))
 }
 
-// updateInjuryGroupStage lets a member move to any stage, forward or back (a relapse, a second surgery),
-// recording what they consciously did during the stage they are leaving and an optional note for the next person.
-// Posts already written keep the stage they were written in.
+// updateInjuryGroupStage は、メンバーが前にも後ろにも（再発や2回目の手術で）好きな段階へ移れるようにする。
+// 離れる段階のあいだに意識してやったことと、次の人への一言（任意）を残す。
+// すでに書いた投稿は、書いたときの段階のままにする。
 func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) {
 	p, part, member, ok := s.injuryGroupMember(w, r)
 	if !ok {
@@ -296,7 +296,7 @@ func (s *Server) updateInjuryGroupStage(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, injuryGroupMemberFromRow(row))
 }
 
-// listInjuryGroupPosts lists the group's posts, optionally for one stage. Any member can read every stage.
+// listInjuryGroupPosts は、グループの投稿を並べる。段階で絞ることもできる。メンバーはどの段階も読める。
 func (s *Server) listInjuryGroupPosts(w http.ResponseWriter, r *http.Request) {
 	_, part, _, ok := s.injuryGroupMember(w, r)
 	if !ok {
@@ -309,7 +309,7 @@ func (s *Server) listInjuryGroupPosts(w http.ResponseWriter, r *http.Request) {
 	s.listPostsFiltered(w, r, "new", nil, &kind)
 }
 
-// createInjuryGroupPost writes a post into the group at the member's current stage; other stages are read-only.
+// createInjuryGroupPost は、メンバーの今の段階でグループに投稿する。ほかの段階は読むだけ。
 func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 	p, part, member, ok := s.injuryGroupMember(w, r)
 	if !ok {
@@ -327,8 +327,8 @@ func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 	s.createInjury(w, r, p, params, in)
 }
 
-// leaveInjuryGroup takes the caller out of the group. Their stage history goes with the membership;
-// the posts they wrote stay, and they can delete those one by one. They can join again later.
+// leaveInjuryGroup は、呼び出した本人をグループから抜けさせる。段階の履歴はメンバー情報といっしょに消える。
+// 書いた投稿は残り、1つずつ削除できる。あとでまた入り直せる。
 func (s *Server) leaveInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	p, part, _, ok := s.injuryGroupMember(w, r)
 	if !ok {

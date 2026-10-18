@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { HomeFilters } from "@/components/home-filters";
 import { PostFab } from "@/components/post-fab";
 
-// The filters live in the layout so they stay mounted while loading.tsx replaces only the feed.
-// The (home) route group keeps that loading.tsx from applying to every other route.
+// 絞り込みは layout に置き、loading.tsx がフィードだけを差し替えるあいだも表示したままにする。
+// (home) のルートグループで、その loading.tsx がほかのすべてのルートにかからないようにする。
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="-mx-4 -mt-6 md:mx-0 md:mt-0">

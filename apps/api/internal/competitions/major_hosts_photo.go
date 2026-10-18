@@ -16,8 +16,8 @@ const (
 	thumbWidth = "960"
 )
 
-// cityLandscape is the skyline editors put first on the English Wikipedia city article.
-// Those files live on Wikimedia Commons. A skyline category is the fallback.
+// cityLandscape は、英語版 Wikipedia の都市の記事で、編集者がいちばん上に置いている風景写真。
+// その画像は Wikimedia Commons にある。なければ風景のカテゴリから選ぶ。
 func cityLandscape(ctx context.Context, host MajorHost) string {
 	english := englishCityName(ctx, host)
 	if english == "" {

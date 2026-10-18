@@ -30,7 +30,7 @@ type senseNoteDTO struct {
 	Body       string    `json:"body"`
 	Event      *string   `json:"event"`
 	EventLabel *string   `json:"event_label"`
-	// Day is the day the note was written, in Japan time (YYYY-MM-DD).
+	// Day はメモを書いた日（日本時間、YYYY-MM-DD）。
 	Day       string    `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -39,7 +39,7 @@ type senseNoteDTO struct {
 type senseNoteStatsDTO struct {
 	Total int64 `json:"total"`
 	Days  int   `json:"days"`
-	// Streak counts consecutive days with a note, ending today or yesterday (Japan time).
+	// Streak は、今日か昨日で終わる、メモを書いた日が続いている日数（日本時間）。
 	Streak int   `json:"streak"`
 	Today  int64 `json:"today"`
 }
@@ -79,7 +79,7 @@ func normalizeSenseNote(req senseNoteReq) (body string, event *string, fields ma
 	return body, event, fields
 }
 
-// senseNoteStreak counts consecutive days ending today or yesterday. days must be newest first and unique.
+// senseNoteStreak は、今日か昨日で終わる連続した日数を数える。days は新しい順で、重なりがないこと。
 func senseNoteStreak(days []time.Time, now time.Time) int {
 	today := dateOnly(now.In(jst.Zone))
 	streak := 0
@@ -228,7 +228,7 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// updateSenseNote fixes a note's text and event. The note keeps the day it was written.
+// updateSenseNote は、メモの文と種目を直す。メモを書いた日は変えない。
 func (s *Server) updateSenseNote(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {

@@ -13,7 +13,7 @@ type CompetitionList = {
 const cache = new Map<string, CompetitionList>();
 const inflight = new Map<string, Promise<CompetitionList>>();
 
-// month 0 means the whole season.
+// month が 0 ならシーズン全体。
 export function competitionCacheKey(prefecture: string, month: number) {
   return `${prefecture}:${month || "season"}`;
 }

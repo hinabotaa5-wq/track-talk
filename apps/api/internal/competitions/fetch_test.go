@@ -20,7 +20,7 @@ func TestPDFPageSeason(t *testing.T) {
 	}{
 		{"https://example.com/pdf/2026/2026_schedule_hp2.pdf", time.Date(2027, 5, 1, 0, 0, 0, 0, time.UTC), 2026},
 		{"https://example.com/schedule_hokkaido2026df0814.pdf", time.Date(2027, 5, 1, 0, 0, 0, 0, time.UTC), 2026},
-		// The upload directory is the posting month, not the season.
+		// アップロード先のディレクトリは掲載した月で、シーズンではない。
 		{"https://example.com/wp-content/uploads/2027/02/6d5f1d6ce9518a2b.pdf", time.Date(2027, 2, 10, 0, 0, 0, 0, time.UTC), 2026},
 		{"https://example.com/competition_16_20260824.pdf", time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 2026},
 	}

@@ -21,7 +21,7 @@ type Meet struct {
 	LinkLabel    string
 }
 
-// Draft is one meet as returned by Gemini, before the URLs are checked.
+// Draft は、Gemini が返した大会1件。URL を確かめる前のもの。
 type Draft struct {
 	Name          string `json:"name"`
 	StartsOn      string `json:"starts_on"`

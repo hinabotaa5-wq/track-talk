@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// InternationalPrefecture stores meets that are not tied to a Japanese prefecture.
+// InternationalPrefecture は、日本の県に結び付かない大会をしまう先。
 const InternationalPrefecture = "00"
 
 const (
@@ -24,7 +24,7 @@ const (
 	diamondLeagueCalendar  = "https://www.diamondleague.com/calendar/"
 )
 
-// SeasonYear is the athletics season containing now. A season starts in April.
+// SeasonYear は、now を含む陸上のシーズン。シーズンは4月に始まる。
 func SeasonYear(now time.Time) int {
 	t := now.In(jst.Zone)
 	if t.Month() >= time.April {
@@ -33,7 +33,7 @@ func SeasonYear(now time.Time) int {
 	return t.Year() - 1
 }
 
-// InternationalWindow is the current season and the next one.
+// InternationalWindow は、今のシーズンと次のシーズン。
 func InternationalWindow(now time.Time) (from, to time.Time, seasons []int) {
 	year := SeasonYear(now)
 	from = time.Date(year, time.April, 1, 0, 0, 0, 0, time.UTC)
@@ -41,7 +41,7 @@ func InternationalWindow(now time.Time) (from, to time.Time, seasons []int) {
 	return from, to, []int{year, year + 1}
 }
 
-// FetchInternational reads the World Athletics and Diamond League calendars.
+// FetchInternational は、World Athletics と Diamond League の日程を読む。
 func FetchInternational(ctx context.Context, now time.Time) ([]Meet, error) {
 	from, to, _ := InternationalWindow(now)
 	events, err := fetchWorldAthletics(ctx, from, to)
@@ -327,7 +327,7 @@ func diamondCard(n *html.Node, base *url.URL, year int) (diamondMeeting, bool) {
 	return diamondMeeting{StartsOn: start, EndsOn: end, Location: place, URL: absolute}, true
 }
 
-// BuildInternationalMeets keeps world championships, the Diamond League, and the top World Athletics permit classes.
+// BuildInternationalMeets は、世界選手権、Diamond League、World Athletics の上位のパーミット区分の大会を残す。
 func BuildInternationalMeets(events []waEvent, meetings []diamondMeeting, from, to time.Time) ([]Meet, error) {
 	unused := map[string][]diamondMeeting{}
 	for _, meeting := range meetings {
@@ -432,8 +432,8 @@ func isDiamondLeague(event waEvent) bool {
 	return strings.Contains(event.CompetitionGroup, "Diamond League")
 }
 
-// takeDiamondMeeting pairs a World Athletics Diamond League row with the meeting site.
-// The same meeting is sometimes listed one day apart, so a neighboring day counts when the city matches.
+// takeDiamondMeeting は、World Athletics の Diamond League の行を、大会のサイトの行と組み合わせる。
+// 同じ大会が1日ずれて載っていることがあるので、都市が同じなら隣の日も同じとみなす。
 func takeDiamondMeeting(unused map[string][]diamondMeeting, start time.Time, haystack string) (diamondMeeting, bool) {
 	if meeting, ok := takeMeetingOn(unused, start, ""); ok {
 		return meeting, true

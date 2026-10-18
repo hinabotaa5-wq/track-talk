@@ -12,8 +12,8 @@ import (
 
 const wikiAPI = "https://ja.wikipedia.org/w/api.php"
 
-// FetchMajorHosts reads one Wikipedia host table and keeps editions that have not ended.
-// The photo is a city skyline from Wikimedia Commons. A missing photo is left blank.
+// FetchMajorHosts は、Wikipedia の開催地の表を1つ読み、まだ終わっていない回を残す。
+// 写真は Wikimedia Commons の都市の風景。見つからなければ空のままにする。
 func FetchMajorHosts(ctx context.Context, kind string, now time.Time) ([]MajorHost, error) {
 	page, heading, parse := wikiSource(kind)
 	if parse == nil {

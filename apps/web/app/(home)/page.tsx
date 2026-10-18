@@ -24,7 +24,7 @@ export async function generateMetadata({ searchParams }: { searchParams: HomeSea
 }
 
 async function ServerHomeFeed({ path }: { path: string }) {
-  // On timeout or failure, HomeFeed retries from the browser when initial is null.
+  // 時間切れや失敗で initial が null のときは、HomeFeed がブラウザから読み直す。
   let initial: PostsPage | null = null;
   try {
     const data = await apiFetch<{ posts: Post[]; meta: Meta }>(path, {

@@ -27,7 +27,7 @@ export function SavedFeed({ page }: { page: number }) {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    // Cached saves show at once; always refresh because saving happens on other screens.
+    // キャッシュした保存はすぐに出す。保存はほかの画面でもされるので、いつも読み直す。
     loadSavedFeed(path, token)
       .then((data) => {
         if (!active) return;

@@ -1,5 +1,5 @@
 -- name: ListDomesticMajors :many
--- Every edition that starts inside the season [season_start, season_end).
+-- シーズン [season_start, season_end) の中で始まるすべての回。
 SELECT slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors
 WHERE starts_on >= sqlc.arg(season_start)::date

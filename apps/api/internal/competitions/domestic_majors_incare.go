@@ -15,8 +15,8 @@ import (
 
 const iuauOrigin = "https://www.iuau.jp"
 
-// regionalIncare maps the number of a federation page on iuau.jp (jigyo/{year}/{n}jigyo.html)
-// to its card. The page lists every meet of that federation with its dates and venue.
+// regionalIncare は、iuau.jp の連盟ページの番号（jigyo/{year}/{n}jigyo.html）をカードに結び付ける。
+// そのページには、連盟のすべての大会が日程と会場つきで載っている。
 var regionalIncare = map[int]string{
 	1: "incare-hokkaido",
 	2: "incare-tohoku",
@@ -29,16 +29,15 @@ var regionalIncare = map[int]string{
 }
 
 var (
-	// The meet code ends in 0101 for the federation's championship; 0102 and later are its side events.
+	// 大会コードは、連盟の選手権なら 0101 で終わる。0102 以降は併催の大会。
 	incareCodePattern  = regexp.MustCompile(`^\d{2}6[1-8]0101$`)
 	leadingYearPattern = regexp.MustCompile(`^20\d{2}\s*`)
 	dayRangePattern    = regexp.MustCompile(`^(\d{1,2})(?:[~〜～-](\d{1,2}))?$`)
 	venueAbbreviations = strings.NewReplacer("（陸）", "陸上競技場", "（運）", "運動公園")
 )
 
-// ParseRegionalIncare reads one federation page that is already UTF-8 and returns its
-// championship of the fiscal year starting in April of fiscalYear. A row with no
-// numeric date (a cancelled meet) is skipped.
+// ParseRegionalIncare は、UTF-8 にした連盟ページを1つ読み、fiscalYear 年の4月から始まる年度の選手権を返す。
+// 数字の日付がない行（中止になった大会）は飛ばす。
 func ParseRegionalIncare(r io.Reader, fiscalYear int, pageURL string) (*DomesticMajor, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -56,7 +55,7 @@ func ParseRegionalIncare(r io.Reader, fiscalYear int, pageURL string) (*Domestic
 				found = &major
 				venues = []string{venue}
 			case found.Name == major.Name && !containsString(venues, venue):
-				// The same meet is listed once per venue.
+				// 同じ大会が会場ごとに1行ずつ載っている。
 				venues = append(venues, venue)
 			}
 		}
@@ -130,7 +129,7 @@ func containsString(list []string, s string) bool {
 	return false
 }
 
-// decodeShiftJIS turns an iuau.jp page, which is served as Shift_JIS, into UTF-8.
+// decodeShiftJIS は、Shift_JIS で配信される iuau.jp のページを UTF-8 にする。
 func decodeShiftJIS(body []byte) (io.Reader, error) {
 	out, _, err := transform.Bytes(japanese.ShiftJIS.NewDecoder(), body)
 	if err != nil {

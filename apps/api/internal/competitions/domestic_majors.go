@@ -15,13 +15,13 @@ const (
 	DomesticYouth   = "youth"
 	DomesticStudent = "student"
 	DomesticOpen    = "open"
-	// DomesticDistance is the ekiden and marathon meets of the off-season.
+	// DomesticDistance は、オフシーズンの駅伝とマラソンの大会。
 	DomesticDistance = "distance"
 
 	jaafOrigin = "https://www.jaaf.or.jp"
 )
 
-// DomesticMajor is one edition of a domestic meet shown on the major-meets page.
+// DomesticMajor は、主要大会のページに出す国内大会の1回分。
 type DomesticMajor struct {
 	Slug          string
 	Year          int
@@ -34,9 +34,8 @@ type DomesticMajor struct {
 	SiteURL       string
 }
 
-// DomesticMeet describes one card. Title picks its entry out of the JAAF monthly list.
-// A meet without Title is not on the JAAF list; the regional intercollegiate meets come
-// from the federation pages on iuau.jp instead (see regionalIncare).
+// DomesticMeet はカード1枚を表す。Title で、日本陸連の月ごとの一覧からその大会の行を選ぶ。
+// Title がない大会は日本陸連の一覧に載っていない。地区インカレは、代わりに iuau.jp の各連盟のページから読む（regionalIncare を参照）。
 type DomesticMeet struct {
 	Slug     string
 	Category string
@@ -44,7 +43,7 @@ type DomesticMeet struct {
 	Skip     *regexp.Regexp
 }
 
-// DomesticMeets is the card order.
+// DomesticMeets は、カードを並べる順番。
 var DomesticMeets = []DomesticMeet{
 	{Slug: "nissin-cup", Category: DomesticYouth, Title: regexp.MustCompile(`日清食品カップ.*小学生`)},
 	{Slug: "zenchu", Category: DomesticYouth, Title: regexp.MustCompile(`全日本中学校陸上競技選手権大会`)},
@@ -90,13 +89,13 @@ var DomesticMeets = []DomesticMeet{
 	{Slug: "nagoya-women-marathon", Category: DomesticDistance, Title: regexp.MustCompile(`名古屋ウィメンズマラソン`)},
 }
 
-// JAAFListEntry is one line of a monthly list on the JAAF competition page.
+// JAAFListEntry は、日本陸連の競技会ページにある月ごとの一覧の1行。
 type JAAFListEntry struct {
 	Title string
 	Path  string
 }
 
-// ParseJAAFList reads the entries of /competition/list/?year=&month=.
+// ParseJAAFList は、/competition/list/?year=&month= の行を読む。
 func ParseJAAFList(r io.Reader) ([]JAAFListEntry, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -131,8 +130,8 @@ var (
 	yearlessDatePattern  = regexp.MustCompile(`^\d{1,2}月\d{1,2}日`)
 )
 
-// ParseJAAFDetail reads one /competition/detail/{id}/ page. listedYear is the year of the monthly
-// list that linked to it, used when the 開催日 has no year (「12月30日（水）予定」). Zero leaves it unread.
+// ParseJAAFDetail は、/competition/detail/{id}/ のページを1つ読む。listedYear は、そこへリンクしていた月ごとの一覧の年で、
+// 開催日に年が書かれていないとき（「12月30日（水）予定」）に使う。0 なら読まない。
 func ParseJAAFDetail(r io.Reader, detailURL string, listedYear int) (DomesticMajor, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -195,15 +194,14 @@ var (
 	mgcSuffixPattern = regexp.MustCompile(`\s*[～〜][^～〜]*MGCシリーズ[^～〜]*[～〜]$`)
 )
 
-// baseMeetName drops the "兼 …" tail that JAAF adds when a meet doubles as a team-selection meet,
-// and the MGC series labels around marathon names.
+// baseMeetName は、選考会を兼ねる大会に日本陸連が付ける「兼 …」の部分と、マラソンの名前の前後に付く MGC シリーズの表記を落とす。
 func baseMeetName(raw string) string {
 	name := alsoPattern.ReplaceAllString(cleanText(raw), "")
 	name = mgcPrefixPattern.ReplaceAllString(name, "")
 	return mgcSuffixPattern.ReplaceAllString(name, "")
 }
 
-// MatchDomesticMeet returns the card a JAAF list title belongs to.
+// MatchDomesticMeet は、日本陸連の一覧のタイトルが当てはまるカードを返す。
 func MatchDomesticMeet(title string) (DomesticMeet, bool) {
 	for _, meet := range DomesticMeets {
 		if meet.Title == nil || !meet.Title.MatchString(title) {
@@ -233,7 +231,7 @@ func firstElement(n *html.Node, tag string) *html.Node {
 	return findElement(n, func(c *html.Node) bool { return c != n && c.Data == tag })
 }
 
-// nextElement walks to the next tag after cur, staying inside root.
+// nextElement は、root の中にとどまったまま、cur の次のタグへ進む。
 func nextElement(cur, root *html.Node, tag string) *html.Node {
 	n := cur
 	for {

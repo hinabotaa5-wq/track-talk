@@ -42,7 +42,7 @@ function KeywordInput({ initial }: { initial: string }) {
           onClick={() => {
             flushSync(() => setValue(""));
             inputRef.current?.focus();
-            // Reset the applied search too, if one is active.
+            // 検索がかかっていれば、それも外す。
             if (initial) inputRef.current?.form?.requestSubmit();
           }}
           className="absolute top-1/2 right-2 z-10 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 hover:text-white"
@@ -55,7 +55,7 @@ function KeywordInput({ initial }: { initial: string }) {
 }
 
 export function HomeFilters() {
-  // Chips switch tabs with history.pushState; HomeView follows the URL without a server round trip.
+  // チップは history.pushState でタブを切り替える。HomeView は URL を見て、サーバーとやりとりせずに切り替える。
   const sp = useSearchParams();
   const sort = parseHomeSort(sp.get("sort"));
   const q = (sp.get("q") ?? "").trim();

@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// newsTargets are the prefectures to read news for: the ones checked longest ago first, never-checked before any.
-// A prefecture with no meets in the database has nothing to attach guidelines to, so it is left out and costs nothing.
+// newsTargets は、ニュースを読む県。確かめたのが古い県から順に並べ、一度も確かめていない県をいちばん先にする。
+// DB に大会が1つもない県は要項を付ける先がないので外し、リクエストを使わない。
 func newsTargets(ctx context.Context, pool *pgxpool.Pool, prefecture string, budget int) ([]competitions.Source, error) {
 	if prefecture != "" {
 		code := prefecture
@@ -60,9 +60,9 @@ func newsTargets(ctx context.Context, pool *pgxpool.Pool, prefecture string, bud
 	return sources, nil
 }
 
-// importNews fills in guidelines from prefecture news for meets that the annual schedule already holds.
-// It uses one Gemini request per prefecture, at most budget of them (no limit when budget is negative).
-// It returns true if any prefecture failed.
+// importNews は、年間の日程表にすでにある大会に、県のニュースから要項を補う。
+// 県ごとに Gemini のリクエストを1回使い、使うのは多くても budget 回まで（budget が負なら上限なし）。
+// どれかの県が失敗したら true を返す。
 func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Client, sources []competitions.Source, budget int, dryRun bool) bool {
 	q := db.New(pool)
 	season := int32(competitions.SeasonYear(time.Now()))
@@ -105,7 +105,7 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 	return failed
 }
 
-// newsCandidates are all meets of the season. Guidelines from news are newer than the annual table's, so they replace it.
+// newsCandidates は、そのシーズンのすべての大会。ニュースの要項は年間の日程表より新しいので、日程表のものを置き換える。
 func newsCandidates(rows []db.ListCompetitionsForNewsRow) ([]competitions.KnownMeet, map[string]db.ListCompetitionsForNewsRow) {
 	var known []competitions.KnownMeet
 	byKey := map[string]db.ListCompetitionsForNewsRow{}
@@ -130,7 +130,7 @@ func readNews(ctx context.Context, client competitions.Client, source competitio
 	for _, match := range competitions.MatchNews(items, known) {
 		link, ok, err := competitions.FindArticleGuidelines(ctx, match.Item)
 		if err != nil {
-			// One article that cannot be opened must not hide the others.
+			// 開けない記事が1つあっても、ほかの記事は隠さない。
 			log.Printf("%s: %s: %v", source.Prefecture, match.Item.ArticleURL, err)
 			continue
 		}

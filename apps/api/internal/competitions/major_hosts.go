@@ -18,7 +18,7 @@ const (
 	MajorOlympics = "olympics"
 )
 
-// MajorHost is one future or past edition taken from a Wikipedia host table.
+// MajorHost は、Wikipedia の開催地の表から取った、これからの回か過去の回の1つ。
 type MajorHost struct {
 	Kind          string
 	Year          int
@@ -103,8 +103,8 @@ func ParseWorldChampionships(r io.Reader) ([]MajorHost, error) {
 	return hosts, nil
 }
 
-// ParseSummerOlympics reads the 夏季オリンピック host table.
-// The host city is the cell after the year. The session cell also contains a year, so it is not used.
+// ParseSummerOlympics は、夏季オリンピックの開催地の表を読む。
+// 開催都市は年の次のセル。回のセルにも年が入っているので、そちらは使わない。
 func ParseSummerOlympics(r io.Reader) ([]MajorHost, error) {
 	rows, err := uniqueTable(r, "年", "開催都市")
 	if err != nil {
@@ -149,7 +149,7 @@ func ParseSummerOlympics(r io.Reader) ([]MajorHost, error) {
 	return hosts, nil
 }
 
-// UpcomingMajorHosts keeps editions that have not ended and returns them by start date.
+// UpcomingMajorHosts は、まだ終わっていない回を残し、始まる日の順に返す。
 func UpcomingMajorHosts(hosts []MajorHost, today time.Time) []MajorHost {
 	day := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
 	var out []MajorHost
@@ -410,7 +410,7 @@ func scheduleLabel(precision string, start, end time.Time) string {
 	}
 }
 
-// MajorHostsForStore keeps the previous rows when a parse finds nothing upcoming.
+// MajorHostsForStore は、読み取りでこれからの回が1つも見つからなかったとき、前の行を残す。
 func MajorHostsForStore(parsed []MajorHost) (next []MajorHost, replace bool) {
 	if len(parsed) == 0 {
 		return nil, false

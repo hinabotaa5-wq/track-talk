@@ -311,7 +311,7 @@ func getInjuryStats(t *testing.T, h http.Handler) injuryStatsResp {
 	return out
 }
 
-// reached returns the post count and the reached count for a part and stage (0 when absent).
+// reached は、部位と段階の投稿数と、届いた数を返す（なければ 0）。
 func (r injuryStatsResp) reached(part, stage string) (posts, reached int64, median *int) {
 	for _, p := range r.Parts {
 		if p.BodyPart != part {
@@ -683,7 +683,7 @@ func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
 	}
 }
 
-// postInjury writes an injury post the way the app does: join the part's group, then post into it.
+// postInjury は、アプリと同じやり方でケガの投稿を書く。部位のグループに入ってから、そこに投稿する。
 func postInjury(t *testing.T, h http.Handler, tok string, body map[string]any) *httptest.ResponseRecorder {
 	t.Helper()
 	part, _ := body["body_part"].(string)
