@@ -13,6 +13,7 @@ import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
+import { umamiBeforeSendName, umamiBeforeSendScript } from "@/lib/analytics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,10 +65,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
       <body className="isolate flex min-h-full flex-col">
         <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
+        {/* Umami より先に読み込ませる。送る URL から保護者のリンクのトークンを外す。 */}
+        <script dangerouslySetInnerHTML={{ __html: umamiBeforeSendScript }} />
         <Script
           defer
           src="https://cloud.umami.is/script.js"
           data-website-id="0442ad3b-c5a2-45d8-825e-09bb48eded74"
+          data-before-send={umamiBeforeSendName}
           strategy="afterInteractive"
         />
         <AuthProvider>

@@ -46,7 +46,7 @@ func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				slog.Error("panic", "recover", rec, "path", r.URL.Path)
+				slog.Error("panic", "recover", rec, "path", logPath(r.URL.Path))
 				Error(w, http.StatusInternalServerError, "internal_error", "サーバーエラーが発生しました")
 			}
 		}()
@@ -64,12 +64,26 @@ func RequestLog(next http.Handler) http.Handler {
 		slog.Info("http",
 			"request_id", id,
 			"method", r.Method,
-			"path", r.URL.Path,
+			"path", logPath(r.URL.Path),
 			"status", ww.status,
 			"ms", time.Since(start).Milliseconds(),
 			"user_id", uid.String(),
 		)
 	})
+}
+
+// logPath は、ログに残すパス。保護者のリンクのトークンは、知っていれば保護者として
+// 同意やメッセージができてしまうので、ログには残さない。
+func logPath(path string) string {
+	const prefix = "/v1/guardian/"
+	rest, ok := strings.CutPrefix(path, prefix)
+	if !ok {
+		return path
+	}
+	if i := strings.IndexByte(rest, '/'); i >= 0 {
+		return prefix + ":token" + rest[i:]
+	}
+	return prefix + ":token"
 }
 
 type statusWriter struct {
