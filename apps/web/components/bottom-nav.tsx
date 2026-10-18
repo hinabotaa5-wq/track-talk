@@ -45,8 +45,8 @@ export function showsBackButton(pathname: string) {
 }
 
 // 投稿はホームの「＋」から開く詳細画面なので、そこから先の作成画面でも下のメニューは出さない。
+// ログイン画面では出す(ログインしていなければ、ホームとコーチ以外のタブはログイン画面に戻る)。
 const bottomNavHidden = new Set([
-  "/login",
   "/register",
   "/reset-password",
   "/upload",
