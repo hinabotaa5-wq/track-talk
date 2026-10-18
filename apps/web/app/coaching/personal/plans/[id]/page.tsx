@@ -153,7 +153,7 @@ export default function ApplyCoachingPlanPage() {
           <p className="text-sm text-slate-200">
             {!me.birth_month
               ? "先に生まれた年月を登録してください。18歳未満の人は保護者の同意が必要です。"
-              : "18歳未満の人は、保護者の同意を得てから申し込めます。保護者に同意のリンクを送ってください。"}
+              : "18歳未満の人は、保護者の同意を得てから申し込めます。保護者に同意のメールを送ってください。"}
           </p>
           <Link
             href="/me/coaching"

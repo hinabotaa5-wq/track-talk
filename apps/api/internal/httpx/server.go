@@ -10,6 +10,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/mail"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,6 +26,7 @@ type Server struct {
 	cloud     cloudinary.Client
 	push      push.Sender
 	stripe    stripe.Client
+	mail      mail.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -52,6 +54,12 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		stripe: stripe.Client{
 			Secret:  cfg.StripeSecretKey,
 			APIBase: cfg.StripeAPIBase,
+		},
+		mail: mail.Client{
+			APIKey:  cfg.ResendAPIKey,
+			From:    cfg.MailFrom,
+			APIBase: cfg.MailAPIBase,
+			DevLog:  cfg.MailDevLog,
 		},
 	}
 	if cfg.PushHTTP != nil {

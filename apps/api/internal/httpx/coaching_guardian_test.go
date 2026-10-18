@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,20 +20,13 @@ import (
 func guardianMinor(t *testing.T, h http.Handler) (string, string) {
 	t.Helper()
 	_, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
-	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("link %d %s", rec.Code, rec.Body.String())
-	}
-	var issued struct {
-		Token string `json:"token"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &issued)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+issued.Token+"/consent", "", map[string]any{
+	gt := issueGuardianLink(t, h, tm, guardianEmail())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/consent", "", map[string]any{
 		"guardian_name": "保護者", "relationship": "mother", "agree": true,
 	}); rec.Code != http.StatusOK {
 		t.Fatalf("guardian consent %d %s", rec.Code, rec.Body.String())
 	}
-	return tm, issued.Token
+	return tm, gt
 }
 
 // minorAccepted は、18歳未満の利用者が申し込み、コーチが承諾したところまで進める。
@@ -260,5 +256,117 @@ func TestCoachingAdminReview(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"body": "再開ありがとうございます"}); rec.Code != http.StatusCreated {
 		t.Fatalf("send after resume %d", rec.Code)
+	}
+}
+
+// tokenWithEmail は、ログインに使うメールアドレスの入ったトークン（Supabase の JWT と同じ形）。
+func tokenWithEmail(t *testing.T, id uuid.UUID, email string) string {
+	t.Helper()
+	secret := os.Getenv("SUPABASE_JWT_SECRET")
+	if secret == "" {
+		secret = "test-jwt-secret-for-ci-only"
+	}
+	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": id.String(), "aud": "authenticated", "exp": time.Now().Add(time.Hour).Unix(), "email": email,
+	}).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// 保護者の同意のリンクは保護者のメールにだけ届き、本人には返さない。本人だけでは同意を済ませられない。
+func TestGuardianLinkIsMailedToGuardian(t *testing.T) {
+	h := setup(t)
+	minor := uuid.New()
+	tm := tokenWithEmail(t, minor, "Kid@Example.com")
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
+		t.Fatalf("birth month %d %s", rec.Code, rec.Body.String())
+	}
+	link := func(body map[string]any) *httptest.ResponseRecorder {
+		return doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, body)
+	}
+
+	// アドレスがない・不正・本人のログインのアドレスなら送らない。
+	for _, body := range []map[string]any{{}, {"guardian_email": "not-an-address"}, {"guardian_email": " kid@example.COM "}} {
+		if rec := link(body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_email") {
+			t.Fatalf("invalid %v: %d %s", body, rec.Code, rec.Body.String())
+		}
+	}
+	var rows int
+	queryRowArgs(t, `SELECT count(*)::int FROM guardian_consents WHERE minor_id = $1`, []any{minor}, &rows)
+	if rows != 0 {
+		t.Fatalf("rows after invalid %d", rows)
+	}
+
+	first := guardianEmail()
+	firstToken := issueGuardianLink(t, h, tm, first)
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching", tm, nil)
+	if strings.Contains(rec.Body.String(), firstToken) || !strings.Contains(rec.Body.String(), first) {
+		t.Fatalf("minor view %s", rec.Body.String())
+	}
+
+	// 保護者が答える前なら、送り先を直せる。前のリンクは使えなくなる。
+	second := guardianEmail()
+	secondToken := issueGuardianLink(t, h, tm, second)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/guardian/"+firstToken, "", nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("old link %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+secondToken+"/consent", "", map[string]any{
+		"guardian_name": "山田 花子", "relationship": "mother", "agree": true,
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("consent %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 保護者が答えたあとは、本人が別のアドレス（自分のもう1つのアドレスなど）に送り直して、
+	// 保護者のページ（上限の変更や契約への同意）を手に入れることはできない。
+	rec = link(map[string]any{"guardian_email": guardianEmail()})
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "guardian_email_locked") {
+		t.Fatalf("change after consent %d %s", rec.Code, rec.Body.String())
+	}
+	// 同じ保護者のアドレスなら送り直せる（大文字小文字は区別しない）。
+	if rec := link(map[string]any{"guardian_email": strings.ToUpper(second)}); rec.Code != http.StatusCreated {
+		t.Fatalf("resend same %d %s", rec.Code, rec.Body.String())
+	}
+	if mailsTo(strings.ToUpper(second)) != 1 {
+		t.Fatalf("resend mail %d", mailsTo(strings.ToUpper(second)))
+	}
+
+	// 1日に送れるのは5回まで（ここまでで3回）。
+	for i := 0; i < 2; i++ {
+		if rec := link(map[string]any{}); rec.Code != http.StatusCreated {
+			t.Fatalf("send %d: %d %s", i, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := link(map[string]any{}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
+	}
+	// 前の日に送った回数は数えない。
+	execSQLArgs(t, `UPDATE guardian_consents SET link_sent_on = link_sent_on - 1 WHERE minor_id = $1`, minor)
+	if rec := link(map[string]any{}); rec.Code != http.StatusCreated {
+		t.Fatalf("next day %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGuardianLinkNeedsMail(t *testing.T) {
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"invalid"}`, http.StatusUnprocessableEntity)
+	}))
+	defer failing.Close()
+
+	// メールを送れない設定なら、リンクを作らない（本人に渡す道はない）。
+	h := setupConfig(t, func(cfg *config.Config) { cfg.ResendAPIKey = "" })
+	_, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, map[string]any{"guardian_email": guardianEmail()})
+	if rec.Code != http.StatusServiceUnavailable || strings.Contains(rec.Body.String(), "token") {
+		t.Fatalf("no mail config %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 送信に失敗したら、本人にはエラーだけを返す。
+	h = setupConfig(t, func(cfg *config.Config) { cfg.MailAPIBase = failing.URL })
+	_, tm = demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, map[string]any{"guardian_email": guardianEmail()})
+	if rec.Code != http.StatusBadGateway || strings.Contains(rec.Body.String(), "token") {
+		t.Fatalf("mail failed %d %s", rec.Code, rec.Body.String())
 	}
 }

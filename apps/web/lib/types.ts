@@ -286,6 +286,8 @@ export type CoachingGuardian = {
   monthly_limit_yen: GuardianLimitYen;
   allow_publish: boolean;
   consented_at: string | null;
+  // 同意のリンクを送った保護者のメールアドレス。本人のアカウントにだけ返す。
+  guardian_email?: string | null;
 };
 
 export type CoachingMe = {

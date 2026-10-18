@@ -30,7 +30,8 @@ export default function CoachingSetupPage() {
   const [loadError, setLoadError] = useState("");
   const [month, setMonth] = useState("");
   const [monthError, setMonthError] = useState("");
-  const [link, setLink] = useState("");
+  const [guardianEmail, setGuardianEmail] = useState("");
+  const [guardianEmailError, setGuardianEmailError] = useState("");
   const [linkMessage, setLinkMessage] = useState("");
   const [pushMessage, setPushMessage] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -69,35 +70,33 @@ export default function CoachingSetupPage() {
     }
   }
 
-  async function onIssueLink() {
+  // 保護者が一度答えたあとは、前と同じアドレスにしか送れない。
+  const guardianEmailLocked = Boolean(me?.guardian && me.guardian.status !== "pending" && me.guardian.guardian_email);
+
+  // 同意のリンクは API が保護者のメールあてに送る。本人の画面にはリンクを出さない（本人だけで同意できないように）。
+  // アドレスを変えられないときは、省いて前と同じアドレスに送り直す。
+  async function onSendLink(event: FormEvent) {
+    event.preventDefault();
     if (!acquire()) return;
     setLinkMessage("");
+    setGuardianEmailError("");
     try {
-      const result = await apiFetch<CoachingGuardian & { token: string }>("/v1/me/guardian-link", {
+      const guardian = await apiFetch<CoachingGuardian>("/v1/me/guardian-link", {
         method: "POST",
         token,
+        body: JSON.stringify(guardianEmailLocked ? {} : { guardian_email: guardianEmail.trim() }),
       });
-      const { token: guardianToken, ...guardian } = result;
-      setLink(`${window.location.origin}/guardian/${guardianToken}`);
       setMe((prev) => (prev ? { ...prev, guardian } : prev));
+      setGuardianEmail("");
+      setLinkMessage(`${guardian.guardian_email ?? "保護者"} にメールを送りました。届いたメールのリンクから、保護者が同意します。`);
     } catch (err) {
-      setLinkMessage(errorMessage(err, "リンクを作れませんでした"));
+      if (err instanceof ApiRequestError && err.fields?.guardian_email) {
+        setGuardianEmailError(err.fields.guardian_email);
+      } else {
+        setLinkMessage(errorMessage(err, "メールを送れませんでした"));
+      }
     } finally {
       release();
-    }
-  }
-
-  async function onShare() {
-    const text = "TrackTalk のフォーム添削を使いたいので、保護者の同意をお願いします。";
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "保護者の同意のお願い", text, url: link });
-        return;
-      }
-      await navigator.clipboard.writeText(link);
-      setLinkMessage("リンクをコピーしました");
-    } catch {
-      // 共有を閉じたときは何もしない
     }
   }
 
@@ -181,23 +180,44 @@ export default function CoachingSetupPage() {
         <section className="space-y-3">
           <h2 className="font-bold">保護者の同意</h2>
           <p className="text-sm text-slate-200">
-            {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にリンクを送っていません"}
+            {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
             {me.guardian?.status === "consented" ? `（${monthlyLimitLabel(me.guardian.monthly_limit_yen)}）` : null}
           </p>
-          {link ? (
-            <div className="space-y-2">
-              <Input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="保護者に送るリンク" />
-              <Button type="button" className="w-full" onClick={() => void onShare()}>
-                LINE などで保護者に送る
-              </Button>
-            </div>
-          ) : (
-            <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={() => void onIssueLink()}>
-              {me.guardian ? "保護者に送るリンクを作り直す" : "保護者に送るリンクを作る"}
+          {me.guardian?.guardian_email ? (
+            <p className="text-sm text-slate-300">送り先: {me.guardian.guardian_email}</p>
+          ) : null}
+          <form onSubmit={onSendLink} className="space-y-2">
+            {guardianEmailLocked ? (
+              <p className="text-xs text-slate-400">
+                保護者が一度答えたあとは、送り先のアドレスは変えられません。変えたいときはお問い合わせください。
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-300">
+                  保護者のメールアドレスに、同意のページのリンクを TrackTalk から送ります。自分のアドレスではなく、保護者のアドレスを入力してください。
+                </p>
+                <Input
+                  type="email"
+                  autoComplete="off"
+                  value={guardianEmail}
+                  onChange={(e) => setGuardianEmail(e.target.value)}
+                  placeholder={me.guardian?.guardian_email ?? "parent@example.com"}
+                  aria-label="保護者のメールアドレス"
+                />
+                {guardianEmailError ? <p className="text-sm text-red-400">{guardianEmailError}</p> : null}
+              </>
+            )}
+            <Button
+              type="submit"
+              variant="secondary"
+              className="w-full"
+              disabled={pending || (!guardianEmailLocked && !guardianEmail.trim())}
+            >
+              {me.guardian?.guardian_email ? "保護者にメールを送り直す" : "保護者にメールを送る"}
             </Button>
-          )}
-          {me.guardian && !link ? (
-            <p className="text-xs text-slate-400">作り直すと、前に送ったリンクは使えなくなります。</p>
+          </form>
+          {me.guardian ? (
+            <p className="text-xs text-slate-400">送り直すと、前に送ったリンクは使えなくなります。メールは1日5回まで送れます。</p>
           ) : null}
           {linkMessage ? <p className="text-sm text-slate-300">{linkMessage}</p> : null}
         </section>

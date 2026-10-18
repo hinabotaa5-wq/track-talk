@@ -36,7 +36,7 @@ type guardianView struct {
 	AllowPublish    bool    `json:"allow_publish"`
 	LimitOptions    []*int  `json:"limit_options"`
 	DefaultLimitYen int     `json:"default_limit_yen"`
-	Token           string  `json:"token"`
+	GuardianEmail   *string `json:"guardian_email"`
 }
 
 // setupNoCoaching は、オンラインコーチングを閉じたサーバーを作る（本番の既定はこれ）。
@@ -197,7 +197,7 @@ func TestBirthMonthIsSetOnce(t *testing.T) {
 	if me.IsMinor == nil || *me.IsMinor {
 		t.Fatalf("adult %+v", me)
 	}
-	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tb, nil)
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tb, map[string]any{"guardian_email": guardianEmail()})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("adult link %d %s", rec.Code, rec.Body.String())
 	}
@@ -208,23 +208,16 @@ func TestGuardianConsentFlow(t *testing.T) {
 	minor := uuid.New()
 	tm := token(t, minor)
 
-	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
+	email := guardianEmail()
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, map[string]any{"guardian_email": email})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("link before birth month %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
 		t.Fatalf("birth month %d %s", rec.Code, rec.Body.String())
 	}
-	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("link %d %s", rec.Code, rec.Body.String())
-	}
-	var issued guardianView
-	_ = json.Unmarshal(rec.Body.Bytes(), &issued)
-	if issued.Status != "pending" || len(issued.Token) != 43 {
-		t.Fatalf("issued %+v", issued)
-	}
-	path := "/v1/guardian/" + issued.Token
+	issued := issueGuardianLink(t, h, tm, email)
+	path := "/v1/guardian/" + issued
 
 	// 保護者のページはログインなしで開ける。子のアカウントの情報は返さない。
 	rec = doJSON(t, h, http.MethodGet, path, "", nil)
@@ -306,14 +299,18 @@ func TestGuardianConsentFlow(t *testing.T) {
 	}
 
 	// リンクを出し直すと、前のリンクは使えなくなる。状態は引き継ぐ。
-	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
+	// 保護者が答えたあとは、アドレスを省くと前と同じ保護者のアドレスに送る。
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, map[string]any{})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("reissue %d %s", rec.Code, rec.Body.String())
 	}
 	var reissued guardianView
 	_ = json.Unmarshal(rec.Body.Bytes(), &reissued)
-	if reissued.Token == issued.Token || reissued.Status != "revoked" {
+	if reissued.Status != "revoked" {
 		t.Fatalf("reissued %+v", reissued)
+	}
+	if again := guardianTokenFromMail(t, email); again == issued || mailsTo(email) != 2 {
+		t.Fatalf("reissued mail %s %d", again, mailsTo(email))
 	}
 	if rec := doJSON(t, h, http.MethodGet, path, "", nil); rec.Code != http.StatusNotFound {
 		t.Fatalf("old link %d", rec.Code)
@@ -327,15 +324,12 @@ func TestGuardianCanDeclineBeforeConsenting(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
 		t.Fatalf("birth month %d %s", rec.Code, rec.Body.String())
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
-	var issued guardianView
-	_ = json.Unmarshal(rec.Body.Bytes(), &issued)
-	path := "/v1/guardian/" + issued.Token
+	path := "/v1/guardian/" + issueGuardianLink(t, h, tm, guardianEmail())
 
 	if rec := doJSON(t, h, http.MethodPost, path+"/revoke", "", nil); rec.Code != http.StatusConflict {
 		t.Fatalf("revoke before consent %d", rec.Code)
 	}
-	rec = doJSON(t, h, http.MethodPost, path+"/decline", "", nil)
+	rec := doJSON(t, h, http.MethodPost, path+"/decline", "", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("decline %d %s", rec.Code, rec.Body.String())
 	}
@@ -523,10 +517,7 @@ func TestGuardianConsentNotifiesTheMinor(t *testing.T) {
 	}); rec.Code != http.StatusNoContent {
 		t.Fatalf("subscribe %d %s", rec.Code, rec.Body.String())
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/me/guardian-link", tm, nil)
-	var issued guardianView
-	_ = json.Unmarshal(rec.Body.Bytes(), &issued)
-	path := "/v1/guardian/" + issued.Token
+	path := "/v1/guardian/" + issueGuardianLink(t, h, tm, guardianEmail())
 	body := map[string]any{"guardian_name": "山田 花子", "relationship": "mother", "agree": true}
 
 	if rec := doJSON(t, h, http.MethodPost, path+"/consent", "", body); rec.Code != http.StatusOK {

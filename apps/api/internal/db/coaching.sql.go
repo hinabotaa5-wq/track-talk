@@ -24,7 +24,7 @@ SET status = 'consented',
     revoked_at = NULL,
     updated_at = now()
 WHERE token_hash = $1
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends
 `
 
 type ConsentGuardianParams struct {
@@ -57,6 +57,9 @@ func (q *Queries) ConsentGuardian(ctx context.Context, arg ConsentGuardianParams
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
@@ -68,7 +71,7 @@ SET status = 'declined',
     updated_at = now()
 WHERE token_hash = $1
   AND status IN ('pending', 'declined')
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends
 `
 
 func (q *Queries) DeclineGuardian(ctx context.Context, tokenHash string) (GuardianConsent, error) {
@@ -87,12 +90,15 @@ func (q *Queries) DeclineGuardian(ctx context.Context, tokenHash string) (Guardi
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
 
 const getGuardianConsentByMinor = `-- name: GetGuardianConsentByMinor :one
-SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at FROM guardian_consents
+SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends FROM guardian_consents
 WHERE minor_id = $1
 `
 
@@ -112,12 +118,15 @@ func (q *Queries) GetGuardianConsentByMinor(ctx context.Context, minorID uuid.UU
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
 
 const getGuardianConsentByToken = `-- name: GetGuardianConsentByToken :one
-SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at FROM guardian_consents
+SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends FROM guardian_consents
 WHERE token_hash = $1
 `
 
@@ -137,27 +146,44 @@ func (q *Queries) GetGuardianConsentByToken(ctx context.Context, tokenHash strin
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
 
 const issueGuardianLink = `-- name: IssueGuardianLink :one
-INSERT INTO guardian_consents (minor_id, token_hash)
-VALUES ($1, $2)
+INSERT INTO guardian_consents (minor_id, token_hash, guardian_email, link_sent_on, link_sends)
+VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Tokyo')::date, 1)
 ON CONFLICT (minor_id) DO UPDATE
 SET token_hash = EXCLUDED.token_hash,
+    guardian_email = EXCLUDED.guardian_email,
+    link_sends = CASE WHEN guardian_consents.link_sent_on = EXCLUDED.link_sent_on THEN guardian_consents.link_sends + 1 ELSE 1 END,
+    link_sent_on = EXCLUDED.link_sent_on,
     updated_at = now()
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at
+WHERE (guardian_consents.link_sent_on IS DISTINCT FROM EXCLUDED.link_sent_on OR guardian_consents.link_sends < $4::integer)
+  AND (guardian_consents.status = 'pending' OR lower(guardian_consents.guardian_email) = lower(EXCLUDED.guardian_email))
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends
 `
 
 type IssueGuardianLinkParams struct {
-	MinorID   uuid.UUID `json:"minor_id"`
-	TokenHash string    `json:"token_hash"`
+	MinorID       uuid.UUID `json:"minor_id"`
+	TokenHash     string    `json:"token_hash"`
+	GuardianEmail *string   `json:"guardian_email"`
+	DailyLimit    int32     `json:"daily_limit"`
 }
 
 // リンクを出し直すと前のリンクは使えなくなる。同意の状態はそのまま残す。
+// 1日（日本時間）に送れるのは daily_limit 回まで。保護者が一度答えたあとは、送り先のメールアドレスを変えられない。
+// どちらかに当たると行を返さない。
 func (q *Queries) IssueGuardianLink(ctx context.Context, arg IssueGuardianLinkParams) (GuardianConsent, error) {
-	row := q.db.QueryRow(ctx, issueGuardianLink, arg.MinorID, arg.TokenHash)
+	row := q.db.QueryRow(ctx, issueGuardianLink,
+		arg.MinorID,
+		arg.TokenHash,
+		arg.GuardianEmail,
+		arg.DailyLimit,
+	)
 	var i GuardianConsent
 	err := row.Scan(
 		&i.MinorID,
@@ -172,6 +198,9 @@ func (q *Queries) IssueGuardianLink(ctx context.Context, arg IssueGuardianLinkPa
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
@@ -183,7 +212,7 @@ SET status = 'revoked',
     updated_at = now()
 WHERE token_hash = $1
   AND status = 'consented'
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends
 `
 
 func (q *Queries) RevokeGuardian(ctx context.Context, tokenHash string) (GuardianConsent, error) {
@@ -202,6 +231,9 @@ func (q *Queries) RevokeGuardian(ctx context.Context, tokenHash string) (Guardia
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }
@@ -244,7 +276,7 @@ SET monthly_limit_yen = $2,
     updated_at = now()
 WHERE token_hash = $1
   AND status = 'consented'
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends
 `
 
 type UpdateGuardianSettingsParams struct {
@@ -269,6 +301,9 @@ func (q *Queries) UpdateGuardianSettings(ctx context.Context, arg UpdateGuardian
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GuardianEmail,
+		&i.LinkSentOn,
+		&i.LinkSends,
 	)
 	return i, err
 }

@@ -40,6 +40,13 @@ type Config struct {
 	StripeAPIBase string
 	// WebBaseURL は、支払い画面から戻ってくる Web の URL。空なら CORS_ORIGINS の最初のもの。
 	WebBaseURL string
+	// Resend の API キーと送り主。保護者の同意のリンクを保護者のメールあてに送る。空なら送れない（リンクも出せない）。
+	ResendAPIKey string
+	MailFrom     string
+	// MailAPIBase はテストで Resend の代わりのサーバーに向けるためのもの。
+	MailAPIBase string
+	// MailDevLog が true なら、メールを送らずに本文を API のログに出す。手元で試すためのもので、本番では立てない。
+	MailDevLog bool
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
 	// Clock はテストで現在時刻を差し替えるためのもの。nil なら time.Now。
@@ -72,6 +79,10 @@ func Load() (Config, error) {
 		StripeWebhookSecret:    os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeAPIBase:          os.Getenv("STRIPE_API_BASE"),
 		WebBaseURL:             strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
+		ResendAPIKey:           os.Getenv("RESEND_API_KEY"),
+		MailFrom:               os.Getenv("MAIL_FROM"),
+		MailAPIBase:            os.Getenv("MAIL_API_BASE"),
+		MailDevLog:             enabled(os.Getenv("MAIL_DEV_LOG")),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
