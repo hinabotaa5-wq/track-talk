@@ -1,4 +1,4 @@
-.PHONY: db api web migrate sqlc test-api test-web lint
+.PHONY: db api web migrate seed-injury sqlc test-api test-web lint
 
 # 開発用 DB(docker)。.env の DATABASE_URL が何であっても、これらのターゲットは必ずここに接続する。
 # 本番に流すときは make を使わず、ALLOW_REMOTE_DB=1 を付けて直接実行すること。
@@ -16,6 +16,10 @@ web:
 
 migrate:
 	cd apps/api && go run ./cmd/migrate up
+
+# ケガ部のデモデータ(ローカルの docker の DB にだけ流す。何度流しても同じ結果になる)
+seed-injury:
+	docker compose exec -T postgres psql -U tracktalk -d tracktalk -v ON_ERROR_STOP=1 < apps/api/seeds/injury_demo.sql
 
 sqlc:
 	cd apps/api && sqlc generate
