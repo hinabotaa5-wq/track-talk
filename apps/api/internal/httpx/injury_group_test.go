@@ -385,3 +385,45 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 		t.Fatalf("faces leak private nickname: %v", faces)
 	}
 }
+
+// 保存したケガの投稿は、グループを抜けると保存一覧からも読めなくなり、入り直すとまた出る。
+func TestSavedInjuryPostsNeedMembership(t *testing.T) {
+	h := setup(t)
+	a, b := token(t, uuid.New()), token(t, uuid.New())
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", a, joinBody("rehab"))
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", b, joinBody("rehab"))
+	rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", a, map[string]any{"kind": "injury", "title": "ひざの経過", "body": "ひざの経過です", "body_part": "jumpers-knee"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("post %d %s", rec.Code, rec.Body.String())
+	}
+	var post struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &post)
+	if r := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/saves", b, nil); r.Code != http.StatusNoContent {
+		t.Fatalf("save %d %s", r.Code, r.Body.String())
+	}
+	saved := func(tok string) string {
+		t.Helper()
+		r := doJSON(t, h, http.MethodGet, "/v1/me/saves", tok, nil)
+		if r.Code != http.StatusOK {
+			t.Fatalf("saves %d %s", r.Code, r.Body.String())
+		}
+		return r.Body.String()
+	}
+	if !strings.Contains(saved(b), post.ID) {
+		t.Fatal("saved post missing while joined")
+	}
+
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/jumpers-knee/me", b, nil); r.Code != http.StatusNoContent {
+		t.Fatalf("leave %d", r.Code)
+	}
+	if body := saved(b); strings.Contains(body, post.ID) || !strings.Contains(body, `"total":0`) {
+		t.Fatalf("saved injury post readable after leaving: %s", body)
+	}
+
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", b, joinBody("jogging"))
+	if !strings.Contains(saved(b), post.ID) {
+		t.Fatal("saved post missing after joining again")
+	}
+}
