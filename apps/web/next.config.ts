@@ -20,6 +20,7 @@ function contentSecurityPolicy() {
     "https://api.cloudinary.com",
     "https://res.cloudinary.com",
     "https://cloud.umami.is",
+    "https://gateway.umami.is",
   ];
   const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is"];
   if (process.env.NODE_ENV !== "production") script.push("'unsafe-eval'");
