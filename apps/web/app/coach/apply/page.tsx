@@ -273,7 +273,15 @@ export default function CoachApplyPage() {
           <p className="text-xs text-slate-300">
             承認されると、ニックネーム・枠・担当種目・記録・成績・競技年数が、誰でも見られるコーチ一覧に載ります。
           </p>
-          {message ? <p className="text-sm text-blue-400">{message}</p> : null}
+          {message ? (
+            <div className="flex items-center gap-3 rounded-xl border border-green-400/40 bg-green-500/15 p-4">
+              <svg className="size-6 shrink-0 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <p className="text-sm font-semibold text-green-300">{message}</p>
+            </div>
+          ) : null}
           <Button type="submit" className="w-full" disabled={pending || (!photo && !application?.photo_url)}>
             {application?.status === "pending" ? "応募内容を更新する" : "応募する"}
           </Button>

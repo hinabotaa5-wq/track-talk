@@ -37,7 +37,7 @@ export function showsBackButton(pathname: string, search = "") {
   // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (pathname === "/upload") return true;
-  if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile" || pathname === "/me/injury" || pathname === "/me/saved" || pathname === "/me/posts") return true;
+  if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile" || pathname === "/me/injury" || pathname === "/me/saved" || pathname === "/me/posts" || pathname === "/me/coaching") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
   if (pathname === "/competitions/regional") return true;

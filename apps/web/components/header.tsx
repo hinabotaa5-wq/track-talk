@@ -130,7 +130,7 @@ export function Header() {
               );
             })}
           </nav>
-          {session && !showBack ? (
+          {session && (!showBack || pathname.startsWith("/me")) ? (
             <>
               {pathname === "/" ? <TodayMeetBalloon /> : null}
               <FeedbackBox />
