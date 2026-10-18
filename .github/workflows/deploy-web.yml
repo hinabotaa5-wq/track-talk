@@ -1,9 +1,8 @@
 name: Deploy Web
 
 # 画面を本番に出す。マージしても自動では出ないので、Actions の画面の Run workflow で手動で流す。
-# 送り先はリポジトリの Secrets に登録したフックの URL（登録してあるものだけ呼ぶ）。
+# 送り先はリポジトリの Secrets に登録した Netlify のビルドフックの URL。
 #   NETLIFY_BUILD_HOOK: Netlify の Site configuration → Build & deploy → Build hooks で作った URL
-#   VERCEL_DEPLOY_HOOK: Vercel の Settings → Git → Deploy Hooks で main 向けに作った URL
 on:
   workflow_dispatch:
 
@@ -15,24 +14,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    env:
-      NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
-      VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
     steps:
-      - name: Call deploy hooks
+      - name: Call deploy hook
         run: |
-          called=0
-          if [ -n "$NETLIFY_BUILD_HOOK" ]; then
-            curl -fsS -X POST -d '{}' "$NETLIFY_BUILD_HOOK?trigger_title=github-actions"
-            echo "Netlify のビルドを始めました"
-            called=1
-          fi
-          if [ -n "$VERCEL_DEPLOY_HOOK" ]; then
-            curl -fsS -X POST "$VERCEL_DEPLOY_HOOK"
-            echo "Vercel のデプロイを始めました"
-            called=1
-          fi
-          if [ "$called" = 0 ]; then
-            echo "::error::NETLIFY_BUILD_HOOK か VERCEL_DEPLOY_HOOK を Secrets に登録してください"
+          if [ -z "${{ secrets.NETLIFY_BUILD_HOOK }}" ]; then
+            echo "::error::NETLIFY_BUILD_HOOK を Secrets に登録してください"
             exit 1
           fi
+          curl -fsS -X POST -d '{}' "${{ secrets.NETLIFY_BUILD_HOOK }}?trigger_title=github-actions"
+          echo "Netlify のビルドを始めました"

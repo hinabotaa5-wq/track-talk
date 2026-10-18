@@ -2,12 +2,12 @@
 
 いまの API の公開先は Cloud Run です（[手順](cloud-run-deploy.md)）。この手順は、あとから VM に移すときのためのものです。
 
-Go API を Oracle の VM で動かし、画面は Vercel のままにする構成です。
+Go API を Oracle の VM で動かし、画面は Netlify のままにする構成です。
 VM では Docker 上で API と Caddy（HTTPS）が動きます。
 無料枠の条件は変わるので、作成前に [Always Free の公式ページ](https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) を確認してください。
 
 ```
-ブラウザ ─ Vercel（画面）
+ブラウザ ─ Netlify（画面）
    └────── https://api.<ドメイン> ─ Caddy ─ API（Docker）─ Supabase（DB・Auth）
 ```
 
@@ -36,7 +36,7 @@ scp deploy/.env.example ubuntu@<IP>:/opt/track-talk/.env
 ssh ubuntu@<IP> nano /opt/track-talk/.env
 ```
 
-入れる値は `deploy/.env.example` です。`API_IMAGE` の `OWNER` は GitHub のユーザー名を小文字にし、`CORS_ORIGINS` は Vercel の本番 URL にします。
+入れる値は `deploy/.env.example` です。`API_IMAGE` の `OWNER` は GitHub のユーザー名を小文字にし、`CORS_ORIGINS` は Netlify の本番 URL にします。
 
 ## 3. GitHub に登録する（手作業）
 
@@ -62,7 +62,7 @@ VM へ自動で送る workflow を戻したときに、リポジトリの Settin
 
 1. VM 上でイメージを取得して `docker compose up -d` する。Cloud Run を使っているあいだは、そのための GitHub Actions は置いていない
 2. `https://api.<ドメイン>/health` が `{"status":"ok"}` を返すことを確認する
-3. Vercel の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
+3. Netlify の `NEXT_PUBLIC_API_BASE_URL` を `https://api.<ドメイン>` にしてデプロイする
 4. 画面からログインと投稿ができることを確認する
 
 ## 運用

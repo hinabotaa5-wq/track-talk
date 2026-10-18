@@ -4,7 +4,7 @@ Go API を Google Cloud Run の東京リージョン（`asia-northeast1`）で�
 アクセスがないときは 0 台まで縮むので、今の利用規模なら費用はほぼ通信料だけです。料金は変わるため、作成前に [Cloud Run の料金](https://cloud.google.com/run/pricing) を確認してください。
 
 ```
-ブラウザ ─ 画面（Vercel / Netlify）
+ブラウザ ─ 画面（Netlify）
    └────── https://track-talk-api-xxxx.a.run.app ─ Cloud Run（東京、最大1台）─ Supabase（DB・Auth）
 ```
 
@@ -31,7 +31,7 @@ nano deploy/cloud-run/env.yaml
 ```
 
 値は Render の Environment からそのまま写せます。`DATABASE_URL` も Render と同じ値で動きます（Cloud Run は IPv4 で外に出るので、Supabase の接続プーラーの URL が必要。Render で動いている値ならプーラーのはず）。
-`CORS_ORIGINS` は画面の本番 URL です。Vercel と Netlify を並行で使う間は、カンマ区切りで両方書きます。
+`CORS_ORIGINS` は画面の本番 URL（Netlify のサイト URL。末尾の `/` なし）です。
 
 ## 3. セットアップを流す
 
@@ -63,7 +63,7 @@ setup.sh は、まず Google の見本イメージでサービスを立てます
 ## 5. 切り替え
 
 1. `curl https://<API の URL>/health` が `{"status":"ok"}` を返すことを確認する
-2. 画面（Vercel、のちに Netlify）の `NEXT_PUBLIC_API_BASE_URL` を Cloud Run の URL にして再デプロイする
+2. 画面（Netlify）の `NEXT_PUBLIC_API_BASE_URL` を Cloud Run の URL にして再デプロイする
 3. 画面からログイン、投稿、画像のアップロードができることを確認する
 4. 問題なければ、前に使っていた API のサービスを削除する
 
