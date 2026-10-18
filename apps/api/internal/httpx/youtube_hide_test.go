@@ -48,7 +48,7 @@ func TestHiddenYouTubeAllowsNewThread(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", author, map[string]any{
-		"url": "https://youtu.be/abcdefghijk",
+		"url": "https://youtu.be/abcdefghijk", "title": "引用タイトル",
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("cite %d %s", rec.Code, rec.Body.String())

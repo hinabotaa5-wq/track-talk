@@ -16,7 +16,11 @@ func ReportDetail(v string) string {
 
 func Title(v string) string {
 	v = strings.TrimSpace(v)
-	if utf8.RuneCountInString(v) > 120 {
+	n := utf8.RuneCountInString(v)
+	if n < 1 {
+		return "タイトルを入力してください"
+	}
+	if n > 120 {
 		return "120文字以内で入力してください"
 	}
 	return ""

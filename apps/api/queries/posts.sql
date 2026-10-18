@@ -10,6 +10,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -96,6 +97,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -268,6 +270,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
@@ -285,9 +288,9 @@ WHERE p.id = $1
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id,
-    instagram_type, instagram_shortcode
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, like_count, comment_count, created_at, updated_at;
+    instagram_type, instagram_shortcode, source_title
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at;
 
 -- name: UpdatePost :one
 UPDATE posts
@@ -326,6 +329,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,

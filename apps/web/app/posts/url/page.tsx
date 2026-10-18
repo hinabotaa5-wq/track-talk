@@ -76,13 +76,13 @@ export default function VideoUrlPostPage() {
         ) : (
           <p className="text-sm text-red-400">{urlError}</p>
         )}
-        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
+        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} required />
         <label className="block text-sm font-medium">
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={submitting || !kind}>
+        <Button type="submit" className="w-full" disabled={submitting || !kind || !title.trim()}>
           {submitting ? "開いています" : "このスレッドを開く"}
         </Button>
       </form>

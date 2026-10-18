@@ -167,9 +167,9 @@ const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id,
-    instagram_type, instagram_shortcode
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, like_count, comment_count, created_at, updated_at
+    instagram_type, instagram_shortcode, source_title
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
@@ -183,6 +183,7 @@ type CreatePostParams struct {
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	SourceTitle         *string   `json:"source_title"`
 }
 
 type CreatePostRow struct {
@@ -196,6 +197,7 @@ type CreatePostRow struct {
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -214,6 +216,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.CloudinaryPublicID,
 		arg.InstagramType,
 		arg.InstagramShortcode,
+		arg.SourceTitle,
 	)
 	var i CreatePostRow
 	err := row.Scan(
@@ -227,6 +230,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.CloudinaryPublicID,
 		&i.InstagramType,
 		&i.InstagramShortcode,
+		&i.SourceTitle,
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.CreatedAt,
@@ -331,6 +335,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
@@ -356,6 +361,7 @@ type GetPostRow struct {
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	AuthorName          *string   `json:"author_name"`
@@ -377,6 +383,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.InstagramType,
 		&i.InstagramShortcode,
 		&i.CloudinaryPublicID,
+		&i.SourceTitle,
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.AuthorName,
@@ -553,6 +560,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -650,6 +658,7 @@ type ListPostsNewRow struct {
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -685,6 +694,7 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.InstagramType,
 			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
+			&i.SourceTitle,
 			&i.LikeCount,
 			&i.CommentCount,
 			&i.CreatedAt,
@@ -712,6 +722,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -811,6 +822,7 @@ type ListPostsPopularRow struct {
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -847,6 +859,7 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.InstagramType,
 			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
+			&i.SourceTitle,
 			&i.LikeCount,
 			&i.CommentCount,
 			&i.CreatedAt,
@@ -906,6 +919,7 @@ SELECT
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
+    p.source_title,
     p.like_count,
     p.comment_count,
     p.created_at,
@@ -970,6 +984,7 @@ type ListSavedPostsRow struct {
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -1002,6 +1017,7 @@ func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) 
 			&i.InstagramType,
 			&i.InstagramShortcode,
 			&i.CloudinaryPublicID,
+			&i.SourceTitle,
 			&i.LikeCount,
 			&i.CommentCount,
 			&i.CreatedAt,

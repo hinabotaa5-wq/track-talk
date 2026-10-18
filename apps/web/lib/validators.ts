@@ -4,12 +4,12 @@ import { practiceEventValues } from "./practice-events";
 z.config(z.locales.ja());
 
 export const postSchema = z.object({
-  title: z.string("タイトルを入力してください").trim().max(120, "120文字以内"),
+  title: z.string("タイトルを入力してください").trim().min(1, "タイトルを入力してください").max(120, "120文字以内"),
   body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
 });
 
-export function hasTextPostContent(title: string, body: string, hasPhoto: boolean) {
-  return title.trim() !== "" || body.trim() !== "" || hasPhoto;
+export function hasTextPostContent(title: string, _body: string, _hasPhoto: boolean) {
+  return title.trim() !== "";
 }
 
 export function isYouTubeUrl(value: string) {

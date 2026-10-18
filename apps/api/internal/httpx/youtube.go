@@ -145,14 +145,12 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 	if s.writeExistingYouTube(w, r, videoID) {
 		return
 	}
-	title, thumb, err := fetchYouTubeMeta(r.Context(), videoID)
+	sourceTitle, thumb, err := fetchYouTubeMeta(r.Context(), videoID)
 	if err != nil {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "この動画の情報を取得できませんでした")
 		return
 	}
-	if customTitle != "" {
-		title = customTitle
-	}
+	title := customTitle
 	created, err := s.q.CreatePost(r.Context(), db.CreatePostParams{
 		ID:                  uuid.New(),
 		AuthorID:            profile.ID,
@@ -161,6 +159,7 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 		Kind:                "youtube",
 		YoutubeVideoID:      &videoID,
 		YoutubeThumbnailUrl: &thumb,
+		SourceTitle:         &sourceTitle,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError

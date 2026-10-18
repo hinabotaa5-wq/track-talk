@@ -32,6 +32,7 @@ type postDTO struct {
 	VideoPublicID  string          `json:"video_public_id,omitempty"`
 	ImagePublicID  string          `json:"image_public_id,omitempty"`
 	PlaybackURL    string          `json:"playback_url,omitempty"`
+	SourceTitle    string          `json:"source_title,omitempty"`
 	Recruitment    *recruitmentDTO `json:"recruitment,omitempty"`
 	Practice       *practiceDTO    `json:"practice,omitempty"`
 	Injury         *injuryDTO      `json:"injury,omitempty"`
@@ -135,6 +136,9 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	}
 	applyKind(&p, row.Kind, row.YoutubeVideoID, row.YoutubeThumbnailUrl, row.CloudinaryPublicID)
 	applyInstagram(&p, row.InstagramType, row.InstagramShortcode)
+	if row.SourceTitle != nil && *row.SourceTitle != "" {
+		p.SourceTitle = *row.SourceTitle
+	}
 	if !list {
 		p.Body = row.Body
 	}
@@ -153,6 +157,7 @@ func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO 
 		InstagramType:       row.InstagramType,
 		InstagramShortcode:  row.InstagramShortcode,
 		CloudinaryPublicID:  row.CloudinaryPublicID,
+		SourceTitle:         row.SourceTitle,
 		LikeCount:           row.LikeCount,
 		CommentCount:        row.CommentCount,
 		CreatedAt:           row.CreatedAt,
@@ -172,6 +177,7 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		InstagramType:       row.InstagramType,
 		InstagramShortcode:  row.InstagramShortcode,
 		CloudinaryPublicID:  row.CloudinaryPublicID,
+		SourceTitle:         row.SourceTitle,
 		LikeCount:           row.LikeCount,
 		CommentCount:        row.CommentCount,
 		CreatedAt:           row.CreatedAt,

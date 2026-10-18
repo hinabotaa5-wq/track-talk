@@ -57,6 +57,7 @@ export type Post = {
   kind: "text" | "youtube" | "instagram" | "video" | "recruitment" | "practice" | "injury" | "meet";
   thumbnail_url?: string;
   youtube_video_id?: string;
+  source_title?: string;
   instagram_type?: "p" | "reel";
   instagram_shortcode?: string;
   video_public_id?: string;

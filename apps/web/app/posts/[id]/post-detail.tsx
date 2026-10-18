@@ -502,6 +502,9 @@ export function PostDetail({
       {post.kind === "practice" ? null : (
         <h1 className="text-4xl font-bold">{feedTitle(post.title)}</h1>
       )}
+      {post.source_title ? (
+        <p className="text-xs text-slate-400">元動画: {post.source_title}</p>
+      ) : null}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
         {post.author_name ? <span>{post.author_name}</span> : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>

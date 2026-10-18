@@ -506,9 +506,6 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	if kind == "practice" {
 		title = practiceTitle(practice.Event, practice.EventOther, practice.StartsAt)
 	}
-	if title == "" {
-		title = titleFromBody(req.Body)
-	}
 	return db.CreatePostParams{
 		Title:               title,
 		Body:                strings.TrimSpace(req.Body),
@@ -517,19 +514,6 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 		YoutubeThumbnailUrl: youtubeThumb,
 		CloudinaryPublicID:  publicID,
 	}, recruitment, practice, injury, true
-}
-
-func textPostHasContent(title, body string, imagePublicID *string) bool {
-	if strings.TrimSpace(title) != "" || strings.TrimSpace(body) != "" {
-		return true
-	}
-	return imagePublicID != nil && strings.TrimSpace(*imagePublicID) != ""
-}
-
-func writeEmptyTextPostError(w http.ResponseWriter) {
-	FieldError(w, map[string]string{
-		"body": "タイトル、本文、写真のいずれかを入力してください",
-	})
 }
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
@@ -553,10 +537,6 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		// ケガの投稿は、部位のグループ(POST /v1/injury/groups/{part}/posts)から書く。
 		_ = injury
 		FieldError(w, map[string]string{"kind": "ケガの投稿は、部位のグループから書いてください"})
-		return
-	}
-	if params.Kind == "text" && !textPostHasContent(params.Title, params.Body, params.CloudinaryPublicID) {
-		writeEmptyTextPostError(w)
 		return
 	}
 	params.ID = uuid.New()
@@ -622,10 +602,6 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	params, _, _, _, ok := s.parsePostReq(w, r, "")
 	if !ok {
-		return
-	}
-	if existing.Kind == "text" && !textPostHasContent(params.Title, params.Body, existing.CloudinaryPublicID) {
-		writeEmptyTextPostError(w)
 		return
 	}
 	_, err = s.q.UpdatePost(r.Context(), db.UpdatePostParams{
@@ -714,6 +690,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 			InstagramType:       row.InstagramType,
 			InstagramShortcode:  row.InstagramShortcode,
 			CloudinaryPublicID:  row.CloudinaryPublicID,
+			SourceTitle:          row.SourceTitle,
 			LikeCount:           row.LikeCount,
 			CommentCount:        row.CommentCount,
 			CreatedAt:           row.CreatedAt,

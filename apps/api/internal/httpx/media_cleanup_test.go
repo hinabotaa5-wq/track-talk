@@ -42,7 +42,7 @@ func TestDeletingAPostRemovesItsPhotoFromCloudinary(t *testing.T) {
 	tb := token(t, uuid.New())
 	photo := "track-talk/" + uuid.NewString()
 	create := func(tok string) string {
-		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{"title": "", "body": "", "image_public_id": photo})
+		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
 		if rec.Code != 201 {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 		}

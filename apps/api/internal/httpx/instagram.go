@@ -69,13 +69,6 @@ func InstagramShortcode(v string) string {
 	return ""
 }
 
-func instagramDefaultTitle(kind string) string {
-	if kind == "reel" {
-		return "Instagramのリール"
-	}
-	return "Instagramの投稿"
-}
-
 func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 	profile, ok := s.requireProfile(w, r)
 	if !ok {
@@ -104,13 +97,6 @@ func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.writeExistingInstagram(w, r, code) {
 		return
-	}
-	// Instagram はログインなしで投稿のタイトルを取れないので、本文か種類から名前を付ける
-	if title == "" {
-		title = titleFromBody(req.Body)
-	}
-	if title == "" {
-		title = instagramDefaultTitle(kind)
 	}
 	created, err := s.q.CreatePost(r.Context(), db.CreatePostParams{
 		ID:                 uuid.New(),

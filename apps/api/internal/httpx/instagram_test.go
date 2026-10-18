@@ -13,7 +13,7 @@ func TestCiteInstagramOpensOneThreadPerPost(t *testing.T) {
 	ta := token(t, uuid.New())
 
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
-		"url": "https://www.instagram.com/reel/C1a2B3c4D5e/?igsh=abc", "body": "スタートの反応がすごい"})
+		"url": "https://www.instagram.com/reel/C1a2B3c4D5e/?igsh=abc", "title": "スタートの反応がすごい", "body": "スタートの反応がすごい"})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -51,7 +51,7 @@ func TestCiteInstagramOpensOneThreadPerPost(t *testing.T) {
 
 	// 同じ投稿を別の形の URL で貼っても、最初のスレッドに集まる
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/instagram", token(t, uuid.New()), map[string]any{
-		"url": "https://instagram.com/someone/reel/C1a2B3c4D5e"})
+		"url": "https://instagram.com/someone/reel/C1a2B3c4D5e", "title": "別の人のタイトル"})
 	if rec.Code != 200 {
 		t.Fatalf("cite again %d %s", rec.Code, rec.Body.String())
 	}
@@ -67,18 +67,9 @@ func TestCiteInstagramOpensOneThreadPerPost(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
-		"url": "https://www.instagram.com/p/D9z8Y7x6W5v/"})
+		"url": "https://www.instagram.com/p/D9z8Y7x6W5v/", "title": "別の投稿"})
 	if rec.Code != 201 {
-		t.Fatalf("no title %d %s", rec.Code, rec.Body.String())
-	}
-	var untitled struct {
-		Post struct {
-			Title string `json:"title"`
-		} `json:"post"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &untitled)
-	if untitled.Post.Title != "Instagramの投稿" {
-		t.Fatalf("default title %q", untitled.Post.Title)
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
 
 	for _, raw := range []string{

@@ -358,6 +358,7 @@ type Post struct {
 	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
 	InstagramType       *string    `json:"instagram_type"`
 	InstagramShortcode  *string    `json:"instagram_shortcode"`
+	SourceTitle         *string    `json:"source_title"`
 }
 
 type PostLike struct {

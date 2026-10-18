@@ -367,7 +367,7 @@ func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
 
 	for name, payload := range map[string]map[string]any{
 		"title only": {"title": "タイトルだけ", "body": ""},
-		"body only":  {"title": "", "body": "本文だけ"},
+		"body only":  {"title": "本文だけのタイトル", "body": "本文だけ"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, payload)
@@ -399,8 +399,7 @@ func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
 	})
 	if rec.Code != 422 {
 		t.Fatalf("empty update %d %s", rec.Code, rec.Body.String())
-	}
-}
+	}}
 
 func TestSignedVideoJoinsTheList(t *testing.T) {
 	var assetBytes atomic.Int64
@@ -462,7 +461,7 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "", "body": "", "kind": "video",
+		"title": "動画タイトル", "body": "", "kind": "video",
 		"video_public_id": signed.PublicID,
 	})
 	if rec.Code != 201 {
@@ -532,7 +531,7 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "", "body": "", "image_public_id": signed.PublicID,
+		"title": "写真タイトル", "body": "", "image_public_id": signed.PublicID,
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -550,7 +549,7 @@ func TestSignedImageJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
-		"title": "", "body": "",
+		"title": "写真タイトル編集", "body": "",
 	})
 	if rec.Code != 200 {
 		t.Fatalf("update image-only post %d %s", rec.Code, rec.Body.String())
@@ -574,7 +573,7 @@ func TestCiteYouTubeOpensExistingThread(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/youtube", ta, map[string]any{
-		"url": "https://youtu.be/abcdefghijk"})
+		"url": "https://youtu.be/abcdefghijk", "title": "引用タイトル"})
 	if rec.Code != 200 {
 		t.Fatalf("cite %d %s", rec.Code, rec.Body.String())
 	}
