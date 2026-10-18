@@ -1,6 +1,9 @@
 package competitions
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -191,4 +194,54 @@ func ptr(day time.Time) *time.Time { return &day }
 
 func urlValues(key, value string) map[string][]string {
 	return map[string][]string{key: {value}}
+}
+
+func TestGetBodyRetriesOnTooManyRequests(t *testing.T) {
+	retryBaseWait = time.Millisecond
+	t.Cleanup(func() { retryBaseWait = 2 * time.Second })
+	calls := 0
+	var agent string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		agent = r.Header.Get("User-Agent")
+		if calls < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	body, err := getBody(context.Background(), server.URL)
+	if err != nil || string(body) != "ok" || calls != 3 {
+		t.Fatalf("body=%q err=%v calls=%d", body, err, calls)
+	}
+	if !strings.Contains(agent, "https://") {
+		t.Fatalf("User-Agent に連絡先がありません: %q", agent)
+	}
+}
+
+func TestGetBodyGivesUpAfterMaxAttempts(t *testing.T) {
+	retryBaseWait = time.Millisecond
+	t.Cleanup(func() { retryBaseWait = 2 * time.Second })
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+	if _, err := getBody(context.Background(), server.URL); err == nil || calls != maxGetAttempts {
+		t.Fatalf("err=%v calls=%d", err, calls)
+	}
+}
+
+func TestGetBodyDoesNotRetryNotFound(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+	if _, err := getBody(context.Background(), server.URL); err == nil || calls != 1 {
+		t.Fatalf("err=%v calls=%d", err, calls)
+	}
 }
