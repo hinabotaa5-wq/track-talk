@@ -42,6 +42,16 @@ function contentSecurityPolicy() {
 }
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+    if (process.env.NODE_ENV === "production") return [];
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiBase}/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -1,7 +1,9 @@
 import type { ApiError } from "./types";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  process.env.NODE_ENV === "development"
+    ? "/api"
+    : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080");
 
 const unknownError = "処理に失敗しました。しばらくしてからもう一度試してください。";
 
