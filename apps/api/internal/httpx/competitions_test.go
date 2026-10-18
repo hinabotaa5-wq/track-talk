@@ -3,6 +3,8 @@ package httpx
 import (
 	"testing"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func TestParsePrefectureCode(t *testing.T) {
@@ -44,7 +46,7 @@ func TestSeasonMonthRange(t *testing.T) {
 		t.Fatalf("october range: %s %s", start, end)
 	}
 
-	january := time.Date(2027, time.January, 15, 0, 0, 0, 0, tokyo)
+	january := time.Date(2027, time.January, 15, 0, 0, 0, 0, jst.Zone)
 	if got := currentSeasonYear(january); got != 2026 {
 		t.Fatalf("january season: got %d", got)
 	}

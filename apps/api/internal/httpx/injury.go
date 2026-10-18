@@ -15,14 +15,14 @@ import (
 
 type injuryInput struct {
 	BodyPart string
-	// GroupStage is the writer's stage in the part's group when the post was made; nil for posts made outside a group.
+	// GroupStage は、投稿したときの、その部位のグループでの書いた人の段階。グループの外で書いた投稿では nil。
 	GroupStage *string
 }
 
 type injuryDTO struct {
 	BodyPart      string `json:"body_part"`
 	BodyPartLabel string `json:"body_part_label"`
-	// Stage is the latest recovery stage reported on the post; empty until the first update.
+	// Stage は、投稿で報告された最新の回復の段階。最初の報告までは空。
 	Stage      string            `json:"stage,omitempty"`
 	StageLabel string            `json:"stage_label,omitempty"`
 	Updates    []injuryUpdateDTO `json:"updates,omitempty"`
@@ -74,8 +74,8 @@ type injuryUpdateReq struct {
 	Body  string `json:"body"`
 }
 
-// injuryBodyParts are the injury groups. The name stays "body part" in the API and the database,
-// but each group is now one diagnosis; anything outside the eight goes to "other".
+// injuryBodyParts は、ケガのグループ。API と DB では名前を「部位（body part）」のままにしているが、
+// 今は各グループが1つの診断名で、8つに当てはまらないものは "other" に入る。
 var injuryBodyParts = []struct{ Code, Label string }{
 	{"hamstring-strain", "ハムストリングの肉離れ"},
 	{"quad-strain", "太もも前の肉離れ"},
@@ -110,7 +110,7 @@ func normalizeInjury(req postReq) (injuryInput, map[string]string) {
 	return injuryInput{BodyPart: part}, fields
 }
 
-// titleFromBody gives a post without a title the start of its body, so feed cards still have a heading.
+// titleFromBody は、タイトルのない投稿に本文の書き出しを付け、フィードのカードにも見出しが出るようにする。
 func titleFromBody(body string) string {
 	flat := strings.Join(strings.Fields(body), " ")
 	runes := []rune(flat)
@@ -261,7 +261,7 @@ func (s *Server) attachInjurySummaries(ctx context.Context, items []postDTO) err
 	return nil
 }
 
-// injuryOwnedPost loads the post and reports whether it is an injury post written by the caller.
+// injuryOwnedPost は、投稿を読み込み、それが呼び出した本人の書いたケガの投稿かを返す。
 func (s *Server) injuryOwnedPost(w http.ResponseWriter, r *http.Request, author db.Profile) (uuid.UUID, bool) {
 	postID, ok := parseUUIDParam(w, r, "id")
 	if !ok {
@@ -365,8 +365,8 @@ func (s *Server) deleteInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// updateInjuryUpdate lets the author correct a report's stage and text. The report keeps its
-// original time and sends no notification, so edits neither reorder the timeline nor nudge followers.
+// updateInjuryUpdate は、書いた本人が報告の段階と文を直せるようにする。報告の時刻は元のままで、通知も送らないので、
+// 直してもタイムラインの順番は変わらず、フォローしている人に知らせも届かない。
 func (s *Server) updateInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -408,8 +408,8 @@ func (s *Server) updateInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, injuryUpdateFromRow(row))
 }
 
-// getReadablePost loads a post for a request that reads or reacts to it. An injury post is readable
-// only by its author, by members of the group for its body part, and by admins; anyone else is turned away.
+// getReadablePost は、読んだり反応したりするリクエストのために投稿を読み込む。ケガの投稿を読めるのは、
+// 書いた本人、その部位のグループのメンバー、運営だけで、それ以外の人は断る。
 func (s *Server) getReadablePost(w http.ResponseWriter, r *http.Request, id uuid.UUID) (db.GetPostRow, bool) {
 	post, err := s.q.GetPost(r.Context(), id)
 	if err != nil {

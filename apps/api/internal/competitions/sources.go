@@ -2,8 +2,8 @@ package competitions
 
 import "context"
 
-// Sources are the athletics association homepages to read.
-// Other prefectures are added here as their schedule page URL is known.
+// Sources は、読みに行く陸上競技協会のホームページ。
+// ほかの県は、日程のページの URL が分かったらここに足す。
 var Sources = []Source{
 	{Prefecture: "01", PageURL: "https://hokkaido-rikkyo.jp/schedule/index.html", PDFLinks: []string{`北海道内全競技会日程|schedule_hokkaido`}, NewsURL: "https://hokkaido-rikkyo.jp/information/index.html"},
 	{Prefecture: "02", PageURL: "https://www.jaafaomori.com/schedule/", NewsURL: "https://www.jaafaomori.com/news/"},
@@ -111,14 +111,14 @@ var Sources = []Source{
 type Source struct {
 	Prefecture string
 	PageURL    string
-	// NewsURL is the prefecture association's news list, read to find guideline links for meets from the annual schedule.
+	// NewsURL は、県の協会のニュース一覧。年間の日程表の大会の要項のリンクを探すために読む。
 	NewsURL   string
 	ExtraURLs []string
-	// PDFLinks are patterns for schedule PDFs linked from PageURL. When set, those PDFs are read instead of PageURL.
+	// PDFLinks は、PageURL からリンクされた日程の PDF のパターン。あれば、PageURL の代わりにその PDF を読む。
 	PDFLinks []string
 }
 
-// ResolveURLs is URLs with PageURL replaced by the PDFs it currently links to.
+// ResolveURLs は、URLs の PageURL を、今リンクされている PDF に置き換えたもの。
 func (s Source) ResolveURLs(ctx context.Context) ([]string, error) {
 	if len(s.PDFLinks) == 0 {
 		return s.URLs(), nil

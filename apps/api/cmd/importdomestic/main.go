@@ -53,7 +53,7 @@ func main() {
 	fmt.Printf("imported %d domestic majors\n", len(majors))
 }
 
-// storeDomesticMajors upserts by (slug, year), so editions the run did not see keep their previous rows.
+// storeDomesticMajors は (slug, year) で upsert するので、今回の実行で見つからなかった回は前の行が残る。
 func storeDomesticMajors(ctx context.Context, pool *pgxpool.Pool, majors []competitions.DomesticMajor) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {

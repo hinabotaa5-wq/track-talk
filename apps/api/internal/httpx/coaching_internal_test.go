@@ -3,6 +3,8 @@ package httpx
 import (
 	"testing"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func TestIsMinorTreatsTheBirthMonthAsLateAsPossible(t *testing.T) {
@@ -12,11 +14,11 @@ func TestIsMinorTreatsTheBirthMonthAsLateAsPossible(t *testing.T) {
 		want bool
 	}{
 		// 2026年10月中は、誕生日が来たか分からないので18歳未満として扱う。
-		{time.Date(2026, time.October, 31, 23, 59, 0, 0, tokyo), true},
-		{time.Date(2026, time.November, 1, 0, 0, 0, 0, tokyo), false},
+		{time.Date(2026, time.October, 31, 23, 59, 0, 0, jst.Zone), true},
+		{time.Date(2026, time.November, 1, 0, 0, 0, 0, jst.Zone), false},
 		// 日本時間で判定する（UTC ではまだ10月31日）。
 		{time.Date(2026, time.October, 31, 15, 0, 0, 0, time.UTC), false},
-		{time.Date(2025, time.December, 1, 0, 0, 0, 0, tokyo), true},
+		{time.Date(2025, time.December, 1, 0, 0, 0, 0, jst.Zone), true},
 	}
 	for _, c := range cases {
 		if got := isMinor(birth, c.now); got != c.want {
@@ -25,16 +27,16 @@ func TestIsMinorTreatsTheBirthMonthAsLateAsPossible(t *testing.T) {
 	}
 	// 12月生まれは翌年1月1日に大人になる。
 	december := time.Date(2008, time.December, 1, 0, 0, 0, 0, time.UTC)
-	if !isMinor(december, time.Date(2026, time.December, 31, 12, 0, 0, 0, tokyo)) {
+	if !isMinor(december, time.Date(2026, time.December, 31, 12, 0, 0, 0, jst.Zone)) {
 		t.Error("2008-12 should still be a minor on 2026-12-31")
 	}
-	if isMinor(december, time.Date(2027, time.January, 1, 0, 0, 0, 0, tokyo)) {
+	if isMinor(december, time.Date(2027, time.January, 1, 0, 0, 0, 0, jst.Zone)) {
 		t.Error("2008-12 should be an adult on 2027-01-01")
 	}
 }
 
 func TestParseBirthMonth(t *testing.T) {
-	now := time.Date(2026, time.October, 15, 12, 0, 0, 0, tokyo)
+	now := time.Date(2026, time.October, 15, 12, 0, 0, 0, jst.Zone)
 	if got, msg := parseBirthMonth("2009-04", now); msg != "" || !got.Equal(time.Date(2009, time.April, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("2009-04 = %v %q", got, msg)
 	}

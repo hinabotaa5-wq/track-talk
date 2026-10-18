@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type injuryProgressDTO struct {
@@ -25,14 +26,14 @@ type injuryProgressPostDTO struct {
 type injuryProgressStageDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
-	// MyDays is whole days from the post to the author's first report of this stage; nil until reached.
+	// MyDays は、投稿から、書いた本人のこの段階の最初の報告までの日数（日単位で切り捨て）。まだ届いていなければ nil。
 	MyDays *int `json:"my_days"`
-	// MedianDays is everyone's median for this injury and stage; nil below the sample minimum.
+	// MedianDays は、このケガと段階の全員の中央値。件数が最小に満たなければ nil。
 	MedianDays *int `json:"median_days"`
 }
 
-// buildInjuryProgress puts each of the author's injury posts next to everyone's medians, stage by stage.
-// The first stage (resting) is the post itself: day 0, with no median to compare against.
+// buildInjuryProgress は、書いた本人のケガの投稿それぞれを、段階ごとに全員の中央値と並べる。
+// 最初の段階（安静）は投稿そのもので、0日目。比べる中央値はない。
 func buildInjuryProgress(posts []db.ListMyInjuryPostsRow, reports []db.ListMyInjuryFirstReportsRow, stats []db.InjuryStageStatsRow) injuryProgressDTO {
 	byPost := make(map[uuid.UUID]map[string]time.Time)
 	for _, row := range reports {
@@ -59,7 +60,7 @@ func buildInjuryProgress(posts []db.ListMyInjuryPostsRow, reports []db.ListMyInj
 			PostID:        post.ID,
 			BodyPart:      post.BodyPart,
 			BodyPartLabel: injuryBodyPartLabel(post.BodyPart),
-			PostedOn:      post.CreatedAt.In(tokyo).Format("2006-01-02"),
+			PostedOn:      post.CreatedAt.In(jst.Zone).Format("2006-01-02"),
 			Stages:        make([]injuryProgressStageDTO, 0, len(injuryStages)),
 		}
 		for i, stage := range injuryStages {

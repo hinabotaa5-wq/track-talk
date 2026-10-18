@@ -7,8 +7,8 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
-// minInjuryStatSample is the fewest reports a stage needs before its median is shown,
-// so a single person's recovery is not read as a typical one.
+// minInjuryStatSample は、段階の中央値を出すのに必要な報告の最小件数。
+// 1人の回復をよくある回復と受け取られないようにする。
 const minInjuryStatSample = 5
 
 type injuryStatsDTO struct {
@@ -27,12 +27,12 @@ type injuryStageStatDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
 	Reached    int64  `json:"reached"`
-	// MedianDays is days from the post to the first report of this stage; nil below the sample minimum.
+	// MedianDays は、投稿からこの段階の最初の報告までの日数。件数が最小に満たなければ nil。
 	MedianDays *int `json:"median_days"`
 }
 
-// buildInjuryStats lays the rows out in the order of the body-part and stage lists,
-// skipping parts with no posts and stages nobody has reached.
+// buildInjuryStats は、部位と段階の一覧の順に行を並べる。
+// 投稿のない部位と、誰も届いていない段階は飛ばす。
 func buildInjuryStats(parts []db.CountInjuryPostsByPartRow, stages []db.InjuryStageStatsRow) injuryStatsDTO {
 	posts := make(map[string]int64, len(parts))
 	for _, row := range parts {

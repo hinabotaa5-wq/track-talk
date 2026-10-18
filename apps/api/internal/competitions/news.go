@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-// NewsItem is one announcement on a prefecture association's news list, as returned by Gemini.
+// NewsItem は、Gemini が返した、県の協会のニュース一覧にあるお知らせ1件。
 type NewsItem struct {
 	Title      string `json:"title"`
 	ArticleURL string `json:"article_url"`
@@ -21,7 +21,7 @@ type NewsItem struct {
 	Venue      string `json:"venue"`
 }
 
-// KnownMeet is a meet that already came from the annual schedule. News never adds meets, only guidelines to these.
+// KnownMeet は、年間の日程表から入った大会。ニュースから大会を増やすことはなく、これらに要項を付けるだけ。
 type KnownMeet struct {
 	Key      string
 	Name     string
@@ -30,13 +30,13 @@ type KnownMeet struct {
 	Location string
 }
 
-// NewsMatch pairs a news item with the one annual meet it announces.
+// NewsMatch は、ニュース1件と、それが知らせている年間の大会1件の組。
 type NewsMatch struct {
 	Item NewsItem
 	Meet KnownMeet
 }
 
-// FetchNewsList reads a news list page as lines of text with each link followed by its URL.
+// FetchNewsList は、ニュース一覧のページを文字の行として読み、リンクのあとにその URL を付ける。
 func FetchNewsList(ctx context.Context, pageURL string, seasonYear int) (Page, error) {
 	res, finalURL, err := get(ctx, pageURL)
 	if err != nil {
@@ -62,7 +62,7 @@ func FetchNewsList(ctx context.Context, pageURL string, seasonYear int) (Page, e
 	return Page{SeasonYear: seasonYear, Body: body, Links: links, plainText: true}, nil
 }
 
-// ExtractNews asks Gemini for the meet announcements on a news list page. One request.
+// ExtractNews は、ニュース一覧のページにある大会のお知らせを Gemini に聞く。リクエストは1回。
 func (c Client) ExtractNews(ctx context.Context, page Page) ([]NewsItem, error) {
 	text, err := c.generate(ctx, []map[string]any{{"text": newsPrompt(page)}})
 	if err != nil {
@@ -72,7 +72,7 @@ func (c Client) ExtractNews(ctx context.Context, page Page) ([]NewsItem, error) 
 	if err != nil {
 		return nil, err
 	}
-	// A link Gemini made up must not be opened.
+	// Gemini が作り出したリンクは開かない。
 	var kept []NewsItem
 	for _, item := range items {
 		if linkOnPage(page, item.ArticleURL) && strings.TrimSpace(item.Title) != "" {
@@ -124,11 +124,11 @@ func linkOnPage(page Page, raw string) bool {
 	return false
 }
 
-// nonMeetNews are announcements that are not about holding a meet. Gemini is told to skip them; this is the backstop.
+// nonMeetNews は、大会の開催についてではないお知らせ。Gemini にも飛ばすよう伝えているが、これは取りこぼしの受け皿。
 var nonMeetNews = []string{"結果", "講習会", "研修", "理事会", "会議", "練習会", "合宿", "表彰", "審判"}
 
-// MatchNews pairs each news item with the single annual meet it announces. An item that fits no meet, or more
-// than one, is dropped: a wrong guidelines link is worse than the association's list the page falls back to.
+// MatchNews は、ニュースごとに、それが知らせている年間の大会を1つだけ組み合わせる。どの大会にも合わないものや、
+// 2つ以上に合うものは捨てる。間違った要項のリンクは、ページが代わりに出す協会の一覧より悪いから。
 func MatchNews(items []NewsItem, meets []KnownMeet) []NewsMatch {
 	var matches []NewsMatch
 	claimed := map[string]bool{}
@@ -155,7 +155,7 @@ func isNonMeetNews(title string) bool {
 	return false
 }
 
-// minContainedName is how long an annual meet name must be to count when it only appears inside a longer news title.
+// minContainedName は、年間の大会名がニュースのタイトルの中に含まれるだけのとき、数に入れるのに必要な名前の長さ。
 const minContainedName = 6
 
 func matchMeet(item NewsItem, meets []KnownMeet) (KnownMeet, bool) {
@@ -184,7 +184,7 @@ func matchMeet(item NewsItem, meets []KnownMeet) (KnownMeet, bool) {
 	if len(candidates) == 1 {
 		return candidates[0], true
 	}
-	// The date and venue only separate meets that the name could not.
+	// 日付と会場は、名前で区別できなかった大会を分けるときだけ使う。
 	var narrowed []KnownMeet
 	for _, meet := range candidates {
 		if agreesOnDateOrVenue(item, meet) {
@@ -216,7 +216,7 @@ func normalizeVenue(s string) string {
 	return strings.Join(strings.Fields(strings.NewReplacer("　", " ").Replace(s)), "")
 }
 
-// meetNameNoise is what news titles add around the meet name.
+// meetNameNoise は、ニュースのタイトルが大会名の前後に付け足す言葉。
 var meetNameNoise = strings.NewReplacer(
 	"掲載のお知らせ", "", "のお知らせ", "", "掲載", "", "要項", "", "【", "", "】", "", "「", "", "」", "",
 	"　", "", " ", "", "\t", "",
@@ -314,7 +314,7 @@ func kanjiRunValue(run []rune) int {
 	return total + current
 }
 
-// notGuidelines are documents next to the guidelines that must not be taken for them.
+// notGuidelines は、要項の隣に並んでいて、要項と取り違えてはいけない文書。
 var notGuidelines = []string{"申込", "申し込み", "結果", "一覧", "タイムテーブル", "競技日程", "エントリー"}
 
 func isNotGuidelinesText(s string) bool {
@@ -361,7 +361,7 @@ func GuidelinesFromArticle(r io.Reader, articleURL string) (string, bool) {
 					}
 					break
 				}
-				// The link text is judged on its own, so it does not count as article text.
+				// リンクの文字はそれだけで判断するので、記事の文字には数えない。
 				return
 			}
 		}
@@ -387,7 +387,7 @@ func GuidelinesFromArticle(r io.Reader, articleURL string) (string, bool) {
 	return "", false
 }
 
-// FindArticleGuidelines opens a news article once and returns the guidelines URL it holds.
+// FindArticleGuidelines は、ニュース記事を1回開き、そこに載っている要項の URL を返す。
 func FindArticleGuidelines(ctx context.Context, item NewsItem) (string, bool, error) {
 	res, finalURL, err := get(ctx, item.ArticleURL)
 	if err != nil {
@@ -395,7 +395,7 @@ func FindArticleGuidelines(ctx context.Context, item NewsItem) (string, bool, er
 	}
 	defer res.Body.Close()
 	if isPDFResponse(res, finalURL) {
-		// The article is itself a document; it is the guidelines only if its title says so.
+		// 記事そのものが文書のとき、タイトルが要項と言っている場合だけ要項とみなす。
 		return finalURL, strings.Contains(item.Title, "要項") && !isNotGuidelinesText(item.Title), nil
 	}
 	reader, err := charset.NewReader(res.Body, res.Header.Get("Content-Type"))

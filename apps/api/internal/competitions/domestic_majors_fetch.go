@@ -10,9 +10,8 @@ import (
 	"time"
 )
 
-// FetchDomesticMajors reads the JAAF monthly lists of this season and the next,
-// then the detail page of every entry that is one of the DomesticMeets.
-// A page that cannot be read is logged and skipped so one outage keeps the other meets.
+// FetchDomesticMajors は、日本陸連の今シーズンと次のシーズンの月ごとの一覧を読み、DomesticMeets のどれかに当たる行の詳細ページを読む。
+// 読めないページはログに残して飛ばし、1か所が落ちていてもほかの大会は残す。
 func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, error) {
 	season := now.Year()
 	if now.Month() < time.April {
@@ -84,7 +83,7 @@ func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, e
 	return majors, nil
 }
 
-// seasonMonths lists every month of count seasons starting in April of season.
+// seasonMonths は、season 年の4月から count シーズン分のすべての月を並べる。
 func seasonMonths(season, count int) []time.Time {
 	var months []time.Time
 	for i := 0; i < count*12; i++ {
@@ -93,8 +92,8 @@ func seasonMonths(season, count int) []time.Time {
 	return months
 }
 
-// fetchRegionalIncare reads the eight federation pages of this fiscal year and the next.
-// The next year's pages appear late, so a missing page is not an error.
+// fetchRegionalIncare は、8つの連盟の今年度と次年度のページを読む。
+// 次年度のページは公開が遅いので、ないページはエラーにしない。
 func fetchRegionalIncare(ctx context.Context, season int) []DomesticMajor {
 	var majors []DomesticMajor
 	for _, fiscalYear := range []int{season, season + 1} {

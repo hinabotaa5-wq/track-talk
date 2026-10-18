@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func TestDueSourcesCapsRequestsAndSkipsFreshImports(t *testing.T) {
@@ -13,8 +15,8 @@ func TestDueSourcesCapsRequestsAndSkipsFreshImports(t *testing.T) {
 	}
 	now := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	updated := map[string]time.Time{
-		"01": time.Date(2026, 10, 1, 0, 0, 1, 0, japanTime),
-		"03": time.Date(2026, 9, 30, 23, 59, 59, 0, japanTime),
+		"01": time.Date(2026, 10, 1, 0, 0, 1, 0, jst.Zone),
+		"03": time.Date(2026, 9, 30, 23, 59, 59, 0, jst.Zone),
 	}
 	due := DueSources(sources, updated, now, 7)
 	if len(due) != 7 {
@@ -90,13 +92,13 @@ func TestImportWindowStart(t *testing.T) {
 		now  time.Time
 		want time.Time
 	}{
-		{time.Date(2026, 10, 14, 3, 0, 0, 0, japanTime), time.Date(2026, 10, 1, 0, 0, 0, 0, japanTime)},
-		{time.Date(2026, 4, 1, 0, 0, 0, 0, japanTime), time.Date(2026, 4, 1, 0, 0, 0, 0, japanTime)},
-		{time.Date(2026, 9, 30, 23, 0, 0, 0, japanTime), time.Date(2026, 4, 1, 0, 0, 0, 0, japanTime)},
-		{time.Date(2027, 2, 1, 0, 0, 0, 0, japanTime), time.Date(2026, 10, 1, 0, 0, 0, 0, japanTime)},
-		{time.Date(2026, 3, 31, 12, 0, 0, 0, japanTime), time.Date(2025, 10, 1, 0, 0, 0, 0, japanTime)},
+		{time.Date(2026, 10, 14, 3, 0, 0, 0, jst.Zone), time.Date(2026, 10, 1, 0, 0, 0, 0, jst.Zone)},
+		{time.Date(2026, 4, 1, 0, 0, 0, 0, jst.Zone), time.Date(2026, 4, 1, 0, 0, 0, 0, jst.Zone)},
+		{time.Date(2026, 9, 30, 23, 0, 0, 0, jst.Zone), time.Date(2026, 4, 1, 0, 0, 0, 0, jst.Zone)},
+		{time.Date(2027, 2, 1, 0, 0, 0, 0, jst.Zone), time.Date(2026, 10, 1, 0, 0, 0, 0, jst.Zone)},
+		{time.Date(2026, 3, 31, 12, 0, 0, 0, jst.Zone), time.Date(2025, 10, 1, 0, 0, 0, 0, jst.Zone)},
 		// 2026-09-30 15:00 UTC is already October 1 in Japan.
-		{time.Date(2026, 9, 30, 15, 0, 0, 0, time.UTC), time.Date(2026, 10, 1, 0, 0, 0, 0, japanTime)},
+		{time.Date(2026, 9, 30, 15, 0, 0, 0, time.UTC), time.Date(2026, 10, 1, 0, 0, 0, 0, jst.Zone)},
 	}
 	for _, c := range cases {
 		if got := ImportWindowStart(c.now); !got.Equal(c.want) {
@@ -112,13 +114,13 @@ func TestDueSourcesImportsOncePerWindowAndRetriesFailures(t *testing.T) {
 		{Prefecture: "03", PageURL: "https://example.com/03"},
 	}
 	updated := map[string]time.Time{
-		"01": time.Date(2026, 10, 2, 9, 0, 0, 0, japanTime), // imported in the October window
-		"02": time.Date(2026, 4, 20, 9, 0, 0, 0, japanTime), // only the April window
+		"01": time.Date(2026, 10, 2, 9, 0, 0, 0, jst.Zone), // imported in the October window
+		"02": time.Date(2026, 4, 20, 9, 0, 0, 0, jst.Zone), // only the April window
 	}
 	// 03 was never imported or failed every time: it stays due until it succeeds.
 	for _, now := range []time.Time{
-		time.Date(2026, 10, 3, 0, 0, 0, 0, japanTime),
-		time.Date(2026, 12, 25, 0, 0, 0, 0, japanTime),
+		time.Date(2026, 10, 3, 0, 0, 0, 0, jst.Zone),
+		time.Date(2026, 12, 25, 0, 0, 0, 0, jst.Zone),
 	} {
 		var codes []string
 		for _, source := range DueSources(sources, updated, now, 15) {
@@ -128,14 +130,14 @@ func TestDueSourcesImportsOncePerWindowAndRetriesFailures(t *testing.T) {
 			t.Fatalf("at %v due %v", now, codes)
 		}
 	}
-	// In November nothing new opened, and 02 imported in October is no longer due.
-	updated["02"] = time.Date(2026, 10, 5, 9, 0, 0, 0, japanTime)
-	updated["03"] = time.Date(2026, 10, 6, 9, 0, 0, 0, japanTime)
-	if due := DueSources(sources, updated, time.Date(2026, 11, 1, 0, 0, 0, 0, japanTime), 15); len(due) != 0 {
+	// 11月には新しい期間は始まっていないので、10月に取り込んだ 02 はもう対象ではない。
+	updated["02"] = time.Date(2026, 10, 5, 9, 0, 0, 0, jst.Zone)
+	updated["03"] = time.Date(2026, 10, 6, 9, 0, 0, 0, jst.Zone)
+	if due := DueSources(sources, updated, time.Date(2026, 11, 1, 0, 0, 0, 0, jst.Zone), 15); len(due) != 0 {
 		t.Fatalf("due %v", due)
 	}
-	// The next spring everything is due again.
-	if due := DueSources(sources, updated, time.Date(2027, 4, 1, 0, 0, 0, 0, japanTime), 15); len(due) != 3 {
+	// 次の春には、すべてがまた対象になる。
+	if due := DueSources(sources, updated, time.Date(2027, 4, 1, 0, 0, 0, 0, jst.Zone), 15); len(due) != 3 {
 		t.Fatalf("due %v", due)
 	}
 }

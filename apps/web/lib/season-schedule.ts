@@ -1,15 +1,10 @@
-// Groups a season's meets by the month they start in, with upcoming meets above finished ones.
+// シーズンの大会を始まる月ごとにまとめ、これからの大会を終わった大会より上に置く。
 
 export type Scheduled = { starts_on: string; ends_on: string | null };
 
 export type MonthGroup<T> = { key: string; label: string; items: T[] };
 
 export type SeasonSchedule<T> = { upcoming: MonthGroup<T>[]; ended: MonthGroup<T>[] };
-
-// "YYYY-MM-DD" in Japan time, the same shape as the date part of starts_on and ends_on.
-export function todayInTokyo(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(now);
-}
 
 function day(iso: string) {
   return iso.slice(0, 10);
@@ -19,7 +14,7 @@ function lastDay(item: Scheduled) {
   return day(item.ends_on ?? item.starts_on);
 }
 
-// A meet is over the day after its last day, in Japan time.
+// 大会は、最終日の翌日（日本時間）に終わったものとする。
 export function isOver(item: Scheduled, today: string) {
   return lastDay(item) < today;
 }
@@ -47,8 +42,8 @@ function byStart(a: Scheduled, b: Scheduled) {
   return day(a.starts_on).localeCompare(day(b.starts_on)) || lastDay(a).localeCompare(lastDay(b));
 }
 
-// Upcoming months run from the current month onward. Finished meets go to their own list with the
-// latest month first, even when they started in the current month.
+// これからの月は今月から先。終わった大会は別の一覧にまとめ、新しい月を先にする。
+// 今月に始まった大会でもそちらに入れる。
 export function seasonSchedule<T extends Scheduled>(items: T[], today: string): SeasonSchedule<T> {
   const upcoming = items.filter((item) => !isOver(item, today)).sort(byStart);
   const ended = items.filter((item) => isOver(item, today)).sort((a, b) => byStart(b, a));

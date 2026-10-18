@@ -23,7 +23,7 @@ export function saveCompetitionPrefecture(code: string) {
   try {
     window.localStorage.setItem(storageKey, normalized);
   } catch {
-    // Keep going so the cookie can still restore the region on the next visit.
+    // 次に来たときにも Cookie から地域を戻せるよう、続ける。
   }
   if (typeof document !== "undefined") {
     document.cookie = `${competitionPrefectureCookie}=${normalized}; Path=/; Max-Age=31536000; SameSite=Lax`;
@@ -33,7 +33,7 @@ export function saveCompetitionPrefecture(code: string) {
 
 export const regionalCompetitionsPath = "/competitions/regional";
 
-// Sends a bare regional visit back to the saved prefecture.
+// 地域ページに県の指定なしで来たら、保存した県へ送る。
 export function regionalRedirectTarget(
   prefectureParam: string | undefined,
   saved: string | undefined,
@@ -45,8 +45,8 @@ export function regionalRedirectTarget(
   return regionalUrl(code, monthNumber(monthParam));
 }
 
-// The main tab used to take ?prefecture= for the yearly lists. 国際 now lives on the main tab and
-// each prefecture on the regional page.
+// 以前はメインタブが年間の一覧のために ?prefecture= を受け取っていた。今は国際がメインタブにあり、
+// 各県は地域ページにある。
 export function legacyCompetitionsTarget(prefectureParam: string | undefined, monthParam: string | undefined) {
   if (!prefectureParam) return "";
   const code = prefectureCode(prefectureParam);

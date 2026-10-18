@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { EmptyState, ErrorState } from "./empty-state";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { todayInTokyo } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseDayLabel } from "@/lib/sense-notes";
 import {
@@ -38,10 +39,6 @@ function errorText(e: unknown, fallback: string) {
     return field || e.message;
   }
   return fallback;
-}
-
-function todayInTokyo() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 // 記録を書く欄。新しく書くときと、直すときの両方で使う。

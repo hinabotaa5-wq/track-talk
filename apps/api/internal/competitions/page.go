@@ -27,14 +27,14 @@ type row struct {
 	Cells []cell
 }
 
-// Page is the schedule text and links taken from one association homepage.
+// Page は、協会のホームページ1つから取った日程の文字とリンク。
 type Page struct {
 	SeasonYear int
 	Body       string
 	Links      []LinkRef
 	rows       []row
 	plainText  bool
-	// PDFs are set instead of Body when the schedule is only published as PDFs.
+	// 日程が PDF でしか公開されていないときは、Body の代わりに PDFs を入れる。
 	PDFs [][]byte
 }
 
@@ -71,7 +71,7 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 		if !looksLikeSchedule(body) {
 			return Page{}, fmt.Errorf("競技日程の表が見つかりません")
 		}
-		// Such pages often link to last season too, so take the newest season named.
+		// そういうページは前のシーズンにもリンクしていることが多いので、書かれている中でいちばん新しいシーズンを取る。
 		if newest, ok := newestSeasonYear(doc); ok {
 			year = newest
 		}
@@ -306,8 +306,8 @@ var (
 	listVenuePattern = regexp.MustCompile(`会場\s*[:：]\s*(\S+)`)
 )
 
-// scheduleListRows reads a homepage that lists meets as items instead of a table.
-// Only the name, date, and venue written on that page are kept.
+// scheduleListRows は、大会を表ではなく項目で並べているホームページを読む。
+// そのページに書かれている名前・日付・会場だけを残す。
 func scheduleListRows(doc *html.Node) []row {
 	var rows []row
 	var walk func(*html.Node)

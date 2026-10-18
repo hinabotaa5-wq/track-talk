@@ -19,20 +19,20 @@ const (
 	maxLegalWind = 20
 )
 
-// raceMarkKind is how an event's mark is stored and compared.
+// raceMarkKind は、種目の記録をどう保存して比べるか。
 type raceMarkKind string
 
 const (
-	// raceMarkTime is hundredths of a second; lower is better.
+	// raceMarkTime は 1/100 秒単位。小さいほどよい。
 	raceMarkTime raceMarkKind = "time"
-	// raceMarkDistance is centimetres; higher is better.
+	// raceMarkDistance はセンチメートル単位。大きいほどよい。
 	raceMarkDistance raceMarkKind = "distance"
-	// raceMarkPoints is combined-event points; higher is better.
+	// raceMarkPoints は混成競技の得点。大きいほどよい。
 	raceMarkPoints raceMarkKind = "points"
 )
 
-// raceEvents are the practice events that a record can have ("other" is left out: its unit is unknown).
-// maxMark keeps typos (an extra digit) out of the graph.
+// raceEvents は、記録を付けられる練習の種目（"other" は単位が分からないので外す）。
+// maxMark は、打ち間違い（桁が1つ多いなど）がグラフに入らないようにする。
 var raceEvents = map[string]struct {
 	kind    raceMarkKind
 	wind    bool
@@ -78,9 +78,9 @@ type raceRecordDTO struct {
 	EventLabel string    `json:"event_label"`
 	Mark       int32     `json:"mark"`
 	Wind       *int16    `json:"wind"`
-	// WindAided marks a tailwind over +2.0m/s; such a mark never counts as a personal best.
+	// WindAided は追い風 +2.0m/s を超えた記録の印。そういう記録は自己ベストに数えない。
 	WindAided bool `json:"wind_aided"`
-	// IsPB is true when the mark beat every earlier legal mark of the same event.
+	// IsPB は、同じ種目のそれまでの公認記録をすべて上回ったとき true。
 	IsPB      bool      `json:"is_pb"`
 	Memo      string    `json:"memo"`
 	CreatedAt time.Time `json:"created_at"`
@@ -147,7 +147,7 @@ func normalizeRaceRecord(req raceRecordReq, today time.Time) (db.CreateRaceRecor
 	return out, fields
 }
 
-// better reports whether a beats b for the event's kind.
+// better は、種目の kind で a が b を上回るかを返す。
 func (k raceMarkKind) better(a, b int32) bool {
 	if k == raceMarkTime {
 		return a < b
@@ -155,7 +155,7 @@ func (k raceMarkKind) better(a, b int32) bool {
 	return a > b
 }
 
-// buildRaceRecords marks wind-aided marks and personal bests. rows must be ordered by event, then date.
+// buildRaceRecords は、追い風参考の記録と自己ベストに印を付ける。rows は種目、日付の順に並んでいること。
 func buildRaceRecords(rows []db.ListRaceRecordsRow) raceRecordsDTO {
 	out := raceRecordsDTO{Events: []raceEventDTO{}, Records: make([]raceRecordDTO, 0, len(rows))}
 	best := map[string]int32{}

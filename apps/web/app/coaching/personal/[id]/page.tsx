@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabel, formatPlanPrice } from "@/lib/coaching-plan";
-import { formatDateTime } from "@/lib/format";
+import { contractStatusLabel } from "@/lib/coaching-plan";
+import { formatDateTime, formatYen } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -85,7 +85,7 @@ function CoachingContractView() {
   }
 
   async function cancel() {
-    if (!window.confirm("申し込みを取り下げますか？")) return;
+    if (!confirm("申し込みを取り下げますか？")) return;
     if (!acquire()) return;
     try {
       const d = await apiFetch<{ contract: CoachingContract }>(`/v1/coaching/contracts/${id}/cancel`, { method: "POST", token });
@@ -128,9 +128,9 @@ function CoachingContractView() {
         {contract.starts_at ? <p className="text-sm text-slate-200">期間: {contractPeriod(contract)}</p> : null}
         {!isCoach && contract.payment ? (
           <p className="text-xs text-slate-300">
-            お支払い {formatPlanPrice(contract.payment.amount_yen)}（{formatDateTime(contract.payment.paid_at)}）
+            お支払い {formatYen(contract.payment.amount_yen)}（{formatDateTime(contract.payment.paid_at)}）
             {contract.payment.refunded_yen > 0 && contract.payment.refunded_at
-              ? ` · 返金 ${formatPlanPrice(contract.payment.refunded_yen)}（${formatDateTime(contract.payment.refunded_at)}）`
+              ? ` · 返金 ${formatYen(contract.payment.refunded_yen)}（${formatDateTime(contract.payment.refunded_at)}）`
               : ""}
           </p>
         ) : null}
@@ -144,7 +144,7 @@ function CoachingContractView() {
         ) : (
           <div className="space-y-2">
             <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
-              お支払いへ進む（{formatPlanPrice(contract.price_yen)}）
+              お支払いへ進む（{formatYen(contract.price_yen)}）
             </Button>
             <p className="text-xs text-slate-300">
               カード・Apple Pay・Google Pay・PayPay で払えます。始まってから72時間コーチの書き込みがなければ、全額を返金します。

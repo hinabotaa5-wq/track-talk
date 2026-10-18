@@ -4,7 +4,7 @@ import { GuardianPersonalSection } from "@/components/coaching-guardian";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen } from "@/lib/push";
+import { monthlyLimitLabel } from "@/lib/push";
 import type { GuardianLimitYen, GuardianPublic } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useParams } from "next/navigation";
@@ -48,7 +48,7 @@ function LimitChoices({
               checked={value === option}
               onChange={() => onChange(option)}
             />
-            {formatYen(option)}
+            {monthlyLimitLabel(option)}
           </label>
         ))}
       </div>
@@ -132,12 +132,12 @@ export default function GuardianPage() {
   }
 
   function onRevoke() {
-    if (!window.confirm("同意を取り消すと、お子さんは新しい添削を頼めなくなります。取り消しますか？")) return;
+    if (!confirm("同意を取り消すと、お子さんは新しい添削を頼めなくなります。取り消しますか？")) return;
     void send("/revoke", "POST", undefined, "同意を取り消しました。");
   }
 
   function onDecline() {
-    if (!window.confirm("同意しない場合、お子さんは添削を使えなくなります。よろしいですか？")) return;
+    if (!confirm("同意しない場合、お子さんは添削を使えなくなります。よろしいですか？")) return;
     void send("/decline", "POST", undefined, "「同意しない」を受け付けました。");
   }
 

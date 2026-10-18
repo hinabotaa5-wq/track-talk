@@ -16,8 +16,7 @@ import {
   tooLong,
   videoDuration,
 } from "@/lib/review";
-import { formatPlanPrice } from "@/lib/coaching-plan";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatYen } from "@/lib/format";
 import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -264,7 +263,7 @@ export default function NewReviewRequestPage() {
           ) : null}
           {estimate?.payments ? (
             <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold">お支払い（1本 {formatPlanPrice(estimate.price_yen)}）</legend>
+              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate.price_yen)}）</legend>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
@@ -282,7 +281,7 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
           <Button type="submit" className="w-full" disabled={pending || !file}>
-            {pending ? "送っています" : estimate?.payments ? `送ってお支払いへ進む（${formatPlanPrice(estimate.price_yen)}）` : "送る"}
+            {pending ? "送っています" : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
           </Button>
         </form>
       )}

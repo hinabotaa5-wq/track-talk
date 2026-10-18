@@ -26,7 +26,7 @@ type injuryCountDTO struct {
 }
 
 type injuryTallyDTO struct {
-	// People is how many people answered. Items stays empty until it reaches min_people.
+	// People は答えた人数。min_people に届くまで Items は空のまま。
 	People int              `json:"people"`
 	Items  []injuryCountDTO `json:"items"`
 }
@@ -35,7 +35,7 @@ type injuryRecoveryStageDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
 	People     int    `json:"people"`
-	// LowDays and HighDays are the middle half (25th to 75th percentile), set only from min_people.
+	// LowDays と HighDays は真ん中の半分（25〜75パーセンタイル）で、min_people からだけ入れる。
 	LowDays  *int `json:"low_days"`
 	HighDays *int `json:"high_days"`
 }
@@ -47,7 +47,7 @@ type injuryRecoveryDTO struct {
 }
 
 type injuryPublicNoteDTO struct {
-	// ID is what a report points at; it is not the stage log's own id.
+	// ID は通報の対象を指すもので、段階の記録そのものの id ではない。
 	ID         uuid.UUID `json:"id"`
 	Note       string    `json:"note"`
 	Stage      string    `json:"stage"`
@@ -71,8 +71,8 @@ type injuryPublicGroupDTO struct {
 	Notes         []injuryPublicNoteDTO `json:"notes"`
 }
 
-// getPublicInjuryGroup is the group's page for everyone, signed in or not, and for search engines.
-// It carries only aggregates and the notes members chose to publish; the conversation stays inside the group.
+// getPublicInjuryGroup は、ログインしているかどうかに関係なく誰でも、検索エンジンも見られるグループのページ。
+// 載せるのは集計と、メンバーが公開を選んだ一言だけで、やりとりはグループの中にとどめる。
 func (s *Server) getPublicInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	part, ok := injuryGroupPart(w, r)
 	if !ok {
@@ -199,7 +199,7 @@ func buildPublicInjuryGroup(
 	return out
 }
 
-// injuryTally lists the chosen options, most chosen first, once at least min people answered.
+// injuryTally は、少なくとも min 人が答えたら、選ばれた選択肢を多い順に並べる。
 func injuryTally(options []injuryOption, counts map[string]int, people int) injuryTallyDTO {
 	out := injuryTallyDTO{People: people, Items: []injuryCountDTO{}}
 	if people < injuryPublicMinPeople {
@@ -214,8 +214,8 @@ func injuryTally(options []injuryOption, counts map[string]int, people int) inju
 	return out
 }
 
-// injuryMiddleHalf returns the 25th and 75th percentiles in whole days. Only the month of the injury is known
-// and it is stored as the 1st, so the injury is taken as the middle of that month.
+// injuryMiddleHalf は、25パーセンタイルと75パーセンタイルを日単位で返す。分かっているのはケガをした月だけで、
+// 1日として保存しているので、ケガはその月の真ん中にしたものとみなす。
 func injuryMiddleHalf(days []float64) (int, int) {
 	sorted := append([]float64(nil), days...)
 	sort.Float64s(sorted)
@@ -226,7 +226,7 @@ func injuryMiddleHalf(days []float64) (int, int) {
 	return at(0.25), at(0.75)
 }
 
-// hideInjuryNote takes a reported note off the public page. The stage change itself still counts in the aggregates.
+// hideInjuryNote は、通報された一言を公開ページから外す。段階の変更そのものは集計に数えたままにする。
 func (s *Server) hideInjuryNote(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return

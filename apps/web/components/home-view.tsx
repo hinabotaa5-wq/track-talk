@@ -9,8 +9,8 @@ import { homeFeedPath, readFeed, seedFeed } from "@/lib/home-feed-cache";
 import { parseHomeSort, parseProductKind } from "@/lib/home-sort";
 import { parseReviewFilters, reviewFiltersQuery } from "@/lib/review-filters";
 
-// The filter chips change the URL with history.pushState, so this reads the tab from the URL
-// instead of server props and switches without a server round trip.
+// 絞り込みのチップは history.pushState で URL を変えるので、タブはサーバーの props ではなく URL から読み、
+// サーバーとやりとりせずに切り替える。
 export function HomeView({ initialPath, initial }: { initialPath: string; initial: PostsPage | null }) {
   const sp = useSearchParams();
   const sort = parseHomeSort(sp.get("sort"));

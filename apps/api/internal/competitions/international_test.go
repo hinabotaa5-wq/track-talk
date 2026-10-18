@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func TestBuildInternationalMeetsUsesDiamondLeagueSiteAndKeepsSeries(t *testing.T) {
@@ -171,7 +173,7 @@ func TestParseWorldAthleticsRejectsAnUnfilteredCalendar(t *testing.T) {
 }
 
 func TestInternationalWindowCoversThisSeasonAndTheNext(t *testing.T) {
-	october := time.Date(2026, time.October, 12, 5, 0, 0, 0, tokyoZone)
+	october := time.Date(2026, time.October, 12, 5, 0, 0, 0, jst.Zone)
 	from, to, seasons := InternationalWindow(october)
 	if SeasonYear(october) != 2026 || seasons[0] != 2026 || seasons[1] != 2027 {
 		t.Fatalf("season %+v %d", seasons, SeasonYear(october))

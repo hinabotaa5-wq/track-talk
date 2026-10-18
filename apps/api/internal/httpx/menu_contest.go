@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -49,11 +50,11 @@ func (r menuContestRound) key() time.Time {
 
 // menuContestSeason は year 年11月に始まるシーズンの回を古い順に返す。
 func menuContestSeason(year int) []menuContestRound {
-	start := time.Date(year, time.November, 1, 0, 0, 0, 0, tokyo)
+	start := time.Date(year, time.November, 1, 0, 0, 0, 0, jst.Zone)
 	for start.Weekday() != time.Monday {
 		start = start.AddDate(0, 0, 1)
 	}
-	end := time.Date(year+1, time.April, 1, 0, 0, 0, 0, tokyo)
+	end := time.Date(year+1, time.April, 1, 0, 0, 0, 0, jst.Zone)
 	var rounds []menuContestRound
 	for r := (menuContestRound{Start: start, Number: 1}); !r.entryEndsAt().After(end); r = (menuContestRound{Start: r.Start.AddDate(0, 0, menuContestRoundDays), Number: r.Number + 1}) {
 		rounds = append(rounds, r)
@@ -63,7 +64,7 @@ func menuContestSeason(year int) []menuContestRound {
 
 // currentMenuContestRound は now を含む回(応募から投票の締め切りまで)を返す。シーズン外なら false。
 func currentMenuContestRound(now time.Time) (menuContestRound, bool) {
-	now = now.In(tokyo)
+	now = now.In(jst.Zone)
 	for _, year := range []int{now.Year() - 1, now.Year()} {
 		for _, r := range menuContestSeason(year) {
 			if !now.Before(r.Start) && now.Before(r.voteEndsAt()) {
@@ -76,7 +77,7 @@ func currentMenuContestRound(now time.Time) (menuContestRound, bool) {
 
 // nextMenuContestStart は now より後に始まる一番近い回の開始時刻。
 func nextMenuContestStart(now time.Time) time.Time {
-	now = now.In(tokyo)
+	now = now.In(jst.Zone)
 	for _, year := range []int{now.Year() - 1, now.Year(), now.Year() + 1} {
 		for _, r := range menuContestSeason(year) {
 			if r.Start.After(now) {
@@ -188,7 +189,7 @@ func viewerID(r *http.Request) uuid.UUID {
 // lastMenuContestResult は投票が締め切られた一番新しい回の結果。
 func (s *Server) lastMenuContestResult(ctx context.Context, now time.Time, viewer uuid.UUID) (*menuContestResultDTO, error) {
 	// 開始日が「今日の14日前」以前の回は、投票が締め切られている。
-	y, m, d := now.In(tokyo).AddDate(0, 0, -menuContestRoundDays).Date()
+	y, m, d := now.In(jst.Zone).AddDate(0, 0, -menuContestRoundDays).Date()
 	key, err := s.q.LatestMenuContestResultRound(ctx, time.Date(y, m, d, 0, 0, 0, 0, time.UTC))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

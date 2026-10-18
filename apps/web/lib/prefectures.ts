@@ -1,3 +1,5 @@
+import { todayInTokyo } from "./format";
+
 export const PREFECTURES = [
   { code: "01", name: "北海道" },
   { code: "02", name: "青森県" },
@@ -73,7 +75,5 @@ export function prefectureName(code: string) {
 }
 
 export function currentMonthInTokyo(now = new Date()) {
-  return Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(now),
-  );
+  return Number(todayInTokyo(now).slice(5, 7));
 }

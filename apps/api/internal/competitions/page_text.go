@@ -9,12 +9,11 @@ import (
 	"golang.org/x/net/html"
 )
 
-// maxTextBody keeps a very long page inside what one Gemini request can read.
+// maxTextBody は、とても長いページを Gemini のリクエスト1回で読める長さに収める。
 const maxTextBody = 400 << 10
 
-// plainTextPage turns a page that has no schedule table into lines of text.
-// Table cells are joined with " | " and each link is followed by its URL,
-// so Gemini can pair a meet with its date, venue, and guidelines.
+// plainTextPage は、日程の表がないページを文字の行にする。
+// 表のセルは " | " でつなぎ、リンクのあとにはその URL を付けて、Gemini が大会を日付・会場・要項と組み合わせられるようにする。
 func plainTextPage(doc *html.Node, base *url.URL) (string, []LinkRef) {
 	var lines []string
 	var links []LinkRef
@@ -104,16 +103,16 @@ func isBlockTag(tag string) bool {
 
 var scheduleDatePattern = regexp.MustCompile(`\d{1,2}\s*月\s*\d{1,2}\s*日|\d{1,2}\s*/\s*\d{1,2}|\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}`)
 
-// looksLikeSchedule says whether plain text has enough dates to be a meet list.
-// A page with only a few dates (a news page, an error page) is not sent to Gemini.
+// looksLikeSchedule は、文字に大会の一覧と言えるだけの日付があるかを返す。
+// 日付が少ししかないページ（ニュースのページ、エラーのページ）は Gemini に送らない。
 func looksLikeSchedule(body string) bool {
 	return len(scheduleDatePattern.FindAllStringIndex(normalizeDigits(body), -1)) >= 10
 }
 
 var seasonNamePattern = regexp.MustCompile(`(?:(?:R|令和)\s*\d{1,2}\s*[（(]\s*(20\d{2})\s*[）)]|(20\d{2})\s*(?:[（(][^）)]{0,8}[）)])?)\s*(?:年度|年開催)`)
 
-// newestSeasonYear is the largest year written as 2026年度, 2026年開催, 2026（令和8）年度, or R8（2026）年度,
-// capped at next season so navigation links to future years (or placeholders like 2029) are ignored.
+// newestSeasonYear は、2026年度、2026年開催、2026（令和8）年度、R8（2026）年度の形で書かれた年のうち、いちばん大きいもの。
+// 次のシーズンを上限にして、先の年へのナビゲーションのリンク（や 2029 のような仮の値）は無視する。
 func newestSeasonYear(doc *html.Node) (int, bool) {
 	newest := 0
 	maxYear := seasonYearCap()

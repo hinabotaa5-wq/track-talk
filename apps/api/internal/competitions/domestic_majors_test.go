@@ -57,7 +57,7 @@ func TestMatchDomesticMeet(t *testing.T) {
 		{"2025-2026 MGCシリーズ大阪マラソン2027 ～MGCシリーズ2026-27（男子G1・女子G2）～", "osaka-marathon"},
 		{"2025-2026 MGCシリーズ東京マラソン2027 ～MGCシリーズ2026-27（男子G1・女子G1）～", "tokyo-marathon"},
 		{"2025-2026 MGCシリーズ名古屋ウィメンズマラソン2027 ～MGCシリーズ2026-27（女子G1）～", "nagoya-women-marathon"},
-		// Side events of the same name that must not become a card.
+		// 同じ名前でも、カードにしてはいけない併催の大会。
 		{"第110回日本陸上競技選手権大会・リレー競技", ""},
 		{"第110回日本陸上競技選手権大会・クロスカントリー競走", ""},
 		{"第42回U20日本陸上競技選手権大会・混成競技", ""},
@@ -205,11 +205,11 @@ func TestParseRegionalIncareOtherCases(t *testing.T) {
 	row := func(month, days, code string) string {
 		return `<table><tr><td>` + month + `</td><td>` + days + `</td><td>` + code + `</td><td>第1回テスト学生陸上競技対校選手権大会</td><td>会場</td><td>学連</td><td>x</td></tr></table>`
 	}
-	// A cancelled meet has no month or day, so there is no edition to show.
+	// 中止になった大会には月も日もないので、出す回がない。
 	if major, _ := ParseRegionalIncare(strings.NewReader(row("中止", "中止", "26610101")), 2026, "p"); major != nil {
 		t.Fatalf("cancelled: %+v", major)
 	}
-	// January to March belong to the fiscal year that began the April before.
+	// 1月から3月は、前の4月に始まった年度に入る。
 	major, _ := ParseRegionalIncare(strings.NewReader(row("3", "7", "26610101")), 2026, "p")
 	if major == nil || !major.StartsOn.Equal(time.Date(2027, 3, 7, 0, 0, 0, 0, time.UTC)) || major.ScheduleLabel != "2027年3月7日" {
 		t.Fatalf("march: %+v", major)

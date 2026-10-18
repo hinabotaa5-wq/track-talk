@@ -111,8 +111,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Annual schedules come first. News gets only the Gemini requests they leave over, so on the days in April
-	// and October when prefectures are being imported, almost nothing is left for it.
+	// 年間の日程表を先に読む。ニュースには、その残りの Gemini リクエストだけを回すので、県の取り込みがある4月と10月の日は、ニュースにはほとんど残らない。
 	newsBudget := 0
 	if *prefecture == "" {
 		limit, err := dailyRequestLimit()
@@ -159,7 +158,7 @@ func main() {
 		}
 	}
 	if len(newsSources) > 0 {
-		// Same pacing as between prefectures, so the free tier's per-minute limit is not hit.
+		// 県と県のあいだと同じ間隔をあけ、無料枠の1分あたりの上限に当たらないようにする。
 		if len(targets) > 0 {
 			time.Sleep(15 * time.Second)
 		}
@@ -201,7 +200,7 @@ func selectTargets(ctx context.Context, pool *pgxpool.Pool, prefecture string) (
 	return competitions.DueSources(competitions.Sources, updated, time.Now(), limit), nil
 }
 
-// dailyRequestLimit lets GEMINI_DAILY_REQUESTS follow the project's requests-per-day shown in AI Studio.
+// dailyRequestLimit は、GEMINI_DAILY_REQUESTS で AI Studio に出ているプロジェクトの1日あたりのリクエスト数に合わせられるようにする。
 func dailyRequestLimit() (int, error) {
 	raw := strings.TrimSpace(os.Getenv("GEMINI_DAILY_REQUESTS"))
 	if raw == "" {
@@ -240,13 +239,13 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 	if len(urls) == 0 {
 		return nil, errors.New("日程ページのURLがありません")
 	}
-	// Consecutive PDFs go to Gemini together so a meet listed in several of them is returned once.
+	// 続けて並んだ PDF はまとめて Gemini に送り、複数の PDF に載っている大会が1回だけ返るようにする。
 	var pages []competitions.Page
 	var pageURLs []string
 	for _, u := range urls {
 		page, err := competitions.FetchPage(ctx, u)
 		if err != nil {
-			// A month that is not published yet must not stop the other pages of the same prefecture.
+			// まだ公開されていない月があっても、同じ県のほかのページは止めない。
 			if len(urls) > 1 {
 				log.Printf("%s: %s を飛ばします: %v", source.Prefecture, u, err)
 				continue
@@ -273,7 +272,7 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 		}
 		meets, err := competitions.BuildMeets(page, drafts, source.Prefecture, u)
 		if err != nil {
-			// If one of multiple URLs has no meets, continue to others unless all fail
+			// 複数の URL のうち1つに大会がなくても、すべて失敗しないかぎりほかを続ける。
 			if len(pages) > 1 && strings.Contains(err.Error(), "大会がありません") {
 				continue
 			}
@@ -296,8 +295,8 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 	return allMeets, nil
 }
 
-// runDryRun reads one prefecture page and prints what would be imported.
-// It never touches the database, so a new URL can be checked before it is registered.
+// runDryRun は県のページを1つ読み、取り込まれる内容を表示する。
+// DB には触らないので、新しい URL を登録する前に確かめられる。
 func runDryRun(prefecture, pageURL string) error {
 	code := strings.TrimSpace(prefecture)
 	if code == "" {
@@ -374,8 +373,8 @@ func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.C
 	}); err != nil {
 		return err
 	}
-	// Meets that are still in the table are updated in place, so the guidelines found from news survive the re-import.
-	// Only meets that left the table are removed.
+	// 日程表にまだある大会はその場で更新し、ニュースから見つけた要項が取り込み直しで消えないようにする。
+	// 日程表から消えた大会だけを削除する。
 	keys := make([]string, 0, len(meets))
 	for _, meet := range meets {
 		keys = append(keys, meet.Name+"|"+meet.StartsOn.Format("2006-01-02"))

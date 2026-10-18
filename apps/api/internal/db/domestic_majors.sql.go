@@ -35,7 +35,7 @@ type ListDomesticMajorsRow struct {
 	SiteUrl       string    `json:"site_url"`
 }
 
-// Every edition that starts inside the season [season_start, season_end).
+// シーズン [season_start, season_end) の中で始まるすべての回。
 func (q *Queries) ListDomesticMajors(ctx context.Context, arg ListDomesticMajorsParams) ([]ListDomesticMajorsRow, error) {
 	rows, err := q.db.Query(ctx, listDomesticMajors, arg.SeasonStart, arg.SeasonEnd)
 	if err != nil {

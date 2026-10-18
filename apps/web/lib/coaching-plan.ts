@@ -1,3 +1,4 @@
+import { formatYen } from "./format";
 import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind } from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
@@ -24,12 +25,8 @@ export function planDurationLabel(kind: CoachingPlanKind, days: number): string 
   return `${days}日`;
 }
 
-export function formatPlanPrice(yen: number): string {
-  return `${yen.toLocaleString("ja-JP")}円`;
-}
-
 export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | "price_yen">): string {
-  return `${planKindLabels[plan.kind]} · ${planDurationLabel(plan.kind, plan.duration_days)} · ${formatPlanPrice(plan.price_yen)}`;
+  return `${planKindLabels[plan.kind]} · ${planDurationLabel(plan.kind, plan.duration_days)} · ${formatYen(plan.price_yen)}`;
 }
 
 // パーソナル指導の誓約の文面。API の coachPledgeVersion と一緒に変える。
