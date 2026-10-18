@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/hinata/track-talk/apps/api/internal/mail"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
@@ -76,6 +77,7 @@ func guardianStatusJSON(c db.GuardianConsent) map[string]any {
 		"monthly_limit_yen": c.MonthlyLimitYen,
 		"allow_publish":     c.AllowPublish,
 		"consented_at":      c.ConsentedAt,
+		"guardian_email":    c.GuardianEmail,
 	}
 }
 
@@ -152,8 +154,16 @@ func (s *Server) setBirthMonth(w http.ResponseWriter, r *http.Request) {
 	s.writeCoachingMe(w, r, updated)
 }
 
-// issueGuardianLink は、18歳未満の本人が保護者に送る同意のリンクを発行する。
-// トークンはこのときだけ返す。出し直すと前のリンクは使えなくなる。
+// 保護者の同意のリンクを1日（日本時間）に送れる回数。
+const guardianLinkDailyLimit int32 = 5
+
+type guardianLinkReq struct {
+	GuardianEmail string `json:"guardian_email"`
+}
+
+// issueGuardianLink は、18歳未満の本人に頼まれて、保護者の同意のリンクを保護者のメールあてに送る。
+// 本人だけで同意を済ませられないよう、トークンは本人には返さない（メールの中にだけある）。
+// 送り直すと前のリンクは使えなくなる。保護者が一度答えたあとは、送り先は前と同じアドレスだけ。
 func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -167,31 +177,90 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "18歳以上の人は保護者の同意はいりません")
 		return
 	}
+	var req guardianLinkReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	current, err := s.q.GetGuardianConsentByMinor(r.Context(), p.ID)
+	exists := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
+	email := strings.TrimSpace(req.GuardianEmail)
+	if email == "" && exists && current.GuardianEmail != nil {
+		email = *current.GuardianEmail
+	}
+	if e := ContactEmail(email); e != "" {
+		if email == "" {
+			e = "保護者のメールアドレスを入力してください"
+		}
+		FieldError(w, map[string]string{"guardian_email": e})
+		return
+	}
+	if identity, _ := userIdentity(r.Context()); identity.Email != "" && strings.EqualFold(identity.Email, email) {
+		FieldError(w, map[string]string{"guardian_email": "自分のメールアドレスではなく、保護者のメールアドレスを入力してください"})
+		return
+	}
+	if exists && current.Status != "pending" && (current.GuardianEmail == nil || !strings.EqualFold(*current.GuardianEmail, email)) {
+		Error(w, http.StatusConflict, "guardian_email_locked", "保護者が一度答えたあとは、送り先のメールアドレスを変えられません。変えたいときはお問い合わせください")
+		return
+	}
+	if !s.mail.Configured() {
+		Error(w, http.StatusServiceUnavailable, "mail_unavailable", "いまは保護者にメールを送れません。しばらくしてからお試しください")
+		return
+	}
 	token, hash, err := newGuardianToken()
 	if err != nil {
 		Error(w, http.StatusInternalServerError, "internal_error", "サーバーエラーが発生しました")
 		return
 	}
-	consent, err := s.q.IssueGuardianLink(r.Context(), db.IssueGuardianLinkParams{MinorID: p.ID, TokenHash: hash})
+	consent, err := s.q.IssueGuardianLink(r.Context(), db.IssueGuardianLinkParams{
+		MinorID: p.ID, TokenHash: hash, GuardianEmail: &email, DailyLimit: guardianLinkDailyLimit,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusTooManyRequests, "rate_limited", "今日はこれ以上送れません。明日もう一度お試しください")
+		return
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	out := guardianStatusJSON(consent)
-	out["token"] = token
-	JSON(w, http.StatusCreated, out)
+	if err := s.mail.Send(r.Context(), guardianLinkMail(email, s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
+		slog.Warn("guardian link mail", "err", err)
+		Error(w, http.StatusBadGateway, "mail_failed", "保護者にメールを送れませんでした。アドレスを確かめて、もう一度お試しください")
+		return
+	}
+	JSON(w, http.StatusCreated, guardianStatusJSON(consent))
+}
+
+// guardianLinkMail は、保護者に送る同意のお願い。届く先を間違えていてもよいよう、子のアカウントの情報は書かない。
+func guardianLinkMail(to, link string) mail.Message {
+	return mail.Message{
+		To:      to,
+		Subject: "【TrackTalk】お子さんの利用について保護者の同意のお願い",
+		Text: "TrackTalk（陸上競技のコミュニティサービス）をご利用中のお子さんが、オンラインコーチング" +
+			"（フォーム添削・パーソナル指導）を使うために、保護者の方の同意を求めています。\n\n" +
+			"次のページで内容をご確認のうえ、同意するかどうかを選んでください。\n" +
+			link + "\n\n" +
+			"・このリンクは保護者の方だけが使うものです。お子さんを含め、他の人には渡さないでください。\n" +
+			"・お子さんが新しいリンクを送ると、このリンクは使えなくなります。\n" +
+			"・心当たりがない場合は、このメールを破棄してください。同意しない限り何も始まりません。\n\n" +
+			"TrackTalk\n",
+	}
 }
 
 func (s *Server) guardianByToken(w http.ResponseWriter, r *http.Request) (string, db.GuardianConsent, bool) {
 	token := chi.URLParam(r, "token")
 	if len(token) != 43 {
-		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに新しいリンクを送ってもらってください")
+		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに頼んで、新しいリンクをメールで送ってもらってください")
 		return "", db.GuardianConsent{}, false
 	}
 	hash := hashGuardianToken(token)
 	consent, err := s.q.GetGuardianConsentByToken(r.Context(), hash)
 	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに新しいリンクを送ってもらってください")
+		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに頼んで、新しいリンクをメールで送ってもらってください")
 		return "", db.GuardianConsent{}, false
 	}
 	if err != nil {

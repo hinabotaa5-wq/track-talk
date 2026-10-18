@@ -9,7 +9,7 @@
 - `DATABASE_URL` は Go API のみ。anon key 以外をフロントに置かない
 - 全テーブルで RLS 有効（マイグレーション済み）。PostgREST からの直接CRUDは許可しない
 - 退会時に Auth ユーザーを削除するため、service_role key を API の `SUPABASE_SERVICE_ROLE_KEY` に入れる。フロントエンドには置かない
-- 標準SMTPは低レートのため、公開前にカスタムSMTP（Resend 等）を設定する
+- 標準SMTPは低レートのため、公開前にカスタムSMTP（Resend 等）を設定する。コーチングを公開するときは、API の `RESEND_API_KEY` と `MAIL_FROM`（保護者の同意のリンクの送信）も同じ Resend のドメインで設定する
 - 無料プランは非アクティブで一時停止する可能性がある
 
 ## Cloud Run（Go API）

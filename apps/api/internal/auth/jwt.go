@@ -21,6 +21,8 @@ type Identity struct {
 	UserID         uuid.UUID
 	Nickname       string
 	NicknamePublic bool
+	// Email はログインに使うメールアドレス（Supabase の JWT の email）。ないこともある。
+	Email string
 }
 
 func NewVerifier(secret, supabaseURL, aud string) (*Verifier, error) {
@@ -60,6 +62,7 @@ func (v *Verifier) ParseIdentity(tokenString string) (Identity, error) {
 		return Identity{}, fmt.Errorf("invalid sub")
 	}
 	identity := Identity{UserID: id}
+	identity.Email, _ = claims["email"].(string)
 	if metadata, ok := claims["user_metadata"].(map[string]any); ok {
 		identity.Nickname, _ = metadata["nickname"].(string)
 		identity.NicknamePublic, _ = metadata["nickname_public"].(bool)

@@ -65,6 +65,10 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		CloudAPIKey:     os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret:  os.Getenv("CLOUDINARY_API_SECRET"),
 		CloudAPIBase:    os.Getenv("CLOUDINARY_API_BASE"),
+		// 保護者の同意のリンクは、Resend の代わりのサーバーに送る（mail_helper_test.go）。
+		ResendAPIKey: "re_test",
+		MailFrom:     "TrackTalk <no-reply@example.com>",
+		MailAPIBase:  mailServerURL(),
 	}
 	if mutate != nil {
 		mutate(&cfg)

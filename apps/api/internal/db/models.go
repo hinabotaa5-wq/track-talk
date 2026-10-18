@@ -227,6 +227,9 @@ type GuardianConsent struct {
 	RevokedAt       *time.Time `json:"revoked_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	GuardianEmail   *string    `json:"guardian_email"`
+	LinkSentOn      *time.Time `json:"link_sent_on"`
+	LinkSends       int32      `json:"link_sends"`
 }
 
 type InjuryDetail struct {
