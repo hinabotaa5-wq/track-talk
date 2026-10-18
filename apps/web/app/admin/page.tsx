@@ -45,21 +45,26 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
   injury_note: "ケガ部の一言",
   review_response: "添削の返答",
   coaching_message: "パーソナル指導のやりとり",
+  practice_rating: "練習の評価のひとこと",
 };
 
 const perPage = 20;
 
-// ケガ部の一言と添削の返答は投稿ページがないので、ここから非表示にする。
+// ケガ部の一言・添削の返答・練習の評価のひとことは、それだけの画面がないので、ここから非表示にする。
+const hideTargets: Partial<Record<AdminReport["target_type"], { confirm: string; path: (id: string) => string }>> = {
+  injury_note: { confirm: "この一言を公開ページから外しますか？", path: (id) => `/v1/admin/injury-notes/${id}/hide` },
+  review_response: { confirm: "この返答を利用者から見えなくしますか？", path: (id) => `/v1/admin/coaching/responses/${id}/hide` },
+  practice_rating: { confirm: "このひとことを練習の投稿から外しますか？", path: (id) => `/v1/admin/practice-ratings/${id}/hide` },
+};
+
 function InjuryNoteActions({ report, token }: { report: AdminReport; token: string | null }) {
   const [hidden, setHidden] = useState(report.target_hidden);
   const [error, setError] = useState("");
-  const isResponse = report.target_type === "review_response";
+  const target = hideTargets[report.target_type];
   async function hide() {
-    if (!confirm(isResponse ? "この返答を利用者から見えなくしますか？" : "この一言を公開ページから外しますか？")) return;
+    if (!target || !confirm(target.confirm)) return;
     try {
-      const path = isResponse
-        ? `/v1/admin/coaching/responses/${report.target_id}/hide`
-        : `/v1/admin/injury-notes/${report.target_id}/hide`;
+      const path = target.path(report.target_id);
       await apiFetch(path, { method: "POST", token });
       setHidden(true);
       setError("");
@@ -69,7 +74,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   }
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
-      {isResponse ? null : (
+      {report.target_type !== "injury_note" ? null : (
         <Link href={`/injury/${report.injury_part}`} className="text-blue-300 underline">
           公開ページを見る
         </Link>
@@ -653,7 +658,7 @@ export default function AdminPage() {
               </p>
               {r.target_type === "coaching_message" ? (
                 <CoachingReportActions report={r} token={token} />
-              ) : !r.target_body ? null : r.target_type === "injury_note" || r.target_type === "review_response" ? (
+              ) : !r.target_body ? null : hideTargets[r.target_type] ? (
                 <InjuryNoteActions report={r} token={token} />
               ) : (
                 <Link href={`/posts/${r.post_id}`} className="text-sm text-blue-300 underline">

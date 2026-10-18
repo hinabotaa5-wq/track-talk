@@ -1108,6 +1108,17 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.TargetType == "practice_rating" {
+		reportable, err := s.q.PracticeRatingReportable(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !reportable {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+	}
 	if req.TargetType == "review_response" {
 		ok, err := s.q.ReviewResponseReportable(r.Context(), db.ReviewResponseReportableParams{RequestID: tid, RequesterID: p.ID})
 		if err != nil {

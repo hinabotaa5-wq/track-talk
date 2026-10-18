@@ -113,6 +113,7 @@ export type Recruitment = {
 };
 
 export type PracticeReputationComment = {
+  id: string;
   score: "good" | "ok" | "bad" | "no_show";
   comment: string;
   created_at: string;
@@ -210,7 +211,7 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message";
+  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message" | "practice_rating";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;

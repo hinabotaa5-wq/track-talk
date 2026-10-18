@@ -341,6 +341,7 @@ func (s *Server) reputationFor(ctx context.Context, userID uuid.UUID, withCommen
 	comments := make([]practiceReputationCommentDTO, 0, len(rows))
 	for _, row := range rows {
 		comments = append(comments, practiceReputationCommentDTO{
+			ID:        row.ID,
 			Score:     row.Score,
 			Comment:   row.Comment,
 			CreatedAt: row.CreatedAt,
@@ -348,6 +349,27 @@ func (s *Server) reputationFor(ctx context.Context, userID uuid.UUID, withCommen
 	}
 	reputation.Comments = comments
 	return reputation, nil
+}
+
+// hidePracticeRating は、通報された練習の評価のひとことを、練習の投稿から外す。
+func (s *Server) hidePracticeRating(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	n, err := s.q.HidePracticeRating(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if n == 0 {
+		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) loadPracticePost(w http.ResponseWriter, r *http.Request) (db.GetPostRow, bool) {
@@ -703,6 +725,9 @@ func normalizeRating(req ratingReq) (string, string, map[string]string) {
 	comment, msg := textLimit(req.Comment, 200, "", "コメントは200文字以内で入力してください", false)
 	if msg != "" {
 		fields["comment"] = msg
+	} else if looksLikeContact(comment) {
+		// ひとことは練習の投稿で誰でも読めるので、相手や自分の連絡先・SNS を書かせない。
+		fields["comment"] = "URL・メールアドレス・SNS の ID・電話番号などは書けません"
 	}
 	return score, comment, fields
 }

@@ -1,4 +1,4 @@
-import { InjuryNoteReport } from "./injury-note-report";
+import { TargetReport } from "./target-report";
 import { injuryPercent, injuryRecoveryRangeText, type InjuryPublicGroup, type InjuryTally } from "@/lib/injury";
 
 const panel = "space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4";
@@ -116,7 +116,7 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
                   <p className="text-xs text-slate-300">
                     {n.stage_label}になったとき{n.event_label ? `・${n.event_label}` : ""}
                   </p>
-                  <InjuryNoteReport id={n.id} part={group.body_part} />
+                  <TargetReport targetType="injury_note" id={n.id} next={`/injury/${group.body_part}`} noun="一言" />
                 </div>
               </li>
             ))}
