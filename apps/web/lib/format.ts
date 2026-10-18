@@ -32,3 +32,8 @@ export function formatDate(iso: string) {
     dateStyle: "medium",
   }).format(d);
 }
+
+// 日本時間の今日を "YYYY-MM-DD" で返す。starts_on や raced_on の日付と同じ形。
+export function todayInTokyo(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: jst }).format(now);
+}

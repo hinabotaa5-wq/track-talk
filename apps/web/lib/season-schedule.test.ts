@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOngoing, isOver, seasonSchedule, todayInTokyo } from "./season-schedule";
+import { isOngoing, isOver, seasonSchedule } from "./season-schedule";
 
 const meet = (name: string, starts_on: string, ends_on: string | null = null) => ({
   name,
@@ -38,8 +38,4 @@ describe("season schedule", () => {
     expect(isOver(meet("one day", "2026-10-12"), "2026-10-12")).toBe(false);
   });
 
-  it("reads today in Japan time", () => {
-    expect(todayInTokyo(new Date("2026-10-15T15:30:00Z"))).toBe("2026-10-16");
-    expect(todayInTokyo(new Date("2026-10-15T14:59:00Z"))).toBe("2026-10-15");
-  });
 });

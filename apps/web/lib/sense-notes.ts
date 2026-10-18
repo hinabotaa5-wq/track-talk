@@ -1,5 +1,7 @@
 // 感覚メモ: 練習で体を動かして感じた感覚を、本人だけが書き溜める。投稿とは別で、誰にも公開しない。
 
+import { todayInTokyo } from "./format";
+
 export const senseNoteMaxLength = 300;
 
 // 器(ためるビン)1杯に入る感覚の数。
@@ -66,7 +68,7 @@ export function senseDayLabel(day: string, now = new Date()) {
   const [y, m, d] = day.split("-").map(Number);
   if (!y || !m || !d) return day;
   const week = "日月火水木金土"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  const thisYear = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(now));
+  const thisYear = Number(todayInTokyo(now).slice(0, 4));
   return `${y === thisYear ? "" : `${y}年`}${m}月${d}日(${week})`;
 }
 

@@ -6,11 +6,6 @@ export type MonthGroup<T> = { key: string; label: string; items: T[] };
 
 export type SeasonSchedule<T> = { upcoming: MonthGroup<T>[]; ended: MonthGroup<T>[] };
 
-// "YYYY-MM-DD" in Japan time, the same shape as the date part of starts_on and ends_on.
-export function todayInTokyo(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(now);
-}
-
 function day(iso: string) {
   return iso.slice(0, 10);
 }

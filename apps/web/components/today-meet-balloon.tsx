@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "./auth-provider";
 import { AnchoredPanel } from "./anchored-panel";
 import { fetchTodayMeetThreads } from "@/lib/meet-threads";
-import { todayInTokyo } from "@/lib/season-schedule";
+import { todayInTokyo } from "@/lib/format";
 import type { MeetThread } from "@/lib/types";
 
 // 閉じた日を覚えておく。アプリを開き直す(タブやホーム画面アプリを起動し直す)とまた出る。
