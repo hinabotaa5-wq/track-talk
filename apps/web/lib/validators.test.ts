@@ -38,11 +38,11 @@ describe("validators", () => {
 
   it("accepts optional text fields and requires title, body, or a photo", () => {
     expect(postSchema.safeParse({ title: "タイトルだけ", body: "" }).success).toBe(true);
-    expect(postSchema.safeParse({ title: "", body: "本文だけ" }).success).toBe(true);
-    expect(postSchema.safeParse({ title: "", body: "" }).success).toBe(true);
+    expect(postSchema.safeParse({ title: "", body: "本文だけ" }).success).toBe(false); // タイトル必須化により false
+    expect(postSchema.safeParse({ title: "", body: "" }).success).toBe(false); // タイトル必須化により false
     expect(hasTextPostContent("タイトルだけ", "", false)).toBe(true);
-    expect(hasTextPostContent("", "本文だけ", false)).toBe(true);
-    expect(hasTextPostContent("", "", true)).toBe(true);
+    expect(hasTextPostContent("", "本文だけ", false)).toBe(false); // タイトル必須化により false
+    expect(hasTextPostContent("", "", true)).toBe(false); // タイトル必須化により false
     expect(hasTextPostContent("  ", "\n", false)).toBe(false);
   });
 

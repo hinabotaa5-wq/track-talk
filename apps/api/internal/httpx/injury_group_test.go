@@ -221,18 +221,18 @@ func TestInjuryGroupPostsStayInTheirStage(t *testing.T) {
 	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", a, joinBody("resting"))
 	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", b, joinBody("jogging"))
 
-	post := func(tok, part, body string) int {
+	post := func(tok, part, title, body string) int {
 		return doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", tok, map[string]any{
-			"kind": "injury", "body": body, "body_part": part,
+			"kind": "injury", "title": title, "body": body, "body_part": part,
 		}).Code
 	}
-	if code := post(a, "sprain", "部位違い"); code != http.StatusUnprocessableEntity {
+	if code := post(a, "sprain", "部位違い", "部位違い"); code != http.StatusUnprocessableEntity {
 		t.Fatalf("wrong part %d", code)
 	}
-	if code := post(a, "jumpers-knee", "階段がつらい"); code != http.StatusCreated {
+	if code := post(a, "jumpers-knee", "階段の状態", "階段がつらい"); code != http.StatusCreated {
 		t.Fatalf("post a %d", code)
 	}
-	if code := post(b, "jumpers-knee", "5分ジョグできた"); code != http.StatusCreated {
+	if code := post(b, "jumpers-knee", "ジョギング", "5分ジョグできた"); code != http.StatusCreated {
 		t.Fatalf("post b %d", code)
 	}
 
@@ -252,7 +252,7 @@ func TestInjuryGroupPostsStayInTheirStage(t *testing.T) {
 	if rehab := listInjury(t, h, "/v1/injury/groups/jumpers-knee/posts?stage=rehab", a); rehab.Meta.Total != 0 {
 		t.Fatalf("rehab feed %+v", rehab)
 	}
-	if code := post(b, "jumpers-knee", "戻ったので今はリハビリ"); code != http.StatusCreated {
+	if code := post(b, "jumpers-knee", "リハビリ復帰", "戻ったので今はリハビリ"); code != http.StatusCreated {
 		t.Fatalf("post after moving back %d", code)
 	}
 	if rehab := listInjury(t, h, "/v1/injury/groups/jumpers-knee/posts?stage=rehab", a); rehab.Meta.Total != 1 {
@@ -265,7 +265,7 @@ func TestInjuryGroupCanBeLeftAndJoinedAgain(t *testing.T) {
 	a, b := token(t, uuid.New()), token(t, uuid.New())
 	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", a, joinBody("rehab"))
 	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", b, joinBody("jogging"))
-	rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", a, map[string]any{"kind": "injury", "body": "抜ける前の投稿", "body_part": "jumpers-knee"})
+	rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", a, map[string]any{"kind": "injury", "title": "抜ける前", "body": "抜ける前の投稿", "body_part": "jumpers-knee"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("post %d %s", rec.Code, rec.Body.String())
 	}

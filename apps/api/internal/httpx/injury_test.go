@@ -74,7 +74,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 		t.Fatalf("unexpected create response %+v", created)
 	}
 	rehab := postInjury(t, h, tok, map[string]any{
-		"kind": "injury", "body": "バイクとコアを続ける", "body_part": "jumpers-knee",
+		"kind": "injury", "title": "リハビリ中", "body": "バイクとコアを続ける", "body_part": "jumpers-knee",
 	})
 	if rehab.Code != http.StatusCreated {
 		t.Fatalf("create rehab %d %s", rehab.Code, rehab.Body.String())
@@ -716,7 +716,7 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 	otherPart := token(t, uuid.New())
 	outsider := token(t, uuid.New())
 
-	rec := postInjury(t, h, author, map[string]any{"kind": "injury", "body": "膝がつらい", "body_part": "jumpers-knee"})
+	rec := postInjury(t, h, author, map[string]any{"kind": "injury", "title": "膝の状態", "body": "膝がつらい", "body_part": "jumpers-knee"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
