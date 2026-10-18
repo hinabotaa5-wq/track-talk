@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -156,7 +158,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	}
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	if created.Status != "queued" || strings.Join(created.Focus, ",") != "start,rhythm" || !strings.HasSuffix(created.DueAt, "T03:00:00Z") || !strings.Contains(created.VideoURL, "/video/authenticated/s--") {
+	if created.Status != "queued" || strings.Join(created.Focus, ",") != "start,rhythm" || !dueAtNoonJST(created.DueAt) || !strings.Contains(created.VideoURL, "/video/authenticated/s--") {
 		t.Fatalf("created %+v", created)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body); rec.Code != http.StatusConflict {
@@ -247,4 +249,14 @@ func TestCoachDuty(t *testing.T) {
 func withCoachPhoto(t *testing.T, id uuid.UUID) {
 	t.Helper()
 	execSQLArgs(t, `UPDATE coach_profiles SET photo_public_id = $2 WHERE profile_id = $1`, id, "track-talk/"+uuid.NewString())
+}
+
+// dueAtNoonJST は、返却の目安が日本時間の12時か。DB から読んだ時刻はマシンのタイムゾーンで返るので、文字列ではなく時刻で比べる。
+func dueAtNoonJST(s string) bool {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return false
+	}
+	t = t.In(jst.Zone)
+	return t.Hour() == 12 && t.Minute() == 0
 }
