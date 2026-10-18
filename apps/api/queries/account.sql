@@ -55,3 +55,21 @@ WHERE author_id = sqlc.arg('user_id');
 -- name: DeleteProfile :exec
 DELETE FROM profiles
 WHERE id = sqlc.arg('user_id');
+
+-- name: WithdrawBlockers :one
+-- 退会すると契約とやりとりが消えるので、進行中のパーソナル指導と、
+-- 自分の契約のやりとりへの未解決の通報があるあいだは退会させない。
+SELECT
+    EXISTS (
+        SELECT 1 FROM coaching_contracts ct
+        WHERE (ct.coach_id = sqlc.arg('user_id') OR ct.requester_id = sqlc.arg('user_id'))
+          AND ct.status IN ('applied', 'accepted', 'active', 'suspended')
+    )::boolean AS open_contract,
+    EXISTS (
+        SELECT 1 FROM reports rp
+        JOIN coaching_messages m ON m.id = rp.target_id
+        JOIN coaching_contracts ct ON ct.id = m.contract_id
+        WHERE rp.target_type = 'coaching_message'
+          AND rp.status = 'open'
+          AND (ct.coach_id = sqlc.arg('user_id') OR ct.requester_id = sqlc.arg('user_id'))
+    )::boolean AS open_report;

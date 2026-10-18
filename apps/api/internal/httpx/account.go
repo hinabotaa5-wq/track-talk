@@ -42,6 +42,21 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// 契約は退会でまとめて消えるので、進行中の指導や未解決の通報（運営が読む証拠）を消させない。
+	blockers, err := s.q.WithTx(tx).WithdrawBlockers(r.Context(), uid)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if blockers.OpenContract {
+		Error(w, http.StatusConflict, "coaching_in_progress", "進行中のパーソナル指導があるあいだは退会できません。終わってから退会するか、お問い合わせからご連絡ください")
+		return
+	}
+	if blockers.OpenReport {
+		Error(w, http.StatusConflict, "report_in_progress", "パーソナル指導のやりとりへの通報を運営が確認しているあいだは退会できません。お問い合わせからご連絡ください")
+		return
+	}
+
 	if err := purgeAccount(r.Context(), s.q.WithTx(tx), uid); err != nil {
 		MapDBError(w, err)
 		return
