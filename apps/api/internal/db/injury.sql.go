@@ -431,7 +431,7 @@ func (q *Queries) ListInjuryGroupAnswers(ctx context.Context, bodyPart string) (
 const listInjuryGroupFaces = `-- name: ListInjuryGroupFaces :many
 SELECT stage, COALESCE(nickname, '')::text AS nickname
 FROM (
-    SELECT m.stage, p.nickname,
+    SELECT m.stage, CASE WHEN p.nickname_public THEN p.nickname END AS nickname,
            row_number() OVER (PARTITION BY m.stage ORDER BY m.updated_at DESC) AS rn
     FROM injury_group_members m
     JOIN profiles p ON p.id = m.user_id
@@ -452,6 +452,7 @@ type ListInjuryGroupFacesRow struct {
 }
 
 // 段階ごとに、新しく入った順で最大 limit_n 人のニックネーム。
+// 投稿への公開をオンにしていない人は、ニックネームを出さず空にする。
 func (q *Queries) ListInjuryGroupFaces(ctx context.Context, arg ListInjuryGroupFacesParams) ([]ListInjuryGroupFacesRow, error) {
 	rows, err := q.db.Query(ctx, listInjuryGroupFaces, arg.BodyPart, arg.LimitN)
 	if err != nil {

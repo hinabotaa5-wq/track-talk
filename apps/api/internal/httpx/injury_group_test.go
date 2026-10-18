@@ -354,3 +354,34 @@ func TestInjuryGroupStageChangeAnswers(t *testing.T) {
 		t.Fatalf("log %v %v %v", actions, note, public)
 	}
 }
+
+// ケガのグループの顔には、投稿への公開をオンにした人のニックネームだけを出す。
+func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
+	h := setup(t)
+	public, private := token(t, uuid.New()), token(t, uuid.New())
+
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true}); rec.Code != http.StatusOK {
+		t.Fatalf("public nickname %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false}); rec.Code != http.StatusOK {
+		t.Fatalf("private nickname %d %s", rec.Code, rec.Body.String())
+	}
+	for _, tok := range []string{public, private} {
+		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/sprain/join", tok, joinBody("rehab")); rec.Code != http.StatusOK {
+			t.Fatalf("join %d %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	g := getGroup(t, h, "sprain", public)
+	var faces []string
+	for _, stage := range g.Stages {
+		faces = append(faces, stage.Faces...)
+	}
+	if len(faces) != 2 {
+		t.Fatalf("faces %v", faces)
+	}
+	joined := strings.Join(faces, ",")
+	if strings.Contains(joined, "ひみつ") || !strings.Contains(joined, "こうかい") {
+		t.Fatalf("faces leak private nickname: %v", faces)
+	}
+}
