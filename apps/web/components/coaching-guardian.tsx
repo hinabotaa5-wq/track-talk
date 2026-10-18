@@ -21,7 +21,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
   const { pending, acquire, release } = useActionLock();
 
   async function answer(action: "consent" | "decline") {
-    if (action === "decline" && !window.confirm("同意しない場合、このパーソナル指導は始まりません。よろしいですか？")) return;
+    if (action === "decline" && !confirm("同意しない場合、このパーソナル指導は始まりません。よろしいですか？")) return;
     if (!acquire()) return;
     setError("");
     setFields({});

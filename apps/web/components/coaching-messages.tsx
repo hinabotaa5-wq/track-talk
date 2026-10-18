@@ -58,7 +58,7 @@ function ReportButton({ message, access }: { message: CoachingMessage; access: A
   const { pending, acquire, release } = useActionLock();
 
   async function report() {
-    if (!window.confirm("このメッセージを運営に通報しますか？通報すると、運営がこのやりとりを確認します。")) return;
+    if (!confirm("このメッセージを運営に通報しますか？通報すると、運営がこのやりとりを確認します。")) return;
     if (!acquire()) return;
     try {
       if (access.guardianToken) {

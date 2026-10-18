@@ -96,7 +96,7 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
   const { pending, acquire, release } = useActionLock();
 
   async function answer(action: "accept" | "decline") {
-    if (action === "decline" && !window.confirm("この申し込みを断りますか？")) return;
+    if (action === "decline" && !confirm("この申し込みを断りますか？")) return;
     if (!acquire()) return;
     setError("");
     setFields({});

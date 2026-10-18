@@ -114,7 +114,7 @@ function PlanForm({
     const capacity = Number(draft.capacity);
     let confirmHigh = false;
     if (Number.isFinite(price) && price > highPlanPriceYen && price !== plan?.price_yen) {
-      if (!window.confirm(`${formatYen(price)}で保存します。打ち間違いではありませんか？`)) return;
+      if (!confirm(`${formatYen(price)}で保存します。打ち間違いではありませんか？`)) return;
       confirmHigh = true;
     }
     if (!acquire()) return;

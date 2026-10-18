@@ -40,7 +40,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
   }
 
   async function report() {
-    if (!window.confirm("この返答を運営に通報しますか？")) return;
+    if (!confirm("この返答を運営に通報しますか？")) return;
     if (!acquire()) return;
     setError("");
     try {
@@ -104,7 +104,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
                 type="button"
                 disabled={pending}
                 onClick={() => {
-                  if (window.confirm(`「${clarifyReasonLabels[r]}」でコーチに補足を頼みますか？`)) void post("clarify", { reason: r });
+                  if (confirm(`「${clarifyReasonLabels[r]}」でコーチに補足を頼みますか？`)) void post("clarify", { reason: r });
                 }}
                 className={chip(false)}
               >

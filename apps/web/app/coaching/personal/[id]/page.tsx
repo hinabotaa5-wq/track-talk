@@ -85,7 +85,7 @@ function CoachingContractView() {
   }
 
   async function cancel() {
-    if (!window.confirm("申し込みを取り下げますか？")) return;
+    if (!confirm("申し込みを取り下げますか？")) return;
     if (!acquire()) return;
     try {
       const d = await apiFetch<{ contract: CoachingContract }>(`/v1/coaching/contracts/${id}/cancel`, { method: "POST", token });

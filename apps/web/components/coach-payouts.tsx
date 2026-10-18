@@ -144,7 +144,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
   }, [load]);
 
   async function run() {
-    if (!window.confirm("前の月までの報酬を、口座を登録したコーチに送金しますか？前に失敗した送金もやり直します。")) return;
+    if (!confirm("前の月までの報酬を、口座を登録したコーチに送金しますか？前に失敗した送金もやり直します。")) return;
     if (!acquire()) return;
     setMessage("");
     try {
@@ -165,7 +165,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
     const ask = enabled
       ? `${c.nickname ?? "このコーチ"}さんに「初年10%」を付けますか？今から1年のあいだに始まったパーソナル指導の手数料が10%になります。`
       : `${c.nickname ?? "このコーチ"}さんの「初年10%」を外しますか？`;
-    if (!window.confirm(ask)) return;
+    if (!confirm(ask)) return;
     if (!acquire()) return;
     try {
       await apiFetch(`/v1/admin/coaching/coaches/${c.profile_id}/reduced-fee`, {

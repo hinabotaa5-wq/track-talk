@@ -132,12 +132,12 @@ export default function GuardianPage() {
   }
 
   function onRevoke() {
-    if (!window.confirm("同意を取り消すと、お子さんは新しい添削を頼めなくなります。取り消しますか？")) return;
+    if (!confirm("同意を取り消すと、お子さんは新しい添削を頼めなくなります。取り消しますか？")) return;
     void send("/revoke", "POST", undefined, "同意を取り消しました。");
   }
 
   function onDecline() {
-    if (!window.confirm("同意しない場合、お子さんは添削を使えなくなります。よろしいですか？")) return;
+    if (!confirm("同意しない場合、お子さんは添削を使えなくなります。よろしいですか？")) return;
     void send("/decline", "POST", undefined, "「同意しない」を受け付けました。");
   }
 

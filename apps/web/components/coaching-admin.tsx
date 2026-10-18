@@ -30,7 +30,7 @@ export function SuspendToggle({
     const ask = suspend
       ? "このやりとりを止めますか？両方に知らせ、再開するまで送れなくなります。"
       : "やりとりを再開しますか？止めていた日数の分、期間を延ばします。";
-    if (!window.confirm(ask)) return;
+    if (!confirm(ask)) return;
     if (!acquire()) return;
     setError("");
     try {
@@ -80,7 +80,7 @@ function RefundButtons({
       kind === "full"
         ? `${formatYen(contract.price_yen)}を全額返金しますか？${running ? "期間中のものは、ここで終わります。" : ""}`
         : "残りの日数分を返金して、ここで終わりにしますか？";
-    if (!window.confirm(ask)) return;
+    if (!confirm(ask)) return;
     if (!acquire()) return;
     setError("");
     try {

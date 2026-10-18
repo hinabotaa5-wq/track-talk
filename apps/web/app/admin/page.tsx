@@ -218,7 +218,7 @@ function ProductsAdmin({ token }: { token: string | null }) {
   }
 
   async function hide(id: string) {
-    if (!window.confirm("この商品を非表示にしますか？")) return;
+    if (!confirm("この商品を非表示にしますか？")) return;
     try {
       await apiFetch(`/v1/admin/products/${id}/hide`, { method: "POST", token });
       await load();
@@ -358,7 +358,7 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
   }, [load]);
 
   async function hide(id: string) {
-    if (!window.confirm("この返答を利用者から見えなくしますか？")) return;
+    if (!confirm("この返答を利用者から見えなくしますか？")) return;
     try {
       await apiFetch(`/v1/admin/coaching/responses/${id}/hide`, { method: "POST", token });
       setMessage("非表示にしました");
@@ -428,7 +428,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
 
   async function review(a: AdminCoachApplication, action: "approve" | "reject") {
     const label = action === "approve" ? "承認" : "見送り";
-    if (!window.confirm(`この応募を${label}にしますか？`)) return;
+    if (!confirm(`この応募を${label}にしますか？`)) return;
     try {
       await apiFetch(`/v1/admin/coach-applications/${a.profile_id}/${action}`, { method: "POST", token });
       setMessage(`${label}にしました`);
@@ -439,7 +439,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
   }
 
   async function removePhoto(a: AdminCoachApplication) {
-    if (!window.confirm("この顔写真を外しますか？コーチはまた別の写真を登録できます。")) return;
+    if (!confirm("この顔写真を外しますか？コーチはまた別の写真を登録できます。")) return;
     try {
       await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/photo`, { method: "DELETE", token });
       setMessage("写真を外しました");
@@ -450,7 +450,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
   }
 
   async function resetRating(a: AdminCoachApplication) {
-    if (!window.confirm("このコーチを順番に戻しますか？これまでの★は、外す判定に数えなくなります。")) return;
+    if (!confirm("このコーチを順番に戻しますか？これまでの★は、外す判定に数えなくなります。")) return;
     try {
       await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/reset-rating`, { method: "POST", token });
       setMessage("順番に戻しました");
@@ -540,7 +540,7 @@ function CoachingReportActions({ report, token }: { report: AdminReport; token: 
   const [error, setError] = useState("");
 
   async function close() {
-    if (!window.confirm("この通報の対応を終えますか？保存期間を過ぎたやりとりは、このあと消えます。")) return;
+    if (!confirm("この通報の対応を終えますか？保存期間を過ぎたやりとりは、このあと消えます。")) return;
     setError("");
     try {
       await apiFetch(`/v1/admin/reports/${report.id}/close`, { method: "POST", token });

@@ -107,7 +107,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   }
 
   async function remove(reviewId: string) {
-    if (!window.confirm("このレビューを削除しますか？")) return;
+    if (!confirm("このレビューを削除しますか？")) return;
     try {
       await apiFetch(`/v1/product-reviews/${reviewId}`, { method: "DELETE", token });
       await load();
