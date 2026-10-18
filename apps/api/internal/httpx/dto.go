@@ -95,6 +95,7 @@ type practiceReputationDTO struct {
 }
 
 type practiceReputationCommentDTO struct {
+	ID        uuid.UUID `json:"id"`
 	Score     string    `json:"score"`
 	Comment   string    `json:"comment"`
 	CreatedAt time.Time `json:"created_at"`

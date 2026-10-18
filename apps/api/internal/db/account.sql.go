@@ -122,3 +122,34 @@ func (q *Queries) ReleaseCommentThreadsForUser(ctx context.Context, userID uuid.
 	_, err := q.db.Exec(ctx, releaseCommentThreadsForUser, userID)
 	return err
 }
+
+const withdrawBlockers = `-- name: WithdrawBlockers :one
+SELECT
+    EXISTS (
+        SELECT 1 FROM coaching_contracts ct
+        WHERE (ct.coach_id = $1 OR ct.requester_id = $1)
+          AND ct.status IN ('applied', 'accepted', 'active', 'suspended')
+    )::boolean AS open_contract,
+    EXISTS (
+        SELECT 1 FROM reports rp
+        JOIN coaching_messages m ON m.id = rp.target_id
+        JOIN coaching_contracts ct ON ct.id = m.contract_id
+        WHERE rp.target_type = 'coaching_message'
+          AND rp.status = 'open'
+          AND (ct.coach_id = $1 OR ct.requester_id = $1)
+    )::boolean AS open_report
+`
+
+type WithdrawBlockersRow struct {
+	OpenContract bool `json:"open_contract"`
+	OpenReport   bool `json:"open_report"`
+}
+
+// 退会すると契約とやりとりが消えるので、進行中のパーソナル指導と、
+// 自分の契約のやりとりへの未解決の通報があるあいだは退会させない。
+func (q *Queries) WithdrawBlockers(ctx context.Context, userID uuid.UUID) (WithdrawBlockersRow, error) {
+	row := q.db.QueryRow(ctx, withdrawBlockers, userID)
+	var i WithdrawBlockersRow
+	err := row.Scan(&i.OpenContract, &i.OpenReport)
+	return i, err
+}

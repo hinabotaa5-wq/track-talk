@@ -1,4 +1,5 @@
 import type { PracticeAttendance, PracticeReputation } from "@/lib/types";
+import { TargetReport } from "./target-report";
 
 export function practiceScoreLabel(score: string) {
   if (score === "good") return "良い";
@@ -22,12 +23,15 @@ export function practiceReputationLine(reputation?: PracticeReputation) {
   return `良い ${reputation.good} / 普通 ${reputation.ok} / 悪い ${reputation.bad}`;
 }
 
+// reportNext があるときは、ひとことごとに通報ボタンを出す(ログイン後に戻る画面)。
 export function PracticeReputationSummary({
   reputation,
   heading,
+  reportNext,
 }: {
   reputation?: PracticeReputation | null;
   heading: string;
+  reportNext?: string;
 }) {
   if (!reputation) return null;
   const line = practiceReputationLine(reputation);
@@ -38,8 +42,11 @@ export function PracticeReputationSummary({
       {reputation.comments && reputation.comments.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {reputation.comments.map((item) => (
-            <li key={`${item.created_at}:${item.score}:${item.comment}`} className="text-sm">
-              <span className="text-slate-200">{practiceScoreLabel(item.score)}</span>
+            <li key={item.id} className="text-sm">
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-slate-200">{practiceScoreLabel(item.score)}</span>
+                {reportNext ? <TargetReport targetType="practice_rating" id={item.id} next={reportNext} noun="ひとこと" /> : null}
+              </span>
               <span className="mt-1 block whitespace-pre-wrap">{item.comment}</span>
             </li>
           ))}

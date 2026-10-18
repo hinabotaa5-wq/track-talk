@@ -147,6 +147,21 @@ func (q *Queries) GetPracticeRatingByRater(ctx context.Context, arg GetPracticeR
 	return id, err
 }
 
+const hidePracticeRating = `-- name: HidePracticeRating :execrows
+UPDATE practice_ratings
+SET hidden_at = now()
+WHERE id = $1
+  AND hidden_at IS NULL
+`
+
+func (q *Queries) HidePracticeRating(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, hidePracticeRating, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertPracticeApplication = `-- name: InsertPracticeApplication :exec
 INSERT INTO practice_applications (id, post_id, user_id, status)
 VALUES ($1, $2, $3, 'pending')
@@ -371,20 +386,23 @@ func (q *Queries) ListPracticeDetails(ctx context.Context, postIds []uuid.UUID) 
 }
 
 const listPracticeReputationComments = `-- name: ListPracticeReputationComments :many
-SELECT score, comment, created_at
+SELECT id, score, comment, created_at
 FROM practice_ratings
 WHERE ratee_id = $1
   AND comment <> ''
+  AND hidden_at IS NULL
 ORDER BY created_at DESC
 LIMIT 5
 `
 
 type ListPracticeReputationCommentsRow struct {
+	ID        uuid.UUID `json:"id"`
 	Score     string    `json:"score"`
 	Comment   string    `json:"comment"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// 運営が非表示にしたひとことは出さない。
 func (q *Queries) ListPracticeReputationComments(ctx context.Context, rateeID uuid.UUID) ([]ListPracticeReputationCommentsRow, error) {
 	rows, err := q.db.Query(ctx, listPracticeReputationComments, rateeID)
 	if err != nil {
@@ -394,7 +412,12 @@ func (q *Queries) ListPracticeReputationComments(ctx context.Context, rateeID uu
 	var items []ListPracticeReputationCommentsRow
 	for rows.Next() {
 		var i ListPracticeReputationCommentsRow
-		if err := rows.Scan(&i.Score, &i.Comment, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Score,
+			&i.Comment,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -500,6 +523,21 @@ func (q *Queries) LockPracticeDetail(ctx context.Context, postID uuid.UUID) (Pra
 		&i.DissolvedAt,
 	)
 	return i, err
+}
+
+const practiceRatingReportable = `-- name: PracticeRatingReportable :one
+SELECT EXISTS (
+    SELECT 1 FROM practice_ratings
+    WHERE id = $1 AND comment <> '' AND hidden_at IS NULL
+)::boolean AS reportable
+`
+
+// 通報できるのは、公開されている(ひとことがあって非表示でない)評価だけ。
+func (q *Queries) PracticeRatingReportable(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, practiceRatingReportable, id)
+	var reportable bool
+	err := row.Scan(&reportable)
+	return reportable, err
 }
 
 const practiceReputationCounts = `-- name: PracticeReputationCounts :one

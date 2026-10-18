@@ -117,12 +117,27 @@ WHERE ratee_id = ANY(sqlc.arg('user_ids')::uuid[])
 GROUP BY ratee_id;
 
 -- name: ListPracticeReputationComments :many
-SELECT score, comment, created_at
+-- 運営が非表示にしたひとことは出さない。
+SELECT id, score, comment, created_at
 FROM practice_ratings
 WHERE ratee_id = $1
   AND comment <> ''
+  AND hidden_at IS NULL
 ORDER BY created_at DESC
 LIMIT 5;
+
+-- name: PracticeRatingReportable :one
+-- 通報できるのは、公開されている(ひとことがあって非表示でない)評価だけ。
+SELECT EXISTS (
+    SELECT 1 FROM practice_ratings
+    WHERE id = $1 AND comment <> '' AND hidden_at IS NULL
+)::boolean AS reportable;
+
+-- name: HidePracticeRating :execrows
+UPDATE practice_ratings
+SET hidden_at = now()
+WHERE id = $1
+  AND hidden_at IS NULL;
 
 -- 参加者として主催者から評価された回数と、そのうちドタキャンだった回数。
 -- name: ListApplicantAttendanceCounts :many

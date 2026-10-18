@@ -142,3 +142,46 @@ func TestCoachingMessages(t *testing.T) {
 		t.Fatalf("rating in detail %s", rec.Body.String())
 	}
 }
+
+// 退会すると契約とやりとりが消えるので、進行中の指導と、やりとりへの未解決の通報があるあいだは退会できない。
+func TestWithdrawBlockedByCoaching(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	tc, tu, id := activeContract(t, h)
+	confirm := map[string]string{"confirm": "退会する"}
+
+	for _, tok := range []string{tc, tu} {
+		if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tok, confirm); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "coaching_in_progress") {
+			t.Fatalf("withdraw during contract %d %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/messages", tu, map[string]any{"body": "よろしくお願いします。"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("send %d %s", rec.Code, rec.Body.String())
+	}
+	var sent struct {
+		Message struct {
+			ID string `json:"id"`
+		} `json:"message"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &sent)
+	msg := sent.Message
+	if rec := doJSON(t, h, http.MethodPost, "/v1/reports", tc, map[string]any{"target_type": "coaching_message", "target_id": msg.ID, "reason": "harassment"}); rec.Code != http.StatusCreated {
+		t.Fatalf("report %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 期間が終わっても、通報が開いているあいだは、どちらも退会できない。
+	var n int
+	queryRowArgs(t, `WITH u AS (UPDATE coaching_contracts SET status = 'ended' WHERE id = $1 RETURNING 1) SELECT count(*)::int FROM u`, []any{id}, &n)
+	for _, tok := range []string{tc, tu} {
+		if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tok, confirm); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "report_in_progress") {
+			t.Fatalf("withdraw during report %d %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	queryRowArgs(t, `WITH u AS (UPDATE reports SET status = 'actioned' WHERE target_id = $1 RETURNING 1) SELECT count(*)::int FROM u`, []any{msg.ID}, &n)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, confirm); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw after report closed %d %s", rec.Code, rec.Body.String())
+	}
+}

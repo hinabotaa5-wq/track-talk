@@ -839,7 +839,11 @@ function PracticeFacts({ post }: { post: Post }) {
           </div>
         ))}
       </dl>
-      <PracticeReputationSummary reputation={info.reputation} heading="これまでの評価" />
+      <PracticeReputationSummary
+        reputation={info.reputation}
+        heading="これまでの評価"
+        reportNext={post.mine ? undefined : `/posts/${post.id}`}
+      />
     </div>
   );
 }

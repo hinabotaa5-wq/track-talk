@@ -339,6 +339,16 @@ JOIN posts p ON p.id = s.post_id
 WHERE s.user_id = sqlc.arg('user_id')
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
+  -- ケガの投稿は、いまそのグループに参加している間だけ出す(抜けたら読めない)。保存は残すので、入り直すとまた出る。
+  AND (
+    p.kind <> 'injury'
+    OR p.author_id = sqlc.arg('user_id')
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      JOIN injury_group_members m ON m.body_part = i.body_part AND m.user_id = sqlc.arg('user_id')
+      WHERE i.post_id = p.id
+    )
+  )
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
@@ -381,6 +391,16 @@ JOIN posts p ON p.id = s.post_id
 WHERE s.user_id = sqlc.arg('user_id')
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
+  -- ケガの投稿は、いまそのグループに参加している間だけ出す(抜けたら読めない)。保存は残すので、入り直すとまた出る。
+  AND (
+    p.kind <> 'injury'
+    OR p.author_id = sqlc.arg('user_id')
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      JOIN injury_group_members m ON m.body_part = i.body_part AND m.user_id = sqlc.arg('user_id')
+      WHERE i.post_id = p.id
+    )
+  )
   AND (
     sqlc.narg('keyword')::text IS NULL
     OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'

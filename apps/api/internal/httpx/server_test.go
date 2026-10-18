@@ -1766,3 +1766,89 @@ func testDSN(t *testing.T) string {
 	}
 	return dsn
 }
+
+// 練習の評価のひとことは誰でも読めるので、連絡先を書けず、通報されたら運営が非表示にできる。
+func TestPracticeRatingCommentCanBeReportedAndHidden(t *testing.T) {
+	h := setup(t)
+	host, guest := token(t, uuid.New()), token(t, uuid.New())
+	starts := time.Now().Add(72 * time.Hour).Format(time.RFC3339)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
+		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場", "starts_at": starts, "event": "100m", "capacity": 2,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	base := "/v1/posts/" + created.ID + "/practice"
+	if rec := doJSON(t, h, http.MethodPost, base+"/applications", guest, nil); rec.Code != 201 {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	var detail struct {
+		Practice struct {
+			Applications []struct {
+				ID string `json:"id"`
+			} `json:"applications"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, host, nil).Body.Bytes(), &detail)
+	app := detail.Practice.Applications[0].ID
+	if rec := doJSON(t, h, http.MethodPost, base+"/applications/"+app+"/accept", host, nil); rec.Code != 200 {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, base+"/dissolve", host, nil); rec.Code != 200 {
+		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, base+"/applications/"+app+"/rating", guest, map[string]any{"score": "bad", "comment": "インスタは @someone_123 です"})
+	if rec.Code != 422 || !strings.Contains(rec.Body.String(), "comment") {
+		t.Fatalf("contact in comment %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, base+"/applications/"+app+"/rating", guest, map[string]any{"score": "bad", "comment": "ひどい人でした"}); rec.Code != 200 && rec.Code != 201 {
+		t.Fatalf("rate %d %s", rec.Code, rec.Body.String())
+	}
+
+	type reputation struct {
+		Practice struct {
+			Reputation struct {
+				Comments []struct {
+					ID      string `json:"id"`
+					Comment string `json:"comment"`
+				} `json:"comments"`
+			} `json:"reputation"`
+		} `json:"practice"`
+	}
+	var public reputation
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil).Body.Bytes(), &public)
+	if len(public.Practice.Reputation.Comments) != 1 || public.Practice.Reputation.Comments[0].ID == "" {
+		t.Fatalf("public comments %+v", public.Practice.Reputation)
+	}
+	ratingID := public.Practice.Reputation.Comments[0].ID
+
+	report := map[string]any{"target_type": "practice_rating", "target_id": ratingID, "reason": "harassment", "detail": ""}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/reports", host, report); rec.Code != http.StatusCreated {
+		t.Fatalf("report %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/reports", host, map[string]any{"target_type": "practice_rating", "target_id": uuid.NewString(), "reason": "other"}); rec.Code != http.StatusNotFound {
+		t.Fatalf("report unknown rating %d", rec.Code)
+	}
+
+	admin := adminToken(t, h)
+	rec = doJSON(t, h, http.MethodGet, "/v1/admin/reports", admin, nil)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "ひどい人でした") {
+		t.Fatalf("admin reports %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/practice-ratings/"+ratingID+"/hide", host, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-admin hide %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/practice-ratings/"+ratingID+"/hide", admin, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("hide %d %s", rec.Code, rec.Body.String())
+	}
+	var after reputation
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil).Body.Bytes(), &after)
+	if len(after.Practice.Reputation.Comments) != 0 {
+		t.Fatalf("hidden comment still shown %+v", after.Practice.Reputation)
+	}
+}

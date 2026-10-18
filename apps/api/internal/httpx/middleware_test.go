@@ -112,3 +112,17 @@ func TestClientIPUsesAddressFromTrustedProxy(t *testing.T) {
 		t.Fatalf("single %s", got)
 	}
 }
+
+func TestLogPathHidesGuardianToken(t *testing.T) {
+	token := "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+	for in, want := range map[string]string{
+		"/v1/guardian/" + token:                           "/v1/guardian/:token",
+		"/v1/guardian/" + token + "/contracts/x/messages": "/v1/guardian/:token/contracts/x/messages",
+		"/v1/posts/123":                                   "/v1/posts/123",
+		"/health":                                         "/health",
+	} {
+		if got := logPath(in); got != want {
+			t.Fatalf("logPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

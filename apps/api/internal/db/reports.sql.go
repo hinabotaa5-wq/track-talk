@@ -170,8 +170,8 @@ SELECT
     COALESCE(cm.contract_id, '00000000-0000-0000-0000-000000000000'::uuid)::uuid AS coaching_contract_id,
     COALESCE(p.id, c.post_id, '00000000-0000-0000-0000-000000000000'::uuid)::uuid AS post_id,
     COALESCE(p.title, ''::text)::text AS target_title,
-    COALESCE(p.body, c.body, n.note, rr.good_point, ''::text)::text AS target_body,
-    (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at, rr.hidden_at) IS NOT NULL)::boolean AS target_hidden,
+    COALESCE(p.body, c.body, n.note, rr.good_point, pr.comment, ''::text)::text AS target_body,
+    (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at, rr.hidden_at, pr.hidden_at) IS NOT NULL)::boolean AS target_hidden,
     COALESCE(n.body_part, ''::text)::text AS injury_part
 FROM reports r
 JOIN profiles rp ON rp.id = r.reporter_id
@@ -180,6 +180,7 @@ LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
 LEFT JOIN injury_group_stage_log n ON r.target_type = 'injury_note' AND n.note_id = r.target_id
 LEFT JOIN review_responses rr ON r.target_type = 'review_response' AND rr.request_id = r.target_id
 LEFT JOIN coaching_messages cm ON r.target_type = 'coaching_message' AND cm.id = r.target_id
+LEFT JOIN practice_ratings pr ON r.target_type = 'practice_rating' AND pr.id = r.target_id
 ORDER BY r.created_at DESC
 LIMIT $1 OFFSET $2
 `

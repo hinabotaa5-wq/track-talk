@@ -163,6 +163,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/posts/{id}/hide", s.hidePost)
 			r.Post("/admin/comments/{id}/hide", s.hideComment)
 			r.Post("/admin/injury-notes/{id}/hide", s.hideInjuryNote)
+			r.Post("/admin/practice-ratings/{id}/hide", s.hidePracticeRating)
 			r.Post("/admin/products", s.createProduct)
 			r.Patch("/admin/products/{id}", s.updateProduct)
 			r.Post("/admin/products/{id}/hide", s.hideProduct)
