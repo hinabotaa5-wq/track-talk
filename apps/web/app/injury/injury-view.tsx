@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { InjuryMeCards } from "@/components/injury-me-cards";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, sortInjuryGroups, type InjuryGroupSummary } from "@/lib/injury";
@@ -34,6 +35,7 @@ export function InjuryView() {
         <h1 className="text-2xl font-bold">ケガ</h1>
         <p className="mt-1 text-sm text-slate-200">同じケガの仲間と、復帰を目指そう</p>
       </div>
+      <InjuryMeCards token={token} />
 
       {failed ? (
         <ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />

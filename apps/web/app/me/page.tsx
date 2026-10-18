@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { InjuryMeCards } from "@/components/injury-me-cards";
 import { SenseNotesCard } from "@/components/sense-notes-card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -71,7 +70,6 @@ export default function MePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <InjuryMeCards token={token} />
       <SenseNotesCard token={token} />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {accountLinks.map((item) => (
