@@ -57,7 +57,7 @@ WHERE post_id = $1
   AND user_id = $2;
 
 -- name: ListPracticeApplications :many
-SELECT id, status, created_at
+SELECT id, user_id, status, created_at
 FROM practice_applications
 WHERE post_id = $1
 ORDER BY created_at;
@@ -123,3 +123,15 @@ WHERE ratee_id = $1
   AND comment <> ''
 ORDER BY created_at DESC
 LIMIT 5;
+
+-- 参加者として主催者から評価された回数と、そのうちドタキャンだった回数。
+-- name: ListApplicantAttendanceCounts :many
+SELECT
+    a.user_id,
+    count(*)::int AS total,
+    (count(*) FILTER (WHERE r.score = 'no_show'))::int AS no_show
+FROM practice_ratings r
+JOIN practice_applications a ON a.id = r.application_id
+WHERE r.ratee_id = a.user_id
+  AND a.user_id = ANY(sqlc.arg('user_ids')::uuid[])
+GROUP BY a.user_id;

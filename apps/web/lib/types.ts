@@ -113,7 +113,7 @@ export type Recruitment = {
 };
 
 export type PracticeReputationComment = {
-  score: "good" | "ok" | "bad";
+  score: "good" | "ok" | "bad" | "no_show";
   comment: string;
   created_at: string;
 };
@@ -125,11 +125,17 @@ export type PracticeReputation = {
   comments?: PracticeReputationComment[];
 };
 
+export type PracticeAttendance = {
+  total: number;
+  no_show: number;
+};
+
 export type PracticeApplication = {
   id: string;
   status: "pending" | "accepted" | "declined";
   created_at: string;
   rated?: boolean;
+  attendance?: PracticeAttendance;
 };
 
 export type Practice = {

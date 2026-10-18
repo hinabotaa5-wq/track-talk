@@ -1,10 +1,19 @@
-import type { PracticeReputation } from "@/lib/types";
+import type { PracticeAttendance, PracticeReputation } from "@/lib/types";
 
 export function practiceScoreLabel(score: string) {
   if (score === "good") return "良い";
   if (score === "ok") return "普通";
   if (score === "bad") return "悪い";
+  if (score === "no_show") return "ドタキャン";
   return score;
+}
+
+// 参加希望者の参加率。承認されて評価された回数がない間は実績なしとして扱う。
+export function practiceAttendanceLine(attendance?: PracticeAttendance) {
+  if (!attendance || attendance.total === 0) return "参加実績はまだありません";
+  const attended = attendance.total - attendance.no_show;
+  const percent = Math.round((attended / attendance.total) * 100);
+  return `参加率 ${percent}%（${attendance.total}回中 ドタキャン${attendance.no_show}回）`;
 }
 
 export function practiceReputationLine(reputation?: PracticeReputation) {

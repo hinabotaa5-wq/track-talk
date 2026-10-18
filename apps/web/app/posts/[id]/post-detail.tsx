@@ -6,7 +6,7 @@ import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
 import { DetailLoadingFrame } from "@/components/loading-frame";
-import { PracticeReputationSummary } from "@/components/practice-reputation";
+import { PracticeReputationSummary, practiceAttendanceLine } from "@/components/practice-reputation";
 import { prefecturePageHref } from "@/lib/prefecture-page";
 import { prefectureName } from "@/lib/prefectures";
 import { Button } from "@/components/ui/button";
@@ -638,9 +638,11 @@ function applicationStatusLabel(status: "pending" | "accepted" | "declined") {
 
 function RatingForm({
   disabled,
+  allowNoShow = false,
   onSubmit,
 }: {
   disabled: boolean;
+  allowNoShow?: boolean;
   onSubmit: (score: string, comment: string) => void;
 }) {
   const [score, setScore] = useState("");
@@ -666,6 +668,7 @@ function RatingForm({
           <option value="good">良い</option>
           <option value="ok">普通</option>
           <option value="bad">悪い</option>
+          {allowNoShow ? <option value="no_show">ドタキャン（当日来なかった）</option> : null}
         </select>
       </label>
       <Textarea
@@ -765,6 +768,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
             <li key={application.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3">
               <p className="text-sm">参加希望 · {formatDateTime(application.created_at)}</p>
               <p className="mt-1 text-sm text-slate-200">{applicationStatusLabel(application.status)}</p>
+              <p className="mt-1 text-sm text-slate-200">{practiceAttendanceLine(application.attendance)}</p>
               {application.status === "pending" && info.status !== "dissolved" ? (
                 <div className="mt-2 flex gap-2">
                   <Button
@@ -793,7 +797,11 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
                 application.rated ? (
                   <p className="mt-2 text-sm">評価済み</p>
                 ) : (
-                  <RatingForm disabled={pending} onSubmit={(score, comment) => rate(application.id, score, comment)} />
+                  <RatingForm
+                    disabled={pending}
+                    allowNoShow
+                    onSubmit={(score, comment) => rate(application.id, score, comment)}
+                  />
                 )
               ) : null}
             </li>
