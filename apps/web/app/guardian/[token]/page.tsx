@@ -4,7 +4,7 @@ import { GuardianPersonalSection } from "@/components/coaching-guardian";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen } from "@/lib/push";
+import { monthlyLimitLabel } from "@/lib/push";
 import type { GuardianLimitYen, GuardianPublic } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useParams } from "next/navigation";
@@ -48,7 +48,7 @@ function LimitChoices({
               checked={value === option}
               onChange={() => onChange(option)}
             />
-            {formatYen(option)}
+            {monthlyLimitLabel(option)}
           </label>
         ))}
       </div>

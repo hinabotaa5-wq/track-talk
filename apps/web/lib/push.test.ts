@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { base64UrlToBytes, formatYen } from "./push";
+import { base64UrlToBytes, monthlyLimitLabel } from "./push";
 
 describe("base64UrlToBytes", () => {
   it("decodes unpadded base64url", () => {
@@ -8,9 +8,9 @@ describe("base64UrlToBytes", () => {
   });
 });
 
-describe("formatYen", () => {
+describe("monthlyLimitLabel", () => {
   it("formats the monthly limit", () => {
-    expect(formatYen(3000)).toBe("月3,000円まで");
-    expect(formatYen(null)).toBe("上限なし");
+    expect(monthlyLimitLabel(3000)).toBe("月3,000円まで");
+    expect(monthlyLimitLabel(null)).toBe("上限なし");
   });
 });

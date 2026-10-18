@@ -4,8 +4,8 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, ContractDetails, contractPeriod, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { contractStatusLabel, formatPlanPrice } from "@/lib/coaching-plan";
-import { formatDateTime } from "@/lib/format";
+import { contractStatusLabel } from "@/lib/coaching-plan";
+import { formatDateTime, formatYen } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -64,7 +64,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
         <ContractDetails contract={contract} />
         <p className="text-sm font-semibold text-white">同意は済んでいます。{by}までにお支払いを済ませると、その時から期間が始まります。</p>
         <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
-          お支払いへ進む（{formatPlanPrice(contract.price_yen)}）
+          お支払いへ進む（{formatYen(contract.price_yen)}）
         </Button>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </div>
@@ -86,7 +86,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
         <li>連絡先の交換と、直接会う約束は禁止です。気になるメッセージは「通報する」から運営に知らせてください。</li>
         {contract.payment_required ? (
           <li>
-            料金は{formatPlanPrice(contract.price_yen)}で、同意のあとお支払いの画面（カード・Apple Pay・Google Pay・PayPay）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
+            料金は{formatYen(contract.price_yen)}で、同意のあとお支払いの画面（カード・Apple Pay・Google Pay・PayPay）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
           </li>
         ) : (
           <li>いまはお試し期間のため、お支払いはありません。</li>

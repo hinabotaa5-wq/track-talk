@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen, pushSupported, subscribePush } from "@/lib/push";
+import { monthlyLimitLabel, pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -182,7 +182,7 @@ export default function CoachingSetupPage() {
           <h2 className="font-bold">保護者の同意</h2>
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にリンクを送っていません"}
-            {me.guardian?.status === "consented" ? `（${formatYen(me.guardian.monthly_limit_yen)}）` : null}
+            {me.guardian?.status === "consented" ? `（${monthlyLimitLabel(me.guardian.monthly_limit_yen)}）` : null}
           </p>
           {link ? (
             <div className="space-y-2">

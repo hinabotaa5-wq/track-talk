@@ -37,3 +37,8 @@ export function formatDate(iso: string) {
 export function todayInTokyo(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: jst }).format(now);
 }
+
+// 金額を "1,000円" の形にする。
+export function formatYen(yen: number) {
+  return `${yen.toLocaleString("ja-JP")}円`;
+}

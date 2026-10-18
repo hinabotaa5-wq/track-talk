@@ -1,8 +1,7 @@
 "use client";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatPlanPrice } from "@/lib/coaching-plan";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatYen } from "@/lib/format";
 import type { AdminCoachPayout, AdminPayoutCoach, CoachEarnings, CoachPayoutStatus } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useState } from "react";
@@ -88,11 +87,11 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
       <div className="grid grid-cols-2 gap-2 text-center">
         <div className="rounded-xl border border-white/15 bg-white/5 p-2">
           <p className="text-xs text-slate-300">今月の報酬</p>
-          <p className="text-lg font-bold">{formatPlanPrice(data.this_month_yen)}</p>
+          <p className="text-lg font-bold">{formatYen(data.this_month_yen)}</p>
         </div>
         <div className="rounded-xl border border-white/15 bg-white/5 p-2">
           <p className="text-xs text-slate-300">まだ送金していない分</p>
-          <p className="text-lg font-bold">{formatPlanPrice(data.unpaid_yen)}</p>
+          <p className="text-lg font-bold">{formatYen(data.unpaid_yen)}</p>
         </div>
       </div>
       <p className="text-xs text-slate-300">
@@ -106,7 +105,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
             <li key={p.id} className="flex justify-between gap-2 border-t border-white/10 pt-1">
               <span>{monthLabel(p.month)}まで</span>
               <span>
-                {formatPlanPrice(p.amount_yen)} · {payoutStatusLabels[p.status]}
+                {formatYen(p.amount_yen)} · {payoutStatusLabels[p.status]}
               </span>
             </li>
           ))}
@@ -203,7 +202,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
               <li key={c.profile_id} className="space-y-1 rounded-xl border border-white/20 bg-white/10 p-3 text-sm">
                 <p className="font-semibold text-white">{c.nickname ?? "名前なし"}</p>
                 <p className="text-xs text-slate-300">
-                  口座: {c.payouts_enabled ? "登録済み" : c.stripe_linked ? "登録の途中" : "未登録"} · まだ送金していない分: {formatPlanPrice(c.unpaid_yen)}
+                  口座: {c.payouts_enabled ? "登録済み" : c.stripe_linked ? "登録の途中" : "未登録"} · まだ送金していない分: {formatYen(c.unpaid_yen)}
                 </p>
                 <label className="flex items-center gap-2 text-xs text-slate-200">
                   <input type="checkbox" checked={Boolean(reduced)} disabled={pending} onChange={(e) => void toggleFee(c, e.target.checked)} />
@@ -221,7 +220,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
           {payouts.map((p) => (
             <li key={p.id} className="border-t border-white/10 pt-1">
               <p>
-                {p.nickname ?? "退会したコーチ"} · {monthLabel(p.month)}まで · {formatPlanPrice(p.amount_yen)} · {payoutStatusLabels[p.status]}
+                {p.nickname ?? "退会したコーチ"} · {monthLabel(p.month)}まで · {formatYen(p.amount_yen)} · {payoutStatusLabels[p.status]}
               </p>
               {p.failure ? <p className="text-xs text-red-300">{p.failure}</p> : null}
             </li>

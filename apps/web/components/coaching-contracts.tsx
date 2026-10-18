@@ -6,12 +6,11 @@ import { coachEventLabels } from "@/lib/coach-recruit";
 import {
   contractConsentItems,
   contractStatusLabel,
-  formatPlanPrice,
   planDurationLabel,
   planKindLabels,
   type ContractConsentKey,
 } from "@/lib/coaching-plan";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatYen } from "@/lib/format";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -61,7 +60,7 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
         <dt className="text-xs text-slate-300">プラン</dt>
         <dd className="text-slate-100">
           {contract.plan_title}（{planKindLabels[contract.plan_kind]} · {planDurationLabel(contract.plan_kind, contract.duration_days)} ·{" "}
-          {formatPlanPrice(contract.price_yen)}）
+          {formatYen(contract.price_yen)}）
         </dd>
       </div>
       <div>

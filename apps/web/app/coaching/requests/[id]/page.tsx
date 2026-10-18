@@ -4,9 +4,8 @@ import { useAuth } from "@/components/auth-provider";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatYen } from "@/lib/format";
 import { clarifyReasonLabels, helpfulLabels, reviewFocusLabels, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
-import { formatPlanPrice } from "@/lib/coaching-plan";
 import type { ClarifyReason, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -132,7 +131,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
 const paidPolls = 10;
 
 function paymentText(p: ReviewPayment): string {
-  const price = formatPlanPrice(p.amount_yen);
+  const price = formatYen(p.amount_yen);
   switch (p.status) {
     case "authorized":
       return `${price}を仮押さえしています（${reviewPayMethodLabels[p.method]}）。返ってきた時に確定し、目安までに返ってこなければ取り消します。`;

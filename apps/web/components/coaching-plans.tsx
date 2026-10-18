@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import {
   coachPledgeItems,
-  formatPlanPrice,
   highPlanPriceYen,
   minPlanPriceYen,
   planDurationLabel,
@@ -14,6 +13,7 @@ import {
   planKindLabels,
   planSummary,
 } from "@/lib/coaching-plan";
+import { formatYen } from "@/lib/format";
 import type { CoachApplication, CoachingPlan, CoachingPlanKind } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -114,7 +114,7 @@ function PlanForm({
     const capacity = Number(draft.capacity);
     let confirmHigh = false;
     if (Number.isFinite(price) && price > highPlanPriceYen && price !== plan?.price_yen) {
-      if (!window.confirm(`${formatPlanPrice(price)}で保存します。打ち間違いではありませんか？`)) return;
+      if (!window.confirm(`${formatYen(price)}で保存します。打ち間違いではありませんか？`)) return;
       confirmHigh = true;
     }
     if (!acquire()) return;
@@ -201,7 +201,7 @@ function PlanForm({
         {fieldError("description")}
       </label>
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>値段（{formatPlanPrice(minPlanPriceYen)}から）</span>
+        <span>値段（{formatYen(minPlanPriceYen)}から）</span>
         <Input inputMode="numeric" value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))} placeholder="8000" />
         <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
         {fieldError("price_yen")}

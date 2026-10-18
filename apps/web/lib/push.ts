@@ -1,3 +1,5 @@
+import { formatYen } from "./format";
+
 // Web Push の購読まわり。通知はブラウザが対応していて、ホーム画面のアプリかブラウザで許可したときだけ届く。
 
 export function pushSupported(): boolean {
@@ -30,6 +32,6 @@ export async function subscribePush(publicKey: string): Promise<PushSubscription
   return subscription.toJSON();
 }
 
-export function formatYen(value: number | null): string {
-  return value === null ? "上限なし" : `月${value.toLocaleString("ja-JP")}円まで`;
+export function monthlyLimitLabel(value: number | null): string {
+  return value === null ? "上限なし" : `月${formatYen(value)}まで`;
 }
