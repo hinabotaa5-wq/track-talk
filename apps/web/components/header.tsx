@@ -10,6 +10,14 @@ import { TodayMeetBalloon } from "./today-meet-balloon";
 import { activeMainTab, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
+import { useSyncExternalStore } from "react";
+
+// useSearchParams はレイアウトで使うと Suspense が要り、全ページが動的になるので、ここでは location から読む。
+// パスが変わるたびに Header は描き直されるので、その時点のクエリが取れる。
+const noSubscribe = () => () => {};
+function useLocationSearch() {
+  return useSyncExternalStore(noSubscribe, () => window.location.search, () => "");
+}
 
 function TrackMark() {
   return (
@@ -60,7 +68,8 @@ export function Header() {
   const { session } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const showBack = showsBackButton(pathname);
+  const search = useLocationSearch();
+  const showBack = showsBackButton(pathname, search);
   const { confirmLeave } = useLeaveGuard();
   const guardedClick = useGuardedLinkClick();
 

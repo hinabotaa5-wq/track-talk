@@ -30,8 +30,12 @@ export function activeMainTab(pathname: string) {
   return "";
 }
 
-export function showsBackButton(pathname: string) {
+// search は "?next=/upload" のような URL のクエリ部分。
+export function showsBackButton(pathname: string, search = "") {
   if (pathname === "/register" || pathname === "/reset-password") return true;
+  // 投稿の＋などログインが要るページから送られてきたときは、元の画面に戻れるようにする。
+  // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。
+  if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (pathname === "/upload") return true;
   if (pathname === "/me/contact" || pathname === "/me/delete" || pathname === "/me/profile" || pathname === "/me/injury" || pathname === "/me/saved") return true;
   if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
