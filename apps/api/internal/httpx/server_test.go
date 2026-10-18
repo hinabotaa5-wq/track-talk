@@ -399,7 +399,8 @@ func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
 	})
 	if rec.Code != 422 {
 		t.Fatalf("empty update %d %s", rec.Code, rec.Body.String())
-	}}
+	}
+}
 
 func TestSignedVideoJoinsTheList(t *testing.T) {
 	var assetBytes atomic.Int64

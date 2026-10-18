@@ -690,7 +690,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 			InstagramType:       row.InstagramType,
 			InstagramShortcode:  row.InstagramShortcode,
 			CloudinaryPublicID:  row.CloudinaryPublicID,
-			SourceTitle:          row.SourceTitle,
+			SourceTitle:         row.SourceTitle,
 			LikeCount:           row.LikeCount,
 			CommentCount:        row.CommentCount,
 			CreatedAt:           row.CreatedAt,
