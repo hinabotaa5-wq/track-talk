@@ -521,18 +521,22 @@ export function PostDetail({
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
       ) : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-2">
-        <LikeButton
-          liked={post.liked_by_me}
-          count={post.like_count}
-          disabled={action.pending}
-          onClick={toggleLike}
-          label={post.kind === "injury" ? "わかる" : undefined}
-        />
-        <SaveButton
-          saved={post.saved_by_me}
-          disabled={action.pending}
-          onClick={toggleSave}
-        />
+        {post.kind === "meet" ? null : (
+          <>
+            <LikeButton
+              liked={post.liked_by_me}
+              count={post.like_count}
+              disabled={action.pending}
+              onClick={toggleLike}
+              label={post.kind === "injury" ? "わかる" : undefined}
+            />
+            <SaveButton
+              saved={post.saved_by_me}
+              disabled={action.pending}
+              onClick={toggleSave}
+            />
+          </>
+        )}
         {mine ? (
           <>
             <Link
@@ -553,7 +557,9 @@ export function PostDetail({
             </Button>
           </>
         ) : null}
-        <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
+        {post.kind === "meet" ? null : (
+          <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
+        )}
       </div>
       </div>
       )}
