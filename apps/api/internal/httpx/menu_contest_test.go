@@ -97,7 +97,7 @@ func TestMenuContestRound(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/menu-contest/entry", "", map[string]any{"body": "x"}); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous entry = %d", rec.Code)
 	}
-	if rec := doJSON(t, h, http.MethodPut, "/v1/menu-contest/entry", alice, map[string]any{"body": strings.Repeat("あ", 201)}); rec.Code != http.StatusUnprocessableEntity {
+	if rec := doJSON(t, h, http.MethodPut, "/v1/menu-contest/entry", alice, map[string]any{"body": strings.Repeat("あ", 101)}); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("long entry = %d", rec.Code)
 	}
 	for tok, body := range map[string]string{alice: "最初の案", bob: "坂ダッシュ50本", carol: "1000m×10"} {
