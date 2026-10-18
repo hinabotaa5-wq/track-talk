@@ -8,7 +8,7 @@ export const postSchema = z.object({
   body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
 });
 
-export function hasTextPostContent(title: string, _body: string, _hasPhoto: boolean) {
+export function hasTextPostContent(title: string) {
   return title.trim() !== "";
 }
 

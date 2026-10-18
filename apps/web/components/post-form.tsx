@@ -45,7 +45,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       return;
     }
     const validatesTextContent = !initial || initial.kind === "text";
-    if (validatesTextContent && !hasTextPostContent(values.title, values.body, Boolean(photo || initial?.image_public_id))) {
+    if (validatesTextContent && !hasTextPostContent(values.title)) {
       setError("タイトルを入力してください");
       return;
     }

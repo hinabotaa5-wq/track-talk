@@ -36,14 +36,13 @@ describe("validators", () => {
     expect(parsed.title).toBe("100m決勝");
   });
 
-  it("accepts optional text fields and requires title, body, or a photo", () => {
+  it("accepts optional text fields and requires a title", () => {
     expect(postSchema.safeParse({ title: "タイトルだけ", body: "" }).success).toBe(true);
     expect(postSchema.safeParse({ title: "", body: "本文だけ" }).success).toBe(false); // タイトル必須化により false
     expect(postSchema.safeParse({ title: "", body: "" }).success).toBe(false); // タイトル必須化により false
-    expect(hasTextPostContent("タイトルだけ", "", false)).toBe(true);
-    expect(hasTextPostContent("", "本文だけ", false)).toBe(false); // タイトル必須化により false
-    expect(hasTextPostContent("", "", true)).toBe(false); // タイトル必須化により false
-    expect(hasTextPostContent("  ", "\n", false)).toBe(false);
+    expect(hasTextPostContent("タイトルだけ")).toBe(true);
+    expect(hasTextPostContent("")).toBe(false);
+    expect(hasTextPostContent("  ")).toBe(false);
   });
 
   it("keeps text post length limits", () => {
