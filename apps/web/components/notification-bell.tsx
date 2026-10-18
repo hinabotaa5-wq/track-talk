@@ -81,10 +81,13 @@ export function NotificationBell() {
     const refresh = () => {
       if (document.visibilityState === "visible") load(open);
     };
-    load(open);
+    // 初回は即フェッチ、以降はタブ復帰時のみ
+    if (open) load(true);
+    else load(false);
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
-  }, [token, open, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   async function markRead(id: string) {
     if (!token) return;
@@ -118,8 +121,10 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => {
-          if (!open) setLoading(true);
-          setOpen(!open);
+          const willOpen = !open;
+          if (willOpen && items.length === 0) setLoading(true);
+          if (willOpen) load(true);
+          setOpen(willOpen);
         }}
         className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-95"
       >
@@ -146,7 +151,7 @@ export function NotificationBell() {
             ) : null}
           </div>
           {loading && items.length === 0 ? <p className="px-3 py-6 text-center text-sm text-slate-200">読み込み中</p> : null}
-          {error ? <p className="px-3 py-3 text-sm text-red-400">{error}</p> : null}
+          {error && items.length === 0 ? <p className="px-3 py-3 text-sm text-red-400">{error}</p> : null}
           {!loading && !error && items.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-slate-200">通知はありません</p>
           ) : null}

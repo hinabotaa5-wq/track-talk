@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-const clickShieldMs = 400;
+const clickShieldMs = 50;
 
 export function AnchoredPanel({
   open,
