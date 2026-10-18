@@ -17,14 +17,14 @@ import (
 // 運営が選んだトップ3をみんなで投票して1位を決める。
 //
 // 回は2週間ごとで、開始日(月曜)から日程が決まる。
-//   - 1週目の月曜〜2週目の水曜(10日間): 応募。1人1件、200文字まで。書き直せる。
+//   - 1週目の月曜〜2週目の水曜(10日間): 応募。1人1件、100文字まで。書き直せる。
 //   - 2週目の木曜: 運営がトップ3を選ぶ。
 //   - 金〜日: 投票。1人1票で、締め切りまでは入れ直せる。
 //   - 翌週の月曜: 結果を出し、次の回の応募が始まる。
 //
 // シーズンは11月の最初の月曜に始まり、応募の締め切りが3月31日の終わりを過ぎない回までを開く。
 const (
-	maxMenuContestBody   = 200
+	maxMenuContestBody   = 100
 	maxMenuContestPicks  = 3
 	menuContestRoundDays = 14
 	menuContestEntryDays = 10
@@ -286,7 +286,7 @@ func (s *Server) saveMenuContestEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	body := strings.TrimSpace(req.Body)
 	if Body(body, maxMenuContestBody) != "" {
-		FieldError(w, map[string]string{"body": "1〜200文字で書いてください"})
+		FieldError(w, map[string]string{"body": "1〜100文字で書いてください"})
 		return
 	}
 	round, ok := s.entryRoundOrError(w)

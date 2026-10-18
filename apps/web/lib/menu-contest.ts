@@ -2,8 +2,8 @@
 // 運営が選んだトップ3にみんなで投票して1位を決める。日程は API が決める。
 
 export const menuContestName = "エグ練大会";
-export const menuContestMaxLength = 200;
-export const menuContestPlaceholder = "例: 300m×15本(レスト1分)。最後の3本は脚が動かなくて、ほぼ気持ちだけで走った";
+export const menuContestMaxLength = 100;
+export const menuContestPlaceholder = "例：300m×15本（レスト3分）。最後の3本は脚が動かなくて、次元が歪んだ";
 
 export type MenuContestPhase = "entry" | "picking" | "voting";
 
