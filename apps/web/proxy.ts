@@ -45,7 +45,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/upload/:path*",
-    "/competitions/:path*",
     "/me/:path*",
     "/posts/new/:path*",
     "/posts/video/:path*",

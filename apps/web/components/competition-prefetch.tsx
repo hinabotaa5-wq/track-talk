@@ -11,18 +11,19 @@ import { INTERNATIONAL } from "@/lib/prefectures";
 
 export function CompetitionPrefetch() {
   const pathname = usePathname();
-  const { session, token, loading } = useAuth();
+  const { session, loading } = useAuth();
 
   useEffect(() => {
-    if (loading || !session || !token) return;
-    loadDomesticMajors(token).catch(() => {});
+    // ログインなしで開く人には、先読みの通信をかけない。
+    if (loading || !session) return;
+    loadDomesticMajors().catch(() => {});
     // 大会タブで「国際大会」に切り替えたとき、読み込みを待たずに出せるよう先に取っておく。
-    void loadCompetitions(INTERNATIONAL, 0, token);
+    void loadCompetitions(INTERNATIONAL, 0);
     if (pathname.startsWith("/competitions")) return;
-    void loadMajorHosts(token).then((hosts) => {
+    void loadMajorHosts().then((hosts) => {
       preloadCityPhotos(hosts.map((host) => host.image_url));
     });
-  }, [loading, session, token, pathname]);
+  }, [loading, session, pathname]);
 
   return null;
 }

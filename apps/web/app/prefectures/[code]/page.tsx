@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isPrefecturePageCode } from "@/lib/prefecture-page";
+import { apiFetch } from "@/lib/api";
+import { isPrefecturePageCode, type PrefecturePage } from "@/lib/prefecture-page";
 import { PREFECTURES, prefectureName } from "@/lib/prefectures";
 import { PrefectureView } from "./prefecture-view";
 
-// 中身は画面側で取るので、47都道府県ぶんをビルド時に作っておき、端のキャッシュから返す。
+// 47都道府県だけを受け付ける。中身は開くたびにサーバーで描き、検索エンジンが読めるようにする。
 export const dynamicParams = false;
 
 export function generateStaticParams() {
@@ -13,11 +14,20 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   const { code } = await params;
-  return { title: isPrefecturePageCode(code) ? `${prefectureName(code)}の大会と募集` : "都道府県" };
+  if (!isPrefecturePageCode(code)) return { title: "都道府県" };
+  const name = prefectureName(code);
+  return {
+    title: `${name}の陸上競技の大会日程とクラブチーム募集`,
+    description: `${name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程と、${name}で活動するクラブチームのメンバー募集をまとめています。`,
+    alternates: { canonical: `/prefectures/${code}` },
+  };
 }
 
-export default async function PrefecturePage({ params }: { params: Promise<{ code: string }> }) {
+export default async function PrefectureRoute({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   if (!isPrefecturePageCode(code)) notFound();
-  return <PrefectureView code={code} />;
+  const page = await apiFetch<PrefecturePage>(`/v1/prefectures/${code}`, { signal: AbortSignal.timeout(3000) }).catch(
+    () => null,
+  );
+  return <PrefectureView code={code} initialPage={page} />;
 }

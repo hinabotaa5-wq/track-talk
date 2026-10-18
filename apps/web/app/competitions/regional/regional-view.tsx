@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAuth } from "@/components/auth-provider";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { BackButton } from "@/components/major-hosts-panel";
@@ -14,7 +13,6 @@ import { regionalPrefecture, saveCompetitionPrefecture } from "@/lib/competition
 import { isPrefecturePageCode, prefecturePageHref } from "@/lib/prefecture-page";
 import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, prefectureName } from "@/lib/prefectures";
 import type { Competition } from "@/lib/types";
-import { RequireSession } from "../require-session";
 
 export function destination(competition: Competition, prefecture: string) {
   // 新着から補った最新の要項を優先し、無ければ年間表の要項を出す。
@@ -36,7 +34,6 @@ export function competitionDates(startsOn: string, endsOn: string | null) {
 }
 
 export function RegionalCompetitionsView() {
-  const { token } = useAuth();
   const sp = useSearchParams();
   const month = monthNumber(sp.get("month") ?? undefined) || currentMonthInTokyo();
   const prefecture = regionalPrefecture(sp.get("prefecture") ?? undefined);
@@ -55,9 +52,9 @@ export function RegionalCompetitionsView() {
   }, [prefecture]);
 
   useEffect(() => {
-    if (!token || !prefecture) return;
+    if (!prefecture) return;
     let active = true;
-    loadCompetitions(prefecture, month, token).then((entry) => {
+    loadCompetitions(prefecture, month).then((entry) => {
       if (!active) return;
       setItems(entry.items);
       setError(entry.error);
@@ -66,47 +63,45 @@ export function RegionalCompetitionsView() {
     return () => {
       active = false;
     };
-  }, [prefecture, month, key, token]);
+  }, [prefecture, month, key]);
 
   return (
-    <RequireSession>
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-slate-100">都道府県の大会</h1>
-        <CompetitionFilters month={month} prefecture={prefecture} />
-        {prefecture && isPrefecturePageCode(prefecture) ? (
-          <Link href={prefecturePageHref(prefecture)} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-            {prefectureName(prefecture)}の大会と募集をまとめて見る
-          </Link>
-        ) : null}
-        {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}
-        {prefecture && loading ? <CompetitionLoadingFrame /> : null}
-        {prefecture && !loading && shownError ? <ErrorState message={shownError} /> : null}
-        {prefecture && !loading && !shownError && shownItems.length === 0 ? (
-          <EmptyState title="この月の大会はありません" body="別の月か都道府県を選んでください。" />
-        ) : null}
-        {prefecture && !loading && shownItems.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {shownItems.map((c) => {
-              const link = destination(c, prefecture);
-              return (
-                <a
-                  key={c.id}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
-                >
-                  <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
-                  <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
-                  {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
-                  <p className="text-sm text-blue-400">{link.label}</p>
-                </a>
-              );
-            })}
-          </div>
-        ) : null}
-        <BackButton />
-      </div>
-    </RequireSession>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-slate-100">都道府県の大会</h1>
+      <CompetitionFilters month={month} prefecture={prefecture} />
+      {prefecture && isPrefecturePageCode(prefecture) ? (
+        <Link href={prefecturePageHref(prefecture)} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
+          {prefectureName(prefecture)}の大会と募集をまとめて見る
+        </Link>
+      ) : null}
+      {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}
+      {prefecture && loading ? <CompetitionLoadingFrame /> : null}
+      {prefecture && !loading && shownError ? <ErrorState message={shownError} /> : null}
+      {prefecture && !loading && !shownError && shownItems.length === 0 ? (
+        <EmptyState title="この月の大会はありません" body="別の月か都道府県を選んでください。" />
+      ) : null}
+      {prefecture && !loading && shownItems.length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {shownItems.map((c) => {
+            const link = destination(c, prefecture);
+            return (
+              <a
+                key={c.id}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+              >
+                <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
+                <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
+                {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
+                <p className="text-sm text-blue-400">{link.label}</p>
+              </a>
+            );
+          })}
+        </div>
+      ) : null}
+      <BackButton />
+    </div>
   );
 }

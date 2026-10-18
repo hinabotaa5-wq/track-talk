@@ -27,7 +27,8 @@ export function clearCompetitions() {
   inflight.clear();
 }
 
-export function loadCompetitions(prefecture: string, month: number, token: string) {
+// 大会の日程はログインなしで読める。
+export function loadCompetitions(prefecture: string, month: number) {
   const key = competitionCacheKey(prefecture, month);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < freshForMs) return Promise.resolve(hit);
@@ -36,7 +37,7 @@ export function loadCompetitions(prefecture: string, month: number, token: strin
   if (pending) return pending;
 
   const query = month ? `prefecture=${prefecture}&month=${month}` : `prefecture=${prefecture}`;
-  const request = apiFetch<{ competitions: Competition[] }>(`/v1/competitions?${query}`, { token })
+  const request = apiFetch<{ competitions: Competition[] }>(`/v1/competitions?${query}`)
     .then((data) => {
       const entry = { items: data.competitions ?? [], error: "", at: Date.now() };
       cache.set(key, entry);

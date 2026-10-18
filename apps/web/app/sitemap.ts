@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { apiFetch } from "@/lib/api";
 import { coachingEnabled } from "@/lib/features";
 import { injuryBodyParts } from "@/lib/injury";
+import { isPrefecturePageCode, prefecturePageHref } from "@/lib/prefecture-page";
+import { PREFECTURES } from "@/lib/prefectures";
 import { siteUrl } from "@/lib/site";
 import type { Meta, Post } from "@/lib/types";
 
@@ -14,6 +16,10 @@ const staticPages = [
   "/injury",
   ...injuryBodyParts.map((part) => `/injury/${part.value}`),
   "/injury/stats",
+  // 大会の日程と県ページは、ログインなしで読める。県ページは「◯◯県 陸上 大会」で探す人の入口にする。
+  "/competitions",
+  "/competitions/major-hosts",
+  ...PREFECTURES.filter((item) => isPrefecturePageCode(item.code)).map((item) => prefecturePageHref(item.code)),
   "/coaching",
   // コーチ一覧は提供を始めるまで 404 なので載せない。
   ...(coachingEnabled ? ["/coaches"] : []),
