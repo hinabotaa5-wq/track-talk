@@ -78,6 +78,13 @@ type practiceApplicationDTO struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	Rated     bool      `json:"rated,omitempty"`
+	// 過去に承認されて主催者から評価された回数と、そのうちドタキャンだった回数。
+	Attendance practiceAttendanceDTO `json:"attendance"`
+}
+
+type practiceAttendanceDTO struct {
+	Total  int32 `json:"total"`
+	NoShow int32 `json:"no_show"`
 }
 
 type practiceReputationDTO struct {

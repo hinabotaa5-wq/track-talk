@@ -399,13 +399,26 @@ func (s *Server) attachPracticeViewer(r *http.Request, item postDTO) (postDTO, e
 			if err != nil {
 				return item, err
 			}
+			userIDs := make([]uuid.UUID, 0, len(rows))
+			for _, row := range rows {
+				userIDs = append(userIDs, row.UserID)
+			}
+			counts, err := s.q.ListApplicantAttendanceCounts(r.Context(), userIDs)
+			if err != nil {
+				return item, err
+			}
+			attendance := map[uuid.UUID]practiceAttendanceDTO{}
+			for _, c := range counts {
+				attendance[c.UserID] = practiceAttendanceDTO{Total: c.Total, NoShow: c.NoShow}
+			}
 			apps := make([]practiceApplicationDTO, 0, len(rows))
 			for _, row := range rows {
 				apps = append(apps, practiceApplicationDTO{
-					ID:        row.ID,
-					Status:    row.Status,
-					CreatedAt: row.CreatedAt,
-					Rated:     rated[row.ID],
+					ID:         row.ID,
+					Status:     row.Status,
+					CreatedAt:  row.CreatedAt,
+					Rated:      rated[row.ID],
+					Attendance: attendance[row.UserID],
 				})
 			}
 			item.Practice.Applications = apps
@@ -683,7 +696,7 @@ func normalizeRating(req ratingReq) (string, string, map[string]string) {
 	fields := map[string]string{}
 	score := strings.TrimSpace(req.Score)
 	switch score {
-	case "good", "ok", "bad":
+	case "good", "ok", "bad", "no_show":
 	default:
 		fields["score"] = "評価を選んでください"
 	}
@@ -764,6 +777,10 @@ func (s *Server) ratePractice(w http.ResponseWriter, r *http.Request) {
 		ratee = application.UserID
 	case me.ID == application.UserID:
 		ratee = post.AuthorID
+		if score == "no_show" {
+			Error(w, http.StatusForbidden, "forbidden", "ドタキャンは主催者だけが選べます")
+			return
+		}
 	default:
 		Error(w, http.StatusForbidden, "forbidden", "この相手は評価できません")
 		return

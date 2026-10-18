@@ -258,8 +258,47 @@ func (q *Queries) ListAcceptedPracticeApplications(ctx context.Context, postID u
 	return items, nil
 }
 
+const listApplicantAttendanceCounts = `-- name: ListApplicantAttendanceCounts :many
+SELECT
+    a.user_id,
+    count(*)::int AS total,
+    (count(*) FILTER (WHERE r.score = 'no_show'))::int AS no_show
+FROM practice_ratings r
+JOIN practice_applications a ON a.id = r.application_id
+WHERE r.ratee_id = a.user_id
+  AND a.user_id = ANY($1::uuid[])
+GROUP BY a.user_id
+`
+
+type ListApplicantAttendanceCountsRow struct {
+	UserID uuid.UUID `json:"user_id"`
+	Total  int32     `json:"total"`
+	NoShow int32     `json:"no_show"`
+}
+
+// 参加者として主催者から評価された回数と、そのうちドタキャンだった回数。
+func (q *Queries) ListApplicantAttendanceCounts(ctx context.Context, userIds []uuid.UUID) ([]ListApplicantAttendanceCountsRow, error) {
+	rows, err := q.db.Query(ctx, listApplicantAttendanceCounts, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicantAttendanceCountsRow
+	for rows.Next() {
+		var i ListApplicantAttendanceCountsRow
+		if err := rows.Scan(&i.UserID, &i.Total, &i.NoShow); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPracticeApplications = `-- name: ListPracticeApplications :many
-SELECT id, status, created_at
+SELECT id, user_id, status, created_at
 FROM practice_applications
 WHERE post_id = $1
 ORDER BY created_at
@@ -267,6 +306,7 @@ ORDER BY created_at
 
 type ListPracticeApplicationsRow struct {
 	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -280,7 +320,12 @@ func (q *Queries) ListPracticeApplications(ctx context.Context, postID uuid.UUID
 	var items []ListPracticeApplicationsRow
 	for rows.Next() {
 		var i ListPracticeApplicationsRow
-		if err := rows.Scan(&i.ID, &i.Status, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
