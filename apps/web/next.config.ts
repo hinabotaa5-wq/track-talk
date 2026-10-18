@@ -53,6 +53,20 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: contentSecurityPolicy() },
         ],
       },
+      // ホームはログインに関係なく同じ中身なので、Netlify の端で短くキャッシュする。
+      // 関数がオハイオで動くため、毎回描くと東京の API との往復で遅い。少し古くても画面側が開いたあとに取り直す。
+      // Next.js の Cache-Control は上書きされるので Netlify 専用のヘッダーで指定する。
+      // Netlify の Next.js アダプターはクエリをキャッシュの区別に入れないため、並び替え・検索・ページを Netlify-Vary で足す。
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Netlify-CDN-Cache-Control",
+            value: "public, durable, max-age=60, stale-while-revalidate=3600",
+          },
+          { key: "Netlify-Vary", value: "query=sort|q|page" },
+        ],
+      },
     ];
   },
   async redirects() {
