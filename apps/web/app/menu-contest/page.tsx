@@ -114,7 +114,7 @@ function EntryForm({ round, token, onSaved }: { round: MenuContestRound; token: 
       </div>
       {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-300">1人1件、200文字まで。応募は運営だけが読み、選ばれた3件だけを公開します。</p>
+      <p className="text-xs text-slate-300">1人1件、100文字まで。応募されたものの中から運営が3つ選び、それを皆さんに投票してもらいます。</p>
     </section>
   );
 }
@@ -265,9 +265,7 @@ export default function MenuContestPage() {
           <Flame className="size-6 text-orange-300" aria-hidden />
           {menuContestName}
         </h1>
-        <p className="mt-1 text-sm text-slate-200">
-          冬(11月〜3月)の間、2週間ごとに開催します。今回いちばんエグかった練習を書いて、みんなで1位を決めよう。
-        </p>
+        <p className="mt-2 text-base font-semibold text-slate-100">過去2週間で1番えぐかった練習を書いて、みんなで1位を決めよう！</p>
       </div>
 
       {failed ? (
@@ -313,14 +311,10 @@ export default function MenuContestPage() {
 
           {state.last_result ? <LastResult result={state.last_result} /> : null}
 
-          <section className="space-y-1 rounded-2xl border border-white/15 bg-white/5 p-4 text-sm text-slate-200">
-            <h2 className="font-semibold text-slate-100">2週間の流れ</h2>
-            <p>1週目の月曜〜2週目の水曜: 応募(1人1件)</p>
-            <p>2週目の木曜: 運営がトップ3を選ぶ</p>
-            <p>金曜〜日曜: みんなで投票(1人1票)</p>
-            <p>翌週の月曜: 1位を発表して、次の回がスタート</p>
-            <p className="pt-2 text-xs text-slate-300">ケガをしているときや体調が悪いときは、無理な練習はしないでね。</p>
-          </section>
+          <div className="space-y-1 text-sm text-slate-200">
+            <p>投票は2週目の金曜から始まります。</p>
+            <p className="text-xs text-slate-300">ケガをしているときや体調が悪いときは、無理な練習はしないでね。</p>
+          </div>
         </>
       )}
     </div>
