@@ -1,155 +1,99 @@
-# DB のリージョン移行計画（Supabase: シンガポール → 東京）
+# DB のリージョン移行（Supabase: シンガポール → 東京）
 
-API は Cloud Run の東京（`asia-northeast1`）にあるが、DB（Supabase）は **シンガポール（`ap-southeast-1`）** にある。クエリのたびに東京↔シンガポールを往復するため、これを東京（`ap-northeast-1`）に移す。
+API は Cloud Run の東京（`asia-northeast1`）にあるが、DB（Supabase）は **シンガポール（`ap-southeast-1`）** にあった。クエリのたびに東京↔シンガポールを往復していたため、DB を東京（`ap-northeast-1`）に移した。2026年10月19日に実施。
 
-## 方針
+Supabase のプロジェクトのリージョンは後から変えられない。**東京に新しいプロジェクトを作り、接続先を切り替える**。
 
-Supabase のプロジェクトのリージョンは後から変えられないので、**東京に新しいプロジェクトを作り、データを移して接続先を切り替える**。短い停止を許容し、dump / restore で一括移行する。
+## 今回やったこと（データは持ち越していない）
 
-## 分かっていること（コードから）
+利用者のデータは持ち越さないと決め、**空の新プロジェクトにテーブルだけを作って**切り替えた。旧プロジェクトの利用者は、新プロジェクトで再登録になる。
 
-- アプリ側のマイグレーション（`apps/api/migrations`）に `auth.*` への参照はない。アプリのテーブルは `public` スキーマだけを移せばよい
-- API が DB に触るのは `DATABASE_URL`（pgxpool）だけ。接続先の切り替えは環境変数 1 つで済む
-- 画像は Cloudinary にあり、Supabase Storage は使っていない（移行不要）
-- 認証は Supabase Auth。API は `SUPABASE_URL` の JWKS か `SUPABASE_JWT_SECRET` で検証し、退会時に `SUPABASE_SERVICE_ROLE_KEY` で Auth ユーザーを削除する
+### 1. 新プロジェクトを作る
 
-## リハーサルの結果
+1. 東京（Northeast Asia (Tokyo)）に新しいプロジェクトを作る。作成画面の Region は「Asia-Pacific」のままだと東京とは限らないので、「Need a specific region?」から選ぶ。「Automatically expose new tables」は外す
+2. 次を控える（チャットには貼らない）
+   - 接続プーラーの URL（Connect → Session pooler）。Cloud Run と GitHub Actions は IPv4 のため、直接接続ではなくプーラーを使う。ユーザー名は `postgres.<プロジェクトID>` の形になる
+   - Project URL、anon key、service_role key
+   - データベースのパスワード。特殊文字（`@` `/` `:` `#` `?` `%` など）があると接続文字列が壊れるので、英数字だけにする
 
-東京に作った新プロジェクトに、本番（シンガポール）のデータを流して確かめた。
+### 2. テーブルを作る
+
+`main` のマイグレーションを、新プロジェクトに流す。作業中のブランチに未リリースのマイグレーションがあると、それも新 DB に入ってしまうので、**`main` の一時的な作業ツリーから流す**。
+
+```bash
+read -rs "NEW_DATABASE_URL?新のプーラー URL: "; echo; D="$(mktemp -d)/tt-main" && git worktree add -q --detach "$D" main && (cd "$D/apps/api" && DATABASE_URL="$NEW_DATABASE_URL" ALLOW_REMOTE_DB=1 SUPABASE_JWT_SECRET=dummy go run ./cmd/migrate up) && psql "$NEW_DATABASE_URL" -Atc "select version, dirty from public.schema_migrations; select count(*) from information_schema.tables where table_schema='public'"; git worktree remove --force "$D"
+```
+
+- `ALLOW_REMOTE_DB=1` は、ローカル DB 以外への接続を許すための指定。`SUPABASE_JWT_SECRET=dummy` は設定の読み込みを通すためだけの仮の値
+- 版が `main` の最新で、dirty でないこと（`66|f`）、テーブルが 51 個あることを確かめる
+
+### 3. Auth の設定を旧プロジェクトと揃える
+
+| 項目 | 値 |
+| --- | --- |
+| Site URL | `https://track-talk.netlify.app` |
+| Redirect URLs | `https://track-talk.netlify.app/auth/callback`、`https://track-talk.netlify.app/login`、`http://localhost:3000/auth/callback`、`http://localhost:3000/login` |
+| Providers | Email と Google |
+
+- 旧プロジェクトの Site URL は前に使っていた Vercel のままになっていた（Netlify に直す価値はあるが、移行とは別の修正）
+- Google は Client ID と Secret を入れる。旧プロジェクトの画面では Secret が隠れるので、Google Cloud コンソールの「認証情報」で、同じ OAuth クライアントからコピーする。その「承認済みのリダイレクト URI」に、新プロジェクトの `https://<新プロジェクトのID>.supabase.co/auth/v1/callback` を**追加**する。旧プロジェクトのものは、切り替えが終わるまで消さない
+- メールのテンプレートは、旧で文面を変えていれば同じものを入れる
+
+### 4. 切り替える前に、手元で画面から試す
+
+画面と API の両方を、新プロジェクトに向けてローカルで起動し、登録、Google ログイン、投稿を確かめる。環境変数はファイルを書き換えず、コマンドの先頭に付けて渡す。
+
+- API（`main` の一時的な作業ツリーで）: `DATABASE_URL`（新）、`ALLOW_REMOTE_DB=1`、`SUPABASE_URL`（新）、`CORS_ORIGINS=http://localhost:3000` を付けて `go run ./cmd/api`。`SUPABASE_JWT_SECRET` は付けない（空のときは Project URL の公開鍵で検証する）
+- 画面: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`、`NEXT_PUBLIC_SITE_URL=http://localhost:3000` を付けて `npm run dev`
+
+### 5. 本番を切り替える
+
+**順番が大事。** 手順 3 の前に Netlify を再デプロイすると、画面は新プロジェクトでログインし、API は旧プロジェクトの鍵で検証するので、ログインしたあとの API が `401` になる。
+
+1. **API を `main` の最新でデプロイする**（Actions の「Deploy API」を Run workflow、ブランチは `main`）。Cloud Run のイメージのマイグレーションが、新 DB の版より古いと、`migrate: no migration found for version …` で起動に失敗する（今回、実際にこれで 1 度失敗した。失敗したリビジョンにはトラフィックが乗らず、前のリビジョンが動き続ける）
+2. Cloud Run `track-talk-api` の環境変数を、新プロジェクトの値にする: `DATABASE_URL`、`SUPABASE_URL`、`SUPABASE_JWT_SECRET`（旧で設定していれば新の値、空なら空のまま）、`SUPABASE_SERVICE_ROLE_KEY`。新しいリビジョンが立ち上がり、`/health` が `{"status":"ok"}` を返すことを確かめる
+3. Netlify の `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` を新プロジェクトの値にし、Actions の「Deploy Web」で再デプロイする（マージでは自動で流れない）
+4. 本番の画面で、登録、ログイン（メールと Google）、投稿を通しで試す
+5. GitHub Secrets の `DATABASE_URL` を、新のプーラー URL にする
+6. 大会データは空なので、Actions の「Imports」を手動で流して入れ直す
+
+   | 取り込み | 自動で流れる時期 | 備考 |
+   | --- | --- | --- |
+   | `domestic-majors` | 毎月 1 日 | 今回 34 件が入った。`2027` のページの `404` は、まだ公開されていないためで、毎回出る |
+   | `major-hosts` | 4 月・10 月の 1 日 | 下記の `429` で失敗する |
+   | `competitions` | 毎日 06:00（日本時間） | Gemini を使う。自動で入る |
+
+### 6. 切り替え後
+
+- 旧プロジェクトは**少なくとも 1 週間は消さず**に残し、問題があれば環境変数を戻せるようにする。消すときは、必要なら最終の dump を手元に保管してから
+- 旧プロジェクトの Google の「承認済みのリダイレクト URI」の旧 callback も、旧プロジェクトを消すときに外す
+- 動作確認で作ったテスト用のユーザーと投稿は、新プロジェクトの Authentication → Users などから消せる
+
+## 既知の問題（移行とは無関係）
+
+- `major-hosts` は、Wikipedia の API が `429 Too Many Requests` を返し、**移行の前から**失敗している（`imports` の定期の実行も、10 月 14 日から連続して失敗）。`User-Agent` に連絡先を含める、`429` のときに待って再試行する、などの修正が考えられる
+- `go test` は、手元の Mac のタイムゾーン（日本時間）で、`TestReviewRequestNeedsDemoCode` が失敗する（`TZ=UTC` を付けると通る。CI は UTC なので影響しない）
+
+## データを持ち越す場合（今回は不要だった）
+
+利用者のデータを持ち越す必要があるときは、次のスクリプトでリハーサルできる。今回、本番（シンガポール）から新プロジェクトへ流して確かめた。
 
 | 項目 | 結果 |
 | --- | --- |
-| `public` の dump（旧） | 14 秒 |
-| `public` の restore（新） | 17 秒 |
-| `public` の行数 | 51 テーブルすべて一致 |
-| マイグレーションの版 | 一致（65、dirty でない） |
-| `auth.users` | 4 → 4（一致） |
-| `auth.identities` | 6 → 6（一致） |
-| 新 DB でのパスワードログイン | 確認済み（`auth` を流したユーザーで成功） |
-| 新 DB に向けた `go test ./...` | 4 件が失敗したが、どれも移行が原因ではない（下記） |
+| `public` の dump / restore | 14 秒 / 17 秒、51 テーブルの行数が一致、マイグレーションの版も一致 |
+| `auth.users` / `auth.identities` | 4 → 4 / 6 → 6、パスワードログインを確認 |
 
-- データの移行そのものは、実測で `public` が 1 分に満たない。停止時間は、接続先の差し替えと確認を含めて **30 分を見込めば足りる**
-- 本番の版は 65。リポジトリにはそれより新しいマイグレーションがあり、切り替え後の API のデプロイで新 DB に適用される
-
-### `go test` の失敗 4 件
-
-RLS・マイグレーション・API の動作に関わる失敗はなかった。失敗した 4 件の原因は次のとおり。
-
-- `TestDeleteCompetitionsBeforeSeason`、`TestDeletePastCompetitionSeasonsKeepsCurrentAndNext`、`TestTodayMeetThreadsCreatesOneThreadPerTargetMeet`: 新 DB に流した本番の大会データ（`competitions`、`domestic_majors`）と、テストの前提がぶつかった。これらのテーブルはテストの TRUNCATE の対象外。空のローカル DB では通る
-- `TestReviewRequestNeedsDemoCode`: 手元の Mac のタイムゾーン（日本時間）で、期限が `Z` でなく `+09:00` で返る。ローカル DB でも失敗し、`TZ=UTC` を付けると通る。CI は UTC なので影響しない
-
-## 要判断・要確認
-
-1. **Auth ユーザーの扱い**: 方式 A（`auth.users`・`auth.identities` のデータだけを移す）に決め、リハーサルで通った。パスワードのハッシュと Google 連携が引き継がれ、ユーザーは再登録不要。ただし新プロジェクトの JWT 鍵は旧と別物なので、**切り替え後は全員が一度ログインし直す**
-2. **Google ログイン**: 未検証。`auth.identities` は移るが、新プロジェクトで Google を有効にし、Google Cloud コンソールの OAuth クライアントに新プロジェクトのコールバック URL（`<Project URL>/auth/v1/callback`）を追加する必要がある。画面から実際にログインして確かめる
-3. **Supabase のプラン**: 組織は無料プランで、同時に持てるプロジェクトの数に上限がある。旧と新を並べる間の費用と上限を確認する
-
-## 手順
-
-### 0. 準備（停止なし）
-
-1. 東京リージョンに新プロジェクトを作る（旧と同じ Postgres のメジャーバージョン。現在は 17）
-2. 新プロジェクトの接続プーラー URL（Cloud Run は IPv4 のため、プーラーが必要）、`SUPABASE_URL`、anon key、JWT 設定、service_role key を控える。プーラーのユーザー名は `postgres.<プロジェクトID>` の形になる
-3. Authentication の設定を旧プロジェクトと揃える
-   - URL Configuration: Site URL と Redirect URLs（Netlify のサイトの URL）
-   - Providers: Google を有効にし、OAuth クライアントのコールバック URL を追加
-   - メールのテンプレートと、メール送信（カスタム SMTP を使っていれば同じもの）
-4. 手元に PostgreSQL 17 のクライアントを入れる。サーバーが 17 のため、16 の `pg_dump` は `server version mismatch` で止まる
-
-```bash
-brew install postgresql@17
-export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"   # そのターミナルのタブだけで有効
-pg_dump --version                                         # 17.x と出ること
-```
-
-### 1. リハーサル（旧 DB は読むだけ）
-
-接続文字列は、チャットや履歴に残らないよう、`read -rs` で変数に入れる。**同じコマンドの中で**変数を使うこと（別のコマンドに分けると、環境変数が引き継がれない場合がある）。
-
-`public`（アプリのデータ）:
-
-```bash
-read -rs "OLD_DATABASE_URL?旧のプーラー URL: "; echo; read -rs "NEW_DATABASE_URL?新のプーラー URL: "; echo; OLD_DATABASE_URL="$OLD_DATABASE_URL" NEW_DATABASE_URL="$NEW_DATABASE_URL" bash deploy/db-migration/rehearse.sh
-```
-
-[`deploy/db-migration/rehearse.sh`](../deploy/db-migration/rehearse.sh) は旧 DB を読むだけで、新 DB の `public` にテーブルがあれば止まる。dump → restore のあと、テーブルごとの行数と `schema_migrations` の版を旧と突き合わせる。Supabase には `public`・`auth` が最初からあるので、スキーマ自体の作成は流さない。
-
-`auth`（ユーザー）:
-
-```bash
-read -rs "OLD_DATABASE_URL?旧のプーラー URL: "; echo; read -rs "NEW_DATABASE_URL?新のプーラー URL: "; echo; OLD_DATABASE_URL="$OLD_DATABASE_URL" NEW_DATABASE_URL="$NEW_DATABASE_URL" bash deploy/db-migration/rehearse-auth.sh
-```
-
-[`deploy/db-migration/rehearse-auth.sh`](../deploy/db-migration/rehearse-auth.sh) は、`auth.users` と `auth.identities` の**データだけ**を流す（テーブルの定義は Supabase が新プロジェクトに作っている）。次は移さない。
-
-- `sessions`・`refresh_tokens`・`flow_state`・`one_time_tokens`: 使い捨てで、新しい JWT 鍵では無効になる
-- `auth.schema_migrations`: Supabase が管理している
-
-多要素認証（`mfa_factors`）を使っているときは、環境変数 `TABLES` に `auth.mfa_factors` を足す。新 DB の `auth.users` が空でなければ止まる。
-
-dump にはパスワードのハッシュとメールアドレスが入る。**確認が済んだら、スクリプトの最後の行に出る場所を `rm -r` で消す**。
-
-確認:
-
-1. 新プロジェクトの Project URL と anon key で、パスワードログインを試す（`200` ならハッシュが引き継がれている）
-
-```bash
-read -r "URL?新の Project URL: "; read -rs "KEY?新の anon key: "; echo; read -r "EMAIL?メールアドレス: "; read -rs "PW?パスワード: "; echo; curl -s -o /dev/null -w "%{http_code}\n" "$URL/auth/v1/token?grant_type=password" -H "apikey: $KEY" -H "Content-Type: application/json" -d "{\"email\":\"$EMAIL\",\"password\":\"$PW\"}"
-```
-
-2. 新 DB に向けて `go test` を通す。テストは `public` の投稿やプロフィールを TRUNCATE するので、**必ず新 DB のリハーサル用の URL で行い、本番（旧）には向けない**。ローカル DB への保護を外すため `ALLOW_REMOTE_DB=1` が要る。タイムゾーンで 1 件落ちるので `TZ=UTC` を付ける
-
-```bash
-read -rs "NEW_DATABASE_URL?新のプーラー URL: "; echo; cd apps/api && TZ=UTC DATABASE_URL="$NEW_DATABASE_URL" ALLOW_REMOTE_DB=1 go test ./...
-```
-
-   新 DB に本番の大会データが入っていると、大会関連の 3 件が落ちる（上の「`go test` の失敗 4 件」）。
-
-### 2. 切り替え（停止 30 分前後）
-
-**切り替え用の新プロジェクトは、リハーサルとは別に、空の状態から作る。** `rehearse.sh` は新 DB の `public` にテーブルがあると止まり、リハーサルのデータをテーブルごと安全に消す方法は用意していない。無料プランでは同時に持てるプロジェクトの数に上限があるので、リハーサル用のプロジェクトを削除してから、東京に作り直す。Auth の設定（手順 0 の 3）も、作り直したプロジェクトでやり直す。
-
-1. Cloud Run の API を止めるか、書き込みを止める（`ingress` を絞る、または台数を 0 にする）。フォーム添削の Cloud Scheduler ジョブ `track-talk-coaching-tick` と GitHub Actions の `imports`（取り込み）も一時停止する
-2. 最終の dump → restore を流す（`rehearse.sh`、`rehearse-auth.sh` の順）
-3. 行数と `schema_migrations` を再確認する
-4. 次を新プロジェクトの値に差し替える
-
-| 場所 | 値 |
-| --- | --- |
-| Cloud Run `track-talk-api` | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` |
-| Netlify（画面） | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` → 再デプロイ |
-| GitHub Secrets | `DATABASE_URL`（`imports.yml` が使う） |
-| `deploy/cloud-run/env.yaml`（手元） | 上と同じ値 |
-
-```bash
-gcloud run services update track-talk-api --region asia-northeast1 \
-  --update-env-vars "DATABASE_URL=...,SUPABASE_URL=..."
-```
-
-5. 画面の再デプロイが終わったら API の `/health` を確認し、ログイン（メールと Google の両方）、投稿、画像のアップロード、退会前の画面表示を通しで試す
-6. 止めていたもの（API の受付、tick、`imports`）を戻す
-
-### 3. 切り替え後
-
-- 旧プロジェクトは**少なくとも 1 週間は消さず**に残し（書き込みは止まった状態）、問題があれば `DATABASE_URL` などを戻せるようにする
-- 旧プロジェクトの最終 dump を手元に保管してから削除する
-- リハーサルや切り替えで作った dump（`/var/folders/.../T/tmp.*`）を消す。本番のデータとパスワードのハッシュが入っている
-- `docs/cloud-run-deploy.md` と `docs/launch.md` の Supabase に関する記述、`README.md` を更新する
+- [`deploy/db-migration/rehearse.sh`](../deploy/db-migration/rehearse.sh): `public` を dump して restore し、行数とマイグレーションの版を旧と突き合わせる。旧 DB は読むだけで、新 DB の `public` にテーブルがあると止まる
+- [`deploy/db-migration/rehearse-auth.sh`](../deploy/db-migration/rehearse-auth.sh): `auth.users` と `auth.identities` のデータだけを流す。`sessions`・`refresh_tokens` などの使い捨てのテーブルは移さない。新プロジェクトの JWT 鍵は旧と別物なので、利用者は一度ログインし直しになる
+- `pg_dump` は、サーバーと同じ（または新しい）メジャーバージョンが要る。サーバーが 17 のとき、手元が 16 だと `server version mismatch` で止まる。`brew install postgresql@17` のあと、`PATH` の先頭に `/opt/homebrew/opt/postgresql@17/bin` を足す
+- 接続文字列は `read -rs` で変数に入れ、**同じコマンドの中で**使う（別のコマンドに分けると、環境変数が引き継がれない場合がある）
+- dump にはパスワードのハッシュとメールアドレスが入る。終わったら、保存先のディレクトリごと消す
+- 新 DB に向けて `go test` を通すと、新 DB に本番の大会データがある場合、大会関連の 3 件が落ちる（`competitions`、`domestic_majors` はテストの TRUNCATE の対象外）。テストは投稿やプロフィールを TRUNCATE するので、**本番には向けない**
 
 ## ロールバック
 
-切り替え後に問題が出たら、上の表の値を旧プロジェクトのものに戻す。ただし切り替え後に新プロジェクトへ入った書き込みは旧に無いので、戻すのは**早い段階（数時間以内）に限る**。それ以降は新プロジェクト側で直す。
+切り替え後に問題が出たら、手順 5 の環境変数を旧プロジェクトの値に戻す（旧プロジェクトを残しているうちは可能）。切り替え後に新プロジェクトへ入った書き込みは旧には無い。
 
-## 期待する効果
+## 効果の確認
 
-DB 往復 1 回あたり、東京↔シンガポール（約 70ms）から東京内（数 ms）になる。API が 1 リクエストで複数クエリを発行する画面ほど体感が速くなる。切り替え後に主要 API の応答時間を測って確かめる。
-
-## 未決事項
-
-- [x] 現在のリージョンと移行先の確認（シンガポール → 東京）
-- [x] `public` の dump / restore のリハーサル（行数・版が一致）
-- [x] Auth ユーザーを移す方式（A）の事前検証（データの一致とパスワードログインを確認）
-- [x] 新 DB に向けた `go test`（失敗 4 件は移行と無関係）
-- [ ] 新プロジェクトの Auth 設定（Site URL・Google ログイン・メール）を旧と揃え、画面から確認する
-- [ ] 切り替え用の新プロジェクトを作り直す（プロジェクト数の上限を確認）
-- [ ] 実施日時（利用の少ない時間帯）と、利用者への事前告知の有無
+DB 往復 1 回あたり、東京↔シンガポール（約 70ms）から東京内（数 ms）になる。API が 1 リクエストで複数クエリを発行する画面ほど体感が速くなる。切り替え後に、主要 API の応答時間を測って確かめる。
