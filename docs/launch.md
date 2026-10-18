@@ -22,9 +22,9 @@
 - 予算（既定は月100円）を超えると API が止まる。再開は手作業
 - VM に移す場合の手順は [Oracle Cloud で動かす手順](oracle-deploy.md)
 
-## Vercel（Next.js）
+## Netlify（Next.js）
 
-- リポジトリの `main` が本番。`apps/web` をビルドする
+- 本番は Actions の「Deploy Web」を手動で流す（`main` をビルドフックでビルド）。`apps/web` をビルドする
 - `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`
 - `NEXT_PUBLIC_API_BASE_URL` は Cloud Run の API の URL
 

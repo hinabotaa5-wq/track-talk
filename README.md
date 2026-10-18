@@ -241,7 +241,7 @@ CI（`.github/workflows/ci.yml`）は push／PR ごとに API テスト（Postgr
 ## デプロイ
 
 - **API**: Cloud Run（東京）。マージしても自動ではデプロイしない。GitHub の Actions →「Deploy API」→ Run workflow で `main` をデプロイする（`.github/workflows/deploy-api.yml`）。予算を超えると自動で API を止める。初回の作り方は [docs/cloud-run-deploy.md](docs/cloud-run-deploy.md)。
-- **Web**: Vercel（`apps/web`、Netlify へ移行予定）。マージしても自動ではデプロイしない（`apps/web/vercel.json`、`netlify.toml` の `ignore`）。Actions →「Deploy Web」→ Run workflow で、Secrets の `NETLIFY_BUILD_HOOK`・`VERCEL_DEPLOY_HOOK` に登録したフックを呼んで本番に出す。
+- **Web**: Netlify（`apps/web`）。マージしても自動ではデプロイしない（`netlify.toml` の `ignore`）。Actions →「Deploy Web」→ Run workflow で、Secrets の `NETLIFY_BUILD_HOOK` に登録したフックを呼んで本番に出す。
 - **DB / Auth**: Supabase
 
 公開前の確認事項は [docs/launch.md](docs/launch.md) を参照してください。料金・無料枠・商用条件は変わるため、公開直前に各公式ドキュメントで確認してください。
