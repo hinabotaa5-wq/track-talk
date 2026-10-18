@@ -122,7 +122,7 @@ func get(ctx context.Context, pageURL string) (*http.Response, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	req.Header.Set("User-Agent", "TrackTalk/1.0")
+	req.Header.Set("User-Agent", userAgent)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, "", err

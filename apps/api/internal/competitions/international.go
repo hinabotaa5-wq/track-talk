@@ -538,21 +538,51 @@ func inWindow(day, from, to time.Time) bool {
 	return !day.Before(from) && !day.After(to)
 }
 
+// userAgent はWikimediaのUser-Agentポリシーに合わせ、連絡先を含める。連絡先のないUser-Agentは429で弾かれやすい。
+const userAgent = "TrackTalk/1.0 (https://github.com/hinabotaa5-wq/track-talk)"
+
+const maxGetAttempts = 4
+
+// retryWaitCap は Retry-After が極端に長いときに待つ上限。
+const retryWaitCap = 30 * time.Second
+
+// retryBaseWait は Retry-After がないときの待ち時間の基準(試行ごとに倍にする)。
+var retryBaseWait = 2 * time.Second
+
+// getBody は429と503のとき、Retry-Afterに従って待ってから最大 maxGetAttempts 回まで取得し直す。
 func getBody(ctx context.Context, pageURL string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
-	if err != nil {
-		return nil, err
+	for attempt := 1; ; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", userAgent)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode == http.StatusOK {
+			defer res.Body.Close()
+			return io.ReadAll(io.LimitReader(res.Body, 8<<20))
+		}
+		res.Body.Close()
+		retryable := res.StatusCode == http.StatusTooManyRequests || res.StatusCode == http.StatusServiceUnavailable
+		if !retryable || attempt >= maxGetAttempts {
+			return nil, fmt.Errorf("page %s: %s", pageURL, res.Status)
+		}
+		wait := retryBaseWait << (attempt - 1)
+		if seconds, err := strconv.Atoi(strings.TrimSpace(res.Header.Get("Retry-After"))); err == nil && seconds >= 0 {
+			wait = time.Duration(seconds) * time.Second
+		}
+		if wait > retryWaitCap {
+			wait = retryWaitCap
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
 	}
-	req.Header.Set("User-Agent", "TrackTalk/1.0")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("page %s: %s", pageURL, res.Status)
-	}
-	return io.ReadAll(io.LimitReader(res.Body, 8<<20))
 }
 
 func hasClass(n *html.Node, class string) bool {
