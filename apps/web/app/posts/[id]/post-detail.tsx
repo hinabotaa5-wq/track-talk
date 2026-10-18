@@ -500,7 +500,7 @@ export function PostDetail({
         />
       ) : null}
       {post.kind === "practice" ? null : (
-        <h1 className="text-3xl font-bold">{feedTitle(post.title)}</h1>
+        <h1 className="text-4xl font-bold">{feedTitle(post.title)}</h1>
       )}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
         {post.author_name ? <span>{post.author_name}</span> : null}
@@ -508,11 +508,11 @@ export function PostDetail({
       </p>
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
-          <h2 className="mb-2 text-xl font-semibold text-slate-100">詳細</h2>
-          <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
+          <h2 className="mb-2 text-2xl font-semibold text-slate-100">詳細</h2>
+          <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
         </div>
       ) : post.body ? (
-        <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 leading-7 text-slate-200">{post.body}</div>
+        <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
       ) : null}
       {post.kind === "injury" && post.injury ? (
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
