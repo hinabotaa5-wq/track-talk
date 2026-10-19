@@ -5,6 +5,7 @@ import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle } from "@/components/feed-card";
+import { MeetThreadNowRunning } from "@/components/meet-now-running";
 import { DetailLoadingFrame } from "@/components/loading-frame";
 import { PracticeReputationSummary, practiceAttendanceLine } from "@/components/practice-reputation";
 import { prefecturePageHref } from "@/lib/prefecture-page";
@@ -502,6 +503,7 @@ export function PostDetail({
       {post.kind === "practice" ? null : (
         <h1 className="text-4xl font-bold">{feedTitle(post.title)}</h1>
       )}
+      {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
         <p className="text-xs text-slate-400">元動画: {post.source_title}</p>
       ) : null}

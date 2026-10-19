@@ -303,6 +303,16 @@ type MajorHost struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type MeetSession struct {
+	ID        uuid.UUID `json:"id"`
+	MeetKey   string    `json:"meet_key"`
+	Event     string    `json:"event"`
+	Round     string    `json:"round"`
+	Gender    string    `json:"gender"`
+	StartsAt  time.Time `json:"starts_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type MeetThread struct {
 	MeetKey   string    `json:"meet_key"`
 	PostID    uuid.UUID `json:"post_id"`

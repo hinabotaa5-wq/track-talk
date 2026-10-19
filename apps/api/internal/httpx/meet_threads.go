@@ -28,6 +28,8 @@ type meetThreadDTO struct {
 	PostID       string `json:"post_id"`
 	CommentCount int    `json:"comment_count"`
 	Href         string `json:"href"`
+	// NowRunning はいま実施中の種目(例: 「女子100m予選」)。タイムテーブルが入っていない大会では空。
+	NowRunning []string `json:"now_running"`
 }
 
 // meetTarget は今日開催中の対象大会。スレッドを1本ずつ用意する。
@@ -62,7 +64,7 @@ func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 	today := now.In(jst.Zone).Format("2006-01-02")
 	start, end := seasonRange(currentSeasonYear(now))
 
-	targets, err := s.todayMeetTargets(ctx, start, end, today)
+	targets, err := s.meetTargets(ctx, start, end, func(starts, ends time.Time) bool { return meetIsOngoing(starts, ends, today) })
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -91,6 +93,13 @@ func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 		byKey[row.MeetKey] = row
 	}
 
+	sessions, err := s.q.ListMeetSessions(ctx, keys)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	running := nowRunningByMeet(sessions, now)
+
 	meets := make([]meetThreadDTO, 0, len(targets))
 	for _, t := range targets {
 		row, ok := byKey[t.key]
@@ -104,13 +113,14 @@ func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 			PostID:       row.PostID.String(),
 			CommentCount: int(row.CommentCount),
 			Href:         "/posts/" + row.PostID.String(),
+			NowRunning:   running[t.key],
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{"meets": meets})
 }
 
-// todayMeetTargets は今日の対象大会(国内主要大会はすべて、国際大会は featured だけ)を集める。
-func (s *Server) todayMeetTargets(ctx context.Context, start, end time.Time, today string) ([]meetTarget, error) {
+// meetTargets は対象大会(国内主要大会はすべて、国際大会は featured だけ)のうち、開催期間が keep を満たすものを集める。
+func (s *Server) meetTargets(ctx context.Context, start, end time.Time, keep func(starts, ends time.Time) bool) ([]meetTarget, error) {
 	var targets []meetTarget
 
 	majors, err := s.q.ListDomesticMajors(ctx, db.ListDomesticMajorsParams{SeasonStart: start, SeasonEnd: end})
@@ -118,7 +128,7 @@ func (s *Server) todayMeetTargets(ctx context.Context, start, end time.Time, tod
 		return nil, err
 	}
 	for _, m := range majors {
-		if !meetIsOngoing(m.StartsOn, m.EndsOn, today) {
+		if !keep(m.StartsOn, m.EndsOn) {
 			continue
 		}
 		dateLabel := meetDateLabel(m.StartsOn)
@@ -140,7 +150,7 @@ func (s *Server) todayMeetTargets(ctx context.Context, start, end time.Time, tod
 		if c.EndsOn != nil {
 			ends = *c.EndsOn
 		}
-		if !meetIsOngoing(c.StartsOn, ends, today) {
+		if !keep(c.StartsOn, ends) {
 			continue
 		}
 		if !isFeaturedInternational(c.Name, c.OrganizerUrl, c.SourceUrl) {

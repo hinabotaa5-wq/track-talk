@@ -22,3 +22,23 @@ JOIN posts p ON p.id = mt.post_id
 WHERE mt.meet_key = ANY(sqlc.arg('meet_keys')::text[])
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL;
+
+-- name: ListMeetSessions :many
+SELECT meet_key, event, round, gender, starts_at
+FROM meet_sessions
+WHERE meet_key = ANY(sqlc.arg('meet_keys')::text[])
+ORDER BY starts_at, gender, event, round;
+
+-- name: DeleteMeetSessions :exec
+DELETE FROM meet_sessions
+WHERE meet_key = $1;
+
+-- name: InsertMeetSession :exec
+INSERT INTO meet_sessions (meet_key, event, round, gender, starts_at)
+VALUES ($1, $2, $3, $4, $5);
+
+-- name: CountMeetSessions :many
+SELECT meet_key, count(*)::int AS session_count
+FROM meet_sessions
+WHERE meet_key = ANY(sqlc.arg('meet_keys')::text[])
+GROUP BY meet_key;

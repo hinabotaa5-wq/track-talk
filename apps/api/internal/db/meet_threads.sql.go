@@ -7,9 +7,42 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const countMeetSessions = `-- name: CountMeetSessions :many
+SELECT meet_key, count(*)::int AS session_count
+FROM meet_sessions
+WHERE meet_key = ANY($1::text[])
+GROUP BY meet_key
+`
+
+type CountMeetSessionsRow struct {
+	MeetKey      string `json:"meet_key"`
+	SessionCount int32  `json:"session_count"`
+}
+
+func (q *Queries) CountMeetSessions(ctx context.Context, meetKeys []string) ([]CountMeetSessionsRow, error) {
+	rows, err := q.db.Query(ctx, countMeetSessions, meetKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountMeetSessionsRow
+	for rows.Next() {
+		var i CountMeetSessionsRow
+		if err := rows.Scan(&i.MeetKey, &i.SessionCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const createMeetPost = `-- name: CreateMeetPost :exec
 INSERT INTO posts (id, author_id, title, body, kind)
@@ -33,6 +66,16 @@ func (q *Queries) CreateMeetPost(ctx context.Context, arg CreateMeetPostParams) 
 	return err
 }
 
+const deleteMeetSessions = `-- name: DeleteMeetSessions :exec
+DELETE FROM meet_sessions
+WHERE meet_key = $1
+`
+
+func (q *Queries) DeleteMeetSessions(ctx context.Context, meetKey string) error {
+	_, err := q.db.Exec(ctx, deleteMeetSessions, meetKey)
+	return err
+}
+
 const getMeetThreadPostID = `-- name: GetMeetThreadPostID :one
 SELECT post_id
 FROM meet_threads
@@ -44,6 +87,30 @@ func (q *Queries) GetMeetThreadPostID(ctx context.Context, meetKey string) (uuid
 	var post_id uuid.UUID
 	err := row.Scan(&post_id)
 	return post_id, err
+}
+
+const insertMeetSession = `-- name: InsertMeetSession :exec
+INSERT INTO meet_sessions (meet_key, event, round, gender, starts_at)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertMeetSessionParams struct {
+	MeetKey  string    `json:"meet_key"`
+	Event    string    `json:"event"`
+	Round    string    `json:"round"`
+	Gender   string    `json:"gender"`
+	StartsAt time.Time `json:"starts_at"`
+}
+
+func (q *Queries) InsertMeetSession(ctx context.Context, arg InsertMeetSessionParams) error {
+	_, err := q.db.Exec(ctx, insertMeetSession,
+		arg.MeetKey,
+		arg.Event,
+		arg.Round,
+		arg.Gender,
+		arg.StartsAt,
+	)
+	return err
 }
 
 const insertMeetThread = `-- name: InsertMeetThread :exec
@@ -59,6 +126,47 @@ type InsertMeetThreadParams struct {
 func (q *Queries) InsertMeetThread(ctx context.Context, arg InsertMeetThreadParams) error {
 	_, err := q.db.Exec(ctx, insertMeetThread, arg.MeetKey, arg.PostID)
 	return err
+}
+
+const listMeetSessions = `-- name: ListMeetSessions :many
+SELECT meet_key, event, round, gender, starts_at
+FROM meet_sessions
+WHERE meet_key = ANY($1::text[])
+ORDER BY starts_at, gender, event, round
+`
+
+type ListMeetSessionsRow struct {
+	MeetKey  string    `json:"meet_key"`
+	Event    string    `json:"event"`
+	Round    string    `json:"round"`
+	Gender   string    `json:"gender"`
+	StartsAt time.Time `json:"starts_at"`
+}
+
+func (q *Queries) ListMeetSessions(ctx context.Context, meetKeys []string) ([]ListMeetSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listMeetSessions, meetKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMeetSessionsRow
+	for rows.Next() {
+		var i ListMeetSessionsRow
+		if err := rows.Scan(
+			&i.MeetKey,
+			&i.Event,
+			&i.Round,
+			&i.Gender,
+			&i.StartsAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMeetThreads = `-- name: ListMeetThreads :many
