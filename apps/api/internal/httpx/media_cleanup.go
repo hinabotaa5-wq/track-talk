@@ -66,17 +66,25 @@ func (s *Server) purgeMedia(m postMedia) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		inUse, err := s.q.ListMediaInUse(ctx, append(slices.Clone(m.Images), m.Videos...))
-		if err != nil {
-			slog.Warn("cloudinary cleanup skipped", "error", err)
-			return
-		}
-		m = postMedia{Images: unused(m.Images, inUse), Videos: unused(m.Videos, inUse)}
-		if err := s.cloud.Delete(ctx, "image", m.Images); err != nil {
-			slog.Warn("cloudinary image delete failed", "public_ids", m.Images, "error", err)
-		}
-		if err := s.cloud.Delete(ctx, "video", m.Videos); err != nil {
-			slog.Warn("cloudinary video delete failed", "public_ids", m.Videos, "error", err)
-		}
+		s.deleteUnusedMedia(ctx, m)
 	}()
+}
+
+// deleteUnusedMedia は、まだどこかで使っている ID を除いてから Cloudinary から消す。
+func (s *Server) deleteUnusedMedia(ctx context.Context, m postMedia) {
+	if m.empty() || !s.cloud.Configured() {
+		return
+	}
+	inUse, err := s.q.ListMediaInUse(ctx, append(slices.Clone(m.Images), m.Videos...))
+	if err != nil {
+		slog.Warn("cloudinary cleanup skipped", "error", err)
+		return
+	}
+	m = postMedia{Images: unused(m.Images, inUse), Videos: unused(m.Videos, inUse)}
+	if err := s.cloud.Delete(ctx, "image", m.Images); err != nil {
+		slog.Warn("cloudinary image delete failed", "public_ids", m.Images, "error", err)
+	}
+	if err := s.cloud.Delete(ctx, "video", m.Videos); err != nil {
+		slog.Warn("cloudinary video delete failed", "public_ids", m.Videos, "error", err)
+	}
 }

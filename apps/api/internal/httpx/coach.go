@@ -141,10 +141,9 @@ func (s *Server) setCoachPhoto(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 前の写真が他人の投稿などの写真だったら消さない（他人の写真の ID を登録してから差し替える手を防ぐ）。
 	if old != nil && *old != id {
-		if err := s.cloud.Delete(r.Context(), "image", []string{*old}); err != nil {
-			slog.Warn("delete old coach photo", "err", err)
-		}
+		s.deleteUnusedMedia(r.Context(), postMedia{Images: []string{*old}})
 	}
 	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
 	if err != nil {
@@ -320,9 +319,7 @@ func (s *Server) removeCoachPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if old != nil {
-		if err := s.cloud.Delete(r.Context(), "image", []string{*old}); err != nil {
-			slog.Warn("delete removed coach photo", "err", err)
-		}
+		s.deleteUnusedMedia(r.Context(), postMedia{Images: []string{*old}})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

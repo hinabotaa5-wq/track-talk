@@ -216,6 +216,23 @@ func TestCoachPhoto(t *testing.T) {
 		t.Fatalf("deleted %v", deleted)
 	}
 
+	// 他人の投稿の写真の ID を登録してから差し替えても、その写真は消さない。
+	others := upload()
+	tb := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", tb, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": others}); rec.Code != http.StatusCreated {
+		t.Fatalf("other's post %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": others}); rec.Code != http.StatusOK {
+		t.Fatalf("set other's photo %d", rec.Code)
+	}
+	deleted = nil
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": second}); rec.Code != http.StatusOK {
+		t.Fatalf("replace again %d", rec.Code)
+	}
+	if len(deleted) != 0 {
+		t.Fatalf("other's photo deleted %v", deleted)
+	}
+
 	// 承認されると、コーチ一覧に写真が出る。
 	admin := uuid.New()
 	tadmin := token(t, admin)
