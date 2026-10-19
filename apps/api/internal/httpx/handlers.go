@@ -59,11 +59,15 @@ func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Prof
 	if value := strings.TrimSpace(identity.Nickname); value != "" && Nickname(value) == "" {
 		nickname = &value
 	}
-	p, err := s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
-		ID:             identity.UserID,
-		Nickname:       nickname,
-		NicknamePublic: nickname != nil && identity.NicknamePublic,
-	})
+	// ほとんどは作成済みなので、まず読むだけで済ませ、無いときだけ作る。
+	p, err := s.q.GetProfileByID(r.Context(), identity.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		p, err = s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
+			ID:             identity.UserID,
+			Nickname:       nickname,
+			NicknamePublic: nickname != nil && identity.NicknamePublic,
+		})
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusUnauthorized, "unauthorized", "このアカウントは退会済みです")
 		return db.Profile{}, false

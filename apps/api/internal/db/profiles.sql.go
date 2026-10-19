@@ -43,6 +43,27 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 	return i, err
 }
 
+const getProfileByID = `-- name: GetProfileByID :one
+SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo FROM profiles WHERE id = $1
+`
+
+// ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
+func (q *Queries) GetProfileByID(ctx context.Context, id uuid.UUID) (Profile, error) {
+	row := q.db.QueryRow(ctx, getProfileByID, id)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+		&i.BirthMonth,
+		&i.CoachingDemo,
+	)
+	return i, err
+}
+
 const updateProfile = `-- name: UpdateProfile :one
 UPDATE profiles
 SET nickname = $2,

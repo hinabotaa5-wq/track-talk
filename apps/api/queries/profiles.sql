@@ -1,3 +1,7 @@
+-- name: GetProfileByID :one
+-- ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
+SELECT * FROM profiles WHERE id = $1;
+
 -- name: EnsureProfile :one
 -- 退会したアカウントでは作らない（行が返らない）。
 INSERT INTO profiles (id, nickname, nickname_public)
