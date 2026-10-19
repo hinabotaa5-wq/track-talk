@@ -141,6 +141,10 @@ func TestCoachingMessages(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"stars":4`) {
 		t.Fatalf("rating in detail %s", rec.Body.String())
 	}
+	// コーチ一覧の★にも入る。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); !strings.Contains(body, `"rating_average":4,"rating_count":1`) {
+		t.Fatalf("rating in coach list %s", body)
+	}
 }
 
 // 退会すると契約とやりとりが消えるので、進行中の指導と、やりとりへの未解決の通報があるあいだは退会できない。
