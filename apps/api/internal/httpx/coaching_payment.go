@@ -362,10 +362,24 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 	if pay.PaymentIntentID == nil {
 		return pay, errors.New("payment has no payment intent")
 	}
-	if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()+"-"+strconv.Itoa(int(amount))); err != nil {
-		return pay, fmt.Errorf("%w: %w", errStripe, err)
+	// 同じ支払いの返金が重なっても Stripe に2回送らないよう、支払いの行をロックしたまま送って記録する。
+	// まだ返金していないことは、ロックしてから確かめ直す（返し終えていたら ErrNoRows）。
+	refunded := pay
+	err := s.tx(ctx, func(q *db.Queries) error {
+		if _, err := q.LockPaidCoachingPayment(ctx, pay.ID); err != nil {
+			return err
+		}
+		if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()+"-"+strconv.Itoa(int(amount))); err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		var err error
+		refunded, err = q.RecordCoachingRefund(ctx, db.RecordCoachingRefundParams{ID: pay.ID, RefundedYen: amount, RefundReason: reason})
+		return err
+	})
+	if err != nil {
+		return pay, err
 	}
-	return s.q.RecordCoachingRefund(ctx, db.RecordCoachingRefundParams{ID: pay.ID, RefundedYen: amount, RefundReason: reason})
+	return refunded, nil
 }
 
 // refundUnstarted は、期間が始まらなかった支払いを全額返金して、払った人の側に知らせる。

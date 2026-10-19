@@ -48,6 +48,11 @@ WHERE contract_id = $1 AND status <> 'pending'
 ORDER BY refund_reason IS NOT DISTINCT FROM 'not_started', paid_at DESC
 LIMIT 1;
 
+-- name: LockPaidCoachingPayment :one
+-- 返金を Stripe に送るあいだ、まだ返金していない支払いの行をロックしておく。
+-- 同じ支払いの返金が重なったら、あとのほうは前のが記録し終えるのを待ってから行が返らなくなる。
+SELECT * FROM coaching_payments WHERE id = $1 AND status = 'paid' FOR UPDATE;
+
 -- name: RecordCoachingRefund :one
 -- 返金は1つの支払いに1回だけ。
 UPDATE coaching_payments

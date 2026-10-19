@@ -274,6 +274,35 @@ func (q *Queries) ListUnstartedPaidPayments(ctx context.Context) ([]CoachingPaym
 	return items, nil
 }
 
+const lockPaidCoachingPayment = `-- name: LockPaidCoachingPayment :one
+SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at FROM coaching_payments WHERE id = $1 AND status = 'paid' FOR UPDATE
+`
+
+// 返金を Stripe に送るあいだ、まだ返金していない支払いの行をロックしておく。
+// 同じ支払いの返金が重なったら、あとのほうは前のが記録し終えるのを待ってから行が返らなくなる。
+func (q *Queries) LockPaidCoachingPayment(ctx context.Context, id uuid.UUID) (CoachingPayment, error) {
+	row := q.db.QueryRow(ctx, lockPaidCoachingPayment, id)
+	var i CoachingPayment
+	err := row.Scan(
+		&i.ID,
+		&i.ContractID,
+		&i.Payer,
+		&i.AmountYen,
+		&i.CheckoutSessionID,
+		&i.CheckoutUrl,
+		&i.SessionExpiresAt,
+		&i.PaymentIntentID,
+		&i.Status,
+		&i.RefundedYen,
+		&i.RefundReason,
+		&i.PaidAt,
+		&i.RefundedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markCoachingPaymentPaid = `-- name: MarkCoachingPaymentPaid :one
 UPDATE coaching_payments
 SET status = 'paid',

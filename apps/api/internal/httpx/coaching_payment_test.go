@@ -35,6 +35,8 @@ type fakeStripe struct {
 	transfers []url.Values
 	// 送金を断らせるときの数。
 	failTransfers int
+	// 返金に答えるまで待つ時間（同時に送ったときの確かめに使う）。
+	refundDelay time.Duration
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -134,6 +136,7 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			f.transfers = append(f.transfers, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
 		case r.URL.Path == "/v1/refunds":
+			time.Sleep(f.refundDelay)
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
 		default:
@@ -418,5 +421,30 @@ func TestCoachingPaymentAfterTheDeadlineIsRefunded(t *testing.T) {
 	demo := setup(t)
 	if rec := stripeWebhook(t, demo, testWebhookSecret, "checkout.session.completed", map[string]any{"id": "cs_x"}); rec.Code != http.StatusNotFound {
 		t.Fatalf("demo webhook %d", rec.Code)
+	}
+}
+
+// 運営の返金を同時に2回送っても、Stripe に送る返金は1件だけ。
+func TestAdminCoachingRefundConcurrentRefundsOnce(t *testing.T) {
+	h, f := setupStripe(t)
+	tu, _, id := adultAccepted(t, h)
+	checkout(t, h, tu, id)
+	paidSession(t, h, sessionIDFor(t, id), "pi_once", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = now() - interval '15 days', ends_at = now() + interval '15 days' WHERE id = $1`, id)
+	ta := adminToken(t, h)
+	f.mu.Lock()
+	f.refundDelay = 200 * time.Millisecond
+	f.mu.Unlock()
+	var wg sync.WaitGroup
+	for _, kind := range []string{"full", "remaining"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": kind})
+		}()
+	}
+	wg.Wait()
+	if refunds := f.refundList(); len(refunds) != 1 {
+		t.Fatalf("refunds %v", refunds)
 	}
 }
