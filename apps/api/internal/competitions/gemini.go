@@ -165,10 +165,17 @@ func parseDrafts(raw string) ([]Draft, error) {
 	raw = strings.TrimPrefix(raw, "```")
 	raw = strings.TrimSuffix(raw, "```")
 	raw = strings.TrimSpace(raw)
-	var wrapped struct {
-		Meets []Draft `json:"meets"`
-	}
-	if err := json.Unmarshal([]byte(raw), &wrapped); err == nil && wrapped.Meets != nil {
+	// {"meets": ...} の形で読めたら、meets が null や省略（大会がないページ）でも「大会なし」として返す。
+	if strings.HasPrefix(raw, "{") {
+		var wrapped struct {
+			Meets []Draft `json:"meets"`
+		}
+		if err := json.Unmarshal([]byte(raw), &wrapped); err != nil {
+			return nil, fmt.Errorf("gemini json: %w", err)
+		}
+		if wrapped.Meets == nil {
+			wrapped.Meets = []Draft{}
+		}
 		return wrapped.Meets, nil
 	}
 	var list []Draft
