@@ -52,10 +52,14 @@ WHERE id = $1 AND status IN ('authorized', 'captured')
 RETURNING *;
 
 -- name: ListReviewPaymentsToCapture :many
--- 返却された依頼の、まだ確定していない仮押さえ。
+-- 返却された依頼の、まだ確定していない仮押さえ。二重の支払いは確定せず（下の Release で解放する）、最初の1本だけ確定する。
 SELECT pay.* FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'authorized' AND r.returned_at IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM review_payments o
+      WHERE o.request_id = pay.request_id AND o.id <> pay.id
+        AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id))
 LIMIT 50;
 
 -- name: ListReviewPaymentsToRelease :many
@@ -67,10 +71,11 @@ WHERE pay.status IN ('authorized', 'captured')
   -- 依頼が消えたもの: 支払った人が退会して消えたもの（payer_id も NULL）は、返却済みで確定した代金なので返さない。
   AND ((r.id IS NULL AND pay.payer_id IS NOT NULL)
        OR r.status IN ('expired', 'awaiting_payment')
-       OR (r.returned_at IS NULL AND EXISTS (
+       -- 二重の支払い: 返却のあとでも、最初の1本以外は返す。
+       OR EXISTS (
            SELECT 1 FROM review_payments o
            WHERE o.request_id = pay.request_id AND o.id <> pay.id
-             AND o.status IN ('authorized', 'captured') AND o.authorized_at < pay.authorized_at)))
+             AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id)))
 LIMIT 50;
 
 -- name: DeleteUnpaidReviewRequests :many

@@ -224,3 +224,27 @@ func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
 		t.Fatalf("second while unpaid %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 1本の依頼に二重の支払いがあったら、返却のあとでも最初の1本だけを確定し、残りは取り消す。
+func TestReviewPaymentDuplicateAfterReturn(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	tadmin := adminToken(t, h)
+	_, tu := demoRequester(t, h, tadmin)
+	id := paidReview(t, h, tu, "card", "pi_card_first")
+	execSQLArgs(t, `INSERT INTO review_payments (id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url,
+			session_expires_at, payment_intent_id, status, authorized_at)
+		SELECT gen_random_uuid(), request_id, payer_id, method, amount_yen, 'cs_second', checkout_url,
+			session_expires_at, 'pi_card_second', 'authorized', now()
+		FROM review_payments WHERE request_id = $1 AND status = 'authorized'`, id)
+	execSQLArgs(t, `UPDATE review_payments SET authorized_at = authorized_at - interval '5 minutes' WHERE payment_intent_id = 'pi_card_first'`)
+	execSQLArgs(t, `UPDATE review_payments SET authorized_at = authorized_at - interval '2 minutes' WHERE payment_intent_id = 'pi_card_second'`)
+	execSQLArgs(t, `UPDATE review_requests SET status = 'returned', returned_at = now() WHERE id = $1`, id)
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK {
+		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+	}
+	captured, canceled := f.calls()
+	if len(captured) != 1 || captured[0] != "pi_card_first" || len(canceled) != 1 || canceled[0] != "pi_card_second" {
+		t.Fatalf("captured %v canceled %v", captured, canceled)
+	}
+}
