@@ -4,9 +4,11 @@ FROM major_hosts
 WHERE ends_on >= sqlc.arg(today)::date
 ORDER BY starts_on ASC, name ASC;
 
--- name: DeleteMajorHostsByKind :exec
+-- name: DeleteMajorHostsNotInYears :exec
+-- 今回の取り込みになかった年の行だけ消す（ある年の行は UpsertMajorHost で更新する）。
 DELETE FROM major_hosts
-WHERE kind = sqlc.arg(kind);
+WHERE kind = sqlc.arg(kind)
+  AND year <> ALL (sqlc.arg(years)::int[]);
 
 -- name: UpsertMajorHost :exec
 INSERT INTO major_hosts (
@@ -23,6 +25,11 @@ SET name = EXCLUDED.name,
     starts_on = EXCLUDED.starts_on,
     ends_on = EXCLUDED.ends_on,
     schedule_label = EXCLUDED.schedule_label,
-    image_url = EXCLUDED.image_url,
+    -- 写真が取れなかったとき（Wikimedia の一時的な失敗など）は、同じ開催地の前回の写真を残す。
+    image_url = CASE
+        WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url
+        WHEN major_hosts.city = EXCLUDED.city THEN major_hosts.image_url
+        ELSE ''
+    END,
     page_url = EXCLUDED.page_url,
     updated_at = now();
