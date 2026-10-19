@@ -141,6 +141,8 @@ type RateLimiter struct {
 	writes    map[string][]time.Time
 	reports   map[string][]time.Time
 	inquiries map[string][]time.Time
+	// lastSweep は、来なくなった IP の行を最後にまとめて消した時刻。
+	lastSweep time.Time
 }
 
 func NewRateLimiter() *RateLimiter {
@@ -161,6 +163,7 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 		ip := clientIP(r)
 		now := time.Now()
 		l.mu.Lock()
+		l.sweep(now)
 		if strings.HasPrefix(r.URL.Path, "/v1/reports") {
 			l.reports[ip] = prune(l.reports[ip], now.Add(-time.Hour))
 			if len(l.reports[ip]) >= 10 {
@@ -189,6 +192,24 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 		l.mu.Unlock()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// sweep は10分ごとに、窓の外の記録しか残っていない IP の行を消す。消さないと、送信元を変えながら
+// 送られるだけ map が増え続ける。l.mu を持って呼ぶ。
+func (l *RateLimiter) sweep(now time.Time) {
+	if now.Sub(l.lastSweep) < 10*time.Minute {
+		return
+	}
+	l.lastSweep = now
+	for m, window := range map[*map[string][]time.Time]time.Duration{&l.writes: time.Minute, &l.reports: time.Hour, &l.inquiries: time.Hour} {
+		for ip, times := range *m {
+			if times = prune(times, now.Add(-window)); len(times) == 0 {
+				delete(*m, ip)
+			} else {
+				(*m)[ip] = times
+			}
+		}
+	}
 }
 
 func prune(in []time.Time, cutoff time.Time) []time.Time {
