@@ -13,7 +13,8 @@ import (
 
 const ensureProfile = `-- name: EnsureProfile :one
 INSERT INTO profiles (id, nickname, nickname_public)
-VALUES ($1, $2, $3)
+SELECT $1::uuid, $2::text, $3::boolean
+WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
 RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
@@ -25,6 +26,7 @@ type EnsureProfileParams struct {
 	NicknamePublic bool      `json:"nickname_public"`
 }
 
+// 退会したアカウントでは作らない（行が返らない）。
 func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (Profile, error) {
 	row := q.db.QueryRow(ctx, ensureProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
 	var i Profile

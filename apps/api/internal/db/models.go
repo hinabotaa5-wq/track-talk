@@ -201,6 +201,11 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type DeletedAccount struct {
+	ID        uuid.UUID `json:"id"`
+	DeletedAt time.Time `json:"deleted_at"`
+}
+
 type DomesticMajor struct {
 	Slug          string    `json:"slug"`
 	Year          int32     `json:"year"`

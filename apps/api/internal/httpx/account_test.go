@@ -186,29 +186,11 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 		t.Fatalf("reputation %d %+v", rec.Code, reputation)
 	}
 
-	rec = doJSON(t, h, http.MethodGet, "/v1/me/posts", author, nil)
-	var mine struct {
-		Posts []any `json:"posts"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &mine)
-	if rec.Code != 200 || len(mine.Posts) != 0 {
-		t.Fatalf("my posts %d %+v", rec.Code, mine)
-	}
-	rec = doJSON(t, h, http.MethodGet, "/v1/me/saves", author, nil)
-	var saves struct {
-		Posts []any `json:"posts"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &saves)
-	if rec.Code != 200 || len(saves.Posts) != 0 {
-		t.Fatalf("saves %d %+v", rec.Code, saves)
-	}
-	rec = doJSON(t, h, http.MethodGet, "/v1/me/inquiries", author, nil)
-	var inquiries struct {
-		Inquiries []any `json:"inquiries"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &inquiries)
-	if rec.Code != 200 || len(inquiries.Inquiries) != 0 {
-		t.Fatalf("inquiries %d %+v", rec.Code, inquiries)
+	// 退会したアカウントのトークンでは、自分のページも開けない（プロフィールを作り直さない）。
+	for _, path := range []string{"/v1/me/posts", "/v1/me/saves", "/v1/me/inquiries"} {
+		if rec := doJSON(t, h, http.MethodGet, path, author, nil); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s after withdraw %d %s", path, rec.Code, rec.Body.String())
+		}
 	}
 }
 
@@ -260,5 +242,24 @@ func TestDeleteAccountKeepsPurgeWhenAuthDeleteFails(t *testing.T) {
 	rec = doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("purge rolled back %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 退会したあと、手元に残ったトークンでプロフィールを作り直させない。
+func TestDeletedAccountTokenCannotRecreateProfile(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", ta, nil); rec.Code != http.StatusOK {
+		t.Fatalf("me %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", ta, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "退会後", "body": "本文"}); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("post after withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	// 退会をもう一度送っても（Auth の削除のやり直し）、エラーにならない。
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", ta, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw again %d %s", rec.Code, rec.Body.String())
 	}
 }

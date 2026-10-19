@@ -134,6 +134,7 @@ func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		q.DeleteReportsForUser,
 		q.DeleteCommentsForUser,
 		q.DeletePostsForUser,
+		q.RememberDeletedAccount,
 		q.DeleteProfile,
 	}
 	for _, step := range steps {

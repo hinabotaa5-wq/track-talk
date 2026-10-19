@@ -52,6 +52,10 @@ WHERE author_id = sqlc.arg('user_id');
 DELETE FROM posts
 WHERE author_id = sqlc.arg('user_id');
 
+-- name: RememberDeletedAccount :exec
+INSERT INTO deleted_accounts (id) VALUES (sqlc.arg('user_id'))
+ON CONFLICT (id) DO NOTHING;
+
 -- name: DeleteProfile :exec
 DELETE FROM profiles
 WHERE id = sqlc.arg('user_id');

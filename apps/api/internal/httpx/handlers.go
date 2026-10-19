@@ -64,6 +64,10 @@ func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Prof
 		Nickname:       nickname,
 		NicknamePublic: nickname != nil && identity.NicknamePublic,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusUnauthorized, "unauthorized", "このアカウントは退会済みです")
+		return db.Profile{}, false
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return db.Profile{}, false

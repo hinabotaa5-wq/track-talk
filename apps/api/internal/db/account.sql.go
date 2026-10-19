@@ -166,6 +166,16 @@ func (q *Queries) ReleaseCommentThreadsForUser(ctx context.Context, userID uuid.
 	return err
 }
 
+const rememberDeletedAccount = `-- name: RememberDeletedAccount :exec
+INSERT INTO deleted_accounts (id) VALUES ($1)
+ON CONFLICT (id) DO NOTHING
+`
+
+func (q *Queries) RememberDeletedAccount(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, rememberDeletedAccount, userID)
+	return err
+}
+
 const withdrawBlockers = `-- name: WithdrawBlockers :one
 SELECT
     EXISTS (
