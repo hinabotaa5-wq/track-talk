@@ -58,16 +58,23 @@ export function PostDetail({
   const [reportedPost, setReportedPost] = useState(false);
   const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
+  // load は何度も重なって呼ばれる(ログイン状態の確定、タブへの復帰、いいねのあとなど)。
+  // 後から始めたものの結果だけを使い、先に始めた古い応答で上書きしない。
+  const loadSeq = useRef(0);
   async function load() {
+    const seq = ++loadSeq.current;
+    const stale = () => seq !== loadSeq.current;
     try {
       const [p, c] = await Promise.all([
         apiFetch<Post>(`/v1/posts/${id}`, { token }),
         apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50`, { token }),
       ]);
+      if (stale()) return;
       setPost(p);
       setComments(c.comments ?? []);
       if (token) {
         const mine = await apiFetch<{ post: boolean; comment_ids: string[] }>(`/v1/posts/${id}/my-reports`, { token }).catch(() => null);
+        if (stale()) return;
         if (mine) {
           setReportedPost(mine.post);
           setReportedComments(new Set(mine.comment_ids));
@@ -75,13 +82,14 @@ export function PostDetail({
       }
       setError("");
     } catch (e) {
+      if (stale()) return;
       if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
       else if (e instanceof ApiRequestError && (e.status === 401 || e.code === "not_joined")) {
         // ケガの投稿は、同じケガのグループに参加した人だけが読める。
         setError("この投稿は、同じケガのグループに参加すると読めます");
       } else setError("読み込みに失敗しました");
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   }
 
@@ -596,7 +604,7 @@ export function PostDetail({
         )}
         {allowComment ? (
           <form
-            onSubmit={form.handleSubmit(onComment)}
+            onSubmit={(event) => void form.handleSubmit(onComment)(event)}
             onFocus={() => document.body.setAttribute("data-comment-typing", "")}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
