@@ -95,4 +95,15 @@ func TestYearFromURL(t *testing.T) {
 	if y, ok := yearFromURL(u2); !ok || y != 2026 {
 		t.Fatalf("expected 2026, got %d, %v", y, ok)
 	}
+	// 月ごとのページの1〜3月は、前の年の競技年度。
+	for _, raw := range []string{
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=12&y=2026",
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=1&y=2027",
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=3&y=2027",
+	} {
+		u, _ := url.Parse(raw)
+		if y, ok := yearFromURL(u); !ok || y != 2026 {
+			t.Fatalf("%s: expected 2026, got %d, %v", raw, y, ok)
+		}
+	}
 }
