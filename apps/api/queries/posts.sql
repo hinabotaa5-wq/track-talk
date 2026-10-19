@@ -496,4 +496,9 @@ SELECT rp.cloudinary_public_id AS public_id
 FROM recruitment_photos rp
 JOIN posts p ON p.id = rp.post_id
 WHERE p.deleted_at IS NULL
-  AND rp.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[]);
+  AND rp.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[])
+UNION
+-- コーチの顔写真も同じフォルダにあり、一覧で公開 ID が見えるので、使っているものとして数える。
+SELECT cp.photo_public_id::text AS public_id
+FROM coach_profiles cp
+WHERE cp.photo_public_id = ANY(sqlc.arg('public_ids')::text[]);

@@ -536,8 +536,13 @@ FROM recruitment_photos rp
 JOIN posts p ON p.id = rp.post_id
 WHERE p.deleted_at IS NULL
   AND rp.cloudinary_public_id = ANY($1::text[])
+UNION
+SELECT cp.photo_public_id::text AS public_id
+FROM coach_profiles cp
+WHERE cp.photo_public_id = ANY($1::text[])
 `
 
+// コーチの顔写真も同じフォルダにあり、一覧で公開 ID が見えるので、使っているものとして数える。
 func (q *Queries) ListMediaInUse(ctx context.Context, publicIds []string) ([]string, error) {
 	rows, err := q.db.Query(ctx, listMediaInUse, publicIds)
 	if err != nil {

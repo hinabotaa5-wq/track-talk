@@ -76,3 +76,50 @@ func TestDeletingAPostRemovesItsPhotoFromCloudinary(t *testing.T) {
 		t.Fatal("photo was not deleted")
 	}
 }
+
+// コーチの顔写真の ID を自分の投稿に付けてから消しても、顔写真は消えない。
+func TestDeletingAPostKeepsACoachPhoto(t *testing.T) {
+	deleted := make(chan []string, 4)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			deleted <- r.URL.Query()["public_ids[]"]
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	tc := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	photo := "track-talk/" + uuid.NewString()
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", tc, map[string]any{"photo_public_id": photo}); rec.Code != http.StatusOK {
+		t.Fatalf("photo %d %s", rec.Code, rec.Body.String())
+	}
+
+	tb := token(t, uuid.New())
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tb, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+created.ID, tb, nil); rec.Code != 204 {
+		t.Fatalf("delete %d", rec.Code)
+	}
+	select {
+	case ids := <-deleted:
+		t.Fatalf("coach photo was deleted: %v", ids)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
