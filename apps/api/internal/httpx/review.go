@@ -13,6 +13,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -134,7 +135,22 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if onDuty && !current.OnDuty {
-		devices, err := s.q.CountPushSubscriptions(r.Context(), p.ID)
+		// 登録の件数だけでは、届かない宛先でも受付中になれてしまう。通知を使えるときは、
+		// 受付を始めた知らせを実際に送って、1台以上に届いたことを確かめる。
+		var devices int64
+		var err error
+		if s.push.Configured() {
+			var sent int
+			sent, err = s.sendPush(r.Context(), p.ID, push.Message{
+				Title: "依頼の受付を始めました",
+				Body:  "フォーム添削の依頼が届くと、この端末に通知します",
+				URL:   "/coach",
+				Tag:   "coach-duty",
+			}, 10*time.Minute)
+			devices = int64(sent)
+		} else {
+			devices, err = s.q.CountPushSubscriptions(r.Context(), p.ID)
+		}
 		if err != nil {
 			MapDBError(w, err)
 			return

@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -259,4 +261,51 @@ func dueAtNoonJST(s string) bool {
 	}
 	t = t.In(jst.Zone)
 	return t.Hour() == 12 && t.Minute() == 0
+}
+
+// 通知を使えるときは、登録があっても実際に届かない宛先だけでは受付中にできない。
+func TestCoachDutyNeedsReachableDevice(t *testing.T) {
+	pushServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/gone") {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer pushServer.Close()
+	priv, pub, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.VAPIDPublicKey = pub
+		cfg.VAPIDPrivateKey = priv
+		cfg.VAPIDSubject = "mailto:test@example.com"
+		cfg.PushHTTP = pushServer.Client()
+	})
+	coach := uuid.New()
+	tc := token(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	withCoachPhoto(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", adminToken(t, h), nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d", rec.Code)
+	}
+	subscribe := func(suffix string) {
+		p256dh, auth := testPushKeys(t)
+		if rec := doJSON(t, h, http.MethodPost, "/v1/me/push-subscriptions", tc, map[string]any{
+			"endpoint": pushServer.URL + suffix, "keys": map[string]string{"p256dh": p256dh, "auth": auth},
+		}); rec.Code != http.StatusNoContent {
+			t.Fatalf("subscribe %s %d %s", suffix, rec.Code, rec.Body.String())
+		}
+	}
+	subscribe("/gone")
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unreachable device %d %s", rec.Code, rec.Body.String())
+	}
+	subscribe("/ok")
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
+		t.Fatalf("reachable device %d %s", rec.Code, rec.Body.String())
+	}
 }
