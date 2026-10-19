@@ -60,6 +60,8 @@ WHERE pay.status = 'authorized' AND r.returned_at IS NOT NULL
       SELECT 1 FROM review_payments o
       WHERE o.request_id = pay.request_id AND o.id <> pay.id
         AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id))
+-- 失敗した行は TouchReviewPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。
+ORDER BY pay.updated_at, pay.id
 LIMIT 50;
 
 -- name: ListReviewPaymentsToRelease :many
@@ -76,7 +78,12 @@ WHERE pay.status IN ('authorized', 'captured')
            SELECT 1 FROM review_payments o
            WHERE o.request_id = pay.request_id AND o.id <> pay.id
              AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id)))
+ORDER BY pay.updated_at, pay.id
 LIMIT 50;
+
+-- name: TouchReviewPayment :exec
+-- Stripe で確定・取り消し・返金ができなかった支払いを、次の tick で後ろに回す。
+UPDATE review_payments SET updated_at = now() WHERE id = $1;
 
 -- name: DeleteUnpaidReviewRequests :many
 -- 払わないまま支払い画面が閉じた依頼を消す。同じ動画で送り直せるようにする。

@@ -80,6 +80,8 @@ WHERE ct.status = 'active' AND ct.payment_required
   AND ct.starts_at <= now() - interval '72 hours'
   AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid')
+-- 返金に失敗した支払いは TouchCoachingPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。
+ORDER BY (SELECT max(pay.updated_at) FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid'), ct.id
 LIMIT 50;
 
 -- name: ListUnstartedPaidPayments :many
@@ -91,7 +93,12 @@ WHERE pay.status = 'paid'
   AND (ct.status NOT IN ('active', 'suspended', 'ended')
        OR EXISTS (SELECT 1 FROM coaching_payments o WHERE o.contract_id = pay.contract_id AND o.id <> pay.id
                   AND o.status <> 'pending' AND o.paid_at < pay.paid_at))
+ORDER BY pay.updated_at, pay.id
 LIMIT 50;
+
+-- name: TouchCoachingPayment :exec
+-- Stripe で返金できなかった支払いを、次の tick で後ろに回す。
+UPDATE coaching_payments SET updated_at = now() WHERE id = $1;
 
 -- name: HasGuardianContractConsent :one
 SELECT EXISTS (

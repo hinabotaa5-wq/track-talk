@@ -2,9 +2,12 @@ package httpx_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -276,4 +279,36 @@ func TestMinorConcurrentReviewRequests(t *testing.T) {
 	if created != 1 {
 		t.Fatalf("created %d", created)
 	}
+}
+
+// Stripe が断り続ける支払いが50件以上たまっても、ほかの支払いは次の tick で処理される。
+func TestReviewPaymentReleaseDoesNotStallBehindFailures(t *testing.T) {
+	h, f := setupStripe(t)
+	payer := uuid.New()
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", token(t, payer), nil); rec.Code != http.StatusOK {
+		t.Fatalf("me %d", rec.Code)
+	}
+	// 依頼が消えた仮押さえ（取り消す対象）。断られる50件を先に、正常な1件をあとに入れる。
+	insert := `INSERT INTO review_payments (id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, updated_at)
+		VALUES (gen_random_uuid(), $1, 'card', 1000, $2, 'https://checkout.stripe.test/x', now(), $2, 'authorized', now() - interval '1 hour', $3)`
+	// 断られる行が残るとほかのテストの tick の枠を使うので、終わったら消す。
+	t.Cleanup(func() { execSQLArgs(t, `DELETE FROM review_payments WHERE payer_id = $1`, payer) })
+	for i := 0; i < 50; i++ {
+		execSQLArgs(t, insert, payer, fmt.Sprintf("pi_fail_%s_%d", payer, i), time.Now().Add(-time.Hour))
+	}
+	good := "pi_good_" + payer.String()
+	execSQLArgs(t, insert, payer, good, time.Now())
+	canceled := func() bool {
+		_, c := f.calls()
+		return slices.Contains(c, good)
+	}
+	for range 2 {
+		if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK {
+			t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+		}
+		if canceled() {
+			return
+		}
+	}
+	t.Fatal("the good payment was never released")
 }

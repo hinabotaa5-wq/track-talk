@@ -295,6 +295,14 @@ func (s *Server) captureReturnedReview(ctx context.Context, requestID uuid.UUID)
 	}
 }
 
+// touchReviewPayment は、Stripe で処理できなかった支払いを次の tick で後ろに回す。
+// 断られ続ける支払いが50件たまっても、ほかの支払いが処理されないままにならないようにする。
+func (s *Server) touchReviewPayment(ctx context.Context, id uuid.UUID) {
+	if err := s.q.TouchReviewPayment(ctx, id); err != nil {
+		slog.Error("touch review payment", "payment", id, "err", err)
+	}
+}
+
 // settleReviewPayments は tick から呼ぶ。返却されたものを確定し、目安を過ぎたもの・始められなかったものを
 // 取り消すか返金し、払わないまま支払い画面が閉じた依頼を消す。
 func (s *Server) settleReviewPayments(ctx context.Context) (released int, err error) {
@@ -308,6 +316,7 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 	for _, pay := range capture {
 		if err := s.captureReviewPayment(ctx, pay); err != nil {
 			slog.Error("capture review payment", "payment", pay.ID, "err", err)
+			s.touchReviewPayment(ctx, pay.ID)
 		}
 	}
 	release, err := s.q.ListReviewPaymentsToRelease(ctx)
@@ -317,6 +326,7 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 	for _, pay := range release {
 		if err := s.releaseReviewPayment(ctx, pay); err != nil {
 			slog.Error("release review payment", "payment", pay.ID, "err", err)
+			s.touchReviewPayment(ctx, pay.ID)
 			continue
 		}
 		released++

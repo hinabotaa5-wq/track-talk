@@ -101,6 +101,12 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "succeeded"})
 		case strings.HasSuffix(r.URL.Path, "/cancel"):
 			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/"), "/cancel")
+			// pi_fail で始まるものは、Stripe が断り続ける仮押さえとして扱う。
+			if strings.HasPrefix(id, "pi_fail") {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "invalid_request_error", "message": "cannot cancel"}})
+				return
+			}
 			f.canceled = append(f.canceled, id)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
 		case r.URL.Path == "/v1/checkout/sessions":

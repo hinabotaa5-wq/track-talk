@@ -207,10 +207,12 @@ WHERE pay.status = 'authorized' AND r.returned_at IS NOT NULL
       SELECT 1 FROM review_payments o
       WHERE o.request_id = pay.request_id AND o.id <> pay.id
         AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id))
+ORDER BY pay.updated_at, pay.id
 LIMIT 50
 `
 
 // 返却された依頼の、まだ確定していない仮押さえ。二重の支払いは確定せず（下の Release で解放する）、最初の1本だけ確定する。
+// 失敗した行は TouchReviewPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。
 func (q *Queries) ListReviewPaymentsToCapture(ctx context.Context) ([]ReviewPayment, error) {
 	rows, err := q.db.Query(ctx, listReviewPaymentsToCapture)
 	if err != nil {
@@ -261,6 +263,7 @@ WHERE pay.status IN ('authorized', 'captured')
            SELECT 1 FROM review_payments o
            WHERE o.request_id = pay.request_id AND o.id <> pay.id
              AND o.status IN ('authorized', 'captured') AND (o.authorized_at, o.id) < (pay.authorized_at, pay.id)))
+ORDER BY pay.updated_at, pay.id
 LIMIT 50
 `
 
@@ -460,4 +463,14 @@ func (q *Queries) SumMonthlyReviewPayments(ctx context.Context, arg SumMonthlyRe
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const touchReviewPayment = `-- name: TouchReviewPayment :exec
+UPDATE review_payments SET updated_at = now() WHERE id = $1
+`
+
+// Stripe で確定・取り消し・返金ができなかった支払いを、次の tick で後ろに回す。
+func (q *Queries) TouchReviewPayment(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchReviewPayment, id)
+	return err
 }

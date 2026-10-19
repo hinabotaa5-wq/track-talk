@@ -403,6 +403,14 @@ func (s *Server) refundUnstarted(ctx context.Context, pay db.CoachingPayment) er
 	return nil
 }
 
+// touchCoachingPayment は、Stripe で返金できなかった支払いを次の tick で後ろに回す。
+// 断られ続ける支払いが50件たまっても、ほかの支払いが返金されないままにならないようにする。
+func (s *Server) touchCoachingPayment(ctx context.Context, id uuid.UUID) {
+	if err := s.q.TouchCoachingPayment(ctx, id); err != nil {
+		slog.Error("touch coaching payment", "payment", id, "err", err)
+	}
+}
+
 // refundCoachingPayments は tick から呼ぶ。始まってから72時間コーチが書いていないものを全額返金して閉じ、
 // 始まらなかったのに返金し損ねた支払いも返金する。
 func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
@@ -421,6 +429,7 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 		}
 		if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "no_coach_reply"); err != nil {
 			slog.Error("refund silent contract", "contract", ct.ID, "err", err)
+			s.touchCoachingPayment(ctx, pay.ID)
 			continue
 		}
 		if _, err := s.q.RefundCoachingContract(ctx, ct.ID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -447,6 +456,7 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 	for _, pay := range unstarted {
 		if err := s.refundUnstarted(ctx, pay); err != nil {
 			slog.Error("refund unstarted payment", "payment", pay.ID, "err", err)
+			s.touchCoachingPayment(ctx, pay.ID)
 			continue
 		}
 		n++
