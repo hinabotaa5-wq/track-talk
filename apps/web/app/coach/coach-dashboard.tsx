@@ -41,6 +41,8 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
 function CoachRequestsSection({ token }: { token: string | null }) {
   const [data, setData] = useState<CoachRequests | null>(null);
   const [error, setError] = useState("");
+  // 読み込みの失敗は、引き受け・見送りの失敗と分ける（読み込めたら消える）。
+  const [loadError, setLoadError] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [reload, setReload] = useState(0);
   const { pending, acquire, release } = useActionLock();
@@ -55,9 +57,10 @@ function CoachRequestsSection({ token }: { token: string | null }) {
           if (cancelled) return;
           setData(d);
           setNow(Date.now());
+          setLoadError("");
         })
         .catch(() => {
-          if (!cancelled) setError("依頼を読み込めませんでした");
+          if (!cancelled) setLoadError("依頼を読み込めませんでした");
         });
     };
     load();
@@ -87,7 +90,8 @@ function CoachRequestsSection({ token }: { token: string | null }) {
     }
   }
 
-  if (!data) return error ? <p className="text-sm text-red-400">{error}</p> : null;
+  const shownError = error || loadError;
+  if (!data) return shownError ? <p className="text-sm text-red-400">{shownError}</p> : null;
 
   return (
     <>
@@ -115,7 +119,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
             </li>
           ))}
         </ul>
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        {shownError ? <p className="text-sm text-red-400">{shownError}</p> : null}
       </section>
 
       <section className="space-y-2">
