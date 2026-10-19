@@ -33,7 +33,7 @@ export function activeMainTab(pathname: string) {
 
 // search は "?next=/upload" のような URL のクエリ部分。
 export function showsBackButton(pathname: string, search = "") {
-  if (pathname === "/register" || pathname === "/reset-password") return true;
+  if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   // 投稿の＋などログインが要るページから送られてきたときは、元の画面に戻れるようにする。
   // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。
   if (pathname === "/login") return new URLSearchParams(search).has("next");
@@ -54,6 +54,7 @@ export function showsBackButton(pathname: string, search = "") {
 const bottomNavHidden = new Set([
   "/register",
   "/reset-password",
+  "/reset-password/update",
   "/upload",
   "/posts/new",
   "/posts/url",
