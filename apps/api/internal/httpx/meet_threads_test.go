@@ -239,3 +239,25 @@ func TestAdminMeetSessionsShowNowRunning(t *testing.T) {
 		t.Fatalf("now_running should be an empty array: %s", body)
 	}
 }
+
+// 3月に始まって4月にまたがる国内主要大会は、4月になっても開催中なら実況スレッドが出る。
+func TestTodayMeetThreadsIncludesMajorSpanningSeasonStart(t *testing.T) {
+	jstZone := time.FixedZone("Asia/Tokyo", 9*60*60)
+	fixed := time.Date(2027, time.April, 1, 12, 0, 0, 0, jstZone)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.Clock = func() time.Time { return fixed }
+	})
+	pool := openPool(t)
+	ctx := context.Background()
+	seedSystemProfile(t, pool)
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM domestic_majors WHERE slug = 'spring-spanning'`) })
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO domestic_majors (slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url)
+		VALUES ('spring-spanning', 2027, '春またぎ大会', 'open', '会場', '2027-03-30', '2027-04-02', '2027年', 'https://example.jp/')`); err != nil {
+		t.Fatal(err)
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "春またぎ大会") {
+		t.Fatalf("today %d %s", rec.Code, rec.Body.String())
+	}
+}
