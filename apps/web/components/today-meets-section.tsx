@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MessageCircle, Trophy } from "lucide-react";
+import { NowRunning } from "@/components/meet-now-running";
 import type { MeetThread } from "@/lib/types";
 
 // ホームの「今日開催中」。実況スレッドへ誘導する。対象大会が無い日は親が描画しない。
@@ -27,6 +28,7 @@ export function TodayMeetsSection({ meets }: { meets: MeetThread[] }) {
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-blue-700">{meet.name}</span>
                     <span className="block text-xs text-slate-500">{meet.date_label}</span>
+                    <NowRunning events={meet.now_running} className="mt-0.5 block text-xs font-semibold text-emerald-700" />
                   </span>
                   <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
                     <MessageCircle className="size-3.5" aria-hidden />

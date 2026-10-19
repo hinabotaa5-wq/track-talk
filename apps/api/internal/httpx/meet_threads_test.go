@@ -155,3 +155,82 @@ func TestUserCannotCreateMeetPost(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+// 運営が貼り付けたタイムテーブルが、今日の実況スレッドの「いま実施中」に出る。
+func TestAdminMeetSessionsShowNowRunning(t *testing.T) {
+	jstZone := time.FixedZone("Asia/Tokyo", 9*60*60)
+	fixed := time.Date(2026, time.October, 12, 10, 45, 0, 0, jstZone)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.Clock = func() time.Time { return fixed }
+	})
+	pool := openPool(t)
+	ctx := context.Background()
+	seedSystemProfile(t, pool)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM domestic_majors WHERE slug = 'izumo-ekiden'`)
+		_, _ = pool.Exec(ctx, `DELETE FROM meet_sessions`)
+	})
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO domestic_majors (slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url)
+		VALUES ('izumo-ekiden', 2026, '出雲駅伝', 'open', '会場', '2026-10-12', '2026-10-12', '2026年', 'https://example.jp/')`); err != nil {
+		t.Fatal(err)
+	}
+
+	admin, user := uuid.New(), uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO profiles (id, is_admin) VALUES ($1, true), ($2, false)`, admin, user); err != nil {
+		t.Fatal(err)
+	}
+	ta, tu := token(t, admin), token(t, user)
+	const key = "m:izumo-ekiden:2026"
+	put := func(tok, meetKey, csv string) int {
+		return doJSON(t, h, http.MethodPut, "/v1/admin/meet-sessions", tok, map[string]string{"meet_key": meetKey, "csv": csv}).Code
+	}
+
+	if code := put(tu, key, "2026-10-12 10:30,100m"); code != http.StatusForbidden {
+		t.Fatalf("non-admin %d", code)
+	}
+	if code := put(ta, "m:unknown:2026", "2026-10-12 10:30,100m"); code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown meet %d", code)
+	}
+	if code := put(ta, key, "2026-10-12 10:30,100m,予選,宇宙人"); code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad row %d", code)
+	}
+	if code := put(ta, key, "開始,種目,ラウンド,性別\n2026-10-12 10:30,100m,予選,女子\n2026-10-12 11:00,200m,予選,女子"); code != http.StatusOK {
+		t.Fatalf("put %d", code)
+	}
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/admin/meet-sessions", ta, nil)
+	var list struct {
+		Meets []struct {
+			MeetKey      string `json:"meet_key"`
+			SessionCount int    `json:"session_count"`
+		} `json:"meets"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Meets) != 1 || list.Meets[0].MeetKey != key || list.Meets[0].SessionCount != 2 {
+		t.Fatalf("admin list %d %s", rec.Code, rec.Body.String())
+	}
+
+	today := func() []string {
+		rec := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil)
+		var body struct {
+			Meets []struct {
+				NowRunning []string `json:"now_running"`
+			} `json:"meets"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Meets) != 1 {
+			t.Fatalf("today %d %s", rec.Code, rec.Body.String())
+		}
+		return body.Meets[0].NowRunning
+	}
+	if got := today(); len(got) != 1 || got[0] != "女子100m予選" {
+		t.Fatalf("now running %v", got)
+	}
+
+	// 貼り直すと置き換わる。空にすると消える。
+	if code := put(ta, key, ""); code != http.StatusOK {
+		t.Fatalf("clear %d", code)
+	}
+	if got := today(); len(got) != 0 {
+		t.Fatalf("cleared %v", got)
+	}
+}

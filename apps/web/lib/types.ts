@@ -78,6 +78,8 @@ export type MeetThread = {
   post_id: string;
   comment_count: number;
   href: string;
+  // いま実施中の種目(例: 「女子100m予選」)。タイムテーブルが無い大会では空。
+  now_running: string[];
 };
 
 export type Injury = {
