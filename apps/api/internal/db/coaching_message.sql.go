@@ -11,6 +11,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const coachingVideoInUse = `-- name: CoachingVideoInUse :one
+SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = $1::text)
+     OR EXISTS (SELECT 1 FROM review_responses WHERE demo_video_public_id = $1::text)
+     OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = $1::text))::boolean AS in_use
+`
+
+// 非公開動画の ID がもうどこかで使われているか。ID は再生 URL に出るので、他人の動画の ID を
+// 自分のやりとりや見本動画に付けて流用（保存期間が過ぎると元の動画まで消える）させないために見る。
+func (q *Queries) CoachingVideoInUse(ctx context.Context, publicID string) (bool, error) {
+	row := q.db.QueryRow(ctx, coachingVideoInUse, publicID)
+	var in_use bool
+	err := row.Scan(&in_use)
+	return in_use, err
+}
+
 const countBlockedContact = `-- name: CountBlockedContact :exec
 INSERT INTO coaching_blocked_counts (contract_id, profile_id, count)
 VALUES ($1, $2, 1)

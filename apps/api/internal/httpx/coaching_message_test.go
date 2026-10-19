@@ -81,6 +81,15 @@ func TestCoachingMessages(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"video_public_id": video}); rec.Code != http.StatusCreated {
 		t.Fatalf("video %d %s", rec.Code, rec.Body.String())
 	}
+	// フォーム添削の依頼に使われている動画（再生 URL に出る ID）は、やりとりに付けられない。
+	_, tr := demoRequester(t, h, adminToken(t, h))
+	body := reviewBody()
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tr, body); rec.Code != http.StatusCreated {
+		t.Fatalf("review request %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, path, tc, map[string]any{"video_public_id": body["video_public_id"]}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "video_public_id") {
+		t.Fatalf("reused video %d %s", rec.Code, rec.Body.String())
+	}
 	// 利用者はメニューを送れない。
 	menu := map[string]any{"title": "1週目", "days": []map[string]any{{"day": "月", "content": "流し 100m×5"}}}
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"menu": menu}); rec.Code != http.StatusUnprocessableEntity {

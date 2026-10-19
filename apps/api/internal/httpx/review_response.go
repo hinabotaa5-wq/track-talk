@@ -213,6 +213,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if demo != nil {
+		if !s.coachingVideoFree(w, r, *demo, "demo_video_public_id") {
+			return
+		}
 		if err := s.cloud.CoachingVideoReady(r.Context(), *demo); err != nil {
 			writeAssetReadyError(w, err, "見本動画")
 			return
