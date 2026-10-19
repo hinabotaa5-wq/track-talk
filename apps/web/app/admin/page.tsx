@@ -95,7 +95,8 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
 type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
-  const [items, setItems] = useState<T[]>([]);
+  // ページごとに持つ。トークンの更新で同じページを読み直しても、行が二重に足されない。
+  const [pages, setPages] = useState<Record<number, T[]>>({});
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
@@ -108,7 +109,7 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
       .then((d) => {
         if (cancelled) return;
         const rows = (d[key] as T[] | undefined) ?? [];
-        setItems((current) => (page === 1 ? rows : [...current, ...rows]));
+        setPages((current) => (page === 1 ? { 1: rows } : { ...current, [page]: rows }));
         setTotal(d.meta.total);
         setError("");
         setLoadedPage(page);
@@ -124,6 +125,10 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
   }, [path, key, enabled, token, page]);
 
   const loading = enabled && loadedPage < page;
+  const items = Object.keys(pages)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .flatMap((n) => pages[n]);
   return { items, total, error, loading, more: items.length < total, loadMore: () => setPage((p) => p + 1) };
 }
 
