@@ -34,6 +34,33 @@ export function formatDate(iso: string) {
 }
 
 // 日本時間の今日を "YYYY-MM-DD" で返す。starts_on や raced_on の日付と同じ形。
+// datetime-local の入力欄（"2026-10-20T18:00"）用に、日時を日本時間の壁時計で文字にする。
+// 端末のタイムゾーンで読み書きすると、海外にいる人や端末の設定が違う人の練習日時がずれる。
+export function toJstInput(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: jst,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+// toJstInput の逆。入力欄の値を日本時間として読む。読めなければ Invalid Date。
+export function fromJstInput(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return new Date(NaN);
+  return new Date(`${value}:00+09:00`);
+}
+
 export function todayInTokyo(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: jst }).format(now);
 }
