@@ -10,7 +10,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 // パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも送れる。終わったあとは読むだけ。
 // 18歳未満のときは保護者もリンクから参加する（保護者は文章だけ）。相手の1通ごとに通報できる。
@@ -142,17 +142,25 @@ function Composer({
   const { pending, acquire, release } = useActionLock();
   const isCoach = contract.role === "coach";
 
+  // 長さを確かめ終えてから選んだことにする(確かめているあいだに送れないように)。
+  // 続けて別の動画を選んだら、前の動画の確認の結果は使わない。
+  const pickSeq = useRef(0);
   async function onPickFile(picked: File | null) {
+    const seq = ++pickSeq.current;
     setError("");
-    setFile(picked);
+    setFile(null);
     if (!picked) return;
     if (picked.size > maxVideoBytes) {
       setError("100MB以内の動画にしてください");
-      setFile(null);
-    } else if (tooLong(await videoDuration(picked))) {
-      setError(`動画は${maxReviewSeconds}秒以内にしてください`);
-      setFile(null);
+      return;
     }
+    const long = tooLong(await videoDuration(picked));
+    if (seq !== pickSeq.current) return;
+    if (long) {
+      setError(`動画は${maxReviewSeconds}秒以内にしてください`);
+      return;
+    }
+    setFile(picked);
   }
 
   function setDay(i: number, key: "day" | "content", value: string) {
