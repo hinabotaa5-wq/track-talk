@@ -116,6 +116,14 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "payouts_enabled": f.enabled[id], "details_submitted": f.enabled[id]})
 		case r.URL.Path == "/v1/account_links":
 			_ = json.NewEncoder(w).Encode(map[string]any{"url": "https://connect.stripe.test/" + r.PostForm.Get("account")})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/transfers":
+			var data []map[string]any
+			for i, tr := range f.transfers {
+				if tr.Get("transfer_group") == r.URL.Query().Get("transfer_group") {
+					data = append(data, map[string]any{"id": fmt.Sprintf("tr_%d", i+1), "amount": json.Number(tr.Get("amount"))})
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 		case r.URL.Path == "/v1/transfers":
 			if f.failTransfers > 0 {
 				f.failTransfers--

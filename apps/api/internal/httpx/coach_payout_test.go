@@ -188,6 +188,12 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"created":0,"paid":0,"failed":0`) || len(f.transferList()) != 2 {
 		t.Fatalf("run again %s", rec.Body.String())
 	}
+	// Stripe では送れていたのに、こちらで失敗のまま残った送金は、送り直さずに済ませる。
+	execSQLArgs(t, `UPDATE coach_payouts SET status = 'failed', stripe_transfer_id = NULL, paid_at = NULL`)
+	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
+	if !strings.Contains(rec.Body.String(), `"created":0,"paid":2,"failed":0`) || len(f.transferList()) != 2 {
+		t.Fatalf("run after lost update %s %d", rec.Body.String(), len(f.transferList()))
+	}
 	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 7200 || !e.Earnings[0].Paid {
 		t.Fatalf("after payout %+v", e)
 	}
