@@ -140,6 +140,8 @@ export function PostDetail({
       await apiFetch(`/v1/posts/${current.id}/likes`, { method: current.liked_by_me ? "DELETE" : "POST", token });
       clearHomeFeeds();
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "いいねできませんでした");
     } finally {
       action.release();
     }
@@ -154,6 +156,8 @@ export function PostDetail({
     try {
       await apiFetch(`/v1/posts/${current.id}/saves`, { method: current.saved_by_me ? "DELETE" : "POST", token });
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "保存できませんでした");
     } finally {
       action.release();
     }
@@ -289,6 +293,8 @@ export function PostDetail({
         body: JSON.stringify({ body }),
       });
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "編集できませんでした");
     } finally {
       action.release();
     }
