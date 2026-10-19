@@ -65,13 +65,10 @@ export function PostDetail({
     const seq = ++loadSeq.current;
     const stale = () => seq !== loadSeq.current;
     try {
-      const [p, c] = await Promise.all([
-        apiFetch<Post>(`/v1/posts/${id}`, { token }),
-        apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50`, { token }),
-      ]);
+      const [p, c] = await Promise.all([apiFetch<Post>(`/v1/posts/${id}`, { token }), loadAllComments(id, token)]);
       if (stale()) return;
       setPost(p);
-      setComments(c.comments ?? []);
+      setComments(c);
       if (token) {
         const mine = await apiFetch<{ post: boolean; comment_ids: string[] }>(`/v1/posts/${id}/my-reports`, { token }).catch(() => null);
         if (stale()) return;
@@ -919,4 +916,16 @@ function RecruitmentFacts({ post }: { post: Post }) {
       ) : null}
     </div>
   );
+}
+
+// コメントは1回に50件までしか返らないので、全件をページごとに読む(新しいコメントは後ろのページにある)。
+async function loadAllComments(id: string, token: string | null) {
+  const all: Comment[] = [];
+  for (let page = 1; page <= 40; page++) {
+    const res = await apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50&page=${page}`, { token });
+    const rows = res.comments ?? [];
+    all.push(...rows);
+    if (rows.length === 0 || all.length >= res.meta.total) break;
+  }
+  return all;
 }
