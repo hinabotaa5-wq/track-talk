@@ -436,12 +436,20 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	// tick が遅れていても、目安を過ぎた依頼は開いた時点で片付ける。
+	// tick が遅れていても、目安を過ぎた依頼は開いた時点で期限切れにする。
+	// 返金や報酬の記録まで含む tick 全体はここでは回さない（Scheduler の tick と重ならないように）。
+	// 開いた人が通信を切っても途中で止まらないよう、リクエストの取り消しは引き継がない。
 	if reviewWaiting(rr.Status) && !time.Now().Before(rr.DueAt) {
-		if _, err := s.runCoachingTick(r.Context()); err != nil {
-			slog.Warn("review tick on read", "err", err)
-		} else if fresh, err := s.q.GetReviewRequest(r.Context(), id); err == nil {
-			rr = fresh
+		ctx := context.WithoutCancel(r.Context())
+		if overdue, err := s.q.ExpireOverdueReviewRequests(ctx); err != nil {
+			slog.Warn("expire overdue reviews on read", "err", err)
+		} else {
+			for _, o := range overdue {
+				s.notifyReviewExpired(ctx, o)
+			}
+			if fresh, err := s.q.GetReviewRequest(ctx, id); err == nil {
+				rr = fresh
+			}
 		}
 	}
 	s.writeRequesterReview(w, r, rr)
