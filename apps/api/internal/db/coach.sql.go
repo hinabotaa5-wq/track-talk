@@ -159,10 +159,19 @@ SELECT
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 CROSS JOIN LATERAL (
-    SELECT count(rt.stars)::int AS rating_count, coalesce(avg(rt.stars), 0)::float8 AS rating_average
-    FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
+    -- 添削の★とパーソナル指導の★を合わせて数える。打診の順番から外す判定(SelectReviewCoach など)は添削の★だけを使う。
+    SELECT count(x.stars)::int AS rating_count, coalesce(avg(x.stars), 0)::float8 AS rating_average
+    FROM (
+        SELECT rt.stars
+        FROM review_ratings rt
+        JOIN review_responses rs ON rs.request_id = rt.request_id
+        WHERE rs.coach_id = c.profile_id
+        UNION ALL
+        SELECT cr.stars
+        FROM coaching_contract_ratings cr
+        JOIN coaching_contracts ct ON ct.id = cr.contract_id
+        WHERE ct.coach_id = c.profile_id
+    ) x
 ) r
 WHERE c.status = 'approved'
 ORDER BY c.tier, c.reviewed_at, c.profile_id
@@ -181,7 +190,7 @@ type ListPublicCoachesRow struct {
 	RatingAverage float64   `json:"rating_average"`
 }
 
-// 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部。
+// 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
 func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow, error) {
 	rows, err := q.db.Query(ctx, listPublicCoaches)
 	if err != nil {
