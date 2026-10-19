@@ -21,7 +21,7 @@ import type { CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 // 引き受けた依頼に返答を書くコーチの画面。「わからなかった」と言われたら、ここから補足を1回返す。
 
@@ -64,6 +64,7 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
   const [fix2, setFix2] = useState("");
   const [drill, setDrill] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const { pending, acquire, release } = useActionLock();
@@ -87,12 +88,16 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
     setErrors({});
     try {
       let demo = "";
-      if (file) {
+      if (file && uploaded.current?.file === file) {
+        // 返答がエラーになって直して送り直すときは、上げ済みの動画を使い回す（同じ動画を上げ直して孤児を増やさない）。
+        demo = uploaded.current.id;
+      } else if (file) {
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
         setUpload({ loaded: 0, total: file.size, percent: 0 });
         const payload = await uploadToCloudinary("video", file, signed, setUpload);
         if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
         demo = payload.public_id;
+        uploaded.current = { file, id: demo };
       }
       const sent = await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/response`, {
         method: "POST",
