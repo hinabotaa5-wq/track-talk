@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Shield } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
@@ -65,7 +65,7 @@ function TrackLogo() {
 }
 
 export function Header() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const search = useLocationSearch();
@@ -130,6 +130,16 @@ export function Header() {
               );
             })}
           </nav>
+          {profile?.is_admin ? (
+            <Link
+              href="/admin"
+              onClick={(event) => guardedClick(event, "/admin")}
+              aria-label="管理"
+              className="inline-flex size-10 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
+            >
+              <Shield className="size-5" strokeWidth={2} aria-hidden />
+            </Link>
+          ) : null}
           {session && (!showBack || pathname.startsWith("/me")) ? (
             <>
               {pathname === "/" ? <TodayMeetBalloon /> : null}
