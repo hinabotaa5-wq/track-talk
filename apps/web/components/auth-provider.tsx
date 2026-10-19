@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Profile } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { clearCompetitions } from "@/lib/competition-list";
@@ -32,16 +32,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
 
+  // 読み込みが重なったら(ログアウト直後に前のトークンの応答が遅れて届くなど)、最後に始めたものの結果だけを使う。
+  const profileSeq = useRef(0);
   async function loadProfile(token: string | null) {
+    const seq = ++profileSeq.current;
     if (!token) {
       setProfile(null);
       return;
     }
     try {
       const me = await apiFetch<Profile>("/v1/me", { token });
-      setProfile(me);
+      if (seq === profileSeq.current) setProfile(me);
     } catch {
-      setProfile(null);
+      if (seq === profileSeq.current) setProfile(null);
     }
   }
 
