@@ -117,13 +117,17 @@ func pdfLinks(n *html.Node, base *url.URL, match *regexp.Regexp) []pdfCandidate 
 	return out
 }
 
+// pageClient は県陸協などのページと PDF を取りに行く。応答しないサイトが1つあるだけで
+// 取り込み全体の持ち時間を使い切らないように、本文を読み終えるまでの上限を付ける。
+var pageClient = &http.Client{Timeout: 90 * time.Second}
+
 func get(ctx context.Context, pageURL string) (*http.Response, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
 		return nil, "", err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	res, err := http.DefaultClient.Do(req)
+	res, err := pageClient.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
