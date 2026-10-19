@@ -107,6 +107,49 @@ func (q *Queries) DeleteReportsForUser(ctx context.Context, userID uuid.UUID) er
 	return err
 }
 
+const listAccountMedia = `-- name: ListAccountMedia :many
+SELECT 'image'::text AS resource, p.cloudinary_public_id::text AS public_id
+FROM posts p WHERE p.author_id = $1 AND p.kind = 'text' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'video'::text, p.cloudinary_public_id::text
+FROM posts p WHERE p.author_id = $1 AND p.kind = 'video' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'image'::text, rp.cloudinary_public_id
+FROM recruitment_photos rp JOIN posts p ON p.id = rp.post_id WHERE p.author_id = $1
+UNION ALL
+SELECT 'image'::text, cp.photo_public_id::text
+FROM coach_profiles cp WHERE cp.profile_id = $1 AND cp.photo_public_id IS NOT NULL
+UNION ALL
+SELECT 'coaching'::text, r.video_public_id
+FROM review_requests r WHERE r.requester_id = $1
+`
+
+type ListAccountMediaRow struct {
+	Resource string `json:"resource"`
+	PublicID string `json:"public_id"`
+}
+
+// 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。
+func (q *Queries) ListAccountMedia(ctx context.Context, userID uuid.UUID) ([]ListAccountMediaRow, error) {
+	rows, err := q.db.Query(ctx, listAccountMedia, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAccountMediaRow
+	for rows.Next() {
+		var i ListAccountMediaRow
+		if err := rows.Scan(&i.Resource, &i.PublicID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const releaseCommentThreadsForUser = `-- name: ReleaseCommentThreadsForUser :exec
 UPDATE comments
 SET parent_id = NULL

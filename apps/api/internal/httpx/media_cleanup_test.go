@@ -123,3 +123,40 @@ func TestDeletingAPostKeepsACoachPhoto(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+// 退会したら、その人の投稿の写真も Cloudinary から消す。
+func TestWithdrawRemovesPhotosFromCloudinary(t *testing.T) {
+	deleted := make(chan []string, 4)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			deleted <- r.URL.Query()["public_ids[]"]
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	ta := token(t, uuid.New())
+	photo := "track-talk/" + uuid.NewString()
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo}); rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", ta, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	select {
+	case ids := <-deleted:
+		if len(ids) != 1 || ids[0] != photo {
+			t.Fatalf("deleted %v", ids)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("photo was not deleted")
+	}
+}

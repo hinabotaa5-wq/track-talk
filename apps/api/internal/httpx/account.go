@@ -61,6 +61,12 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 消える行が使っている写真・動画は、コミットしたあとで Cloudinary からも消す。
+	mediaRows, err := s.q.WithTx(tx).ListAccountMedia(r.Context(), uid)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := purgeAccount(r.Context(), s.q.WithTx(tx), uid); err != nil {
 		MapDBError(w, err)
 		return
@@ -83,6 +89,20 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	var media postMedia
+	var coachingVideos []string
+	for _, m := range mediaRows {
+		switch m.Resource {
+		case "image":
+			media.Images = append(media.Images, m.PublicID)
+		case "video":
+			media.Videos = append(media.Videos, m.PublicID)
+		case "coaching":
+			coachingVideos = append(coachingVideos, m.PublicID)
+		}
+	}
+	s.purgeMedia(media)
+	s.purgeCoachingVideos(coachingVideos)
 	if errors.Is(err, errAuthDelete) {
 		slog.Error("auth user remains after account purge", "err", err, "user_id", uid.String())
 	}

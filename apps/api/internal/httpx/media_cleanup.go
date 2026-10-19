@@ -88,3 +88,17 @@ func (s *Server) deleteUnusedMedia(ctx context.Context, m postMedia) {
 		slog.Warn("cloudinary video delete failed", "public_ids", m.Videos, "error", err)
 	}
 }
+
+// purgeCoachingVideos は、非公開の添削・やりとりの動画を裏で Cloudinary から消す。
+func (s *Server) purgeCoachingVideos(ids []string) {
+	if len(ids) == 0 || !s.cloud.Configured() {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.cloud.DeleteCoachingVideos(ctx, ids); err != nil {
+			slog.Warn("cloudinary coaching video delete failed", "public_ids", ids, "error", err)
+		}
+	}()
+}
