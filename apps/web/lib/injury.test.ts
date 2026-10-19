@@ -115,13 +115,16 @@ describe("injury group join", () => {
   });
 
   it("lists the recent months, newest first", () => {
-    const months = recentMonths(new Date(2026, 1, 10), 3);
+    const months = recentMonths(new Date("2026-02-10T03:00:00Z"), 3);
     expect(months).toEqual([
       { value: "2026-02", label: "2026年2月" },
       { value: "2026-01", label: "2026年1月" },
       { value: "2025-12", label: "2025年12月" },
     ]);
-    expect(localMonthString(new Date(2026, 0, 5))).toBe("2026-01");
+    expect(localMonthString(new Date("2026-01-05T03:00:00Z"))).toBe("2026-01");
+    // 日本時間の月初の朝は、UTC ではまだ前の月。「今月」は日本時間で決める。
+    expect(localMonthString(new Date("2026-10-31T20:00:00Z"))).toBe("2026-11");
+    expect(recentMonths(new Date("2026-10-31T20:00:00Z"), 2)[0].value).toBe("2026-11");
     expect(injuryGroupPath("shin-splints")).toBe("/injury/shin-splints");
   });
 
