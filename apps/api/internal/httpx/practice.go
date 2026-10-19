@@ -518,6 +518,10 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		Error(w, status, "conflict", message)
 		return
 	}
+	if !detail.StartsAt.After(time.Now()) {
+		Error(w, http.StatusConflict, "conflict", "練習の日時を過ぎています")
+		return
+	}
 	accepted, err := q.CountAcceptedApplications(r.Context(), post.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -616,6 +620,11 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		return
 	}
 	if status == "accepted" {
+		// 作成・編集と同じく、日時を過ぎた練習には参加を決められない。
+		if !detail.StartsAt.After(time.Now()) {
+			Error(w, http.StatusConflict, "conflict", "練習の日時を過ぎています")
+			return
+		}
 		accepted, err := q.CountAcceptedApplications(r.Context(), post.ID)
 		if err != nil {
 			MapDBError(w, err)

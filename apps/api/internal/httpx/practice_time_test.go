@@ -69,3 +69,38 @@ func TestPracticeUpdateRejectsPastStart(t *testing.T) {
 		t.Fatalf("dissolved past update %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 日時を過ぎた練習には、解散していなくても申請も承認もできない。
+func TestPracticeClosesApplicationsAfterStart(t *testing.T) {
+	h := setup(t)
+	host := token(t, uuid.New())
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
+		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
+		"starts_at": time.Now().Add(48 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 3,
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications", token(t, uuid.New()), nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	var applied struct {
+		Practice struct {
+			MyApplicationID string `json:"my_application_id"`
+		} `json:"practice"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &applied)
+
+	execSQLArgs(t, `UPDATE practice_details SET starts_at = now() - interval '1 hour' WHERE post_id = $1`, created.ID)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications", token(t, uuid.New()), nil); rec.Code != http.StatusConflict {
+		t.Fatalf("apply after start %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/applications/"+applied.Practice.MyApplicationID+"/accept", host, nil); rec.Code != http.StatusConflict {
+		t.Fatalf("accept after start %d %s", rec.Code, rec.Body.String())
+	}
+}
