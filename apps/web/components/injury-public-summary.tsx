@@ -94,6 +94,13 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
         )}
       </section>
 
+      <section className={panel} aria-labelledby="injury-hindsight">
+        <h2 id="injury-hindsight" className="text-base font-bold">
+          いま思うと、どうすればよかったか
+        </h2>
+        {hasItems(group.hindsight) ? <Bars title="選んだ人の割合" tally={group.hindsight} /> : <Waiting min={min} />}
+      </section>
+
       <section className={panel} aria-labelledby="injury-actions">
         <h2 id="injury-actions" className="text-base font-bold">
           復帰までにやったこと

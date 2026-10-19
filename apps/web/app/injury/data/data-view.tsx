@@ -18,7 +18,7 @@ function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: num
     { title: "場所", tally: group.places },
     { title: "種目", tally: group.events },
   ];
-  const ready = hasItems(group.actions, ...situation.map((item) => item.tally));
+  const ready = hasItems(group.actions, group.hindsight, ...situation.map((item) => item.tally));
   return (
     <div className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-baseline justify-between gap-2">
@@ -33,6 +33,12 @@ function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: num
               {situation.map((item) => (
                 <Bars key={item.title} title={item.title} tally={item.tally} />
               ))}
+            </section>
+          ) : null}
+          {hasItems(group.hindsight) ? (
+            <section className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300">いま思うと、どうすればよかったか</h4>
+              <Bars title="選んだ人の割合" tally={group.hindsight} />
             </section>
           ) : null}
           {hasItems(group.actions) ? (
