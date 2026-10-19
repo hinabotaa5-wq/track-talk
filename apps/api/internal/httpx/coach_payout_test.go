@@ -291,3 +291,38 @@ func TestCoachEarningsSkipZeroShare(t *testing.T) {
 		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 期間が終わってから全額を返金したら、まだ送金していない報酬を外す。送金に含めたあとは返金させない。
+func TestFullRefundAfterEndRemovesEarning(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	tu, tc, contractID := adultAccepted(t, h)
+	checkout(t, h, tu, contractID)
+	paidSession(t, h, sessionIDFor(t, contractID), "pi_personal_refund_after_end", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = now() - interval '1 minute' WHERE id = $1`, contractID)
+	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":1`) {
+		t.Fatalf("tick %s", rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+contractID+"/refund", tadmin, map[string]any{"kind": "full"}); rec.Code != http.StatusOK {
+		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
+	}
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Earnings) != 0 {
+		t.Fatalf("earnings after refund %+v", e)
+	}
+	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
+		t.Fatalf("tick after refund %s", rec.Body.String())
+	}
+
+	// 送金に含めた報酬がある指導は、ここからは返金できない。
+	tu2, _, other := adultAccepted(t, h)
+	checkout(t, h, tu2, other)
+	paidSession(t, h, sessionIDFor(t, other), "pi_personal_paid_out", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = now() - interval '1 minute' WHERE id = $1`, other)
+	tick(t, h, "tick-secret")
+	execSQLArgs(t, `INSERT INTO coach_payouts (id, coach_id, month, amount_yen) SELECT gen_random_uuid(), coach_id, date_trunc('month', now())::date, amount_yen FROM coach_earnings WHERE contract_id = $1`, other)
+	execSQLArgs(t, `UPDATE coach_earnings e SET payout_id = p.id FROM coach_payouts p WHERE p.coach_id = e.coach_id AND e.contract_id = $1`, other)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+other+"/refund", tadmin, map[string]any{"kind": "full"}); rec.Code != http.StatusConflict {
+		t.Fatalf("refund after payout %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -158,3 +158,10 @@ FROM coach_payouts cpo
 LEFT JOIN profiles p ON p.id = cpo.coach_id
 ORDER BY cpo.created_at DESC
 LIMIT 100;
+
+-- name: GetContractEarning :one
+SELECT * FROM coach_earnings WHERE contract_id = $1;
+
+-- name: DeleteUnpaidContractEarning :exec
+-- 期間が終わってから全額を返金した指導の、まだ送金に含めていない報酬を消す。
+DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL;

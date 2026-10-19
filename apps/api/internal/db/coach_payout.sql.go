@@ -134,6 +134,16 @@ func (q *Queries) AttachEarningsToPayout(ctx context.Context, arg AttachEarnings
 	return result.RowsAffected(), nil
 }
 
+const deleteUnpaidContractEarning = `-- name: DeleteUnpaidContractEarning :exec
+DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL
+`
+
+// 期間が終わってから全額を返金した指導の、まだ送金に含めていない報酬を消す。
+func (q *Queries) DeleteUnpaidContractEarning(ctx context.Context, contractID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUnpaidContractEarning, contractID)
+	return err
+}
+
 const getCoachEarningsSummary = `-- name: GetCoachEarningsSummary :one
 SELECT
     COALESCE(sum(amount_yen) FILTER (
@@ -153,6 +163,28 @@ func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUI
 	row := q.db.QueryRow(ctx, getCoachEarningsSummary, coachID)
 	var i GetCoachEarningsSummaryRow
 	err := row.Scan(&i.ThisMonthYen, &i.UnpaidYen)
+	return i, err
+}
+
+const getContractEarning = `-- name: GetContractEarning :one
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at FROM coach_earnings WHERE contract_id = $1
+`
+
+func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID) (CoachEarning, error) {
+	row := q.db.QueryRow(ctx, getContractEarning, contractID)
+	var i CoachEarning
+	err := row.Scan(
+		&i.ID,
+		&i.CoachID,
+		&i.Source,
+		&i.ReviewRequestID,
+		&i.ContractID,
+		&i.GrossYen,
+		&i.SharePercent,
+		&i.AmountYen,
+		&i.PayoutID,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 

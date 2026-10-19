@@ -497,6 +497,16 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	amount, reason := pay.AmountYen, "admin_full"
+	// 期間が終わった指導は、tick がコーチの報酬をもう記録している。送金に含めたあとは取り戻せないので、全額の返金はさせない。
+	earning, err := s.q.GetContractEarning(r.Context(), &ct.ID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
+	if err == nil && earning.PayoutID != nil {
+		Error(w, http.StatusConflict, "conflict", "コーチへの報酬を送金に含めたあとなので、ここからは返金できません。Stripe のダッシュボードで対応してください")
+		return
+	}
 	if req.Kind == "remaining" {
 		if ct.Status != "active" && ct.Status != "suspended" {
 			Error(w, http.StatusConflict, "conflict", "残りの日数分は、期間中のものだけ返金できます")
@@ -515,6 +525,11 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 			Error(w, http.StatusBadGateway, "payment_unavailable", "Stripe で返金できませんでした。Stripe のダッシュボードで確かめてください")
 			return
 		}
+		MapDBError(w, err)
+		return
+	}
+	// 返金した分をコーチの報酬から外す。まだ記録していなければ、tick が返金後の額で記録する。
+	if err := s.q.DeleteUnpaidContractEarning(r.Context(), &ct.ID); err != nil {
 		MapDBError(w, err)
 		return
 	}
