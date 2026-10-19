@@ -181,9 +181,16 @@ func TargetType(v string) string {
 	}
 }
 
+// maxPage は、ページ番号の上限。
+const maxPage = 10000
+
 func ClampPage(page, perPage int) (int, int) {
 	if page < 1 {
 		page = 1
+	}
+	// 極端に大きなページ番号で、offset が int32 からあふれて負になるのを防ぐ。
+	if page > maxPage {
+		page = maxPage
 	}
 	if perPage < 1 {
 		perPage = 20
