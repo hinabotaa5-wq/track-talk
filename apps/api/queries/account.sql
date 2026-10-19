@@ -72,4 +72,13 @@ SELECT
         WHERE rp.target_type = 'coaching_message'
           AND rp.status = 'open'
           AND (ct.coach_id = sqlc.arg('user_id') OR ct.requester_id = sqlc.arg('user_id'))
-    )::boolean AS open_report;
+    )::boolean AS open_report,
+    -- 依頼は退会で消え、依頼が消えた支払いは tick が返金する。確定していない支払いがあるあいだは退会させない。
+    -- 確定済み（返却された依頼の captured）だけになれば退会できる。
+    EXISTS (
+        SELECT 1 FROM review_payments pay
+        LEFT JOIN review_requests r ON r.id = pay.request_id
+        WHERE pay.payer_id = sqlc.arg('user_id')
+          AND pay.status IN ('authorized', 'captured')
+          AND (pay.status = 'authorized' OR r.id IS NULL OR r.returned_at IS NULL)
+    )::boolean AS open_review_payment;

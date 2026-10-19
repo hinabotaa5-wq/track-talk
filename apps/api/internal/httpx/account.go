@@ -52,6 +52,10 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "coaching_in_progress", "進行中のパーソナル指導があるあいだは退会できません。終わってから退会するか、お問い合わせからご連絡ください")
 		return
 	}
+	if blockers.OpenReviewPayment {
+		Error(w, http.StatusConflict, "review_in_progress", "支払いが確定していないフォーム添削の依頼があるあいだは退会できません。返却されてから退会するか、お問い合わせからご連絡ください")
+		return
+	}
 	if blockers.OpenReport {
 		Error(w, http.StatusConflict, "report_in_progress", "パーソナル指導のやりとりへの通報を運営が確認しているあいだは退会できません。お問い合わせからご連絡ください")
 		return

@@ -249,7 +249,8 @@ SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.che
 LEFT JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status IN ('authorized', 'captured')
   AND pay.authorized_at <= now() - interval '1 minute'
-  AND (r.id IS NULL
+  -- 依頼が消えたもの: 支払った人が退会して消えたもの（payer_id も NULL）は、返却済みで確定した代金なので返さない。
+  AND ((r.id IS NULL AND pay.payer_id IS NOT NULL)
        OR r.status IN ('expired', 'awaiting_payment')
        OR (r.returned_at IS NULL AND EXISTS (
            SELECT 1 FROM review_payments o

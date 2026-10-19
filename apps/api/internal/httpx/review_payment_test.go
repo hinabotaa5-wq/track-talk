@@ -172,3 +172,29 @@ func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
 		t.Fatalf("within limit %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 退会すると依頼が消える。確定していない代金があるあいだは退会させず、返却済みで確定した代金は退会しても返金しない。
+func TestWithdrawKeepsSettledReviewPayment(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	tadmin := adminToken(t, h)
+	_, tu := demoRequester(t, h, tadmin)
+	confirm := map[string]string{"confirm": "退会する"}
+
+	id := paidReview(t, h, tu, "paypay", "pi_paypay_withdraw")
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, confirm); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "review_in_progress") {
+		t.Fatalf("withdraw before return %d %s", rec.Code, rec.Body.String())
+	}
+
+	execSQLArgs(t, `UPDATE review_requests SET status = 'returned', returned_at = now() WHERE id = $1`, id)
+	execSQLArgs(t, `UPDATE review_payments SET authorized_at = now() - interval '2 minutes' WHERE request_id = $1`, id)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, confirm); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw after return %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK {
+		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+	}
+	if refunds := f.refundList(); len(refunds) != 0 {
+		t.Fatalf("settled payment refunded %v", refunds)
+	}
+}
