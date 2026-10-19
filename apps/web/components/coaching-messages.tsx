@@ -355,6 +355,9 @@ export function CoachingMessages({
 }) {
   const [messages, setMessages] = useState<CoachingMessage[] | null>(null);
   const [error, setError] = useState("");
+  // 読み込みが重なったり、送信した直後に始まった読み込みが返ったりしても、古い一覧で上書きしないよう、
+  // 最新の読み込みだけ反映する（送信したら、それまでに始まった読み込みを無効にする）。
+  const loadSeq = useRef(0);
   const path = contractPath(contract, { token, guardianToken });
 
   const fetchMessages = useCallback(() => apiFetch<{ messages: CoachingMessage[] }>(`${path}/messages`, { token }), [path, token]);
@@ -362,12 +365,15 @@ export function CoachingMessages({
   useEffect(() => {
     let cancelled = false;
     const load = () => {
+      const seq = ++loadSeq.current;
       fetchMessages()
         .then((d) => {
-          if (!cancelled) setMessages(d.messages);
+          if (cancelled || seq !== loadSeq.current) return;
+          setMessages(d.messages);
+          setError("");
         })
         .catch(() => {
-          if (!cancelled) setError("やりとりを読み込めませんでした");
+          if (!cancelled && seq === loadSeq.current) setError("やりとりを読み込めませんでした");
         });
     };
     load();
@@ -432,7 +438,10 @@ export function CoachingMessages({
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
       {contract.status === "active" ? (
-        <Composer contract={contract} access={access} onSent={(m) => setMessages((list) => [...(list ?? []), m])} />
+        <Composer contract={contract} access={access} onSent={(m) => {
+            loadSeq.current++;
+            setMessages((list) => [...(list ?? []), m]);
+          }} />
       ) : contract.status === "suspended" ? (
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
           運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
