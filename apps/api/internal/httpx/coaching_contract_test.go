@@ -202,19 +202,14 @@ func TestCoachingContractFlow(t *testing.T) {
 	}
 }
 
-func TestMinorCoachingContractNeedsGuardian(t *testing.T) {
+func TestMinorCoachingContractAppliesWithoutGuardian(t *testing.T) {
 	h := setup(t)
 	_, _, planID := planCoach(t, h, 3)
 	birth := time.Date(time.Now().Year()-15, 4, 1, 0, 0, 0, 0, time.UTC)
-	minor, tm := demoUser(t, h, birth)
+	_, tm := demoUser(t, h, birth)
+	// 申し込みの時点では保護者の同意は要らない。保護者のメールは、コーチが承諾したあとに聞く。
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tm, contractBody(planID))
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_required") {
-		t.Fatalf("no guardian %d %s", rec.Code, rec.Body.String())
-	}
-	execSQLArgs(t, `INSERT INTO guardian_consents (minor_id, token_hash, status, guardian_name, relationship, consented_at)
-		VALUES ($1, $2, 'consented', '保護者', 'mother', now())`, minor, uuid.NewString())
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tm, contractBody(planID))
 	if rec.Code != http.StatusCreated || !decodeContract(t, rec.Body.Bytes()).Minor {
-		t.Fatalf("with guardian %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("minor apply %d %s", rec.Code, rec.Body.String())
 	}
 }

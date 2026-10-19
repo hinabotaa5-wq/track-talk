@@ -107,7 +107,6 @@ export default function ApplyCoachingPlanPage() {
 
   const { plan, coach } = data;
   const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);
-  const needsGuardian = me.is_minor === true && me.guardian?.status !== "consented";
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -148,18 +147,16 @@ export default function ApplyCoachingPlanPage() {
           token={token}
           onJoined={loadMe}
         />
-      ) : !me.birth_month || needsGuardian ? (
+      ) : !me.birth_month ? (
         <div className="space-y-3">
           <p className="text-sm text-slate-200">
-            {!me.birth_month
-              ? "先に生まれた年月を登録してください。18歳未満の人は保護者の同意が必要です。"
-              : "18歳未満の人は、保護者の同意を得てから申し込めます。保護者に同意のメールを送ってください。"}
+            先に生まれた年月を登録してください。18歳未満の人は、コーチが引き受けたあとに保護者の同意が必要です。
           </p>
           <Link
             href="/me/coaching"
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
           >
-            {!me.birth_month ? "生まれた年月を登録する" : "保護者の同意へ"}
+            生まれた年月を登録する
           </Link>
         </div>
       ) : (
@@ -202,7 +199,7 @@ export default function ApplyCoachingPlanPage() {
             {!data.payments
               ? "コーチが48時間以内に引き受けると、その時から期間が始まります。デモ版なので支払いはありません。"
               : me.is_minor
-                ? "コーチが48時間以内に引き受けたら、保護者が72時間以内に同意してお支払いをすると、その時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"
+                ? "コーチが48時間以内に引き受けたら、そのあとの画面で保護者のメールアドレスを入れてください。保護者が72時間以内に同意してお支払いをすると、その時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"
                 : "コーチが48時間以内に引き受けたら、72時間以内にお支払いください（カード・Apple Pay・Google Pay・PayPay）。支払った時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"}
           </p>
           {error ? <p className="text-sm text-red-400">{error}</p> : null}

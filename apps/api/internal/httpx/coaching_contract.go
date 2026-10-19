@@ -144,20 +144,8 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	minor := isMinor(*me.BirthMonth, time.Now())
-	if minor {
-		// 保護者のリンクが使える（添削と同じ同意が済んでいる）人だけ申し込める。
-		// 契約ごとの同意は、コーチが承諾したあとに保護者がそのリンクから行う。
-		consent, err := s.q.GetGuardianConsentByMinor(r.Context(), me.ID)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			MapDBError(w, err)
-			return
-		}
-		if err != nil || consent.Status != "consented" {
-			Error(w, http.StatusUnprocessableEntity, "guardian_required", "18歳未満の人は、保護者の同意を得てから申し込めます")
-			return
-		}
-	}
-
+	// 18歳未満でも、申し込みの時点では保護者のメールアドレスは聞かない。
+	// コーチが承諾したあとに本人が保護者へリンクを送り、保護者がそのリンクから同意とお支払いをする。
 	var ct db.CoachingContract
 	err = s.tx(r.Context(), func(q *db.Queries) error {
 		var err error
