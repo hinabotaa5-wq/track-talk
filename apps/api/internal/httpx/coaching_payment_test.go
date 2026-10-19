@@ -454,3 +454,38 @@ func TestAdminCoachingRefundConcurrentRefundsOnce(t *testing.T) {
 		t.Fatalf("refunds %v", refunds)
 	}
 }
+
+// 支払い待ちの申し込みも枠を使うので、定員1のプランはコーチ一覧でも満員になる。
+func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
+	h, _ := setupStripe(t)
+	_, tc, planID := planCoach(t, h, 1)
+	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu, contractBody(planID))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	id := decodeContract(t, rec.Body.Bytes()).ID
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/contracts/"+id+"/accept", tc, map[string]any{"agree_report": true, "agree_detection": true}); rec.Code != http.StatusOK {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Coaches []struct {
+			Plans []struct {
+				ID   string `json:"id"`
+				Full bool   `json:"full"`
+			} `json:"plans"`
+		} `json:"coaches"`
+	}
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.Bytes(), &out)
+	for _, c := range out.Coaches {
+		for _, p := range c.Plans {
+			if p.ID == planID {
+				if !p.Full {
+					t.Fatal("plan with an accepted contract is not full in the coach list")
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("plan not listed")
+}
