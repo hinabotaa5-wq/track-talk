@@ -548,6 +548,10 @@ const retryWaitCap = 30 * time.Second
 // retryBaseWait は Retry-After がないときの待ち時間の基準(試行ごとに倍にする)。
 var retryBaseWait = 2 * time.Second
 
+// getBodyClient は国際大会・国内主要大会・開催地の取得に使う。応答しないサイトが1つあるだけで
+// 全体の時間を使い切らないよう、1回ごとに時間を区切る。
+var getBodyClient = &http.Client{Timeout: 60 * time.Second}
+
 // getBody は429と503のとき、Retry-Afterに従って待ってから最大 maxGetAttempts 回まで取得し直す。
 func getBody(ctx context.Context, pageURL string) ([]byte, error) {
 	for attempt := 1; ; attempt++ {
@@ -556,7 +560,7 @@ func getBody(ctx context.Context, pageURL string) ([]byte, error) {
 			return nil, err
 		}
 		req.Header.Set("User-Agent", userAgent)
-		res, err := http.DefaultClient.Do(req)
+		res, err := getBodyClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
