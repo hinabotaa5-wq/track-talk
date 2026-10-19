@@ -242,3 +242,7 @@ SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
   AND status IN ('in_review', 'clarifying')
 ORDER BY due_at;
+
+-- name: LockReviewRequester :exec
+-- 同じ人の依頼の作成を1つずつにする。「同意待ちの18歳未満は1本目まで」の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('review_requester:' || sqlc.arg(requester_id)::uuid::text));

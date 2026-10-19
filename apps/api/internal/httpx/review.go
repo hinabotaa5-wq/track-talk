@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"log/slog"
@@ -257,8 +258,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "birth_month_required", "先に生まれた年月を登録してください")
 		return
 	}
-	if isMinor(*p.BirthMonth, time.Now()) {
-		if code, message := s.minorRequestBlock(r, p.ID); code != "" {
+	minor := isMinor(*p.BirthMonth, time.Now())
+	if minor {
+		if code, message := s.minorRequestBlock(r.Context(), s.q, p.ID); code != "" {
 			Error(w, http.StatusUnprocessableEntity, code, message)
 			return
 		}
@@ -284,7 +286,25 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rr, err := s.q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if minor {
+		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
+		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); code != "" {
+			Error(w, http.StatusUnprocessableEntity, code, message)
+			return
+		}
+	}
+	rr, err := q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
 		ID:            uuid.New(),
 		RequesterID:   p.ID,
 		Tier:          req.Tier,
@@ -301,6 +321,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -331,8 +355,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 
 // minorRequestBlock は、18歳未満が依頼を送れない理由を返す。送れるなら空。
 // 保護者の同意を待たずに1本目は送れるが、同意が済むまで2本目は送れない。同意しないと言われたら送れない。
-func (s *Server) minorRequestBlock(r *http.Request, minorID uuid.UUID) (string, string) {
-	consent, err := s.q.GetGuardianConsentByMinor(r.Context(), minorID)
+func (s *Server) minorRequestBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID) (string, string) {
+	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
 	status := "none"
 	if err == nil {
 		status = consent.Status
@@ -345,7 +369,7 @@ func (s *Server) minorRequestBlock(r *http.Request, minorID uuid.UUID) (string, 
 	case "declined", "revoked":
 		return "guardian_declined", "保護者の同意がないため、フォーム添削は使えません"
 	}
-	sent, err := s.q.CountReviewRequestsByRequester(r.Context(), minorID)
+	sent, err := q.CountReviewRequestsByRequester(ctx, minorID)
 	if err != nil {
 		return "internal_error", "サーバーエラーが発生しました"
 	}

@@ -248,3 +248,32 @@ func TestReviewPaymentDuplicateAfterReturn(t *testing.T) {
 		t.Fatalf("captured %v canceled %v", captured, canceled)
 	}
 }
+
+// 同意待ちの18歳未満が2本を同時に送っても、作られるのは1本だけ。
+func TestMinorConcurrentReviewRequests(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	tadmin := adminToken(t, h)
+	tm := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/demo", tm, map[string]any{"code": newDemoCodeFor(t, h, tadmin)}); rec.Code != http.StatusOK {
+		t.Fatalf("join %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
+		t.Fatalf("birth month %d", rec.Code)
+	}
+	codes := make(chan int, 4)
+	for range 4 {
+		go func() {
+			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody()).Code
+		}()
+	}
+	created := 0
+	for range 4 {
+		if <-codes == http.StatusCreated {
+			created++
+		}
+	}
+	if created != 1 {
+		t.Fatalf("created %d", created)
+	}
+}

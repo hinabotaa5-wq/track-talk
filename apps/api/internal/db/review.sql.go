@@ -624,6 +624,16 @@ func (q *Queries) LockReviewAssignment(ctx context.Context) error {
 	return err
 }
 
+const lockReviewRequester = `-- name: LockReviewRequester :exec
+SELECT pg_advisory_xact_lock(hashtext('review_requester:' || $1::uuid::text))
+`
+
+// 同じ人の依頼の作成を1つずつにする。「同意待ちの18歳未満は1本目まで」の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockReviewRequester(ctx context.Context, requesterID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockReviewRequester, requesterID)
+	return err
+}
+
 const markReviewRequestOffered = `-- name: MarkReviewRequestOffered :exec
 UPDATE review_requests
 SET status = 'offered',
