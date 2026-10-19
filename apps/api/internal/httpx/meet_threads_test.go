@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,5 +233,9 @@ func TestAdminMeetSessionsShowNowRunning(t *testing.T) {
 	}
 	if got := today(); len(got) != 0 {
 		t.Fatalf("cleared %v", got)
+	}
+	// 実施中が無いときも、null ではなく空の配列で返す。
+	if body := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil).Body.String(); !strings.Contains(body, `"now_running":[]`) {
+		t.Fatalf("now_running should be an empty array: %s", body)
 	}
 }

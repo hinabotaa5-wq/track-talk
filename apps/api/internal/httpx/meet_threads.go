@@ -113,7 +113,7 @@ func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 			PostID:       row.PostID.String(),
 			CommentCount: int(row.CommentCount),
 			Href:         "/posts/" + row.PostID.String(),
-			NowRunning:   running[t.key],
+			NowRunning:   nonNilStrings(running[t.key]),
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{"meets": meets})
@@ -259,4 +259,12 @@ func isDiamondLeagueSite(raw string) bool {
 	}
 	host := u.Hostname()
 	return host == "diamondleague.com" || strings.HasSuffix(host, ".diamondleague.com")
+}
+
+// nonNilStrings は、JSON に null ではなく [] を出すために、空のスライスを返す。
+func nonNilStrings(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }
