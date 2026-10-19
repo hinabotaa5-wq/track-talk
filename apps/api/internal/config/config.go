@@ -40,6 +40,8 @@ type Config struct {
 	StripeConnectWebhookSecret string
 	// StripeAPIBase はテストで Stripe の代わりのサーバーに向けるためのもの。
 	StripeAPIBase string
+	// StripeAPIVersion を入れると、Stripe の API のバージョンを固定する(空ならアカウントの既定)。
+	StripeAPIVersion string
 	// WebBaseURL は、支払い画面から戻ってくる Web の URL。空なら CORS_ORIGINS の最初のもの。
 	WebBaseURL string
 	// Resend の API キーと送り主。保護者の同意のリンクを保護者のメールあてに送る。空なら送れない（リンクも出せない）。
@@ -81,6 +83,7 @@ func Load() (Config, error) {
 		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),
 		StripeAPIBase:              os.Getenv("STRIPE_API_BASE"),
+		StripeAPIVersion:           os.Getenv("STRIPE_API_VERSION"),
 		WebBaseURL:                 strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
 		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
 		MailFrom:                   os.Getenv("MAIL_FROM"),
@@ -102,7 +105,52 @@ func Load() (Config, error) {
 	if cfg.WebBaseURL == "" && len(cfg.CORSOrigins) > 0 {
 		cfg.WebBaseURL = strings.TrimRight(cfg.CORSOrigins[0], "/")
 	}
+	if err := cfg.ValidateStripe(); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
+}
+
+// StripeMode は、秘密鍵の種類。鍵が無ければ空(支払いなしのデモ版)、テスト用の鍵なら "test"、本番の鍵なら "live"。
+func (c Config) StripeMode() string {
+	switch {
+	case c.StripeSecretKey == "":
+		return ""
+	case strings.Contains(c.StripeSecretKey, "_live_"):
+		return "live"
+	}
+	return "test"
+}
+
+// ValidateStripe は、Stripe の設定の取り違えを起動のときに止める。鍵だけ入れて Webhook の鍵を入れ忘れると、
+// お金は動くのに期間が始まらない状態になるため。秘密鍵が空なら何も確かめない。
+func (c Config) ValidateStripe() error {
+	if c.StripeSecretKey == "" {
+		return nil
+	}
+	if !strings.HasPrefix(c.StripeSecretKey, "sk_") && !strings.HasPrefix(c.StripeSecretKey, "rk_") {
+		return fmt.Errorf("STRIPE_SECRET_KEY must be a secret key (sk_...) or restricted key (rk_...), not a publishable key")
+	}
+	if c.StripeWebhookSecret == "" {
+		return fmt.Errorf("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set (payments would never complete)")
+	}
+	for name, v := range map[string]string{
+		"STRIPE_WEBHOOK_SECRET":         c.StripeWebhookSecret,
+		"STRIPE_CONNECT_WEBHOOK_SECRET": c.StripeConnectWebhookSecret,
+	} {
+		if v != "" && !strings.HasPrefix(v, "whsec_") {
+			return fmt.Errorf("%s must be a signing secret (whsec_...)", name)
+		}
+	}
+	if c.StripeMode() == "live" {
+		if !strings.HasPrefix(c.WebBaseURL, "https://") {
+			return fmt.Errorf("WEB_BASE_URL (or the first CORS_ORIGINS) must be https:// when using a live Stripe key")
+		}
+		if c.CoachingTickSecret == "" {
+			return fmt.Errorf("COACHING_TICK_SECRET is required when using a live Stripe key (expiry and refunds run in the tick)")
+		}
+	}
+	return nil
 }
 
 func env(key, fallback string) string {

@@ -25,6 +25,7 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
+	slog.Info("stripe", "mode", cfg.StripeMode(), "coaching_enabled", cfg.CoachingEnabled)
 	if err := config.RequireLocalDatabase(cfg.DatabaseURL); err != nil {
 		slog.Error("config", "err", err)
 		os.Exit(1)
