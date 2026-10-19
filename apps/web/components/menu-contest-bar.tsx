@@ -42,13 +42,21 @@ export function MenuContestBar() {
   const deadline = round ? menuContestDeadline(round) : null;
   const parts = deadline ? remainingParts(Date.parse(deadline.until), now) : null;
 
-  // 締め切りを過ぎたら、次の段階を取り直す。
+  // 締め切りを過ぎたら、次の段階を取り直す。取り直しても同じ締め切りのまま(運営がトップ3を選ぶ前など)なら、
+  // 毎秒取り直さずに1分おきにする。
+  const [reloadedFor, setReloadedFor] = useState<string | null>(null);
+  const expiredUntil = deadline && !parts ? deadline.until : null;
   useEffect(() => {
-    if (deadline && !parts) {
-      const id = window.setTimeout(() => setReload((n) => n + 1), 1000);
-      return () => window.clearTimeout(id);
-    }
-  }, [deadline, parts]);
+    if (!expiredUntil) return;
+    const id = window.setTimeout(
+      () => {
+        setReloadedFor(expiredUntil);
+        setReload((n) => n + 1);
+      },
+      reloadedFor === expiredUntil ? 60_000 : 1000,
+    );
+    return () => window.clearTimeout(id);
+  }, [expiredUntil, reloadedFor, reload]);
 
   if (!round || !deadline || !parts) return null;
 
