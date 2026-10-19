@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import type { ProductKind } from "@/lib/home-sort";
 import { productKindLabels } from "@/lib/product";
+import { useActionLock } from "@/lib/use-action-lock";
 
 const input = "mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white";
 
@@ -19,7 +20,7 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-  const [pending, setPending] = useState(false);
+  const { pending, acquire, release } = useActionLock();
   const doneRef = useRef<HTMLDivElement>(null);
 
   // フォームが閉じて高さが縮むので、完了の表示が画面の外に出ないようにする。
@@ -29,8 +30,7 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (pending) return;
-    setPending(true);
+    if (!acquire()) return;
     setError("");
     try {
       await apiFetch("/v1/product-requests", {
@@ -46,7 +46,7 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "送信できませんでした");
     } finally {
-      setPending(false);
+      release();
     }
   }
 
