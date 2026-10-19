@@ -160,10 +160,8 @@ func PDFPage(data []byte, pageURL string, now time.Time) (Page, error) {
 	if err != nil {
 		return Page{}, fmt.Errorf("page url: %w", err)
 	}
-	year := now.Year()
-	if now.Month() < time.April {
-		year--
-	}
+	// 年度の境目は日本時間で決める（ランナーは UTC なので、日本時間の4月1日の朝は UTC ではまだ3月）。
+	year := SeasonYear(now)
 	if m := pdfNameYearPattern.FindStringSubmatch(path.Base(parsed.Path)); m != nil {
 		if y, _ := strconv.Atoi(m[1]); y >= 2020 && y <= seasonYearCap() {
 			year = y

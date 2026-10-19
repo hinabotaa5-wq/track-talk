@@ -109,3 +109,15 @@ func TestExtractSendsPDFsInline(t *testing.T) {
 		t.Fatalf("pdfs %q", got)
 	}
 }
+
+// 日本時間の4月1日の朝（UTC ではまだ3月31日）でも、年のない PDF の競技年度は新しい年度になる。
+func TestPDFPageSeasonStartsInJST(t *testing.T) {
+	now := time.Date(2027, 3, 31, 21, 0, 0, 0, time.UTC) // 日本時間 4月1日 6:00
+	page, err := PDFPage([]byte("%PDF-1.7 schedule"), "https://example.com/schedule.pdf", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SeasonYear != 2027 {
+		t.Fatalf("season %d, want 2027", page.SeasonYear)
+	}
+}
