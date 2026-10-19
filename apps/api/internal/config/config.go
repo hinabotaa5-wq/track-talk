@@ -36,6 +36,8 @@ type Config struct {
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
 	StripeSecretKey     string
 	StripeWebhookSecret string
+	// Connect（コーチのアカウント）の知らせを受ける Webhook の署名の鍵。Stripe は送り先ごとに鍵を分けるので、別に作ったときだけ入れる。
+	StripeConnectWebhookSecret string
 	// StripeAPIBase はテストで Stripe の代わりのサーバーに向けるためのもの。
 	StripeAPIBase string
 	// WebBaseURL は、支払い画面から戻ってくる Web の URL。空なら CORS_ORIGINS の最初のもの。
@@ -58,31 +60,32 @@ func Load() (Config, error) {
 	_ = godotenv.Load("../../.env")
 
 	cfg := Config{
-		Addr:                   env("API_ADDR", ":8080"),
-		DatabaseURL:            os.Getenv("DATABASE_URL"),
-		SupabaseURL:            os.Getenv("SUPABASE_URL"),
-		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
-		JWTSecret:              os.Getenv("SUPABASE_JWT_SECRET"),
-		JWTAUD:                 env("SUPABASE_JWT_AUD", "authenticated"),
-		LogLevel:               env("LOG_LEVEL", "info"),
-		ShutdownTimeout:        10 * time.Second,
-		CloudName:              os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:            os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:         os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:           os.Getenv("CLOUDINARY_API_BASE"),
-		VAPIDPublicKey:         os.Getenv("VAPID_PUBLIC_KEY"),
-		VAPIDPrivateKey:        os.Getenv("VAPID_PRIVATE_KEY"),
-		VAPIDSubject:           os.Getenv("VAPID_SUBJECT"),
-		CoachingEnabled:        enabled(os.Getenv("COACHING_ENABLED")),
-		CoachingTickSecret:     os.Getenv("COACHING_TICK_SECRET"),
-		StripeSecretKey:        os.Getenv("STRIPE_SECRET_KEY"),
-		StripeWebhookSecret:    os.Getenv("STRIPE_WEBHOOK_SECRET"),
-		StripeAPIBase:          os.Getenv("STRIPE_API_BASE"),
-		WebBaseURL:             strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
-		ResendAPIKey:           os.Getenv("RESEND_API_KEY"),
-		MailFrom:               os.Getenv("MAIL_FROM"),
-		MailAPIBase:            os.Getenv("MAIL_API_BASE"),
-		MailDevLog:             enabled(os.Getenv("MAIL_DEV_LOG")),
+		Addr:                       env("API_ADDR", ":8080"),
+		DatabaseURL:                os.Getenv("DATABASE_URL"),
+		SupabaseURL:                os.Getenv("SUPABASE_URL"),
+		SupabaseServiceRoleKey:     os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		JWTSecret:                  os.Getenv("SUPABASE_JWT_SECRET"),
+		JWTAUD:                     env("SUPABASE_JWT_AUD", "authenticated"),
+		LogLevel:                   env("LOG_LEVEL", "info"),
+		ShutdownTimeout:            10 * time.Second,
+		CloudName:                  os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:                os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:             os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:               os.Getenv("CLOUDINARY_API_BASE"),
+		VAPIDPublicKey:             os.Getenv("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
+		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
+		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
+		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
+		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),
+		StripeAPIBase:              os.Getenv("STRIPE_API_BASE"),
+		WebBaseURL:                 strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
+		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
+		MailFrom:                   os.Getenv("MAIL_FROM"),
+		MailAPIBase:                os.Getenv("MAIL_API_BASE"),
+		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

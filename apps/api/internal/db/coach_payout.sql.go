@@ -525,6 +525,49 @@ func (q *Queries) SetCoachPayoutsEnabled(ctx context.Context, arg SetCoachPayout
 	return i, err
 }
 
+const setCoachPayoutsEnabledByAccount = `-- name: SetCoachPayoutsEnabledByAccount :one
+UPDATE coach_profiles
+SET payouts_enabled = $1,
+    updated_at = now()
+WHERE stripe_account_id = $2
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
+`
+
+type SetCoachPayoutsEnabledByAccountParams struct {
+	PayoutsEnabled  bool    `json:"payouts_enabled"`
+	StripeAccountID *string `json:"stripe_account_id"`
+}
+
+// Stripe から口座の状態が変わったと届いた。登録が済んだ時も、あとから送金を受け取れなくなった時も反映する。
+func (q *Queries) SetCoachPayoutsEnabledByAccount(ctx context.Context, arg SetCoachPayoutsEnabledByAccountParams) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, setCoachPayoutsEnabledByAccount, arg.PayoutsEnabled, arg.StripeAccountID)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+		&i.PledgedAt,
+		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ReducedFeeUntil,
+	)
+	return i, err
+}
+
 const setCoachReducedFee = `-- name: SetCoachReducedFee :one
 UPDATE coach_profiles
 SET reduced_fee_until = CASE WHEN $1::boolean THEN now() + interval '1 year' END,
