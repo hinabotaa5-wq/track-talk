@@ -80,6 +80,10 @@ export type MeetThread = {
   href: string;
   // いま実施中の種目(例: 「女子100m予選」)。タイムテーブルが無い大会では空。
   now_running: string[];
+  // 大会タブの一覧のどの大会か。国内主要大会は major_slug と major_year、国際大会は competition_id(もう一方は空)。
+  major_slug: string;
+  major_year: number;
+  competition_id: string;
 };
 
 export type Injury = {

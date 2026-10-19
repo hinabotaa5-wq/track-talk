@@ -30,6 +30,11 @@ type meetThreadDTO struct {
 	Href         string `json:"href"`
 	// NowRunning はいま実施中の種目(例: 「女子100m予選」)。タイムテーブルが入っていない大会では空。
 	NowRunning []string `json:"now_running"`
+	// 大会タブの一覧のどの大会か。国内主要大会は major_slug と major_year、国際大会は competition_id が入る(もう一方は空)。
+	// 大会タブはこれで一覧の大会と突き合わせ、開催中の大会だけ実況スレッドへの入口を出す。
+	MajorSlug     string `json:"major_slug"`
+	MajorYear     int    `json:"major_year"`
+	CompetitionID string `json:"competition_id"`
 }
 
 // meetTarget は今日開催中の対象大会。スレッドを1本ずつ用意する。
@@ -39,6 +44,10 @@ type meetTarget struct {
 	dateLabel string
 	title     string
 	body      string
+	// 大会タブの一覧の大会との対応。国内主要大会なら majorSlug と majorYear、国際大会なら competitionID。
+	majorSlug     string
+	majorYear     int
+	competitionID string
 }
 
 // featuredInternationalPatterns はホームの吹き出しに出す国際大会の絞り込み。
@@ -107,13 +116,16 @@ func (s *Server) todayMeetThreads(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		meets = append(meets, meetThreadDTO{
-			MeetKey:      t.key,
-			Name:         t.name,
-			DateLabel:    t.dateLabel,
-			PostID:       row.PostID.String(),
-			CommentCount: int(row.CommentCount),
-			Href:         "/posts/" + row.PostID.String(),
-			NowRunning:   nonNilStrings(running[t.key]),
+			MeetKey:       t.key,
+			Name:          t.name,
+			DateLabel:     t.dateLabel,
+			PostID:        row.PostID.String(),
+			CommentCount:  int(row.CommentCount),
+			Href:          "/posts/" + row.PostID.String(),
+			NowRunning:    nonNilStrings(running[t.key]),
+			MajorSlug:     t.majorSlug,
+			MajorYear:     t.majorYear,
+			CompetitionID: t.competitionID,
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{"meets": meets})
@@ -138,6 +150,8 @@ func (s *Server) meetTargets(ctx context.Context, start, end time.Time, keep fun
 			dateLabel: dateLabel,
 			title:     meetTitle(m.Name, dateLabel),
 			body:      meetBody(m.Venue, m.SiteUrl),
+			majorSlug: m.Slug,
+			majorYear: int(m.Year),
 		})
 	}
 
@@ -159,11 +173,12 @@ func (s *Server) meetTargets(ctx context.Context, start, end time.Time, keep fun
 		dateLabel := meetDateLabel(c.StartsOn)
 		link := firstNonEmpty(c.GuidelinesUrl, c.OrganizerUrl, c.SourceUrl)
 		targets = append(targets, meetTarget{
-			key:       fmt.Sprintf("c:%s:%d:%s:%s", c.Prefecture, c.SeasonYear, c.Name, c.StartsOn.Format("2006-01-02")),
-			name:      c.Name,
-			dateLabel: dateLabel,
-			title:     meetTitle(c.Name, dateLabel),
-			body:      meetBody(c.Location, link),
+			key:           fmt.Sprintf("c:%s:%d:%s:%s", c.Prefecture, c.SeasonYear, c.Name, c.StartsOn.Format("2006-01-02")),
+			name:          c.Name,
+			dateLabel:     dateLabel,
+			title:         meetTitle(c.Name, dateLabel),
+			body:          meetBody(c.Location, link),
+			competitionID: c.ID.String(),
 		})
 	}
 	return targets, nil
