@@ -216,20 +216,34 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "internal_error", "サーバーエラーが発生しました")
 		return
 	}
-	consent, err := s.q.IssueGuardianLink(r.Context(), db.IssueGuardianLinkParams{
-		MinorID: p.ID, TokenHash: hash, GuardianEmail: &email, DailyLimit: guardianLinkDailyLimit,
+	// 新しいリンクに差し替えるのは、メールを送れたときだけ。送れなかったら、
+	// 保護者が持っている前のリンクを使えるままにし、1日の回数も減らさない。
+	var consent db.GuardianConsent
+	errMail := errors.New("guardian link mail")
+	err = s.tx(r.Context(), func(q *db.Queries) error {
+		var err error
+		consent, err = q.IssueGuardianLink(r.Context(), db.IssueGuardianLinkParams{
+			MinorID: p.ID, TokenHash: hash, GuardianEmail: &email, DailyLimit: guardianLinkDailyLimit,
+		})
+		if err != nil {
+			return err
+		}
+		if err := s.mail.Send(r.Context(), guardianLinkMail(email, s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
+			slog.Warn("guardian link mail", "err", err)
+			return errMail
+		}
+		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusTooManyRequests, "rate_limited", "今日はこれ以上送れません。明日もう一度お試しください")
 		return
 	}
-	if err != nil {
-		MapDBError(w, err)
+	if errors.Is(err, errMail) {
+		Error(w, http.StatusBadGateway, "mail_failed", "保護者にメールを送れませんでした。アドレスを確かめて、もう一度お試しください")
 		return
 	}
-	if err := s.mail.Send(r.Context(), guardianLinkMail(email, s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
-		slog.Warn("guardian link mail", "err", err)
-		Error(w, http.StatusBadGateway, "mail_failed", "保護者にメールを送れませんでした。アドレスを確かめて、もう一度お試しください")
+	if err != nil {
+		MapDBError(w, err)
 		return
 	}
 	JSON(w, http.StatusCreated, guardianStatusJSON(consent))
