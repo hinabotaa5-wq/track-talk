@@ -196,7 +196,8 @@ func (s *Server) checkoutGuardianContract(w http.ResponseWriter, r *http.Request
 // stripeWebhook は、Stripe からの知らせを受ける。署名が正しいものだけを読む。
 // 2xx を返さないと Stripe は送り直すので、こちらの都合で読めないもの以外は 200 を返す。
 func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
-	if !s.stripe.Configured() || s.cfg.StripeWebhookSecret == "" {
+	secrets := s.webhookSecrets()
+	if !s.stripe.Configured() || len(secrets) == 0 {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
@@ -205,12 +206,20 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "読めませんでした")
 		return
 	}
-	ev, err := stripe.VerifyWebhook(payload, r.Header.Get("Stripe-Signature"), s.cfg.StripeWebhookSecret, time.Now())
+	ev, err := verifyWebhookAny(payload, r.Header.Get("Stripe-Signature"), secrets)
 	if err != nil {
 		Error(w, http.StatusBadRequest, "bad_signature", "署名が正しくありません")
 		return
 	}
 	switch ev.Type {
+	case "account.updated":
+		if err := s.syncCoachAccount(r.Context(), ev); err != nil {
+			slog.Error("stripe webhook", "event", ev.ID, "err", err)
+			Error(w, http.StatusInternalServerError, "internal_error", "処理できませんでした")
+			return
+		}
+	case "charge.dispute.created":
+		s.alertDispute(r.Context(), ev)
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
 		var sess stripe.CheckoutSession
 		if err := json.Unmarshal(ev.Data.Object, &sess); err != nil {
@@ -228,6 +237,67 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"received": true})
+}
+
+// webhookSecrets は、署名を確かめる鍵。Stripe は platform の知らせと Connect（コーチのアカウント）の知らせで
+// 送り先ごとに鍵を分けるので、両方を受け付ける。
+func (s *Server) webhookSecrets() []string {
+	var out []string
+	for _, k := range []string{s.cfg.StripeWebhookSecret, s.cfg.StripeConnectWebhookSecret} {
+		if k != "" {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func verifyWebhookAny(payload []byte, header string, secrets []string) (stripe.Event, error) {
+	for _, k := range secrets {
+		if ev, err := stripe.VerifyWebhook(payload, header, k, time.Now()); err == nil {
+			return ev, nil
+		}
+	}
+	return stripe.Event{}, stripe.ErrBadSignature
+}
+
+// syncCoachAccount は、コーチの Stripe アカウントの状態が変わった知らせを、受け取れるかどうかに反映する。
+// 知らないアカウントの知らせは読み飛ばす。
+func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
+	var a stripe.Account
+	if err := json.Unmarshal(ev.Data.Object, &a); err != nil || a.ID == "" {
+		return nil
+	}
+	_, err := s.q.SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
+// alertDispute は、チャージバック（利用者がカード会社に異議を申し立てた）を運営に知らせる。中身は載せない。
+// 対応は Stripe のダッシュボードで期限までに行うので、読めない知らせでも落とさず記録だけ残す。
+func (s *Server) alertDispute(ctx context.Context, ev stripe.Event) {
+	var d struct {
+		ID            string `json:"id"`
+		Amount        int    `json:"amount"`
+		Reason        string `json:"reason"`
+		PaymentIntent string `json:"payment_intent"`
+	}
+	_ = json.Unmarshal(ev.Data.Object, &d)
+	slog.Error("stripe dispute", "dispute", d.ID, "amount", d.Amount, "reason", d.Reason, "payment_intent", d.PaymentIntent)
+	ids, err := s.q.ListAdminProfileIDs(ctx)
+	if err != nil {
+		slog.Warn("dispute notify", "err", err)
+		return
+	}
+	for _, id := range ids {
+		s.pushQuietly(ctx, id, push.Message{
+			Title: "支払いに異議が申し立てられました",
+			Body:  "Stripe のダッシュボードで、期限までに対応してください",
+			URL:   "/admin",
+			Tag:   "stripe-dispute-" + d.ID,
+		}, 7*24*time.Hour)
+	}
 }
 
 // completeCoachingCheckout は、支払いが済んだ契約の期間を始める。始められないもの（期限切れ、二重の支払い）は返金する。

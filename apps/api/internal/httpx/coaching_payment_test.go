@@ -16,7 +16,10 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 )
 
-const testWebhookSecret = "whsec_test"
+const (
+	testWebhookSecret        = "whsec_test"
+	testConnectWebhookSecret = "whsec_connect_test"
+)
 
 // fakeStripe は、Stripe の代わりに支払い画面と返金を受け付けるサーバー。
 type fakeStripe struct {
@@ -133,6 +136,7 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 	h := setupConfig(t, func(cfg *config.Config) {
 		cfg.StripeSecretKey = "sk_test_x"
 		cfg.StripeWebhookSecret = testWebhookSecret
+		cfg.StripeConnectWebhookSecret = testConnectWebhookSecret
 		cfg.StripeAPIBase = srv.URL
 		cfg.WebBaseURL = "https://web.test"
 		cfg.CoachingTickSecret = "tick-secret"

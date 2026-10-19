@@ -213,3 +213,48 @@ func TestCoachPayoutsDemoMode(t *testing.T) {
 		t.Fatalf("run demo %d", rec.Code)
 	}
 }
+
+func TestStripeWebhookSyncsCoachAccountAndAlertsDispute(t *testing.T) {
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	id := uuid.New()
+	tc := token(t, id)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	withCoachPhoto(t, id)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+id.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/stripe/onboarding", tc, nil); rec.Code != http.StatusOK {
+		t.Fatalf("onboarding %d", rec.Code)
+	}
+	account := "acct_" + id.String()
+	enabled := func() bool {
+		var ok bool
+		queryRowArgs(t, `SELECT payouts_enabled FROM coach_profiles WHERE profile_id = $1`, []any{id}, &ok)
+		return ok
+	}
+
+	// Connect の知らせは、別の鍵で署名されて届く。
+	update := func(secret string, payouts bool) int {
+		return stripeWebhook(t, h, secret, "account.updated", map[string]any{"id": account, "payouts_enabled": payouts}).Code
+	}
+	if code := update(testConnectWebhookSecret, true); code != http.StatusOK || !enabled() {
+		t.Fatalf("enable %d %v", code, enabled())
+	}
+	// あとから受け取れなくなったら、送金の対象から外す。
+	if code := update(testConnectWebhookSecret, false); code != http.StatusOK || enabled() {
+		t.Fatalf("disable %d %v", code, enabled())
+	}
+	if code := update("whsec_other", true); code != http.StatusBadRequest || enabled() {
+		t.Fatalf("bad signature %d %v", code, enabled())
+	}
+	// 知らないアカウントの知らせは読み飛ばす。
+	if rec := stripeWebhook(t, h, testConnectWebhookSecret, "account.updated", map[string]any{"id": "acct_unknown", "payouts_enabled": true}); rec.Code != http.StatusOK {
+		t.Fatalf("unknown account %d", rec.Code)
+	}
+	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1", "amount": 1000, "reason": "fraudulent", "payment_intent": "pi_x"}); rec.Code != http.StatusOK {
+		t.Fatalf("dispute %d", rec.Code)
+	}
+}

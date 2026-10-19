@@ -13,6 +13,14 @@ SET payouts_enabled = sqlc.arg(payouts_enabled),
 WHERE profile_id = sqlc.arg(profile_id)
 RETURNING *;
 
+-- name: SetCoachPayoutsEnabledByAccount :one
+-- Stripe から口座の状態が変わったと届いた。登録が済んだ時も、あとから送金を受け取れなくなった時も反映する。
+UPDATE coach_profiles
+SET payouts_enabled = sqlc.arg(payouts_enabled),
+    updated_at = now()
+WHERE stripe_account_id = sqlc.arg(stripe_account_id)
+RETURNING *;
+
 -- name: SetCoachReducedFee :one
 -- 運営が「初年10%」を付けたり外したりする。付けた時から1年。
 UPDATE coach_profiles
