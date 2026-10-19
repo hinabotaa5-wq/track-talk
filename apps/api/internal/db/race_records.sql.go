@@ -141,6 +141,16 @@ func (q *Queries) ListRaceRecords(ctx context.Context, authorID uuid.UUID) ([]Li
 	return items, nil
 }
 
+const lockRaceRecordAuthor = `-- name: LockRaceRecordAuthor :exec
+SELECT pg_advisory_xact_lock(hashtext('race_records:' || $1::uuid::text))
+`
+
+// 同じ人の記録の作成を1つずつにする。1000件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockRaceRecordAuthor(ctx context.Context, authorID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockRaceRecordAuthor, authorID)
+	return err
+}
+
 const updateRaceRecord = `-- name: UpdateRaceRecord :one
 UPDATE race_records
 SET raced_on = $1,

@@ -29,6 +29,10 @@ DELETE FROM sense_notes
 WHERE id = $1
   AND author_id = $2;
 
+-- name: LockSenseNoteAuthor :exec
+-- 同じ人の感覚メモの作成を1つずつにする。1日20件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('sense_notes:' || sqlc.arg(author_id)::uuid::text));
+
 -- name: CountSenseNotesSince :one
 SELECT count(*) FROM sense_notes
 WHERE author_id = $1
