@@ -1207,6 +1207,20 @@ func (q *Queries) ListMyCoachingContracts(ctx context.Context, requesterID uuid.
 	return items, nil
 }
 
+const lockContractPlan = `-- name: LockContractPlan :exec
+SELECT pl.id FROM coaching_plans pl
+JOIN coaching_contracts ct ON ct.plan_id = pl.id
+WHERE ct.id = $1
+FOR UPDATE OF pl
+`
+
+// 承諾で定員を数える前に、その申し込みのプランの行をロックする。
+// 同じプランの承諾を同時に送っても、1件ずつ数えるようにするため。
+func (q *Queries) LockContractPlan(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockContractPlan, id)
+	return err
+}
+
 const resumeCoachingContract = `-- name: ResumeCoachingContract :one
 UPDATE coaching_contracts
 SET status = 'active',
