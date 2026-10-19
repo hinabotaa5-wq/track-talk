@@ -33,12 +33,39 @@ type pushSubscriptionReq struct {
 	ExpirationTime *int64 `json:"expirationTime"`
 }
 
-func validPushEndpoint(raw string) bool {
+// pushServiceHosts は、ブラウザのプッシュサービスのホスト。宛先はここだけに限り、
+// 任意の URL を登録させて API から内部のアドレスへ接続させる（SSRF）ことを防ぐ。
+var pushServiceHosts = []string{
+	"fcm.googleapis.com",                // Chrome・Edge(Chromium)・Android・Samsung Internet・Opera
+	"updates.push.services.mozilla.com", // Firefox
+	"web.push.apple.com",                // Safari・iOS のホーム画面のアプリ
+	".push.apple.com",
+	".notify.windows.com", // 古い Edge
+}
+
+func pushServiceHost(host string) bool {
+	host = strings.ToLower(host)
+	for _, h := range pushServiceHosts {
+		if host == h || (strings.HasPrefix(h, ".") && strings.HasSuffix(host, h)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) validPushEndpoint(raw string) bool {
 	if len(raw) > 1000 {
 		return false
 	}
 	u, err := url.Parse(raw)
-	return err == nil && u.Scheme == "https" && u.Host != ""
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return false
+	}
+	// テストで送信先を差し替えたときは、そのテスト用サーバーへの登録を許す。
+	if s.cfg.PushHTTP != nil {
+		return true
+	}
+	return u.Port() == "" && pushServiceHost(u.Hostname())
 }
 
 func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +80,7 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 	p256dh := strings.TrimSpace(req.Keys.P256dh)
 	auth := strings.TrimSpace(req.Keys.Auth)
-	if !validPushEndpoint(req.Endpoint) || p256dh == "" || len(p256dh) > 200 || auth == "" || len(auth) > 100 {
+	if !s.validPushEndpoint(req.Endpoint) || p256dh == "" || len(p256dh) > 200 || auth == "" || len(auth) > 100 {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "通知の登録内容が不正です")
 		return
 	}
@@ -130,6 +157,10 @@ func (s *Server) sendPush(ctx context.Context, profileID uuid.UUID, msg push.Mes
 	}
 	sent := 0
 	for _, sub := range subs {
+		// 宛先を限る前に登録されたものも、プッシュサービス以外には送らない。
+		if !s.validPushEndpoint(sub.Endpoint) {
+			continue
+		}
 		err := s.push.Send(ctx, push.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, msg, ttl)
 		switch {
 		case err == nil:
