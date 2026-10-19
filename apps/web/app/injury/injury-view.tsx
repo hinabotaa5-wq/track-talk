@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, sortInjuryGroups, type InjuryGroupSummary } from "@/lib/injury";
 
 export function InjuryView() {
-  const { session, token, loading } = useAuth();
+  const { token, loading } = useAuth();
   const [groups, setGroups] = useState<InjuryGroupSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -53,7 +53,7 @@ export function InjuryView() {
           {sorted.map((group) => (
             <li key={group.body_part}>
               <Link
-                href={session ? injuryGroupPath(group.body_part) : "/login"}
+                href={injuryGroupPath(group.body_part)}
                 className={`block h-full rounded-2xl border p-3.5 transition active:scale-[0.98] ${
                   group.me ? "border-blue-400 bg-blue-950/50 hover:bg-blue-950/70" : "border-white/20 glass bg-white/10 hover:bg-white/16"
                 }`}
