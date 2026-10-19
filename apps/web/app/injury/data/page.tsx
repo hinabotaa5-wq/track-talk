@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { DataView } from "./data-view";
 
 export const metadata: Metadata = {
-  title: "ケガのデータ｜ケガの状況と、どうすればよかったか",
+  title: "ケガのデータ｜ケガの状況と、復帰までにやったこと",
   description:
-    "ケガをしたときの状況と、そのときどうすればよかったかを、選択式で匿名に集めた集計。まだケガをしていない人の予防に役立てます。",
+    "ケガをしたときの状況と、復帰までにやったことを、ケガ共有のグループの回答から匿名で集計。まだケガをしていない人の予防に役立てます。",
   alternates: { canonical: "/injury/data" },
 };
 

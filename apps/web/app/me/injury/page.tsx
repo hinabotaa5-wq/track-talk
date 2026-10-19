@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { InjuryMyCases } from "@/components/injury-my-cases";
 import { InjuryProgressCompare } from "@/components/injury-progress-compare";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -116,7 +115,6 @@ export default function MyInjuryHistoryPage() {
           {token ? <InjuryProgressCompare token={token} /> : null}
         </>
       )}
-      {token ? <InjuryMyCases token={token} /> : null}
     </div>
   );
 }

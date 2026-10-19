@@ -8,7 +8,7 @@ function Waiting({ min }: { min: number }) {
 }
 
 // まだ集計が出ていない項目は見出しごと出さない。全部まだのときは、呼ぶ側で1行だけ出す。
-function Bars({ title, tally }: { title: string; tally: InjuryTally }) {
+export function Bars({ title, tally }: { title: string; tally: InjuryTally }) {
   if (tally.items.length === 0) return null;
   return (
     <div className="space-y-2">
@@ -33,7 +33,7 @@ function Bars({ title, tally }: { title: string; tally: InjuryTally }) {
   );
 }
 
-const hasItems = (...tallies: InjuryTally[]) => tallies.some((tally) => tally.items.length > 0);
+export const hasItems = (...tallies: InjuryTally[]) => tallies.some((tally) => tally.items.length > 0);
 
 // グループの公開ページの中身。ログインしていなくても、検索から来た人にも見える。
 // 集計は少人数だと誰のことかわかるので、min_people 人そろうまでは出さない(API 側でも出さない)。

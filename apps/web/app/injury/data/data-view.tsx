@@ -4,62 +4,65 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { InjuryTabs } from "@/components/injury-tabs";
-import { useAuth } from "@/components/auth-provider";
+import { Bars, hasItems } from "@/components/injury-public-summary";
 import { apiFetch } from "@/lib/api";
-import { injuryCaseNeedText, type InjuryCaseGroup, type InjuryCaseStats, type InjuryChoiceStat } from "@/lib/injury-cases";
+import { injuryGroupPath, type InjuryPublicGroup } from "@/lib/injury";
 
-function StatBars({ title, items }: { title: string; items: InjuryChoiceStat[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section className="space-y-1.5">
-      <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-      <ul className="space-y-1.5">
-        {items.map((item) => (
-          <li key={item.code} className="text-sm">
-            <div className="flex justify-between gap-3 text-slate-200">
-              <span>{item.label}</span>
-              <span className="shrink-0">{item.percent}%（{item.count}人）</span>
-            </div>
-            <div className="mt-0.5 h-1.5 rounded-full bg-white/10" aria-hidden>
-              <div className="h-full rounded-full bg-blue-400" style={{ width: `${item.percent}%` }} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
+type InjuryData = { min_people: number; overall: InjuryPublicGroup; groups: InjuryPublicGroup[] };
 
-function GroupCard({ group, minSample, headingLevel }: { group: InjuryCaseGroup; minSample: number; headingLevel: "h2" | "h3" }) {
-  const Heading = headingLevel;
+function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: number; overall?: boolean }) {
+  const Heading = overall ? "h2" : "h3";
+  const situation = [
+    { title: "ケガの前に変わったこと", tally: group.pre_changes },
+    { title: "そのときしていたこと", tally: group.activities },
+    { title: "場所", tally: group.places },
+    { title: "種目", tally: group.events },
+  ];
+  const ready = hasItems(group.actions, ...situation.map((item) => item.tally));
   return (
-    <div className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
+    <div className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <Heading className="text-lg font-semibold">{group.body_part_label}</Heading>
-        <span className="text-sm text-slate-200">{group.cases}人が回答</span>
+        <Heading className="text-lg font-bold">{group.body_part_label}</Heading>
+        <span className="text-sm text-slate-200">{group.members}人</span>
       </div>
-      {group.ready ? (
+      {ready ? (
         <>
-          <StatBars title="ケガをしたとき" items={group.timings} />
-          <StatBars title="そのときの状況" items={group.situations} />
-          <StatBars title="どうすればよかったか" items={group.preventions} />
+          {hasItems(...situation.map((item) => item.tally)) ? (
+            <section className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300">ケガをしたときの状況</h4>
+              {situation.map((item) => (
+                <Bars key={item.title} title={item.title} tally={item.tally} />
+              ))}
+            </section>
+          ) : null}
+          {hasItems(group.actions) ? (
+            <section className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300">復帰までにやったこと</h4>
+              <Bars title="やった人の割合" tally={group.actions} />
+            </section>
+          ) : null}
         </>
       ) : (
-        <p className="text-sm text-slate-300">{injuryCaseNeedText(group, minSample)}</p>
+        <p className="text-sm text-slate-400">{min}人そろうと表示</p>
       )}
+      {!overall ? (
+        <Link href={injuryGroupPath(group.body_part)} className="block text-sm text-blue-300 underline-offset-2 hover:underline">
+          このグループを見る →
+        </Link>
+      ) : null}
     </div>
   );
 }
 
+// 「データ」タブ。ケガ共有のグループで集まった回答を、全体とケガごとに集計して見せるだけで、ここでは何も集めない。
 export function DataView() {
-  const { session } = useAuth();
-  const [stats, setStats] = useState<InjuryCaseStats | null>(null);
+  const [data, setData] = useState<InjuryData | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    apiFetch<InjuryCaseStats>("/v1/injury/cases/stats", { signal: controller.signal })
-      .then(setStats)
+    apiFetch<InjuryData>("/v1/injury/data", { signal: controller.signal })
+      .then(setData)
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true);
       });
@@ -73,33 +76,24 @@ export function DataView() {
         <p className="mt-1 text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
       </div>
       <InjuryTabs current="data" />
-
-      <div className="space-y-2 rounded-xl border border-blue-400/40 bg-blue-950/40 p-4">
-        <p className="text-sm text-slate-100">
-          ケガをしたときの状況と、そのときどうすればよかったかを、選ぶだけで教えてください。名前・日付・学校などは聞かず、
-          集計だけを匿名で見せます（回答が{stats?.min_sample ?? 5}人そろうまで、数は表示しません）。
-        </p>
-        <Link
-          href={session ? "/injury/data/new" : "/login?next=/injury/data/new"}
-          className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4.5 py-2 text-sm font-semibold text-white shadow-xs hover:bg-blue-500"
-        >
-          自分のケガを答える
-        </Link>
-      </div>
+      <p className="text-sm text-slate-200">
+        ケガ共有のグループに入った人が答えた、ケガをしたときの状況と、復帰までにやったことの集計です。匿名で、
+        {data?.min_people ?? 5}人そろった項目だけ表示します。
+      </p>
 
       {failed ? (
         <ErrorState message="データの取得に失敗しました。APIの起動を確認してください。" />
-      ) : stats === null ? (
+      ) : data === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>
-      ) : stats.parts.length === 0 ? (
-        <EmptyState title="まだ回答がありません" body="回答が集まると、ここにケガごとの集計が出ます。" />
+      ) : data.groups.length === 0 ? (
+        <EmptyState title="まだデータがありません" body="ケガ共有のグループに参加する人が増えると、ここに集計が出ます。" />
       ) : (
         <>
-          <GroupCard group={stats.overall} minSample={stats.min_sample} headingLevel="h2" />
+          <GroupCard group={data.overall} min={data.min_people} overall />
           <ul className="grid gap-3 sm:grid-cols-2">
-            {stats.parts.map((group) => (
+            {data.groups.map((group) => (
               <li key={group.body_part}>
-                <GroupCard group={group} minSample={stats.min_sample} headingLevel="h3" />
+                <GroupCard group={group} min={data.min_people} />
               </li>
             ))}
           </ul>
