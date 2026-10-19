@@ -25,6 +25,10 @@ FROM injury_updates
 WHERE post_id = $1
 ORDER BY created_at ASC;
 
+-- name: LockInjuryPost :exec
+-- 経過報告の作成を、投稿ごとに1つずつにする。50件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT id FROM posts WHERE id = $1 FOR UPDATE;
+
 -- name: CountInjuryUpdates :one
 SELECT count(*) FROM injury_updates WHERE post_id = $1;
 

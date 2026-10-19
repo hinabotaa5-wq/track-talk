@@ -761,6 +761,16 @@ func (q *Queries) ListPublicInjuryGroupNotes(ctx context.Context, arg ListPublic
 	return items, nil
 }
 
+const lockInjuryPost = `-- name: LockInjuryPost :exec
+SELECT id FROM posts WHERE id = $1 FOR UPDATE
+`
+
+// 経過報告の作成を、投稿ごとに1つずつにする。50件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockInjuryPost(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockInjuryPost, id)
+	return err
+}
+
 const notifyInjuryFollowers = `-- name: NotifyInjuryFollowers :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id)
 SELECT gen_random_uuid(), f.user_id, 'injury_update', $1::uuid

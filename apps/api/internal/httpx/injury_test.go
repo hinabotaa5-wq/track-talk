@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -757,5 +758,33 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 		if got := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+path, member, map[string]any{"body": "わかる"}).Code; got >= 300 {
 			t.Fatalf("member POST %s: %d", path, got)
 		}
+	}
+}
+
+// 経過報告が49件ある投稿に同時に送っても、50件を超えて保存できない。
+func TestInjuryUpdateLimitHoldsUnderConcurrency(t *testing.T) {
+	h := setup(t)
+	tok := token(t, uuid.New())
+	rec := postInjury(t, h, tok, map[string]any{
+		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "body_part": "shin-splints",
+	})
+	var post struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &post)
+	execSQLArgs(t, `INSERT INTO injury_updates (id, post_id, stage, body) SELECT gen_random_uuid(), $1, 'rehab', '経過' FROM generate_series(1, 49)`, post.ID)
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/injury/updates", tok, map[string]any{"stage": "race", "body": "同時の報告"})
+		}()
+	}
+	wg.Wait()
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM injury_updates WHERE post_id = $1`, []any{post.ID}, &n)
+	if n != 50 {
+		t.Fatalf("updates %d", n)
 	}
 }
