@@ -1,7 +1,8 @@
 import type { ApiError } from "./types";
 
+// 開発中のブラウザは /api の書き換えを通す。サーバーで描くときは相対パスを解決できないので、API を直に呼ぶ。
 const API_BASE =
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
     ? "/api"
     : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080");
 

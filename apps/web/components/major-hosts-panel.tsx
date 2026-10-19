@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -11,16 +10,14 @@ import { cityPhotoSrc, preloadCityPhotos } from "@/lib/city-photo";
 import { loadMajorHosts, peekMajorHosts } from "@/lib/major-hosts";
 import type { MajorHost } from "@/lib/types";
 
-export function MajorHostsPanel() {
-  const { token } = useAuth();
-  const [hosts, setHosts] = useState<MajorHost[] | null>(peekMajorHosts);
+export function MajorHostsPanel({ initialHosts = null }: { initialHosts?: MajorHost[] | null }) {
+  const [hosts, setHosts] = useState<MajorHost[] | null>(() => peekMajorHosts() ?? initialHosts);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(() => peekMajorHosts() === null);
+  const [loading, setLoading] = useState(() => (peekMajorHosts() ?? initialHosts) === null);
 
   useEffect(() => {
-    if (!token) return;
     let active = true;
-    loadMajorHosts(token)
+    loadMajorHosts()
       .then((next) => {
         if (!active) return;
         preloadCityPhotos(next.map((host) => host.image_url), "high");
@@ -36,7 +33,7 @@ export function MajorHostsPanel() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, []);
 
   return (
     <div className="space-y-6">

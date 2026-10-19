@@ -58,10 +58,10 @@ export function clearDomesticMajors() {
   majorsRequest = null;
 }
 
-export function loadDomesticMajors(token: string) {
+export function loadDomesticMajors() {
   if (cachedMajors) return Promise.resolve(cachedMajors);
   if (!majorsRequest) {
-    majorsRequest = apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors", { token })
+    majorsRequest = apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors")
       .then((data) => {
         cachedMajors = data.majors ?? [];
         return cachedMajors;

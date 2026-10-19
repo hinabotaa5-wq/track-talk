@@ -13,10 +13,10 @@ export function clearMajorHosts() {
   hostsRequest = null;
 }
 
-export function loadMajorHosts(token: string) {
+export function loadMajorHosts() {
   if (cachedHosts) return Promise.resolve(cachedHosts);
   if (!hostsRequest) {
-    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts", { token })
+    hostsRequest = apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts")
       .then((data) => {
         cachedHosts = data.hosts ?? [];
         return cachedHosts;

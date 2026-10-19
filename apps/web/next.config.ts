@@ -77,6 +77,26 @@ const nextConfig: NextConfig = {
           { key: "Netlify-Vary", value: "query=sort|q|page" },
         ],
       },
+      // 大会の日程と県ページも、ログインに関係なく同じ中身なので端で短くキャッシュする(ホームと同じ理由)。
+      // 都道府県の大会(/competitions/regional)は Cookie で県を選ぶので、ここには入れない。
+      {
+        source: "/competitions",
+        headers: [
+          {
+            key: "Netlify-CDN-Cache-Control",
+            value: "public, durable, max-age=300, stale-while-revalidate=3600",
+          },
+          { key: "Netlify-Vary", value: "query=view|month|prefecture" },
+        ],
+      },
+      {
+        source: "/competitions/major-hosts",
+        headers: [{ key: "Netlify-CDN-Cache-Control", value: "public, durable, max-age=300, stale-while-revalidate=3600" }],
+      },
+      {
+        source: "/prefectures/:code",
+        headers: [{ key: "Netlify-CDN-Cache-Control", value: "public, durable, max-age=300, stale-while-revalidate=3600" }],
+      },
     ];
   },
   async redirects() {

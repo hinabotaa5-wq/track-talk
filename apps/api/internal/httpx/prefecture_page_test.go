@@ -60,7 +60,7 @@ func TestPrefecturePageGathersMeetsAndRecruitments(t *testing.T) {
 		t.Fatalf("delete %d", rec.Code)
 	}
 
-	if rec := doJSON(t, h, http.MethodGet, "/v1/prefectures/39", "", nil); rec.Code != http.StatusUnauthorized {
+	if rec := doJSON(t, h, http.MethodGet, "/v1/prefectures/39", "", nil); rec.Code != http.StatusOK {
 		t.Fatalf("anonymous = %d", rec.Code)
 	}
 	for _, bad := range []string{"00", "48", "tokyo"} {

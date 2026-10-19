@@ -96,13 +96,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/menu-contest", s.getMenuContest)
 		r.Get("/meet-threads/today", s.todayMeetThreads)
+		// 大会の日程と県ページは、検索から来た人がログインなしで読めるようにする。
+		r.Get("/competitions", s.listCompetitions)
+		r.Get("/major-hosts", s.listMajorHosts)
+		r.Get("/domestic-majors", s.listDomesticMajors)
+		r.Get("/prefectures/{code}", s.getPrefecturePage)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
-			r.Get("/competitions", s.listCompetitions)
-			r.Get("/major-hosts", s.listMajorHosts)
-			r.Get("/domestic-majors", s.listDomesticMajors)
-			r.Get("/prefectures/{code}", s.getPrefecturePage)
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Delete("/me", s.deleteAccount)

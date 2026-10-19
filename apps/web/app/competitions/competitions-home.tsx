@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ChevronRight, Globe, MapPin } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
 import { useSearchParams } from "next/navigation";
-import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
@@ -15,7 +14,6 @@ import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
 import type { Competition, DomesticMajor } from "@/lib/types";
-import { RequireSession } from "./require-session";
 import { competitionDates, destination } from "./regional/regional-view";
 
 type View = "domestic" | "international";
@@ -30,7 +28,7 @@ const entries = [
   { href: "/competitions/major-hosts", label: "今後の国際大会", icon: Globe },
 ];
 
-export function CompetitionsHome() {
+export function CompetitionsHome({ initialMajors = null }: { initialMajors?: DomesticMajor[] | null }) {
   const sp = useSearchParams();
   const view: View = sp.get("view") === "international" ? "international" : "domestic";
   // 一度開いた一覧は消さずに隠しておき、行き来しても読み込み直さない。
@@ -44,80 +42,76 @@ export function CompetitionsHome() {
   }
 
   return (
-    <RequireSession>
-      <div className="space-y-5">
-        {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
-        <nav aria-label="ほかの大会" className="grid grid-cols-2 gap-2 md:max-w-md">
-          {entries.map((entry) => {
-            const Icon = entry.icon;
+    <div className="space-y-5">
+      {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
+      <nav aria-label="ほかの大会" className="grid grid-cols-2 gap-2 md:max-w-md">
+        {entries.map((entry) => {
+          const Icon = entry.icon;
+          return (
+            <Link
+              key={entry.href}
+              href={entry.href}
+              className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95"
+            >
+              <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
+              <span className="truncate">{entry.label}</span>
+              <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+            </Link>
+          );
+        })}
+      </nav>
+      <MotionConfig reducedMotion="user">
+        <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
+          {views.map((item) => {
+            const active = item.id === view;
             return (
-              <Link
-                key={entry.href}
-                href={entry.href}
-                className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95"
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => select(item.id)}
+                className={`relative h-10 rounded-full text-sm font-semibold transition-colors duration-200 active:scale-95 ${
+                  active ? "text-white" : "text-slate-200 hover:text-white"
+                }`}
               >
-                <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
-                <span className="truncate">{entry.label}</span>
-                <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
-              </Link>
+                {active ? (
+                  <motion.span
+                    layoutId="competition-view-pill"
+                    className="absolute inset-0 rounded-full bg-white/25"
+                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                    aria-hidden
+                  />
+                ) : null}
+                <span className="relative">{item.label}</span>
+              </button>
             );
           })}
-        </nav>
-        <MotionConfig reducedMotion="user">
-          <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
-            {views.map((item) => {
-              const active = item.id === view;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => select(item.id)}
-                  className={`relative h-10 rounded-full text-sm font-semibold transition-colors duration-200 active:scale-95 ${
-                    active ? "text-white" : "text-slate-200 hover:text-white"
-                  }`}
-                >
-                  {active ? (
-                    <motion.span
-                      layoutId="competition-view-pill"
-                      className="absolute inset-0 rounded-full bg-white/25"
-                      transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                      aria-hidden
-                    />
-                  ) : null}
-                  <span className="relative">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          {views.map((item) =>
-            opened.has(item.id) || item.id === view ? (
-              <motion.div
-                key={item.id}
-                hidden={item.id !== view}
-                initial={{ opacity: 0, y: 8 }}
-                animate={item.id === view ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
-                {item.id === "domestic" ? <DomesticSchedule /> : <InternationalSchedule />}
-              </motion.div>
-            ) : null,
-          )}
-        </MotionConfig>
-      </div>
-    </RequireSession>
+        </div>
+        {views.map((item) =>
+          opened.has(item.id) || item.id === view ? (
+            <motion.div
+              key={item.id}
+              hidden={item.id !== view}
+              initial={{ opacity: 0, y: 8 }}
+              animate={item.id === view ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {item.id === "domestic" ? <DomesticSchedule initial={initialMajors} /> : <InternationalSchedule />}
+            </motion.div>
+          ) : null,
+        )}
+      </MotionConfig>
+    </div>
   );
 }
 
-function DomesticSchedule() {
-  const { token } = useAuth();
-  const [majors, setMajors] = useState<DomesticMajor[] | null>(peekDomesticMajors);
+function DomesticSchedule({ initial }: { initial: DomesticMajor[] | null }) {
+  const [majors, setMajors] = useState<DomesticMajor[] | null>(() => peekDomesticMajors() ?? initial);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) return;
     let active = true;
-    loadDomesticMajors(token)
+    loadDomesticMajors()
       .then((next) => {
         if (!active) return;
         setMajors(next);
@@ -129,7 +123,7 @@ function DomesticSchedule() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, []);
 
   if (error) return <ErrorState message={error} />;
   if (!majors) return <CompetitionLoadingFrame />;
@@ -145,20 +139,18 @@ function DomesticSchedule() {
 }
 
 function InternationalSchedule() {
-  const { token } = useAuth();
   const cached = readCompetitions(INTERNATIONAL, 0);
   const [entry, setEntry] = useState(cached);
 
   useEffect(() => {
-    if (!token) return;
     let active = true;
-    loadCompetitions(INTERNATIONAL, 0, token).then((next) => {
+    loadCompetitions(INTERNATIONAL, 0).then((next) => {
       if (active) setEntry(next);
     });
     return () => {
       active = false;
     };
-  }, [token]);
+  }, []);
 
   if (!entry) return <CompetitionLoadingFrame />;
   if (entry.error) return <ErrorState message={entry.error} />;
