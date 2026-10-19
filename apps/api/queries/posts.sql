@@ -303,6 +303,10 @@ WHERE id = $1
   AND hidden_at IS NULL
 RETURNING id, author_id, title, body, like_count, comment_count, created_at, updated_at;
 
+-- name: GetPostMedia :one
+-- 投稿を消す前に、使っている写真・動画を集めるための読み取り。非表示の投稿も読む。
+SELECT id, kind, cloudinary_public_id FROM posts WHERE id = $1 AND deleted_at IS NULL;
+
 -- name: SoftDeletePost :execrows
 UPDATE posts
 SET deleted_at = now(), updated_at = now()

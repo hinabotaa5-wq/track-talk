@@ -555,12 +555,14 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 			publicID = *params.CloudinaryPublicID
 		}
 		if err := s.cloud.Ready(r.Context(), publicID); err != nil {
+			s.purgeRejectedUpload(err, "video", publicID)
 			writeVideoReadyError(w, err)
 			return
 		}
 	}
 	if params.Kind == "text" && params.CloudinaryPublicID != nil {
 		if err := s.cloud.ImageReady(r.Context(), *params.CloudinaryPublicID); err != nil {
+			s.purgeRejectedUpload(err, "image", *params.CloudinaryPublicID)
 			writeAssetReadyError(w, err, "写真")
 			return
 		}

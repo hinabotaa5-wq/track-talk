@@ -129,6 +129,7 @@ func (s *Server) setCoachPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.cloud.ImageReady(r.Context(), id); err != nil {
+		s.purgeRejectedUpload(err, "image", id)
 		writeAssetReadyError(w, err, "写真")
 		return
 	}

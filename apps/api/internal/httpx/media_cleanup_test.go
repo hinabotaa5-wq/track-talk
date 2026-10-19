@@ -160,3 +160,82 @@ func TestWithdrawRemovesPhotosFromCloudinary(t *testing.T) {
 		t.Fatal("photo was not deleted")
 	}
 }
+
+// 運営が非表示にした投稿を投稿者が消しても、写真は Cloudinary から消える。
+func TestDeletingAHiddenPostRemovesItsPhoto(t *testing.T) {
+	deleted := make(chan []string, 4)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			deleted <- r.URL.Query()["public_ids[]"]
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	ta := token(t, uuid.New())
+	photo := "track-talk/" + uuid.NewString()
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/posts/"+created.ID+"/hide", adminToken(t, h), nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("hide %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+created.ID, ta, nil); rec.Code != 204 {
+		t.Fatalf("delete %d", rec.Code)
+	}
+	select {
+	case ids := <-deleted:
+		if len(ids) != 1 || ids[0] != photo {
+			t.Fatalf("deleted %v", ids)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("photo of a hidden post was not deleted")
+	}
+}
+
+// 大きさの上限を超えて投稿を断った写真は、Cloudinary に残さず消す。
+func TestRejectedPhotoIsRemovedFromCloudinary(t *testing.T) {
+	deleted := make(chan []string, 4)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			deleted <- r.URL.Query()["public_ids[]"]
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":999999999}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	photo := "track-talk/" + uuid.NewString()
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", token(t, uuid.New()), map[string]any{"title": "大きな写真", "body": "", "image_public_id": photo})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	select {
+	case ids := <-deleted:
+		if len(ids) != 1 || ids[0] != photo {
+			t.Fatalf("deleted %v", ids)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("rejected photo was not deleted")
+	}
+}

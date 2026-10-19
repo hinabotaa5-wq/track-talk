@@ -2,11 +2,13 @@ package httpx
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 )
 
 // postMedia は投稿に付いている Cloudinary の写真と動画。
@@ -22,7 +24,8 @@ func (m postMedia) empty() bool {
 // postMediaOf は投稿を消す前に、その投稿が使っている写真・動画を集める。
 func (s *Server) postMediaOf(ctx context.Context, id uuid.UUID) postMedia {
 	var m postMedia
-	post, err := s.q.GetPost(ctx, id)
+	// 運営が非表示にした投稿でも、投稿者が消すときは写真・動画を消すため、非表示を除かずに読む。
+	post, err := s.q.GetPostMedia(ctx, id)
 	if err != nil {
 		return m
 	}
@@ -43,6 +46,19 @@ func (s *Server) postMediaOf(ctx context.Context, id uuid.UUID) postMedia {
 		}
 	}
 	return m
+}
+
+// purgeRejectedUpload は、形式・大きさ・長さの条件を満たさず投稿を断った写真・動画を、Cloudinary から消す。
+// 断っても残ると、条件に合わないファイルが溜まり続ける。他で使っている ID は deleteUnusedMedia が除く。
+func (s *Server) purgeRejectedUpload(err error, resource, id string) {
+	if !errors.Is(err, cloudinary.ErrRejected) && !errors.Is(err, cloudinary.ErrTooLarge) && !errors.Is(err, cloudinary.ErrTooLong) {
+		return
+	}
+	if resource == "video" {
+		s.purgeMedia(postMedia{Videos: []string{id}})
+		return
+	}
+	s.purgeMedia(postMedia{Images: []string{id}})
 }
 
 // unused は、まだ残っている投稿から参照されていない ID だけを返す。

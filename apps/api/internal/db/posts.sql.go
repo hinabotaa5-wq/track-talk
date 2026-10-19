@@ -403,6 +403,24 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 	return i, err
 }
 
+const getPostMedia = `-- name: GetPostMedia :one
+SELECT id, kind, cloudinary_public_id FROM posts WHERE id = $1 AND deleted_at IS NULL
+`
+
+type GetPostMediaRow struct {
+	ID                 uuid.UUID `json:"id"`
+	Kind               string    `json:"kind"`
+	CloudinaryPublicID *string   `json:"cloudinary_public_id"`
+}
+
+// 投稿を消す前に、使っている写真・動画を集めるための読み取り。非表示の投稿も読む。
+func (q *Queries) GetPostMedia(ctx context.Context, id uuid.UUID) (GetPostMediaRow, error) {
+	row := q.db.QueryRow(ctx, getPostMedia, id)
+	var i GetPostMediaRow
+	err := row.Scan(&i.ID, &i.Kind, &i.CloudinaryPublicID)
+	return i, err
+}
+
 const hidePost = `-- name: HidePost :execrows
 UPDATE posts
 SET hidden_at = now(), updated_at = now()
