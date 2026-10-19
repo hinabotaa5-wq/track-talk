@@ -17,7 +17,8 @@ export const mainTabs = [
 export function mainTabHref(id: (typeof mainTabs)[number]["id"], signedIn: boolean) {
   const tab = mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
-  if (id !== "home" && id !== "coaching" && !signedIn) return "/login";
+  // ログインが要るのはマイページだけ。ほかのタブは、ログインなしで開ける。
+  if (id === "me" && !signedIn) return "/login";
   return tab.href;
 }
 

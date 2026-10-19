@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { hidesBottomNav, showsBackButton } from "./bottom-nav";
+import { mainTabHref } from "./bottom-nav";
 
-describe("login page header and bottom nav", () => {
-  it("shows the back button only when sent to login from a page that needs it", () => {
-    expect(showsBackButton("/login", "?next=%2Fupload")).toBe(true);
-    expect(showsBackButton("/login", "")).toBe(false);
-    expect(showsBackButton("/login")).toBe(false);
+describe("mainTabHref", () => {
+  it("ログインしていなくても、マイページ以外のタブはそのまま開ける", () => {
+    expect(mainTabHref("home", false)).toBe("/");
+    expect(mainTabHref("competitions", false)).toBe("/competitions");
+    expect(mainTabHref("coaching", false)).toBe("/coaching");
+    expect(mainTabHref("injury", false)).toBe("/injury");
   });
 
-  it("shows the bottom nav on the login page", () => {
-    expect(hidesBottomNav("/login")).toBe(false);
-    expect(hidesBottomNav("/register")).toBe(true);
+  it("マイページは、ログインしていなければログイン画面に向ける", () => {
+    expect(mainTabHref("me", false)).toBe("/login");
+    expect(mainTabHref("me", true)).toBe("/me");
   });
 });
