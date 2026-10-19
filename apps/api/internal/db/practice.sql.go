@@ -28,11 +28,13 @@ func (q *Queries) CountAcceptedApplications(ctx context.Context, postID uuid.UUI
 
 const dissolvePractice = `-- name: DissolvePractice :execrows
 UPDATE practice_details
-SET dissolved_at = now()
+SET dissolved_at = now(),
+    canceled = now() < starts_at
 WHERE post_id = $1
   AND dissolved_at IS NULL
 `
 
+// 練習の日時より前に解散したものは中止（canceled）として残す。
 func (q *Queries) DissolvePractice(ctx context.Context, postID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, dissolvePractice, postID)
 	if err != nil {
@@ -108,7 +110,7 @@ func (q *Queries) GetPracticeApplicationByUser(ctx context.Context, arg GetPract
 }
 
 const getPracticeDetail = `-- name: GetPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = $1
 `
@@ -124,6 +126,7 @@ func (q *Queries) GetPracticeDetail(ctx context.Context, postID uuid.UUID) (Prac
 		&i.EventOther,
 		&i.Capacity,
 		&i.DissolvedAt,
+		&i.Canceled,
 	)
 	return i, err
 }
@@ -352,7 +355,7 @@ func (q *Queries) ListPracticeApplications(ctx context.Context, postID uuid.UUID
 }
 
 const listPracticeDetails = `-- name: ListPracticeDetails :many
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = ANY($1::uuid[])
 `
@@ -374,6 +377,7 @@ func (q *Queries) ListPracticeDetails(ctx context.Context, postIds []uuid.UUID) 
 			&i.EventOther,
 			&i.Capacity,
 			&i.DissolvedAt,
+			&i.Canceled,
 		); err != nil {
 			return nil, err
 		}
@@ -504,7 +508,7 @@ func (q *Queries) ListRatedApplicationIDs(ctx context.Context, arg ListRatedAppl
 }
 
 const lockPracticeDetail = `-- name: LockPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = $1
 FOR UPDATE
@@ -521,6 +525,7 @@ func (q *Queries) LockPracticeDetail(ctx context.Context, postID uuid.UUID) (Pra
 		&i.EventOther,
 		&i.Capacity,
 		&i.DissolvedAt,
+		&i.Canceled,
 	)
 	return i, err
 }

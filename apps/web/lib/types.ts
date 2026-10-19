@@ -151,6 +151,8 @@ export type Practice = {
   accepted_count: number;
   status: "open" | "full" | "dissolved";
   dissolved_at?: string;
+  // 練習の日時を過ぎてから解散した（開かれた）練習で、評価できるとき true。日時より前の解散は中止。
+  ratable?: boolean;
   my_application?: PracticeApplication["status"];
   my_application_id?: string;
   rated_host?: boolean;

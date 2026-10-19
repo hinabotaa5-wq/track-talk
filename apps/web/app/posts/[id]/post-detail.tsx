@@ -765,7 +765,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
           参加したい
         </Button>
       ) : null}
-      {!mine && info.status === "dissolved" && info.my_application === "accepted" && info.my_application_id ? (
+      {!mine && info.ratable && info.my_application === "accepted" && info.my_application_id ? (
         info.rated_host ? (
           <p className="text-sm">評価しました</p>
         ) : (
@@ -806,7 +806,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
                   </Button>
                 </div>
               ) : null}
-              {application.status === "accepted" && info.status === "dissolved" ? (
+              {application.status === "accepted" && info.ratable ? (
                 application.rated ? (
                   <p className="mt-2 text-sm">評価済み</p>
                 ) : (

@@ -111,6 +111,7 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
+	practiceHeld(t, practice.ID)
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practice.ID+"/practice/dissolve", other, nil)
 	if rec.Code != 200 {
 		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())

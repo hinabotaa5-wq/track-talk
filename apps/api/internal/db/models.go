@@ -408,6 +408,7 @@ type PracticeDetail struct {
 	EventOther  string     `json:"event_other"`
 	Capacity    int32      `json:"capacity"`
 	DissolvedAt *time.Time `json:"dissolved_at"`
+	Canceled    bool       `json:"canceled"`
 }
 
 type PracticeRating struct {
