@@ -36,9 +36,10 @@ SET coaching_demo = true,
 WHERE id = $1;
 
 -- name: CountReviewRequestsByRequester :one
--- 送った依頼の数。支払いがまだのものは数えない。
+-- 送った依頼の数。支払いがまだのものも数える（数えないと、保護者の同意前に何本でも作ってから払える）。
+-- 払わないまま閉じたものは tick が消すので、そのあとは数に入らない。
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1 AND status <> 'awaiting_payment';
+WHERE requester_id = $1;
 
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。

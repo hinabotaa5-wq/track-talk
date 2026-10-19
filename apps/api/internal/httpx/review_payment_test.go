@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // paidReview は、支払い方法を選んで依頼を送り、Stripe から支払いが届いたところまで進める。
@@ -196,5 +198,29 @@ func TestWithdrawKeepsSettledReviewPayment(t *testing.T) {
 	}
 	if refunds := f.refundList(); len(refunds) != 0 {
 		t.Fatalf("settled payment refunded %v", refunds)
+	}
+}
+
+// 保護者の同意を待っている18歳未満は、支払いがまだの依頼を含めて1本目までしか作れない。
+func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	tm := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/demo", tm, map[string]any{"code": newDemoCodeFor(t, h, tadmin)}); rec.Code != http.StatusOK {
+		t.Fatalf("join %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
+		t.Fatalf("birth month %d", rec.Code)
+	}
+	body := reviewBody()
+	body["method"] = "card"
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
+		t.Fatalf("first %d %s", rec.Code, rec.Body.String())
+	}
+	body = reviewBody()
+	body["method"] = "card"
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_pending") {
+		t.Fatalf("second while unpaid %d %s", rec.Code, rec.Body.String())
 	}
 }

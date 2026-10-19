@@ -119,10 +119,11 @@ func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoaches
 
 const countReviewRequestsByRequester = `-- name: CountReviewRequestsByRequester :one
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1 AND status <> 'awaiting_payment'
+WHERE requester_id = $1
 `
 
-// 送った依頼の数。支払いがまだのものは数えない。
+// 送った依頼の数。支払いがまだのものも数える（数えないと、保護者の同意前に何本でも作ってから払える）。
+// 払わないまま閉じたものは tick が消すので、そのあとは数に入らない。
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
 	var count int64
