@@ -271,3 +271,17 @@ func TestStripeWebhookIs404WhileCoachingIsOff(t *testing.T) {
 		t.Fatalf("webhook while off %d", rec.Code)
 	}
 }
+
+// 返金で1円だけ残った契約は取り分が0円になる。記録しないで、tick 全体を止めない。
+func TestCoachEarningsSkipZeroShare(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tu, _, contractID := adultAccepted(t, h)
+	checkout(t, h, tu, contractID)
+	paidSession(t, h, sessionIDFor(t, contractID), "pi_personal_one_yen", 8000)
+	execSQLArgs(t, `UPDATE coaching_payments SET status = 'partially_refunded', refunded_yen = amount_yen - 1 WHERE contract_id = $1`, contractID)
+	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'refunded' WHERE id = $1`, contractID)
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
+		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+	}
+}

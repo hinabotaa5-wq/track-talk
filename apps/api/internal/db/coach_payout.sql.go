@@ -174,7 +174,7 @@ FROM (
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)
     ORDER BY ct.id, pay.paid_at
 ) x
-WHERE x.gross > 0
+WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
 RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at
@@ -187,6 +187,7 @@ type InsertPersonalEarningsParams struct {
 
 // 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
 // 手数料は20%、初年10%のコーチは、その期間中に始まった指導が10%。
+// 取り分が0円になる行（1円だけ残った返金など）は記録しない。amount_yen > 0 の制約で全体が失敗するため。
 func (q *Queries) InsertPersonalEarnings(ctx context.Context, arg InsertPersonalEarningsParams) ([]CoachEarning, error) {
 	rows, err := q.db.Query(ctx, insertPersonalEarnings, arg.ReducedFeePercent, arg.FeePercent)
 	if err != nil {
