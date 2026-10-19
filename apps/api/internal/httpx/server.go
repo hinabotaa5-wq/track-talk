@@ -52,8 +52,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			Subject:    cfg.VAPIDSubject,
 		},
 		stripe: stripe.Client{
-			Secret:  cfg.StripeSecretKey,
-			APIBase: cfg.StripeAPIBase,
+			Secret:     cfg.StripeSecretKey,
+			APIBase:    cfg.StripeAPIBase,
+			APIVersion: cfg.StripeAPIVersion,
 		},
 		mail: mail.Client{
 			APIKey:  cfg.ResendAPIKey,
@@ -81,7 +82,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
 	// コーチングを提供していない間は、tick も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
-	r.Post("/webhooks/stripe", s.stripeWebhook)
+	// 支払いはコーチングの一部なので、提供していない間は Webhook も無いものとして扱う。
+	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))

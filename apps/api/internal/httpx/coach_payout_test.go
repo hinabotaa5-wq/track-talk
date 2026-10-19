@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
 type earningsView struct {
@@ -256,5 +257,17 @@ func TestStripeWebhookSyncsCoachAccountAndAlertsDispute(t *testing.T) {
 	}
 	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1", "amount": 1000, "reason": "fraudulent", "payment_intent": "pi_x"}); rec.Code != http.StatusOK {
 		t.Fatalf("dispute %d", rec.Code)
+	}
+}
+
+// コーチングを提供していない間は、鍵があっても Webhook は無いものとして扱う。
+func TestStripeWebhookIs404WhileCoachingIsOff(t *testing.T) {
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingEnabled = false
+		cfg.StripeSecretKey = "sk_test_x"
+		cfg.StripeWebhookSecret = testWebhookSecret
+	})
+	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1"}); rec.Code != http.StatusNotFound {
+		t.Fatalf("webhook while off %d", rec.Code)
 	}
 }

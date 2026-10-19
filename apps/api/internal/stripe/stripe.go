@@ -31,8 +31,15 @@ var (
 type Client struct {
 	Secret  string
 	APIBase string
-	HTTP    *http.Client
+	// APIVersion を入れると Stripe-Version ヘッダーで API のバージョンを固定する。空ならアカウントの既定。
+	APIVersion string
+	HTTP       *http.Client
+	// RetryDelay は、一時的な失敗のあとの最初の待ち時間(2回目はその2倍)。空なら400ms。
+	RetryDelay time.Duration
 }
+
+// 同じ Idempotency-Key で送る POST は、一時的な失敗(通信エラー・429・5xx)をこの回数まで試す。
+const maxAttempts = 3
 
 // Configured は、秘密鍵が設定されているか。設定されていなければ支払いなしのデモ版として動く。
 func (c Client) Configured() bool { return c.Secret != "" }
@@ -64,10 +71,37 @@ func (e *APIError) Error() string {
 }
 
 // post は、フォーム形式で POST する。同じ idempotencyKey で送り直すと、Stripe は前と同じ結果を返す。
+// idempotencyKey がある POST は、一時的な失敗(通信エラー・429・5xx)なら間を置いて送り直す(重複して課金されない)。
 func (c Client) post(ctx context.Context, path string, form url.Values, idempotencyKey string, out any) error {
 	if !c.Configured() {
 		return ErrNotConfigured
 	}
+	attempts := 1
+	if idempotencyKey != "" {
+		attempts = maxAttempts
+	}
+	delay := c.RetryDelay
+	if delay <= 0 {
+		delay = 400 * time.Millisecond
+	}
+	var err error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay << (i - 1)):
+			}
+		}
+		err = c.postOnce(ctx, path, form, idempotencyKey, out)
+		if err == nil || !retryable(ctx, err) {
+			return err
+		}
+	}
+	return err
+}
+
+func (c Client) postOnce(ctx context.Context, path string, form url.Values, idempotencyKey string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base()+path, strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
@@ -80,8 +114,23 @@ func (c Client) post(ctx context.Context, path string, form url.Values, idempote
 	return c.do(req, out)
 }
 
+// retryable は、送り直して良い失敗か。呼んだ側が止めた(ctx)ときと、Stripe が断った 4xx は送り直さない。
+func retryable(ctx context.Context, err error) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Status == http.StatusTooManyRequests || apiErr.Status >= 500
+	}
+	return true
+}
+
 // do は、リクエストを送って JSON を out に読む。2xx 以外は APIError。
 func (c Client) do(req *http.Request, out any) error {
+	if c.APIVersion != "" {
+		req.Header.Set("Stripe-Version", c.APIVersion)
+	}
 	res, err := c.httpClient().Do(req)
 	if err != nil {
 		return err

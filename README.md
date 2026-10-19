@@ -195,6 +195,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `MAIL_DEV_LOG` | API | `1` なら、メールを送らずに本文を API のログに出す。手元で保護者の同意を試すためのもので、本番では空のまま |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | API | パーソナル指導の支払い（空なら支払いなしのデモ版）。Webhook の送り先は `POST /webhooks/stripe` |
 | `STRIPE_CONNECT_WEBHOOK_SECRET` | API | コーチの Stripe アカウントの変化（`account.updated`）を受ける Webhook の署名の鍵。Stripe は「接続アカウント」の知らせを別の送り先（同じ URL でよい）で作らせ、鍵も別になるので、作ったときだけ入れる。登録が済んだ・受け取れなくなった、が報酬の画面と送金に反映される。`charge.dispute.created`（チャージバック）は運営にプッシュで知らせる |
+| `STRIPE_API_VERSION` | API | 入れると Stripe の API のバージョンを固定する（`Stripe-Version`）。空ならアカウントの既定 |
 | `WEB_BASE_URL` | API | 支払い画面から戻ってくる画面の URL（空なら `CORS_ORIGINS` の最初のもの） |
 | `API_ADDR` / `CORS_ORIGINS` / `LOG_LEVEL` | API | 既定は `:8080` / `http://localhost:3000` / `info` |
 | `GEMINI_API_KEY` | 大会取り込み | 都道府県の取り込みに必要 |
