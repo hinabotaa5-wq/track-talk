@@ -5,6 +5,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
+import { GuardianLinkForm } from "@/components/guardian-link-form";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabel } from "@/lib/coaching-plan";
 import { formatDateTime, formatYen } from "@/lib/format";
@@ -152,6 +153,8 @@ function CoachingContractView() {
           </div>
         )
       ) : null}
+
+      {!isCoach && contract.minor && contract.status === "accepted" ? <GuardianLinkForm token={token} /> : null}
 
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
