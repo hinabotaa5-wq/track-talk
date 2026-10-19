@@ -1,0 +1,1 @@
+ALTER TABLE competition_news_checks DISABLE ROW LEVEL SECURITY;
