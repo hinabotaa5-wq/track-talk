@@ -588,6 +588,19 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	if got := notes(liker); len(got) != 2 {
 		t.Fatalf("a new update after reading should notify again: %+v", got)
 	}
+
+	// グループを抜けた人には、読めない投稿の通知を送らない。
+	savedNote := notes(saver)[0]
+	if r := doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+savedNote.ID+"/read", saver, nil); r.Code >= 300 {
+		t.Fatalf("read %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/achilles-tendinitis/me", saver, nil); r.Code != http.StatusNoContent {
+		t.Fatalf("leave %d %s", r.Code, r.Body.String())
+	}
+	report("race")
+	if got := notes(saver); len(got) != 1 {
+		t.Fatalf("a member who left must not be notified: %+v", got)
+	}
 }
 
 func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {

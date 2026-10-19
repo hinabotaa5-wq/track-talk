@@ -780,6 +780,11 @@ FROM (
     SELECT s.user_id FROM post_saves s WHERE s.post_id = $1::uuid
 ) f
 WHERE f.user_id <> $2::uuid
+  AND EXISTS (
+    SELECT 1 FROM injury_group_members gm
+    JOIN injury_details d ON d.body_part = gm.body_part
+    WHERE gm.user_id = f.user_id AND d.post_id = $1::uuid
+  )
   AND NOT EXISTS (
     SELECT 1 FROM notifications n
     WHERE n.recipient_id = f.user_id
@@ -795,6 +800,7 @@ type NotifyInjuryFollowersParams struct {
 }
 
 // 経過報告があったとき、その投稿に「わかる」か保存をした人(投稿者を除く)へ通知する。
+// ケガの投稿は部位のグループのメンバーしか読めないので、いまそのグループに入っている人だけに送る。
 // 同じ投稿の未読の通知がすでにある人には重ねて送らない。
 func (q *Queries) NotifyInjuryFollowers(ctx context.Context, arg NotifyInjuryFollowersParams) error {
 	_, err := q.db.Exec(ctx, notifyInjuryFollowers, arg.PostID, arg.AuthorID)

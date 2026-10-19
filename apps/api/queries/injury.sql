@@ -95,6 +95,7 @@ GROUP BY u.post_id, u.stage;
 
 -- name: NotifyInjuryFollowers :exec
 -- 経過報告があったとき、その投稿に「わかる」か保存をした人(投稿者を除く)へ通知する。
+-- ケガの投稿は部位のグループのメンバーしか読めないので、いまそのグループに入っている人だけに送る。
 -- 同じ投稿の未読の通知がすでにある人には重ねて送らない。
 INSERT INTO notifications (id, recipient_id, kind, post_id)
 SELECT gen_random_uuid(), f.user_id, 'injury_update', sqlc.arg('post_id')::uuid
@@ -104,6 +105,11 @@ FROM (
     SELECT s.user_id FROM post_saves s WHERE s.post_id = sqlc.arg('post_id')::uuid
 ) f
 WHERE f.user_id <> sqlc.arg('author_id')::uuid
+  AND EXISTS (
+    SELECT 1 FROM injury_group_members gm
+    JOIN injury_details d ON d.body_part = gm.body_part
+    WHERE gm.user_id = f.user_id AND d.post_id = sqlc.arg('post_id')::uuid
+  )
   AND NOT EXISTS (
     SELECT 1 FROM notifications n
     WHERE n.recipient_id = f.user_id
