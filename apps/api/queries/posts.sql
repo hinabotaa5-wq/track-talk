@@ -475,16 +475,16 @@ DELETE FROM post_likes
 WHERE post_id = $1 AND user_id = $2;
 
 -- name: IncrementLikeCount :exec
-UPDATE posts SET like_count = like_count + 1, updated_at = now() WHERE id = $1;
+UPDATE posts SET like_count = like_count + 1 WHERE id = $1;
 
 -- name: DecrementLikeCount :exec
-UPDATE posts SET like_count = GREATEST(like_count - 1, 0), updated_at = now() WHERE id = $1;
+UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1;
 
 -- name: IncrementCommentCount :exec
-UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id = $1;
+UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1;
 
 -- name: DecrementCommentCount :exec
-UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1;
+UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1;
 
 -- name: ListMediaInUse :many
 SELECT p.cloudinary_public_id::text AS public_id

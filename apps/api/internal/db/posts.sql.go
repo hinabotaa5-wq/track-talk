@@ -250,7 +250,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 }
 
 const decrementCommentCount = `-- name: DecrementCommentCount :exec
-UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -259,7 +259,7 @@ func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const decrementLikeCount = `-- name: DecrementLikeCount :exec
-UPDATE posts SET like_count = GREATEST(like_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementLikeCount(ctx context.Context, id uuid.UUID) error {
@@ -420,7 +420,7 @@ func (q *Queries) HidePost(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const incrementCommentCount = `-- name: IncrementCommentCount :exec
-UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -429,7 +429,7 @@ func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const incrementLikeCount = `-- name: IncrementLikeCount :exec
-UPDATE posts SET like_count = like_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = like_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementLikeCount(ctx context.Context, id uuid.UUID) error {
