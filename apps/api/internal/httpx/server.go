@@ -43,10 +43,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		},
 		limit: NewRateLimiter(),
 		cloud: cloudinary.Client{
-			Cloud:   cfg.CloudName,
-			Key:     cfg.CloudAPIKey,
-			Secret:  cfg.CloudAPISecret,
-			APIBase: cfg.CloudAPIBase,
+			Cloud:        cfg.CloudName,
+			Key:          cfg.CloudAPIKey,
+			Secret:       cfg.CloudAPISecret,
+			APIBase:      cfg.CloudAPIBase,
+			AuthTokenKey: cfg.CloudAuthTokenKey,
 		},
 		push: push.Sender{
 			PublicKey:  cfg.VAPIDPublicKey,

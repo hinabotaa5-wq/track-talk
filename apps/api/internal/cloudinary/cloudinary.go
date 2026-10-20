@@ -3,7 +3,9 @@ package cloudinary
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -57,7 +59,15 @@ type Client struct {
 	Secret  string
 	APIBase string
 	HTTP    *http.Client
+	// AuthTokenKey は Cloudinary のトークン認証の鍵（16進数）。あれば非公開の動画の URL に期限を付ける。
+	// 空のあいだは、期限のない署名付き URL のまま。
+	AuthTokenKey string
+	// Now は期限の起点。テストで差し替える。nil なら time.Now。
+	Now func() time.Time
 }
+
+// AuthTokenTTL は、非公開の動画の URL を使える時間。画面を開き直せば新しい URL を受け取れる。
+const AuthTokenTTL = 3 * time.Hour
 
 func (c Client) Configured() bool {
 	return c.Cloud != "" && c.Key != "" && c.Secret != ""
@@ -312,17 +322,57 @@ func (c Client) CoachingThumbnailURL(publicID string) string {
 	return c.signedVideoURL("so_auto,c_limit,w_800,f_jpg", publicID, "jpg")
 }
 
-// signedVideoURL は Cloudinary の配信 URL の署名（s--XXXXXXXX--）を付ける。
-// 署名は「変換/public_id.拡張子」に API シークレットを足した SHA-1 を URL 用の Base64 にした先頭8文字。
-// バージョン（v1）は署名に含めない。
+// signedVideoURL は非公開の動画を配信する URL を返す。
+// トークン認証の鍵があれば、期限付きのトークン（__cld_token__）を付ける。公式 SDK と同じく、そのときは署名を付けない。
+// 鍵が無ければ署名（s--XXXXXXXX--）を付ける。署名は「変換/public_id.拡張子」に API シークレットを足した SHA-1 を
+// URL 用の Base64 にした先頭8文字。バージョン（v1）は署名に含めない。
 func (c Client) signedVideoURL(transformation, publicID, ext string) string {
 	if c.Cloud == "" || c.Secret == "" || !ValidCoachingPublicID(publicID) {
 		return ""
 	}
 	source := deliveryPath(publicID) + "." + ext
+	base := "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/" + CoachingVideoType + "/"
+	if c.AuthTokenKey != "" {
+		token, err := c.authToken(publicID)
+		if err != nil {
+			return ""
+		}
+		return base + transformation + "/v1/" + source + "?" + token
+	}
 	sum := sha1.Sum([]byte(transformation + "/" + source + c.Secret))
 	signature := "s--" + base64.URLEncoding.EncodeToString(sum[:])[:8] + "--"
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/" + CoachingVideoType + "/" + signature + "/" + transformation + "/v1/" + source
+	return base + signature + "/" + transformation + "/v1/" + source
+}
+
+// authToken は、その動画の配信（変換やサムネイルを含む）だけに使える、AuthTokenTTL で切れるトークンを返す。
+func (c Client) authToken(publicID string) (string, error) {
+	key, err := hex.DecodeString(c.AuthTokenKey)
+	if err != nil {
+		return "", err
+	}
+	now := time.Now
+	if c.Now != nil {
+		now = c.Now
+	}
+	acl := "/video/" + CoachingVideoType + "/*" + publicID + "*"
+	parts := fmt.Sprintf("exp=%d~acl=%s", now().Add(AuthTokenTTL).Unix(), escapeToLower(acl))
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(parts))
+	return "__cld_token__=" + parts + "~hmac=" + hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+// escapeToLower は、トークンに入れる文字列を公式 SDK と同じ規則（記号を小文字の %xx に）でエスケープする。
+func escapeToLower(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch < 0x20 || ch >= 0x7f || strings.IndexByte(" \"#%&'/:;<=>?@[\\]^`{|}~", ch) >= 0 {
+			fmt.Fprintf(&b, "%%%02x", ch)
+			continue
+		}
+		b.WriteByte(ch)
+	}
+	return b.String()
 }
 
 func deliveryPath(publicID string) string {
