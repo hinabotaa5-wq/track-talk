@@ -178,7 +178,18 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	n, err := s.q.CountCoachingPlans(r.Context(), c.ProfileID)
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	n, err := q.CountCoachingPlans(r.Context(), c.ProfileID)
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -191,7 +202,7 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	if req.Published != nil {
 		published = *req.Published
 	}
-	p, err := s.q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
+	p, err := q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
 		ID:           uuid.New(),
 		CoachID:      c.ProfileID,
 		Kind:         req.Kind,
@@ -203,6 +214,10 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Published:    published,
 	})
 	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
