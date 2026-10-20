@@ -363,7 +363,12 @@ func TestCoachingPaymentRefundsWhenTheCoachIsSilent(t *testing.T) {
 	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":0`) {
 		t.Fatalf("tick early %d %s", rec.Code, rec.Body.String())
 	}
-	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = now() - interval '73 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
+	// 止めていた時間は数えない。100時間前に始まっても、95時間止めていたら(終了日がその分延びる)まだ返金しない。
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = starts_at - interval '100 hours', ends_at = ends_at - interval '5 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":0`) {
+		t.Fatalf("tick after suspension %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = ends_at - interval '68 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
 	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":1`) {
 		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
 	}

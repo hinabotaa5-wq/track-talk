@@ -75,9 +75,10 @@ RETURNING *;
 
 -- name: ListSilentPaidContracts :many
 -- 支払いが済んで始まってから72時間、コーチが1通も書いていないもの。全額を返金して閉じる。
+-- 運営が止めていた時間(コーチは書けない)は数えない。再開で終了日をその分延ばすので、終了日から期間を引いた時を始まりとみなす。
 SELECT ct.* FROM coaching_contracts ct
 WHERE ct.status = 'active' AND ct.payment_required
-  AND ct.starts_at <= now() - interval '72 hours'
+  AND ct.ends_at - make_interval(days => ct.duration_days) <= now() - interval '72 hours'
   AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid')
 -- 返金に失敗した支払いは TouchCoachingPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。

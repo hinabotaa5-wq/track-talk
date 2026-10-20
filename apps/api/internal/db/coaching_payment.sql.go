@@ -174,7 +174,7 @@ func (q *Queries) HasGuardianContractConsent(ctx context.Context, contractID uui
 const listSilentPaidContracts = `-- name: ListSilentPaidContracts :many
 SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at FROM coaching_contracts ct
 WHERE ct.status = 'active' AND ct.payment_required
-  AND ct.starts_at <= now() - interval '72 hours'
+  AND ct.ends_at - make_interval(days => ct.duration_days) <= now() - interval '72 hours'
   AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid')
 ORDER BY (SELECT max(pay.updated_at) FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid'), ct.id
@@ -182,6 +182,7 @@ LIMIT 50
 `
 
 // 支払いが済んで始まってから72時間、コーチが1通も書いていないもの。全額を返金して閉じる。
+// 運営が止めていた時間(コーチは書けない)は数えない。再開で終了日をその分延ばすので、終了日から期間を引いた時を始まりとみなす。
 // 返金に失敗した支払いは TouchCoachingPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。
 func (q *Queries) ListSilentPaidContracts(ctx context.Context) ([]CoachingContract, error) {
 	rows, err := q.db.Query(ctx, listSilentPaidContracts)
