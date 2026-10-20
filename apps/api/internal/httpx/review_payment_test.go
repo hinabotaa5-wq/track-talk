@@ -341,6 +341,28 @@ func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
 	}
 }
 
+// 18歳未満の支払い画面は、ロックを持つトランザクションの接続だけで作る。
+// 別の接続を待つと、接続の数だけ同時に来たときに全員が止まる。
+func TestReviewPaymentMinorCheckoutUsesOneConnection(t *testing.T) {
+	testPoolMaxConns = 1
+	t.Cleanup(func() { testPoolMaxConns = 0 })
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tm, _ := guardianMinor(t, h)
+	body := reviewBodyFor(t, h, tm)
+	body["method"] = "paypay"
+	done := make(chan int, 1)
+	go func() { done <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code }()
+	select {
+	case code := <-done:
+		if code != http.StatusCreated {
+			t.Fatalf("create %d", code)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("minor checkout waited for a second connection while holding the lock")
+	}
+}
+
 // 保護者が同意しないと答えたあとは、前に送って支払いがまだの依頼も払えない。
 func TestReviewPaymentBlockedAfterGuardianDeclines(t *testing.T) {
 	fakeCoachingCloudinary(t)
