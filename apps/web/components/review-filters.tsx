@@ -113,7 +113,7 @@ export function ReviewAttrChips({ review }: { review: ProductReview }) {
   return (
     <p className="flex flex-wrap gap-1">
       {chips.map((chip) => (
-        <span key={chip} className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200">
+        <span key={chip} className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
           {chip}
         </span>
       ))}

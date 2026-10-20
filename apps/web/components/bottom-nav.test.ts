@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { hasBackOnlyHeader, mainTabHref, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, mainTabs, mainTabHref, showsBackButton } from "./bottom-nav";
 
 describe("mainTabHref", () => {
-  it("ログインしていなくても、マイページ以外のタブはそのまま開ける", () => {
+  it("下のメニューは ホーム→大会→メモ→コーチ→ケガ の順", () => {
+    expect(mainTabs.map((tab) => tab.id)).toEqual(["home", "competitions", "memo", "coaching", "injury"]);
+  });
+
+  it("ログインしていなくても、メモとマイページ以外のタブはそのまま開ける", () => {
     expect(mainTabHref("home", false)).toBe("/");
     expect(mainTabHref("competitions", false)).toBe("/competitions");
     expect(mainTabHref("coaching", false)).toBe("/coaching");
     expect(mainTabHref("injury", false)).toBe("/injury");
   });
 
-  it("マイページは、ログインしていなければログイン画面に向ける", () => {
+  it("メモとマイページは、ログインしていなければログイン画面に向ける", () => {
+    expect(mainTabHref("memo", false)).toBe("/login");
+    expect(mainTabHref("memo", true)).toBe("/memo");
+    expect(activeMainTab("/memo")).toBe("memo");
     expect(mainTabHref("me", false)).toBe("/login");
     expect(mainTabHref("me", true)).toBe("/me");
   });

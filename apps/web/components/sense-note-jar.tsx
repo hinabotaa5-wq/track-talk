@@ -64,7 +64,7 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
         <path d="M24 60 Q22 90 24 128" stroke="rgb(255 255 255 / 0.45)" strokeWidth="3" strokeLinecap="round" fill="none" />
       </svg>
       {filled > 0 ? (
-        <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-[11px] font-bold text-slate-900 shadow">
+        <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-xs font-bold text-slate-900 shadow">
           {jarIndex}杯目
         </span>
       ) : null}

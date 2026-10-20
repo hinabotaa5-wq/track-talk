@@ -20,7 +20,7 @@ function Faces({ stage }: { stage: InjuryGroupStage }) {
       {stage.faces.map((name, index) => (
         <span
           key={`${name}-${index}`}
-          className="-ml-1.5 flex size-6 items-center justify-center rounded-full border-2 border-slate-900 text-[11px] font-bold text-slate-900 first:ml-0"
+          className="-ml-1.5 flex size-6 items-center justify-center rounded-full border-2 border-slate-900 text-xs font-bold text-slate-900 first:ml-0"
           style={{ backgroundColor: `hsl(${injuryFaceHue(name)} 70% 75%)` }}
         >
           {injuryFaceInitial(name)}

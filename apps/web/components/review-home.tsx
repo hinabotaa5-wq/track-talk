@@ -87,7 +87,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
             >
               <ProductImage product={p} />
               <div className="space-y-0.5 px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-300">
+                <p className="text-xs text-slate-300">
                   {p.brand}
                   {p.discontinued ? <span className="ml-1.5 text-amber-300">旧モデル</span> : null}
                 </p>

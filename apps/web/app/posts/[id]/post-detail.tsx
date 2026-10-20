@@ -380,7 +380,7 @@ export function PostDetail({
             {renderQuote(c)}
             <p className="whitespace-pre-wrap break-words">{c.body}</p>
           </div>
-          <span className="shrink-0 pb-0.5 text-[11px] text-slate-300">{formatRelativeTime(c.created_at)}</span>
+          <span className="shrink-0 pb-0.5 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</span>
         </div>
       </div>
     );

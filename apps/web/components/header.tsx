@@ -7,7 +7,7 @@ import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, hasBackOnlyHeader, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, mainTabHref, mainTabs, meTab, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -148,6 +148,19 @@ export function Header() {
                 <FeedbackBox />
                 <NotificationBell />
               </>
+            ) : null}
+            {!showBack || pathname.startsWith("/me") ? (
+              <Link
+                href={mainTabHref("me", !!session)}
+                onClick={(event) => guardedClick(event, mainTabHref("me", !!session))}
+                aria-label={meTab.label}
+                aria-current={current === "me" ? "page" : undefined}
+                className={`inline-flex size-10 items-center justify-center rounded-full transition active:scale-95 ${
+                  current === "me" ? "bg-white/20 text-white" : "text-slate-300 hover:bg-white/16"
+                }`}
+              >
+                <meTab.icon className="size-5" strokeWidth={current === "me" ? 2.4 : 2} aria-hidden />
+              </Link>
             ) : null}
           </div>
         )}

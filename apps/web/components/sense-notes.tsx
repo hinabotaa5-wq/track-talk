@@ -264,7 +264,7 @@ export function SenseNoteStatsRow({ stats }: { stats: SenseNoteStats }) {
     <dl className="grid grid-cols-3 gap-2">
       {items.map((item) => (
         <div key={item.label} className="rounded-xl border border-white/15 bg-white/8 px-2 py-2 text-center">
-          <dt className="text-[11px] text-slate-300">{item.label}</dt>
+          <dt className="text-xs text-slate-300">{item.label}</dt>
           <dd className="font-bold text-slate-50">
             <span className="text-xl tabular-nums">{item.value}</span>
             <span className="ml-0.5 text-xs font-medium text-slate-300">{item.unit}</span>

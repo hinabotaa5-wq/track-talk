@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
+import { GraduationCap, HeartPulse, Home, NotebookPen, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 import { isInjuryBodyPart } from "@/lib/injury";
@@ -10,16 +10,19 @@ import { isInjuryBodyPart } from "@/lib/injury";
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
+  { id: "memo", href: "/memo", label: "メモ", icon: NotebookPen },
   { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
   { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
-  { id: "me", href: "/me", label: "マイページ", icon: UserRound },
 ] as const;
 
-export function mainTabHref(id: (typeof mainTabs)[number]["id"], signedIn: boolean) {
-  const tab = mainTabs.find((item) => item.id === id);
+// マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
+export const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
+
+export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
+  const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
-  // ログインが要るのはマイページだけ。ほかのタブは、ログインなしで開ける。
-  if (id === "me" && !signedIn) return "/login";
+  // ログインが要るのはメモとマイページ。ほかのタブは、ログインなしで開ける。
+  if ((id === "me" || id === "memo") && !signedIn) return "/login";
   return tab.href;
 }
 
@@ -28,6 +31,7 @@ export function activeMainTab(pathname: string) {
   if (pathname === "/coaching") return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
+  if (pathname === "/memo") return "memo";
   if (pathname === "/me") return "me";
   return "";
 }
@@ -112,7 +116,7 @@ export function BottomNav() {
                 <Link
                   href={href}
                   onClick={(event) => guardedClick(event, href)}
-                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-150 active:scale-95 ${
+                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-transform duration-150 active:scale-95 ${
                     active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}
                   aria-current={active ? "page" : undefined}
