@@ -54,17 +54,19 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	insertMajor("izumo-ekiden", "出雲駅伝", "2026-10-12", "2026-10-12")
 	insertMajor("all-japan", "後日の大会", "2026-11-03", "2026-11-03")
 
-	insertComp := func(name, starts string, ends *string) {
+	insertComp := func(name, starts string, ends *string) uuid.UUID {
 		t.Helper()
+		id := uuid.New()
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO competitions (id, name, starts_on, ends_on, location, prefecture, season_year, organizer_url, source_url)
 			VALUES ($1, $2, $3::date, $4::date, '', '00', 2026, 'https://worldathletics.org/', 'https://worldathletics.org/')`,
-			uuid.New(), name, starts, ends); err != nil {
+			id, name, starts, ends); err != nil {
 			t.Fatal(err)
 		}
+		return id
 	}
 	// 開催中の featured 国際大会と、開催中だが featured でない国際大会。
-	insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13"))
+	finalID := insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13"))
 	insertComp("コンチネンタルツアー・ゴールド", "2026-10-12", nil)
 
 	// ログイン不要で読める。
@@ -74,12 +76,15 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	}
 	var body struct {
 		Meets []struct {
-			MeetKey      string `json:"meet_key"`
-			Name         string `json:"name"`
-			DateLabel    string `json:"date_label"`
-			PostID       string `json:"post_id"`
-			CommentCount int    `json:"comment_count"`
-			Href         string `json:"href"`
+			MeetKey       string `json:"meet_key"`
+			Name          string `json:"name"`
+			DateLabel     string `json:"date_label"`
+			PostID        string `json:"post_id"`
+			CommentCount  int    `json:"comment_count"`
+			Href          string `json:"href"`
+			MajorSlug     string `json:"major_slug"`
+			MajorYear     int    `json:"major_year"`
+			CompetitionID string `json:"competition_id"`
 		} `json:"meets"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -97,6 +102,13 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	}
 	if intl.MeetKey != "c:00:2026:ダイヤモンドリーグ・ファイナル:2026-10-11" || intl.Name != "ダイヤモンドリーグ・ファイナル" {
 		t.Fatalf("intl %+v", intl)
+	}
+	// 大会タブの一覧と突き合わせるための対応。国内主要大会は slug と年、国際大会は大会の ID。
+	if domestic.MajorSlug != "izumo-ekiden" || domestic.MajorYear != 2026 || domestic.CompetitionID != "" {
+		t.Fatalf("domestic list link %+v", domestic)
+	}
+	if intl.CompetitionID != finalID.String() || intl.MajorSlug != "" || intl.MajorYear != 0 {
+		t.Fatalf("intl list link %+v", intl)
 	}
 
 	// 実況スレッドは運営プロフィールが投稿した kind=meet の投稿。

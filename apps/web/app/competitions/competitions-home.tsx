@@ -2,19 +2,21 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight, Globe, MapPin } from "lucide-react";
+import { ChevronRight, Globe, MapPin, MessageCircle } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { NowRunning } from "@/components/meet-now-running";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
 import { regionalCompetitionsPath } from "@/lib/competition-prefecture";
 import { loadDomesticMajors, peekDomesticMajors, undecidedDomesticMeets, type DomesticMeet } from "@/lib/domestic-majors";
+import { fetchTodayMeetThreads, meetThreadForCompetition, meetThreadForMajor } from "@/lib/meet-threads";
 import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
 import { useNow } from "@/lib/use-now";
-import type { Competition, DomesticMajor } from "@/lib/types";
+import type { Competition, DomesticMajor, MeetThread } from "@/lib/types";
 import { competitionDates, destination } from "./regional/regional-view";
 
 type View = "domestic" | "international";
@@ -34,6 +36,19 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   const view: View = sp.get("view") === "international" ? "international" : "domestic";
   // 一度開いた一覧は消さずに隠しておき、行き来しても読み込み直さない。
   const [opened, setOpened] = useState<Set<View>>(() => new Set([view]));
+  // 開催中の大会の実況スレッド。ホームの「今日開催中」と同じ API なので、開催中の判定もホームとそろう。
+  // 取れなければ空のままで、どの大会もふだんどおり公式サイトへ飛ぶ。
+  const [meets, setMeets] = useState<MeetThread[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchTodayMeetThreads().then((next) => {
+      if (active) setMeets(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // router.replace だとサーバーまで取りに行って「読み込み中」が挟まるので、URL だけ書き換えてその場で切り替える。
   function select(next: View) {
@@ -97,7 +112,11 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
               animate={item.id === view ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              {item.id === "domestic" ? <DomesticSchedule initial={initialMajors} /> : <InternationalSchedule />}
+              {item.id === "domestic" ? (
+                <DomesticSchedule initial={initialMajors} meets={meets} />
+              ) : (
+                <InternationalSchedule meets={meets} />
+              )}
             </motion.div>
           ) : null,
         )}
@@ -106,7 +125,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   );
 }
 
-function DomesticSchedule({ initial }: { initial: DomesticMajor[] | null }) {
+function DomesticSchedule({ initial, meets }: { initial: DomesticMajor[] | null; meets: MeetThread[] }) {
   const [majors, setMajors] = useState<DomesticMajor[] | null>(() => peekDomesticMajors() ?? initial);
   const [error, setError] = useState("");
 
@@ -132,14 +151,14 @@ function DomesticSchedule({ initial }: { initial: DomesticMajor[] | null }) {
     <Schedule
       items={majors}
       itemKey={(major) => `${major.slug}:${major.year}`}
-      renderCard={(major, today) => <DomesticCard major={major} today={today} />}
+      renderCard={(major, today) => <DomesticCard major={major} today={today} thread={meetThreadForMajor(meets, major)} />}
       undecided={undecidedDomesticMeets(majors)}
       emptyBody="今シーズンの国内主要大会はまだ発表されていません。"
     />
   );
 }
 
-function InternationalSchedule() {
+function InternationalSchedule({ meets }: { meets: MeetThread[] }) {
   const cached = readCompetitions(INTERNATIONAL, 0);
   const [entry, setEntry] = useState(cached);
 
@@ -159,7 +178,7 @@ function InternationalSchedule() {
     <Schedule
       items={entry.items}
       itemKey={(c) => c.id}
-      renderCard={(c, today) => <InternationalCard competition={c} today={today} />}
+      renderCard={(c, today) => <InternationalCard competition={c} today={today} thread={meetThreadForCompetition(meets, c)} />}
       emptyBody="今シーズンの国際大会はまだ取り込まれていません。"
     />
   );
@@ -239,8 +258,55 @@ function StateBadge({ item, today }: { item: Scheduled; today: string }) {
   return null;
 }
 
-function CardLink({ href, over, children }: { href: string; over: boolean; children: ReactNode }) {
-  if (!href) return <div className={cardBase}>{children}</div>;
+// ふだんは公式サイト(要項)へ飛ぶ。開催中で実況スレッドがある大会だけ、カードのタップで実況スレッドへ入り、公式サイトは下の小さなリンクに残す。
+function ScheduleCard({
+  href,
+  linkLabel,
+  over,
+  thread,
+  children,
+}: {
+  href: string;
+  linkLabel: string;
+  over: boolean;
+  thread?: MeetThread;
+  children: ReactNode;
+}) {
+  if (thread) {
+    return (
+      <div className={`${cardBase} border-amber-300/60`}>
+        <Link href={thread.href} className="block transition active:scale-[0.98]">
+          {children}
+          <span className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30">
+            <span className="min-w-0">
+              <span className="block">実況スレッドへ</span>
+              <NowRunning events={thread.now_running} className="block truncate text-xs font-semibold text-emerald-200" />
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-xs text-amber-100/80">
+              <MessageCircle className="size-3.5" aria-hidden />
+              {thread.comment_count}
+              <ChevronRight className="size-4" aria-hidden />
+            </span>
+          </span>
+        </Link>
+        {href && linkLabel ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-blue-400 hover:underline">
+            {linkLabel}
+          </a>
+        ) : null}
+      </div>
+    );
+  }
+
+  const label = linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null;
+  if (!href) {
+    return (
+      <div className={cardBase}>
+        {children}
+        {label}
+      </div>
+    );
+  }
   return (
     <a
       href={href}
@@ -249,35 +315,34 @@ function CardLink({ href, over, children }: { href: string; over: boolean; child
       className={`${cardBase} transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95 ${over ? "opacity-80" : ""}`}
     >
       {children}
+      {label}
     </a>
   );
 }
 
-function DomesticCard({ major, today }: { major: DomesticMajor; today: string }) {
+function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: string; thread?: MeetThread }) {
   return (
-    <CardLink href={major.site_url} over={isOver(major, today)}>
+    <ScheduleCard href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {major.schedule_label}
         <StateBadge item={major} today={today} />
       </p>
       <h4 className="text-lg font-semibold text-slate-100">{major.name}</h4>
       {major.venue ? <p className="mt-1 text-sm text-slate-200">{major.venue}</p> : null}
-      {major.site_url ? <p className="text-sm text-blue-400">公式サイト</p> : null}
-    </CardLink>
+    </ScheduleCard>
   );
 }
 
-function InternationalCard({ competition, today }: { competition: Competition; today: string }) {
+function InternationalCard({ competition, today, thread }: { competition: Competition; today: string; thread?: MeetThread }) {
   const link = destination(competition, INTERNATIONAL);
   return (
-    <CardLink href={link.href} over={isOver(competition, today)}>
+    <ScheduleCard href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {competitionDates(competition.starts_on, competition.ends_on)}
         <StateBadge item={competition} today={today} />
       </p>
       <h4 className="text-lg font-semibold text-slate-100">{competition.name}</h4>
       {competition.location ? <p className="mt-1 text-sm text-slate-200">{competition.location}</p> : null}
-      <p className="text-sm text-blue-400">{link.label}</p>
-    </CardLink>
+    </ScheduleCard>
   );
 }
