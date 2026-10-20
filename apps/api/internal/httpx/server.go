@@ -8,10 +8,10 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
-	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
+	"github.com/hinata/track-talk/apps/api/internal/openai"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +28,7 @@ type Server struct {
 	push      push.Sender
 	stripe    stripe.Client
 	mail      mail.Client
-	gemini    competitions.Client
+	ai        openai.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -64,9 +64,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			APIBase: cfg.MailAPIBase,
 			DevLog:  cfg.MailDevLog,
 		},
-		gemini: competitions.Client{
-			Key:      cfg.GeminiAPIKey,
-			Endpoint: cfg.GeminiEndpoint,
+		ai: openai.Client{
+			Key:     cfg.OpenAIAPIKey,
+			Model:   cfg.OpenAIModel,
+			APIBase: cfg.OpenAIAPIBase,
 		},
 	}
 	if cfg.PushHTTP != nil {

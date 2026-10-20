@@ -22,13 +22,6 @@ type Client struct {
 	Key   string
 	Model string
 	HTTP  *http.Client
-	// Endpoint はテストで Gemini の代わりのサーバーに向けるためのもの。空なら本物の Gemini。
-	Endpoint string
-}
-
-// GenerateJSON は、文だけのプロンプトを Gemini に送り、返ってきた JSON の文字列を返す。
-func (c Client) GenerateJSON(ctx context.Context, prompt string) (string, error) {
-	return c.generate(ctx, []map[string]any{{"text": prompt}})
 }
 
 func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
@@ -71,11 +64,8 @@ func (c Client) generate(ctx context.Context, parts []map[string]any) (string, e
 		return "", err
 	}
 	endpoint := generateEndpoint
-	if c.Endpoint != "" {
-		endpoint = c.Endpoint
-	}
-	if strings.Contains(endpoint, "%s") {
-		endpoint = fmt.Sprintf(endpoint, model)
+	if strings.Contains(generateEndpoint, "%s") {
+		endpoint = fmt.Sprintf(generateEndpoint, model)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
