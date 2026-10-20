@@ -59,10 +59,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			APIVersion: cfg.StripeAPIVersion,
 		},
 		mail: mail.Client{
-			APIKey:  cfg.ResendAPIKey,
-			From:    cfg.MailFrom,
-			APIBase: cfg.MailAPIBase,
-			DevLog:  cfg.MailDevLog,
+			APIKey:   cfg.ResendAPIKey,
+			From:     cfg.MailFrom,
+			APIBase:  cfg.MailAPIBase,
+			SMTPHost: cfg.SMTPHost, SMTPPort: cfg.SMTPPort, SMTPUser: cfg.SMTPUser, SMTPPassword: cfg.SMTPPassword,
+			DevLog: cfg.MailDevLog,
 		},
 		ai: openai.Client{
 			Key:     cfg.OpenAIAPIKey,

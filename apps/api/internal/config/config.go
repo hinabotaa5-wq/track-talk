@@ -47,6 +47,11 @@ type Config struct {
 	// Resend の API キーと送り主。保護者の同意のリンクを保護者のメールあてに送る。空なら送れない（リンクも出せない）。
 	ResendAPIKey string
 	MailFrom     string
+	// SMTP で送るときの設定(Gmail なら smtp.gmail.com / 465 / アプリパスワード)。SMTPHost が入っていれば Resend より優先する。
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
 	// MailAPIBase はテストで Resend の代わりのサーバーに向けるためのもの。
 	MailAPIBase string
 	// MailDevLog が true なら、メールを送らずに本文を API のログに出す。手元で試すためのもので、本番では立てない。
@@ -97,6 +102,10 @@ func Load() (Config, error) {
 		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
 		MailFrom:                   os.Getenv("MAIL_FROM"),
 		MailAPIBase:                os.Getenv("MAIL_API_BASE"),
+		SMTPHost:                   os.Getenv("SMTP_HOST"),
+		SMTPPort:                   os.Getenv("SMTP_PORT"),
+		SMTPUser:                   os.Getenv("SMTP_USER"),
+		SMTPPassword:               os.Getenv("SMTP_PASSWORD"),
 		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
 		OpenAIAPIKey:               os.Getenv("OPENAI_API_KEY"),
