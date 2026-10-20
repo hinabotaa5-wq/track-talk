@@ -24,7 +24,9 @@ var contactPatterns = []*regexp.Regexp{
 	// SNS のアカウント名（@ のあとに英数字）
 	regexp.MustCompile(`(?i)@[a-z0-9_.]{3,}`),
 	// 電話番号（区切りを含めて10桁以上の数字）。ラップを「.」で書くので「.」は区切りに入れない。
-	regexp.MustCompile(`(?:\d[\s\-–ー()/・_]*){10,}`),
+	regexp.MustCompile(`(?:\d[\s\-–ー()_]*){10,}`),
+	// 「/」「・」区切りは距離や年の並びにも使うので、0 で始まる電話番号の形のときだけ止める。
+	regexp.MustCompile(`(?:^|\D)0\d{1,4}[/・]\d{1,4}[/・]\d{3,4}(?:\D|$)`),
 	// SNS やメッセージアプリの名前と、ID のやりとり
 	regexp.MustCompile(`(?i)\bline\b|instagram|\binsta\b|インスタ|twitter|ツイッター|tiktok|ティックトック|discord|ディスコード|カカオ|kakao|facebook|フェイスブック|threads|スレッズ|\bDM\b|メアド|メールアドレス|電話番号|連絡先|\bID\s*[:：は]`),
 	// 「ライン」は陸上の用語でもあるので、交換や ID と一緒のときと、ひらがなのときだけ止める。
