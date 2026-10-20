@@ -313,3 +313,50 @@ func TestReviewPaymentReleaseDoesNotStallBehindFailures(t *testing.T) {
 	}
 	t.Fatal("the good payment was never released")
 }
+
+// 18歳未満が同時に依頼を送っても、今月の上限を超える支払い画面は作らない。
+func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tm, _ := guardianMinor(t, h)
+	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 1000`)
+	codes := make(chan int, 4)
+	for range 4 {
+		body := reviewBodyFor(t, h, tm)
+		body["method"] = "paypay"
+		go func() {
+			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code
+		}()
+	}
+	created := 0
+	for range 4 {
+		if <-codes == http.StatusCreated {
+			created++
+		}
+	}
+	var open int
+	queryRowArgs(t, `SELECT count(*)::int FROM review_payments WHERE status = 'pending'`, nil, &open)
+	if created != 1 || open != 1 {
+		t.Fatalf("created %d requests with %d checkouts under a 1000 yen limit", created, open)
+	}
+}
+
+// 保護者が同意しないと答えたあとは、前に送って支払いがまだの依頼も払えない。
+func TestReviewPaymentBlockedAfterGuardianDeclines(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tm, _ := guardianMinor(t, h)
+	body := reviewBodyFor(t, h, tm)
+	body["method"] = "paypay"
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created reviewRequestView
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	execSQLArgs(t, `UPDATE guardian_consents SET status = 'declined'`)
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tm, map[string]any{"method": "card"})
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_declined") {
+		t.Fatalf("checkout after decline %d %s", rec.Code, rec.Body.String())
+	}
+}
