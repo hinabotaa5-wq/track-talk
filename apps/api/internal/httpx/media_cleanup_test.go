@@ -42,6 +42,7 @@ func TestDeletingAPostRemovesItsPhotoFromCloudinary(t *testing.T) {
 	tb := token(t, uuid.New())
 	photo := "track-talk/" + uuid.NewString()
 	create := func(tok string) string {
+		grantUpload(t, h, tok, photo)
 		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
 		if rec.Code != 201 {
 			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -101,11 +102,13 @@ func TestDeletingAPostKeepsACoachPhoto(t *testing.T) {
 		t.Fatalf("apply %d", rec.Code)
 	}
 	photo := "track-talk/" + uuid.NewString()
+	grantUpload(t, h, tc, photo)
 	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", tc, map[string]any{"photo_public_id": photo}); rec.Code != http.StatusOK {
 		t.Fatalf("photo %d %s", rec.Code, rec.Body.String())
 	}
 
 	tb := token(t, uuid.New())
+	grantUpload(t, h, tb, photo)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tb, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -145,6 +148,7 @@ func TestWithdrawRemovesPhotosFromCloudinary(t *testing.T) {
 	h := setup(t)
 	ta := token(t, uuid.New())
 	photo := "track-talk/" + uuid.NewString()
+	grantUpload(t, h, ta, photo)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo}); rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -182,6 +186,7 @@ func TestDeletingAHiddenPostRemovesItsPhoto(t *testing.T) {
 	h := setup(t)
 	ta := token(t, uuid.New())
 	photo := "track-talk/" + uuid.NewString()
+	grantUpload(t, h, ta, photo)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -226,7 +231,9 @@ func TestRejectedPhotoIsRemovedFromCloudinary(t *testing.T) {
 
 	h := setup(t)
 	photo := "track-talk/" + uuid.NewString()
-	rec := doJSON(t, h, http.MethodPost, "/v1/posts", token(t, uuid.New()), map[string]any{"title": "大きな写真", "body": "", "image_public_id": photo})
+	tx := token(t, uuid.New())
+	grantUpload(t, h, tx, photo)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tx, map[string]any{"title": "大きな写真", "body": "", "image_public_id": photo})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}

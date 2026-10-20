@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
@@ -33,7 +32,7 @@ func TestCoachingMessagesPurgedAfterOneYear(t *testing.T) {
 	// 1年たった契約、通報が残っている契約、まだ1年たっていない契約。
 	tc, tu, old := activeContract(t, h)
 	send(tu, old, map[string]any{"body": "よろしくお願いします"})
-	send(tu, old, map[string]any{"video_public_id": "track-talk-coaching/" + uuid.NewString()})
+	send(tu, old, map[string]any{"video_public_id": signedCoachingVideo(t, h, tu)})
 	send(tc, old, map[string]any{"body": "1週目のメニューです"})
 	tc2, tu2, reported := activeContract(t, h)
 	msg := send(tc2, reported, map[string]any{"body": "通報するメッセージ"})

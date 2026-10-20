@@ -10,6 +10,7 @@ import (
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
@@ -57,12 +58,37 @@ func execSQLArgs(t *testing.T, sql string, args ...any) {
 	}
 }
 
-func reviewBody() map[string]any {
+// grantUpload は、id をアップロード署名で tok のユーザーに発行したことにする。
+// 署名の API を通さないのは、書き込みの回数制限を使わないため。持ち主は入れ替えられる。
+func grantUpload(t *testing.T, h http.Handler, tok, id string) {
+	t.Helper()
+	// プロフィールは最初の API 呼び出しで作られる。
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", tok, nil); rec.Code != http.StatusOK {
+		t.Fatalf("me %d %s", rec.Code, rec.Body.String())
+	}
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(tok, claims); err != nil {
+		t.Fatal(err)
+	}
+	execSQLArgs(t, `INSERT INTO cloudinary_uploads (public_id, owner_id) VALUES ($1, $2::uuid)
+		ON CONFLICT (public_id) DO UPDATE SET owner_id = EXCLUDED.owner_id`, id, claims["sub"])
+}
+
+// signedCoachingVideo は、tok のユーザーに発行された添削用の動画 ID を返す。
+func signedCoachingVideo(t *testing.T, h http.Handler, tok string) string {
+	t.Helper()
+	id := "track-talk-coaching/" + uuid.NewString()
+	grantUpload(t, h, tok, id)
+	return id
+}
+
+func reviewBodyFor(t *testing.T, h http.Handler, tok string) map[string]any {
+	t.Helper()
 	return map[string]any{
 		"tier":            "coach",
 		"event":           "100m",
 		"focus":           []string{"rhythm", "start", "start"},
-		"video_public_id": "track-talk-coaching/" + uuid.NewString(),
+		"video_public_id": signedCoachingVideo(t, h, tok),
 	}
 }
 
@@ -103,7 +129,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/demo-codes", tu, nil); rec.Code != http.StatusForbidden {
 		t.Fatalf("non-admin code %d", rec.Code)
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("before demo %d %s", rec.Code, rec.Body.String())
 	}
@@ -130,7 +156,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	}
 
 	// 生まれた年月がないと送れない。
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "birth_month_required") {
 		t.Fatalf("no birth month %d %s", rec.Code, rec.Body.String())
 	}
@@ -138,7 +164,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 		t.Fatalf("birth month %d", rec.Code)
 	}
 
-	bad := reviewBody()
+	bad := reviewBodyFor(t, h, tu)
 	bad["tier"] = "pro"
 	bad["event"] = "marathon"
 	bad["focus"] = []string{}
@@ -153,7 +179,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 		}
 	}
 
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tu)
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -190,20 +216,20 @@ func TestMinorReviewRequestWaitsForGuardian(t *testing.T) {
 		t.Fatalf("birth month %d", rec.Code)
 	}
 	// 1本目は同意を待たずに送れる。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody()); rec.Code != http.StatusCreated {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm)); rec.Code != http.StatusCreated {
 		t.Fatalf("first %d %s", rec.Code, rec.Body.String())
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody())
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm))
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_pending") {
 		t.Fatalf("second before consent %d %s", rec.Code, rec.Body.String())
 	}
 	execSQLArgs(t, `INSERT INTO guardian_consents (minor_id, token_hash, status, guardian_name, relationship, consented_at)
 		VALUES ($1, $2, 'consented', '保護者', 'mother', now())`, minor, uuid.NewString())
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody()); rec.Code != http.StatusCreated {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm)); rec.Code != http.StatusCreated {
 		t.Fatalf("after consent %d %s", rec.Code, rec.Body.String())
 	}
 	execSQLArgs(t, `UPDATE guardian_consents SET status = 'declined', declined_at = now() WHERE minor_id = $1`, minor)
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody())
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm))
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_declined") {
 		t.Fatalf("declined %d %s", rec.Code, rec.Body.String())
 	}

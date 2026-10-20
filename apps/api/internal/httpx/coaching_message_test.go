@@ -77,13 +77,13 @@ func TestCoachingMessages(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"body": "よろしくお願いします。"}); rec.Code != http.StatusCreated {
 		t.Fatalf("user send %d %s", rec.Code, rec.Body.String())
 	}
-	video := "track-talk-coaching/" + uuid.NewString()
+	video := signedCoachingVideo(t, h, tu)
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"video_public_id": video}); rec.Code != http.StatusCreated {
 		t.Fatalf("video %d %s", rec.Code, rec.Body.String())
 	}
 	// フォーム添削の依頼に使われている動画（再生 URL に出る ID）は、やりとりに付けられない。
 	_, tr := demoRequester(t, h, adminToken(t, h))
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tr)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tr, body); rec.Code != http.StatusCreated {
 		t.Fatalf("review request %d %s", rec.Code, rec.Body.String())
 	}

@@ -222,6 +222,12 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 		if !s.coachingVideoFree(w, r, req.VideoPublicID, "video_public_id") {
 			return
 		}
+		if sender == nil || !s.uploadIssuedToMe(w, r, *sender, req.VideoPublicID, "video_public_id", "動画") {
+			if sender == nil {
+				FieldError(w, map[string]string{"video_public_id": "動画を選び直してください"})
+			}
+			return
+		}
 		if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
 			writeAssetReadyError(w, err, "動画")
 			return

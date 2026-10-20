@@ -451,6 +451,12 @@ type ProductReview struct {
 	Usage     *string    `json:"usage"`
 }
 
+type CloudinaryUpload struct {
+	PublicID  string    `json:"public_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Profile struct {
 	ID             uuid.UUID  `json:"id"`
 	IsAdmin        bool       `json:"is_admin"`

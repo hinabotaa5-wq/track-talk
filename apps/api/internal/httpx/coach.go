@@ -128,6 +128,9 @@ func (s *Server) setCoachPhoto(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"photo_public_id": e})
 		return
 	}
+	if !s.uploadIssuedToMe(w, r, p.ID, id, "photo_public_id", "写真") {
+		return
+	}
 	if err := s.cloud.ImageReady(r.Context(), id); err != nil {
 		s.purgeRejectedUpload(err, "image", id)
 		writeAssetReadyError(w, err, "写真")

@@ -507,12 +507,17 @@ func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
 
 // signCoachingVideoUpload は、添削の動画を非公開でアップロードするための署名を返す。
 func (s *Server) signCoachingVideoUpload(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireProfile(w, r); !ok {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
 		return
 	}
 	signed, err := s.cloud.SignedCoachingUpload(time.Now())
 	if err != nil {
 		writeAssetReadyError(w, err, "動画")
+		return
+	}
+	if err := s.q.RecordUpload(r.Context(), db.RecordUploadParams{PublicID: signed.PublicID, OwnerID: p.ID}); err != nil {
+		MapDBError(w, err)
 		return
 	}
 	JSON(w, http.StatusOK, signed)

@@ -163,7 +163,11 @@ func normalizePhotoIDs(in []string) ([]string, string) {
 }
 
 func (s *Server) photosReady(w http.ResponseWriter, r *http.Request, ids []string) bool {
+	uid, _ := UserID(r.Context())
 	for _, id := range ids {
+		if !s.uploadIssuedToMe(w, r, uid, id, "photo_public_ids", "写真") {
+			return false
+		}
 		if err := s.cloud.ImageReady(r.Context(), id); err != nil {
 			s.purgeRejectedUpload(err, "image", id)
 			writeAssetReadyError(w, err, "写真")

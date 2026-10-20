@@ -13,7 +13,7 @@ import (
 // acceptedReview は、コーチが引き受けて添削中になった依頼を1つ作る。
 func acceptedReview(t *testing.T, h http.Handler, tadmin, tc, tu string) string {
 	t.Helper()
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -255,7 +255,7 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, `"coaches_on_duty":false`) {
 		t.Fatalf("estimate %s", body)
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	if rec.Code != http.StatusCreated || created.Status != "queued" {

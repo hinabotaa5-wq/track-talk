@@ -15,7 +15,7 @@ import (
 // paidReview は、支払い方法を選んで依頼を送り、Stripe から支払いが届いたところまで進める。
 func paidReview(t *testing.T, h http.Handler, tu, method, intent string) string {
 	t.Helper()
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tu)
 	body["method"] = method
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	if rec.Code != http.StatusCreated {
@@ -62,7 +62,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1000`) {
 		t.Fatalf("estimate %s", rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody()); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
 		t.Fatalf("no method %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -113,7 +113,7 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 		t.Fatalf("paypay %s", reviewPaymentStatus(t, paypay))
 	}
 	// 払わないまま閉じた依頼。
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tu)
 	body["method"] = "card"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	var unpaid reviewRequestView
@@ -143,7 +143,7 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 	}
 
 	// 目安を過ぎてから届いた支払いは、始めずに取り消す。
-	late := reviewBody()
+	late := reviewBodyFor(t, h, tu)
 	late["method"] = "card"
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, late)
 	var lateReq reviewRequestView
@@ -165,7 +165,7 @@ func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
 	tm, _ := guardianMinor(t, h)
 	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 1000`)
 	paidReview(t, h, tm, "card", "pi_card_minor")
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "monthly_limit") || !strings.Contains(rec.Body.String(), "あと0円") {
@@ -216,12 +216,12 @@ func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
 		t.Fatalf("birth month %d", rec.Code)
 	}
-	body := reviewBody()
+	body := reviewBodyFor(t, h, tm)
 	body["method"] = "card"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
 		t.Fatalf("first %d %s", rec.Code, rec.Body.String())
 	}
-	body = reviewBody()
+	body = reviewBodyFor(t, h, tm)
 	body["method"] = "card"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_pending") {
 		t.Fatalf("second while unpaid %d %s", rec.Code, rec.Body.String())
@@ -266,8 +266,9 @@ func TestMinorConcurrentReviewRequests(t *testing.T) {
 	}
 	codes := make(chan int, 4)
 	for range 4 {
+		body := reviewBodyFor(t, h, tm)
 		go func() {
-			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBody()).Code
+			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code
 		}()
 	}
 	created := 0

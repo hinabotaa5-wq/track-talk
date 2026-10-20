@@ -292,6 +292,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
+		return
+	}
 	if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
 		writeAssetReadyError(w, err, "動画")
 		return

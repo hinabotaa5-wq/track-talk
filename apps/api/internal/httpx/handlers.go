@@ -554,6 +554,9 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		if params.CloudinaryPublicID != nil {
 			publicID = *params.CloudinaryPublicID
 		}
+		if !s.uploadIssuedToMe(w, r, p.ID, publicID, "video_public_id", "動画") {
+			return
+		}
 		if err := s.cloud.Ready(r.Context(), publicID); err != nil {
 			s.purgeRejectedUpload(err, "video", publicID)
 			writeVideoReadyError(w, err)
@@ -561,6 +564,9 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if params.Kind == "text" && params.CloudinaryPublicID != nil {
+		if !s.uploadIssuedToMe(w, r, p.ID, *params.CloudinaryPublicID, "cloudinary_public_id", "写真") {
+			return
+		}
 		if err := s.cloud.ImageReady(r.Context(), *params.CloudinaryPublicID); err != nil {
 			s.purgeRejectedUpload(err, "image", *params.CloudinaryPublicID)
 			writeAssetReadyError(w, err, "写真")

@@ -219,9 +219,11 @@ func TestCoachPhoto(t *testing.T) {
 	// 他人の投稿の写真の ID を登録してから差し替えても、その写真は消さない。
 	others := upload()
 	tb := token(t, uuid.New())
+	grantUpload(t, h, tb, others)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", tb, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": others}); rec.Code != http.StatusCreated {
 		t.Fatalf("other's post %d %s", rec.Code, rec.Body.String())
 	}
+	grantUpload(t, h, ta, others)
 	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/photo", ta, map[string]any{"photo_public_id": others}); rec.Code != http.StatusOK {
 		t.Fatalf("set other's photo %d", rec.Code)
 	}
