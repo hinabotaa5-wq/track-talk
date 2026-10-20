@@ -18,6 +18,7 @@ type postDTO struct {
 	Title          string    `json:"title"`
 	Body           string    `json:"body,omitempty"`
 	AuthorName     *string   `json:"author_name,omitempty"`
+	PostMaster     bool      `json:"author_post_master,omitempty"`
 	authorID       uuid.UUID
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
@@ -192,5 +193,19 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		UpdatedAt:           row.UpdatedAt,
 	}, liked, false)
 	p.AuthorName = row.AuthorName
+	p.PostMaster = isPostMaster(row)
 	return p
+}
+
+// postMasterLikedPosts は、投稿マスターのバッジに要る「いいねが1つ以上ついた投稿」の数。
+// 数だけで付けると連投が増えるので、いいねのついた投稿だけを数える。
+const postMasterLikedPosts = 30
+
+// isPostMaster は、投稿の詳細で投稿者に投稿マスターのバッジを出すかどうか。
+// 匿名の投稿にバッジを出すと同じ人の投稿だと見分けられてしまうので、
+// ニックネームを公開している人だけにする。運営（実況スレッド）には付けない。
+func isPostMaster(row db.GetPostRow) bool {
+	return row.AuthorName != nil &&
+		row.AuthorID != SystemProfileID &&
+		row.AuthorLikedPostCount >= postMasterLikedPosts
 }

@@ -48,6 +48,7 @@ export type Post = {
   id: string;
   title: string;
   author_name?: string;
+  author_post_master?: boolean;
   body?: string;
   mine: boolean;
   like_count: number;

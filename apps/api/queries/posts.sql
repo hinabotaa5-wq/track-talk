@@ -274,6 +274,14 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
+    -- 投稿マスターのバッジ用。ニックネームを公開している人だけ数える
+    CASE WHEN profile.id IS NULL THEN 0 ELSE (
+        SELECT count(*) FROM posts liked
+        WHERE liked.author_id = p.author_id
+          AND liked.like_count > 0
+          AND liked.deleted_at IS NULL
+          AND liked.hidden_at IS NULL
+    ) END::bigint AS author_liked_post_count,
     p.created_at,
     p.updated_at
 FROM posts p

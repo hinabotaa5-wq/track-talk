@@ -349,6 +349,14 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
+    -- 投稿マスターのバッジ用。ニックネームを公開している人だけ数える
+    CASE WHEN profile.id IS NULL THEN 0 ELSE (
+        SELECT count(*) FROM posts liked
+        WHERE liked.author_id = p.author_id
+          AND liked.like_count > 0
+          AND liked.deleted_at IS NULL
+          AND liked.hidden_at IS NULL
+    ) END::bigint AS author_liked_post_count,
     p.created_at,
     p.updated_at
 FROM posts p
@@ -361,22 +369,23 @@ WHERE p.id = $1
 `
 
 type GetPostRow struct {
-	ID                  uuid.UUID `json:"id"`
-	AuthorID            uuid.UUID `json:"author_id"`
-	Title               string    `json:"title"`
-	Body                string    `json:"body"`
-	Kind                string    `json:"kind"`
-	YoutubeVideoID      *string   `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
-	InstagramType       *string   `json:"instagram_type"`
-	InstagramShortcode  *string   `json:"instagram_shortcode"`
-	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
-	SourceTitle         *string   `json:"source_title"`
-	LikeCount           int32     `json:"like_count"`
-	CommentCount        int32     `json:"comment_count"`
-	AuthorName          *string   `json:"author_name"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	ID                   uuid.UUID `json:"id"`
+	AuthorID             uuid.UUID `json:"author_id"`
+	Title                string    `json:"title"`
+	Body                 string    `json:"body"`
+	Kind                 string    `json:"kind"`
+	YoutubeVideoID       *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl  *string   `json:"youtube_thumbnail_url"`
+	InstagramType        *string   `json:"instagram_type"`
+	InstagramShortcode   *string   `json:"instagram_shortcode"`
+	CloudinaryPublicID   *string   `json:"cloudinary_public_id"`
+	SourceTitle          *string   `json:"source_title"`
+	LikeCount            int32     `json:"like_count"`
+	CommentCount         int32     `json:"comment_count"`
+	AuthorName           *string   `json:"author_name"`
+	AuthorLikedPostCount int64     `json:"author_liked_post_count"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
@@ -397,6 +406,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.AuthorName,
+		&i.AuthorLikedPostCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
