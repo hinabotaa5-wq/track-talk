@@ -45,6 +45,8 @@ func looksLikeContact(s string) bool {
 
 // 区切りでつながった数字の並び。ラップを「.」で書くので「.」は区切りに入れない。
 // 日本語入力の全角ハイフン(−)やダッシュ(‐〜―)、波線も区切りにする。
+var digitGroup = regexp.MustCompile(`\d+`)
+
 var digitRun = regexp.MustCompile(`\d(?:[\s\-\x{2010}-\x{2015}\x{2212}ー~〜()_/・]*\d)*`)
 
 // looksLikePhone は、電話番号らしい数字の並びがあれば true を返す。
@@ -53,7 +55,11 @@ var digitRun = regexp.MustCompile(`\d(?:[\s\-\x{2010}-\x{2015}\x{2212}ー~〜()_
 // ラップ(68 68 67 67 66)や年の並び(2019 2020 2021)、日付(08/12 08/19)は止めない。
 func looksLikePhone(s string) bool {
 	for _, run := range digitRun.FindAllString(s, -1) {
-		groups := strings.FieldsFunc(run, func(r rune) bool { return r < '0' || r > '9' })
+		idx := digitGroup.FindAllStringIndex(run, -1)
+		groups := make([]string, len(idx))
+		for i, m := range idx {
+			groups[i] = run[m[0]:m[1]]
+		}
 		single := true
 		for _, g := range groups {
 			if len(g) >= 10 {
@@ -64,15 +70,18 @@ func looksLikePhone(s string) bool {
 		if single && len(groups) >= 10 && groups[0] == "0" {
 			return true
 		}
-		// 番号の前に付くのは国番号や1〜3桁の数字くらいなので、並びの4桁目までに始まるものだけ調べる。
-		// 「2024/08/12〜2024/08/19」の途中から番号を拾わないため。
+		// 番号の前に付くのは国番号や1〜3桁の数字くらいなので、空白や「〜」のあとから数えて4桁目までに
+		// 始まるものだけ調べる。「2024/08/12〜2024/08/19」の途中の「08 12 2024 08」を番号と見ないため。
 		prefix := 0
 		for i, g := range groups {
 			if i > 0 {
 				prefix += len(groups[i-1])
+				if strings.ContainsAny(run[idx[i-1][1]:idx[i][0]], " \t\n〜~") {
+					prefix = 0
+				}
 			}
 			if prefix > 3 {
-				break
+				continue
 			}
 			if g[0] != '0' && !strings.HasPrefix(g, "81") {
 				continue
