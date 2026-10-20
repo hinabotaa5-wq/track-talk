@@ -91,6 +91,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
 		r.Get("/injury/stats", s.injuryStats)
+		r.Get("/injury/data", s.injuryData)
 		r.Get("/injury/groups", s.listInjuryGroups)
 		r.Get("/injury/groups/{part}/public", s.getPublicInjuryGroup)
 		r.Get("/products", s.listProducts)

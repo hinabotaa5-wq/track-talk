@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange,
+  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -67,10 +68,11 @@ describe("injury group join", () => {
     place: "tartan",
     activity: "sprint",
     preChanges: ["more-volume"],
+    hindsight: ["rest-early"],
     event: "sprint",
     stage: "rehab",
   } as const;
-  const answers = { ...filled, preChanges: [...filled.preChanges] };
+  const answers = { ...filled, preChanges: [...filled.preChanges], hindsight: [...filled.hindsight] };
 
   it("asks for the injury's name only in the other group", () => {
     expect(injuryJoinStepsFor("sprain")[0]).toBe("severity");
@@ -88,7 +90,7 @@ describe("injury group join", () => {
   });
 
   it("needs an answer for every choice", () => {
-    for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "event", "stage"] as const) {
+    for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "hindsight", "event", "stage"] as const) {
       expect(injuryJoinStepError(step, emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
       expect(injuryJoinStepError(step, answers, thisMonth)).toBe("");
     }
@@ -108,6 +110,7 @@ describe("injury group join", () => {
       place: "tartan",
       activity: "sprint",
       pre_changes: ["more-volume"],
+      hindsight: ["rest-early"],
       event: "sprint",
       stage: "rehab",
     });
@@ -227,5 +230,12 @@ describe("injury public page", () => {
   it("rounds shares to whole percents", () => {
     expect(injuryPercent(1, 3)).toBe(33);
     expect(injuryPercent(0, 0)).toBe(0);
+  });
+});
+
+describe("injury hindsight", () => {
+  it("keeps 'don't know' apart from the other choices", () => {
+    expect(toggleHindsight(["warmup"], "none")).toEqual(["none"]);
+    expect(toggleHindsight(["none"], "gear")).toEqual(["gear"]);
   });
 });

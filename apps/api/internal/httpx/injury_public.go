@@ -58,17 +58,19 @@ type injuryPublicNoteDTO struct {
 }
 
 type injuryPublicGroupDTO struct {
-	BodyPart      string                `json:"body_part"`
-	BodyPartLabel string                `json:"body_part_label"`
-	Members       int64                 `json:"members"`
-	MinPeople     int                   `json:"min_people"`
-	Recovery      []injuryRecoveryDTO   `json:"recovery"`
-	Places        injuryTallyDTO        `json:"places"`
-	Activities    injuryTallyDTO        `json:"activities"`
-	PreChanges    injuryTallyDTO        `json:"pre_changes"`
-	Events        injuryTallyDTO        `json:"events"`
-	Actions       injuryTallyDTO        `json:"actions"`
-	Notes         []injuryPublicNoteDTO `json:"notes"`
+	BodyPart      string              `json:"body_part"`
+	BodyPartLabel string              `json:"body_part_label"`
+	Members       int64               `json:"members"`
+	MinPeople     int                 `json:"min_people"`
+	Recovery      []injuryRecoveryDTO `json:"recovery"`
+	Places        injuryTallyDTO      `json:"places"`
+	Activities    injuryTallyDTO      `json:"activities"`
+	PreChanges    injuryTallyDTO      `json:"pre_changes"`
+	Events        injuryTallyDTO      `json:"events"`
+	Actions       injuryTallyDTO      `json:"actions"`
+	// Hindsight は「いま思うと、どうすればよかったか」。buildPublicInjuryGroup のあと、呼ぶ側が入れる。
+	Hindsight injuryTallyDTO        `json:"hindsight"`
+	Notes     []injuryPublicNoteDTO `json:"notes"`
 }
 
 // getPublicInjuryGroup は、ログインしているかどうかに関係なく誰でも、検索エンジンも見られるグループのページ。
@@ -98,7 +100,14 @@ func (s *Server) getPublicInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, buildPublicInjuryGroup(part, counts, answers, changes, notes))
+	group := buildPublicInjuryGroup(part, counts, answers, changes, notes)
+	hindsight, err := s.loadInjuryHindsight(r.Context(), part)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	group.Hindsight = hindsight.tally()
+	JSON(w, http.StatusOK, group)
 }
 
 func buildPublicInjuryGroup(
@@ -137,6 +146,7 @@ func buildPublicInjuryGroup(
 	out.Activities = injuryTally(injuryActivities, activities, len(answers))
 	out.PreChanges = injuryTally(injuryPreChanges, preChanges, len(answers))
 	out.Events = injuryTally(injuryEvents, events, len(answers))
+	out.Hindsight = injuryTally(injuryHindsights, nil, 0)
 
 	type key struct{ severity, stage string }
 	// 意識的にやったことは、1人が何度段階を変えても1回と数える。
