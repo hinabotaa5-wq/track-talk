@@ -521,3 +521,35 @@ func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
 	}
 	t.Fatal("plan not listed")
 }
+
+// 返金を記録したあとで指導を閉じられなかったら、返金の記録も戻す。次の tick で返金をやり直し
+// (Stripe には同じキーなので2回目の返金は起きない)、返金済みの支払いのまま指導が続くことがない。
+func TestCoachingPaymentSilentRefundClosesContractTogether(t *testing.T) {
+	h, f := setupStripe(t)
+	tu, _, id := adultAccepted(t, h)
+	checkout(t, h, tu, id)
+	paidSession(t, h, sessionIDFor(t, id), "pi_silent", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = starts_at - interval '73 hours', ends_at = ends_at - interval '73 hours' WHERE id = $1`, id)
+	execSQLArgs(t, `CREATE OR REPLACE FUNCTION test_block_refund_close() RETURNS trigger AS $$
+		BEGIN RAISE EXCEPTION 'blocked for test'; END $$ LANGUAGE plpgsql`)
+	execSQLArgs(t, `CREATE TRIGGER test_block_refund_close BEFORE UPDATE ON coaching_contracts
+		FOR EACH ROW WHEN (NEW.status = 'refunded') EXECUTE FUNCTION test_block_refund_close()`)
+	t.Cleanup(func() { execSQLArgs(t, `DROP TRIGGER IF EXISTS test_block_refund_close ON coaching_contracts`) })
+
+	tick(t, h, "tick-secret")
+	var status string
+	queryRowArgs(t, `SELECT status FROM coaching_payments WHERE contract_id = $1`, []any{id}, &status)
+	if status != "paid" || contractStatus(t, id) != "active" {
+		t.Fatalf("payment %s contract %s: refund recorded without closing the contract", status, contractStatus(t, id))
+	}
+
+	execSQLArgs(t, `DROP TRIGGER test_block_refund_close ON coaching_contracts`)
+	tick(t, h, "tick-secret")
+	queryRowArgs(t, `SELECT status FROM coaching_payments WHERE contract_id = $1`, []any{id}, &status)
+	if status != "refunded" || contractStatus(t, id) != "refunded" {
+		t.Fatalf("payment %s contract %s after retry", status, contractStatus(t, id))
+	}
+	if refunds := f.refundList(); len(refunds) != 1 {
+		t.Fatalf("refunds %v", refunds)
+	}
+}

@@ -358,7 +358,9 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 }
 
 // refundPayment は、支払いを Stripe で返金して記録する。1つの支払いの返金は1回だけ。
-func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amount int32, reason string) (db.CoachingPayment, error) {
+// closeContract なら、同じトランザクションで指導を閉じ、まだ送金に含めていない報酬を消す。返金だけ記録されて
+// 指導が期間中のまま残る(途中で落ちた)と、返金済みの支払いは二度と拾われず、無料で続いてしまうので。
+func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amount int32, reason string, closeContract bool) (db.CoachingPayment, error) {
 	if pay.PaymentIntentID == nil {
 		return pay, errors.New("payment has no payment intent")
 	}
@@ -376,7 +378,16 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 		}
 		var err error
 		refunded, err = q.RecordCoachingRefund(ctx, db.RecordCoachingRefundParams{ID: pay.ID, RefundedYen: amount, RefundReason: reason})
-		return err
+		if err != nil || !closeContract || pay.ContractID == nil {
+			return err
+		}
+		if err := q.DeleteUnpaidContractEarning(ctx, pay.ContractID); err != nil {
+			return err
+		}
+		if _, err := q.RefundCoachingContract(ctx, *pay.ContractID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return pay, err
@@ -386,7 +397,7 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 
 // refundUnstarted は、期間が始まらなかった支払いを全額返金して、払った人の側に知らせる。
 func (s *Server) refundUnstarted(ctx context.Context, pay db.CoachingPayment) error {
-	if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "not_started"); err != nil {
+	if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "not_started", false); err != nil {
 		return err
 	}
 	if pay.ContractID == nil {
@@ -429,13 +440,10 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 		if err != nil {
 			continue
 		}
-		if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "no_coach_reply"); err != nil {
+		if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "no_coach_reply", true); err != nil {
 			slog.Error("refund silent contract", "contract", ct.ID, "err", err)
 			s.touchCoachingPayment(ctx, pay.ID)
 			continue
-		}
-		if _, err := s.q.RefundCoachingContract(ctx, ct.ID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return n, err
 		}
 		n++
 		s.pushQuietly(ctx, ct.RequesterID, push.Message{
@@ -544,7 +552,7 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-	pay, err = s.refundPayment(r.Context(), pay, amount, reason)
+	pay, err = s.refundPayment(r.Context(), pay, amount, reason, true)
 	if err != nil {
 		if errors.Is(err, errStripe) {
 			slog.Warn("stripe refund", "err", err)
@@ -554,16 +562,9 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 		MapDBError(w, err)
 		return
 	}
-	// 返金した分をコーチの報酬から外す。まだ記録していなければ、tick が返金後の額で記録する。
-	if err := s.q.DeleteUnpaidContractEarning(r.Context(), &ct.ID); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if ended, err := s.q.RefundCoachingContract(r.Context(), ct.ID); err == nil {
+	// 返金した分のコーチの報酬は refundPayment が外した。まだ記録していなければ、tick が返金後の額で記録する。
+	if ended, err := s.q.GetCoachingContract(r.Context(), ct.ID); err == nil {
 		ct = ended
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		MapDBError(w, err)
-		return
 	}
 	msg := push.Message{
 		Title: "パーソナル指導を返金しました",
