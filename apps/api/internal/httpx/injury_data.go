@@ -3,8 +3,7 @@ package httpx
 import (
 	"context"
 	"net/http"
-
-	"github.com/hinata/track-talk/apps/api/internal/db"
+	"sort"
 )
 
 // 「データ」タブ。ケガ共有のグループで集まった回答(ケガの前に変わったこと・そのときしていたこと・場所・種目)と、
@@ -50,9 +49,6 @@ func (s *Server) loadInjuryHindsight(ctx context.Context, part string) (injuryHi
 func (s *Server) injuryData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	out := injuryDataDTO{MinPeople: injuryPublicMinPeople, Groups: []injuryPublicGroupDTO{}}
-	var allCounts []db.CountInjuryGroupMembersByStageRow
-	var allAnswers []db.ListInjuryGroupAnswersRow
-	var allChanges []db.ListInjuryGroupStageChangesRow
 	for _, part := range injuryBodyParts {
 		counts, err := s.q.CountInjuryGroupMembersByStage(ctx, part.Code)
 		if err != nil {
@@ -69,9 +65,6 @@ func (s *Server) injuryData(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, err)
 			return
 		}
-		allCounts = append(allCounts, counts...)
-		allAnswers = append(allAnswers, answers...)
-		allChanges = append(allChanges, changes...)
 		group := buildPublicInjuryGroup(part.Code, counts, answers, changes, nil)
 		if group.Members == 0 {
 			continue
@@ -85,14 +78,50 @@ func (s *Server) injuryData(w http.ResponseWriter, r *http.Request) {
 		group.Hindsight = hindsight.tally()
 		out.Groups = append(out.Groups, group)
 	}
-	out.Overall = buildPublicInjuryGroup("", allCounts, allAnswers, allChanges, nil)
-	out.Overall.BodyPartLabel = "すべてのケガ"
-	out.Overall.Recovery = []injuryRecoveryDTO{}
-	all, err := s.loadInjuryHindsight(ctx, "")
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	out.Overall.Hindsight = all.tally()
+	out.Overall = injuryOverall(out.Groups)
 	JSON(w, http.StatusOK, out)
+}
+
+// injuryOverall は、全体の集計を、ケガごとに公開している集計(5人以上)だけを足して作る。
+// 5人に満たないグループの回答を混ぜると、全体から公開しているグループの分を引くだけで、その人の回答がわかってしまう。
+func injuryOverall(groups []injuryPublicGroupDTO) injuryPublicGroupDTO {
+	out := buildPublicInjuryGroup("", nil, nil, nil, nil)
+	out.BodyPartLabel = "すべてのケガ"
+	out.Recovery = []injuryRecoveryDTO{}
+	pick := []func(*injuryPublicGroupDTO) *injuryTallyDTO{
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.Places },
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.Activities },
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.PreChanges },
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.Events },
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.Actions },
+		func(g *injuryPublicGroupDTO) *injuryTallyDTO { return &g.Hindsight },
+	}
+	for _, field := range pick {
+		total := field(&out)
+		byCode := map[string]int{}
+		labels := []injuryCountDTO{}
+		for i := range groups {
+			tally := field(&groups[i])
+			if tally.People < injuryPublicMinPeople {
+				continue
+			}
+			total.People += tally.People
+			for _, item := range tally.Items {
+				if _, seen := byCode[item.Code]; !seen {
+					labels = append(labels, injuryCountDTO{Code: item.Code, Label: item.Label})
+				}
+				byCode[item.Code] += item.People
+			}
+		}
+		total.Items = []injuryCountDTO{}
+		for _, item := range labels {
+			item.People = byCode[item.Code]
+			total.Items = append(total.Items, item)
+		}
+		sort.SliceStable(total.Items, func(i, j int) bool { return total.Items[i].People > total.Items[j].People })
+	}
+	for _, g := range groups {
+		out.Members += g.Members
+	}
+	return out
 }
