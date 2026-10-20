@@ -11,6 +11,30 @@ import (
 	"github.com/google/uuid"
 )
 
+const countRecentUploads = `-- name: CountRecentUploads :one
+SELECT count(*)::int FROM cloudinary_uploads
+WHERE owner_id = $1
+  AND created_at > now() - interval '1 day'
+`
+
+// この人に、この1日(24時間)に出した署名の数。
+func (q *Queries) CountRecentUploads(ctx context.Context, ownerID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countRecentUploads, ownerID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const lockUploadOwner = `-- name: LockUploadOwner :exec
+SELECT pg_advisory_xact_lock(hashtext('uploads:' || $1::uuid::text))
+`
+
+// 同じ人への署名を1つずつにする。1日の上限の確認と記録のあいだに、別の署名を割り込ませない。
+func (q *Queries) LockUploadOwner(ctx context.Context, ownerID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockUploadOwner, ownerID)
+	return err
+}
+
 const recordUpload = `-- name: RecordUpload :exec
 INSERT INTO cloudinary_uploads (public_id, owner_id)
 VALUES ($1, $2)
@@ -47,18 +71,4 @@ func (q *Queries) UploadIssuedTo(ctx context.Context, arg UploadIssuedToParams) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const countRecentUploads = `-- name: CountRecentUploads :one
-SELECT count(*)::int FROM cloudinary_uploads
-WHERE owner_id = $1
-  AND created_at > now() - interval '1 day'
-`
-
-// この人に、この1日(24時間)に出した署名の数。
-func (q *Queries) CountRecentUploads(ctx context.Context, ownerID uuid.UUID) (int32, error) {
-	row := q.db.QueryRow(ctx, countRecentUploads, ownerID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
 }

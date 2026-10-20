@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type CloudinaryUpload struct {
+	PublicID  string    `json:"public_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type CoachEarning struct {
 	ID              uuid.UUID  `json:"id"`
 	CoachID         *uuid.UUID `json:"coach_id"`
@@ -235,12 +241,20 @@ type GuardianConsent struct {
 	GuardianEmail   *string    `json:"guardian_email"`
 	LinkSentOn      *time.Time `json:"link_sent_on"`
 	LinkSends       int32      `json:"link_sends"`
+	LinkIssuedAt    time.Time  `json:"link_issued_at"`
 }
 
 type InjuryDetail struct {
 	PostID     uuid.UUID `json:"post_id"`
 	BodyPart   string    `json:"body_part"`
 	GroupStage *string   `json:"group_stage"`
+}
+
+type InjuryGroupHindsight struct {
+	UserID    uuid.UUID `json:"user_id"`
+	BodyPart  string    `json:"body_part"`
+	Codes     []string  `json:"codes"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type InjuryGroupMember struct {
@@ -449,12 +463,6 @@ type ProductReview struct {
 	FootSize  *int16     `json:"foot_size"`
 	FootWidth *string    `json:"foot_width"`
 	Usage     *string    `json:"usage"`
-}
-
-type CloudinaryUpload struct {
-	PublicID  string    `json:"public_id"`
-	OwnerID   uuid.UUID `json:"owner_id"`
-	CreatedAt time.Time `json:"created_at"`
 }
 
 type Profile struct {
