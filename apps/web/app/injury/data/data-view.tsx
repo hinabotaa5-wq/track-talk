@@ -77,22 +77,16 @@ export function DataView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">ケガ</h1>
-        <p className="mt-1 text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
-      </div>
+      <h1 className="sr-only">ケガ</h1>
+      <p className="text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
       <InjuryTabs current="data" />
-      <p className="text-sm text-slate-200">
-        ケガ共有のグループに入った人が答えた、ケガをしたときの状況と、復帰までにやったことの集計です。匿名で、
-        {data?.min_people ?? 5}人そろった項目だけ表示します。
-      </p>
 
       {failed ? (
         <ErrorState message="データの取得に失敗しました。APIの起動を確認してください。" />
       ) : data === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>
       ) : data.groups.length === 0 ? (
-        <EmptyState title="まだデータがありません" body="ケガ共有のグループに参加する人が増えると、ここに集計が出ます。" />
+        <EmptyState title="まだデータがありません" body="共有のグループに参加する人が増えると、ここに集計が出ます。" />
       ) : (
         <>
           <GroupCard group={data.overall} min={data.min_people} overall />

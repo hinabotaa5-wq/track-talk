@@ -20,12 +20,10 @@ var (
 	injuryPlaces = []injuryOption{
 		{"tartan", "タータン"},
 		{"grass", "芝生"},
-		{"dirt", "土"},
 		{"asphalt", "アスファルト"},
 		{"slope", "坂"},
 		{"stairs", "階段"},
-		{"weight-room", "ウエイト場"},
-		{"gym", "体育館"},
+		{"weight-room", "ジム"},
 	}
 	injuryActivities = []injuryOption{
 		{"jog", "ジョグ"},
@@ -41,7 +39,7 @@ var (
 		{"new-shoes", "シューズを替えた"},
 		{"comeback", "休み明け・久しぶりの再開"},
 		{"fatigue", "疲れがたまっていた"},
-		{"played-through-pain", "痛みをがまんしていた"},
+		{"played-through-pain", "痛みを我慢していた"},
 		{"none", "とくになし"},
 	}
 	// 「いま思うと、どうすればよかったか」。まだケガをしていない人の予防に使う。

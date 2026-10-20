@@ -32,10 +32,8 @@ export function InjuryView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">ケガ</h1>
-        <p className="mt-1 text-sm text-slate-200">同じケガの仲間と、復帰を目指そう</p>
-      </div>
+      <h1 className="sr-only">ケガ</h1>
+      <p className="text-sm text-slate-200">同じ怪我をしている人たちと気持ちを共有して復帰を目指そう！</p>
       <InjuryTabs current="share" />
       <InjuryMeCards token={token} />
 

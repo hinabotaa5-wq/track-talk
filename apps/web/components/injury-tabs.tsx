@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 const tabs = [
-  { id: "share", href: "/injury", label: "ケガ共有" },
+  { id: "share", href: "/injury", label: "共有" },
   { id: "data", href: "/injury/data", label: "データ" },
 ] as const;
 
-// ケガタブの中の切り替え。「ケガ共有」は同じケガの仲間のグループ、「データ」は予防に役立てる匿名の集計。
+// ケガタブの中の切り替え。「共有」は同じケガの仲間のグループ、「データ」は予防に役立てる匿名の集計。
 export function InjuryTabs({ current }: { current: (typeof tabs)[number]["id"] }) {
   return (
     <nav aria-label="ケガタブの切り替え" className="grid grid-cols-2 gap-1 rounded-xl border border-white/20 glass bg-white/8 p-1">

@@ -180,12 +180,10 @@ export type InjurySeverity = (typeof injurySeverities)[number]["value"];
 export const injuryPlaces = [
   { value: "tartan", label: "タータン" },
   { value: "grass", label: "芝生" },
-  { value: "dirt", label: "土" },
   { value: "asphalt", label: "アスファルト" },
   { value: "slope", label: "坂" },
   { value: "stairs", label: "階段" },
-  { value: "weight-room", label: "ウエイト場" },
-  { value: "gym", label: "体育館" },
+  { value: "weight-room", label: "ジム" },
 ] as const;
 export type InjuryPlace = (typeof injuryPlaces)[number]["value"];
 
@@ -205,7 +203,7 @@ export const injuryPreChanges = [
   { value: "new-shoes", label: "シューズを替えた" },
   { value: "comeback", label: "休み明け・久しぶりの再開" },
   { value: "fatigue", label: "疲れがたまっていた" },
-  { value: "played-through-pain", label: "痛みをがまんしていた" },
+  { value: "played-through-pain", label: "痛みを我慢していた" },
   { value: "none", label: "とくになし" },
 ] as const;
 export type InjuryPreChange = (typeof injuryPreChanges)[number]["value"];

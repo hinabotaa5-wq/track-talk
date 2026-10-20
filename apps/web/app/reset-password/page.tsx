@@ -25,15 +25,19 @@ export default function ResetPasswordPage() {
     // リンクを開いたら、新しいパスワードを設定する画面に戻す(Supabase の Redirect URLs にこの URL を入れておく)。
     const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/reset-password/update`;
     const { error } = await supabase.auth.resetPasswordForEmail(values.email, { redirectTo }).finally(release);
-    setMessage(error ? authErrorMessage(error) : "リセット用メールを送信しました。");
+    setMessage(
+      error
+        ? authErrorMessage(error)
+        : "リセット用メールを送信しました。\n届かない場合は迷惑メールに入っているかアカウントを作成していない可能性があります。",
+    );
   }
 
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">パスワードリセット</h1>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input type="email" placeholder="メール" {...form.register("email")} />
-        {message ? <p className="text-sm">{message}</p> : null}
+        <Input type="email" placeholder="メールアドレス" {...form.register("email")} />
+        {message ? <p className="whitespace-pre-line text-sm">{message}</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>
           送信
         </Button>
