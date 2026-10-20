@@ -29,7 +29,7 @@ const distanceEvents = new Set(["long-jump", "triple-jump", "high-jump", "pole-v
 const pointsEvents = new Set(["heptathlon", "decathlon"]);
 const windEvents = new Set(["100m", "200m", "100mh", "110mh", "long-jump", "triple-jump"]);
 
-// 記録を残せる種目。アプリ内の種目と同じ。七種・十種は、以前に付けた記録を見られるように点数の扱いだけ残してある。
+// 記録を残せる種目。アプリ内の種目と同じ。七種・十種は点数で残す。
 export const raceRecordEvents = appEvents;
 
 export function raceMarkKind(event: string): RaceMarkKind {

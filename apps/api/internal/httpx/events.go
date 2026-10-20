@@ -27,21 +27,21 @@ var appEvents = []struct {
 	{"javelin", "やり投"},
 	{"race-walk", "競歩"},
 	{"relay", "リレー"},
+	{"heptathlon", "七種競技"},
+	{"decathlon", "十種競技"},
 }
 
 // legacyEventLabels は、いまは選べないが、以前に保存した値の表示に使う名前。
 var legacyEventLabels = map[string]string{
-	"heptathlon": "七種競技",
-	"decathlon":  "十種競技",
-	"4x100":      "4×100mR",
-	"4x400":      "4×400mR",
-	"sprint":     "短距離",
-	"hurdles":    "ハードル",
-	"middle":     "中距離",
-	"long":       "長距離",
-	"jumps":      "跳躍",
-	"throws":     "投てき",
-	"combined":   "混成",
+	"4x100":    "4×100mR",
+	"4x400":    "4×400mR",
+	"sprint":   "短距離",
+	"hurdles":  "ハードル",
+	"middle":   "中距離",
+	"long":     "長距離",
+	"jumps":    "跳躍",
+	"throws":   "投てき",
+	"combined": "混成",
 }
 
 func validEvent(code string) bool {
@@ -72,7 +72,7 @@ func eventOptions() []injuryOption {
 	for _, event := range appEvents {
 		out = append(out, injuryOption{event.Code, event.Label})
 	}
-	for _, code := range []string{"sprint", "hurdles", "middle", "long", "jumps", "throws", "combined", "heptathlon", "decathlon", "4x100", "4x400"} {
+	for _, code := range []string{"sprint", "hurdles", "middle", "long", "jumps", "throws", "combined", "4x100", "4x400"} {
 		out = append(out, injuryOption{code, legacyEventLabels[code]})
 	}
 	return out

@@ -1,6 +1,6 @@
 -- アプリ内の種目を、コーチの担当種目に統一する。
--- 練習相手募集・感覚メモ・競技会の記録・レビューの種目に、競歩(race-walk)とリレー(relay)を足す。
--- 以前に保存した値(七種・十種・4x100・4x400・その他)はそのまま残すので、制約には残しておく。
+-- 練習相手募集・感覚メモ・競技会の記録・レビューの種目に、競歩(race-walk)とリレー(relay)を足す。コーチ(担当種目・添削依頼)も同じ一覧にそろえる。
+-- 七種・十種も共通の種目に含める。以前に保存した「その他」はそのまま残すので、制約には残しておく。
 
 -- 利用者の種目。登録のときにニックネームと一緒に選んでもらう。以前から使っている人は、次に開いたときに選ぶまで空のまま。
 ALTER TABLE profiles
@@ -9,7 +9,8 @@ ALTER TABLE profiles
         event IS NULL OR event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay'
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
+            'heptathlon', 'decathlon'
         )
     );
 
@@ -20,7 +21,7 @@ ALTER TABLE practice_details
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
             'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
-            'heptathlon', 'decathlon', '4x100', '4x400', 'other'
+            'heptathlon', 'decathlon', 'other'
         )
     );
 
@@ -31,7 +32,7 @@ ALTER TABLE sense_notes
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
             'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
-            'heptathlon', 'decathlon', '4x100', '4x400', 'other'
+            'heptathlon', 'decathlon', 'other'
         )
     );
 
@@ -42,7 +43,7 @@ ALTER TABLE product_reviews
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
             'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
-            'heptathlon', 'decathlon', '4x100', '4x400', 'other'
+            'heptathlon', 'decathlon', 'other'
         )
     );
 
@@ -53,7 +54,7 @@ ALTER TABLE race_records
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
             'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
-            'heptathlon', 'decathlon', '4x100', '4x400'
+            'heptathlon', 'decathlon'
         )
     );
 
@@ -65,6 +66,31 @@ ALTER TABLE injury_group_members
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
             'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
+            'heptathlon', 'decathlon',
             'sprint', 'hurdles', 'middle', 'long', 'jumps', 'throws', 'combined'
+        )
+    );
+
+-- コーチの担当種目と添削依頼の種目。
+ALTER TABLE coach_profiles
+    DROP CONSTRAINT coach_profiles_events_check,
+    ADD CONSTRAINT coach_profiles_events_check CHECK (
+        cardinality(events) BETWEEN 1 AND 23
+        AND events <@ ARRAY[
+            '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
+            '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
+            'heptathlon', 'decathlon'
+        ]::text[]
+    );
+
+ALTER TABLE review_requests
+    DROP CONSTRAINT review_requests_event_check,
+    ADD CONSTRAINT review_requests_event_check CHECK (
+        event IN (
+            '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
+            '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
+            'heptathlon', 'decathlon'
         )
     );

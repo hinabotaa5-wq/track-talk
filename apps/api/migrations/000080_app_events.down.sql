@@ -1,3 +1,27 @@
+-- 新しく足した種目(七種・十種)をコーチの側から外す。
+DELETE FROM review_requests WHERE event IN ('heptathlon', 'decathlon');
+UPDATE coach_profiles SET events = ARRAY(SELECT e FROM unnest(events) e WHERE e NOT IN ('heptathlon', 'decathlon'));
+DELETE FROM coach_profiles WHERE cardinality(events) = 0;
+ALTER TABLE coach_profiles
+    DROP CONSTRAINT coach_profiles_events_check,
+    ADD CONSTRAINT coach_profiles_events_check CHECK (
+        cardinality(events) BETWEEN 1 AND 21
+        AND events <@ ARRAY[
+            '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
+            '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay'
+        ]::text[]
+    );
+ALTER TABLE review_requests
+    DROP CONSTRAINT review_requests_event_check,
+    ADD CONSTRAINT review_requests_event_check CHECK (
+        event IN (
+            '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
+            '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay'
+        )
+    );
+
 ALTER TABLE injury_group_members
     DROP CONSTRAINT injury_group_members_event_check,
     ADD CONSTRAINT injury_group_members_event_check CHECK (

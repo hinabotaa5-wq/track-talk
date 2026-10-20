@@ -340,7 +340,9 @@ export type CoachEvent =
   | "hammer"
   | "javelin"
   | "race-walk"
-  | "relay";
+  | "relay"
+  | "heptathlon"
+  | "decathlon";
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {
