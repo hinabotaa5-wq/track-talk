@@ -138,7 +138,7 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 	// 種目は、まだ選んでいない人は必ず選ぶ。選んだ人は、送らなければそのまま。
 	var event *string
 	if req.Event != "" || p.Event == nil {
-		if !validInjuryOption(injuryEvents, req.Event) {
+		if !validEvent(req.Event) {
 			FieldError(w, map[string]string{"event": "種目を選んでください"})
 			return
 		}

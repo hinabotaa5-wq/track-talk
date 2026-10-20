@@ -9,7 +9,7 @@ func TestNormalizeInjuryJoinMonth(t *testing.T) {
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	req := injuryJoinReq{
 		Severity: "mild", SawDoctor: new(bool), Place: "grass", Activity: "jog",
-		PreChanges: []string{"fatigue", "fatigue"}, Event: "long", Stage: "resting",
+		PreChanges: []string{"fatigue", "fatigue"}, Stage: "resting",
 	}
 	for month, ok := range map[string]bool{"2026-10": true, "2025-01": true, "2026-11": false, "10月": false} {
 		req.InjuredMonth = month
@@ -56,7 +56,7 @@ func TestNormalizeInjuryJoinMonthUsesJST(t *testing.T) {
 	now := time.Date(2026, 10, 31, 20, 0, 0, 0, time.UTC) // 日本時間 11月1日 05:00
 	req := injuryJoinReq{
 		Severity: "mild", SawDoctor: new(bool), Place: "grass", Activity: "jog",
-		PreChanges: []string{"fatigue"}, Event: "long", Stage: "resting", InjuredMonth: "2026-11",
+		PreChanges: []string{"fatigue"}, Stage: "resting", InjuredMonth: "2026-11",
 	}
 	if _, fields := normalizeInjuryJoin("shin-splints", req, now); len(fields) != 0 {
 		t.Fatalf("fields %v", fields)

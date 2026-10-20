@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { injuryEvents } from "@/lib/injury";
+import { appEvents } from "@/lib/practice-events";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { nicknameSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -87,7 +87,7 @@ export default function ProfilePage() {
             <option value="" className="text-slate-900">
               選んでください
             </option>
-            {injuryEvents.map((item) => (
+            {appEvents.map((item) => (
               <option key={item.value} value={item.value} className="text-slate-900">
                 {item.label}
               </option>

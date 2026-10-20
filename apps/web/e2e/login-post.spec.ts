@@ -11,7 +11,7 @@ test("login then publish a text post", async ({ page }) => {
   // はじめてのログインは、ニックネームと種目を決めるまで先に進めない。
   await expect(page.getByRole("heading", { name: "ニックネームと種目を決めよう" })).toBeVisible({ timeout: 20_000 });
   await page.getByPlaceholder("ニックネーム").fill("あされん");
-  await page.getByLabel("種目").selectOption("sprint");
+  await page.getByLabel("種目").selectOption("100m");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page).toHaveURL("/", { timeout: 20_000 });
 

@@ -231,8 +231,9 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		Place:      &in.Place,
 		Activity:   &in.Activity,
 		PreChanges: in.PreChanges,
-		Event:      &in.Event,
-		Stage:      in.Stage,
+		// 種目は、登録のときに選んだものを使う(まだ選んでいない人は空のまま)。
+		Event: p.Event,
+		Stage: in.Stage,
 	})
 	if err != nil {
 		MapDBError(w, err)

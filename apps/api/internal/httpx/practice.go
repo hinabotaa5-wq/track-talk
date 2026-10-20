@@ -21,55 +21,17 @@ type practiceInput struct {
 	Capacity   int32
 }
 
-var practiceEvents = []struct {
-	Code  string
-	Label string
-}{
-	{"100m", "100m"},
-	{"200m", "200m"},
-	{"400m", "400m"},
-	{"800m", "800m"},
-	{"1500m", "1500m"},
-	{"5000m", "5000m"},
-	{"10000m", "10000m"},
-	{"100mh", "100mH"},
-	{"110mh", "110mH"},
-	{"400mh", "400mH"},
-	{"3000msc", "3000mSC"},
-	{"long-jump", "走幅跳"},
-	{"triple-jump", "三段跳"},
-	{"high-jump", "走高跳"},
-	{"pole-vault", "棒高跳"},
-	{"shot-put", "砲丸投"},
-	{"discus", "円盤投"},
-	{"hammer", "ハンマー投"},
-	{"javelin", "やり投"},
-	{"heptathlon", "七種競技"},
-	{"decathlon", "十種競技"},
-	{"4x100", "4×100mR"},
-	{"4x400", "4×400mR"},
-	{"other", "その他"},
-}
-
+// 練習相手募集の種目は、アプリ内の種目にリレーを足したもの(コーチの担当種目と同じ)。
 func validPracticeEvent(code string) bool {
-	for _, event := range practiceEvents {
-		if event.Code == code {
-			return true
-		}
-	}
-	return false
+	return validEvent(code) || code == relayEvent
 }
 
+// practiceLabel は種目の表示名。「その他」は、選べた頃に自分で書いた名前(other)を出す。
 func practiceLabel(event, other string) string {
 	if event == "other" {
 		return other
 	}
-	for _, item := range practiceEvents {
-		if item.Code == event {
-			return item.Label
-		}
-	}
-	return event
+	return eventLabel(event)
 }
 
 func practiceTitle(event, other string, starts time.Time) string {

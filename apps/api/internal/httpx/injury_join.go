@@ -53,16 +53,8 @@ var (
 		{"tell-coach", "顧問やコーチに早めに伝える"},
 		{"none", "わからない・とくにない"},
 	}
-	injuryEvents = []injuryOption{
-		{"sprint", "短距離"},
-		{"hurdles", "ハードル"},
-		{"middle", "中距離"},
-		{"long", "長距離"},
-		{"jumps", "跳躍"},
-		{"throws", "投てき"},
-		{"combined", "混成"},
-		{"race-walk", "競歩"},
-	}
+	// 種目は登録のときに選んだものを使う。以前の区分で答えた人の値も表示できるようにしておく。
+	injuryEvents = eventOptions()
 )
 
 const injuryDiagnosisMaxLength = 40
@@ -91,7 +83,6 @@ type injuryJoinReq struct {
 	PreChanges   []string `json:"pre_changes"`
 	// Hindsight は、前から入っている人の更新やむかしの画面からも来るので、空でもよい。
 	Hindsight []string `json:"hindsight"`
-	Event     string   `json:"event"`
 	Stage     string   `json:"stage"`
 }
 
@@ -104,7 +95,6 @@ type injuryJoin struct {
 	Activity   string
 	PreChanges []string
 	Hindsight  []string
-	Event      string
 	Stage      string
 }
 
@@ -182,10 +172,6 @@ func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJ
 	}
 	if fields["hindsight"] == "" && hindsight["none"] && len(out.Hindsight) > 1 {
 		fields["hindsight"] = "「わからない・とくにない」はほかと一緒に選べません"
-	}
-	out.Event = strings.TrimSpace(req.Event)
-	if !validInjuryOption(injuryEvents, out.Event) {
-		fields["event"] = "種目を選んでください"
 	}
 	out.Stage = strings.TrimSpace(req.Stage)
 	if !validInjuryStage(out.Stage) {

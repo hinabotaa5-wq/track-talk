@@ -1,6 +1,6 @@
 // 競技会の記録: 日付・種目・記録・風・感想を本人だけが残し、種目ごとの推移をグラフで見る。感覚メモの延長。
 
-import { practiceEvents } from "./practice-events";
+import { appEvents } from "./practice-events";
 
 // 記録の持ち方。time は1/100秒(小さいほどよい)、distance はcm、points は点(どちらも大きいほどよい)。
 export type RaceMarkKind = "time" | "distance" | "points";
@@ -29,8 +29,8 @@ const distanceEvents = new Set(["long-jump", "triple-jump", "high-jump", "pole-v
 const pointsEvents = new Set(["heptathlon", "decathlon"]);
 const windEvents = new Set(["100m", "200m", "100mh", "110mh", "long-jump", "triple-jump"]);
 
-// 記録を残せる種目。「その他」は単位が分からないので外す。
-export const raceRecordEvents = practiceEvents.filter((item) => item.value !== "other");
+// 記録を残せる種目。アプリ内の種目と同じ。七種・十種は、以前に付けた記録を見られるように点数の扱いだけ残してある。
+export const raceRecordEvents = appEvents;
 
 export function raceMarkKind(event: string): RaceMarkKind {
   if (distanceEvents.has(event)) return "distance";

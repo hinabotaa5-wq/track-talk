@@ -25,7 +25,6 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   const [venue, setVenue] = useState(practice?.venue ?? "");
   const [startsAt, setStartsAt] = useState(practice ? toJstInput(practice.starts_at) : "");
   const [event, setEvent] = useState(practice?.event ?? "");
-  const [eventOther, setEventOther] = useState(practice?.event_other ?? "");
   const [capacity, setCapacity] = useState(practice ? String(practice.capacity) : "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
@@ -42,16 +41,11 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       venue,
       starts_at: startsAt,
       event,
-      event_other: event === "other" ? eventOther : "",
       capacity: Number(capacity),
       body,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "入力を確認してください");
-      return;
-    }
-    if (parsed.data.event === "other" && parsed.data.event_other === "") {
-      setError("種目名を入力してください");
       return;
     }
     const when = fromJstInput(parsed.data.starts_at);
@@ -71,7 +65,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         venue: parsed.data.venue,
         starts_at: when.toISOString(),
         event: parsed.data.event,
-        event_other: parsed.data.event === "other" ? parsed.data.event_other : "",
+        event_other: "",
         capacity: parsed.data.capacity,
       };
       const post = initial
@@ -133,18 +127,6 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           ))}
         </select>
       </label>
-      {event === "other" ? (
-        <label className="block text-sm font-medium">
-          種目名
-          <Input
-            className={fieldClass}
-            maxLength={40}
-            placeholder="3000m"
-            value={eventOther}
-            onChange={(e) => setEventOther(e.target.value)}
-          />
-        </label>
-      ) : null}
       <label className="block text-sm font-medium">
         募集人数
         <Input

@@ -13,7 +13,7 @@ import (
 func joinBody(stage string) map[string]any {
 	return map[string]any{
 		"severity": "moderate", "saw_doctor": true, "injured_month": "2026-09", "place": "tartan",
-		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "event": "sprint", "stage": stage,
+		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "stage": stage,
 	}
 }
 
@@ -71,7 +71,6 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 		"no pre changes":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{}}),
 		"none with others": joinBodyWith("rehab", map[string]any{"pre_changes": []string{"none", "fatigue"}}),
 		"bad pre change":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{"rain"}}),
-		"bad event":        joinBodyWith("rehab", map[string]any{"event": "relay"}),
 		"bad stage":        joinBodyWith("sprint", nil),
 	} {
 		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", tok, body); rec.Code != http.StatusUnprocessableEntity {
@@ -80,9 +79,19 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 	}
 }
 
+// 種目は登録のときに選ぶので、ケガのグループに入る前に、プロフィールに種目を入れておく。
+func setProfileEvent(t *testing.T, h http.Handler, tok, event string) {
+	t.Helper()
+	body := map[string]any{"nickname": "テスト", "nickname_public": false, "event": event}
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", tok, body); rec.Code != http.StatusOK {
+		t.Fatalf("set event %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestInjuryGroupJoinAnswers(t *testing.T) {
 	h := setup(t)
 	tok := token(t, uuid.New())
+	setProfileEvent(t, h, tok, "100m")
 
 	// 「その他」では、グループ名がケガを表さないので、ケガの名前を書いてもらう。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/other/join", tok, joinBody("resting")); rec.Code != http.StatusUnprocessableEntity {
@@ -107,7 +116,7 @@ func TestInjuryGroupJoinAnswers(t *testing.T) {
 	}
 	if me.InjuredMonth != "2026-09" || me.Diagnosis != "脛骨の疲労骨折" || me.SeverityLabel != "中くらい(練習を数週間休む)" ||
 		me.SawDoctor == nil || !*me.SawDoctor || me.PlaceLabel != "タータン" || me.ActivityLabel != "中間から後半を全力疾走" ||
-		len(me.PreChanges) != 2 || me.EventLabel != "短距離" {
+		len(me.PreChanges) != 2 || me.EventLabel != "100m" {
 		t.Fatalf("answers %+v", me)
 	}
 
@@ -360,10 +369,10 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 	h := setup(t)
 	public, private := token(t, uuid.New()), token(t, uuid.New())
 
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "sprint"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "100m"}); rec.Code != http.StatusOK {
 		t.Fatalf("public nickname %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "sprint"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "100m"}); rec.Code != http.StatusOK {
 		t.Fatalf("private nickname %d %s", rec.Code, rec.Body.String())
 	}
 	for _, tok := range []string{public, private} {

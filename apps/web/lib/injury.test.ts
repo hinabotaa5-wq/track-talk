@@ -69,7 +69,6 @@ describe("injury group join", () => {
     activity: "sprint",
     preChanges: ["more-volume"],
     hindsight: ["rest-early"],
-    event: "sprint",
     stage: "rehab",
   } as const;
   const answers = { ...filled, preChanges: [...filled.preChanges], hindsight: [...filled.hindsight] };
@@ -90,7 +89,7 @@ describe("injury group join", () => {
   });
 
   it("needs an answer for every choice", () => {
-    for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "hindsight", "event", "stage"] as const) {
+    for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "hindsight", "stage"] as const) {
       expect(injuryJoinStepError(step, emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
       expect(injuryJoinStepError(step, answers, thisMonth)).toBe("");
     }
@@ -111,7 +110,6 @@ describe("injury group join", () => {
       activity: "sprint",
       pre_changes: ["more-volume"],
       hindsight: ["rest-early"],
-      event: "sprint",
       stage: "rehab",
     });
     expect(injuryJoinPayload("other", { ...answers, diagnosis: " 疲労骨折 " })).toMatchObject({ diagnosis: "疲労骨折" });

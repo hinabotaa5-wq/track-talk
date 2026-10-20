@@ -12,7 +12,6 @@ import {
   injuryActivities,
   injuryBodyPartLabel,
   injuryDiagnosisMaxLength,
-  injuryEvents,
   injuryJoinPayload,
   injuryJoinStepError,
   injuryJoinStepsFor,
@@ -39,7 +38,6 @@ const questions: Record<InjuryJoinStep, string> = {
   activity: "そのとき何をしていましたか?",
   preChanges: "ケガの前に変わったことは?",
   hindsight: "いま思うと、どうすればよかったですか?",
-  event: "種目は?",
   stage: "いまの段階は?",
 };
 
@@ -214,14 +212,6 @@ export function InjuryJoinWizard({
           />
         ) : null}
 
-        {step === "event" ? (
-          <Choices
-            label="種目"
-            options={injuryEvents}
-            selected={(value) => answers.event === value}
-            onSelect={(value) => change({ event: value })}
-          />
-        ) : null}
 
         {step === "stage" ? (
           <Choices

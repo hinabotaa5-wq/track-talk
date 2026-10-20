@@ -5,7 +5,7 @@ import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { practiceEvents } from "@/lib/practice-events";
+import { appEvents } from "@/lib/practice-events";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
@@ -52,7 +52,7 @@ function SenseNoteFields({
           <span className="sr-only">種目(任意)</span>
           <select className={selectClass} value={event} onChange={(e) => onEvent(e.target.value)}>
             <option value="">種目(任意)</option>
-            {practiceEvents.map((item) => (
+            {appEvents.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>

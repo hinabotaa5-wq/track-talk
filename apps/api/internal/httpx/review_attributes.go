@@ -76,7 +76,7 @@ func optionalCode(raw *string) *string {
 func normalizeReviewAttrs(req reviewAttrsReq, fields map[string]string) reviewAttrs {
 	var out reviewAttrs
 	if v := optionalCode(req.Event); v != nil {
-		if validPracticeEvent(*v) {
+		if validEvent(*v) {
 			out.Event = v
 		} else {
 			fields["event"] = "種目を選び直してください"

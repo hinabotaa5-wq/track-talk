@@ -143,7 +143,8 @@ export type InjuryGroupMember = {
   activity?: InjuryActivity;
   activity_label?: string;
   pre_changes: InjuryPreChange[];
-  event?: InjuryEvent;
+  // 登録のときに選んだ種目。
+  event?: string;
   event_label?: string;
 };
 
@@ -221,18 +222,6 @@ export const injuryHindsights = [
 ] as const;
 export type InjuryHindsight = (typeof injuryHindsights)[number]["value"];
 
-export const injuryEvents = [
-  { value: "sprint", label: "短距離" },
-  { value: "hurdles", label: "ハードル" },
-  { value: "middle", label: "中距離" },
-  { value: "long", label: "長距離" },
-  { value: "jumps", label: "跳躍" },
-  { value: "throws", label: "投てき" },
-  { value: "combined", label: "混成" },
-  { value: "race-walk", label: "競歩" },
-] as const;
-export type InjuryEvent = (typeof injuryEvents)[number]["value"];
-
 export const injuryDiagnosisMaxLength = 40;
 
 // 参加時に1問ずつ聞く質問。順番がそのまま画面の順。ケガの名前は「その他」のときだけ聞く。
@@ -245,7 +234,6 @@ export const injuryJoinSteps = [
   "activity",
   "preChanges",
   "hindsight",
-  "event",
   "stage",
 ] as const;
 export type InjuryJoinStep = (typeof injuryJoinSteps)[number];
@@ -263,7 +251,6 @@ export type InjuryJoinAnswers = {
   activity: InjuryActivity | "";
   preChanges: InjuryPreChange[];
   hindsight: InjuryHindsight[];
-  event: InjuryEvent | "";
   stage: InjuryStage | "";
 };
 
@@ -276,7 +263,6 @@ export const emptyInjuryJoinAnswers: InjuryJoinAnswers = {
   activity: "",
   preChanges: [],
   hindsight: [],
-  event: "",
   stage: "",
 };
 
@@ -351,8 +337,6 @@ export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAns
       return answers.preChanges.length > 0 ? "" : "当てはまるものを選んでください(なければ「とくになし」)";
     case "hindsight":
       return answers.hindsight.length > 0 ? "" : "当てはまるものを選んでください(なければ「わからない・とくにない」)";
-    case "event":
-      return hasValue(injuryEvents, answers.event) ? "" : "種目を選んでください";
     case "stage":
       return isInjuryStage(answers.stage) ? "" : "いまの段階を選んでください";
   }
@@ -368,7 +352,6 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
     activity: answers.activity,
     pre_changes: answers.preChanges,
     hindsight: answers.hindsight,
-    event: answers.event,
     stage: answers.stage,
   };
 }
@@ -523,7 +506,7 @@ export type InjuryPublicGroup = {
   events: InjuryTally;
   actions: InjuryTally;
   hindsight: InjuryTally;
-  notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
+  notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: string; event_label?: string; created_at: string }[];
 };
 
 // 復帰の目安は幅で出す。2か月までは週、それより長いと月で言う。

@@ -125,12 +125,14 @@ describe("validators", () => {
   });
 
   it("validates nicknames and their visibility setting", () => {
-    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "sprint" }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false, event: "sprint" }).success).toBe(false);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false, event: "long" }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true, event: "long" }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "100m" }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false, event: "100m" }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false, event: "5000m" }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true, event: "5000m" }).success).toBe(false);
     expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(false);
+    // リレーは、コーチと練習相手募集の種目で、利用者の種目にはない。
     expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "relay" }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "sprint" }).success).toBe(false);
   });
 
   it("translates auth and upload errors", () => {

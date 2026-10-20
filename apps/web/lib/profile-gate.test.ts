@@ -4,10 +4,10 @@ import { mustCompleteProfile, profileIncomplete } from "./profile-gate";
 describe("profileIncomplete", () => {
   it("ニックネームか種目がまだなら、決めていないとみなす", () => {
     expect(profileIncomplete(null)).toBe(false);
-    expect(profileIncomplete({ nickname: null, event: "sprint" })).toBe(true);
-    expect(profileIncomplete({ nickname: " ", event: "sprint" })).toBe(true);
+    expect(profileIncomplete({ nickname: null, event: "100m" })).toBe(true);
+    expect(profileIncomplete({ nickname: " ", event: "100m" })).toBe(true);
     expect(profileIncomplete({ nickname: "ラン", event: null })).toBe(true);
-    expect(profileIncomplete({ nickname: "ラン", event: "sprint" })).toBe(false);
+    expect(profileIncomplete({ nickname: "ラン", event: "100m" })).toBe(false);
   });
 });
 
@@ -23,7 +23,7 @@ describe("mustCompleteProfile", () => {
   });
 
   it("決め終えた人と、まだ読み込み中の人は止めない", () => {
-    expect(mustCompleteProfile("/", { nickname: "ラン", event: "sprint" })).toBe(false);
+    expect(mustCompleteProfile("/", { nickname: "ラン", event: "100m" })).toBe(false);
     expect(mustCompleteProfile("/", null)).toBe(false);
   });
 });
