@@ -27,10 +27,15 @@ function callbackErrorCode() {
   return new URLSearchParams(window.location.search).get("error");
 }
 
+function nextParam() {
+  return new URLSearchParams(window.location.search).get("next");
+}
+
 export default function LoginPage() {
   const [submitError, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
+  const next = useSyncExternalStore(subscribeToNothing, nextParam, () => null);
   const error = submitError || (code ? (callbackErrors[code] ?? "") : "");
 
   const form = useForm<z.infer<typeof loginSchema>>({
@@ -66,7 +71,8 @@ export default function LoginPage() {
           ログイン
         </Button>
       </form>
-      <GoogleSignInButton />
+      {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
+      <GoogleSignInButton nextPath={safeNextPath(next)} />
       <p className="text-sm">
         アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-95">登録</Link>
       </p>

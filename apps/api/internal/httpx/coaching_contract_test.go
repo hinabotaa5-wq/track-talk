@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -211,5 +212,42 @@ func TestMinorCoachingContractAppliesWithoutGuardian(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tm, contractBody(planID))
 	if rec.Code != http.StatusCreated || !decodeContract(t, rec.Body.Bytes()).Minor {
 		t.Fatalf("minor apply %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 定員1のプランで2件の申し込みを同時に承諾しても、承諾できるのは1件だけ。
+func TestAcceptCoachingContractConcurrentRespectsCapacity(t *testing.T) {
+	h := setup(t)
+	// 書き込みの回数制限（1分に30回）に収まる回数だけ繰り返す。
+	for round := 0; round < 3; round++ {
+		_, tc, planID := planCoach(t, h, 1)
+		var ids []string
+		for i := 0; i < 2; i++ {
+			_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
+			rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu, contractBody(planID))
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+			}
+			ids = append(ids, decodeContract(t, rec.Body.Bytes()).ID)
+		}
+		codes := make([]int, len(ids))
+		var wg sync.WaitGroup
+		for i, id := range ids {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				codes[i] = doJSON(t, h, http.MethodPost, "/v1/coach/contracts/"+id+"/accept", tc, map[string]any{"agree_report": true, "agree_detection": true}).Code
+			}()
+		}
+		wg.Wait()
+		ok := 0
+		for _, c := range codes {
+			if c == http.StatusOK {
+				ok++
+			}
+		}
+		if ok != 1 {
+			t.Fatalf("round %d: accepted %d of capacity 1 (%v)", round, ok, codes)
+		}
 	}
 }

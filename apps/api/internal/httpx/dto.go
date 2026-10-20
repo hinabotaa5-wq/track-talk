@@ -57,15 +57,17 @@ type recruitmentDTO struct {
 }
 
 type practiceDTO struct {
-	Venue           string                   `json:"venue"`
-	StartsAt        time.Time                `json:"starts_at"`
-	Event           string                   `json:"event"`
-	EventOther      string                   `json:"event_other,omitempty"`
-	EventLabel      string                   `json:"event_label"`
-	Capacity        int32                    `json:"capacity"`
-	DissolvedAt     *time.Time               `json:"dissolved_at,omitempty"`
-	AcceptedCount   int32                    `json:"accepted_count"`
-	Status          string                   `json:"status"`
+	Venue         string     `json:"venue"`
+	StartsAt      time.Time  `json:"starts_at"`
+	Event         string     `json:"event"`
+	EventOther    string     `json:"event_other,omitempty"`
+	EventLabel    string     `json:"event_label"`
+	Capacity      int32      `json:"capacity"`
+	DissolvedAt   *time.Time `json:"dissolved_at,omitempty"`
+	AcceptedCount int32      `json:"accepted_count"`
+	Status        string     `json:"status"`
+	// Ratable は、練習の日時を過ぎてから解散した（開かれた）練習で、評価できること。
+	Ratable         bool                     `json:"ratable,omitempty"`
 	MyApplication   string                   `json:"my_application,omitempty"`
 	MyApplicationID *uuid.UUID               `json:"my_application_id,omitempty"`
 	RatedHost       bool                     `json:"rated_host,omitempty"`

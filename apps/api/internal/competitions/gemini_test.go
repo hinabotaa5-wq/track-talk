@@ -51,3 +51,17 @@ func TestExtractReadsJSONAndStopsOnRateLimit(t *testing.T) {
 		t.Fatalf("rate limit: %v", err)
 	}
 }
+
+// 大会がないページで meets が null や省略で返っても、パース失敗にせず「大会なし」として読む。
+func TestParseDraftsAcceptsEmptyMeetsObject(t *testing.T) {
+	for _, raw := range []string{`{"meets":null}`, `{}`, `{"meets":[]}`, "```json\n{\"meets\": null}\n```"} {
+		drafts, err := parseDrafts(raw)
+		if err != nil || len(drafts) != 0 {
+			t.Fatalf("%q: %v %v", raw, drafts, err)
+		}
+	}
+	drafts, err := parseDrafts(`[{"name":"A","starts_on":"2026-10-17"}]`)
+	if err != nil || len(drafts) != 1 {
+		t.Fatalf("array: %v %v", drafts, err)
+	}
+}

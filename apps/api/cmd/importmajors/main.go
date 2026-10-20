@@ -61,7 +61,11 @@ func storeMajorHosts(ctx context.Context, pool *pgxpool.Pool, kind string, hosts
 	}
 	defer tx.Rollback(ctx)
 	q := db.New(tx)
-	if err := q.DeleteMajorHostsByKind(ctx, kind); err != nil {
+	years := make([]int32, 0, len(hosts))
+	for _, host := range hosts {
+		years = append(years, int32(host.Year))
+	}
+	if err := q.DeleteMajorHostsNotInYears(ctx, db.DeleteMajorHostsNotInYearsParams{Kind: kind, Years: years}); err != nil {
 		return err
 	}
 	for _, host := range hosts {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -99,7 +100,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	}
 
 	patch := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
-		"title": "肉離れ", "body": "少し歩けた", "body_part": "quad-strain",
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "hamstring-strain",
 	})
 	if patch.Code != http.StatusOK {
 		t.Fatalf("patch %d %s", patch.Code, patch.Body.String())
@@ -114,8 +115,16 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "quad-strain" {
+	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "hamstring-strain" {
 		t.Fatalf("detail after patch %+v", detail)
+	}
+
+	// 編集で別の部位に付け替えると、その部位のグループに参加していなくても投稿が出てしまう。
+	move := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "quad-strain",
+	})
+	if move.Code != http.StatusUnprocessableEntity || !strings.Contains(move.Body.String(), "body_part") {
+		t.Fatalf("move to another part %d %s", move.Code, move.Body.String())
 	}
 }
 
@@ -587,6 +596,19 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	if got := notes(liker); len(got) != 2 {
 		t.Fatalf("a new update after reading should notify again: %+v", got)
 	}
+
+	// グループを抜けた人には、読めない投稿の通知を送らない。
+	savedNote := notes(saver)[0]
+	if r := doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+savedNote.ID+"/read", saver, nil); r.Code >= 300 {
+		t.Fatalf("read %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, http.MethodDelete, "/v1/injury/groups/achilles-tendinitis/me", saver, nil); r.Code != http.StatusNoContent {
+		t.Fatalf("leave %d %s", r.Code, r.Body.String())
+	}
+	report("race")
+	if got := notes(saver); len(got) != 1 {
+		t.Fatalf("a member who left must not be notified: %+v", got)
+	}
 }
 
 func TestInjuryUpdateCanBeEditedByTheAuthorOnly(t *testing.T) {
@@ -757,5 +779,33 @@ func TestInjuryPostIsReadableOnlyByTheGroup(t *testing.T) {
 		if got := doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+path, member, map[string]any{"body": "わかる"}).Code; got >= 300 {
 			t.Fatalf("member POST %s: %d", path, got)
 		}
+	}
+}
+
+// 経過報告が49件ある投稿に同時に送っても、50件を超えて保存できない。
+func TestInjuryUpdateLimitHoldsUnderConcurrency(t *testing.T) {
+	h := setup(t)
+	tok := token(t, uuid.New())
+	rec := postInjury(t, h, tok, map[string]any{
+		"kind": "injury", "title": "疲労骨折", "body": "診断が出た", "body_part": "shin-splints",
+	})
+	var post struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &post)
+	execSQLArgs(t, `INSERT INTO injury_updates (id, post_id, stage, body) SELECT gen_random_uuid(), $1, 'rehab', '経過' FROM generate_series(1, 49)`, post.ID)
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/posts/"+post.ID+"/injury/updates", tok, map[string]any{"stage": "race", "body": "同時の報告"})
+		}()
+	}
+	wg.Wait()
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM injury_updates WHERE post_id = $1`, []any{post.ID}, &n)
+	if n != 50 {
+		t.Fatalf("updates %d", n)
 	}
 }

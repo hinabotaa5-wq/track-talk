@@ -12,6 +12,8 @@ type CompetitionList = {
 
 const cache = new Map<string, CompetitionList>();
 const inflight = new Map<string, Promise<CompetitionList>>();
+// 消したあとに、消す前に始めた読み込みが古い一覧を書き戻さないよう、消すたびに進める。
+let generation = 0;
 
 // month が 0 ならシーズン全体。
 export function competitionCacheKey(prefecture: string, month: number) {
@@ -23,6 +25,7 @@ export function readCompetitions(prefecture: string, month: number) {
 }
 
 export function clearCompetitions() {
+  generation++;
   cache.clear();
   inflight.clear();
 }
@@ -36,11 +39,12 @@ export function loadCompetitions(prefecture: string, month: number) {
   const pending = inflight.get(key);
   if (pending) return pending;
 
+  const startedAt = generation;
   const query = month ? `prefecture=${prefecture}&month=${month}` : `prefecture=${prefecture}`;
   const request = apiFetch<{ competitions: Competition[] }>(`/v1/competitions?${query}`)
     .then((data) => {
       const entry = { items: data.competitions ?? [], error: "", at: Date.now() };
-      cache.set(key, entry);
+      if (startedAt === generation) cache.set(key, entry);
       return entry;
     })
     .catch(() => {
@@ -49,7 +53,7 @@ export function loadCompetitions(prefecture: string, month: number) {
       return { items: [] as Competition[], error: listError, at: 0 };
     })
     .finally(() => {
-      inflight.delete(key);
+      if (inflight.get(key) === request) inflight.delete(key);
     });
 
   inflight.set(key, request);

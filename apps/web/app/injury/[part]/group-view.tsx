@@ -14,6 +14,7 @@ import { InjuryStageChange } from "@/components/injury-stage-change";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { fetchAllPages } from "@/lib/paging";
 import type { PostsPage } from "@/lib/fetch-posts";
 import {
   canPostInStage,
@@ -71,8 +72,15 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   useEffect(() => {
     if (!joined || !token || !selected) return;
     const controller = new AbortController();
-    apiFetch<PostsPage>(`/v1/injury/groups/${part}/posts?per_page=20&stage=${selected}`, { token, signal: controller.signal })
-      .then((page) => setPosts({ stage: selected, page: { posts: page.posts ?? [], meta: page.meta } }))
+    // 21件目以降もグループの中から辿れるよう、最後のページまで集める。
+    fetchAllPages(async (pageNo) => {
+      const page = await apiFetch<PostsPage>(`/v1/injury/groups/${part}/posts?page=${pageNo}&per_page=50&stage=${selected}`, {
+        token,
+        signal: controller.signal,
+      });
+      return { items: page.posts ?? [], total: page.meta.total };
+    })
+      .then((all) => setPosts({ stage: selected, page: { posts: all.items, meta: { page: 1, per_page: all.items.length, total: all.total } } }))
       .catch(() => {
         if (!controller.signal.aborted) setPosts({ stage: selected, page: { posts: [], meta: { page: 1, per_page: 20, total: 0 } } });
       });

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { apiFetch } from "@/lib/api";
+import { fetchAllPages } from "@/lib/paging";
 import type { Meta, Post } from "@/lib/types";
 
 export default function MyPostsPage() {
@@ -21,10 +22,14 @@ export default function MyPostsPage() {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/me/posts?sort=${sort}`, { token })
+    // API は1ページ20件（最大50件）で切るので、最後のページまで集める。
+    fetchAllPages(async (page) => {
+      const d = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/me/posts?sort=${sort}&page=${page}&per_page=50`, { token });
+      return { items: d.posts ?? [], total: d.meta.total };
+    })
       .then((d) => {
         if (!active) return;
-        setPosts(d.posts ?? []);
+        setPosts(d.items);
         setPostsError("");
       })
       .catch(() => {

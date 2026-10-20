@@ -13,6 +13,7 @@ import { loadDomesticMajors, peekDomesticMajors, undecidedDomesticMeets, type Do
 import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
+import { useNow } from "@/lib/use-now";
 import type { Competition, DomesticMajor } from "@/lib/types";
 import { competitionDates, destination } from "./regional/regional-view";
 
@@ -177,7 +178,10 @@ function Schedule<T extends Scheduled>({
   undecided?: DomesticMeet[];
   emptyBody: string;
 }) {
-  const today = todayInTokyo();
+  // ページは CDN にキャッシュされるので、「今日」は表示のあとに決める。それまでは日付に依存しない形
+  // （すべて開催予定、バッジなし）で出し、キャッシュされた前日の振り分けを見せない。
+  const now = useNow();
+  const today = now === null ? "0000-01-01" : todayInTokyo(new Date(now));
   const { upcoming, ended } = seasonSchedule(items, today);
   if (items.length === 0 && undecided.length === 0) {
     return <EmptyState title="大会がありません" body={emptyBody} />;

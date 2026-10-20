@@ -20,9 +20,12 @@ export function CompetitionPrefetch() {
     // 大会タブで「国際大会」に切り替えたとき、読み込みを待たずに出せるよう先に取っておく。
     void loadCompetitions(INTERNATIONAL, 0);
     if (pathname.startsWith("/competitions")) return;
-    void loadMajorHosts().then((hosts) => {
-      preloadCityPhotos(hosts.map((host) => host.image_url));
-    });
+    // 先読みの失敗は、使うときに読み直すので捨てる（未処理の拒否にしない）。
+    loadMajorHosts()
+      .then((hosts) => {
+        preloadCityPhotos(hosts.map((host) => host.image_url));
+      })
+      .catch(() => {});
   }, [loading, session, pathname]);
 
   return null;

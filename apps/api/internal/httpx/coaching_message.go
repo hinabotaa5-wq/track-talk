@@ -219,6 +219,15 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 	}
 	var videoID *string
 	if req.VideoPublicID != "" {
+		if !s.coachingVideoFree(w, r, req.VideoPublicID, "video_public_id") {
+			return
+		}
+		if sender == nil || !s.uploadIssuedToMe(w, r, *sender, req.VideoPublicID, "video_public_id", "動画") {
+			if sender == nil {
+				FieldError(w, map[string]string{"video_public_id": "動画を選び直してください"})
+			}
+			return
+		}
 		if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
 			writeAssetReadyError(w, err, "動画")
 			return
@@ -304,4 +313,19 @@ func (s *Server) rateCoachingContract(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"rating": map[string]any{"stars": rt.Stars, "rated_at": rt.RatedAt}})
+}
+
+// coachingVideoFree は、非公開動画の ID がまだどこにも使われていないかを見る。使われていたらエラーを書いて false を返す。
+// アップロードした本人しか知らない ID だけを受け付け、他人の動画の流用を防ぐ。
+func (s *Server) coachingVideoFree(w http.ResponseWriter, r *http.Request, publicID, field string) bool {
+	inUse, err := s.q.CoachingVideoInUse(r.Context(), publicID)
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if inUse {
+		FieldError(w, map[string]string{field: "この動画は使えません。動画を選び直してください"})
+		return false
+	}
+	return true
 }

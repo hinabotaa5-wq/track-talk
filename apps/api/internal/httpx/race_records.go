@@ -219,17 +219,28 @@ func (s *Server) createRaceRecord(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	count, err := s.q.CountRaceRecords(r.Context(), me.ID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if count >= maxRaceRecords {
+	// 同時に送られても1000件を超えないよう、作成者ごとのロックの中で数えて保存する。
+	errFull := errors.New("race records full")
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockRaceRecordAuthor(r.Context(), me.ID); err != nil {
+			return err
+		}
+		count, err := q.CountRaceRecords(r.Context(), me.ID)
+		if err != nil {
+			return err
+		}
+		if count >= maxRaceRecords {
+			return errFull
+		}
+		params.ID, params.AuthorID = uuid.New(), me.ID
+		_, err = q.CreateRaceRecord(r.Context(), params)
+		return err
+	})
+	if errors.Is(err, errFull) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "記録は1000件までです")
 		return
 	}
-	params.ID, params.AuthorID = uuid.New(), me.ID
-	if _, err := s.q.CreateRaceRecord(r.Context(), params); err != nil {
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}

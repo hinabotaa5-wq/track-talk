@@ -141,6 +141,8 @@ type RateLimiter struct {
 	writes    map[string][]time.Time
 	reports   map[string][]time.Time
 	inquiries map[string][]time.Time
+	// lastSweep は、来なくなった IP の行を最後にまとめて消した時刻。
+	lastSweep time.Time
 }
 
 func NewRateLimiter() *RateLimiter {
@@ -158,9 +160,10 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ip := clientIP(r)
+		ip := rateKey(clientIP(r))
 		now := time.Now()
 		l.mu.Lock()
+		l.sweep(now)
 		if strings.HasPrefix(r.URL.Path, "/v1/reports") {
 			l.reports[ip] = prune(l.reports[ip], now.Add(-time.Hour))
 			if len(l.reports[ip]) >= 10 {
@@ -191,6 +194,24 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 	})
 }
 
+// sweep は10分ごとに、窓の外の記録しか残っていない IP の行を消す。消さないと、送信元を変えながら
+// 送られるだけ map が増え続ける。l.mu を持って呼ぶ。
+func (l *RateLimiter) sweep(now time.Time) {
+	if now.Sub(l.lastSweep) < 10*time.Minute {
+		return
+	}
+	l.lastSweep = now
+	for m, window := range map[*map[string][]time.Time]time.Duration{&l.writes: time.Minute, &l.reports: time.Hour, &l.inquiries: time.Hour} {
+		for ip, times := range *m {
+			if times = prune(times, now.Add(-window)); len(times) == 0 {
+				delete(*m, ip)
+			} else {
+				(*m)[ip] = times
+			}
+		}
+	}
+}
+
 func prune(in []time.Time, cutoff time.Time) []time.Time {
 	out := in[:0]
 	for _, t := range in {
@@ -210,6 +231,15 @@ func clientIP(r *http.Request) string {
 		return ip
 	}
 	return host
+}
+
+// rateKey は、回数制限の数え方の単位を返す。IPv6 は1人が /64 を丸ごと持つので、/64 でまとめて数える。
+func rateKey(host string) string {
+	ip := net.ParseIP(host)
+	if ip == nil || ip.To4() != nil {
+		return host
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }
 
 func requestHost(r *http.Request) string {

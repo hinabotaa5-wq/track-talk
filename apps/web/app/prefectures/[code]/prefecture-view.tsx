@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { BackButton } from "@/components/major-hosts-panel";
 import { apiFetch } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/format";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { prefectureCompetitionsHref, prefectureRecruitmentsHref, type PrefecturePage } from "@/lib/prefecture-page";
 import { prefectureName } from "@/lib/prefectures";
+import { useNow } from "@/lib/use-now";
 import { competitionDates } from "../../competitions/regional/regional-view";
 
 function MoreLink({ href, total, shown }: { href: string; total: number; shown: number }) {
@@ -23,6 +24,8 @@ export function PrefectureView({ code, initialPage }: { code: string; initialPag
   const [page, setPage] = useState(initialPage);
   const [failed, setFailed] = useState(false);
   const name = prefectureName(code);
+  // ページは CDN にキャッシュされるので、相対時刻は表示のあとに計算する（それまでは日時で出す）。
+  const now = useNow();
 
   useEffect(() => {
     if (initialPage) return;
@@ -80,7 +83,7 @@ export function PrefectureView({ code, initialPage }: { code: string; initialPag
                     >
                       <p className="font-semibold text-slate-100">{r.title}</p>
                       <p className="text-sm text-slate-300">{[r.venue, r.schedule].filter(Boolean).join("・")}</p>
-                      <p className="text-xs text-slate-400">{formatRelativeTime(r.created_at)}</p>
+                      <p className="text-xs text-slate-400">{now === null ? formatDateTime(r.created_at) : formatRelativeTime(r.created_at, now)}</p>
                     </Link>
                   </li>
                 ))}

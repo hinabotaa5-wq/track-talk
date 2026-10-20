@@ -201,6 +201,11 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type DeletedAccount struct {
+	ID        uuid.UUID `json:"id"`
+	DeletedAt time.Time `json:"deleted_at"`
+}
+
 type DomesticMajor struct {
 	Slug          string    `json:"slug"`
 	Year          int32     `json:"year"`
@@ -403,6 +408,7 @@ type PracticeDetail struct {
 	EventOther  string     `json:"event_other"`
 	Capacity    int32      `json:"capacity"`
 	DissolvedAt *time.Time `json:"dissolved_at"`
+	Canceled    bool       `json:"canceled"`
 }
 
 type PracticeRating struct {
@@ -443,6 +449,12 @@ type ProductReview struct {
 	FootSize  *int16     `json:"foot_size"`
 	FootWidth *string    `json:"foot_width"`
 	Usage     *string    `json:"usage"`
+}
+
+type CloudinaryUpload struct {
+	PublicID  string    `json:"public_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Profile struct {

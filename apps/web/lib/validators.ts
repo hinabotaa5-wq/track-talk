@@ -90,3 +90,10 @@ export const nicknameSchema = z.object({
 export const resetSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),
 });
+
+export const newPasswordSchema = z
+  .object({
+    password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
+    confirm: z.string("もう一度入力してください"),
+  })
+  .refine((v) => v.password === v.confirm, { message: "同じパスワードを入力してください", path: ["confirm"] });

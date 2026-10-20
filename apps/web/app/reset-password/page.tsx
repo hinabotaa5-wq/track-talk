@@ -22,7 +22,8 @@ export default function ResetPasswordPage() {
   async function onSubmit(values: z.infer<typeof resetSchema>) {
     const supabase = createClient();
     if (!supabase || !acquire()) return;
-    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/login`;
+    // リンクを開いたら、新しいパスワードを設定する画面に戻す(Supabase の Redirect URLs にこの URL を入れておく)。
+    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/reset-password/update`;
     const { error } = await supabase.auth.resetPasswordForEmail(values.email, { redirectTo }).finally(release);
     setMessage(error ? authErrorMessage(error) : "リセット用メールを送信しました。");
   }

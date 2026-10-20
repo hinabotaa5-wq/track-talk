@@ -250,7 +250,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 }
 
 const decrementCommentCount = `-- name: DecrementCommentCount :exec
-UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -259,7 +259,7 @@ func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const decrementLikeCount = `-- name: DecrementLikeCount :exec
-UPDATE posts SET like_count = GREATEST(like_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementLikeCount(ctx context.Context, id uuid.UUID) error {
@@ -403,6 +403,24 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 	return i, err
 }
 
+const getPostMedia = `-- name: GetPostMedia :one
+SELECT id, kind, cloudinary_public_id FROM posts WHERE id = $1 AND deleted_at IS NULL
+`
+
+type GetPostMediaRow struct {
+	ID                 uuid.UUID `json:"id"`
+	Kind               string    `json:"kind"`
+	CloudinaryPublicID *string   `json:"cloudinary_public_id"`
+}
+
+// 投稿を消す前に、使っている写真・動画を集めるための読み取り。非表示の投稿も読む。
+func (q *Queries) GetPostMedia(ctx context.Context, id uuid.UUID) (GetPostMediaRow, error) {
+	row := q.db.QueryRow(ctx, getPostMedia, id)
+	var i GetPostMediaRow
+	err := row.Scan(&i.ID, &i.Kind, &i.CloudinaryPublicID)
+	return i, err
+}
+
 const hidePost = `-- name: HidePost :execrows
 UPDATE posts
 SET hidden_at = now(), updated_at = now()
@@ -420,7 +438,7 @@ func (q *Queries) HidePost(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const incrementCommentCount = `-- name: IncrementCommentCount :exec
-UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -429,7 +447,7 @@ func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const incrementLikeCount = `-- name: IncrementLikeCount :exec
-UPDATE posts SET like_count = like_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = like_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementLikeCount(ctx context.Context, id uuid.UUID) error {
@@ -536,8 +554,13 @@ FROM recruitment_photos rp
 JOIN posts p ON p.id = rp.post_id
 WHERE p.deleted_at IS NULL
   AND rp.cloudinary_public_id = ANY($1::text[])
+UNION
+SELECT cp.photo_public_id::text AS public_id
+FROM coach_profiles cp
+WHERE cp.photo_public_id = ANY($1::text[])
 `
 
+// コーチの顔写真も同じフォルダにあり、一覧で公開 ID が見えるので、使っているものとして数える。
 func (q *Queries) ListMediaInUse(ctx context.Context, publicIds []string) ([]string, error) {
 	rows, err := q.db.Query(ctx, listMediaInUse, publicIds)
 	if err != nil {

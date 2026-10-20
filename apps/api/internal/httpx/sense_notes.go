@@ -203,16 +203,27 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	today, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: startOfTokyoDay(time.Now())})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if today >= maxSenseNotesPerDay {
+	// 同時に送られても1日20件を超えないよう、作成者ごとのロックの中で数えて保存する。
+	errFull := errors.New("sense notes full")
+	var row db.CreateSenseNoteRow
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockSenseNoteAuthor(r.Context(), me.ID); err != nil {
+			return err
+		}
+		today, err := q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: startOfTokyoDay(time.Now())})
+		if err != nil {
+			return err
+		}
+		if today >= maxSenseNotesPerDay {
+			return errFull
+		}
+		row, err = q.CreateSenseNote(r.Context(), db.CreateSenseNoteParams{ID: uuid.New(), AuthorID: me.ID, Body: body, Event: event})
+		return err
+	})
+	if errors.Is(err, errFull) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "感覚メモは1日20件までです")
 		return
 	}
-	row, err := s.q.CreateSenseNote(r.Context(), db.CreateSenseNoteParams{ID: uuid.New(), AuthorID: me.ID, Body: body, Event: event})
 	if err != nil {
 		MapDBError(w, err)
 		return

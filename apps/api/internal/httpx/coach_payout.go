@@ -207,8 +207,36 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 		return out, err
 	}
 	for _, p := range unpaid {
-		// 金額が変わったら（同じ月に足したら）、別の送金として送る。
-		t, err := s.stripe.CreateTransfer(ctx, p.StripeAccountID, int(p.AmountYen),
+		group := "payout-" + p.ID.String()
+		// 前の送金が Stripe 側では成功していた（通信エラーや DB の更新失敗で failed/pending のまま残った）ら、
+		// 送り直さずにその送金で済ませる。Idempotency-Key は約24時間で切れるので、それだけでは二重送金を防げない。
+		sent, err := s.stripe.FindTransfers(ctx, group)
+		if err != nil {
+			slog.Warn("stripe find transfers", "payout", p.ID, "err", err)
+			msg := err.Error()
+			if dbErr := s.q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
+				return out, dbErr
+			}
+			out.Failed++
+			continue
+		}
+		if len(sent) > 0 {
+			if sent[0].Amount != int(p.AmountYen) {
+				// 金額の違う送金がすでにある。差額をどうするかは運営が確かめる。
+				msg := fmt.Sprintf("金額の違う送金 %s（%d円）がすでにあります", sent[0].ID, sent[0].Amount)
+				if dbErr := s.q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
+					return out, dbErr
+				}
+				out.Failed++
+				continue
+			}
+			if _, err := s.q.MarkCoachPayoutPaid(ctx, db.MarkCoachPayoutPaidParams{ID: p.ID, StripeTransferID: &sent[0].ID}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return out, err
+			}
+			out.Paid++
+			continue
+		}
+		t, err := s.stripe.CreateTransfer(ctx, p.StripeAccountID, int(p.AmountYen), group,
 			map[string]string{"payout_id": p.ID.String(), "month": p.Month.Format("2006-01")},
 			fmt.Sprintf("payout-%s-%d", p.ID, p.AmountYen))
 		if err != nil {

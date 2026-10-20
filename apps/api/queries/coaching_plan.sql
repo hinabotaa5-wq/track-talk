@@ -40,9 +40,9 @@ WHERE coach_id = $1
 ORDER BY created_at, id;
 
 -- name: ListPublicCoachingPlans :many
--- コーチ一覧に出すプラン。期間中の人数をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
+-- コーチ一覧に出すプラン。枠を使っている人数（支払い待ち・期間中・停止中）をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
 SELECT pl.*,
-    (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status = 'active')::int AS active_count
+    (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status IN ('accepted', 'active', 'suspended'))::int AS active_count
 FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 WHERE pl.published

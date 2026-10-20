@@ -52,6 +52,7 @@ export const maxResponseChars = 300;
 // 添削の動画は30秒まで。少しの誤差はサーバーと同じく許す。
 export const maxReviewSeconds = 30;
 const secondsSlop = 1;
+const videoDurationTimeoutMs = 10_000;
 
 // videoDuration は、選んだ動画の長さ（秒）を読む。読めなければ null。
 export function videoDuration(file: File): Promise<number | null> {
@@ -59,7 +60,14 @@ export function videoDuration(file: File): Promise<number | null> {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
+    // 読めない形式でメタデータも失敗も来ないと待ち続けて画面が固まるので、一定時間で諦める。
+    const timer = window.setTimeout(() => done(null), videoDurationTimeoutMs);
     const done = (value: number | null) => {
+      window.clearTimeout(timer);
+      video.onloadedmetadata = null;
+      video.onerror = null;
+      video.removeAttribute("src");
+      video.load();
       URL.revokeObjectURL(url);
       resolve(value);
     };

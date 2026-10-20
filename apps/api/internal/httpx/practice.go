@@ -132,7 +132,14 @@ func practiceFromDetail(row db.PracticeDetail, accepted int32) *practiceDTO {
 		DissolvedAt:   row.DissolvedAt,
 		AcceptedCount: accepted,
 		Status:        status,
+		Ratable:       practiceRatable(row),
 	}
+}
+
+// practiceRatable は、練習が開かれたものとして評価できるか。練習の日時より前に解散したものは中止として扱い、
+// 参加者を「ドタキャン」などと評価できないようにする。
+func practiceRatable(row db.PracticeDetail) bool {
+	return row.DissolvedAt != nil && !row.Canceled
 }
 
 func savePractice(ctx context.Context, q *db.Queries, postID uuid.UUID, in practiceInput) error {
@@ -518,6 +525,10 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		Error(w, status, "conflict", message)
 		return
 	}
+	if !detail.StartsAt.After(time.Now()) {
+		Error(w, http.StatusConflict, "conflict", "練習の日時を過ぎています")
+		return
+	}
 	accepted, err := q.CountAcceptedApplications(r.Context(), post.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -616,6 +627,11 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		return
 	}
 	if status == "accepted" {
+		// 作成・編集と同じく、日時を過ぎた練習には参加を決められない。
+		if !detail.StartsAt.After(time.Now()) {
+			Error(w, http.StatusConflict, "conflict", "練習の日時を過ぎています")
+			return
+		}
 		accepted, err := q.CountAcceptedApplications(r.Context(), post.ID)
 		if err != nil {
 			MapDBError(w, err)
@@ -672,7 +688,8 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
-	if _, err := q.LockPracticeDetail(r.Context(), post.ID); err != nil {
+	detail, err := q.LockPracticeDetail(r.Context(), post.ID)
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -690,7 +707,8 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if len(accepted) > 0 {
+	// 練習の日時より前の解散は中止なので、評価のお願いは送らない。
+	if len(accepted) > 0 && !time.Now().Before(detail.StartsAt) {
 		if err := insertNotification(r.Context(), q, post.AuthorID, "practice_rate", post.ID, nil, nil); err != nil {
 			MapDBError(w, err)
 			return
@@ -782,6 +800,10 @@ func (s *Server) ratePractice(w http.ResponseWriter, r *http.Request) {
 	}
 	if detail.DissolvedAt == nil {
 		Error(w, http.StatusConflict, "conflict", "解散後に評価できます")
+		return
+	}
+	if !practiceRatable(detail) {
+		Error(w, http.StatusConflict, "conflict", "練習の日時より前に解散した練習は評価できません")
 		return
 	}
 	application, err := q.GetPracticeApplication(r.Context(), db.GetPracticeApplicationParams{

@@ -186,6 +186,16 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 	return items, nil
 }
 
+const lockSenseNoteAuthor = `-- name: LockSenseNoteAuthor :exec
+SELECT pg_advisory_xact_lock(hashtext('sense_notes:' || $1::uuid::text))
+`
+
+// 同じ人の感覚メモの作成を1つずつにする。1日20件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockSenseNoteAuthor(ctx context.Context, authorID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockSenseNoteAuthor, authorID)
+	return err
+}
+
 const updateSenseNote = `-- name: UpdateSenseNote :one
 UPDATE sense_notes
 SET body = $1,

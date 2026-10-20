@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { SenseNotesCard } from "@/components/sense-notes-card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -42,6 +42,8 @@ export default function MePage() {
   const router = useRouter();
   const logoutLock = useActionLock();
   const [installed, setInstalled] = useState(true);
+  // ログアウト中は、未ログインのリダイレクトでホームへの移動を上書きしない。
+  const leaving = useRef(false);
 
   useEffect(() => {
     function sync() {
@@ -54,6 +56,7 @@ export default function MePage() {
   async function logout() {
     if (!confirm("ログアウトしますか？")) return;
     if (!logoutLock.acquire()) return;
+    leaving.current = true;
     const supabase = createClient();
     await supabase?.auth.signOut();
     router.push("/");
@@ -61,7 +64,7 @@ export default function MePage() {
   }
 
   useEffect(() => {
-    if (!loading && !session) router.replace("/login");
+    if (!loading && !session && !leaving.current) router.replace("/login");
   }, [loading, session, router]);
 
   if (loading || !session) {

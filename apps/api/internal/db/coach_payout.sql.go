@@ -134,6 +134,16 @@ func (q *Queries) AttachEarningsToPayout(ctx context.Context, arg AttachEarnings
 	return result.RowsAffected(), nil
 }
 
+const deleteUnpaidContractEarning = `-- name: DeleteUnpaidContractEarning :exec
+DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL
+`
+
+// 期間が終わってから全額を返金した指導の、まだ送金に含めていない報酬を消す。
+func (q *Queries) DeleteUnpaidContractEarning(ctx context.Context, contractID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUnpaidContractEarning, contractID)
+	return err
+}
+
 const getCoachEarningsSummary = `-- name: GetCoachEarningsSummary :one
 SELECT
     COALESCE(sum(amount_yen) FILTER (
@@ -156,6 +166,28 @@ func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUI
 	return i, err
 }
 
+const getContractEarning = `-- name: GetContractEarning :one
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at FROM coach_earnings WHERE contract_id = $1
+`
+
+func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID) (CoachEarning, error) {
+	row := q.db.QueryRow(ctx, getContractEarning, contractID)
+	var i CoachEarning
+	err := row.Scan(
+		&i.ID,
+		&i.CoachID,
+		&i.Source,
+		&i.ReviewRequestID,
+		&i.ContractID,
+		&i.GrossYen,
+		&i.SharePercent,
+		&i.AmountYen,
+		&i.PayoutID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertPersonalEarnings = `-- name: InsertPersonalEarnings :many
 INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen)
 SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100
@@ -174,7 +206,7 @@ FROM (
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)
     ORDER BY ct.id, pay.paid_at
 ) x
-WHERE x.gross > 0
+WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
 RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at
@@ -187,6 +219,7 @@ type InsertPersonalEarningsParams struct {
 
 // 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
 // 手数料は20%、初年10%のコーチは、その期間中に始まった指導が10%。
+// 取り分が0円になる行（1円だけ残った返金など）は記録しない。amount_yen > 0 の制約で全体が失敗するため。
 func (q *Queries) InsertPersonalEarnings(ctx context.Context, arg InsertPersonalEarningsParams) ([]CoachEarning, error) {
 	rows, err := q.db.Query(ctx, insertPersonalEarnings, arg.ReducedFeePercent, arg.FeePercent)
 	if err != nil {

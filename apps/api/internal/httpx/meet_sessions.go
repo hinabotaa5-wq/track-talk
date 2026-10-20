@@ -49,7 +49,8 @@ func normalizeGender(v string) (string, bool) {
 
 // parseMeetSessionsCSV は、運営が貼り付けたタイムテーブルを読む。
 // 列は「開始日時(日本時間 2026-10-12 10:30),種目,ラウンド,性別」で、ラウンドと性別は空でよい。
-// 区切りはカンマかタブ(表計算からの貼り付け)。1行目が日時で読めなければ見出しとして読み飛ばす。
+// 区切りはカンマかタブ(表計算からの貼り付け)。1行目が日時で読めず、数字も含まないときだけ見出しとして読み飛ばす
+// （数字を含むのに読めないのは、日時の書き間違いなのでエラーにする）。
 func parseMeetSessionsCSV(text string) ([]meetSessionInput, map[string]string) {
 	var rows []meetSessionInput
 	errs := map[string]string{}
@@ -69,10 +70,11 @@ func parseMeetSessionsCSV(text string) ([]meetSessionInput, map[string]string) {
 		}
 		at, ok := parseMeetSessionTime(cols[0])
 		if !ok {
-			if first {
+			if first && !strings.ContainsAny(cols[0], "0123456789０１２３４５６７８９") {
 				first = false
 				continue
 			}
+			first = false
 			errs[lineKey(i)] = "開始日時は 2026-10-12 10:30 の形で入れてください"
 			continue
 		}

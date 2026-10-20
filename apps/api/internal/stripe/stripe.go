@@ -382,15 +382,40 @@ type Transfer struct {
 }
 
 // CreateTransfer は、TrackTalk の残高からコーチのアカウントへ送金する。
-func (c Client) CreateTransfer(ctx context.Context, account string, amountYen int, metadata map[string]string, idempotencyKey string) (Transfer, error) {
+// group は transfer_group として付け、送り直す前に FindTransfer で探せるようにする。
+func (c Client) CreateTransfer(ctx context.Context, account string, amountYen int, group string, metadata map[string]string, idempotencyKey string) (Transfer, error) {
 	form := url.Values{}
 	form.Set("amount", strconv.Itoa(amountYen))
 	form.Set("currency", "jpy")
 	form.Set("destination", account)
+	if group != "" {
+		form.Set("transfer_group", group)
+	}
 	for k, v := range metadata {
 		form.Set("metadata["+k+"]", v)
 	}
 	var t Transfer
 	err := c.post(ctx, "/v1/transfers", form, idempotencyKey, &t)
 	return t, err
+}
+
+// FindTransfers は、transfer_group が group の送金を返す。Idempotency-Key は約24時間で切れるので、
+// 送り直す前にこれで「Stripe 側では送れていた」送金を探す。
+func (c Client) FindTransfers(ctx context.Context, group string) ([]Transfer, error) {
+	if !c.Configured() {
+		return nil, ErrNotConfigured
+	}
+	q := url.Values{}
+	q.Set("transfer_group", group)
+	q.Set("limit", "10")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/transfers?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var out struct {
+		Data []Transfer `json:"data"`
+	}
+	err = c.do(req, &out)
+	return out.Data, err
 }

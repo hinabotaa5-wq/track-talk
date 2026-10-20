@@ -9,6 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import type { Post } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { fromJstInput, toJstInput } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
@@ -17,19 +18,12 @@ const fieldClass = "mt-1";
 const selectClass =
   "mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
-function toLocalInput(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?: "me" }) {
   const { token, session } = useAuth();
   const router = useRouter();
   const practice = initial?.practice;
   const [venue, setVenue] = useState(practice?.venue ?? "");
-  const [startsAt, setStartsAt] = useState(practice ? toLocalInput(practice.starts_at) : "");
+  const [startsAt, setStartsAt] = useState(practice ? toJstInput(practice.starts_at) : "");
   const [event, setEvent] = useState(practice?.event ?? "");
   const [eventOther, setEventOther] = useState(practice?.event_other ?? "");
   const [capacity, setCapacity] = useState(practice ? String(practice.capacity) : "");
@@ -60,7 +54,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       setError("種目名を入力してください");
       return;
     }
-    const when = new Date(parsed.data.starts_at);
+    const when = fromJstInput(parsed.data.starts_at);
     if (Number.isNaN(when.getTime())) {
       setError("練習日時を入力してください");
       return;
@@ -123,7 +117,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
             className="block w-full min-w-0 max-w-full"
             type="datetime-local"
             value={startsAt}
-            min={toLocalInput(new Date().toISOString())}
+            min={toJstInput(new Date().toISOString())}
             onChange={(e) => setStartsAt(e.target.value)}
           />
         </span>

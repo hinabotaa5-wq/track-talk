@@ -29,6 +29,14 @@ func TestParseMeetSessionsCSV(t *testing.T) {
 	}
 }
 
+// 見出しなしで貼り付けて1行目の日時に誤記があっても、見出しとして黙って捨てずにエラーにする。
+func TestParseMeetSessionsCSVDoesNotDropBadFirstRow(t *testing.T) {
+	_, errs := parseMeetSessionsCSV("2026.10.12 10:30,100m,予選,女子\n2026-10-12 11:00,200m,予選,女子")
+	if errs["line_1"] == "" {
+		t.Fatalf("errs %v", errs)
+	}
+}
+
 func TestNowRunningByMeet(t *testing.T) {
 	at := func(h, m int) time.Time { return time.Date(2026, 10, 12, h, m, 0, 0, jst.Zone) }
 	row := func(h, m int, gender, event, round string) db.ListMeetSessionsRow {

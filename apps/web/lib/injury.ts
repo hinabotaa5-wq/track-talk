@@ -266,16 +266,30 @@ export const emptyInjuryJoinAnswers: InjuryJoinAnswers = {
   stage: "",
 };
 
-// 端末の月を YYYY-MM で返す(「今月より先」を選べなくするため)。
-export function localMonthString(now: Date) {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+// 日本時間の年と月（1〜12）。サーバーは「今月」を日本時間で決めるので、端末のタイムゾーンは使わない。
+function jstYearMonth(now: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
+  );
+  return { year: Number(parts.year), month: Number(parts.month) };
 }
 
-// 今月から過去 count か月を、新しい順に返す。いつごろケガをしたかの選択肢。
+// 日本時間の月を YYYY-MM で返す(「今月より先」を選べなくするため)。
+export function localMonthString(now: Date) {
+  const { year, month } = jstYearMonth(now);
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+// 今月(日本時間)から過去 count か月を、新しい順に返す。いつごろケガをしたかの選択肢。
 export function recentMonths(now: Date, count = 24) {
+  const { year, month } = jstYearMonth(now);
   return Array.from({ length: count }, (_, i) => {
-    const day = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    return { value: localMonthString(day), label: `${day.getFullYear()}年${day.getMonth() + 1}月` };
+    const day = new Date(Date.UTC(year, month - 1 - i, 1));
+    const y = day.getUTCFullYear();
+    const m = day.getUTCMonth() + 1;
+    return { value: `${y}-${String(m).padStart(2, "0")}`, label: `${y}年${m}月` };
   });
 }
 

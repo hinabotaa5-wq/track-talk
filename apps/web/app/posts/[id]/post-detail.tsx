@@ -58,16 +58,20 @@ export function PostDetail({
   const [reportedPost, setReportedPost] = useState(false);
   const [reportedComments, setReportedComments] = useState<Set<string>>(new Set());
 
+  // load は何度も重なって呼ばれる(ログイン状態の確定、タブへの復帰、いいねのあとなど)。
+  // 後から始めたものの結果だけを使い、先に始めた古い応答で上書きしない。
+  const loadSeq = useRef(0);
   async function load() {
+    const seq = ++loadSeq.current;
+    const stale = () => seq !== loadSeq.current;
     try {
-      const [p, c] = await Promise.all([
-        apiFetch<Post>(`/v1/posts/${id}`, { token }),
-        apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50`, { token }),
-      ]);
+      const [p, c] = await Promise.all([apiFetch<Post>(`/v1/posts/${id}`, { token }), loadAllComments(id, token)]);
+      if (stale()) return;
       setPost(p);
-      setComments(c.comments ?? []);
+      setComments(c);
       if (token) {
         const mine = await apiFetch<{ post: boolean; comment_ids: string[] }>(`/v1/posts/${id}/my-reports`, { token }).catch(() => null);
+        if (stale()) return;
         if (mine) {
           setReportedPost(mine.post);
           setReportedComments(new Set(mine.comment_ids));
@@ -75,13 +79,14 @@ export function PostDetail({
       }
       setError("");
     } catch (e) {
+      if (stale()) return;
       if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
       else if (e instanceof ApiRequestError && (e.status === 401 || e.code === "not_joined")) {
         // ケガの投稿は、同じケガのグループに参加した人だけが読める。
         setError("この投稿は、同じケガのグループに参加すると読めます");
       } else setError("読み込みに失敗しました");
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   }
 
@@ -135,6 +140,8 @@ export function PostDetail({
       await apiFetch(`/v1/posts/${current.id}/likes`, { method: current.liked_by_me ? "DELETE" : "POST", token });
       clearHomeFeeds();
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "いいねできませんでした");
     } finally {
       action.release();
     }
@@ -149,6 +156,8 @@ export function PostDetail({
     try {
       await apiFetch(`/v1/posts/${current.id}/saves`, { method: current.saved_by_me ? "DELETE" : "POST", token });
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "保存できませんでした");
     } finally {
       action.release();
     }
@@ -284,6 +293,8 @@ export function PostDetail({
         body: JSON.stringify({ body }),
       });
       await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "編集できませんでした");
     } finally {
       action.release();
     }
@@ -596,7 +607,7 @@ export function PostDetail({
         )}
         {allowComment ? (
           <form
-            onSubmit={form.handleSubmit(onComment)}
+            onSubmit={(event) => void form.handleSubmit(onComment)(event)}
             onFocus={() => document.body.setAttribute("data-comment-typing", "")}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -760,7 +771,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
           参加したい
         </Button>
       ) : null}
-      {!mine && info.status === "dissolved" && info.my_application === "accepted" && info.my_application_id ? (
+      {!mine && info.ratable && info.my_application === "accepted" && info.my_application_id ? (
         info.rated_host ? (
           <p className="text-sm">評価しました</p>
         ) : (
@@ -801,7 +812,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
                   </Button>
                 </div>
               ) : null}
-              {application.status === "accepted" && info.status === "dissolved" ? (
+              {application.status === "accepted" && info.ratable ? (
                 application.rated ? (
                   <p className="mt-2 text-sm">評価済み</p>
                 ) : (
@@ -911,4 +922,16 @@ function RecruitmentFacts({ post }: { post: Post }) {
       ) : null}
     </div>
   );
+}
+
+// コメントは1回に50件までしか返らないので、全件をページごとに読む(新しいコメントは後ろのページにある)。
+async function loadAllComments(id: string, token: string | null) {
+  const all: Comment[] = [];
+  for (let page = 1; page <= 40; page++) {
+    const res = await apiFetch<{ comments: Comment[]; meta: Meta }>(`/v1/posts/${id}/comments?per_page=50&page=${page}`, { token });
+    const rows = res.comments ?? [];
+    all.push(...rows);
+    if (rows.length === 0 || all.length >= res.meta.total) break;
+  }
+  return all;
 }

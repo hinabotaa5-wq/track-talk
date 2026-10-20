@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -21,6 +21,7 @@ export default function OwnVideoPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
@@ -45,16 +46,24 @@ export default function OwnVideoPage() {
     setError("");
     setUpload(null);
     try {
-      setStatus("アップロードの準備をしています…");
-      const signed = await apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token });
-      setStatus("");
-      setUploadPhase("upload");
-      setUpload({ loaded: 0, total: file.size, percent: 0 });
-      const payload = await uploadToCloudinary("video", file, signed, setUpload);
-      if (payload.public_id !== signed.public_id) {
-        throw new Error("アップロードに失敗しました");
+      let publicId: string;
+      if (uploaded.current?.file === file) {
+        // タイトルなどの直しで送り直すときは、上げ済みの動画を使い回す（同じ動画を上げ直して孤児を増やさない）。
+        publicId = uploaded.current.id;
+      } else {
+        setStatus("アップロードの準備をしています…");
+        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token });
+        setStatus("");
+        setUploadPhase("upload");
+        setUpload({ loaded: 0, total: file.size, percent: 0 });
+        const payload = await uploadToCloudinary("video", file, signed, setUpload);
+        if (payload.public_id !== signed.public_id) {
+          throw new Error("アップロードに失敗しました");
+        }
+        publicId = payload.public_id;
+        uploaded.current = { file, id: publicId };
+        setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
       }
-      setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
       setUploadPhase("saving");
       setStatus("");
       await apiFetch<Post>("/v1/posts", {
@@ -64,12 +73,14 @@ export default function OwnVideoPage() {
           title,
           body,
           kind: "video",
-          video_public_id: payload.public_id,
+          video_public_id: publicId,
         }),
       });
       clearHomeFeeds();
       router.push("/?sort=new");
     } catch (err) {
+      // 動画そのものを断られたとき（項目の指定がないエラー）は、上げ直しが必要なので使い回さない。
+      if (!(err instanceof ApiRequestError && err.fields)) uploaded.current = null;
       if (err instanceof ApiRequestError) {
         const field = err.fields ? Object.values(err.fields)[0] : "";
         setError(field || err.message);

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -24,11 +25,17 @@ var (
 	testOutbox     []sentMail
 	testMailOnce   sync.Once
 	testMailServer *httptest.Server
+	// testMailDown を立てているあいだは、メールの送信 API が失敗する。
+	testMailDown atomic.Bool
 )
 
 func mailServerURL() string {
 	testMailOnce.Do(func() {
 		testMailServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if testMailDown.Load() {
+				http.Error(w, `{"message":"unavailable"}`, http.StatusServiceUnavailable)
+				return
+			}
 			if r.URL.Path != "/emails" || r.Header.Get("Authorization") != "Bearer re_test" {
 				http.Error(w, "bad request", http.StatusBadRequest)
 				return

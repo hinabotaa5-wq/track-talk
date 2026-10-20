@@ -1,9 +1,9 @@
 -- name: ListDomesticMajors :many
--- シーズン [season_start, season_end) の中で始まるすべての回。
+-- シーズン [season_start, season_end) にかかるすべての回。3月に始まって4月にまたがる回も、4月になって開催中なら含める。
 SELECT slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors
-WHERE starts_on >= sqlc.arg(season_start)::date
-  AND starts_on < sqlc.arg(season_end)::date
+WHERE starts_on < sqlc.arg(season_end)::date
+  AND COALESCE(ends_on, starts_on) >= sqlc.arg(season_start)::date
 ORDER BY starts_on ASC, slug ASC;
 
 -- name: UpsertDomesticMajor :exec

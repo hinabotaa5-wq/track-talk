@@ -10,6 +10,10 @@ FROM race_records
 WHERE author_id = sqlc.arg('author_id')
 ORDER BY event, raced_on, created_at, id;
 
+-- name: LockRaceRecordAuthor :exec
+-- 同じ人の記録の作成を1つずつにする。1000件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('race_records:' || sqlc.arg(author_id)::uuid::text));
+
 -- name: CountRaceRecords :one
 SELECT count(*) FROM race_records WHERE author_id = $1;
 

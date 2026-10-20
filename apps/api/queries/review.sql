@@ -36,9 +36,10 @@ SET coaching_demo = true,
 WHERE id = $1;
 
 -- name: CountReviewRequestsByRequester :one
--- 送った依頼の数。支払いがまだのものは数えない。
+-- 送った依頼の数。支払いがまだのものも数える（数えないと、保護者の同意前に何本でも作ってから払える）。
+-- 払わないまま閉じたものは tick が消すので、そのあとは数に入らない。
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1 AND status <> 'awaiting_payment';
+WHERE requester_id = $1;
 
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
@@ -241,3 +242,7 @@ SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
   AND status IN ('in_review', 'clarifying')
 ORDER BY due_at;
+
+-- name: LockReviewRequester :exec
+-- 同じ人の依頼の作成を1つずつにする。「同意待ちの18歳未満は1本目まで」の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('review_requester:' || sqlc.arg(requester_id)::uuid::text));

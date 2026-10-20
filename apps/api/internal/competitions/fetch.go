@@ -117,13 +117,17 @@ func pdfLinks(n *html.Node, base *url.URL, match *regexp.Regexp) []pdfCandidate 
 	return out
 }
 
+// pageClient は県陸協などのページと PDF を取りに行く。応答しないサイトが1つあるだけで
+// 取り込み全体の持ち時間を使い切らないように、本文を読み終えるまでの上限を付ける。
+var pageClient = &http.Client{Timeout: 90 * time.Second}
+
 func get(ctx context.Context, pageURL string) (*http.Response, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
 		return nil, "", err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	res, err := http.DefaultClient.Do(req)
+	res, err := pageClient.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -156,10 +160,8 @@ func PDFPage(data []byte, pageURL string, now time.Time) (Page, error) {
 	if err != nil {
 		return Page{}, fmt.Errorf("page url: %w", err)
 	}
-	year := now.Year()
-	if now.Month() < time.April {
-		year--
-	}
+	// 年度の境目は日本時間で決める（ランナーは UTC なので、日本時間の4月1日の朝は UTC ではまだ3月）。
+	year := SeasonYear(now)
 	if m := pdfNameYearPattern.FindStringSubmatch(path.Base(parsed.Path)); m != nil {
 		if y, _ := strconv.Atoi(m[1]); y >= 2020 && y <= seasonYearCap() {
 			year = y

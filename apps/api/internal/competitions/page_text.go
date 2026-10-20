@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"golang.org/x/net/html"
 )
 
@@ -133,5 +134,5 @@ func newestSeasonYear(doc *html.Node) (int, bool) {
 }
 
 func seasonYearCap() int {
-	return time.Now().Year() + 1
+	return time.Now().In(jst.Zone).Year() + 1
 }

@@ -13,14 +13,14 @@ import (
 const listDomesticMajors = `-- name: ListDomesticMajors :many
 SELECT slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url
 FROM domestic_majors
-WHERE starts_on >= $1::date
-  AND starts_on < $2::date
+WHERE starts_on < $1::date
+  AND COALESCE(ends_on, starts_on) >= $2::date
 ORDER BY starts_on ASC, slug ASC
 `
 
 type ListDomesticMajorsParams struct {
-	SeasonStart time.Time `json:"season_start"`
 	SeasonEnd   time.Time `json:"season_end"`
+	SeasonStart time.Time `json:"season_start"`
 }
 
 type ListDomesticMajorsRow struct {
@@ -35,9 +35,9 @@ type ListDomesticMajorsRow struct {
 	SiteUrl       string    `json:"site_url"`
 }
 
-// シーズン [season_start, season_end) の中で始まるすべての回。
+// シーズン [season_start, season_end) にかかるすべての回。3月に始まって4月にまたがる回も、4月になって開催中なら含める。
 func (q *Queries) ListDomesticMajors(ctx context.Context, arg ListDomesticMajorsParams) ([]ListDomesticMajorsRow, error) {
-	rows, err := q.db.Query(ctx, listDomesticMajors, arg.SeasonStart, arg.SeasonEnd)
+	rows, err := q.db.Query(ctx, listDomesticMajors, arg.SeasonEnd, arg.SeasonStart)
 	if err != nil {
 		return nil, err
 	}

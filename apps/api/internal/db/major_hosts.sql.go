@@ -10,13 +10,20 @@ import (
 	"time"
 )
 
-const deleteMajorHostsByKind = `-- name: DeleteMajorHostsByKind :exec
+const deleteMajorHostsNotInYears = `-- name: DeleteMajorHostsNotInYears :exec
 DELETE FROM major_hosts
 WHERE kind = $1
+  AND year <> ALL ($2::int[])
 `
 
-func (q *Queries) DeleteMajorHostsByKind(ctx context.Context, kind string) error {
-	_, err := q.db.Exec(ctx, deleteMajorHostsByKind, kind)
+type DeleteMajorHostsNotInYearsParams struct {
+	Kind  string  `json:"kind"`
+	Years []int32 `json:"years"`
+}
+
+// 今回の取り込みになかった年の行だけ消す（ある年の行は UpsertMajorHost で更新する）。
+func (q *Queries) DeleteMajorHostsNotInYears(ctx context.Context, arg DeleteMajorHostsNotInYearsParams) error {
+	_, err := q.db.Exec(ctx, deleteMajorHostsNotInYears, arg.Kind, arg.Years)
 	return err
 }
 
@@ -88,7 +95,12 @@ SET name = EXCLUDED.name,
     starts_on = EXCLUDED.starts_on,
     ends_on = EXCLUDED.ends_on,
     schedule_label = EXCLUDED.schedule_label,
-    image_url = EXCLUDED.image_url,
+    -- 写真が取れなかったとき（Wikimedia の一時的な失敗など）は、同じ開催地の前回の写真を残す。
+    image_url = CASE
+        WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url
+        WHEN major_hosts.city = EXCLUDED.city THEN major_hosts.image_url
+        ELSE ''
+    END,
     page_url = EXCLUDED.page_url,
     updated_at = now()
 `

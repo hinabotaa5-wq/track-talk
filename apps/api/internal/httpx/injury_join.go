@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type injuryOption struct{ Code, Label string }
@@ -116,6 +118,8 @@ func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJ
 		out.SawDoctor = *req.SawDoctor
 	}
 	month, err := time.Parse("2006-01", strings.TrimSpace(req.InjuredMonth))
+	// 「今月」は日本時間で決める（UTC のままだと、毎月1日の朝9時前は前月になる）。
+	now = now.In(jst.Zone)
 	thisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	switch {
 	case err != nil:

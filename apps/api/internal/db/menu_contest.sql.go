@@ -253,6 +253,16 @@ func (q *Queries) ListMenuContestFinalists(ctx context.Context, roundStart time.
 	return items, nil
 }
 
+const lockMenuContestRound = `-- name: LockMenuContestRound :exec
+SELECT pg_advisory_xact_lock(hashtext('menu_contest:' || $1::date::text))
+`
+
+// トップ3の選び直しと投票を1つずつにする。投票が0件の確認から選び直しまでのあいだに票を割り込ませない。
+func (q *Queries) LockMenuContestRound(ctx context.Context, roundStart time.Time) error {
+	_, err := q.db.Exec(ctx, lockMenuContestRound, roundStart)
+	return err
+}
+
 const upsertMenuContestEntry = `-- name: UpsertMenuContestEntry :one
 INSERT INTO menu_contest_entries (id, round_start, author_id, body)
 VALUES ($1, $2, $3, $4)

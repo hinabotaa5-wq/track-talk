@@ -10,7 +10,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 // パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも送れる。終わったあとは読むだけ。
 // 18歳未満のときは保護者もリンクから参加する（保護者は文章だけ）。相手の1通ごとに通報できる。
@@ -142,17 +142,25 @@ function Composer({
   const { pending, acquire, release } = useActionLock();
   const isCoach = contract.role === "coach";
 
+  // 長さを確かめ終えてから選んだことにする(確かめているあいだに送れないように)。
+  // 続けて別の動画を選んだら、前の動画の確認の結果は使わない。
+  const pickSeq = useRef(0);
   async function onPickFile(picked: File | null) {
+    const seq = ++pickSeq.current;
     setError("");
-    setFile(picked);
+    setFile(null);
     if (!picked) return;
     if (picked.size > maxVideoBytes) {
       setError("100MB以内の動画にしてください");
-      setFile(null);
-    } else if (tooLong(await videoDuration(picked))) {
-      setError(`動画は${maxReviewSeconds}秒以内にしてください`);
-      setFile(null);
+      return;
     }
+    const long = tooLong(await videoDuration(picked));
+    if (seq !== pickSeq.current) return;
+    if (long) {
+      setError(`動画は${maxReviewSeconds}秒以内にしてください`);
+      return;
+    }
+    setFile(picked);
   }
 
   function setDay(i: number, key: "day" | "content", value: string) {
@@ -347,6 +355,9 @@ export function CoachingMessages({
 }) {
   const [messages, setMessages] = useState<CoachingMessage[] | null>(null);
   const [error, setError] = useState("");
+  // 読み込みが重なったり、送信した直後に始まった読み込みが返ったりしても、古い一覧で上書きしないよう、
+  // 最新の読み込みだけ反映する（送信したら、それまでに始まった読み込みを無効にする）。
+  const loadSeq = useRef(0);
   const path = contractPath(contract, { token, guardianToken });
 
   const fetchMessages = useCallback(() => apiFetch<{ messages: CoachingMessage[] }>(`${path}/messages`, { token }), [path, token]);
@@ -354,12 +365,15 @@ export function CoachingMessages({
   useEffect(() => {
     let cancelled = false;
     const load = () => {
+      const seq = ++loadSeq.current;
       fetchMessages()
         .then((d) => {
-          if (!cancelled) setMessages(d.messages);
+          if (cancelled || seq !== loadSeq.current) return;
+          setMessages(d.messages);
+          setError("");
         })
         .catch(() => {
-          if (!cancelled) setError("やりとりを読み込めませんでした");
+          if (!cancelled && seq === loadSeq.current) setError("やりとりを読み込めませんでした");
         });
     };
     load();
@@ -424,7 +438,10 @@ export function CoachingMessages({
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
       {contract.status === "active" ? (
-        <Composer contract={contract} access={access} onSent={(m) => setMessages((list) => [...(list ?? []), m])} />
+        <Composer contract={contract} access={access} onSent={(m) => {
+            loadSeq.current++;
+            setMessages((list) => [...(list ?? []), m]);
+          }} />
       ) : contract.status === "suspended" ? (
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
           運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
