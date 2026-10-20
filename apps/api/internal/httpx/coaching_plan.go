@@ -122,10 +122,11 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 			fields["duration_days"] = "期間は2週間か1か月を選んでください"
 		}
 	}
-	if e := coachTextError("プラン名", req.Title, 60); e != "" {
+	// プランはコーチ一覧で誰でも見るので、連絡先は書けない。
+	if e := coachPublicTextError("プラン名", req.Title, 60); e != "" {
 		fields["title"] = e
 	}
-	if e := coachTextError("内容", req.Description, 1000); e != "" {
+	if e := coachPublicTextError("内容", req.Description, 1000); e != "" {
 		fields["description"] = e
 	}
 	switch {
