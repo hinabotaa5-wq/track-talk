@@ -44,26 +44,38 @@ func looksLikeContact(s string) bool {
 }
 
 // 区切りでつながった数字の並び。ラップを「.」で書くので「.」は区切りに入れない。
-var digitRun = regexp.MustCompile(`\d(?:[\s\-–ー()_/・]*\d)*`)
+// 日本語入力の全角ハイフン(−)やダッシュ(‐〜―)、波線も区切りにする。
+var digitRun = regexp.MustCompile(`\d(?:[\s\-\x{2010}-\x{2015}\x{2212}ー~〜()_/・]*\d)*`)
 
 // looksLikePhone は、電話番号らしい数字の並びがあれば true を返す。
-// 区切りのない10桁以上の数字と、0 か 81 で始まる10〜13桁で、区切りが3つまで(090-1234-5678、+81 90 1234 5678)
-// か1桁ずつ空けたものを電話番号とみなす。ラップ(68 68 67 67 66)や年の並び(2019 2020 2021)は止めない。
+// 区切りのない10桁以上の数字か、0 か 81 で始まる連続した4つまでの区切りで10〜13桁になり、
+// 4桁以上の区切りを含むもの(090-1234-5678、+81 (0)90 1234 5678)か、1桁ずつ空けたものを電話番号とみなす。
+// ラップ(68 68 67 67 66)や年の並び(2019 2020 2021)、日付(08/12 08/19)は止めない。
 func looksLikePhone(s string) bool {
 	for _, run := range digitRun.FindAllString(s, -1) {
 		groups := strings.FieldsFunc(run, func(r rune) bool { return r < '0' || r > '9' })
-		digits := 0
 		single := true
 		for _, g := range groups {
-			digits += len(g)
+			if len(g) >= 10 {
+				return true
+			}
 			single = single && len(g) == 1
 		}
-		if len(groups) == 1 && digits >= 10 {
+		if single && len(groups) >= 10 && groups[0] == "0" {
 			return true
 		}
-		first := groups[0]
-		if digits >= 10 && digits <= 13 && (first[0] == '0' || strings.HasPrefix(first, "81")) && (len(groups) <= 4 || single) {
-			return true
+		for i, g := range groups {
+			if g[0] != '0' && !strings.HasPrefix(g, "81") {
+				continue
+			}
+			digits, long := 0, false
+			for j := i; j < len(groups) && j < i+4; j++ {
+				digits += len(groups[j])
+				long = long || len(groups[j]) >= 4
+				if digits >= 10 && digits <= 13 && long {
+					return true
+				}
+			}
 		}
 	}
 	return false
