@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
+	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
@@ -27,6 +28,7 @@ type Server struct {
 	push      push.Sender
 	stripe    stripe.Client
 	mail      mail.Client
+	gemini    competitions.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -61,6 +63,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			From:    cfg.MailFrom,
 			APIBase: cfg.MailAPIBase,
 			DevLog:  cfg.MailDevLog,
+		},
+		gemini: competitions.Client{
+			Key:      cfg.GeminiAPIKey,
+			Endpoint: cfg.GeminiEndpoint,
 		},
 	}
 	if cfg.PushHTTP != nil {
@@ -114,6 +120,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/injury-history", s.myInjuryHistory)
 			r.Get("/injury/me/progress", s.myInjuryProgress)
 			r.Get("/me/sense-notes", s.listSenseNotes)
+			// 感覚メモの1週間のまとめ（AI）。提供を始めるまで 404。
+			r.With(s.requireSenseSummary).Get("/me/sense-notes/summary", s.getSenseSummary)
+			r.With(s.requireSenseSummary).Post("/me/sense-notes/summary", s.createSenseSummary)
 			r.Post("/me/sense-notes", s.createSenseNote)
 			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)

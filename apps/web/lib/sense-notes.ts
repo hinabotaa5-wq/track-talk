@@ -78,3 +78,25 @@ const grainColors = ["#7dd3fc", "#a5b4fc", "#f9a8d4", "#fcd34d", "#6ee7b7", "#fd
 export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];
 }
+
+// 1週間のまとめ(AI)。直近7日(今日を含む)の感覚メモから作る。
+export type SenseSummary = {
+  id: string;
+  from_day: string;
+  to_day: string;
+  note_count: number;
+  summary: { overview: string; good: string[]; concerns: string[]; next: string[] };
+  created_at: string;
+};
+
+export type SenseSummaryResponse = { summary: SenseSummary | null; remaining_today: number };
+
+// まとめた期間。"10月14日(火)〜10月20日(月)"。
+export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | "to_day">, now = new Date()) {
+  return `${senseDayLabel(summary.from_day, now)}〜${senseDayLabel(summary.to_day, now)}`;
+}
+
+// まとめが今日作ったものか。今日でなければ、作り直しをすすめる。
+export function senseSummaryIsFresh(summary: Pick<SenseSummary, "to_day">, now = new Date()) {
+  return summary.to_day === todayInTokyo(now);
+}

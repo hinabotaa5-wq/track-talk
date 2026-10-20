@@ -592,3 +592,13 @@ type SenseNote struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type SenseNoteSummary struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+	CreatedAt time.Time `json:"created_at"`
+}
