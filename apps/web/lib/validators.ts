@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { injuryEvents } from "./injury";
 import { practiceEventValues } from "./practice-events";
 
 z.config(z.locales.ja());
@@ -82,9 +83,12 @@ export const loginSchema = z.object({
   password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
 });
 
+const profileEventValues = injuryEvents.map((item) => item.value) as [string, ...string[]];
+
 export const nicknameSchema = z.object({
   nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(10, "10文字以内で入力してください"),
   nickname_public: z.boolean(),
+  event: z.enum(profileEventValues, "種目を選んでください"),
 });
 
 export const resetSchema = z.object({

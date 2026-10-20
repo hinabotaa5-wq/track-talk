@@ -5,6 +5,7 @@ import { preconnect } from "react-dom";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
+import { ProfileGate } from "@/components/profile-gate";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <AuthProvider>
           <LeaveGuardProvider>
+          <ProfileGate />
           <AmbientBackground />
           <CompetitionPrefetch />
           <Header />

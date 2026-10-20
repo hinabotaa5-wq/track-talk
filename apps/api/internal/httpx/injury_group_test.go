@@ -360,10 +360,10 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 	h := setup(t)
 	public, private := token(t, uuid.New()), token(t, uuid.New())
 
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "sprint"}); rec.Code != http.StatusOK {
 		t.Fatalf("public nickname %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "sprint"}); rec.Code != http.StatusOK {
 		t.Fatalf("private nickname %d %s", rec.Code, rec.Body.String())
 	}
 	for _, tok := range []string{public, private} {

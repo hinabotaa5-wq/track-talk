@@ -96,6 +96,8 @@ func profileJSON(p db.Profile) map[string]any {
 		"id":              p.ID,
 		"nickname":        p.Nickname,
 		"nickname_public": p.NicknamePublic,
+		// 登録のときに選んだ種目(ケガ部の種目と同じコード)。以前から使っている人は、選ぶまで null。
+		"event": p.Event,
 		// 投稿マスターのバッジを投稿の詳細に出すかどうか
 		"post_master_badge_public": p.PostMasterBadgePublic,
 		"is_admin":                 p.IsAdmin,
@@ -115,6 +117,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 type profileReq struct {
 	Nickname       string `json:"nickname"`
 	NicknamePublic bool   `json:"nickname_public"`
+	Event          string `json:"event"`
 }
 
 func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -132,10 +135,20 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"nickname": message})
 		return
 	}
+	// 種目は、まだ選んでいない人は必ず選ぶ。選んだ人は、送らなければそのまま。
+	var event *string
+	if req.Event != "" || p.Event == nil {
+		if !validInjuryOption(injuryEvents, req.Event) {
+			FieldError(w, map[string]string{"event": "種目を選んでください"})
+			return
+		}
+		event = &req.Event
+	}
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
 		ID:             p.ID,
 		Nickname:       &nickname,
 		NicknamePublic: req.NicknamePublic,
+		Event:          event,
 	})
 	if err != nil {
 		MapDBError(w, err)

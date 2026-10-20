@@ -202,6 +202,18 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
 		"nickname": "変更後", "nickname_public": false,
 	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("update without event %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "変更後", "nickname_public": false, "event": "relay",
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("update with unknown event %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "変更後", "nickname_public": false, "event": "sprint",
+	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
 	}
@@ -212,6 +224,13 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 		t.Fatalf("private post %d %+v", rec.Code, post)
 	}
 
+	// 種目を選んだあとは、ニックネームだけ送っても種目は変わらない。
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "また変更", "nickname_public": false,
+	})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"event":"sprint"`) {
+		t.Fatalf("keep event %d %s", rec.Code, rec.Body.String())
+	}
 	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
 		"nickname": "", "nickname_public": true,
 	})
