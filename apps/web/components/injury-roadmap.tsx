@@ -1,13 +1,14 @@
 "use client";
 
-import { ArrowDown, Bandage, Flag, Footprints, HeartPulse, PersonStanding, type LucideIcon } from "lucide-react";
+import { ArrowDown, Bandage, Flag, Footprints, HeartPulse, PersonStanding, Zap, type LucideIcon } from "lucide-react";
 import { injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, type InjuryGroupStage, type InjuryStage } from "@/lib/injury";
 
 const stageStyle: Record<InjuryStage, { icon: LucideIcon; tone: string }> = {
   resting: { icon: Bandage, tone: "bg-red-950/60 text-red-300" },
   rehab: { icon: HeartPulse, tone: "bg-amber-950/60 text-amber-300" },
   jogging: { icon: PersonStanding, tone: "bg-blue-950/70 text-blue-300" },
-  practice: { icon: Footprints, tone: "bg-emerald-950/60 text-emerald-300" },
+  half: { icon: Footprints, tone: "bg-teal-950/60 text-teal-300" },
+  full: { icon: Zap, tone: "bg-emerald-950/60 text-emerald-300" },
   race: { icon: Flag, tone: "bg-emerald-950/60 text-emerald-300" },
 };
 

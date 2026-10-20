@@ -50,7 +50,7 @@ export function InjuryMeCards({ token }: { token: string | null }) {
       {celebrating !== null ? <InjuryGoalCelebration onClose={() => setCelebrating(null)} /> : null}
       {current.map((item) => {
         const label = item.me.diagnosis ? `${item.label}(${item.me.diagnosis})` : item.label;
-        const elapsed = injuryElapsedText(item.me.injured_month, now);
+        const elapsed = injuryElapsedText(item.me.injured_on, now);
         return (
           <div key={item.part} className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">

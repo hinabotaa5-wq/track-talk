@@ -485,7 +485,7 @@ func TestMyInjuryProgressComparesOnlyMyPosts(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.MinSample != 5 || len(got.Posts) != 1 || got.Posts[0].PostID != id || len(got.Posts[0].Stages) != 5 {
+	if got.MinSample != 5 || len(got.Posts) != 1 || got.Posts[0].PostID != id || len(got.Posts[0].Stages) != 6 {
 		t.Fatalf("progress %s", rec.Body.String())
 	}
 	for _, s := range got.Posts[0].Stages {
@@ -592,7 +592,7 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 	if r := doJSON(t, h, http.MethodPost, "/v1/me/notifications/"+first.ID+"/read", liker, nil); r.Code >= 300 {
 		t.Fatalf("read %d %s", r.Code, r.Body.String())
 	}
-	report("practice")
+	report("half")
 	if got := notes(liker); len(got) != 2 {
 		t.Fatalf("a new update after reading should notify again: %+v", got)
 	}

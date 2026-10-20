@@ -21,9 +21,8 @@ type practiceInput struct {
 	Capacity   int32
 }
 
-// 練習相手募集の種目は、アプリ内の種目にリレーを足したもの(コーチの担当種目と同じ)。
 func validPracticeEvent(code string) bool {
-	return validEvent(code) || code == relayEvent
+	return validEvent(code)
 }
 
 // practiceLabel は種目の表示名。「その他」は、選べた頃に自分で書いた名前(other)を出す。

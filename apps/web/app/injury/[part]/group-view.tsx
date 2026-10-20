@@ -9,7 +9,6 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
-import { InjuryStageChange } from "@/components/injury-stage-change";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -22,7 +21,6 @@ import {
   injuryGroupTitle,
   injuryStages,
   type InjuryGroup,
-  type InjuryGroupMember,
   type InjuryStage,
 } from "@/lib/injury";
 
@@ -34,10 +32,10 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const [selected, setSelected] = useState<InjuryStage | null>(null);
   const [posts, setPosts] = useState<{ stage: string; page: PostsPage } | null>(null);
   const router = useRouter();
-  const [changing, setChanging] = useState(false);
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
-  const [celebrate, setCelebrate] = useState(false);
+  // 段階を変えるページから、初めて大会に復帰して戻ってきたときだけ祝う。
+  const [celebrate, setCelebrate] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("celebrate"));
   const [joining, setJoining] = useState(false);
 
   const applyGroup = useCallback((group: InjuryGroup) => {
@@ -65,6 +63,10 @@ export function GroupView({ part, members, summary }: { part: string; members: n
     return () => controller.abort();
   }, [loading, token, part, applyGroup, applyGroupError]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("celebrate")) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
   const joined = load.kind === "joined";
   const myStage = joined ? load.group.me.stage : null;
   useEffect(() => {
@@ -84,14 +86,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       });
     return () => controller.abort();
   }, [joined, part, token, selected, myStage]);
-
-  async function onStageChanged(member: InjuryGroupMember, celebrate: boolean) {
-    setChanging(false);
-    setSelected(member.stage);
-    setPosts(null);
-    if (celebrate) setCelebrate(true);
-    await fetchGroup();
-  }
 
   async function leaveGroup() {
     setLeaving("busy");
@@ -177,22 +171,15 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           </h1>
           <p className="mt-1 text-sm text-slate-200">段階をタップで読めます</p>
         </div>
-        <Button variant="secondary" className="shrink-0" onClick={() => setChanging((v) => !v)} aria-expanded={changing}>
+        <Link
+          href={`/injury/${part}/stage`}
+          className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/15 active:scale-95"
+        >
           段階を変える
-        </Button>
+        </Link>
       </div>
 
       {celebrate ? <InjuryGoalCelebration onClose={() => setCelebrate(false)} /> : null}
-
-      {changing ? (
-        <InjuryStageChange
-          part={part}
-          token={token}
-          member={group.me}
-          onChanged={(member, celebrate) => void onStageChanged(member, celebrate)}
-          onCancel={() => setChanging(false)}
-        />
-      ) : null}
 
       <InjuryRoadmap stages={group.stages} mine={mine} selected={selected} onSelect={setSelected} />
 
@@ -221,25 +208,23 @@ export function GroupView({ part, members, summary }: { part: string; members: n
 
       {/* 投稿ボタンはスクロールしているあいだ下のメニューのすぐ上に貼りつき、いちばん下まで来ると
           「このグループを抜ける」の上に収まる。段階を変えるフォームを書いているあいだは、入力の邪魔になるので出さない。 */}
-      {changing ? null : (
-        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 space-y-1.5 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {own ? (
-            <Link
-              href={`/injury/${part}/new`}
-              className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-95"
-            >
-              {selectedLabel}に投稿
-            </Link>
-          ) : (
-            <>
-              <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-                この段階には投稿できません
-              </span>
-              <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
-            </>
-          )}
-        </div>
-      )}
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 space-y-1.5 pb-3 md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {own ? (
+          <Link
+            href={`/injury/${part}/new`}
+            className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-95"
+          >
+            {selectedLabel}に投稿
+          </Link>
+        ) : (
+          <>
+            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
+              この段階には投稿できません
+            </span>
+            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+          </>
+        )}
+      </div>
 
       <div className="space-y-2 border-t border-white/15 pt-4">
         {leaving === "idle" ? (

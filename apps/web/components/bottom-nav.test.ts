@@ -29,6 +29,7 @@ describe("hasBackOnlyHeader", () => {
     expect(hasBackOnlyHeader("/injury")).toBe(false);
     expect(hasBackOnlyHeader("/injury/data")).toBe(false);
     expect(showsBackButton("/injury/hamstring-strain")).toBe(true);
+    expect(showsBackButton("/injury/hamstring-strain/stage")).toBe(true);
     expect(showsBackButton("/injury/data")).toBe(false);
   });
 });

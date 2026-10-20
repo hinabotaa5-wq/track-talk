@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, localMonthString, recentMonths, togglePreChange,
+import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, jstToday, togglePreChange,
   toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
     expect(isInjuryBodyPart("shin-splints")).toBe(true);
-    expect(isInjuryBodyPart("lower-back")).toBe(false);
+    expect(isInjuryBodyPart("lower-back")).toBe(true);
+    expect(isInjuryBodyPart("neck")).toBe(false);
     expect(isInjuryBodyPart(null)).toBe(false);
   });
 
@@ -59,12 +60,12 @@ describe("injury", () => {
 });
 
 describe("injury group join", () => {
-  const thisMonth = "2026-10";
+  const today = "2026-10-20";
   const filled = {
     diagnosis: "",
     severity: "moderate",
     sawDoctor: false,
-    injuredMonth: "2026-09",
+    injuredOn: "2026-09-20",
     place: "tartan",
     activity: "sprint",
     preChanges: ["more-volume"],
@@ -77,21 +78,22 @@ describe("injury group join", () => {
     expect(injuryJoinStepsFor("sprain")[0]).toBe("severity");
     expect(injuryJoinStepsFor("other")[0]).toBe("diagnosis");
     expect(injuryJoinStepsFor("other").at(-1)).toBe("stage");
-    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "  " }, thisMonth)).not.toBe("");
-    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "あ".repeat(41) }, thisMonth)).not.toBe("");
-    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "わからない" }, thisMonth)).toBe("");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "  " }, today)).not.toBe("");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "あ".repeat(41) }, today)).not.toBe("");
+    expect(injuryJoinStepError("diagnosis", { ...answers, diagnosis: "わからない" }, today)).toBe("");
   });
 
-  it("asks for the month, rejecting a missing or future one", () => {
-    expect(injuryJoinStepError("injuredMonth", emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
-    expect(injuryJoinStepError("injuredMonth", { ...answers, injuredMonth: "2026-11" }, thisMonth)).toBe("これから先の月は選べません");
-    expect(injuryJoinStepError("injuredMonth", { ...answers, injuredMonth: thisMonth }, thisMonth)).toBe("");
+  it("asks for the day, rejecting a missing or future one", () => {
+    expect(injuryJoinStepError("injuredOn", emptyInjuryJoinAnswers, today)).not.toBe("");
+    expect(injuryJoinStepError("injuredOn", { ...answers, injuredOn: "2026-09" }, today)).not.toBe("");
+    expect(injuryJoinStepError("injuredOn", { ...answers, injuredOn: "2026-10-21" }, today)).toBe("これから先の日は選べません");
+    expect(injuryJoinStepError("injuredOn", { ...answers, injuredOn: today }, today)).toBe("");
   });
 
   it("needs an answer for every choice", () => {
     for (const step of ["severity", "sawDoctor", "place", "activity", "preChanges", "hindsight", "stage"] as const) {
-      expect(injuryJoinStepError(step, emptyInjuryJoinAnswers, thisMonth)).not.toBe("");
-      expect(injuryJoinStepError(step, answers, thisMonth)).toBe("");
+      expect(injuryJoinStepError(step, emptyInjuryJoinAnswers, today)).not.toBe("");
+      expect(injuryJoinStepError(step, answers, today)).toBe("");
     }
   });
 
@@ -105,7 +107,7 @@ describe("injury group join", () => {
     expect(injuryJoinPayload("sprain", { ...answers, diagnosis: "無視される" })).toEqual({
       severity: "moderate",
       saw_doctor: false,
-      injured_month: "2026-09",
+      injured_on: "2026-09-20",
       place: "tartan",
       activity: "sprint",
       pre_changes: ["more-volume"],
@@ -115,22 +117,15 @@ describe("injury group join", () => {
     expect(injuryJoinPayload("other", { ...answers, diagnosis: " 疲労骨折 " })).toMatchObject({ diagnosis: "疲労骨折" });
   });
 
-  it("lists the recent months, newest first", () => {
-    const months = recentMonths(new Date("2026-02-10T03:00:00Z"), 3);
-    expect(months).toEqual([
-      { value: "2026-02", label: "2026年2月" },
-      { value: "2026-01", label: "2026年1月" },
-      { value: "2025-12", label: "2025年12月" },
-    ]);
-    expect(localMonthString(new Date("2026-01-05T03:00:00Z"))).toBe("2026-01");
-    // 日本時間の月初の朝は、UTC ではまだ前の月。「今月」は日本時間で決める。
-    expect(localMonthString(new Date("2026-10-31T20:00:00Z"))).toBe("2026-11");
-    expect(recentMonths(new Date("2026-10-31T20:00:00Z"), 2)[0].value).toBe("2026-11");
+  it("decides today in Japan time", () => {
+    expect(jstToday(new Date("2026-01-05T03:00:00Z"))).toBe("2026-01-05");
+    // 日本時間の朝は、UTC ではまだ前日。「今日」は日本時間で決める。
+    expect(jstToday(new Date("2026-10-31T20:00:00Z"))).toBe("2026-11-01");
     expect(injuryGroupPath("shin-splints")).toBe("/injury/shin-splints");
   });
 
   it("lists groups in the fixed order, with other last", () => {
-    const me = { stage: "rehab", stage_label: "リハビリ中", injured_month: "2026-09", pre_changes: [] } as const;
+    const me = { stage: "rehab", stage_label: "リハビリ中", injured_on: "2026-09-20", injured_on_exact: true, pre_changes: [] } as const;
     const sorted = sortInjuryGroups([
       { body_part: "other", body_part_label: "その他", members: 9 },
       { body_part: "elbow", body_part_label: "肘の痛み", members: 0 },
@@ -150,12 +145,12 @@ describe("injury group roadmap", () => {
   it("celebrates only the first arrival at the goal", () => {
     expect(shouldCelebrate("race", false)).toBe(true);
     expect(shouldCelebrate("race", true)).toBe(false);
-    expect(shouldCelebrate("practice", false)).toBe(false);
+    expect(shouldCelebrate("full", false)).toBe(false);
     expect(injuryCelebrationKey("knee")).toBe("injury-celebrated:knee");
   });
 
   it("treats every stage before the race as a current injury", () => {
-    expect(isCurrentInjuryStage("practice")).toBe(true);
+    expect(isCurrentInjuryStage("full")).toBe(true);
     expect(isCurrentInjuryStage("resting")).toBe(true);
     expect(isCurrentInjuryStage("race")).toBe(false);
   });
@@ -214,7 +209,7 @@ describe("injury stage change", () => {
 describe("injury public page", () => {
   it("describes every group and names その他 naturally", () => {
     for (const part of injuryBodyParts) expect(injuryGroupDescriptions[part.value]).toBeTruthy();
-    expect(injuryGroupTitle("sprain")).toBe("捻挫の仲間");
+    expect(injuryGroupTitle("sprain")).toBe("足首の捻挫の仲間");
     expect(injuryGroupTitle("other")).toBe("その他のケガの仲間");
   });
 

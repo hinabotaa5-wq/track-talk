@@ -19,8 +19,7 @@ import {
   injuryPreChanges,
   injurySeverities,
   injuryStages,
-  localMonthString,
-  recentMonths,
+  jstToday,
   injuryHindsights,
   toggleHindsight,
   togglePreChange,
@@ -33,7 +32,7 @@ const questions: Record<InjuryJoinStep, string> = {
   diagnosis: "ケガの名前は?",
   severity: "ケガの重さは?",
   sawDoctor: "病院でみてもらいましたか?",
-  injuredMonth: "いつごろケガをしましたか?",
+  injuredOn: "いつケガをしましたか?",
   place: "どこでケガをしましたか?",
   activity: "そのとき何をしていましたか?",
   preChanges: "ケガの前に変わったことは?",
@@ -43,7 +42,7 @@ const questions: Record<InjuryJoinStep, string> = {
 
 const hints: Partial<Record<InjuryJoinStep, string>> = {
   diagnosis: "診断名がわからなければ「わからない」と書いてください。",
-  injuredMonth: "だいたいで大丈夫です。",
+  injuredOn: "覚えているいちばん近い日でも大丈夫です。",
   preChanges: "当てはまるものをいくつでも選べます。",
   hindsight: "これから同じケガをしないための、ほかの人へのヒントとして集計します。いくつでも選べます。",
 };
@@ -66,7 +65,7 @@ export function InjuryJoinWizard({
   const step = steps[index];
   const last = index === steps.length - 1;
   const now = new Date();
-  const thisMonth = localMonthString(now);
+  const today = jstToday(now);
 
   function change(patch: Partial<InjuryJoinAnswers>) {
     setAnswers((current) => ({ ...current, ...patch }));
@@ -75,7 +74,7 @@ export function InjuryJoinWizard({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const problem = injuryJoinStepError(step, answers, thisMonth);
+    const problem = injuryJoinStepError(step, answers, today);
     if (problem) {
       setError(problem);
       return;
@@ -158,22 +157,15 @@ export function InjuryJoinWizard({
           />
         ) : null}
 
-        {step === "injuredMonth" ? (
-          <select
-            aria-label="ケガをした月"
-            value={answers.injuredMonth}
-            onChange={(e) => change({ injuredMonth: e.target.value })}
+        {step === "injuredOn" ? (
+          <input
+            type="date"
+            aria-label="ケガをした日"
+            value={answers.injuredOn}
+            max={today}
+            onChange={(e) => change({ injuredOn: e.target.value })}
             className="w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2.5 text-base text-slate-100 outline-none focus:border-blue-400"
-          >
-            <option value="" className="text-slate-900">
-              月を選ぶ
-            </option>
-            {recentMonths(now).map((month) => (
-              <option key={month.value} value={month.value} className="text-slate-900">
-                {month.label}
-              </option>
-            ))}
-          </select>
+          />
         ) : null}
 
         {step === "place" ? (

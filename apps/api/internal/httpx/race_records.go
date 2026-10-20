@@ -50,6 +50,7 @@ var raceEvents = map[string]struct {
 	"400mh":       {raceMarkTime, false, 24000},
 	"3000msc":     {raceMarkTime, false, 240000},
 	"race-walk":   {raceMarkTime, false, 1800000},
+	"relay":       {raceMarkTime, false, 90000},
 	"4x100":       {raceMarkTime, false, 24000},
 	"4x400":       {raceMarkTime, false, 90000},
 	"long-jump":   {raceMarkDistance, true, 1200},

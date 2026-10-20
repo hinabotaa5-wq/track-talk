@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { practiceSchema } from "@/lib/validators";
-import { practiceEvents } from "@/lib/practice-events";
+import { appEvents } from "@/lib/practice-events";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -120,7 +120,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         種目
         <select className={selectClass} value={event} onChange={(e) => setEvent(e.target.value)}>
           <option value="">選んでください</option>
-          {practiceEvents.map((item) => (
+          {appEvents.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>

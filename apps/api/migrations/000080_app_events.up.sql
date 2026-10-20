@@ -1,5 +1,5 @@
--- アプリ内の種目を、コーチの担当種目に統一する。リレー(relay)は、コーチの担当種目と練習相手募集だけに入れる。
--- 練習相手募集・感覚メモ・競技会の記録・レビューの種目に、競歩(race-walk)を足す。
+-- アプリ内の種目を、コーチの担当種目に統一する。
+-- 練習相手募集・感覚メモ・競技会の記録・レビューの種目に、競歩(race-walk)とリレー(relay)を足す。
 -- 以前に保存した値(七種・十種・4x100・4x400・その他)はそのまま残すので、制約には残しておく。
 
 -- 利用者の種目。登録のときにニックネームと一緒に選んでもらう。以前から使っている人は、次に開いたときに選ぶまで空のまま。
@@ -9,7 +9,7 @@ ALTER TABLE profiles
         event IS NULL OR event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk'
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay'
         )
     );
 
@@ -19,8 +19,8 @@ ALTER TABLE practice_details
         event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk',
-            'heptathlon', 'decathlon', '4x100', '4x400', 'relay', 'other'
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
+            'heptathlon', 'decathlon', '4x100', '4x400', 'other'
         )
     );
 
@@ -30,7 +30,7 @@ ALTER TABLE sense_notes
         event IS NULL OR event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
             'heptathlon', 'decathlon', '4x100', '4x400', 'other'
         )
     );
@@ -41,7 +41,7 @@ ALTER TABLE product_reviews
         event IS NULL OR event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
             'heptathlon', 'decathlon', '4x100', '4x400', 'other'
         )
     );
@@ -52,7 +52,7 @@ ALTER TABLE race_records
         event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
             'heptathlon', 'decathlon', '4x100', '4x400'
         )
     );
@@ -64,7 +64,7 @@ ALTER TABLE injury_group_members
         event IS NULL OR event IN (
             '100m', '200m', '400m', '800m', '1500m', '5000m', '10000m', '110mh',
             '100mh', '400mh', '3000msc', 'high-jump', 'pole-vault', 'long-jump',
-            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk',
+            'triple-jump', 'shot-put', 'discus', 'hammer', 'javelin', 'race-walk', 'relay',
             'sprint', 'hurdles', 'middle', 'long', 'jumps', 'throws', 'combined'
         )
     );

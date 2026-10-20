@@ -16,13 +16,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// コーチの担当種目。アプリ内の種目(appEvents)にリレーを足したもの。並びは画面に出す順。
+// コーチの担当種目。アプリ内の種目(appEvents)と同じ。並びは画面に出す順。
 var coachEvents = func() []string {
-	out := make([]string, 0, len(appEvents)+1)
+	out := make([]string, 0, len(appEvents))
 	for _, event := range appEvents {
 		out = append(out, event.Code)
 	}
-	return append(out, relayEvent)
+	return out
 }()
 
 func validCoachTier(tier string) bool {

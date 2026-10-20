@@ -130,8 +130,8 @@ describe("validators", () => {
     expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false, event: "5000m" }).success).toBe(true);
     expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true, event: "5000m" }).success).toBe(false);
     expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(false);
-    // リレーは、コーチと練習相手募集の種目で、利用者の種目にはない。
-    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "relay" }).success).toBe(false);
+    // 種目は、コーチの担当種目と同じ一覧(リレーも選べる)。以前の区分や「その他」は選べない。
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "relay" }).success).toBe(true);
     expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "sprint" }).success).toBe(false);
   });
 

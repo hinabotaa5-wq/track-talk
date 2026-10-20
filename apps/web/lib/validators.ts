@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { appEventValues, practiceEventValues } from "./practice-events";
+import { appEventValues } from "./practice-events";
 
 z.config(z.locales.ja());
 
@@ -42,7 +42,7 @@ export const recruitmentSchema = z.object({
 export const practiceSchema = z.object({
   venue: z.string("練習場所を入力してください").trim().min(1, "練習場所を入力してください").max(80, "練習場所は80文字以内で入力してください"),
   starts_at: z.string("練習日時を入力してください").trim().min(1, "練習日時を入力してください"),
-  event: z.enum(practiceEventValues, "種目を選んでください"),
+  event: z.enum(appEventValues, "種目を選んでください"),
   capacity: z
     .number("募集人数は1〜99で入力してください")
     .int("募集人数は1〜99で入力してください")

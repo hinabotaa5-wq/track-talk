@@ -1,7 +1,7 @@
 package httpx
 
-// appEvents は、アプリ内で選べる種目。コーチの担当種目と同じ並びで、練習相手募集・感覚メモ・競技会の記録・
-// レビュー・利用者の種目(登録のときに選ぶ)・ケガ部がすべてこれを使う。リレーはコーチの担当種目だけ。
+// appEvents は、アプリ内で選べる種目。コーチの担当種目と同じ一覧と並びで、コーチ・練習相手募集・感覚メモ・
+// 競技会の記録・レビュー・利用者の種目(登録のときに選ぶ)・ケガ部がすべてこれを使う。
 var appEvents = []struct {
 	Code  string
 	Label string
@@ -26,18 +26,15 @@ var appEvents = []struct {
 	{"hammer", "ハンマー投"},
 	{"javelin", "やり投"},
 	{"race-walk", "競歩"},
+	{"relay", "リレー"},
 }
 
-// relayEvent は、コーチの担当種目と練習相手募集だけにある種目。
-const relayEvent = "relay"
-
-// legacyEventLabels は、種目の選択肢にないが表示に使う名前。以前に保存した値と、リレー(練習相手募集とコーチの種目)。
+// legacyEventLabels は、いまは選べないが、以前に保存した値の表示に使う名前。
 var legacyEventLabels = map[string]string{
 	"heptathlon": "七種競技",
 	"decathlon":  "十種競技",
 	"4x100":      "4×100mR",
 	"4x400":      "4×400mR",
-	relayEvent:   "リレー",
 	"sprint":     "短距離",
 	"hurdles":    "ハードル",
 	"middle":     "中距離",
