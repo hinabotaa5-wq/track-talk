@@ -23,10 +23,6 @@ var contactPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}`),
 	// SNS のアカウント名（@ のあとに英数字）
 	regexp.MustCompile(`(?i)@[a-z0-9_.]{3,}`),
-	// 電話番号（区切りを含めて10桁以上の数字）。ラップを「.」で書くので「.」は区切りに入れない。
-	regexp.MustCompile(`(?:\d[\s\-–ー()_]*){10,}`),
-	// 「/」「・」区切りは距離や年の並びにも使うので、0 で始まる電話番号の形のときだけ止める。
-	regexp.MustCompile(`(?:^|\D)0\d{1,4}[/・]\d{1,4}[/・]\d{3,4}(?:\D|$)`),
 	// SNS やメッセージアプリの名前と、ID のやりとり
 	regexp.MustCompile(`(?i)\bline\b|instagram|\binsta\b|インスタ|twitter|ツイッター|tiktok|ティックトック|discord|ディスコード|カカオ|kakao|facebook|フェイスブック|threads|スレッズ|\bDM\b|メアド|メールアドレス|電話番号|連絡先|\bID\s*[:：は]`),
 	// 「ライン」は陸上の用語でもあるので、交換や ID と一緒のときと、ひらがなのときだけ止める。
@@ -36,8 +32,37 @@ var contactPatterns = []*regexp.Regexp{
 // looksLikeContact は、文章に連絡先らしき文字列があれば true を返す。
 func looksLikeContact(s string) bool {
 	folded := normalizeForContact(s)
+	if looksLikePhone(folded) {
+		return true
+	}
 	for _, re := range contactPatterns {
 		if re.MatchString(folded) {
+			return true
+		}
+	}
+	return false
+}
+
+// 区切りでつながった数字の並び。ラップを「.」で書くので「.」は区切りに入れない。
+var digitRun = regexp.MustCompile(`\d(?:[\s\-–ー()_/・]*\d)*`)
+
+// looksLikePhone は、電話番号らしい数字の並びがあれば true を返す。
+// 区切りのない10桁以上の数字と、0 か 81 で始まる10〜13桁で、区切りが3つまで(090-1234-5678、+81 90 1234 5678)
+// か1桁ずつ空けたものを電話番号とみなす。ラップ(68 68 67 67 66)や年の並び(2019 2020 2021)は止めない。
+func looksLikePhone(s string) bool {
+	for _, run := range digitRun.FindAllString(s, -1) {
+		groups := strings.FieldsFunc(run, func(r rune) bool { return r < '0' || r > '9' })
+		digits := 0
+		single := true
+		for _, g := range groups {
+			digits += len(g)
+			single = single && len(g) == 1
+		}
+		if len(groups) == 1 && digits >= 10 {
+			return true
+		}
+		first := groups[0]
+		if digits >= 10 && digits <= 13 && (first[0] == '0' || strings.HasPrefix(first, "81")) && (len(groups) <= 4 || single) {
 			return true
 		}
 	}
