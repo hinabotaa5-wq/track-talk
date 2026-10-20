@@ -138,15 +138,9 @@ SELECT
     c.parent_id,
     c.reply_to_id,
     t.author_id AS reply_to_author_id,
-    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed,
-    tp.nickname AS reply_to_nickname,
-    COALESCE(tp.nickname_public, false)::boolean AS reply_to_nickname_public,
-    ap.nickname AS author_nickname,
-    COALESCE(ap.nickname_public, false)::boolean AS author_nickname_public
+    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed
 FROM comments c
-LEFT JOIN profiles ap ON ap.id = c.author_id
 LEFT JOIN comments t ON t.id = c.reply_to_id
-LEFT JOIN profiles tp ON tp.id = t.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL
@@ -161,20 +155,16 @@ type ListCommentsParams struct {
 }
 
 type ListCommentsRow struct {
-	ID                    uuid.UUID  `json:"id"`
-	PostID                uuid.UUID  `json:"post_id"`
-	AuthorID              uuid.UUID  `json:"author_id"`
-	Body                  string     `json:"body"`
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
-	ParentID              *uuid.UUID `json:"parent_id"`
-	ReplyToID             *uuid.UUID `json:"reply_to_id"`
-	ReplyToAuthorID       *uuid.UUID `json:"reply_to_author_id"`
-	ReplyToRemoved        bool       `json:"reply_to_removed"`
-	ReplyToNickname       *string    `json:"reply_to_nickname"`
-	ReplyToNicknamePublic bool       `json:"reply_to_nickname_public"`
-	AuthorNickname        *string    `json:"author_nickname"`
-	AuthorNicknamePublic  bool       `json:"author_nickname_public"`
+	ID              uuid.UUID  `json:"id"`
+	PostID          uuid.UUID  `json:"post_id"`
+	AuthorID        uuid.UUID  `json:"author_id"`
+	Body            string     `json:"body"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	ParentID        *uuid.UUID `json:"parent_id"`
+	ReplyToID       *uuid.UUID `json:"reply_to_id"`
+	ReplyToAuthorID *uuid.UUID `json:"reply_to_author_id"`
+	ReplyToRemoved  bool       `json:"reply_to_removed"`
 }
 
 func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
@@ -197,10 +187,6 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]L
 			&i.ReplyToID,
 			&i.ReplyToAuthorID,
 			&i.ReplyToRemoved,
-			&i.ReplyToNickname,
-			&i.ReplyToNicknamePublic,
-			&i.AuthorNickname,
-			&i.AuthorNicknamePublic,
 		); err != nil {
 			return nil, err
 		}

@@ -87,8 +87,8 @@ func TestCommentRepliesAreFlattenedAndLabeled(t *testing.T) {
 		t.Fatalf("private nickname should be 匿名: %+v", got["返信への返信"])
 	}
 	got = listReplyComments(t, h, b, postID)
-	if n := got["返信1"].ReplyToName; n == nil || *n != "あさひ" {
-		t.Fatalf("public nickname expected: %+v", got["返信1"])
+	if n := got["返信1"].ReplyToName; n == nil || *n != "匿名" {
+		t.Fatalf("public nickname must not be shown on comments: %+v", got["返信1"])
 	}
 	if n := got["返信への返信"].ReplyToName; n == nil || *n != "あなた" {
 		t.Fatalf("viewer should see あなた: %+v", got["返信への返信"])

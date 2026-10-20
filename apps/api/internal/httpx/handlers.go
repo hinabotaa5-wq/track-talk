@@ -879,15 +879,14 @@ func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, c
 }
 
 // replyToName は返信先コメントの投稿者を表示用の名前にする。
-// 投稿者は「投稿者」、閲覧者本人は「あなた」、それ以外は公開ニックネーム(非公開なら「匿名」)。
-func replyToName(viewer uuid.UUID, viewerOK bool, postAuthor, target uuid.UUID, nickname *string, public bool) string {
+// 投稿者は「投稿者」、閲覧者本人は「あなた」、それ以外は「匿名」。
+// コメントは匿名の場なので、ニックネームを公開にしていても出さない。
+func replyToName(viewer uuid.UUID, viewerOK bool, postAuthor, target uuid.UUID) string {
 	switch {
 	case viewerOK && target == viewer:
 		return "あなた"
 	case target == postAuthor:
 		return "投稿者"
-	case public && nickname != nil && *nickname != "":
-		return *nickname
 	default:
 		return "匿名"
 	}
@@ -917,13 +916,13 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		c := commentJSON(r, row.ID, row.PostID, row.AuthorID, row.Body, row.CreatedAt, row.UpdatedAt, row.ParentID, row.ReplyToID)
-		c["author_name"] = replyToName(viewer, viewerOK, post.AuthorID, row.AuthorID, row.AuthorNickname, row.AuthorNicknamePublic)
+		c["author_name"] = replyToName(viewer, viewerOK, post.AuthorID, row.AuthorID)
 		if row.ReplyToID != nil {
 			if row.ReplyToRemoved || row.ReplyToAuthorID == nil {
 				c["reply_to_name"] = nil
 				c["reply_to_removed"] = true
 			} else {
-				c["reply_to_name"] = replyToName(viewer, viewerOK, post.AuthorID, *row.ReplyToAuthorID, row.ReplyToNickname, row.ReplyToNicknamePublic)
+				c["reply_to_name"] = replyToName(viewer, viewerOK, post.AuthorID, *row.ReplyToAuthorID)
 				c["reply_to_removed"] = false
 			}
 		}
