@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Award, Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { installGuideOpenEvent } from "@/lib/install-guide";
 
 const accountLinks = [
@@ -58,6 +59,7 @@ export default function MePage() {
     if (!confirm("ログアウトしますか？")) return;
     if (!logoutLock.acquire()) return;
     leaving.current = true;
+    await unsubscribePushOnThisDevice(token);
     const supabase = createClient();
     await supabase?.auth.signOut();
     router.push("/");
