@@ -1141,6 +1141,22 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	// 投稿とコメントは、本人が読めるものだけ通報できる(ない ID や消えたもので運営の一覧を埋めさせない)。
+	if req.TargetType == "post" {
+		if _, ok := s.getReadablePost(w, r, tid); !ok {
+			return
+		}
+	}
+	if req.TargetType == "comment" {
+		c, err := s.q.GetComment(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if _, ok := s.getReadablePost(w, r, c.PostID); !ok {
+			return
+		}
+	}
 	if req.TargetType == "injury_note" {
 		public, err := s.q.InjuryNoteIsPublic(r.Context(), tid)
 		if err != nil {
