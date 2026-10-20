@@ -89,14 +89,16 @@ export type SenseSummary = {
   created_at: string;
 };
 
-export type SenseSummaryResponse = { summary: SenseSummary | null; remaining_today: number };
+// next_available_at は、次のまとめを作れる時刻。すぐ作れるなら null。
+export type SenseSummaryResponse = { summary: SenseSummary | null; next_available_at: string | null };
 
 // まとめた期間。"10月14日(火)〜10月20日(月)"。
 export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | "to_day">, now = new Date()) {
   return `${senseDayLabel(summary.from_day, now)}〜${senseDayLabel(summary.to_day, now)}`;
 }
 
-// まとめが今日作ったものか。今日でなければ、作り直しをすすめる。
-export function senseSummaryIsFresh(summary: Pick<SenseSummary, "to_day">, now = new Date()) {
-  return summary.to_day === todayInTokyo(now);
+// 次のまとめを作れる日。"10月27日(火)"。すぐ作れるなら null。
+export function senseSummaryNextLabel(nextAvailableAt: string | null, now = new Date()) {
+  if (!nextAvailableAt) return null;
+  return senseDayLabel(todayInTokyo(new Date(nextAvailableAt)), now);
 }

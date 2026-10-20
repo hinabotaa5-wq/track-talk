@@ -12,24 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countSenseNoteSummariesSince = `-- name: CountSenseNoteSummariesSince :one
-SELECT count(*) FROM sense_note_summaries
-WHERE author_id = $1
-  AND created_at >= $2
-`
-
-type CountSenseNoteSummariesSinceParams struct {
-	AuthorID uuid.UUID `json:"author_id"`
-	Since    time.Time `json:"since"`
-}
-
-func (q *Queries) CountSenseNoteSummariesSince(ctx context.Context, arg CountSenseNoteSummariesSinceParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSenseNoteSummariesSince, arg.AuthorID, arg.Since)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countSenseNotes = `-- name: CountSenseNotes :one
 SELECT count(*) FROM sense_notes WHERE author_id = $1
 `

@@ -65,8 +65,3 @@ FROM sense_note_summaries
 WHERE author_id = $1
 ORDER BY created_at DESC
 LIMIT 1;
-
--- name: CountSenseNoteSummariesSince :one
-SELECT count(*) FROM sense_note_summaries
-WHERE author_id = $1
-  AND created_at >= sqlc.arg('since');

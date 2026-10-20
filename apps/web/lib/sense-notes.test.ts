@@ -4,7 +4,7 @@ import {
   senseCheer,
   senseDayLabel,
   senseJarLevel,
-  senseSummaryIsFresh,
+  senseSummaryNextLabel,
   senseSummaryRangeLabel,
   type SenseNote,
 } from "./sense-notes";
@@ -44,11 +44,11 @@ describe("sense notes", () => {
     expect(senseDayLabel("2025-12-31", now)).toBe("2025年12月31日(水)");
   });
 
-  it("labels the week of a summary and tells whether it is from today", () => {
+  it("labels the week of a summary and the day the next one opens", () => {
     // 2026-10-20 10:00 JST
     const now = new Date("2026-10-20T01:00:00Z");
     expect(senseSummaryRangeLabel({ from_day: "2026-10-14", to_day: "2026-10-20" }, now)).toBe("10月14日(水)〜10月20日(火)");
-    expect(senseSummaryIsFresh({ to_day: "2026-10-20" }, now)).toBe(true);
-    expect(senseSummaryIsFresh({ to_day: "2026-10-19" }, now)).toBe(false);
+    expect(senseSummaryNextLabel("2026-10-27T01:00:00Z", now)).toBe("10月27日(火)");
+    expect(senseSummaryNextLabel(null, now)).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
-import { senseSummaryIsFresh, senseSummaryRangeLabel, type SenseSummary, type SenseSummaryResponse } from "@/lib/sense-notes";
+import { senseSummaryNextLabel, senseSummaryRangeLabel, type SenseSummary, type SenseSummaryResponse } from "@/lib/sense-notes";
 
 function SummaryList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
@@ -24,7 +24,7 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
 // 直近7日の感覚メモを AI でまとめるカード。まとめは本人だけに表示する。
 export function SenseSummaryCard({ token }: { token: string | null }) {
   const [summary, setSummary] = useState<SenseSummary | null>(null);
-  const [remaining, setRemaining] = useState(0);
+  const [nextAt, setNextAt] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const { pending: busy, acquire, release } = useActionLock();
@@ -35,7 +35,7 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
     apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { token, signal: controller.signal })
       .then((d) => {
         setSummary(d.summary);
-        setRemaining(d.remaining_today);
+        setNextAt(d.next_available_at);
         setLoaded(true);
       })
       .catch(() => {
@@ -50,7 +50,7 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
     try {
       const d = await apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { method: "POST", token });
       setSummary(d.summary);
-      setRemaining(d.remaining_today);
+      setNextAt(d.next_available_at);
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "まとめを作れませんでした");
     } finally {
@@ -60,7 +60,7 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
 
   if (!loaded) return null;
 
-  const fresh = summary ? senseSummaryIsFresh(summary) : false;
+  const nextLabel = senseSummaryNextLabel(nextAt);
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -84,10 +84,10 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant={summary && fresh ? "secondary" : "primary"} onClick={create} disabled={busy || remaining <= 0}>
-          {busy ? "まとめています..." : summary ? (fresh ? "作り直す" : "今週の分をまとめる") : "この1週間をまとめる"}
+        <Button onClick={create} disabled={busy || nextLabel !== null}>
+          {busy ? "まとめています..." : summary ? "今週の分をまとめる" : "この1週間をまとめる"}
         </Button>
-        <span className="text-xs text-slate-300">今日はあと{remaining}回</span>
+        <span className="text-xs text-slate-300">{nextLabel ? `次は${nextLabel}から作れます` : "まとめは1週間に1回です"}</span>
       </div>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを Google の Gemini に送ります。</p>

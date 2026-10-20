@@ -25,7 +25,7 @@ type senseSummaryResponse struct {
 			Next     []string `json:"next"`
 		} `json:"summary"`
 	} `json:"summary"`
-	RemainingToday int `json:"remaining_today"`
+	NextAvailableAt *string `json:"next_available_at"`
 }
 
 // fakeGemini は、Gemini の代わりに reply を返し、届いたプロンプトを残す。
@@ -80,7 +80,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	var got senseSummaryResponse
 	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if rec.Code != http.StatusOK || got.Summary != nil || got.RemainingToday != 3 {
+	if rec.Code != http.StatusOK || got.Summary != nil || got.NextAvailableAt != nil {
 		t.Fatalf("empty get = %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusUnprocessableEntity {
@@ -104,7 +104,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatalf("create summary = %d %s", rec.Code, rec.Body.String())
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.Summary == nil || got.Summary.NoteCount != 2 || got.Summary.Summary.Overview == "" || len(got.Summary.Summary.Good) != 1 || got.RemainingToday != 2 {
+	if got.Summary == nil || got.Summary.NoteCount != 2 || got.Summary.Summary.Overview == "" || len(got.Summary.Summary.Good) != 1 || got.NextAvailableAt == nil {
 		t.Fatalf("summary = %s", rec.Body.String())
 	}
 	if got.Summary.FromDay >= got.Summary.ToDay {
@@ -117,7 +117,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.Summary == nil || got.Summary.Summary.Concerns[0] != "右のハムに張りがある" || got.RemainingToday != 2 {
+	if got.Summary == nil || got.Summary.Summary.Concerns[0] != "右のハムに張りがある" || got.NextAvailableAt == nil {
 		t.Fatalf("get = %s", rec.Body.String())
 	}
 	// 他の人には見えない。
@@ -127,18 +127,17 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatalf("other sees = %s", rec.Body.String())
 	}
 
-	// 壊れた答えは 502 で、回数に数えない。
+	// 1週間に1回。2回目は 429。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second summary in a week = %d", rec.Code)
+	}
+	// 他の人は別に数える。壊れた答えは 502 で、回数に数えない。
 	gemini.reply = "not json"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusBadGateway {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusBadGateway {
 		t.Fatalf("broken reply = %d", rec.Code)
 	}
 	gemini.reply = `{"overview":"ok","good":[],"concerns":[],"next":[]}`
-	for i := 0; i < 2; i++ {
-		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusCreated {
-			t.Fatalf("summary %d = %d", i+2, rec.Code)
-		}
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("4th summary = %d", rec.Code)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusCreated {
+		t.Fatalf("other summary after failure = %d", rec.Code)
 	}
 }

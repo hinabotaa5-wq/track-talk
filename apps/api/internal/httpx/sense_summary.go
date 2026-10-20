@@ -17,10 +17,10 @@ import (
 )
 
 // 感覚メモの1週間のまとめ。本人が頼んだときだけ、直近7日（今日を含む、日本時間）の感覚メモを
-// Gemini に送ってまとめる。まとめは本人だけが読む。
+// Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たってから。
 const (
-	senseSummaryDays        = 7
-	maxSenseSummariesPerDay = 3
+	senseSummaryDays     = 7
+	senseSummaryInterval = senseSummaryDays * 24 * time.Hour
 	// 1日20件までなので、7日分でも140件に収まる。
 	maxSenseSummaryNotes    = senseSummaryDays * maxSenseNotesPerDay
 	maxSenseSummaryItems    = 3
@@ -71,12 +71,13 @@ func (s *Server) requireSenseSummary(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) senseSummariesLeft(ctx context.Context, authorID uuid.UUID, now time.Time) (int64, error) {
-	used, err := s.q.CountSenseNoteSummariesSince(ctx, db.CountSenseNoteSummariesSinceParams{AuthorID: authorID, Since: startOfTokyoDay(now)})
-	if err != nil {
-		return 0, err
+// senseSummaryNextAt は、次のまとめを作れる時刻。もう作れるなら nil。
+func senseSummaryNextAt(lastCreatedAt, now time.Time) *time.Time {
+	next := lastCreatedAt.Add(senseSummaryInterval)
+	if !next.After(now) {
+		return nil
 	}
-	return max(0, maxSenseSummariesPerDay-used), nil
+	return &next
 }
 
 // getSenseSummary は、いちばん新しいまとめを返す。まだ無ければ summary は null。
@@ -85,14 +86,9 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	left, err := s.senseSummariesLeft(r.Context(), me.ID, s.now())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
 	row, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		JSON(w, http.StatusOK, map[string]any{"summary": nil, "remaining_today": left})
+		JSON(w, http.StatusOK, map[string]any{"summary": nil, "next_available_at": nil})
 		return
 	}
 	if err != nil {
@@ -100,8 +96,8 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{
-		"summary":         senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
-		"remaining_today": left,
+		"summary":           senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
+		"next_available_at": senseSummaryNextAt(row.CreatedAt, s.now()),
 	})
 }
 
@@ -116,14 +112,16 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.now()
-	left, err := s.senseSummariesLeft(r.Context(), me.ID, now)
-	if err != nil {
+	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		MapDBError(w, err)
 		return
 	}
-	if left <= 0 {
-		Error(w, http.StatusTooManyRequests, "rate_limited", "まとめは1日3回までです。明日もう一度お試しください")
-		return
+	if err == nil {
+		if next := senseSummaryNextAt(last.CreatedAt, now); next != nil {
+			Error(w, http.StatusTooManyRequests, "rate_limited", "まとめは1週間に1回です。"+next.In(jst.Zone).Format("1月2日 15:04")+"から、また作れます")
+			return
+		}
 	}
 	since := startOfTokyoDay(now).AddDate(0, 0, -(senseSummaryDays - 1))
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
@@ -171,8 +169,8 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusCreated, map[string]any{
-		"summary":         senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
-		"remaining_today": left - 1,
+		"summary":           senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
+		"next_available_at": senseSummaryNextAt(row.CreatedAt, now),
 	})
 }
 
