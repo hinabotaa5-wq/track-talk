@@ -80,6 +80,51 @@ func (q *Queries) CreateSenseNote(ctx context.Context, arg CreateSenseNoteParams
 	return i, err
 }
 
+const createSenseNoteSummary = `-- name: CreateSenseNoteSummary :one
+INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, summary)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, from_day, to_day, note_count, summary, created_at
+`
+
+type CreateSenseNoteSummaryParams struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+}
+
+type CreateSenseNoteSummaryRow struct {
+	ID        uuid.UUID `json:"id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) CreateSenseNoteSummary(ctx context.Context, arg CreateSenseNoteSummaryParams) (CreateSenseNoteSummaryRow, error) {
+	row := q.db.QueryRow(ctx, createSenseNoteSummary,
+		arg.ID,
+		arg.AuthorID,
+		arg.FromDay,
+		arg.ToDay,
+		arg.NoteCount,
+		arg.Summary,
+	)
+	var i CreateSenseNoteSummaryRow
+	err := row.Scan(
+		&i.ID,
+		&i.FromDay,
+		&i.ToDay,
+		&i.NoteCount,
+		&i.Summary,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deleteSenseNote = `-- name: DeleteSenseNote :execrows
 DELETE FROM sense_notes
 WHERE id = $1
@@ -97,6 +142,37 @@ func (q *Queries) DeleteSenseNote(ctx context.Context, arg DeleteSenseNoteParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const latestSenseNoteSummary = `-- name: LatestSenseNoteSummary :one
+SELECT id, from_day, to_day, note_count, summary, created_at
+FROM sense_note_summaries
+WHERE author_id = $1
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type LatestSenseNoteSummaryRow struct {
+	ID        uuid.UUID `json:"id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) LatestSenseNoteSummary(ctx context.Context, authorID uuid.UUID) (LatestSenseNoteSummaryRow, error) {
+	row := q.db.QueryRow(ctx, latestSenseNoteSummary, authorID)
+	var i LatestSenseNoteSummaryRow
+	err := row.Scan(
+		&i.ID,
+		&i.FromDay,
+		&i.ToDay,
+		&i.NoteCount,
+		&i.Summary,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const listSenseNoteDays = `-- name: ListSenseNoteDays :many
@@ -176,6 +252,55 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSenseNotesBetween = `-- name: ListSenseNotesBetween :many
+SELECT body, event, created_at
+FROM sense_notes
+WHERE author_id = $1
+  AND created_at >= $2
+  AND created_at < $3
+ORDER BY created_at, id
+LIMIT $4
+`
+
+type ListSenseNotesBetweenParams struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	Since    time.Time `json:"since"`
+	Until    time.Time `json:"until"`
+	MaxNotes int32     `json:"max_notes"`
+}
+
+type ListSenseNotesBetweenRow struct {
+	Body      string    `json:"body"`
+	Event     *string   `json:"event"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// まとめに渡す感覚メモ。古い順。
+func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesBetweenParams) ([]ListSenseNotesBetweenRow, error) {
+	rows, err := q.db.Query(ctx, listSenseNotesBetween,
+		arg.AuthorID,
+		arg.Since,
+		arg.Until,
+		arg.MaxNotes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSenseNotesBetweenRow
+	for rows.Next() {
+		var i ListSenseNotesBetweenRow
+		if err := rows.Scan(&i.Body, &i.Event, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
