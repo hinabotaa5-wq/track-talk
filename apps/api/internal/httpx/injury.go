@@ -187,6 +187,16 @@ func (s *Server) updateInjury(w http.ResponseWriter, r *http.Request, author db.
 		MapDBError(w, err)
 		return
 	}
+	// 部位は参加しているグループで決まるので、編集では変えられない。
+	current, err := q.GetInjuryDetail(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if current.BodyPart != in.BodyPart {
+		FieldError(w, map[string]string{"body_part": "部位は変えられません"})
+		return
+	}
 	if err := saveInjury(r.Context(), q, id, in); err != nil {
 		MapDBError(w, err)
 		return

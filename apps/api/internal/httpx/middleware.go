@@ -160,7 +160,7 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ip := clientIP(r)
+		ip := rateKey(clientIP(r))
 		now := time.Now()
 		l.mu.Lock()
 		l.sweep(now)
@@ -231,6 +231,15 @@ func clientIP(r *http.Request) string {
 		return ip
 	}
 	return host
+}
+
+// rateKey は、回数制限の数え方の単位を返す。IPv6 は1人が /64 を丸ごと持つので、/64 でまとめて数える。
+func rateKey(host string) string {
+	ip := net.ParseIP(host)
+	if ip == nil || ip.To4() != nil {
+		return host
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }
 
 func requestHost(r *http.Request) string {

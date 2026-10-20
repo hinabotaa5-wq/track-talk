@@ -100,7 +100,7 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	}
 
 	patch := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
-		"title": "肉離れ", "body": "少し歩けた", "body_part": "quad-strain",
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "hamstring-strain",
 	})
 	if patch.Code != http.StatusOK {
 		t.Fatalf("patch %d %s", patch.Code, patch.Body.String())
@@ -115,8 +115,16 @@ func TestInjuryPostLifecycleAndFeedSeparation(t *testing.T) {
 	if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "quad-strain" {
+	if detail.Body != "少し歩けた" || detail.Injury.BodyPart != "hamstring-strain" {
 		t.Fatalf("detail after patch %+v", detail)
+	}
+
+	// 編集で別の部位に付け替えると、その部位のグループに参加していなくても投稿が出てしまう。
+	move := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tok, map[string]any{
+		"title": "肉離れ", "body": "少し歩けた", "body_part": "quad-strain",
+	})
+	if move.Code != http.StatusUnprocessableEntity || !strings.Contains(move.Body.String(), "body_part") {
+		t.Fatalf("move to another part %d %s", move.Code, move.Body.String())
 	}
 }
 
