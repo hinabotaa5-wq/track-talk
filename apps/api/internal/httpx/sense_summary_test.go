@@ -2,11 +2,13 @@ package httpx_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -137,5 +139,43 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	ai.reply = `{"overview":"ok","good":[],"concerns":[],"next":[]}`
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusCreated {
 		t.Fatalf("other summary after failure = %d", rec.Code)
+	}
+}
+
+// 同時に頼まれても、まとめは1回しか作らず、AI も1回しか呼ばない。
+func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
+	ai := &fakeAI{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	url := ai.serve(t)
+	h := setupConfig(t, func(c *config.Config) {
+		c.SenseSummaryEnabled = true
+		c.OpenAIAPIKey = "test"
+		c.OpenAIAPIBase = url
+	})
+	me := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "接地で地面を押せた"}); rec.Code != http.StatusCreated {
+		t.Fatalf("create note = %d", rec.Code)
+	}
+	var wg sync.WaitGroup
+	var created atomic.Int32
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/v1/me/sense-notes/summary", nil)
+			req.Header.Set("Authorization", "Bearer "+me)
+			req.RemoteAddr = fmt.Sprintf("203.0.113.%d:1234", i+1)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code == http.StatusCreated {
+				created.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	ai.mu.Lock()
+	calls := len(ai.prompts)
+	ai.mu.Unlock()
+	if created.Load() != 1 || calls != 1 {
+		t.Fatalf("created %d summaries with %d AI calls, want 1 and 1", created.Load(), calls)
 	}
 }

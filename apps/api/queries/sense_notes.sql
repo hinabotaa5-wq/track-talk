@@ -69,3 +69,14 @@ FROM sense_note_summaries
 WHERE author_id = $1
 ORDER BY created_at DESC
 LIMIT 1;
+
+-- name: ClaimSenseNoteSummary :one
+-- まとめを作り始める印を取る。ほかのリクエストが作っている最中(2分以内)なら行は返らない。
+INSERT INTO sense_note_summary_claims (author_id, claimed_at)
+VALUES ($1, now())
+ON CONFLICT (author_id) DO UPDATE SET claimed_at = now()
+WHERE sense_note_summary_claims.claimed_at < now() - interval '2 minutes'
+RETURNING author_id;
+
+-- name: ReleaseSenseNoteSummaryClaim :exec
+DELETE FROM sense_note_summary_claims WHERE author_id = $1;

@@ -101,6 +101,22 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// senseSummaryAvailable は、前のまとめから1週間たっているかを確かめる。まだなら 429 を書いて false を返す。
+func (s *Server) senseSummaryAvailable(w http.ResponseWriter, r *http.Request, author uuid.UUID, now time.Time) bool {
+	last, err := s.q.LatestSenseNoteSummary(r.Context(), author)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return false
+	}
+	if err == nil {
+		if next := senseSummaryNextAt(last.CreatedAt, now); next != nil {
+			Error(w, http.StatusTooManyRequests, "rate_limited", "まとめは1週間に1回です。"+next.In(jst.Zone).Format("1月2日 15:04")+"から、また作れます")
+			return false
+		}
+	}
+	return true
+}
+
 // createSenseSummary は、直近7日の感覚メモを OpenAI でまとめて残す。
 func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
@@ -112,16 +128,26 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.now()
-	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if !s.senseSummaryAvailable(w, r, me.ID, now) {
+		return
+	}
+	// AI の返事を待つあいだに、同じ人のまとめをもう1つ作らせない。印を取ったら、そのあいだに
+	// 別のリクエストが作り終えていないかをもう一度確かめる。
+	if _, err := s.q.ClaimSenseNoteSummary(r.Context(), me.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			Error(w, http.StatusConflict, "conflict", "いままとめを作っています。少し待ってから開き直してください")
+			return
+		}
 		MapDBError(w, err)
 		return
 	}
-	if err == nil {
-		if next := senseSummaryNextAt(last.CreatedAt, now); next != nil {
-			Error(w, http.StatusTooManyRequests, "rate_limited", "まとめは1週間に1回です。"+next.In(jst.Zone).Format("1月2日 15:04")+"から、また作れます")
-			return
+	defer func() {
+		if err := s.q.ReleaseSenseNoteSummaryClaim(context.WithoutCancel(r.Context()), me.ID); err != nil {
+			slog.Warn("release sense summary claim", "err", err)
 		}
+	}()
+	if !s.senseSummaryAvailable(w, r, me.ID, now) {
+		return
 	}
 	since := startOfTokyoDay(now).AddDate(0, 0, -(senseSummaryDays - 1))
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
