@@ -1742,7 +1742,7 @@ func TestNotifications(t *testing.T) {
 	if len(notesFor(authorNotes, practicePost.ID, "practice_rate")) != 1 || authorUnread < 1 {
 		t.Fatalf("host rate notification %+v unread %d", authorNotes, authorUnread)
 	}
-	viewerNotes, viewerUnread = listNotifications(t, h, viewer)
+	viewerNotes, _ = listNotifications(t, h, viewer)
 	if len(notesFor(viewerNotes, practicePost.ID, "practice_rate")) != 1 {
 		t.Fatalf("guest rate notification %+v", viewerNotes)
 	}
