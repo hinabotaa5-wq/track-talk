@@ -48,9 +48,13 @@ func (f *fakeStripe) transferList() []url.Values {
 }
 
 func (f *fakeStripe) enable(account string) {
+	f.setEnabled(account, true)
+}
+
+func (f *fakeStripe) setEnabled(account string, enabled bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.enabled[account] = true
+	f.enabled[account] = enabled
 }
 
 func (f *fakeStripe) failNextTransfers(n int) {

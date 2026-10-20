@@ -267,7 +267,19 @@ func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
 	if err := json.Unmarshal(ev.Data.Object, &a); err != nil || a.ID == "" {
 		return nil
 	}
-	_, err := s.q.SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
+	// 知らないアカウントの知らせは読み飛ばす。
+	known, err := s.q.CoachStripeAccountExists(ctx, a.ID)
+	if err != nil || !known {
+		return err
+	}
+	// 知らせは順番どおりに届くとは限らないので、中身ではなく、いまのアカウントを読み直して決める。
+	// 読めなければ失敗を返し、Stripe に送り直してもらう。
+	current, err := s.stripe.GetAccount(ctx, a.ID)
+	if err != nil {
+		return err
+	}
+	a.PayoutsEnabled = current.PayoutsEnabled
+	_, err = s.q.SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
