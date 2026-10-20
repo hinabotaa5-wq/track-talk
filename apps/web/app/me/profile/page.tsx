@@ -18,7 +18,7 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const form = useForm<z.infer<typeof nicknameSchema>>({
     resolver: zodResolver(nicknameSchema),
-    defaultValues: { nickname: "", nickname_public: false, post_master_badge_public: true },
+    defaultValues: { nickname: "", nickname_public: false },
   });
   const nickname = useWatch({ control: form.control, name: "nickname" });
   const overLimit = Array.from(nickname).length > 10;
@@ -32,7 +32,6 @@ export default function ProfilePage() {
     form.reset({
       nickname: profile.nickname ?? "",
       nickname_public: profile.nickname_public ?? false,
-      post_master_badge_public: profile.post_master_badge_public ?? true,
     });
   }, [profile, form]);
 
@@ -47,7 +46,7 @@ export default function ProfilePage() {
         body: JSON.stringify(values),
       });
       await refreshProfile();
-      setMessage("保存しました。");
+      setMessage("ニックネームを更新しました。");
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "更新に失敗しました。");
     }
@@ -59,7 +58,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">ニックネームとバッジ</h1>
+      <h1 className="text-2xl font-bold">ニックネームの変更</h1>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input placeholder="ニックネーム" {...form.register("nickname")} />
         {overLimit ? (
@@ -71,15 +70,6 @@ export default function ProfilePage() {
           <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
           投稿にニックネームを公開する
         </label>
-        <div className="space-y-1">
-          <label className="flex items-center gap-2 text-sm text-slate-200">
-            <input type="checkbox" className="size-4 accent-blue-500" {...form.register("post_master_badge_public")} />
-            「投稿マスター」のバッジを表示する
-          </label>
-          <p className="pl-6 text-xs text-slate-400">
-            いいねがついた投稿が30件以上になると、投稿の詳細でニックネームの横に出ます。ニックネームを公開していないときは出ません。
-          </p>
-        </div>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>

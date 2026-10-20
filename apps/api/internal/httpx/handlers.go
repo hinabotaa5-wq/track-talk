@@ -107,8 +107,6 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 type profileReq struct {
 	Nickname       string `json:"nickname"`
 	NicknamePublic bool   `json:"nickname_public"`
-	// 送られてこなければ、いまの設定のままにする
-	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
 }
 
 func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -126,15 +124,36 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"nickname": message})
 		return
 	}
-	badgePublic := p.PostMasterBadgePublic
-	if req.PostMasterBadgePublic != nil {
-		badgePublic = *req.PostMasterBadgePublic
-	}
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
+		ID:             p.ID,
+		Nickname:       &nickname,
+		NicknamePublic: req.NicknamePublic,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, profileJSON(updated))
+}
+
+type badgeReq struct {
+	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
+}
+
+// updateBadge は、投稿マスターのバッジを投稿の詳細に出すかどうかを切り替える。
+func (s *Server) updateBadge(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req badgeReq
+	if err := DecodeJSON(r, &req); err != nil || req.PostMasterBadgePublic == nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	updated, err := s.q.UpdatePostMasterBadge(r.Context(), db.UpdatePostMasterBadgeParams{
 		ID:                    p.ID,
-		Nickname:              &nickname,
-		NicknamePublic:        req.NicknamePublic,
-		PostMasterBadgePublic: badgePublic,
+		PostMasterBadgePublic: *req.PostMasterBadgePublic,
 	})
 	if err != nil {
 		MapDBError(w, err)
