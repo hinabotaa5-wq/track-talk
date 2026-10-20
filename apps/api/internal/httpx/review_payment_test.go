@@ -360,3 +360,23 @@ func TestReviewPaymentBlockedAfterGuardianDeclines(t *testing.T) {
 		t.Fatalf("checkout after decline %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 返却して代金が確定した直後(tick が報酬を記録する前)に依頼した人が退会しても、コーチの報酬は残る。
+func TestWithdrawRecordsCoachEarningFirst(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	coach, _ := onDutyCoach(t, h, tadmin)
+	_, tu := demoRequester(t, h, tadmin)
+	id := paidReview(t, h, tu, "paypay", "pi_paypay_earning")
+	execSQLArgs(t, `UPDATE review_requests SET status = 'returned', returned_at = now(), coach_id = $2 WHERE id = $1`, id, coach)
+	execSQLArgs(t, `UPDATE review_payments SET authorized_at = now() - interval '2 minutes' WHERE request_id = $1`, id)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	var n int
+	queryRowArgs(t, `SELECT count(*)::int FROM coach_earnings WHERE coach_id = $1`, []any{coach}, &n)
+	if n != 1 {
+		t.Fatalf("coach earnings after the requester withdrew = %d", n)
+	}
+}

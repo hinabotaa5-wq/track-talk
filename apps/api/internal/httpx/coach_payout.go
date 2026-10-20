@@ -145,11 +145,16 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 
 // recordCoachEarnings は、返却した添削と、終わったパーソナル指導の報酬を記録する（tick から）。
 func (s *Server) recordCoachEarnings(ctx context.Context) (int, error) {
-	reviews, err := s.q.InsertReviewEarnings(ctx, reviewSharePercent)
+	return recordCoachEarningsWith(ctx, s.q)
+}
+
+// recordCoachEarningsWith は recordCoachEarnings を q(トランザクションの中など)で行う。
+func recordCoachEarningsWith(ctx context.Context, q *db.Queries) (int, error) {
+	reviews, err := q.InsertReviewEarnings(ctx, reviewSharePercent)
 	if err != nil {
 		return 0, err
 	}
-	personal, err := s.q.InsertPersonalEarnings(ctx, db.InsertPersonalEarningsParams{
+	personal, err := q.InsertPersonalEarnings(ctx, db.InsertPersonalEarningsParams{
 		FeePercent: personalFeePercent, ReducedFeePercent: personalReducedFeePercent,
 	})
 	if err != nil {
