@@ -5,7 +5,7 @@ import { SenseNotesCard } from "@/components/sense-notes-card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { Award, Bookmark, ChevronRight, FileText, HeartPulse, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { installGuideOpenEvent } from "@/lib/install-guide";
@@ -15,6 +15,7 @@ const accountLinks = [
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
   { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
+  { href: "/me/badge", label: "バッジ", icon: Award },
 ] as const;
 
 const infoLinks = [

@@ -458,14 +458,15 @@ type CloudinaryUpload struct {
 }
 
 type Profile struct {
-	ID             uuid.UUID  `json:"id"`
-	IsAdmin        bool       `json:"is_admin"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
-	Nickname       *string    `json:"nickname"`
-	NicknamePublic bool       `json:"nickname_public"`
-	BirthMonth     *time.Time `json:"birth_month"`
-	CoachingDemo   bool       `json:"coaching_demo"`
+	ID                    uuid.UUID  `json:"id"`
+	IsAdmin               bool       `json:"is_admin"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	Nickname              *string    `json:"nickname"`
+	NicknamePublic        bool       `json:"nickname_public"`
+	BirthMonth            *time.Time `json:"birth_month"`
+	CoachingDemo          bool       `json:"coaching_demo"`
+	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
 }
 
 type PushSubscription struct {

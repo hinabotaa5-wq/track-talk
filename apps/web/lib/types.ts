@@ -48,6 +48,7 @@ export type Post = {
   id: string;
   title: string;
   author_name?: string;
+  author_post_master?: boolean;
   body?: string;
   mine: boolean;
   like_count: number;
@@ -242,6 +243,7 @@ export type Profile = {
   id: string;
   nickname: string | null;
   nickname_public: boolean;
+  post_master_badge_public?: boolean;
   is_admin?: boolean;
   created_at: string;
   updated_at?: string;

@@ -96,9 +96,11 @@ func profileJSON(p db.Profile) map[string]any {
 		"id":              p.ID,
 		"nickname":        p.Nickname,
 		"nickname_public": p.NicknamePublic,
-		"is_admin":        p.IsAdmin,
-		"created_at":      p.CreatedAt,
-		"updated_at":      p.UpdatedAt,
+		// 投稿マスターのバッジを投稿の詳細に出すかどうか
+		"post_master_badge_public": p.PostMasterBadgePublic,
+		"is_admin":                 p.IsAdmin,
+		"created_at":               p.CreatedAt,
+		"updated_at":               p.UpdatedAt,
 	}
 }
 
@@ -134,6 +136,32 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		ID:             p.ID,
 		Nickname:       &nickname,
 		NicknamePublic: req.NicknamePublic,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, profileJSON(updated))
+}
+
+type badgeReq struct {
+	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
+}
+
+// updateBadge は、投稿マスターのバッジを投稿の詳細に出すかどうかを切り替える。
+func (s *Server) updateBadge(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req badgeReq
+	if err := DecodeJSON(r, &req); err != nil || req.PostMasterBadgePublic == nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	updated, err := s.q.UpdatePostMasterBadge(r.Context(), db.UpdatePostMasterBadgeParams{
+		ID:                    p.ID,
+		PostMasterBadgePublic: *req.PostMasterBadgePublic,
 	})
 	if err != nil {
 		MapDBError(w, err)

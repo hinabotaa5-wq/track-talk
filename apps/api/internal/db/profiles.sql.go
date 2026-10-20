@@ -17,7 +17,7 @@ SELECT $1::uuid, $2::text, $3::boolean
 WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type EnsureProfileParams struct {
@@ -39,6 +39,37 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 		&i.NicknamePublic,
 		&i.BirthMonth,
 		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
+	)
+	return i, err
+}
+
+const updatePostMasterBadge = `-- name: UpdatePostMasterBadge :one
+UPDATE profiles
+SET post_master_badge_public = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
+`
+
+type UpdatePostMasterBadgeParams struct {
+	ID                    uuid.UUID `json:"id"`
+	PostMasterBadgePublic bool      `json:"post_master_badge_public"`
+}
+
+func (q *Queries) UpdatePostMasterBadge(ctx context.Context, arg UpdatePostMasterBadgeParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, updatePostMasterBadge, arg.ID, arg.PostMasterBadgePublic)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+		&i.BirthMonth,
+		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
 	)
 	return i, err
 }
@@ -70,7 +101,7 @@ SET nickname = $2,
     nickname_public = $3,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type UpdateProfileParams struct {
@@ -91,6 +122,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.NicknamePublic,
 		&i.BirthMonth,
 		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
 	)
 	return i, err
 }

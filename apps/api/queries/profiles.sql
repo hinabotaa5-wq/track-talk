@@ -18,3 +18,10 @@ SET nickname = $2,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: UpdatePostMasterBadge :one
+UPDATE profiles
+SET post_master_badge_public = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING *;

@@ -520,6 +520,14 @@ export function PostDetail({
       ) : null}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
         {post.author_name ? <span>{post.author_name}</span> : null}
+        {post.author_name && post.author_post_master ? (
+          <span
+            title="いいねがついた投稿が30件以上ある人"
+            className="rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-200"
+          >
+            投稿マスター
+          </span>
+        ) : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>
       </p>
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
