@@ -48,3 +48,17 @@ func (q *Queries) UploadIssuedTo(ctx context.Context, arg UploadIssuedToParams) 
 	err := row.Scan(&exists)
 	return exists, err
 }
+
+const countRecentUploads = `-- name: CountRecentUploads :one
+SELECT count(*)::int FROM cloudinary_uploads
+WHERE owner_id = $1
+  AND created_at > now() - interval '1 day'
+`
+
+// この人に、この1日(24時間)に出した署名の数。
+func (q *Queries) CountRecentUploads(ctx context.Context, ownerID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countRecentUploads, ownerID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}

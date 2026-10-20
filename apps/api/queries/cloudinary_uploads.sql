@@ -11,3 +11,9 @@ SELECT EXISTS (
     WHERE public_id = $1
       AND owner_id = $2
 );
+
+-- name: CountRecentUploads :one
+-- この人に、この1日(24時間)に出した署名の数。
+SELECT count(*)::int FROM cloudinary_uploads
+WHERE owner_id = $1
+  AND created_at > now() - interval '1 day';

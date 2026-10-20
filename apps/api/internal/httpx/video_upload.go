@@ -23,6 +23,9 @@ func (s *Server) signUpload(w http.ResponseWriter, r *http.Request, resource, no
 	if !ok {
 		return
 	}
+	if !s.uploadQuotaLeft(w, r, p.ID) {
+		return
+	}
 	signed, err := s.cloud.SignedUpload(time.Now(), resource)
 	if err != nil {
 		writeAssetReadyError(w, err, noun)
@@ -56,6 +59,23 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 	default:
 		Error(w, http.StatusBadGateway, "unavailable", noun+"の確認に失敗しました")
 	}
+}
+
+// maxUploadSignsPerDay は、1人が1日(24時間)に受け取れる署名の数。署名があれば Cloudinary に直接アップロードできるので、数を絞る。
+const maxUploadSignsPerDay = 30
+
+// uploadQuotaLeft は、署名の数が1日の上限に届いていないかを確かめる。届いていれば 429 を書いて false を返す。
+func (s *Server) uploadQuotaLeft(w http.ResponseWriter, r *http.Request, owner uuid.UUID) bool {
+	n, err := s.q.CountRecentUploads(r.Context(), owner)
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if n >= maxUploadSignsPerDay {
+		Error(w, http.StatusTooManyRequests, "rate_limited", "アップロードの回数が1日の上限に達しました。明日またお試しください")
+		return false
+	}
+	return true
 }
 
 // uploadIssuedToMe は、この public_id の署名を、ログイン中の本人に出したかを確かめる。

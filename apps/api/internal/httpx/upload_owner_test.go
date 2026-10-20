@@ -47,3 +47,21 @@ func TestCoachingVideoIdsAreBoundToTheirOwner(t *testing.T) {
 		t.Fatalf("other's video %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 署名は1人1日 30 回まで。超えたら 429 になり、前の日の分は数えない。
+func TestUploadSigningIsLimitedPerUserPerDay(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	tok := token(t, uuid.New())
+	first := signedCoachingVideo(t, h, tok)
+	for i := 1; i < 30; i++ {
+		grantUpload(t, h, tok, "track-talk/"+uuid.NewString())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/uploads/image", tok, map[string]any{}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `UPDATE cloudinary_uploads SET created_at = now() - interval '2 days' WHERE public_id = $1`, first)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/uploads/image", tok, map[string]any{}); rec.Code != http.StatusOK {
+		t.Fatalf("after a day %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -511,6 +511,9 @@ func (s *Server) signCoachingVideoUpload(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
+	if !s.uploadQuotaLeft(w, r, p.ID) {
+		return
+	}
 	signed, err := s.cloud.SignedCoachingUpload(time.Now())
 	if err != nil {
 		writeAssetReadyError(w, err, "動画")
