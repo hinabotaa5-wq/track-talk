@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
+import { isInjuryBodyPart } from "@/lib/injury";
 
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
@@ -31,6 +32,22 @@ export function activeMainTab(pathname: string) {
   return "";
 }
 
+const injuryGroupPathPattern = /^\/injury\/([^/]+)$/;
+
+// ケガのグループの画面(/injury/hamstring-strain など)。「データ」の /injury/data は含まない。
+function isInjuryGroupPath(pathname: string) {
+  const code = injuryGroupPathPattern.exec(pathname)?.[1];
+  return !!code && isInjuryBodyPart(code);
+}
+
+// ヘッダーを「戻る」ボタンだけにする画面。ロゴ・大会などのメニュー・通知は出さない。
+// 下のメニューの「マイページ」から開いたログイン画面(next なし)は、ふつうのヘッダーのまま。
+export function hasBackOnlyHeader(pathname: string, search = "") {
+  if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
+  if (pathname === "/login") return new URLSearchParams(search).has("next");
+  return isInjuryGroupPath(pathname);
+}
+
 // search は "?next=/upload" のような URL のクエリ部分。
 export function showsBackButton(pathname: string, search = "") {
   if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
@@ -44,6 +61,7 @@ export function showsBackButton(pathname: string, search = "") {
   if (pathname === "/competitions/regional") return true;
   if (pathname === "/menu-contest") return true;
   if (/^\/injury\/[^/]+\/new$/.test(pathname)) return true;
+  if (isInjuryGroupPath(pathname)) return true;
   if (pathname.startsWith("/posts/")) return true;
   if (pathname.startsWith("/reviews/")) return true;
   return false;

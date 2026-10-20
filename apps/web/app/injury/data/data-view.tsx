@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { InjuryTabs } from "@/components/injury-tabs";
 import { Bars, hasItems } from "@/components/injury-public-summary";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, type InjuryPublicGroup } from "@/lib/injury";
@@ -60,7 +59,7 @@ function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: num
   );
 }
 
-// 「データ」タブ。ケガ共有のグループで集まった回答を、全体とケガごとに集計して見せるだけで、ここでは何も集めない。
+// 「データ」タブ。共有のグループで集まった回答を、全体とケガごとに集計して見せるだけで、ここでは何も集めない。
 export function DataView() {
   const [data, setData] = useState<InjuryData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -77,9 +76,7 @@ export function DataView() {
 
   return (
     <div className="space-y-4">
-      <h1 className="sr-only">ケガ</h1>
       <p className="text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
-      <InjuryTabs current="data" />
 
       {failed ? (
         <ErrorState message="データの取得に失敗しました。APIの起動を確認してください。" />
@@ -99,12 +96,6 @@ export function DataView() {
           </ul>
         </>
       )}
-
-      <p className="text-sm text-slate-300">
-        <Link href="/injury/stats" className="underline-offset-2 hover:underline">
-          みんなの復帰データ（復帰までの日数の目安）→
-        </Link>
-      </p>
     </div>
   );
 }

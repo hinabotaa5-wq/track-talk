@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { InjuryTabs } from "@/components/injury-tabs";
 import { InjuryMeCards } from "@/components/injury-me-cards";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, sortInjuryGroups, type InjuryGroupSummary } from "@/lib/injury";
 
+// 「共有」タブ。ケガのグループの一覧。
 export function InjuryView() {
   const { token, loading } = useAuth();
   const [groups, setGroups] = useState<InjuryGroupSummary[] | null>(null);
@@ -32,9 +32,7 @@ export function InjuryView() {
 
   return (
     <div className="space-y-4">
-      <h1 className="sr-only">ケガ</h1>
       <p className="text-sm text-slate-200">同じ怪我をしている人たちと気持ちを共有して復帰を目指そう！</p>
-      <InjuryTabs current="share" />
       <InjuryMeCards token={token} />
 
       {failed ? (

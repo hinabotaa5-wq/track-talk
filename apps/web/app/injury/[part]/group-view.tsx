@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FeedCard, feedGridClass } from "@/components/feed-card";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { useGuardedLinkClick } from "@/components/leave-guard";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
@@ -35,7 +34,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const [selected, setSelected] = useState<InjuryStage | null>(null);
   const [posts, setPosts] = useState<{ stage: string; page: PostsPage } | null>(null);
   const router = useRouter();
-  const guardedClick = useGuardedLinkClick();
   const [changing, setChanging] = useState(false);
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
@@ -107,21 +105,10 @@ export function GroupView({ part, members, summary }: { part: string; members: n
     }
   }
 
-  const back = (
-    <Link
-      href="/injury"
-      onClick={(event) => guardedClick(event, "/injury")}
-      className="inline-block text-sm font-semibold text-blue-300 underline-offset-2 hover:underline"
-    >
-      ← ケガ
-    </Link>
-  );
-
-  // 入っていない人(ログインしていない人や検索から来た人も)には、グループの紹介と公開の集計を見せる。
+  // 入っていない人(ログインしていない人や検索から来た人も)には、グループの紹介と入るボタンだけを見せる。
   // サーバーで描くときはまだログインがわからないので、最初はこの形で描く。
   const intro = (cta: ReactNode) => (
     <div className="space-y-4">
-      {back}
       <div>
         <h1 className="text-2xl font-bold">
           {injuryGroupTitle(part)}
@@ -130,7 +117,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         <p className="mt-2 text-sm text-slate-200">{injuryGroupDescriptions[part]}</p>
       </div>
       {cta}
-      {summary}
     </div>
   );
   const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95";
@@ -157,8 +143,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
     }
     return (
       <div className="space-y-4">
-        {back}
-        <InjuryJoinWizard
+          <InjuryJoinWizard
           part={part}
           token={token}
           onJoined={() => {
@@ -185,7 +170,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
 
   return (
     <div className="space-y-4">
-      {back}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">

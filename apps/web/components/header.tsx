@@ -7,7 +7,7 @@ import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, mainTabHref, mainTabs, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -70,6 +70,7 @@ export function Header() {
   const pathname = usePathname();
   const search = useLocationSearch();
   const showBack = showsBackButton(pathname, search);
+  const backOnly = hasBackOnlyHeader(pathname, search);
   const { confirmLeave } = useLeaveGuard();
   const guardedClick = useGuardedLinkClick();
 
@@ -107,47 +108,49 @@ export function Header() {
             </Link>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
-            {mainTabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = current === tab.id;
-              return (
-                <Link
-                  key={tab.id}
-                  href={mainTabHref(tab.id, !!session)}
-                  onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}
-                  aria-current={active ? "page" : undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
-                    active
-                      ? "border border-white/35 bg-white/20 font-semibold text-white"
-                      : "text-slate-200 hover:bg-white/12 hover:text-white"
-                  }`}
-                >
-                  <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </nav>
-          {profile?.is_admin ? (
-            <Link
-              href="/admin"
-              onClick={(event) => guardedClick(event, "/admin")}
-              aria-label="管理"
-              className="inline-flex size-10 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
-            >
-              <Shield className="size-5" strokeWidth={2} aria-hidden />
-            </Link>
-          ) : null}
-          {session && (!showBack || pathname.startsWith("/me")) ? (
-            <>
-              {pathname === "/" ? <TodayMeetBalloon /> : null}
-              <FeedbackBox />
-              <NotificationBell />
-            </>
-          ) : null}
-        </div>
+        {backOnly ? null : (
+          <div className="flex shrink-0 items-center gap-1">
+            <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
+              {mainTabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = current === tab.id;
+                return (
+                  <Link
+                    key={tab.id}
+                    href={mainTabHref(tab.id, !!session)}
+                    onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}
+                    aria-current={active ? "page" : undefined}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
+                      active
+                        ? "border border-white/35 bg-white/20 font-semibold text-white"
+                        : "text-slate-200 hover:bg-white/12 hover:text-white"
+                    }`}
+                  >
+                    <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {profile?.is_admin ? (
+              <Link
+                href="/admin"
+                onClick={(event) => guardedClick(event, "/admin")}
+                aria-label="管理"
+                className="inline-flex size-10 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
+              >
+                <Shield className="size-5" strokeWidth={2} aria-hidden />
+              </Link>
+            ) : null}
+            {session && (!showBack || pathname.startsWith("/me")) ? (
+              <>
+                {pathname === "/" ? <TodayMeetBalloon /> : null}
+                <FeedbackBox />
+                <NotificationBell />
+              </>
+            ) : null}
+          </div>
+        )}
       </div>
       {/* エグ練大会の開催中だけ、ホームのヘッダーに締め切りまでの残り時間を出す。 */}
       {pathname === "/" ? <MenuContestBar /> : null}

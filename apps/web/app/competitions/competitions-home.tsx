@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Globe, MapPin, MessageCircle } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
+import { ViewSwitch } from "@/components/view-switch";
 import { useSearchParams } from "next/navigation";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { NowRunning } from "@/components/meet-now-running";
@@ -77,32 +78,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
         })}
       </nav>
       <MotionConfig reducedMotion="user">
-        <div role="group" aria-label="表示する大会" className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
-          {views.map((item) => {
-            const active = item.id === view;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => select(item.id)}
-                className={`relative h-10 rounded-full text-sm font-semibold transition-colors duration-200 active:scale-95 ${
-                  active ? "text-white" : "text-slate-200 hover:text-white"
-                }`}
-              >
-                {active ? (
-                  <motion.span
-                    layoutId="competition-view-pill"
-                    className="absolute inset-0 rounded-full bg-white/25"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                    aria-hidden
-                  />
-                ) : null}
-                <span className="relative">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <ViewSwitch label="表示する大会" layoutId="competition-view-pill" views={views} current={view} onSelect={select} />
         {views.map((item) =>
           opened.has(item.id) || item.id === view ? (
             <motion.div
