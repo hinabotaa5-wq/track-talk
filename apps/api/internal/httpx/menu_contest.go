@@ -340,7 +340,20 @@ func (s *Server) voteMenuContest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "closed", "いまは投票を受け付けていません")
 		return
 	}
-	rows, err := s.q.ListMenuContestFinalists(r.Context(), round.key())
+	// 運営のトップ3の選び直しと重ならないよう、回のロックを取ってからトップ3を読んで投票する。
+	ctx := r.Context()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+	if err := q.LockMenuContestRound(ctx, round.key()); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	rows, err := q.ListMenuContestFinalists(ctx, round.key())
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -363,7 +376,11 @@ func (s *Server) voteMenuContest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "自分の応募には投票できません")
 		return
 	}
-	if err := s.q.UpsertMenuContestVote(r.Context(), db.UpsertMenuContestVoteParams{RoundStart: round.key(), VoterID: me.ID, EntryID: picked.ID}); err != nil {
+	if err := q.UpsertMenuContestVote(ctx, db.UpsertMenuContestVoteParams{RoundStart: round.key(), VoterID: me.ID, EntryID: picked.ID}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -451,6 +468,11 @@ func (s *Server) setMenuContestFinalists(w http.ResponseWriter, r *http.Request)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.q.WithTx(tx)
+	// 投票と重ならないよう、回のロックを取ってから票を数える。
+	if err := q.LockMenuContestRound(ctx, round.key()); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	votes, err := q.CountMenuContestVotes(ctx, round.key())
 	if err != nil {
 		MapDBError(w, err)

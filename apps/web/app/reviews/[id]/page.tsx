@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { FeedLoadingFrame } from "@/components/loading-frame";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { fetchAllPages } from "@/lib/paging";
 import { productKindLabels, ratingText } from "@/lib/product";
 import {
   activeReviewFilterCount,
@@ -51,20 +52,31 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   const [formError, setFormError] = useState("");
   const [pending, setPending] = useState(false);
 
+  // 絞り込みやログイン状態の確定で読み込みが重なったとき、古い応答が後から返って上書きしないよう、最新の読み込みだけ反映する。
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
-      const [p, r] = await Promise.all([
+      let firstSummary: { review_count: number; avg_rating: number } | null = null;
+      // 自分のレビューが51件目以降にあっても投稿済みと分かるよう、最後のページまで集める。
+      const [p, all] = await Promise.all([
         apiFetch<Product>(`/v1/products/${id}`),
-        apiFetch<{ reviews: ProductReview[]; meta: Meta; summary: { review_count: number; avg_rating: number } }>(
-          `/v1/products/${id}/reviews?per_page=50${filterQuery ? `&${filterQuery}` : ""}`,
-          { token },
-        ),
+        fetchAllPages(async (page) => {
+          const r = await apiFetch<{ reviews: ProductReview[]; meta: Meta; summary: { review_count: number; avg_rating: number } }>(
+            `/v1/products/${id}/reviews?page=${page}&per_page=50${filterQuery ? `&${filterQuery}` : ""}`,
+            { token },
+          );
+          if (page === 1) firstSummary = r.summary ?? null;
+          return { items: r.reviews ?? [], total: r.meta.total };
+        }),
       ]);
+      if (seq !== loadSeq.current) return;
       setProduct(p);
-      setReviews(r.reviews ?? []);
-      setSummary(r.summary ?? null);
+      setReviews(all.items);
+      setSummary(firstSummary);
       setError("");
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       setError(e instanceof ApiRequestError && e.status === 404 ? "商品が見つかりませんでした。" : "取得に失敗しました。");
     }
   }, [id, token, filterQuery]);

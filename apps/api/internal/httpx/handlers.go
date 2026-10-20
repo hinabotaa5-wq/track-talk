@@ -59,11 +59,19 @@ func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Prof
 	if value := strings.TrimSpace(identity.Nickname); value != "" && Nickname(value) == "" {
 		nickname = &value
 	}
-	p, err := s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
-		ID:             identity.UserID,
-		Nickname:       nickname,
-		NicknamePublic: nickname != nil && identity.NicknamePublic,
-	})
+	// ほとんどは作成済みなので、まず読むだけで済ませ、無いときだけ作る。
+	p, err := s.q.GetProfileByID(r.Context(), identity.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		p, err = s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
+			ID:             identity.UserID,
+			Nickname:       nickname,
+			NicknamePublic: nickname != nil && identity.NicknamePublic,
+		})
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusUnauthorized, "unauthorized", "このアカウントは退会済みです")
+		return db.Profile{}, false
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return db.Profile{}, false
@@ -88,9 +96,11 @@ func profileJSON(p db.Profile) map[string]any {
 		"id":              p.ID,
 		"nickname":        p.Nickname,
 		"nickname_public": p.NicknamePublic,
-		"is_admin":        p.IsAdmin,
-		"created_at":      p.CreatedAt,
-		"updated_at":      p.UpdatedAt,
+		// 投稿マスターのバッジを投稿の詳細に出すかどうか
+		"post_master_badge_public": p.PostMasterBadgePublic,
+		"is_admin":                 p.IsAdmin,
+		"created_at":               p.CreatedAt,
+		"updated_at":               p.UpdatedAt,
 	}
 }
 
@@ -126,6 +136,32 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		ID:             p.ID,
 		Nickname:       &nickname,
 		NicknamePublic: req.NicknamePublic,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, profileJSON(updated))
+}
+
+type badgeReq struct {
+	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
+}
+
+// updateBadge は、投稿マスターのバッジを投稿の詳細に出すかどうかを切り替える。
+func (s *Server) updateBadge(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req badgeReq
+	if err := DecodeJSON(r, &req); err != nil || req.PostMasterBadgePublic == nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	updated, err := s.q.UpdatePostMasterBadge(r.Context(), db.UpdatePostMasterBadgeParams{
+		ID:                    p.ID,
+		PostMasterBadgePublic: *req.PostMasterBadgePublic,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -546,13 +582,21 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		if params.CloudinaryPublicID != nil {
 			publicID = *params.CloudinaryPublicID
 		}
+		if !s.uploadIssuedToMe(w, r, p.ID, publicID, "video_public_id", "動画") {
+			return
+		}
 		if err := s.cloud.Ready(r.Context(), publicID); err != nil {
+			s.purgeRejectedUpload(err, "video", publicID)
 			writeVideoReadyError(w, err)
 			return
 		}
 	}
 	if params.Kind == "text" && params.CloudinaryPublicID != nil {
+		if !s.uploadIssuedToMe(w, r, p.ID, *params.CloudinaryPublicID, "cloudinary_public_id", "写真") {
+			return
+		}
 		if err := s.cloud.ImageReady(r.Context(), *params.CloudinaryPublicID); err != nil {
+			s.purgeRejectedUpload(err, "image", *params.CloudinaryPublicID)
 			writeAssetReadyError(w, err, "写真")
 			return
 		}

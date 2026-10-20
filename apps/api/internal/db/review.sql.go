@@ -119,10 +119,11 @@ func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoaches
 
 const countReviewRequestsByRequester = `-- name: CountReviewRequestsByRequester :one
 SELECT count(*) FROM review_requests
-WHERE requester_id = $1 AND status <> 'awaiting_payment'
+WHERE requester_id = $1
 `
 
-// 送った依頼の数。支払いがまだのものは数えない。
+// 送った依頼の数。支払いがまだのものも数える（数えないと、保護者の同意前に何本でも作ってから払える）。
+// 払わないまま閉じたものは tick が消すので、そのあとは数に入らない。
 func (q *Queries) CountReviewRequestsByRequester(ctx context.Context, requesterID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countReviewRequestsByRequester, requesterID)
 	var count int64
@@ -620,6 +621,16 @@ SELECT pg_advisory_xact_lock(7351002)
 // 割り当ては1つずつ行い、同じコーチに上限を超えて回さないようにする。
 func (q *Queries) LockReviewAssignment(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockReviewAssignment)
+	return err
+}
+
+const lockReviewRequester = `-- name: LockReviewRequester :exec
+SELECT pg_advisory_xact_lock(hashtext('review_requester:' || $1::uuid::text))
+`
+
+// 同じ人の依頼の作成を1つずつにする。「同意待ちの18歳未満は1本目まで」の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockReviewRequester(ctx context.Context, requesterID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockReviewRequester, requesterID)
 	return err
 }
 

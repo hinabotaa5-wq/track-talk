@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { groupSenseNotesByDay, senseCheer, senseDayLabel, senseJarLevel, type SenseNote } from "./sense-notes";
+import {
+  groupSenseNotesByDay,
+  senseCheer,
+  senseDayLabel,
+  senseJarLevel,
+  senseSummaryNextLabel,
+  senseSummaryRangeLabel,
+  type SenseNote,
+} from "./sense-notes";
 
 function note(id: string, day: string): SenseNote {
   return { id, body: id, event: null, event_label: null, day, created_at: `${day}T10:00:00Z`, updated_at: `${day}T10:00:00Z` };
@@ -34,5 +42,13 @@ describe("sense notes", () => {
     const now = new Date("2026-10-16T03:00:00Z");
     expect(senseDayLabel("2026-10-16", now)).toBe("10月16日(金)");
     expect(senseDayLabel("2025-12-31", now)).toBe("2025年12月31日(水)");
+  });
+
+  it("labels the week of a summary and the day the next one opens", () => {
+    // 2026-10-20 10:00 JST
+    const now = new Date("2026-10-20T01:00:00Z");
+    expect(senseSummaryRangeLabel({ from_day: "2026-10-14", to_day: "2026-10-20" }, now)).toBe("10月14日(水)〜10月20日(火)");
+    expect(senseSummaryNextLabel("2026-10-27T01:00:00Z", now)).toBe("10月27日(火)");
+    expect(senseSummaryNextLabel(null, now)).toBeNull();
   });
 });

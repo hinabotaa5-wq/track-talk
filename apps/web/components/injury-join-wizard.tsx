@@ -22,6 +22,8 @@ import {
   injuryStages,
   localMonthString,
   recentMonths,
+  injuryHindsights,
+  toggleHindsight,
   togglePreChange,
   type InjuryGroupMember,
   type InjuryJoinAnswers,
@@ -36,6 +38,7 @@ const questions: Record<InjuryJoinStep, string> = {
   place: "どこでケガをしましたか?",
   activity: "そのとき何をしていましたか?",
   preChanges: "ケガの前に変わったことは?",
+  hindsight: "いま思うと、どうすればよかったですか?",
   event: "種目は?",
   stage: "いまの段階は?",
 };
@@ -44,6 +47,7 @@ const hints: Partial<Record<InjuryJoinStep, string>> = {
   diagnosis: "診断名がわからなければ「わからない」と書いてください。",
   injuredMonth: "だいたいで大丈夫です。",
   preChanges: "当てはまるものをいくつでも選べます。",
+  hindsight: "これから同じケガをしないための、ほかの人へのヒントとして集計します。いくつでも選べます。",
 };
 
 export function InjuryJoinWizard({
@@ -198,6 +202,15 @@ export function InjuryJoinWizard({
             options={injuryPreChanges}
             selected={(value) => answers.preChanges.includes(value)}
             onSelect={(value) => change({ preChanges: togglePreChange(answers.preChanges, value) })}
+          />
+        ) : null}
+
+        {step === "hindsight" ? (
+          <Choices
+            label="どうすればよかったか"
+            options={injuryHindsights}
+            selected={(value) => answers.hindsight.includes(value)}
+            onSelect={(value) => change({ hindsight: toggleHindsight(answers.hindsight, value) })}
           />
         ) : null}
 

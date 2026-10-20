@@ -8,3 +8,7 @@ export function flagEnabled(value: string | undefined): boolean {
 // 提供前でも開けておく。プライバシーポリシーは「未提供」で書いているので、
 // 提供を始めるまで本番では立てない。API 側の COACHING_ENABLED と揃えること。
 export const coachingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_ENABLED);
+
+// 感覚メモの1週間のまとめ(AI)。感覚メモを OpenAI に送るので、プライバシーポリシーに
+// 委託先を書くまで本番では立てない。API 側の SENSE_SUMMARY_ENABLED と揃えること。
+export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUMMARY_ENABLED);

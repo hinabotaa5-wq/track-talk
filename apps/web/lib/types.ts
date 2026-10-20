@@ -48,6 +48,7 @@ export type Post = {
   id: string;
   title: string;
   author_name?: string;
+  author_post_master?: boolean;
   body?: string;
   mine: boolean;
   like_count: number;
@@ -80,6 +81,10 @@ export type MeetThread = {
   href: string;
   // いま実施中の種目(例: 「女子100m予選」)。タイムテーブルが無い大会では空。
   now_running: string[];
+  // 大会タブの一覧のどの大会か。国内主要大会は major_slug と major_year、国際大会は competition_id(もう一方は空)。
+  major_slug: string;
+  major_year: number;
+  competition_id: string;
 };
 
 export type Injury = {
@@ -151,6 +156,8 @@ export type Practice = {
   accepted_count: number;
   status: "open" | "full" | "dissolved";
   dissolved_at?: string;
+  // 練習の日時を過ぎてから解散した（開かれた）練習で、評価できるとき true。日時より前の解散は中止。
+  ratable?: boolean;
   my_application?: PracticeApplication["status"];
   my_application_id?: string;
   rated_host?: boolean;
@@ -236,6 +243,7 @@ export type Profile = {
   id: string;
   nickname: string | null;
   nickname_public: boolean;
+  post_master_badge_public?: boolean;
   is_admin?: boolean;
   created_at: string;
   updated_at?: string;

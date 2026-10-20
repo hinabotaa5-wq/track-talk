@@ -11,6 +11,8 @@ type Entry = { data: PostsPage; at: number };
 
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<PostsPage>>();
+// 消したあとに、消す前に始めた読み込みが書き戻さないようにする世代の番号(ログアウト後に前の人の保存一覧が残らないように)。
+let generation = 0;
 
 export function homeFeedPath(sort: FeedSort, q: string, page: number) {
   const qs = new URLSearchParams({
@@ -43,6 +45,7 @@ export function seedFeed(path: string, data: PostsPage) {
 }
 
 export function clearHomeFeeds() {
+  generation++;
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/posts")) {
       cache.delete(key);
@@ -52,6 +55,7 @@ export function clearHomeFeeds() {
 }
 
 export function clearSavedFeeds() {
+  generation++;
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/me/")) {
       cache.delete(key);
@@ -61,14 +65,15 @@ export function clearSavedFeeds() {
 }
 
 function start(path: string, request: () => Promise<{ posts?: PostsPage["posts"] | null; meta: PostsPage["meta"] }>) {
-  const pending = request()
+  const startedAt = generation;
+  const pending: Promise<PostsPage> = request()
     .then((data) => {
       const page = { posts: data.posts ?? [], meta: data.meta };
-      seedFeed(path, page);
+      if (startedAt === generation) seedFeed(path, page);
       return page;
     })
     .finally(() => {
-      inflight.delete(path);
+      if (inflight.get(path) === pending) inflight.delete(path);
     });
   inflight.set(path, pending);
   return pending;

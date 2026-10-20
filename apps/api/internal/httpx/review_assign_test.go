@@ -112,7 +112,7 @@ func TestReviewOfferFlow(t *testing.T) {
 	}
 
 	// 送るとすぐ、先に受付を始めたコーチ A に打診される。動画は引き受けるまで見せない。
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -162,7 +162,7 @@ func TestReviewOfferFlow(t *testing.T) {
 	}
 
 	// 2本目は、最後に打診されたのが古い A に回る。A が引き受けると動画が見られる。
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	var second reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &second)
 	if rec.Code != http.StatusCreated || second.Status != "offered" {
@@ -221,7 +221,7 @@ func TestReviewOfferRespectsActiveLimit(t *testing.T) {
 	}
 	statuses := []string{}
 	for range 3 {
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBody())
+		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 		var rr reviewRequestView
 		_ = json.Unmarshal(rec.Body.Bytes(), &rr)
 		statuses = append(statuses, rr.Status)

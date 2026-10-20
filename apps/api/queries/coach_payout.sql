@@ -62,7 +62,8 @@ FROM (
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)
     ORDER BY ct.id, pay.paid_at
 ) x
-WHERE x.gross > 0
+-- 取り分が0円になる行（1円だけ残った返金など）は記録しない。amount_yen > 0 の制約で全体が失敗するため。
+WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
 RETURNING *;
@@ -157,3 +158,10 @@ FROM coach_payouts cpo
 LEFT JOIN profiles p ON p.id = cpo.coach_id
 ORDER BY cpo.created_at DESC
 LIMIT 100;
+
+-- name: GetContractEarning :one
+SELECT * FROM coach_earnings WHERE contract_id = $1;
+
+-- name: DeleteUnpaidContractEarning :exec
+-- 期間が終わってから全額を返金した指導の、まだ送金に含めていない報酬を消す。
+DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL;

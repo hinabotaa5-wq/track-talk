@@ -187,6 +187,16 @@ func (s *Server) updateInjury(w http.ResponseWriter, r *http.Request, author db.
 		MapDBError(w, err)
 		return
 	}
+	// 部位は参加しているグループで決まるので、編集では変えられない。
+	current, err := q.GetInjuryDetail(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if current.BodyPart != in.BodyPart {
+		FieldError(w, map[string]string{"body_part": "部位は変えられません"})
+		return
+	}
 	if err := saveInjury(r.Context(), q, id, in); err != nil {
 		MapDBError(w, err)
 		return
@@ -314,21 +324,32 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	count, err := s.q.CountInjuryUpdates(r.Context(), postID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if count >= maxInjuryUpdates {
+	// 同時に送られても50件を超えないよう、投稿の行をロックしてから数えて保存する。
+	errFull := errors.New("injury updates full")
+	var row db.InjuryUpdate
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockInjuryPost(r.Context(), postID); err != nil {
+			return err
+		}
+		count, err := q.CountInjuryUpdates(r.Context(), postID)
+		if err != nil {
+			return err
+		}
+		if count >= maxInjuryUpdates {
+			return errFull
+		}
+		row, err = q.CreateInjuryUpdate(r.Context(), db.CreateInjuryUpdateParams{
+			ID:     uuid.New(),
+			PostID: postID,
+			Stage:  stage,
+			Body:   body,
+		})
+		return err
+	})
+	if errors.Is(err, errFull) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "経過報告は1つの投稿につき50件までです")
 		return
 	}
-	row, err := s.q.CreateInjuryUpdate(r.Context(), db.CreateInjuryUpdateParams{
-		ID:     uuid.New(),
-		PostID: postID,
-		Stage:  stage,
-		Body:   body,
-	})
 	if err != nil {
 		MapDBError(w, err)
 		return

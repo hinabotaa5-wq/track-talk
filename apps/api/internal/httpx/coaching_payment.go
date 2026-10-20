@@ -362,10 +362,24 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 	if pay.PaymentIntentID == nil {
 		return pay, errors.New("payment has no payment intent")
 	}
-	if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()+"-"+strconv.Itoa(int(amount))); err != nil {
-		return pay, fmt.Errorf("%w: %w", errStripe, err)
+	// 同じ支払いの返金が重なっても Stripe に2回送らないよう、支払いの行をロックしたまま送って記録する。
+	// まだ返金していないことは、ロックしてから確かめ直す（返し終えていたら ErrNoRows）。
+	refunded := pay
+	err := s.tx(ctx, func(q *db.Queries) error {
+		if _, err := q.LockPaidCoachingPayment(ctx, pay.ID); err != nil {
+			return err
+		}
+		if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()+"-"+strconv.Itoa(int(amount))); err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		var err error
+		refunded, err = q.RecordCoachingRefund(ctx, db.RecordCoachingRefundParams{ID: pay.ID, RefundedYen: amount, RefundReason: reason})
+		return err
+	})
+	if err != nil {
+		return pay, err
 	}
-	return s.q.RecordCoachingRefund(ctx, db.RecordCoachingRefundParams{ID: pay.ID, RefundedYen: amount, RefundReason: reason})
+	return refunded, nil
 }
 
 // refundUnstarted は、期間が始まらなかった支払いを全額返金して、払った人の側に知らせる。
@@ -389,6 +403,14 @@ func (s *Server) refundUnstarted(ctx context.Context, pay db.CoachingPayment) er
 	return nil
 }
 
+// touchCoachingPayment は、Stripe で返金できなかった支払いを次の tick で後ろに回す。
+// 断られ続ける支払いが50件たまっても、ほかの支払いが返金されないままにならないようにする。
+func (s *Server) touchCoachingPayment(ctx context.Context, id uuid.UUID) {
+	if err := s.q.TouchCoachingPayment(ctx, id); err != nil {
+		slog.Error("touch coaching payment", "payment", id, "err", err)
+	}
+}
+
 // refundCoachingPayments は tick から呼ぶ。始まってから72時間コーチが書いていないものを全額返金して閉じ、
 // 始まらなかったのに返金し損ねた支払いも返金する。
 func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
@@ -407,6 +429,7 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 		}
 		if _, err := s.refundPayment(ctx, pay, pay.AmountYen, "no_coach_reply"); err != nil {
 			slog.Error("refund silent contract", "contract", ct.ID, "err", err)
+			s.touchCoachingPayment(ctx, pay.ID)
 			continue
 		}
 		if _, err := s.q.RefundCoachingContract(ctx, ct.ID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -433,6 +456,7 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 	for _, pay := range unstarted {
 		if err := s.refundUnstarted(ctx, pay); err != nil {
 			slog.Error("refund unstarted payment", "payment", pay.ID, "err", err)
+			s.touchCoachingPayment(ctx, pay.ID)
 			continue
 		}
 		n++
@@ -497,6 +521,16 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	amount, reason := pay.AmountYen, "admin_full"
+	// 期間が終わった指導は、tick がコーチの報酬をもう記録している。送金に含めたあとは取り戻せないので、全額の返金はさせない。
+	earning, err := s.q.GetContractEarning(r.Context(), &ct.ID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
+	if err == nil && earning.PayoutID != nil {
+		Error(w, http.StatusConflict, "conflict", "コーチへの報酬を送金に含めたあとなので、ここからは返金できません。Stripe のダッシュボードで対応してください")
+		return
+	}
 	if req.Kind == "remaining" {
 		if ct.Status != "active" && ct.Status != "suspended" {
 			Error(w, http.StatusConflict, "conflict", "残りの日数分は、期間中のものだけ返金できます")
@@ -515,6 +549,11 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 			Error(w, http.StatusBadGateway, "payment_unavailable", "Stripe で返金できませんでした。Stripe のダッシュボードで確かめてください")
 			return
 		}
+		MapDBError(w, err)
+		return
+	}
+	// 返金した分をコーチの報酬から外す。まだ記録していなければ、tick が返金後の額で記録する。
+	if err := s.q.DeleteUnpaidContractEarning(r.Context(), &ct.ID); err != nil {
 		MapDBError(w, err)
 		return
 	}

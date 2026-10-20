@@ -29,6 +29,10 @@ DELETE FROM sense_notes
 WHERE id = $1
   AND author_id = $2;
 
+-- name: LockSenseNoteAuthor :exec
+-- 同じ人の感覚メモの作成を1つずつにする。1日20件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('sense_notes:' || sqlc.arg(author_id)::uuid::text));
+
 -- name: CountSenseNotesSince :one
 SELECT count(*) FROM sense_notes
 WHERE author_id = $1
@@ -43,3 +47,25 @@ SELECT DISTINCT (created_at AT TIME ZONE 'Asia/Tokyo')::date AS day
 FROM sense_notes
 WHERE author_id = $1
 ORDER BY day DESC;
+
+-- name: ListSenseNotesBetween :many
+-- まとめに渡す感覚メモ。古い順。
+SELECT body, event, created_at
+FROM sense_notes
+WHERE author_id = sqlc.arg('author_id')
+  AND created_at >= sqlc.arg('since')
+  AND created_at < sqlc.arg('until')
+ORDER BY created_at, id
+LIMIT sqlc.arg('max_notes');
+
+-- name: CreateSenseNoteSummary :one
+INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, summary)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, from_day, to_day, note_count, summary, created_at;
+
+-- name: LatestSenseNoteSummary :one
+SELECT id, from_day, to_day, note_count, summary, created_at
+FROM sense_note_summaries
+WHERE author_id = $1
+ORDER BY created_at DESC
+LIMIT 1;

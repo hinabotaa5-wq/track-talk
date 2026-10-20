@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -162,5 +163,30 @@ func TestSenseNotesPageAndDailyLimit(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes?cursor=bad", me, nil); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad cursor = %d", rec.Code)
+	}
+}
+
+// 19件ある日に同時に送っても、20件を超えて作れない。
+func TestSenseNoteDailyLimitHoldsUnderConcurrency(t *testing.T) {
+	h := setup(t)
+	id := uuid.New()
+	me := token(t, id)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes", me, nil); rec.Code != http.StatusOK {
+		t.Fatalf("list %d", rec.Code)
+	}
+	execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body) SELECT gen_random_uuid(), $1, 'メモ' FROM generate_series(1, 19)`, id)
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "同時のメモ"})
+		}()
+	}
+	wg.Wait()
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM sense_notes WHERE author_id = $1`, []any{id}, &n)
+	if n != 20 {
+		t.Fatalf("notes %d", n)
 	}
 }

@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -98,5 +99,30 @@ func TestRaceRecordsStayWithTheAthlete(t *testing.T) {
 	}
 	if got := decodeRaceRecords(t, rec.Body.Bytes()); len(got.Records) != 1 || len(got.Events) != 1 || got.Events[0].Count != 1 {
 		t.Fatalf("after delete %s", rec.Body.String())
+	}
+}
+
+// 999件ある状態で同時に送っても、1000件を超えて保存できない。
+func TestRaceRecordLimitHoldsUnderConcurrency(t *testing.T) {
+	h := setup(t)
+	id := uuid.New()
+	me := token(t, id)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/race-records", me, nil); rec.Code != http.StatusOK {
+		t.Fatalf("list %d", rec.Code)
+	}
+	execSQLArgs(t, `INSERT INTO race_records (id, author_id, raced_on, event, mark) SELECT gen_random_uuid(), $1, '2026-05-03', '100m', 1112 FROM generate_series(1, 999)`, id)
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/me/race-records", me, map[string]any{"raced_on": "2026-05-03", "event": "100m", "mark": 1100})
+		}()
+	}
+	wg.Wait()
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM race_records WHERE author_id = $1`, []any{id}, &n)
+	if n != 1000 {
+		t.Fatalf("records %d", n)
 	}
 }

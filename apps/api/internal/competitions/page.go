@@ -110,6 +110,12 @@ func yearFromURL(u *url.URL) (int, bool) {
 	for _, key := range []string{"y", "year", "season"} {
 		if val := u.Query().Get(key); val != "" {
 			if y, err := strconv.Atoi(val); err == nil && y >= 2020 && y <= seasonYearCap() {
+				// 月ごとのページ（?m=1&y=2027 など）の y は暦年。1〜3月は前の年の競技年度に入る。
+				if key != "season" {
+					if m, err := strconv.Atoi(u.Query().Get("m")); err == nil && m >= 1 && m <= 3 {
+						y--
+					}
+				}
 				return y, true
 			}
 		}
@@ -691,6 +697,11 @@ func spanAttr(n *html.Node, key string) int {
 		value, err := strconv.Atoi(strings.TrimSpace(attr.Val))
 		if err != nil || value < 1 {
 			return 1
+		}
+		// ブラウザと同じく上限で切る（HTML の仕様で colspan は1000、rowspan は65534）。
+		// 切らないと、巨大な値のセルが1つあるだけで表の展開がメモリを使い切る。
+		if limit := map[string]int{"colspan": 1000, "rowspan": 65534}[strings.ToLower(key)]; limit > 0 && value > limit {
+			return limit
 		}
 		return value
 	}

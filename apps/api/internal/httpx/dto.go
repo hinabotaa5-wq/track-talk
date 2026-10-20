@@ -18,6 +18,7 @@ type postDTO struct {
 	Title          string    `json:"title"`
 	Body           string    `json:"body,omitempty"`
 	AuthorName     *string   `json:"author_name,omitempty"`
+	PostMaster     bool      `json:"author_post_master,omitempty"`
 	authorID       uuid.UUID
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
@@ -57,15 +58,17 @@ type recruitmentDTO struct {
 }
 
 type practiceDTO struct {
-	Venue           string                   `json:"venue"`
-	StartsAt        time.Time                `json:"starts_at"`
-	Event           string                   `json:"event"`
-	EventOther      string                   `json:"event_other,omitempty"`
-	EventLabel      string                   `json:"event_label"`
-	Capacity        int32                    `json:"capacity"`
-	DissolvedAt     *time.Time               `json:"dissolved_at,omitempty"`
-	AcceptedCount   int32                    `json:"accepted_count"`
-	Status          string                   `json:"status"`
+	Venue         string     `json:"venue"`
+	StartsAt      time.Time  `json:"starts_at"`
+	Event         string     `json:"event"`
+	EventOther    string     `json:"event_other,omitempty"`
+	EventLabel    string     `json:"event_label"`
+	Capacity      int32      `json:"capacity"`
+	DissolvedAt   *time.Time `json:"dissolved_at,omitempty"`
+	AcceptedCount int32      `json:"accepted_count"`
+	Status        string     `json:"status"`
+	// Ratable は、練習の日時を過ぎてから解散した（開かれた）練習で、評価できること。
+	Ratable         bool                     `json:"ratable,omitempty"`
 	MyApplication   string                   `json:"my_application,omitempty"`
 	MyApplicationID *uuid.UUID               `json:"my_application_id,omitempty"`
 	RatedHost       bool                     `json:"rated_host,omitempty"`
@@ -192,5 +195,20 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		UpdatedAt:           row.UpdatedAt,
 	}, liked, false)
 	p.AuthorName = row.AuthorName
+	p.PostMaster = isPostMaster(row)
 	return p
+}
+
+// postMasterLikedPosts は、投稿マスターのバッジに要る「いいねが1つ以上ついた投稿」の数。
+// 数だけで付けると連投が増えるので、いいねのついた投稿だけを数える。
+const postMasterLikedPosts = 30
+
+// isPostMaster は、投稿の詳細で投稿者に投稿マスターのバッジを出すかどうか。
+// 匿名の投稿にバッジを出すと同じ人の投稿だと見分けられてしまうので、
+// ニックネームを公開している人だけにする（本人がバッジを隠していれば数は0になる）。
+// 運営（実況スレッド）には付けない。
+func isPostMaster(row db.GetPostRow) bool {
+	return row.AuthorName != nil &&
+		row.AuthorID != SystemProfileID &&
+		row.AuthorLikedPostCount >= postMasterLikedPosts
 }

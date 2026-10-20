@@ -50,3 +50,15 @@ func TestInjuryMiddleHalf(t *testing.T) {
 		t.Fatalf("should not go below zero: %d", low)
 	}
 }
+
+// 日本時間の月初の朝（UTC ではまだ前月）でも、今月を選べる。
+func TestNormalizeInjuryJoinMonthUsesJST(t *testing.T) {
+	now := time.Date(2026, 10, 31, 20, 0, 0, 0, time.UTC) // 日本時間 11月1日 05:00
+	req := injuryJoinReq{
+		Severity: "mild", SawDoctor: new(bool), Place: "grass", Activity: "jog",
+		PreChanges: []string{"fatigue"}, Event: "long", Stage: "resting", InjuredMonth: "2026-11",
+	}
+	if _, fields := normalizeInjuryJoin("shin-splints", req, now); len(fields) != 0 {
+		t.Fatalf("fields %v", fields)
+	}
+}

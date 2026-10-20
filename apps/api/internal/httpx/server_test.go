@@ -1355,6 +1355,7 @@ func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
 	if rec.Code != 409 {
 		t.Fatalf("rate before dissolve %d %s", rec.Code, rec.Body.String())
 	}
+	practiceHeld(t, created.ID)
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+created.ID+"/practice/dissolve", host, nil)
 	if rec.Code != 200 {
 		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
@@ -1732,6 +1733,7 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("rate notification without participants %+v", authorNotes)
 	}
 
+	practiceHeld(t, practicePost.ID)
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts/"+practicePost.ID+"/practice/dissolve", author, nil)
 	if rec.Code != 200 {
 		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
@@ -1802,6 +1804,7 @@ func TestPracticeRatingCommentCanBeReportedAndHidden(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, base+"/applications/"+app+"/accept", host, nil); rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
+	practiceHeld(t, created.ID)
 	if rec := doJSON(t, h, http.MethodPost, base+"/dissolve", host, nil); rec.Code != 200 {
 		t.Fatalf("dissolve %d %s", rec.Code, rec.Body.String())
 	}

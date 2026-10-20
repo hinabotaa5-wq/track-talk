@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -133,7 +135,22 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if onDuty && !current.OnDuty {
-		devices, err := s.q.CountPushSubscriptions(r.Context(), p.ID)
+		// 登録の件数だけでは、届かない宛先でも受付中になれてしまう。通知を使えるときは、
+		// 受付を始めた知らせを実際に送って、1台以上に届いたことを確かめる。
+		var devices int64
+		var err error
+		if s.push.Configured() {
+			var sent int
+			sent, err = s.sendPush(r.Context(), p.ID, push.Message{
+				Title: "依頼の受付を始めました",
+				Body:  "フォーム添削の依頼が届くと、この端末に通知します",
+				URL:   "/coach",
+				Tag:   "coach-duty",
+			}, 10*time.Minute)
+			devices = int64(sent)
+		} else {
+			devices, err = s.q.CountPushSubscriptions(r.Context(), p.ID)
+		}
 		if err != nil {
 			MapDBError(w, err)
 			return
@@ -257,8 +274,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "birth_month_required", "先に生まれた年月を登録してください")
 		return
 	}
-	if isMinor(*p.BirthMonth, time.Now()) {
-		if code, message := s.minorRequestBlock(r, p.ID); code != "" {
+	minor := isMinor(*p.BirthMonth, time.Now())
+	if minor {
+		if code, message := s.minorRequestBlock(r.Context(), s.q, p.ID); code != "" {
 			Error(w, http.StatusUnprocessableEntity, code, message)
 			return
 		}
@@ -274,6 +292,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
+		return
+	}
 	if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
 		writeAssetReadyError(w, err, "動画")
 		return
@@ -284,7 +305,25 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rr, err := s.q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if minor {
+		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
+		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); code != "" {
+			Error(w, http.StatusUnprocessableEntity, code, message)
+			return
+		}
+	}
+	rr, err := q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
 		ID:            uuid.New(),
 		RequesterID:   p.ID,
 		Tier:          req.Tier,
@@ -301,6 +340,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -331,8 +374,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 
 // minorRequestBlock は、18歳未満が依頼を送れない理由を返す。送れるなら空。
 // 保護者の同意を待たずに1本目は送れるが、同意が済むまで2本目は送れない。同意しないと言われたら送れない。
-func (s *Server) minorRequestBlock(r *http.Request, minorID uuid.UUID) (string, string) {
-	consent, err := s.q.GetGuardianConsentByMinor(r.Context(), minorID)
+func (s *Server) minorRequestBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID) (string, string) {
+	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
 	status := "none"
 	if err == nil {
 		status = consent.Status
@@ -345,7 +388,7 @@ func (s *Server) minorRequestBlock(r *http.Request, minorID uuid.UUID) (string, 
 	case "declined", "revoked":
 		return "guardian_declined", "保護者の同意がないため、フォーム添削は使えません"
 	}
-	sent, err := s.q.CountReviewRequestsByRequester(r.Context(), minorID)
+	sent, err := q.CountReviewRequestsByRequester(ctx, minorID)
 	if err != nil {
 		return "internal_error", "サーバーエラーが発生しました"
 	}
@@ -396,12 +439,20 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	// tick が遅れていても、目安を過ぎた依頼は開いた時点で片付ける。
+	// tick が遅れていても、目安を過ぎた依頼は開いた時点で期限切れにする。
+	// 返金や報酬の記録まで含む tick 全体はここでは回さない（Scheduler の tick と重ならないように）。
+	// 開いた人が通信を切っても途中で止まらないよう、リクエストの取り消しは引き継がない。
 	if reviewWaiting(rr.Status) && !time.Now().Before(rr.DueAt) {
-		if _, err := s.runCoachingTick(r.Context()); err != nil {
-			slog.Warn("review tick on read", "err", err)
-		} else if fresh, err := s.q.GetReviewRequest(r.Context(), id); err == nil {
-			rr = fresh
+		ctx := context.WithoutCancel(r.Context())
+		if overdue, err := s.q.ExpireOverdueReviewRequests(ctx); err != nil {
+			slog.Warn("expire overdue reviews on read", "err", err)
+		} else {
+			for _, o := range overdue {
+				s.notifyReviewExpired(ctx, o)
+			}
+			if fresh, err := s.q.GetReviewRequest(ctx, id); err == nil {
+				rr = fresh
+			}
 		}
 	}
 	s.writeRequesterReview(w, r, rr)

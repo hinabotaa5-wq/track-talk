@@ -140,7 +140,7 @@ func (q *Queries) ListMyCoachingPlans(ctx context.Context, coachID uuid.UUID) ([
 
 const listPublicCoachingPlans = `-- name: ListPublicCoachingPlans :many
 SELECT pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at,
-    (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status = 'active')::int AS active_count
+    (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status IN ('accepted', 'active', 'suspended'))::int AS active_count
 FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 WHERE pl.published
@@ -164,7 +164,7 @@ type ListPublicCoachingPlansRow struct {
 	ActiveCount  int32     `json:"active_count"`
 }
 
-// コーチ一覧に出すプラン。期間中の人数をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
+// コーチ一覧に出すプラン。枠を使っている人数（支払い待ち・期間中・停止中）をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
 func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int16) ([]ListPublicCoachingPlansRow, error) {
 	rows, err := q.db.Query(ctx, listPublicCoachingPlans, pledgeVersion)
 	if err != nil {

@@ -10,24 +10,26 @@ ON CONFLICT (post_id) DO UPDATE SET
     capacity = EXCLUDED.capacity;
 
 -- name: GetPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = $1;
 
 -- name: ListPracticeDetails :many
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = ANY(sqlc.arg('post_ids')::uuid[]);
 
 -- name: LockPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
 FROM practice_details
 WHERE post_id = $1
 FOR UPDATE;
 
 -- name: DissolvePractice :execrows
+-- 練習の日時より前に解散したものは中止（canceled）として残す。
 UPDATE practice_details
-SET dissolved_at = now()
+SET dissolved_at = now(),
+    canceled = now() < starts_at
 WHERE post_id = $1
   AND dissolved_at IS NULL;
 

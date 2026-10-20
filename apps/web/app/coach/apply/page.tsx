@@ -13,7 +13,7 @@ import type { CoachApplication, CoachEvent, CoachTier } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 // コーチ（先輩を含む）の応募。集めるのは担当種目・記録・成績・競技年数だけ。
 // 運営が審査し、結果はこの画面と通知で伝える。
@@ -60,6 +60,8 @@ export default function CoachApplyPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  // 入力中の内容を、トークンの更新による読み直しで消さないよう、フォームを埋めるのは初回の読み込みだけにする。
+  const draftFilled = useRef(false);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -74,7 +76,8 @@ export default function CoachApplyPage() {
       .then((d) => {
         if (cancelled) return;
         setApplication(d.application);
-        if (d.application) setDraft(draftFrom(d.application));
+        if (d.application && !draftFilled.current) setDraft(draftFrom(d.application));
+        draftFilled.current = true;
         setLoaded(true);
       })
       .catch(() => {

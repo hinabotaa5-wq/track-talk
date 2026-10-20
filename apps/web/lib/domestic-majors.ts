@@ -48,12 +48,15 @@ export function undecidedDomesticMeets(majors: DomesticMajor[]) {
 
 let cachedMajors: DomesticMajor[] | null = null;
 let majorsRequest: Promise<DomesticMajor[]> | null = null;
+// 消したあとに、消す前に始めた読み込みが古い一覧を書き戻さないよう、消すたびに進める。
+let generation = 0;
 
 export function peekDomesticMajors() {
   return cachedMajors;
 }
 
 export function clearDomesticMajors() {
+  generation++;
   cachedMajors = null;
   majorsRequest = null;
 }
@@ -61,15 +64,18 @@ export function clearDomesticMajors() {
 export function loadDomesticMajors() {
   if (cachedMajors) return Promise.resolve(cachedMajors);
   if (!majorsRequest) {
-    majorsRequest = apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors")
+    const startedAt = generation;
+    const request: Promise<DomesticMajor[]> = apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors")
       .then((data) => {
-        cachedMajors = data.majors ?? [];
-        return cachedMajors;
+        const majors = data.majors ?? [];
+        if (startedAt === generation) cachedMajors = majors;
+        return majors;
       })
       .catch((err) => {
-        majorsRequest = null;
+        if (majorsRequest === request) majorsRequest = null;
         throw err;
       });
+    majorsRequest = request;
   }
   return majorsRequest;
 }

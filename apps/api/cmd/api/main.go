@@ -77,6 +77,10 @@ func main() {
 		Addr:              cfg.Addr,
 		Handler:           httpx.New(cfg, pool, verifier),
 		ReadHeaderTimeout: 5 * time.Second,
+		// ボディを極端に遅く送る接続や、放置された keep-alive 接続が資源を握り続けないようにする。
+		// WriteTimeout は、時間のかかる tick の応答を切らないよう設けない。
+		ReadTimeout: 30 * time.Second,
+		IdleTimeout: 120 * time.Second,
 	}
 	go func() {
 		slog.Info("listen", "addr", cfg.Addr)

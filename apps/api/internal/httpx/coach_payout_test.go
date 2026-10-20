@@ -188,6 +188,12 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"created":0,"paid":0,"failed":0`) || len(f.transferList()) != 2 {
 		t.Fatalf("run again %s", rec.Body.String())
 	}
+	// Stripe では送れていたのに、こちらで失敗のまま残った送金は、送り直さずに済ませる。
+	execSQLArgs(t, `UPDATE coach_payouts SET status = 'failed', stripe_transfer_id = NULL, paid_at = NULL`)
+	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
+	if !strings.Contains(rec.Body.String(), `"created":0,"paid":2,"failed":0`) || len(f.transferList()) != 2 {
+		t.Fatalf("run after lost update %s %d", rec.Body.String(), len(f.transferList()))
+	}
 	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 7200 || !e.Earnings[0].Paid {
 		t.Fatalf("after payout %+v", e)
 	}
@@ -269,5 +275,54 @@ func TestStripeWebhookIs404WhileCoachingIsOff(t *testing.T) {
 	})
 	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1"}); rec.Code != http.StatusNotFound {
 		t.Fatalf("webhook while off %d", rec.Code)
+	}
+}
+
+// 返金で1円だけ残った契約は取り分が0円になる。記録しないで、tick 全体を止めない。
+func TestCoachEarningsSkipZeroShare(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tu, _, contractID := adultAccepted(t, h)
+	checkout(t, h, tu, contractID)
+	paidSession(t, h, sessionIDFor(t, contractID), "pi_personal_one_yen", 8000)
+	execSQLArgs(t, `UPDATE coaching_payments SET status = 'partially_refunded', refunded_yen = amount_yen - 1 WHERE contract_id = $1`, contractID)
+	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'refunded' WHERE id = $1`, contractID)
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
+		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 期間が終わってから全額を返金したら、まだ送金していない報酬を外す。送金に含めたあとは返金させない。
+func TestFullRefundAfterEndRemovesEarning(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	tu, tc, contractID := adultAccepted(t, h)
+	checkout(t, h, tu, contractID)
+	paidSession(t, h, sessionIDFor(t, contractID), "pi_personal_refund_after_end", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = now() - interval '1 minute' WHERE id = $1`, contractID)
+	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":1`) {
+		t.Fatalf("tick %s", rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+contractID+"/refund", tadmin, map[string]any{"kind": "full"}); rec.Code != http.StatusOK {
+		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
+	}
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Earnings) != 0 {
+		t.Fatalf("earnings after refund %+v", e)
+	}
+	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
+		t.Fatalf("tick after refund %s", rec.Body.String())
+	}
+
+	// 送金に含めた報酬がある指導は、ここからは返金できない。
+	tu2, _, other := adultAccepted(t, h)
+	checkout(t, h, tu2, other)
+	paidSession(t, h, sessionIDFor(t, other), "pi_personal_paid_out", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = now() - interval '1 minute' WHERE id = $1`, other)
+	tick(t, h, "tick-secret")
+	execSQLArgs(t, `INSERT INTO coach_payouts (id, coach_id, month, amount_yen) SELECT gen_random_uuid(), coach_id, date_trunc('month', now())::date, amount_yen FROM coach_earnings WHERE contract_id = $1`, other)
+	execSQLArgs(t, `UPDATE coach_earnings e SET payout_id = p.id FROM coach_payouts p WHERE p.coach_id = e.coach_id AND e.contract_id = $1`, other)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+other+"/refund", tadmin, map[string]any{"kind": "full"}); rec.Code != http.StatusConflict {
+		t.Fatalf("refund after payout %d %s", rec.Code, rec.Body.String())
 	}
 }

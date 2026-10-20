@@ -274,6 +274,14 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
+    -- 投稿マスターのバッジ用。ニックネームとバッジを公開している人だけ数える
+    CASE WHEN profile.id IS NULL OR NOT profile.post_master_badge_public THEN 0 ELSE (
+        SELECT count(*) FROM posts liked
+        WHERE liked.author_id = p.author_id
+          AND liked.like_count > 0
+          AND liked.deleted_at IS NULL
+          AND liked.hidden_at IS NULL
+    ) END::bigint AS author_liked_post_count,
     p.created_at,
     p.updated_at
 FROM posts p
@@ -302,6 +310,10 @@ WHERE id = $1
   AND deleted_at IS NULL
   AND hidden_at IS NULL
 RETURNING id, author_id, title, body, like_count, comment_count, created_at, updated_at;
+
+-- name: GetPostMedia :one
+-- 投稿を消す前に、使っている写真・動画を集めるための読み取り。非表示の投稿も読む。
+SELECT id, kind, cloudinary_public_id FROM posts WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: SoftDeletePost :execrows
 UPDATE posts
@@ -475,16 +487,16 @@ DELETE FROM post_likes
 WHERE post_id = $1 AND user_id = $2;
 
 -- name: IncrementLikeCount :exec
-UPDATE posts SET like_count = like_count + 1, updated_at = now() WHERE id = $1;
+UPDATE posts SET like_count = like_count + 1 WHERE id = $1;
 
 -- name: DecrementLikeCount :exec
-UPDATE posts SET like_count = GREATEST(like_count - 1, 0), updated_at = now() WHERE id = $1;
+UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1;
 
 -- name: IncrementCommentCount :exec
-UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id = $1;
+UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1;
 
 -- name: DecrementCommentCount :exec
-UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1;
+UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1;
 
 -- name: ListMediaInUse :many
 SELECT p.cloudinary_public_id::text AS public_id
@@ -496,4 +508,9 @@ SELECT rp.cloudinary_public_id AS public_id
 FROM recruitment_photos rp
 JOIN posts p ON p.id = rp.post_id
 WHERE p.deleted_at IS NULL
-  AND rp.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[]);
+  AND rp.cloudinary_public_id = ANY(sqlc.arg('public_ids')::text[])
+UNION
+-- コーチの顔写真も同じフォルダにあり、一覧で公開 ID が見えるので、使っているものとして数える。
+SELECT cp.photo_public_id::text AS public_id
+FROM coach_profiles cp
+WHERE cp.photo_public_id = ANY(sqlc.arg('public_ids')::text[]);

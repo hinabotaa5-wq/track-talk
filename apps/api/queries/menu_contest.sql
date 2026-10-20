@@ -62,6 +62,10 @@ FROM menu_contest_entries e
 WHERE e.id = sqlc.arg('entry_id')
   AND e.round_start = sqlc.arg('round_start');
 
+-- name: LockMenuContestRound :exec
+-- トップ3の選び直しと投票を1つずつにする。投票が0件の確認から選び直しまでのあいだに票を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('menu_contest:' || sqlc.arg(round_start)::date::text));
+
 -- name: CountMenuContestVotes :one
 SELECT count(*) FROM menu_contest_votes WHERE round_start = $1;
 

@@ -238,6 +238,14 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if len(in.Hindsight) > 0 {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO injury_group_hindsight (user_id, body_part, codes) VALUES ($1, $2, $3)
+			ON CONFLICT (user_id, body_part) DO UPDATE SET codes = EXCLUDED.codes`, p.ID, part, in.Hindsight); err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
 	if err := q.AddInjuryGroupStageLog(r.Context(), db.AddInjuryGroupStageLogParams{UserID: p.ID, BodyPart: part, Stage: in.Stage, Actions: []string{}}); err != nil {
 		MapDBError(w, err)
 		return

@@ -13,10 +13,11 @@ WHERE minor_id = $1;
 
 -- name: GetGuardianConsentByToken :one
 SELECT * FROM guardian_consents
-WHERE token_hash = $1;
+WHERE token_hash = $1
+  AND link_issued_at > now() - interval '30 days';
 
 -- name: IssueGuardianLink :one
--- リンクを出し直すと前のリンクは使えなくなる。同意の状態はそのまま残す。
+-- リンクを出し直すと前のリンクは使えなくなる。リンクは出してから30日で使えなくなる。同意の状態はそのまま残す。
 -- 1日（日本時間）に送れるのは daily_limit 回まで。保護者が一度答えたあとは、送り先のメールアドレスを変えられない。
 -- どちらかに当たると行を返さない。
 INSERT INTO guardian_consents (minor_id, token_hash, guardian_email, link_sent_on, link_sends)
@@ -26,6 +27,7 @@ SET token_hash = EXCLUDED.token_hash,
     guardian_email = EXCLUDED.guardian_email,
     link_sends = CASE WHEN guardian_consents.link_sent_on = EXCLUDED.link_sent_on THEN guardian_consents.link_sends + 1 ELSE 1 END,
     link_sent_on = EXCLUDED.link_sent_on,
+    link_issued_at = now(),
     updated_at = now()
 WHERE (guardian_consents.link_sent_on IS DISTINCT FROM EXCLUDED.link_sent_on OR guardian_consents.link_sends < sqlc.arg(daily_limit)::integer)
   AND (guardian_consents.status = 'pending' OR lower(guardian_consents.guardian_email) = lower(EXCLUDED.guardian_email))

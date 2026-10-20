@@ -163,3 +163,24 @@ func TestCleanNameAndLocationForSpacedOkayamaCells(t *testing.T) {
 		t.Errorf("latin words keep their space: %q", got)
 	}
 }
+
+// 名前が部分一致する行が複数あるときは、どの行の要項か決められないので付けない。
+func TestDestinationForNameSkipsAmbiguousPartialMatches(t *testing.T) {
+	link := func(url string) []cell {
+		return []cell{{Header: "要項", Links: []LinkRef{{URL: url, Text: "要項", Header: "要項"}}}}
+	}
+	mk := func(name, url string) row {
+		return row{Cells: append([]cell{{Header: "競技会", Text: name}}, link(url)...)}
+	}
+	page := Page{rows: []row{
+		mk("(68)県選手権", "https://example.com/a"),
+		mk("(68)県選手権(混成)", "https://example.com/b"),
+	}}
+	if url, _, ok := page.destinationForName("県選手権"); ok {
+		t.Fatalf("ambiguous match returned %s", url)
+	}
+	one := Page{rows: []row{mk("(68)県選手権", "https://example.com/a")}}
+	if url, _, ok := one.destinationForName("県選手権"); !ok || url != "https://example.com/a" {
+		t.Fatalf("single match %s %v", url, ok)
+	}
+}

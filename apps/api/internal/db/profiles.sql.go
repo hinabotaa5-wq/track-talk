@@ -13,10 +13,11 @@ import (
 
 const ensureProfile = `-- name: EnsureProfile :one
 INSERT INTO profiles (id, nickname, nickname_public)
-VALUES ($1, $2, $3)
+SELECT $1::uuid, $2::text, $3::boolean
+WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type EnsureProfileParams struct {
@@ -25,8 +26,61 @@ type EnsureProfileParams struct {
 	NicknamePublic bool      `json:"nickname_public"`
 }
 
+// 退会したアカウントでは作らない（行が返らない）。
 func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (Profile, error) {
 	row := q.db.QueryRow(ctx, ensureProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+		&i.BirthMonth,
+		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
+	)
+	return i, err
+}
+
+const updatePostMasterBadge = `-- name: UpdatePostMasterBadge :one
+UPDATE profiles
+SET post_master_badge_public = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
+`
+
+type UpdatePostMasterBadgeParams struct {
+	ID                    uuid.UUID `json:"id"`
+	PostMasterBadgePublic bool      `json:"post_master_badge_public"`
+}
+
+func (q *Queries) UpdatePostMasterBadge(ctx context.Context, arg UpdatePostMasterBadgeParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, updatePostMasterBadge, arg.ID, arg.PostMasterBadgePublic)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+		&i.BirthMonth,
+		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
+	)
+	return i, err
+}
+
+const getProfileByID = `-- name: GetProfileByID :one
+SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo FROM profiles WHERE id = $1
+`
+
+// ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
+func (q *Queries) GetProfileByID(ctx context.Context, id uuid.UUID) (Profile, error) {
+	row := q.db.QueryRow(ctx, getProfileByID, id)
 	var i Profile
 	err := row.Scan(
 		&i.ID,
@@ -47,7 +101,7 @@ SET nickname = $2,
     nickname_public = $3,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type UpdateProfileParams struct {
@@ -68,6 +122,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.NicknamePublic,
 		&i.BirthMonth,
 		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
 	)
 	return i, err
 }

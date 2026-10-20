@@ -153,6 +153,7 @@ func (page Page) destinationForName(name string) (string, string, bool) {
 	}
 	var partial row
 	var partialLinks []LinkRef
+	partialRows := 0
 	for _, row := range page.rows {
 		rowName := cleanText(nameCell(row))
 		links := guidelinesColumnLinks(row)
@@ -165,9 +166,11 @@ func (page Page) destinationForName(name string) (string, string, bool) {
 		if strings.Contains(rowName, want) || strings.Contains(want, rowName) {
 			partial = row
 			partialLinks = links
+			partialRows++
 		}
 	}
-	if len(partialLinks) == 0 {
+	// 部分一致の行が複数あると、どの行の大会か決められない（誤った要項を付けない）。
+	if partialRows != 1 {
 		return "", "", false
 	}
 	return chooseColumnLink(partial, partialLinks)

@@ -1,6 +1,7 @@
 package competitions
 
 import (
+	"golang.org/x/net/html"
 	"net/url"
 	"strings"
 	"testing"
@@ -94,5 +95,37 @@ func TestYearFromURL(t *testing.T) {
 	u2, _ := url.Parse("https://jaaf-nagasaki.net/schedule/2026ken.htm")
 	if y, ok := yearFromURL(u2); !ok || y != 2026 {
 		t.Fatalf("expected 2026, got %d, %v", y, ok)
+	}
+	// 月ごとのページの1〜3月は、前の年の競技年度。
+	for _, raw := range []string{
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=12&y=2026",
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=1&y=2027",
+		"https://www.fukui-jaaf.com/020_schedule/index.php?m=3&y=2027",
+	} {
+		u, _ := url.Parse(raw)
+		if y, ok := yearFromURL(u); !ok || y != 2026 {
+			t.Fatalf("%s: expected 2026, got %d, %v", raw, y, ok)
+		}
+	}
+}
+
+func TestLayoutTableCapsHugeColspan(t *testing.T) {
+	doc, err := html.Parse(strings.NewReader(`<table><tr><td colspan="2000000000">x</td></tr></table>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var table *html.Node
+	var find func(*html.Node)
+	find = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "table" {
+			table = n
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			find(c)
+		}
+	}
+	find(doc)
+	if grid := layoutTable(table); len(grid) != 1 || len(grid[0]) != 1000 {
+		t.Fatalf("grid %d x %d", len(grid), len(grid[0]))
 	}
 }

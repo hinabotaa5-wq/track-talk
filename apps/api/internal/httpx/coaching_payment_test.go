@@ -35,6 +35,8 @@ type fakeStripe struct {
 	transfers []url.Values
 	// 送金を断らせるときの数。
 	failTransfers int
+	// 返金に答えるまで待つ時間（同時に送ったときの確かめに使う）。
+	refundDelay time.Duration
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -99,6 +101,12 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "succeeded"})
 		case strings.HasSuffix(r.URL.Path, "/cancel"):
 			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/"), "/cancel")
+			// pi_fail で始まるものは、Stripe が断り続ける仮押さえとして扱う。
+			if strings.HasPrefix(id, "pi_fail") {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "invalid_request_error", "message": "cannot cancel"}})
+				return
+			}
 			f.canceled = append(f.canceled, id)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
 		case r.URL.Path == "/v1/checkout/sessions":
@@ -116,6 +124,14 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "payouts_enabled": f.enabled[id], "details_submitted": f.enabled[id]})
 		case r.URL.Path == "/v1/account_links":
 			_ = json.NewEncoder(w).Encode(map[string]any{"url": "https://connect.stripe.test/" + r.PostForm.Get("account")})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/transfers":
+			var data []map[string]any
+			for i, tr := range f.transfers {
+				if tr.Get("transfer_group") == r.URL.Query().Get("transfer_group") {
+					data = append(data, map[string]any{"id": fmt.Sprintf("tr_%d", i+1), "amount": json.Number(tr.Get("amount"))})
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 		case r.URL.Path == "/v1/transfers":
 			if f.failTransfers > 0 {
 				f.failTransfers--
@@ -126,6 +142,7 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			f.transfers = append(f.transfers, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
 		case r.URL.Path == "/v1/refunds":
+			time.Sleep(f.refundDelay)
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
 		default:
@@ -411,4 +428,64 @@ func TestCoachingPaymentAfterTheDeadlineIsRefunded(t *testing.T) {
 	if rec := stripeWebhook(t, demo, testWebhookSecret, "checkout.session.completed", map[string]any{"id": "cs_x"}); rec.Code != http.StatusNotFound {
 		t.Fatalf("demo webhook %d", rec.Code)
 	}
+}
+
+// 運営の返金を同時に2回送っても、Stripe に送る返金は1件だけ。
+func TestAdminCoachingRefundConcurrentRefundsOnce(t *testing.T) {
+	h, f := setupStripe(t)
+	tu, _, id := adultAccepted(t, h)
+	checkout(t, h, tu, id)
+	paidSession(t, h, sessionIDFor(t, id), "pi_once", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = now() - interval '15 days', ends_at = now() + interval '15 days' WHERE id = $1`, id)
+	ta := adminToken(t, h)
+	f.mu.Lock()
+	f.refundDelay = 200 * time.Millisecond
+	f.mu.Unlock()
+	var wg sync.WaitGroup
+	for _, kind := range []string{"full", "remaining"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": kind})
+		}()
+	}
+	wg.Wait()
+	if refunds := f.refundList(); len(refunds) != 1 {
+		t.Fatalf("refunds %v", refunds)
+	}
+}
+
+// 支払い待ちの申し込みも枠を使うので、定員1のプランはコーチ一覧でも満員になる。
+func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
+	h, _ := setupStripe(t)
+	_, tc, planID := planCoach(t, h, 1)
+	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu, contractBody(planID))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	id := decodeContract(t, rec.Body.Bytes()).ID
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/contracts/"+id+"/accept", tc, map[string]any{"agree_report": true, "agree_detection": true}); rec.Code != http.StatusOK {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Coaches []struct {
+			Plans []struct {
+				ID   string `json:"id"`
+				Full bool   `json:"full"`
+			} `json:"plans"`
+		} `json:"coaches"`
+	}
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.Bytes(), &out)
+	for _, c := range out.Coaches {
+		for _, p := range c.Plans {
+			if p.ID == planID {
+				if !p.Full {
+					t.Fatal("plan with an accepted contract is not full in the coach list")
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("plan not listed")
 }

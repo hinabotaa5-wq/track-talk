@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const Model = "gemini-3.8-flash"
@@ -40,6 +41,10 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 	return parseDrafts(text)
 }
 
+// geminiClient は、HTTP を指定しないときの Gemini 用のクライアント。応答しないまま
+// 全体の時間を使い切って、残りの県が取り込めなくならないよう、1回ごとに時間を区切る。
+var geminiClient = &http.Client{Timeout: 3 * time.Minute}
+
 // generate は、Gemini にリクエストを1回送り、返ってきた JSON の文字列を返す。
 func (c Client) generate(ctx context.Context, parts []map[string]any) (string, error) {
 	model := c.Model
@@ -48,7 +53,7 @@ func (c Client) generate(ctx context.Context, parts []map[string]any) (string, e
 	}
 	httpClient := c.HTTP
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = geminiClient
 	}
 	body, err := json.Marshal(map[string]any{
 		"contents": []map[string]any{
@@ -160,10 +165,17 @@ func parseDrafts(raw string) ([]Draft, error) {
 	raw = strings.TrimPrefix(raw, "```")
 	raw = strings.TrimSuffix(raw, "```")
 	raw = strings.TrimSpace(raw)
-	var wrapped struct {
-		Meets []Draft `json:"meets"`
-	}
-	if err := json.Unmarshal([]byte(raw), &wrapped); err == nil && wrapped.Meets != nil {
+	// {"meets": ...} の形で読めたら、meets が null や省略（大会がないページ）でも「大会なし」として返す。
+	if strings.HasPrefix(raw, "{") {
+		var wrapped struct {
+			Meets []Draft `json:"meets"`
+		}
+		if err := json.Unmarshal([]byte(raw), &wrapped); err != nil {
+			return nil, fmt.Errorf("gemini json: %w", err)
+		}
+		if wrapped.Meets == nil {
+			wrapped.Meets = []Draft{}
+		}
 		return wrapped.Meets, nil
 	}
 	var list []Draft

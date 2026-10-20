@@ -107,6 +107,49 @@ func (q *Queries) DeleteReportsForUser(ctx context.Context, userID uuid.UUID) er
 	return err
 }
 
+const listAccountMedia = `-- name: ListAccountMedia :many
+SELECT 'image'::text AS resource, p.cloudinary_public_id::text AS public_id
+FROM posts p WHERE p.author_id = $1 AND p.kind = 'text' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'video'::text, p.cloudinary_public_id::text
+FROM posts p WHERE p.author_id = $1 AND p.kind = 'video' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'image'::text, rp.cloudinary_public_id
+FROM recruitment_photos rp JOIN posts p ON p.id = rp.post_id WHERE p.author_id = $1
+UNION ALL
+SELECT 'image'::text, cp.photo_public_id::text
+FROM coach_profiles cp WHERE cp.profile_id = $1 AND cp.photo_public_id IS NOT NULL
+UNION ALL
+SELECT 'coaching'::text, r.video_public_id
+FROM review_requests r WHERE r.requester_id = $1
+`
+
+type ListAccountMediaRow struct {
+	Resource string `json:"resource"`
+	PublicID string `json:"public_id"`
+}
+
+// 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。
+func (q *Queries) ListAccountMedia(ctx context.Context, userID uuid.UUID) ([]ListAccountMediaRow, error) {
+	rows, err := q.db.Query(ctx, listAccountMedia, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAccountMediaRow
+	for rows.Next() {
+		var i ListAccountMediaRow
+		if err := rows.Scan(&i.Resource, &i.PublicID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const releaseCommentThreadsForUser = `-- name: ReleaseCommentThreadsForUser :exec
 UPDATE comments
 SET parent_id = NULL
@@ -120,6 +163,16 @@ WHERE parent_id IN (
 
 func (q *Queries) ReleaseCommentThreadsForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, releaseCommentThreadsForUser, userID)
+	return err
+}
+
+const rememberDeletedAccount = `-- name: RememberDeletedAccount :exec
+INSERT INTO deleted_accounts (id) VALUES ($1)
+ON CONFLICT (id) DO NOTHING
+`
+
+func (q *Queries) RememberDeletedAccount(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, rememberDeletedAccount, userID)
 	return err
 }
 
@@ -137,12 +190,22 @@ SELECT
         WHERE rp.target_type = 'coaching_message'
           AND rp.status = 'open'
           AND (ct.coach_id = $1 OR ct.requester_id = $1)
-    )::boolean AS open_report
+    )::boolean AS open_report,
+    -- 依頼は退会で消え、依頼が消えた支払いは tick が返金する。確定していない支払いがあるあいだは退会させない。
+    -- 確定済み（返却された依頼の captured）だけになれば退会できる。
+    EXISTS (
+        SELECT 1 FROM review_payments pay
+        LEFT JOIN review_requests r ON r.id = pay.request_id
+        WHERE pay.payer_id = $1
+          AND pay.status IN ('authorized', 'captured')
+          AND (pay.status = 'authorized' OR r.id IS NULL OR r.returned_at IS NULL)
+    )::boolean AS open_review_payment
 `
 
 type WithdrawBlockersRow struct {
-	OpenContract bool `json:"open_contract"`
-	OpenReport   bool `json:"open_report"`
+	OpenContract      bool `json:"open_contract"`
+	OpenReport        bool `json:"open_report"`
+	OpenReviewPayment bool `json:"open_review_payment"`
 }
 
 // 退会すると契約とやりとりが消えるので、進行中のパーソナル指導と、
@@ -150,6 +213,6 @@ type WithdrawBlockersRow struct {
 func (q *Queries) WithdrawBlockers(ctx context.Context, userID uuid.UUID) (WithdrawBlockersRow, error) {
 	row := q.db.QueryRow(ctx, withdrawBlockers, userID)
 	var i WithdrawBlockersRow
-	err := row.Scan(&i.OpenContract, &i.OpenReport)
+	err := row.Scan(&i.OpenContract, &i.OpenReport, &i.OpenReviewPayment)
 	return i, err
 }

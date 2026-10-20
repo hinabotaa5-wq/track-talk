@@ -54,17 +54,19 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	insertMajor("izumo-ekiden", "出雲駅伝", "2026-10-12", "2026-10-12")
 	insertMajor("all-japan", "後日の大会", "2026-11-03", "2026-11-03")
 
-	insertComp := func(name, starts string, ends *string) {
+	insertComp := func(name, starts string, ends *string) uuid.UUID {
 		t.Helper()
+		id := uuid.New()
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO competitions (id, name, starts_on, ends_on, location, prefecture, season_year, organizer_url, source_url)
 			VALUES ($1, $2, $3::date, $4::date, '', '00', 2026, 'https://worldathletics.org/', 'https://worldathletics.org/')`,
-			uuid.New(), name, starts, ends); err != nil {
+			id, name, starts, ends); err != nil {
 			t.Fatal(err)
 		}
+		return id
 	}
 	// 開催中の featured 国際大会と、開催中だが featured でない国際大会。
-	insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13"))
+	finalID := insertComp("ダイヤモンドリーグ・ファイナル", "2026-10-11", strPtr("2026-10-13"))
 	insertComp("コンチネンタルツアー・ゴールド", "2026-10-12", nil)
 
 	// ログイン不要で読める。
@@ -74,12 +76,15 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	}
 	var body struct {
 		Meets []struct {
-			MeetKey      string `json:"meet_key"`
-			Name         string `json:"name"`
-			DateLabel    string `json:"date_label"`
-			PostID       string `json:"post_id"`
-			CommentCount int    `json:"comment_count"`
-			Href         string `json:"href"`
+			MeetKey       string `json:"meet_key"`
+			Name          string `json:"name"`
+			DateLabel     string `json:"date_label"`
+			PostID        string `json:"post_id"`
+			CommentCount  int    `json:"comment_count"`
+			Href          string `json:"href"`
+			MajorSlug     string `json:"major_slug"`
+			MajorYear     int    `json:"major_year"`
+			CompetitionID string `json:"competition_id"`
 		} `json:"meets"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -97,6 +102,13 @@ func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
 	}
 	if intl.MeetKey != "c:00:2026:ダイヤモンドリーグ・ファイナル:2026-10-11" || intl.Name != "ダイヤモンドリーグ・ファイナル" {
 		t.Fatalf("intl %+v", intl)
+	}
+	// 大会タブの一覧と突き合わせるための対応。国内主要大会は slug と年、国際大会は大会の ID。
+	if domestic.MajorSlug != "izumo-ekiden" || domestic.MajorYear != 2026 || domestic.CompetitionID != "" {
+		t.Fatalf("domestic list link %+v", domestic)
+	}
+	if intl.CompetitionID != finalID.String() || intl.MajorSlug != "" || intl.MajorYear != 0 {
+		t.Fatalf("intl list link %+v", intl)
 	}
 
 	// 実況スレッドは運営プロフィールが投稿した kind=meet の投稿。
@@ -237,5 +249,27 @@ func TestAdminMeetSessionsShowNowRunning(t *testing.T) {
 	// 実施中が無いときも、null ではなく空の配列で返す。
 	if body := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil).Body.String(); !strings.Contains(body, `"now_running":[]`) {
 		t.Fatalf("now_running should be an empty array: %s", body)
+	}
+}
+
+// 3月に始まって4月にまたがる国内主要大会は、4月になっても開催中なら実況スレッドが出る。
+func TestTodayMeetThreadsIncludesMajorSpanningSeasonStart(t *testing.T) {
+	jstZone := time.FixedZone("Asia/Tokyo", 9*60*60)
+	fixed := time.Date(2027, time.April, 1, 12, 0, 0, 0, jstZone)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.Clock = func() time.Time { return fixed }
+	})
+	pool := openPool(t)
+	ctx := context.Background()
+	seedSystemProfile(t, pool)
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM domestic_majors WHERE slug = 'spring-spanning'`) })
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO domestic_majors (slug, year, name, category, venue, starts_on, ends_on, schedule_label, site_url)
+		VALUES ('spring-spanning', 2027, '春またぎ大会', 'open', '会場', '2027-03-30', '2027-04-02', '2027年', 'https://example.jp/')`); err != nil {
+		t.Fatal(err)
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/meet-threads/today", "", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "春またぎ大会") {
+		t.Fatalf("today %d %s", rec.Code, rec.Body.String())
 	}
 }

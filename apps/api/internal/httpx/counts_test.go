@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -190,5 +191,35 @@ func execSQL(t *testing.T, query string) {
 	defer pool.Close()
 	if _, err := pool.Exec(ctx, query); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// いいねやコメントの数が変わっても、本文が変わっていない投稿の更新日時は動かない。
+func TestCountChangesKeepPostUpdatedAt(t *testing.T) {
+	h := setup(t)
+	author := token(t, uuid.New())
+	liker := token(t, uuid.New())
+	postID := createTextPost(t, h, author, "更新日時")
+	execSQLArgs(t, `UPDATE posts SET updated_at = now() - interval '1 day' WHERE id = $1`, postID)
+	var before time.Time
+	queryRowArgs(t, `SELECT updated_at FROM posts WHERE id = $1`, []any{postID}, &before)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+postID+"/likes", liker, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("like %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+postID+"/comments", liker, map[string]any{"body": "こんにちは"}); rec.Code != http.StatusCreated {
+		t.Fatalf("comment %d %s", rec.Code, rec.Body.String())
+	}
+	var after time.Time
+	queryRowArgs(t, `SELECT updated_at FROM posts WHERE id = $1`, []any{postID}, &after)
+	if !after.Equal(before) {
+		t.Fatalf("updated_at moved %s -> %s", before, after)
+	}
+}
+
+// 極端に大きなページ番号でも、offset があふれて 500 にならない。
+func TestHugePageNumberIsClamped(t *testing.T) {
+	h := setup(t)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/posts?page=50000000&per_page=50", "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("huge page %d %s", rec.Code, rec.Body.String())
 	}
 }

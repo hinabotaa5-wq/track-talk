@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS cloudinary_uploads;
+ALTER TABLE schema_migrations DISABLE ROW LEVEL SECURITY;

@@ -51,6 +51,11 @@ export function NotificationBell() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // タブに戻ったときの読み直しは、effect を作った時点ではなく、いま開いているかで決める。
+  const openRef = useRef(false);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const load = useCallback(
     (list: boolean) => {
@@ -79,11 +84,10 @@ export function NotificationBell() {
   useEffect(() => {
     if (!token) return;
     const refresh = () => {
-      if (document.visibilityState === "visible") load(open);
+      if (document.visibilityState === "visible") load(openRef.current);
     };
     // 初回は即フェッチ、以降はタブ復帰時のみ
-    if (open) load(true);
-    else load(false);
+    load(openRef.current);
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -250,7 +250,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 }
 
 const decrementCommentCount = `-- name: DecrementCommentCount :exec
-UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -259,7 +259,7 @@ func (q *Queries) DecrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const decrementLikeCount = `-- name: DecrementLikeCount :exec
-UPDATE posts SET like_count = GREATEST(like_count - 1, 0), updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1
 `
 
 func (q *Queries) DecrementLikeCount(ctx context.Context, id uuid.UUID) error {
@@ -349,6 +349,14 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
+    -- 投稿マスターのバッジ用。ニックネームとバッジを公開している人だけ数える
+    CASE WHEN profile.id IS NULL OR NOT profile.post_master_badge_public THEN 0 ELSE (
+        SELECT count(*) FROM posts liked
+        WHERE liked.author_id = p.author_id
+          AND liked.like_count > 0
+          AND liked.deleted_at IS NULL
+          AND liked.hidden_at IS NULL
+    ) END::bigint AS author_liked_post_count,
     p.created_at,
     p.updated_at
 FROM posts p
@@ -361,22 +369,23 @@ WHERE p.id = $1
 `
 
 type GetPostRow struct {
-	ID                  uuid.UUID `json:"id"`
-	AuthorID            uuid.UUID `json:"author_id"`
-	Title               string    `json:"title"`
-	Body                string    `json:"body"`
-	Kind                string    `json:"kind"`
-	YoutubeVideoID      *string   `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
-	InstagramType       *string   `json:"instagram_type"`
-	InstagramShortcode  *string   `json:"instagram_shortcode"`
-	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
-	SourceTitle         *string   `json:"source_title"`
-	LikeCount           int32     `json:"like_count"`
-	CommentCount        int32     `json:"comment_count"`
-	AuthorName          *string   `json:"author_name"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	ID                   uuid.UUID `json:"id"`
+	AuthorID             uuid.UUID `json:"author_id"`
+	Title                string    `json:"title"`
+	Body                 string    `json:"body"`
+	Kind                 string    `json:"kind"`
+	YoutubeVideoID       *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl  *string   `json:"youtube_thumbnail_url"`
+	InstagramType        *string   `json:"instagram_type"`
+	InstagramShortcode   *string   `json:"instagram_shortcode"`
+	CloudinaryPublicID   *string   `json:"cloudinary_public_id"`
+	SourceTitle          *string   `json:"source_title"`
+	LikeCount            int32     `json:"like_count"`
+	CommentCount         int32     `json:"comment_count"`
+	AuthorName           *string   `json:"author_name"`
+	AuthorLikedPostCount int64     `json:"author_liked_post_count"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
@@ -397,9 +406,28 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.LikeCount,
 		&i.CommentCount,
 		&i.AuthorName,
+		&i.AuthorLikedPostCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getPostMedia = `-- name: GetPostMedia :one
+SELECT id, kind, cloudinary_public_id FROM posts WHERE id = $1 AND deleted_at IS NULL
+`
+
+type GetPostMediaRow struct {
+	ID                 uuid.UUID `json:"id"`
+	Kind               string    `json:"kind"`
+	CloudinaryPublicID *string   `json:"cloudinary_public_id"`
+}
+
+// 投稿を消す前に、使っている写真・動画を集めるための読み取り。非表示の投稿も読む。
+func (q *Queries) GetPostMedia(ctx context.Context, id uuid.UUID) (GetPostMediaRow, error) {
+	row := q.db.QueryRow(ctx, getPostMedia, id)
+	var i GetPostMediaRow
+	err := row.Scan(&i.ID, &i.Kind, &i.CloudinaryPublicID)
 	return i, err
 }
 
@@ -420,7 +448,7 @@ func (q *Queries) HidePost(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const incrementCommentCount = `-- name: IncrementCommentCount :exec
-UPDATE posts SET comment_count = comment_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error {
@@ -429,7 +457,7 @@ func (q *Queries) IncrementCommentCount(ctx context.Context, id uuid.UUID) error
 }
 
 const incrementLikeCount = `-- name: IncrementLikeCount :exec
-UPDATE posts SET like_count = like_count + 1, updated_at = now() WHERE id = $1
+UPDATE posts SET like_count = like_count + 1 WHERE id = $1
 `
 
 func (q *Queries) IncrementLikeCount(ctx context.Context, id uuid.UUID) error {
@@ -536,8 +564,13 @@ FROM recruitment_photos rp
 JOIN posts p ON p.id = rp.post_id
 WHERE p.deleted_at IS NULL
   AND rp.cloudinary_public_id = ANY($1::text[])
+UNION
+SELECT cp.photo_public_id::text AS public_id
+FROM coach_profiles cp
+WHERE cp.photo_public_id = ANY($1::text[])
 `
 
+// コーチの顔写真も同じフォルダにあり、一覧で公開 ID が見えるので、使っているものとして数える。
 func (q *Queries) ListMediaInUse(ctx context.Context, publicIds []string) ([]string, error) {
 	rows, err := q.db.Query(ctx, listMediaInUse, publicIds)
 	if err != nil {

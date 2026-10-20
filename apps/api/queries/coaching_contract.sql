@@ -60,6 +60,14 @@ UNION ALL
  LIMIT 30)
 ORDER BY created_at DESC;
 
+-- name: LockContractPlan :exec
+-- 承諾で定員を数える前に、その申し込みのプランの行をロックする。
+-- 同じプランの承諾を同時に送っても、1件ずつ数えるようにするため。
+SELECT pl.id FROM coaching_plans pl
+JOIN coaching_contracts ct ON ct.plan_id = pl.id
+WHERE ct.id = $1
+FOR UPDATE OF pl;
+
 -- name: AcceptCoachingContract :one
 -- 返事待ちで期限内のものだけ承諾できる。
 -- 支払いがあるとき（payment_required）は、72時間以内に支払いが済んだら始まる（18歳未満は保護者が同意して払う）。

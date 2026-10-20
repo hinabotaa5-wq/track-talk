@@ -52,6 +52,10 @@ WHERE author_id = sqlc.arg('user_id');
 DELETE FROM posts
 WHERE author_id = sqlc.arg('user_id');
 
+-- name: RememberDeletedAccount :exec
+INSERT INTO deleted_accounts (id) VALUES (sqlc.arg('user_id'))
+ON CONFLICT (id) DO NOTHING;
+
 -- name: DeleteProfile :exec
 DELETE FROM profiles
 WHERE id = sqlc.arg('user_id');
@@ -72,4 +76,30 @@ SELECT
         WHERE rp.target_type = 'coaching_message'
           AND rp.status = 'open'
           AND (ct.coach_id = sqlc.arg('user_id') OR ct.requester_id = sqlc.arg('user_id'))
-    )::boolean AS open_report;
+    )::boolean AS open_report,
+    -- 依頼は退会で消え、依頼が消えた支払いは tick が返金する。確定していない支払いがあるあいだは退会させない。
+    -- 確定済み（返却された依頼の captured）だけになれば退会できる。
+    EXISTS (
+        SELECT 1 FROM review_payments pay
+        LEFT JOIN review_requests r ON r.id = pay.request_id
+        WHERE pay.payer_id = sqlc.arg('user_id')
+          AND pay.status IN ('authorized', 'captured')
+          AND (pay.status = 'authorized' OR r.id IS NULL OR r.returned_at IS NULL)
+    )::boolean AS open_review_payment;
+
+-- name: ListAccountMedia :many
+-- 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。
+SELECT 'image'::text AS resource, p.cloudinary_public_id::text AS public_id
+FROM posts p WHERE p.author_id = sqlc.arg('user_id') AND p.kind = 'text' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'video'::text, p.cloudinary_public_id::text
+FROM posts p WHERE p.author_id = sqlc.arg('user_id') AND p.kind = 'video' AND p.cloudinary_public_id IS NOT NULL
+UNION ALL
+SELECT 'image'::text, rp.cloudinary_public_id
+FROM recruitment_photos rp JOIN posts p ON p.id = rp.post_id WHERE p.author_id = sqlc.arg('user_id')
+UNION ALL
+SELECT 'image'::text, cp.photo_public_id::text
+FROM coach_profiles cp WHERE cp.profile_id = sqlc.arg('user_id') AND cp.photo_public_id IS NOT NULL
+UNION ALL
+SELECT 'coaching'::text, r.video_public_id
+FROM review_requests r WHERE r.requester_id = sqlc.arg('user_id');

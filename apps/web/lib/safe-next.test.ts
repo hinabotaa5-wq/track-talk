@@ -16,6 +16,13 @@ describe("safeNextPath", () => {
     expect(safeNextPath(null)).toBe("/");
   });
 
+  it("rejects control characters that the URL parser strips", () => {
+    expect(safeNextPath("/\t/evil.example")).toBe("/");
+    expect(safeNextPath("/\n/evil.example")).toBe("/");
+    expect(safeNextPath("/\r/evil.example")).toBe("/");
+    expect(nextCookiePath("%2F%09%2Fevil.example")).toBe("/");
+  });
+
   it("does not loop back to the login page", () => {
     expect(safeNextPath("/login")).toBe("/");
     expect(safeNextPath("/login?next=/me")).toBe("/");

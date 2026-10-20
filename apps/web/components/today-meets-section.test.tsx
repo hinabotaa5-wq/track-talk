@@ -12,6 +12,9 @@ const meets: MeetThread[] = [
     comment_count: 3,
     href: "/posts/p1",
     now_running: ["女子100m予選", "男子走幅跳決勝"],
+    major_slug: "izumo-ekiden",
+    major_year: 2026,
+    competition_id: "",
   },
   {
     meet_key: "c:00:2026:ダイヤモンドリーグ・ファイナル:2026-10-11",
@@ -21,6 +24,9 @@ const meets: MeetThread[] = [
     comment_count: 0,
     href: "/posts/p2",
     now_running: [],
+    major_slug: "",
+    major_year: 0,
+    competition_id: "c2",
   },
 ];
 

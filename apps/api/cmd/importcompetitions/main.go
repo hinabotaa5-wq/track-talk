@@ -367,9 +367,12 @@ func importSource(ctx context.Context, pool *pgxpool.Pool, client competitions.C
 	defer tx.Rollback(ctx)
 	q := db.New(tx)
 	season := int32(meets[0].SeasonYear)
+	// 古いシーズンの大会を消すのは、いまのシーズンより前の分だけにする。ページに翌年度の表記があって
+	// 翌シーズンと判定されても、いまのシーズンの大会まで消さないようにする。
+	before := min(season, int32(competitions.SeasonYear(time.Now())))
 	if err := q.DeleteCompetitionsBeforeSeason(ctx, db.DeleteCompetitionsBeforeSeasonParams{
 		Prefecture: source.Prefecture,
-		SeasonYear: season,
+		SeasonYear: before,
 	}); err != nil {
 		return err
 	}

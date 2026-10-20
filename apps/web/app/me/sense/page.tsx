@@ -7,8 +7,10 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteItem, SenseNoteStatsRow } from "@/components/sense-notes";
+import { SenseSummaryCard } from "@/components/sense-summary";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { senseSummaryEnabled } from "@/lib/features";
 import { groupSenseNotesByDay, senseDayLabel, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 type Page = { notes: SenseNote[]; next_cursor: string | null; stats: SenseNoteStats };
@@ -111,6 +113,8 @@ export default function MySenseNotesPage() {
               }}
             />
           </section>
+
+          {senseSummaryEnabled && notes.length > 0 ? <SenseSummaryCard token={token} /> : null}
 
           {notes.length === 0 ? (
             <EmptyState title="まだ感覚メモがありません" body="今日の練習で「うまくいった」「なんか違った」と感じたことを、ひとことから書いてみよう。" />

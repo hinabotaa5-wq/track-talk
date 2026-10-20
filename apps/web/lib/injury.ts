@@ -210,6 +210,19 @@ export const injuryPreChanges = [
 ] as const;
 export type InjuryPreChange = (typeof injuryPreChanges)[number]["value"];
 
+// 「いま思うと、どうすればよかったか」。まだケガをしていない人の予防に使う。
+export const injuryHindsights = [
+  { value: "rest-early", label: "違和感の段階で休む" },
+  { value: "warmup", label: "ウォームアップを念入りにする" },
+  { value: "adjust-volume", label: "練習量や強度を調整する" },
+  { value: "see-doctor-early", label: "早めに病院へ行く" },
+  { value: "sleep-food", label: "睡眠や食事を整える" },
+  { value: "gear", label: "シューズや路面を見直す" },
+  { value: "tell-coach", label: "顧問やコーチに早めに伝える" },
+  { value: "none", label: "わからない・とくにない" },
+] as const;
+export type InjuryHindsight = (typeof injuryHindsights)[number]["value"];
+
 export const injuryEvents = [
   { value: "sprint", label: "短距離" },
   { value: "hurdles", label: "ハードル" },
@@ -233,6 +246,7 @@ export const injuryJoinSteps = [
   "place",
   "activity",
   "preChanges",
+  "hindsight",
   "event",
   "stage",
 ] as const;
@@ -250,6 +264,7 @@ export type InjuryJoinAnswers = {
   place: InjuryPlace | "";
   activity: InjuryActivity | "";
   preChanges: InjuryPreChange[];
+  hindsight: InjuryHindsight[];
   event: InjuryEvent | "";
   stage: InjuryStage | "";
 };
@@ -262,20 +277,35 @@ export const emptyInjuryJoinAnswers: InjuryJoinAnswers = {
   place: "",
   activity: "",
   preChanges: [],
+  hindsight: [],
   event: "",
   stage: "",
 };
 
-// 端末の月を YYYY-MM で返す(「今月より先」を選べなくするため)。
-export function localMonthString(now: Date) {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+// 日本時間の年と月（1〜12）。サーバーは「今月」を日本時間で決めるので、端末のタイムゾーンは使わない。
+function jstYearMonth(now: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
+  );
+  return { year: Number(parts.year), month: Number(parts.month) };
 }
 
-// 今月から過去 count か月を、新しい順に返す。いつごろケガをしたかの選択肢。
+// 日本時間の月を YYYY-MM で返す(「今月より先」を選べなくするため)。
+export function localMonthString(now: Date) {
+  const { year, month } = jstYearMonth(now);
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+// 今月(日本時間)から過去 count か月を、新しい順に返す。いつごろケガをしたかの選択肢。
 export function recentMonths(now: Date, count = 24) {
+  const { year, month } = jstYearMonth(now);
   return Array.from({ length: count }, (_, i) => {
-    const day = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    return { value: localMonthString(day), label: `${day.getFullYear()}年${day.getMonth() + 1}月` };
+    const day = new Date(Date.UTC(year, month - 1 - i, 1));
+    const y = day.getUTCFullYear();
+    const m = day.getUTCMonth() + 1;
+    return { value: `${y}-${String(m).padStart(2, "0")}`, label: `${y}年${m}月` };
   });
 }
 
@@ -287,6 +317,10 @@ function toggleExclusive<T extends string>(current: T[], value: T, exclusive: T)
 }
 
 export function togglePreChange(current: InjuryPreChange[], value: InjuryPreChange): InjuryPreChange[] {
+  return toggleExclusive(current, value, "none");
+}
+
+export function toggleHindsight(current: InjuryHindsight[], value: InjuryHindsight): InjuryHindsight[] {
   return toggleExclusive(current, value, "none");
 }
 
@@ -317,6 +351,8 @@ export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAns
       return hasValue(injuryActivities, answers.activity) ? "" : "そのとき何をしていたかを選んでください";
     case "preChanges":
       return answers.preChanges.length > 0 ? "" : "当てはまるものを選んでください(なければ「とくになし」)";
+    case "hindsight":
+      return answers.hindsight.length > 0 ? "" : "当てはまるものを選んでください(なければ「わからない・とくにない」)";
     case "event":
       return hasValue(injuryEvents, answers.event) ? "" : "種目を選んでください";
     case "stage":
@@ -333,6 +369,7 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
     place: answers.place,
     activity: answers.activity,
     pre_changes: answers.preChanges,
+    hindsight: answers.hindsight,
     event: answers.event,
     stage: answers.stage,
   };
@@ -487,6 +524,7 @@ export type InjuryPublicGroup = {
   pre_changes: InjuryTally;
   events: InjuryTally;
   actions: InjuryTally;
+  hindsight: InjuryTally;
   notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
 };
 

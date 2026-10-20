@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { InjuryTabs } from "@/components/injury-tabs";
 import { InjuryMeCards } from "@/components/injury-me-cards";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, sortInjuryGroups, type InjuryGroupSummary } from "@/lib/injury";
 
 export function InjuryView() {
-  const { session, token, loading } = useAuth();
+  const { token, loading } = useAuth();
   const [groups, setGroups] = useState<InjuryGroupSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -35,6 +36,7 @@ export function InjuryView() {
         <h1 className="text-2xl font-bold">ケガ</h1>
         <p className="mt-1 text-sm text-slate-200">同じケガの仲間と、復帰を目指そう</p>
       </div>
+      <InjuryTabs current="share" />
       <InjuryMeCards token={token} />
 
       {failed ? (
@@ -53,7 +55,7 @@ export function InjuryView() {
           {sorted.map((group) => (
             <li key={group.body_part}>
               <Link
-                href={session ? injuryGroupPath(group.body_part) : "/login"}
+                href={injuryGroupPath(group.body_part)}
                 className={`block h-full rounded-2xl border p-3.5 transition active:scale-[0.98] ${
                   group.me ? "border-blue-400 bg-blue-950/50 hover:bg-blue-950/70" : "border-white/20 glass bg-white/10 hover:bg-white/16"
                 }`}

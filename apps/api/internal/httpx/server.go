@@ -11,6 +11,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
+	"github.com/hinata/track-talk/apps/api/internal/openai"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,6 +28,7 @@ type Server struct {
 	push      push.Sender
 	stripe    stripe.Client
 	mail      mail.Client
+	ai        openai.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -62,6 +64,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			APIBase: cfg.MailAPIBase,
 			DevLog:  cfg.MailDevLog,
 		},
+		ai: openai.Client{
+			Key:     cfg.OpenAIAPIKey,
+			Model:   cfg.OpenAIModel,
+			APIBase: cfg.OpenAIAPIBase,
+		},
 	}
 	if cfg.PushHTTP != nil {
 		s.push.HTTP = cfg.PushHTTP
@@ -91,6 +98,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
 		r.Get("/injury/stats", s.injuryStats)
+		r.Get("/injury/data", s.injuryData)
 		r.Get("/injury/groups", s.listInjuryGroups)
 		r.Get("/injury/groups/{part}/public", s.getPublicInjuryGroup)
 		r.Get("/products", s.listProducts)
@@ -108,12 +116,16 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Use(RequireAuth(v))
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
+			r.Patch("/me/badge", s.updateBadge)
 			r.Delete("/me", s.deleteAccount)
 			r.Get("/me/practice-reputation", s.practiceReputation)
 			r.Get("/me/posts", s.listMyPosts)
 			r.Get("/me/injury-history", s.myInjuryHistory)
 			r.Get("/injury/me/progress", s.myInjuryProgress)
 			r.Get("/me/sense-notes", s.listSenseNotes)
+			// 感覚メモの1週間のまとめ（AI）。提供を始めるまで 404。
+			r.With(s.requireSenseSummary).Get("/me/sense-notes/summary", s.getSenseSummary)
+			r.With(s.requireSenseSummary).Post("/me/sense-notes/summary", s.createSenseSummary)
 			r.Post("/me/sense-notes", s.createSenseNote)
 			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)

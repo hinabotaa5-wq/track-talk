@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { MeetSessionsAdmin } from "@/components/meet-sessions-admin";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { apiFetch } from "@/lib/api";
+import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
@@ -24,7 +25,7 @@ import type {
 import { inquiryCategoryLabels } from "@/lib/validators";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const reasonLabels: Record<AdminReport["reason"], string> = {
   spam: "スパム",
@@ -95,7 +96,8 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
 type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
-  const [items, setItems] = useState<T[]>([]);
+  // ページごとに持つ。トークンの更新で同じページを読み直しても、行が二重に足されない。
+  const [pages, setPages] = useState<Record<number, T[]>>({});
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
@@ -108,7 +110,7 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
       .then((d) => {
         if (cancelled) return;
         const rows = (d[key] as T[] | undefined) ?? [];
-        setItems((current) => (page === 1 ? rows : [...current, ...rows]));
+        setPages((current) => (page === 1 ? { 1: rows } : { ...current, [page]: rows }));
         setTotal(d.meta.total);
         setError("");
         setLoadedPage(page);
@@ -124,6 +126,10 @@ function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: bo
   }, [path, key, enabled, token, page]);
 
   const loading = enabled && loadedPage < page;
+  const items = Object.keys(pages)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .flatMap((n) => pages[n]);
   return { items, total, error, loading, more: items.length < total, loadMore: () => setPage((p) => p + 1) };
 }
 
@@ -175,12 +181,18 @@ function ProductsAdmin({ token }: { token: string | null }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
+  // 種類を素早く切り替えたとき、古い種類の応答が後から返って一覧を上書きしないよう、最新の読み込みだけ反映する。
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
-      const d = await apiFetch<{ products: Product[] }>(`/v1/products?kind=${kind}&per_page=100`);
-      setProducts(d.products ?? []);
+      const { items } = await fetchAllPages(async (page) => {
+        const d = await apiFetch<{ products: Product[]; meta: Meta }>(`/v1/products?kind=${kind}&page=${page}&per_page=50`);
+        return { items: d.products ?? [], total: d.meta.total };
+      });
+      if (seq === loadSeq.current) setProducts(items);
     } catch {
-      setMessage("取得に失敗しました");
+      if (seq === loadSeq.current) setMessage("取得に失敗しました");
     }
   }, [kind]);
 
@@ -416,12 +428,15 @@ function CoachesAdmin({ token }: { token: string | null }) {
 
   const load = useCallback(async () => {
     try {
-      const d = await apiFetch<{ applications: AdminCoachApplication[]; meta: Meta }>(
-        `/v1/admin/coach-applications?status=${status}&per_page=100`,
-        { token },
-      );
-      setItems(d.applications ?? []);
-      setTotal(d.meta.total);
+      const all = await fetchAllPages(async (page) => {
+        const d = await apiFetch<{ applications: AdminCoachApplication[]; meta: Meta }>(
+          `/v1/admin/coach-applications?status=${status}&page=${page}&per_page=50`,
+          { token },
+        );
+        return { items: d.applications ?? [], total: d.meta.total };
+      });
+      setItems(all.items);
+      setTotal(all.total);
     } catch {
       setMessage("取得に失敗しました");
     }

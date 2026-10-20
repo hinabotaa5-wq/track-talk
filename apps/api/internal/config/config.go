@@ -51,6 +51,15 @@ type Config struct {
 	MailAPIBase string
 	// MailDevLog が true なら、メールを送らずに本文を API のログに出す。手元で試すためのもので、本番では立てない。
 	MailDevLog bool
+	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
+	// 感覚メモを OpenAI に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
+	SenseSummaryEnabled bool
+	// OpenAI の API キー。感覚メモのまとめに使う。空ならまとめは作れない。
+	OpenAIAPIKey string
+	// OpenAIModel は、まとめに使うモデル。空なら openai.DefaultModel。
+	OpenAIModel string
+	// OpenAIAPIBase はテストで OpenAI の代わりのサーバーに向けるためのもの。
+	OpenAIAPIBase string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
 	// Clock はテストで現在時刻を差し替えるためのもの。nil なら time.Now。
@@ -89,6 +98,10 @@ func Load() (Config, error) {
 		MailFrom:                   os.Getenv("MAIL_FROM"),
 		MailAPIBase:                os.Getenv("MAIL_API_BASE"),
 		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
+		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
+		OpenAIAPIKey:               os.Getenv("OPENAI_API_KEY"),
+		OpenAIModel:                os.Getenv("OPENAI_MODEL"),
+		OpenAIAPIBase:              os.Getenv("OPENAI_API_BASE"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

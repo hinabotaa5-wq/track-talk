@@ -201,6 +201,11 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type DeletedAccount struct {
+	ID        uuid.UUID `json:"id"`
+	DeletedAt time.Time `json:"deleted_at"`
+}
+
 type DomesticMajor struct {
 	Slug          string    `json:"slug"`
 	Year          int32     `json:"year"`
@@ -403,6 +408,7 @@ type PracticeDetail struct {
 	EventOther  string     `json:"event_other"`
 	Capacity    int32      `json:"capacity"`
 	DissolvedAt *time.Time `json:"dissolved_at"`
+	Canceled    bool       `json:"canceled"`
 }
 
 type PracticeRating struct {
@@ -445,15 +451,22 @@ type ProductReview struct {
 	Usage     *string    `json:"usage"`
 }
 
+type CloudinaryUpload struct {
+	PublicID  string    `json:"public_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Profile struct {
-	ID             uuid.UUID  `json:"id"`
-	IsAdmin        bool       `json:"is_admin"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
-	Nickname       *string    `json:"nickname"`
-	NicknamePublic bool       `json:"nickname_public"`
-	BirthMonth     *time.Time `json:"birth_month"`
-	CoachingDemo   bool       `json:"coaching_demo"`
+	ID                    uuid.UUID  `json:"id"`
+	IsAdmin               bool       `json:"is_admin"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	Nickname              *string    `json:"nickname"`
+	NicknamePublic        bool       `json:"nickname_public"`
+	BirthMonth            *time.Time `json:"birth_month"`
+	CoachingDemo          bool       `json:"coaching_demo"`
+	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
 }
 
 type PushSubscription struct {
@@ -591,4 +604,14 @@ type SenseNote struct {
 	Event     *string   `json:"event"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type SenseNoteSummary struct {
+	ID        uuid.UUID `json:"id"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+	CreatedAt time.Time `json:"created_at"`
 }

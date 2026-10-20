@@ -340,6 +340,10 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	var ct db.CoachingContract
 	err := s.tx(r.Context(), func(q *db.Queries) error {
+		// 同じプランの承諾が重なっても定員を超えないよう、プランの行をロックしてから数える。
+		if err := q.LockContractPlan(r.Context(), id); err != nil {
+			return err
+		}
 		var err error
 		// Stripe の鍵があるときは、支払いが済んでから始まる。
 		ct, err = q.AcceptCoachingContract(r.Context(), db.AcceptCoachingContractParams{
