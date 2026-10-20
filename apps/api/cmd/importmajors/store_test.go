@@ -8,6 +8,7 @@ import (
 
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/migrate"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,6 +19,10 @@ func TestStoreMajorHostsKeepsPreviousImageWhenFetchFails(t *testing.T) {
 		t.Skip("DATABASE_URL is not set")
 	}
 	if err := config.RequireLocalDatabase(dsn); err != nil {
+		t.Fatal(err)
+	}
+	// 新しい DB でもこのパッケージだけで動くよう、表を先に作っておく(他のパッケージのテストの順番に頼らない)。
+	if err := migrate.Up(dsn); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
