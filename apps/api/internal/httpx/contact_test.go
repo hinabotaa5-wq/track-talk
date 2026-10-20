@@ -72,6 +72,8 @@ func TestLooksLikeContact(t *testing.T) {
 		"05/10/2024 関東大会",
 		"020 040 060 080 100",
 		"08/12 08/19 08/26 09/02",
+		"2024/08/12〜2024/08/19 合宿",
+		"2024-09-01 2024-09-08",
 	}
 	for _, s := range allowed {
 		if looksLikeContact(s) {

@@ -64,7 +64,16 @@ func looksLikePhone(s string) bool {
 		if single && len(groups) >= 10 && groups[0] == "0" {
 			return true
 		}
+		// 番号の前に付くのは国番号や1〜3桁の数字くらいなので、並びの4桁目までに始まるものだけ調べる。
+		// 「2024/08/12〜2024/08/19」の途中から番号を拾わないため。
+		prefix := 0
 		for i, g := range groups {
+			if i > 0 {
+				prefix += len(groups[i-1])
+			}
+			if prefix > 3 {
+				break
+			}
 			if g[0] != '0' && !strings.HasPrefix(g, "81") {
 				continue
 			}
