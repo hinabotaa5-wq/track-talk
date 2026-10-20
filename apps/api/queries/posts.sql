@@ -274,8 +274,8 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
-    -- 投稿マスターのバッジ用。ニックネームを公開している人だけ数える
-    CASE WHEN profile.id IS NULL THEN 0 ELSE (
+    -- 投稿マスターのバッジ用。ニックネームとバッジを公開している人だけ数える
+    CASE WHEN profile.id IS NULL OR NOT profile.post_master_badge_public THEN 0 ELSE (
         SELECT count(*) FROM posts liked
         WHERE liked.author_id = p.author_id
           AND liked.like_count > 0

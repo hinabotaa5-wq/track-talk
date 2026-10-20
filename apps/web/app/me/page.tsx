@@ -14,7 +14,7 @@ const accountLinks = [
   { href: "/me/posts", label: "自分の投稿", icon: LayoutGrid },
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
-  { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
+  { href: "/me/profile", label: "ニックネームとバッジ", icon: UserRoundPen },
 ] as const;
 
 const infoLinks = [

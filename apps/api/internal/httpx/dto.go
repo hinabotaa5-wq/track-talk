@@ -203,7 +203,8 @@ const postMasterLikedPosts = 30
 
 // isPostMaster は、投稿の詳細で投稿者に投稿マスターのバッジを出すかどうか。
 // 匿名の投稿にバッジを出すと同じ人の投稿だと見分けられてしまうので、
-// ニックネームを公開している人だけにする。運営（実況スレッド）には付けない。
+// ニックネームを公開している人だけにする（本人がバッジを隠していれば数は0になる）。
+// 運営（実況スレッド）には付けない。
 func isPostMaster(row db.GetPostRow) bool {
 	return row.AuthorName != nil &&
 		row.AuthorID != SystemProfileID &&

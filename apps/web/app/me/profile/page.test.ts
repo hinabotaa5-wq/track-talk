@@ -62,6 +62,7 @@ describe("ProfilePage", () => {
   it("shows the public-name choice and warns at eleven characters", async () => {
     const view = await renderPage();
     expect(view.div.textContent).toContain("投稿にニックネームを公開する");
+    expect(view.div.textContent).toContain("「投稿マスター」のバッジを表示する");
     expect(view.div.textContent).not.toContain("投稿詳細で");
     const input = view.div.querySelector("input:not([type='checkbox'])");
     if (!(input instanceof HTMLInputElement)) throw new Error("input missing");

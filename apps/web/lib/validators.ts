@@ -85,6 +85,7 @@ export const loginSchema = z.object({
 export const nicknameSchema = z.object({
   nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(10, "10文字以内で入力してください"),
   nickname_public: z.boolean(),
+  post_master_badge_public: z.boolean(),
 });
 
 export const resetSchema = z.object({

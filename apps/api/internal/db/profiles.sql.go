@@ -16,7 +16,7 @@ INSERT INTO profiles (id, nickname, nickname_public)
 VALUES ($1, $2, $3)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type EnsureProfileParams struct {
@@ -37,6 +37,7 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 		&i.NicknamePublic,
 		&i.BirthMonth,
 		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
 	)
 	return i, err
 }
@@ -45,19 +46,26 @@ const updateProfile = `-- name: UpdateProfile :one
 UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
+    post_master_badge_public = $4,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
 `
 
 type UpdateProfileParams struct {
-	ID             uuid.UUID `json:"id"`
-	Nickname       *string   `json:"nickname"`
-	NicknamePublic bool      `json:"nickname_public"`
+	ID                    uuid.UUID `json:"id"`
+	Nickname              *string   `json:"nickname"`
+	NicknamePublic        bool      `json:"nickname_public"`
+	PostMasterBadgePublic bool      `json:"post_master_badge_public"`
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
-	row := q.db.QueryRow(ctx, updateProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
+	row := q.db.QueryRow(ctx, updateProfile,
+		arg.ID,
+		arg.Nickname,
+		arg.NicknamePublic,
+		arg.PostMasterBadgePublic,
+	)
 	var i Profile
 	err := row.Scan(
 		&i.ID,
@@ -68,6 +76,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.NicknamePublic,
 		&i.BirthMonth,
 		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
 	)
 	return i, err
 }

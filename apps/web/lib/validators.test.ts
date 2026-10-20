@@ -125,10 +125,10 @@ describe("validators", () => {
   });
 
   it("validates nicknames and their visibility setting", () => {
-    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false }).success).toBe(false);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, post_master_badge_public: true }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false, post_master_badge_public: true }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false, post_master_badge_public: true }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true, post_master_badge_public: true }).success).toBe(false);
   });
 
   it("translates auth and upload errors", () => {

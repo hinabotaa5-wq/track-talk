@@ -88,9 +88,11 @@ func profileJSON(p db.Profile) map[string]any {
 		"id":              p.ID,
 		"nickname":        p.Nickname,
 		"nickname_public": p.NicknamePublic,
-		"is_admin":        p.IsAdmin,
-		"created_at":      p.CreatedAt,
-		"updated_at":      p.UpdatedAt,
+		// 投稿マスターのバッジを投稿の詳細に出すかどうか
+		"post_master_badge_public": p.PostMasterBadgePublic,
+		"is_admin":                 p.IsAdmin,
+		"created_at":               p.CreatedAt,
+		"updated_at":               p.UpdatedAt,
 	}
 }
 
@@ -105,6 +107,8 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 type profileReq struct {
 	Nickname       string `json:"nickname"`
 	NicknamePublic bool   `json:"nickname_public"`
+	// 送られてこなければ、いまの設定のままにする
+	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
 }
 
 func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -122,10 +126,15 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"nickname": message})
 		return
 	}
+	badgePublic := p.PostMasterBadgePublic
+	if req.PostMasterBadgePublic != nil {
+		badgePublic = *req.PostMasterBadgePublic
+	}
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
-		ID:             p.ID,
-		Nickname:       &nickname,
-		NicknamePublic: req.NicknamePublic,
+		ID:                    p.ID,
+		Nickname:              &nickname,
+		NicknamePublic:        req.NicknamePublic,
+		PostMasterBadgePublic: badgePublic,
 	})
 	if err != nil {
 		MapDBError(w, err)
