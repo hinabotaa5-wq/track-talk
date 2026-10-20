@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { authErrorMessage } from "./auth-errors";
 import { cloudinaryErrorMessage } from "./cloudinary-upload";
 import {
+  changeEmailSchema,
+  changePasswordSchema,
   commentSchema,
   hasTextPostContent,
   inquirySchema,
@@ -145,5 +147,20 @@ describe("validators", () => {
     expect(cloudinaryErrorMessage("File size too large. Got 20. Maximum is 10.")).toBe(
       "ファイルサイズが大きすぎます",
     );
+  });
+});
+
+describe("account change schemas", () => {
+  it("requires the current password and a matching new password", () => {
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "newpassword", confirm: "newpassword" }).success).toBe(true);
+    expect(changePasswordSchema.safeParse({ current: "", password: "newpassword", confirm: "newpassword" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "short", confirm: "short" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "newpassword", confirm: "different1" }).success).toBe(false);
+  });
+
+  it("checks the new email address", () => {
+    expect(changeEmailSchema.safeParse({ email: "new@example.com", current: "oldpassword" }).success).toBe(true);
+    expect(changeEmailSchema.safeParse({ email: "not-an-email", current: "oldpassword" }).success).toBe(false);
+    expect(changeEmailSchema.safeParse({ email: "new@example.com", current: "" }).success).toBe(false);
   });
 });

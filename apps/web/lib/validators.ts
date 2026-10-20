@@ -91,6 +91,19 @@ export const resetSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),
 });
 
+export const changeEmailSchema = z.object({
+  email: z.string("メールアドレスを確認してください").trim().email("メールアドレスを確認してください").max(254, "254文字以内で入力してください"),
+  current: z.string("いまのパスワードを入力してください").min(1, "いまのパスワードを入力してください"),
+});
+
+export const changePasswordSchema = z
+  .object({
+    current: z.string("いまのパスワードを入力してください").min(1, "いまのパスワードを入力してください"),
+    password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
+    confirm: z.string("もう一度入力してください"),
+  })
+  .refine((v) => v.password === v.confirm, { message: "同じパスワードを入力してください", path: ["confirm"] });
+
 export const newPasswordSchema = z
   .object({
     password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
