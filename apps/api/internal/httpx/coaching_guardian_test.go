@@ -393,3 +393,22 @@ func TestGuardianLinkKeepsOldLinkWhenMailFails(t *testing.T) {
 		t.Fatalf("link_sends %d", sends)
 	}
 }
+
+// 保護者のリンクは、出してから30日で使えなくなる。本人が出し直せば、また使える。
+func TestGuardianLinkExpiresAfter30Days(t *testing.T) {
+	h := setup(t)
+	_, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
+	gt := issueGuardianLink(t, h, tm, guardianEmail())
+	if rec := doJSON(t, h, http.MethodGet, "/v1/guardian/"+gt, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("fresh link %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `UPDATE guardian_consents SET link_issued_at = now() - interval '31 days'`)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/guardian/"+gt, "", nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("expired link %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/consent", "", map[string]any{
+		"guardian_name": "保護者", "relationship": "mother", "agree": true,
+	}); rec.Code != http.StatusNotFound {
+		t.Fatalf("consent with expired link %d %s", rec.Code, rec.Body.String())
+	}
+}
