@@ -369,7 +369,9 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 		if _, err := q.LockPaidCoachingPayment(ctx, pay.ID); err != nil {
 			return err
 		}
-		if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()+"-"+strconv.Itoa(int(amount))); err != nil {
+		// キーは支払いだけで決める。残りの日数分の額は時間で変わるので、額を入れると、Stripe で返金できたのに
+		// 記録の前に落ちたあとで押し直したとき、別の返金としてもう一度返してしまう。同じキーで額が違えば Stripe が断る。
+		if _, err := s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(amount), "refund-"+pay.ID.String()); err != nil {
 			return fmt.Errorf("%w: %w", errStripe, err)
 		}
 		var err error

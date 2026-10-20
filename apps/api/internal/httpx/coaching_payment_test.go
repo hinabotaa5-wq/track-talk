@@ -37,6 +37,8 @@ type fakeStripe struct {
 	failTransfers int
 	// 返金に答えるまで待つ時間（同時に送ったときの確かめに使う）。
 	refundDelay time.Duration
+	// 返金の Idempotency-Key ごとの中身。Stripe と同じく、同じキーなら前の返金を返し、中身が違えば断る。
+	refundKeys map[string]url.Values
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -143,6 +145,21 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
 		case r.URL.Path == "/v1/refunds":
 			time.Sleep(f.refundDelay)
+			if key := r.Header.Get("Idempotency-Key"); key != "" {
+				if f.refundKeys == nil {
+					f.refundKeys = map[string]url.Values{}
+				}
+				if prev, ok := f.refundKeys[key]; ok {
+					if prev.Encode() != r.PostForm.Encode() {
+						w.WriteHeader(http.StatusBadRequest)
+						_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "idempotency_error", "message": "Keys for idempotent requests can only be used with the same parameters"}})
+						return
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": "re_again", "status": "succeeded"})
+					return
+				}
+				f.refundKeys[key] = r.PostForm
+			}
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
 		default:
@@ -308,6 +325,7 @@ func TestCoachingPaymentStartsTheContract(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": "full"}); rec.Code != http.StatusConflict {
 		t.Fatalf("second refund %d", rec.Code)
 	}
+
 	// 返金して閉じたあとも、やりとりは読める。送れない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/coaching/contracts/"+id+"/messages", tu, nil); rec.Code != http.StatusOK {
 		t.Fatalf("read after refund %d", rec.Code)
@@ -317,6 +335,15 @@ func TestCoachingPaymentStartsTheContract(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/coaching/contracts", ta, nil); !strings.Contains(rec.Body.String(), `"payment_status":"partially_refunded"`) {
 		t.Fatalf("admin list %s", rec.Body.String())
+	}
+
+	// Stripe で返金できたのに記録の前に落ちて(DB は元のまま)、時間がたってから押し直しても、2回目の返金は送らない。
+	// 残りの日数分は時間で額が変わるので、額を返金のキーに入れると別の返金になってしまう。
+	execSQLArgs(t, `UPDATE coaching_payments SET status = 'paid', refunded_yen = 0, refund_reason = NULL, refunded_at = NULL WHERE payment_intent_id = 'pi_1'`)
+	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'active', starts_at = now() - interval '16 days', ends_at = now() + interval '14 days' WHERE id = $1`, id)
+	doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": "remaining"})
+	if refunds := f.refundList(); len(refunds) != 2 {
+		t.Fatalf("refunded the same payment again %v", refunds)
 	}
 }
 
