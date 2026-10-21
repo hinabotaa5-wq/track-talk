@@ -355,8 +355,8 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	// 「わかる」や保存をした人が多くても報告した人を待たせないよう、プッシュは裏で1人ずつ送る。
 	if len(pushTo) > 0 {
+		ctx := context.WithoutCancel(r.Context())
 		go func() {
-			ctx := context.WithoutCancel(r.Context())
 			msg := postPushMessage("復帰の経過が更新されました", postID)
 			for _, id := range pushTo {
 				s.pushQuietly(ctx, id, notifyInjury, msg, 24*time.Hour)
