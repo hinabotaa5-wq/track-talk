@@ -47,7 +47,8 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
         ? await apiFetch<Post>(`/v1/posts/${initial.id}`, { method: "PATCH", token, body: JSON.stringify(payload) })
         : await apiFetch<Post>(groupPart ? `/v1/injury/groups/${groupPart}/posts` : "/v1/posts", { method: "POST", token, body: JSON.stringify(payload) });
       clearHomeFeeds();
-      router.push(
+      // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
+      (initial ? router.replace : router.push)(
         initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : groupPart ? injuryGroupPath(groupPart) : "/injury",
       );
     } catch (e) {

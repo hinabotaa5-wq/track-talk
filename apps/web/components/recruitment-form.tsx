@@ -151,7 +151,8 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
             body: JSON.stringify(payload),
           });
       clearHomeFeeds();
-      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
+      // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
+      (initial ? router.replace : router.push)(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
     } catch (e) {
       setError(apiErrorText(e, e instanceof Error ? e.message : "保存に失敗しました"));
       setStatus("");
