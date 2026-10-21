@@ -1,14 +1,16 @@
 import { senseGrainColor, senseJarLevel, senseJarSize } from "@/lib/sense-notes";
 
-// 感覚がたまっていくビン。1件書くごとに粒が1つ増え、30粒で満杯になって次のビンに移る。
+// 感覚がたまっていくビン。1件書くごとに粒が1つ増え、9粒で満杯になって次のビンに移る。
 // dropLatest を付けると、いちばん新しい粒が上から落ちてくる(「動きを減らす」設定の人には動かさない)。
-const columns = 5;
+// 粒の大きさは、senseJarSize 粒でビンの中がちょうど埋まる大きさ(3列×3段)。粒の数を変えたら合わせ直す。
+const columns = 3;
+const grainRadius = 14.5;
+const grainStep = 29;
 
 function grainPosition(index: number) {
   const row = Math.floor(index / columns);
   const col = index % columns;
-  const shift = row % 2 === 1 ? 4 : -4;
-  return { cx: 28 + col * 16 + shift, cy: 141 - row * 15 };
+  return { cx: 60 + (col - 1) * grainStep, cy: 135 - row * grainStep };
 }
 
 export function SenseNoteJar({ total, dropLatest = false, className = "" }: { total: number; dropLatest?: boolean; className?: string }) {
@@ -16,7 +18,7 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
   // 満杯になった直後は、空のビンではなく満杯のビンを見せる。
   const shown = total > 0 && current === 0 ? senseJarSize : current;
   const jarIndex = total > 0 && current === 0 ? filled : filled + 1;
-  const fillTop = shown === 0 ? 146 : 141 - Math.ceil(shown / columns) * 15 + 6;
+  const fillTop = shown === 0 ? 146 : 135 - (Math.ceil(shown / columns) - 1) * grainStep - grainRadius + 6;
   return (
     <div className={`relative shrink-0 ${className}`}>
       <svg viewBox="0 0 120 160" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
@@ -52,7 +54,7 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
                 key={`${jarIndex}-${i}`}
                 cx={cx}
                 cy={cy}
-                r="7.6"
+                r={grainRadius}
                 fill={senseGrainColor(i + filled * 7)}
                 stroke="rgb(15 23 42 / 0.25)"
                 strokeWidth="1"

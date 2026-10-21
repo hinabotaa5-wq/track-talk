@@ -108,7 +108,7 @@ export default function MySenseNotesPage() {
             />
           </section>
 
-          {senseSummaryEnabled && notes.length > 0 ? <SenseSummaryCard token={token} /> : null}
+          {senseSummaryEnabled && notes.length > 0 ? <SenseSummaryCard token={token} total={stats.total} /> : null}
 
           {notes.length === 0 ? (
             <EmptyState title="まだ感覚メモがありません" body="今日の練習で「うまくいった」「なんか違った」と感じたことを、ひとことから書いてみよう。" />

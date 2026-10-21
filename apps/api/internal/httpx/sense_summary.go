@@ -19,6 +19,9 @@ import (
 // 感覚メモの1週間のまとめ。本人が頼んだときだけ、直近7日（今日を含む、日本時間）の感覚メモを
 // Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たってから。
 const (
+	// senseSummaryMinNotes は、まとめを作るのに直近7日で要る感覚メモの数。画面のビン1杯の数
+	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
+	senseSummaryMinNotes = 9
 	senseSummaryDays     = 7
 	senseSummaryInterval = senseSummaryDays * 24 * time.Hour
 	// 1日20件までなので、7日分でも140件に収まる。
@@ -86,9 +89,15 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// 直近7日に書いた数。画面で「あと何個でまとめられるか」を出すのに使う。
+	weekNotes, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: senseSummaryWindowStart(s.now())})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	row, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		JSON(w, http.StatusOK, map[string]any{"summary": nil, "next_available_at": nil})
+		JSON(w, http.StatusOK, map[string]any{"summary": nil, "next_available_at": nil, "week_notes": weekNotes, "min_notes": senseSummaryMinNotes})
 		return
 	}
 	if err != nil {
@@ -98,7 +107,14 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{
 		"summary":           senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
 		"next_available_at": senseSummaryNextAt(row.CreatedAt, s.now()),
+		"week_notes":        weekNotes,
+		"min_notes":         senseSummaryMinNotes,
 	})
+}
+
+// senseSummaryWindowStart は、まとめに入れる感覚メモの最初の時刻（7日前の日本時間の0時）。
+func senseSummaryWindowStart(now time.Time) time.Time {
+	return startOfTokyoDay(now).AddDate(0, 0, -(senseSummaryDays - 1))
 }
 
 // senseSummaryAvailable は、前のまとめから1週間たっているかを確かめる。まだなら 429 を書いて false を返す。
@@ -149,7 +165,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if !s.senseSummaryAvailable(w, r, me.ID, now) {
 		return
 	}
-	since := startOfTokyoDay(now).AddDate(0, 0, -(senseSummaryDays - 1))
+	since := senseSummaryWindowStart(now)
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
 		AuthorID: me.ID,
 		Since:    since,
@@ -160,8 +176,8 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if len(notes) == 0 {
-		Error(w, http.StatusUnprocessableEntity, "validation_error", "この1週間の感覚メモがありません。書いてからまとめてみよう")
+	if len(notes) < senseSummaryMinNotes {
+		Error(w, http.StatusUnprocessableEntity, "validation_error", fmt.Sprintf("まとめるには、この1週間の感覚メモがあと%d個必要です", senseSummaryMinNotes-len(notes)))
 		return
 	}
 
