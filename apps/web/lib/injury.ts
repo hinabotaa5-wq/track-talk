@@ -368,12 +368,26 @@ export type InjuryStageChangeAnswers = {
 
 export const emptyInjuryStageChangeAnswers: InjuryStageChangeAnswers = { stage: "", actions: [], note: "", notePublic: false };
 
+// 段階を変えるときは、グループに入るときと同じように1問ずつ聞く。
+export const injuryStageChangeSteps = ["stage", "actions", "note"] as const;
+export type InjuryStageChangeStep = (typeof injuryStageChangeSteps)[number];
+
+export function injuryStageChangeStepError(step: InjuryStageChangeStep, answers: InjuryStageChangeAnswers, current: InjuryStage) {
+  if (step === "stage") {
+    if (!isInjuryStage(answers.stage)) return "新しい段階を選んでください";
+    if (answers.stage === current) return "いまと同じ段階です。変わった段階を選んでください";
+  }
+  if (step === "actions" && answers.actions.length === 0) return "意識的にやったことを1つ以上選んでください(なければ「何もしなかった」)";
+  if (step === "note" && [...answers.note.trim()].length > injuryStageNoteMaxLength) return `一言は${injuryStageNoteMaxLength}文字以内で書いてください`;
+  return "";
+}
+
 // 段階を変えるフォームの答えに問題があれば、最初の問題の文言を返す。問題なければ空文字。
 export function injuryStageChangeError(answers: InjuryStageChangeAnswers, current: InjuryStage) {
-  if (!isInjuryStage(answers.stage)) return "新しい段階を選んでください";
-  if (answers.stage === current) return "いまと同じ段階です。変わった段階を選んでください";
-  if (answers.actions.length === 0) return "意識的にやったことを1つ以上選んでください(なければ「何もしなかった」)";
-  if ([...answers.note.trim()].length > injuryStageNoteMaxLength) return `一言は${injuryStageNoteMaxLength}文字以内で書いてください`;
+  for (const step of injuryStageChangeSteps) {
+    const problem = injuryStageChangeStepError(step, answers, current);
+    if (problem) return problem;
+  }
   return "";
 }
 

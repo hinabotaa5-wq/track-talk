@@ -4,6 +4,7 @@ import {
   formatRaceWind,
   parseRaceMark,
   parseRaceWind,
+  toggleRaceWindSign,
   raceChartBox,
   raceChartPoints,
   raceEventHasWind,
@@ -67,6 +68,15 @@ describe("race records", () => {
     expect(formatRaceWind(18)).toBe("+1.8");
     expect(formatRaceWind(-5)).toBe("-0.5");
     expect(formatRaceWind(0)).toBe("±0.0");
+  });
+
+  it("flips the wind sign for number-only keyboards", () => {
+    expect(toggleRaceWindSign("1.8")).toBe("-1.8");
+    expect(toggleRaceWindSign("-1.8")).toBe("+1.8");
+    expect(toggleRaceWindSign("+1.8")).toBe("-1.8");
+    expect(toggleRaceWindSign("－0.5")).toBe("+0.5");
+    expect(toggleRaceWindSign("")).toBe("-");
+    expect(parseRaceWind(toggleRaceWindSign(toggleRaceWindSign("2.0")))).toBe(20);
   });
 
   it("orders events like the practice list", () => {

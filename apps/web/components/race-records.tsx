@@ -15,6 +15,7 @@ import {
   formatRaceWind,
   parseRaceMark,
   parseRaceWind,
+  toggleRaceWindSign,
   raceChartBox,
   raceChartPoints,
   raceEventHasWind,
@@ -126,7 +127,17 @@ function RaceRecordForm({
         {hasWind ? (
           <label className="block">
             <span className="mb-1 block text-xs text-slate-300">風(m/s・任意)</span>
-            <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" />
+            <span className="flex gap-1">
+              <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" className="min-w-0 flex-1" />
+              <button
+                type="button"
+                onClick={() => setWind((current) => toggleRaceWindSign(current))}
+                aria-label="追い風(+)と向かい風(-)を切り替える"
+                className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-3 text-sm font-semibold text-white transition active:scale-95"
+              >
+                +/−
+              </button>
+            </span>
           </label>
         ) : null}
       </div>
