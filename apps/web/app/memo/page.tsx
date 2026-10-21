@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
@@ -16,6 +16,9 @@ import { groupSenseNotesByDay, senseDayLabel, sortSenseNotes, type SenseNote, ty
 
 type Page = { notes: SenseNote[]; next_cursor: string | null; stats: SenseNoteStats };
 
+const guestStats: SenseNoteStats = { total: 0, days: 0, streak: 0, today: 0 };
+const loginPath = "/login?next=/memo";
+
 export default function MySenseNotesPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
@@ -28,9 +31,14 @@ export default function MySenseNotesPage() {
   // 感覚メモと、競技会の記録(グラフ)を切り替える。
   const [tab, setTab] = useState<"sense" | "records">("sense");
 
-  useEffect(() => {
-    if (!loading && !session) router.replace("/login?next=/memo");
-  }, [loading, session, router]);
+  // ログインしていなくても中身は見られる。書こうとしたり、ボタンを押したりしたらログインへ案内する。
+  const guest = !loading && !session;
+  function toLogin(event: SyntheticEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.target instanceof HTMLElement) event.target.blur();
+    router.push(loginPath);
+  }
 
   // 月1回の記録のお知らせ(プッシュ通知)は /memo?tab=records を開く。
   useEffect(() => {
@@ -67,7 +75,9 @@ export default function MySenseNotesPage() {
     }
   }
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  const shownNotes = guest ? [] : notes;
+  const shownStats = guest ? guestStats : stats;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -83,69 +93,80 @@ export default function MySenseNotesPage() {
         onSelect={setTab}
       />
 
-      {tab === "records" ? (
-        <RaceRecordsPanel token={token} />
-      ) : failed ? (
-        <ErrorState message="感覚メモの取得に失敗しました。APIの起動を確認してください。" />
-      ) : notes === null || stats === null ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
-      ) : (
-        <>
-          <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-            <div className="flex items-center gap-4">
-              <SenseNoteJar total={stats.total} dropLatest={dropped} className="h-32 w-24" />
-              <div className="min-w-0 flex-1">
-                <SenseNoteStatsRow stats={stats} />
-              </div>
-            </div>
-            <SenseNoteComposer
-              token={token}
-              onCreated={(note, next) => {
-                setNotes((list) => sortSenseNotes([note, ...(list ?? [])]));
-                setStats(next);
-                setDropped(true);
-              }}
-            />
-          </section>
-
-          {senseSummaryEnabled && notes.length > 0 ? <SenseSummaryCard token={token} total={stats.total} /> : null}
-
-          {notes.length === 0 ? (
-            <EmptyState title="まだ感覚メモがありません" body="今日の練習で「うまくいった」「なんか違った」と感じたことを、ひとことから書いてみよう。" />
-          ) : (
-            <div className="space-y-5">
-              {groupSenseNotesByDay(notes).map((group) => (
-                <section key={group.day} className="space-y-2">
-                  <h2 className="text-sm font-semibold text-slate-200">{senseDayLabel(group.day)}</h2>
-                  <ul className="space-y-2">
-                    {group.notes.map((note) => (
-                      <li key={note.id}>
-                        <SenseNoteItem
-                          note={note}
-                          token={token}
-                          onUpdated={(updated) => setNotes((list) => list?.map((n) => (n.id === updated.id ? updated : n)) ?? list)}
-                          onDeleted={(id, next) => {
-                            setNotes((list) => list?.filter((n) => n.id !== id) ?? list);
-                            setStats(next);
-                            setDropped(false);
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-              {cursor ? (
-                <div className="flex justify-center">
-                  <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-                    {loadingMore ? "読み込み中..." : "もっと見る"}
-                  </Button>
+      <div
+        className="space-y-4"
+        onFocusCapture={guest ? toLogin : undefined}
+        onClickCapture={guest ? toLogin : undefined}
+        onSubmitCapture={guest ? toLogin : undefined}
+      >
+        {guest ? (
+          <p className="rounded-xl border border-sky-300/30 bg-sky-950/40 p-3 text-sm text-sky-100">
+            ログインすると、感覚や記録をためて、あとからふりかえれます。
+          </p>
+        ) : null}
+        {tab === "records" ? (
+          <RaceRecordsPanel token={guest ? null : token} />
+        ) : failed ? (
+          <ErrorState message="感覚メモの取得に失敗しました。APIの起動を確認してください。" />
+        ) : shownNotes === null || shownStats === null ? (
+          <p className="text-sm text-slate-200">読み込み中...</p>
+        ) : (
+          <>
+            <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
+              <div className="flex items-center gap-4">
+                <SenseNoteJar total={shownStats.total} dropLatest={dropped} className="h-32 w-24" />
+                <div className="min-w-0 flex-1">
+                  <SenseNoteStatsRow stats={shownStats} />
                 </div>
-              ) : null}
-            </div>
-          )}
-        </>
-      )}
+              </div>
+              <SenseNoteComposer
+                token={token}
+                onCreated={(note, next) => {
+                  setNotes((list) => sortSenseNotes([note, ...(list ?? [])]));
+                  setStats(next);
+                  setDropped(true);
+                }}
+              />
+            </section>
+
+            {senseSummaryEnabled && shownNotes.length > 0 ? <SenseSummaryCard token={token} total={shownStats.total} /> : null}
+
+            {shownNotes.length === 0 ? (
+              <EmptyState title="まだ感覚メモがありません" body="今日の練習で「うまくいった」「なんか違った」と感じたことを、ひとことから書いてみよう。" />
+            ) : (
+              <div className="space-y-5">
+                {groupSenseNotesByDay(shownNotes).map((group) => (
+                  <section key={group.day} className="space-y-2">
+                    <h2 className="text-sm font-semibold text-slate-200">{senseDayLabel(group.day)}</h2>
+                    <ul className="space-y-2">
+                      {group.notes.map((note) => (
+                        <li key={note.id}>
+                          <SenseNoteItem
+                            note={note}
+                            token={token}
+                            onDeleted={(id, next) => {
+                              setNotes((list) => list?.filter((n) => n.id !== id) ?? list);
+                              setStats(next);
+                              setDropped(false);
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                {cursor ? (
+                  <div className="flex justify-center">
+                    <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
+                      {loadingMore ? "読み込み中..." : "もっと見る"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

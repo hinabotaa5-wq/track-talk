@@ -33,8 +33,8 @@ export const meTab = { id: "me", href: "/me", label: "マイページ", icon: Us
 export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
   const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
-  // ログインが要るのはメモとマイページ。ほかのタブは、ログインなしで開ける。
-  if ((id === "me" || id === "memo") && !signedIn) return "/login";
+  // ログインが要るのはマイページだけ。メモはログインなしでも見られ、書こうとしたときにログインへ案内する。
+  if (id === "me" && !signedIn) return "/login";
   return tab.href;
 }
 
@@ -68,6 +68,14 @@ export function hasBackOnlyHeader(pathname: string, search = "") {
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (isMeSubPage(pathname)) return true;
   return isInjuryGroupPath(pathname);
+}
+
+// ヘッダーを何も出さない画面。はじめにニックネームと種目を決める画面と、新しいパスワードを決める画面
+// (リンクの有効期限切れの案内も含む)は、ほかへ移らずにその場で済ませてもらう。
+// mustSetProfile は、まだニックネームか種目を決めていない人のとき true。
+export function hidesHeader(pathname: string, search = "", mustSetProfile = false) {
+  if (pathname === "/reset-password/update") return true;
+  return pathname === "/me/profile" && (mustSetProfile || new URLSearchParams(search).has("onboarding"));
 }
 
 // search は "?next=/upload" のような URL のクエリ部分。

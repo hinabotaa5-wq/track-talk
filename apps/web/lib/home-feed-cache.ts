@@ -42,8 +42,9 @@ export function isFeedFresh(path: string) {
   return !!hit && Date.now() - hit.at < freshForMs;
 }
 
-export function seedFeed(path: string, data: PostsPage) {
-  cache.set(path, { data, at: Date.now() });
+// at を渡すと、その時刻に取ったものとして入れる(古ければ、開いたあとに目立たないように取り直す)。
+export function seedFeed(path: string, data: PostsPage, at = Date.now()) {
+  cache.set(path, { data, at });
 }
 
 // サーバーが renderedAt に描いた一覧が、フィードを消したあとの新しいものか。
@@ -54,6 +55,14 @@ export function renderStamp() {
 
 export function isRenderFresh(renderedAt: number) {
   return renderedAt > homeClearedAt;
+}
+
+// サーバーが描いてから少しでも時間がたった一覧(Netlify の端にキャッシュされていたもの)は、
+// 別の端末で消した投稿や退会した人の投稿が残っていることがあるので、すぐ取り直す。
+const renderReusedAfterMs = 10_000;
+
+export function renderSeedTime(renderedAt: number, now = Date.now()) {
+  return now - renderedAt > renderReusedAfterMs ? 0 : now;
 }
 
 export function clearHomeFeeds() {

@@ -28,6 +28,25 @@ func (q *Queries) ClaimSenseNoteSummary(ctx context.Context, authorID uuid.UUID)
 	return author_id, err
 }
 
+const countSenseNoteSummariesSince = `-- name: CountSenseNoteSummariesSince :one
+SELECT count(*) FROM sense_note_summaries
+WHERE author_id = $1
+  AND created_at >= $2
+`
+
+type CountSenseNoteSummariesSinceParams struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	Since    time.Time `json:"since"`
+}
+
+// その日(since は日本時間の0時)に作ったまとめの数。1日の上限に使う。
+func (q *Queries) CountSenseNoteSummariesSince(ctx context.Context, arg CountSenseNoteSummariesSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSenseNoteSummariesSince, arg.AuthorID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSenseNotes = `-- name: CountSenseNotes :one
 SELECT count(*) FROM sense_notes WHERE author_id = $1
 `
@@ -341,7 +360,12 @@ func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesB
 	var items []ListSenseNotesBetweenRow
 	for rows.Next() {
 		var i ListSenseNotesBetweenRow
-		if err := rows.Scan(&i.Body, &i.Event, &i.Day, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.Body,
+			&i.Event,
+			&i.Day,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -369,49 +393,4 @@ DELETE FROM sense_note_summary_claims WHERE author_id = $1
 func (q *Queries) ReleaseSenseNoteSummaryClaim(ctx context.Context, authorID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, releaseSenseNoteSummaryClaim, authorID)
 	return err
-}
-
-const updateSenseNote = `-- name: UpdateSenseNote :one
-UPDATE sense_notes
-SET body = $1,
-    event = $2,
-    updated_at = now()
-WHERE id = $3
-  AND author_id = $4
-RETURNING id, body, event, day, created_at, updated_at
-`
-
-type UpdateSenseNoteParams struct {
-	Body     string    `json:"body"`
-	Event    *string   `json:"event"`
-	ID       uuid.UUID `json:"id"`
-	AuthorID uuid.UUID `json:"author_id"`
-}
-
-type UpdateSenseNoteRow struct {
-	ID        uuid.UUID `json:"id"`
-	Body      string    `json:"body"`
-	Event     *string   `json:"event"`
-	Day       time.Time `json:"day"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) UpdateSenseNote(ctx context.Context, arg UpdateSenseNoteParams) (UpdateSenseNoteRow, error) {
-	row := q.db.QueryRow(ctx, updateSenseNote,
-		arg.Body,
-		arg.Event,
-		arg.ID,
-		arg.AuthorID,
-	)
-	var i UpdateSenseNoteRow
-	err := row.Scan(
-		&i.ID,
-		&i.Body,
-		&i.Event,
-		&i.Day,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }

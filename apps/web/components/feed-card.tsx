@@ -16,9 +16,9 @@ export function hasFeedTitle(title: string) {
   return title.trim() !== "";
 }
 
+// タイトルが空のときは空のまま返す(「（質問なし）」のような代わりの文字は出さない)。
 export function feedTitle(title: string) {
-  const trimmed = title.trim();
-  return trimmed === "" ? "（質問なし）" : trimmed;
+  return title.trim();
 }
 
 function CardTitle({ title }: { title: string }) {

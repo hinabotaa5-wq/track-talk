@@ -6,25 +6,42 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { z } from "zod";
+
+// 利用規約などを読みに行って戻ってきても、入れたメールアドレス・パスワード・同意のチェックが消えないよう、
+// 画面を離れる間だけメモリに置いておく(パスワードを含むので、ブラウザの保存領域には書かない。再読み込みで消える)。
+type Draft = { email: string; password: string; agreed: boolean };
+const emptyDraft: Draft = { email: "", password: "", agreed: false };
+let draft = emptyDraft;
+
+function saveDraft(next: Draft) {
+  draft = next;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(draft.agreed);
   const { pending, acquire, release } = useActionLock();
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: draft.email, password: draft.password },
   });
+
+  const email = useWatch({ control: form.control, name: "email" });
+  const password = useWatch({ control: form.control, name: "password" });
+
+  useEffect(() => {
+    saveDraft({ email: email ?? "", password: password ?? "", agreed });
+  }, [email, password, agreed]);
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     if (!agreed) {
@@ -50,6 +67,7 @@ export default function RegisterPage() {
       setError(authErrorMessage(err));
       return;
     }
+    saveDraft(emptyDraft);
     if (data.session) {
       router.push("/me/profile?onboarding=1");
       return;

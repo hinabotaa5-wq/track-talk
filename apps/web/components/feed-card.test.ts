@@ -94,6 +94,11 @@ describe("FeedCard", () => {
     expect(noTitle).not.toContain("<p ");
   });
 
+  it("does not show a placeholder when a post has no title", () => {
+    const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, title: "" } }));
+    expect(html).not.toContain("質問なし");
+  });
+
   it("loads the cover of an instagram post", () => {
     const html = renderToStaticMarkup(
       createElement(FeedCard, { post: { ...post, kind: "instagram", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e" } }),

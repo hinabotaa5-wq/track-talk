@@ -633,6 +633,7 @@ type SenseNote struct {
 	Event     *string   `json:"event"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Day       time.Time `json:"day"`
 }
 
 type SenseNoteSummary struct {
