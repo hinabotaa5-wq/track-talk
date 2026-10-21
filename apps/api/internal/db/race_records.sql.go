@@ -83,9 +83,9 @@ func (q *Queries) CountRecentPBAuthors(ctx context.Context, arg CountRecentPBAut
 }
 
 const createRaceRecord = `-- name: CreateRaceRecord :one
-INSERT INTO race_records (id, author_id, raced_on, event, mark, wind, memo)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, raced_on, event, mark, wind, memo, created_at, updated_at
+INSERT INTO race_records (id, author_id, raced_on, event, mark, wind, memo, meet_name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
 `
 
 type CreateRaceRecordParams struct {
@@ -96,6 +96,7 @@ type CreateRaceRecordParams struct {
 	Mark     int32     `json:"mark"`
 	Wind     *int16    `json:"wind"`
 	Memo     string    `json:"memo"`
+	MeetName string    `json:"meet_name"`
 }
 
 type CreateRaceRecordRow struct {
@@ -105,6 +106,7 @@ type CreateRaceRecordRow struct {
 	Mark      int32     `json:"mark"`
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
+	MeetName  string    `json:"meet_name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -118,6 +120,7 @@ func (q *Queries) CreateRaceRecord(ctx context.Context, arg CreateRaceRecordPara
 		arg.Mark,
 		arg.Wind,
 		arg.Memo,
+		arg.MeetName,
 	)
 	var i CreateRaceRecordRow
 	err := row.Scan(
@@ -127,6 +130,7 @@ func (q *Queries) CreateRaceRecord(ctx context.Context, arg CreateRaceRecordPara
 		&i.Mark,
 		&i.Wind,
 		&i.Memo,
+		&i.MeetName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -153,7 +157,7 @@ func (q *Queries) DeleteRaceRecord(ctx context.Context, arg DeleteRaceRecordPara
 }
 
 const listRaceRecords = `-- name: ListRaceRecords :many
-SELECT id, raced_on, event, mark, wind, memo, created_at, updated_at
+SELECT id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
 FROM race_records
 WHERE author_id = $1
 ORDER BY event, raced_on, created_at, id
@@ -166,6 +170,7 @@ type ListRaceRecordsRow struct {
 	Mark      int32     `json:"mark"`
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
+	MeetName  string    `json:"meet_name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -187,6 +192,7 @@ func (q *Queries) ListRaceRecords(ctx context.Context, authorID uuid.UUID) ([]Li
 			&i.Mark,
 			&i.Wind,
 			&i.Memo,
+			&i.MeetName,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -217,10 +223,11 @@ SET raced_on = $1,
     mark = $3,
     wind = $4,
     memo = $5,
+    meet_name = $6,
     updated_at = now()
-WHERE id = $6
-  AND author_id = $7
-RETURNING id, raced_on, event, mark, wind, memo, created_at, updated_at
+WHERE id = $7
+  AND author_id = $8
+RETURNING id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
 `
 
 type UpdateRaceRecordParams struct {
@@ -229,6 +236,7 @@ type UpdateRaceRecordParams struct {
 	Mark     int32     `json:"mark"`
 	Wind     *int16    `json:"wind"`
 	Memo     string    `json:"memo"`
+	MeetName string    `json:"meet_name"`
 	ID       uuid.UUID `json:"id"`
 	AuthorID uuid.UUID `json:"author_id"`
 }
@@ -240,6 +248,7 @@ type UpdateRaceRecordRow struct {
 	Mark      int32     `json:"mark"`
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
+	MeetName  string    `json:"meet_name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -251,6 +260,7 @@ func (q *Queries) UpdateRaceRecord(ctx context.Context, arg UpdateRaceRecordPara
 		arg.Mark,
 		arg.Wind,
 		arg.Memo,
+		arg.MeetName,
 		arg.ID,
 		arg.AuthorID,
 	)
@@ -262,6 +272,7 @@ func (q *Queries) UpdateRaceRecord(ctx context.Context, arg UpdateRaceRecordPara
 		&i.Mark,
 		&i.Wind,
 		&i.Memo,
+		&i.MeetName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -22,6 +22,7 @@ import {
   raceMarkInput,
   raceMarkKind,
   raceRecordEvents,
+  raceRecordMeetNameMaxLength,
   raceRecordMemoMaxLength,
   sortRaceEvents,
   type RaceMarkKind,
@@ -53,6 +54,7 @@ function RaceRecordForm({
   const kind = raceMarkKind(event);
   const [mark, setMark] = useState(record ? raceMarkInput(record.mark, kind) : "");
   const [wind, setWind] = useState(record?.wind != null ? formatRaceWind(record.wind).replace("±", "") : "");
+  const [meetName, setMeetName] = useState(record?.meet_name ?? "");
   const [memo, setMemo] = useState(record?.memo ?? "");
   const [error, setError] = useState("");
   const lock = useActionLock();
@@ -80,11 +82,12 @@ function RaceRecordForm({
       const res = await apiFetch<RaceRecords>(record ? `/v1/me/race-records/${record.id}` : "/v1/me/race-records", {
         method: record ? "PATCH" : "POST",
         token,
-        body: JSON.stringify({ raced_on: day, event, mark: parsedMark, wind: parsedWind ?? null, memo: memo.trim() }),
+        body: JSON.stringify({ raced_on: day, event, mark: parsedMark, wind: parsedWind ?? null, memo: memo.trim(), meet_name: meetName.trim() }),
       });
       if (!record) {
         setMark("");
         setWind("");
+        setMeetName("");
         setMemo("");
       }
       onSaved(res, event);
@@ -133,6 +136,10 @@ function RaceRecordForm({
           </label>
         ) : null}
       </div>
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-300">大会名(任意)</span>
+        <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder="例: 県高校総体" />
+      </label>
       <label className="block">
         <span className="mb-1 block text-xs text-slate-300">感想(任意)</span>
         <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder="例: 後半で腕振りが小さくなった" />
@@ -268,7 +275,10 @@ function RaceRecordRow({
   return (
     <div className="flex items-start gap-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-xs text-slate-300">{senseDayLabel(record.raced_on)}</p>
+        <p className="text-xs text-slate-300">
+          {senseDayLabel(record.raced_on)}
+          {record.meet_name ? ` ・ ${record.meet_name}` : ""}
+        </p>
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-lg font-bold tabular-nums text-slate-100">{formatRaceMark(record.mark, kind)}</span>
           {record.wind !== null ? <span className="text-xs tabular-nums text-slate-300">風 {formatRaceWind(record.wind)}</span> : null}

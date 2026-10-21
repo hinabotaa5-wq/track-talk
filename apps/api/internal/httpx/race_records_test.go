@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
@@ -23,6 +24,7 @@ type raceRecordsResp struct {
 		WindAided bool   `json:"wind_aided"`
 		IsPB      bool   `json:"is_pb"`
 		Memo      string `json:"memo"`
+		MeetName  string `json:"meet_name"`
 	} `json:"records"`
 }
 
@@ -49,8 +51,14 @@ func TestRaceRecordsStayWithTheAthlete(t *testing.T) {
 		t.Fatalf("wind on 400m = %d", rec.Code)
 	}
 
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/race-records", me, map[string]any{
+		"raced_on": "2026-05-03", "event": "100m", "mark": 1112, "meet_name": strings.Repeat("あ", 61),
+	}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("long meet name = %d", rec.Code)
+	}
+
 	rec := doJSON(t, h, http.MethodPost, "/v1/me/race-records", me, map[string]any{
-		"raced_on": "2026-05-03", "event": "100m", "mark": 1112, "wind": 8, "memo": "スタートで出遅れた",
+		"raced_on": "2026-05-03", "event": "100m", "mark": 1112, "wind": 8, "memo": "スタートで出遅れた", "meet_name": "  県  選手権 ",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body.String())
@@ -65,7 +73,7 @@ func TestRaceRecordsStayWithTheAthlete(t *testing.T) {
 	if len(got.Records) != 2 || !got.Records[0].IsPB || got.Records[1].IsPB || !got.Records[1].WindAided {
 		t.Fatalf("records %s", rec.Body.String())
 	}
-	if got.Records[0].Memo != "スタートで出遅れた" || got.Records[0].Wind == nil || *got.Records[0].Wind != 8 {
+	if got.Records[0].Memo != "スタートで出遅れた" || got.Records[0].MeetName != "県 選手権" || got.Records[0].Wind == nil || *got.Records[0].Wind != 8 {
 		t.Fatalf("first record %s", rec.Body.String())
 	}
 	id := got.Records[0].ID
@@ -89,7 +97,7 @@ func TestRaceRecordsStayWithTheAthlete(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update = %d %s", rec.Code, rec.Body.String())
 	}
-	if got := decodeRaceRecords(t, rec.Body.Bytes()); got.Records[0].Mark != 1102 || got.Records[0].Memo != "" {
+	if got := decodeRaceRecords(t, rec.Body.Bytes()); got.Records[0].Mark != 1102 || got.Records[0].Memo != "" || got.Records[0].MeetName != "" {
 		t.Fatalf("updated %s", rec.Body.String())
 	}
 

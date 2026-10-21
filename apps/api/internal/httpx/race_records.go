@@ -16,6 +16,7 @@ import (
 // 競技会の記録は本人だけが読み書きする。感覚メモと同じく、フィードにも公開ページにも出さない。
 const (
 	maxRaceRecordMemo = 300
+	maxRaceMeetName   = 60
 	maxRaceRecords    = 1000
 	// 追い風参考の境目(0.1m/s単位)。+2.0m/s を超えると公認されない。
 	maxLegalWind = 20
@@ -73,6 +74,8 @@ type raceRecordReq struct {
 	Mark    int    `json:"mark"`
 	Wind    *int   `json:"wind"`
 	Memo    string `json:"memo"`
+	// MeetName は記録を出した大会の名前。任意。
+	MeetName string `json:"meet_name"`
 }
 
 type raceRecordDTO struct {
@@ -87,6 +90,7 @@ type raceRecordDTO struct {
 	// IsPB は、同じ種目のそれまでの公認記録をすべて上回ったとき true。
 	IsPB      bool      `json:"is_pb"`
 	Memo      string    `json:"memo"`
+	MeetName  string    `json:"meet_name"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -148,6 +152,12 @@ func normalizeRaceRecord(req raceRecordReq, today time.Time) (db.CreateRaceRecor
 		fields["memo"] = "感想は300文字以内で書いてください"
 	}
 	out.Memo = memo
+
+	meetName := strings.Join(strings.Fields(req.MeetName), " ")
+	if len([]rune(meetName)) > maxRaceMeetName {
+		fields["meet_name"] = "大会名は60文字以内で書いてください"
+	}
+	out.MeetName = meetName
 	return out, fields
 }
 
@@ -174,6 +184,7 @@ func buildRaceRecords(rows []db.ListRaceRecordsRow) raceRecordsDTO {
 			Wind:       row.Wind,
 			WindAided:  row.Wind != nil && *row.Wind > maxLegalWind,
 			Memo:       row.Memo,
+			MeetName:   row.MeetName,
 			CreatedAt:  row.CreatedAt,
 		}
 		if !item.WindAided {
@@ -278,6 +289,7 @@ func (s *Server) updateRaceRecord(w http.ResponseWriter, r *http.Request) {
 		Mark:     params.Mark,
 		Wind:     params.Wind,
 		Memo:     params.Memo,
+		MeetName: params.MeetName,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
