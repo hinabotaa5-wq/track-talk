@@ -1,6 +1,10 @@
 -- 開発用のケガデータ。ケガ部の公開ページ・集計(予防・復帰の目安・みんなの一言)が表示される程度の人数を入れる。
 -- 何度流しても同じ結果になる(デモ用プロフィールを消してから入れ直し、乱数は固定)。
--- 実行: make seed-injury(ローカルの docker の DB にだけ流す)
+-- 実行: make seed-injury(ローカルの docker の DB)。消すときは make unseed-injury。
+-- 本番に流すとき(make は使わない。デモ用プロフィールは「デモ1」〜「デモ81」のニックネームで、公開の集計にも入る):
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo.sql
+-- 本番から消すとき:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo_remove.sql
 BEGIN;
 
 SELECT setseed(0.42);
