@@ -505,6 +505,7 @@ type RaceRecord struct {
 	Memo      string    `json:"memo"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	MeetName  string    `json:"meet_name"`
 }
 
 type RecruitmentDetail struct {

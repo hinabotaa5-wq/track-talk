@@ -16,6 +16,8 @@ export type RaceRecord = {
   wind_aided: boolean;
   is_pb: boolean;
   memo: string;
+  // 記録を出した大会の名前。書かなければ空。
+  meet_name: string;
   created_at: string;
 };
 
@@ -24,6 +26,7 @@ export type RaceEvent = { event: string; event_label: string; kind: RaceMarkKind
 export type RaceRecords = { events: RaceEvent[]; records: RaceRecord[] };
 
 export const raceRecordMemoMaxLength = 300;
+export const raceRecordMeetNameMaxLength = 60;
 
 const distanceEvents = new Set(["long-jump", "triple-jump", "high-jump", "pole-vault", "shot-put", "discus", "hammer", "javelin"]);
 const pointsEvents = new Set(["heptathlon", "decathlon"]);

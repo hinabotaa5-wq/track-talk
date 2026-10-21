@@ -16,7 +16,7 @@ import {
 } from "./race-records";
 
 function record(raced_on: string, mark: number, extra: Partial<RaceRecord> = {}): RaceRecord {
-  return { id: `${raced_on}-${mark}`, raced_on, event: "100m", event_label: "100m", mark, wind: null, wind_aided: false, is_pb: false, memo: "", created_at: "", ...extra };
+  return { id: `${raced_on}-${mark}`, raced_on, event: "100m", event_label: "100m", mark, wind: null, wind_aided: false, is_pb: false, memo: "", meet_name: "", created_at: "", ...extra };
 }
 
 describe("race records", () => {
