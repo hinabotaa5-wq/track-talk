@@ -5,17 +5,13 @@ import { coachingEnabled } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "オンラインコーチング",
-  description: "TrackTalk のオンラインコーチングは準備中です。動画添削とパーソナル指導の説明と、コーチの募集です。",
+  description: "TrackTalk のオンラインコーチングは準備中です。自分の走りの動画をコーチに見てもらえます。料金と、コーチの募集です。",
 };
 
-const reviewSteps = ["動画を送る", "コーチが見る", "返事が届く"] as const;
-
-// メニューは決まっているが、金額はまだ決めていないので載せない。
+// 1本の値段は API の reviewPrices(review_payment.go)と同じにする。
 const prices = [
-  { menu: "動画添削(コーチ)", price: "1本ごと" },
-  { menu: "動画添削(先輩)", price: "コーチより安め" },
-  { menu: "急ぎ", price: "追加料金" },
-  { menu: "パーソナル指導", price: "コーチごと" },
+  { menu: "動画1本(コーチ)", price: "1,000円" },
+  { menu: "動画1本(先輩)", price: "500円" },
 ] as const;
 
 const tag = "text-xs text-slate-300";
@@ -25,12 +21,12 @@ const tag = "text-xs text-slate-300";
 export default function CoachingPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <div className="space-y-2">
-        <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+      <div className="space-y-3">
+        <p className="flex min-h-14 items-center justify-center rounded-2xl border-2 border-amber-300/70 bg-amber-400/20 px-4 text-2xl font-extrabold tracking-widest text-amber-200">
           準備中
         </p>
         <h1 className="text-2xl font-bold">オンラインコーチング</h1>
-        <p className="text-sm text-slate-200">コーチや先輩に、オンラインで走りを見てもらえます。</p>
+        <p className="text-sm text-slate-200">自分の走りの動画をコーチに見てもらえます</p>
       </div>
 
       <section
@@ -42,8 +38,10 @@ export default function CoachingPage() {
         </h2>
         <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-200">
           <li>動画1本ごとに報酬</li>
-          <li>集客・支払いは運営におまかせ</li>
-          <li>大学生・社会人は「先輩」として登録可能</li>
+          <li>コーチング経験のある方</li>
+          <li>社会人で競技経験が豊富な方</li>
+          <li>大学生で成績が優秀な方</li>
+          <li>応募完了後は運営が審査します</li>
         </ul>
         <Link
           href={coachApplyPath}
@@ -51,58 +49,6 @@ export default function CoachingPage() {
         >
           応募する
         </Link>
-      </section>
-
-      <section aria-labelledby="coaching-review" className="space-y-3">
-        <h2 id="coaching-review" className="text-lg font-bold">
-          動画添削
-        </h2>
-        <ol className="grid grid-cols-3 gap-2">
-          {reviewSteps.map((step, index) => (
-            <li key={step} className="flex flex-col items-center gap-1.5 rounded-xl border border-white/20 glass bg-white/10 p-3 text-center">
-              <span
-                className="flex size-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white"
-                aria-hidden
-              >
-                {index + 1}
-              </span>
-              <span className="text-xs font-semibold leading-snug text-white">{step}</span>
-            </li>
-          ))}
-        </ol>
-        <p className={tag}>夜に送れば、翌日の昼までに返ってきます。</p>
-        <p className={tag}>最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
-        <p className={tag}>18歳未満は保護者の同意が必要です。</p>
-        {coachingEnabled ? (
-          <>
-            <p className={tag}>
-              どんなコーチがいるかは
-              <Link href="/coaches" className="text-blue-300 underline">
-                コーチ一覧
-              </Link>
-              で見られます。
-            </p>
-            <p className={tag}>
-              招待コードをお持ちの方は
-              <Link href="/coaching/new" className="text-blue-300 underline">
-                デモ版
-              </Link>
-              を使えます。
-            </p>
-          </>
-        ) : null}
-      </section>
-
-      <section aria-labelledby="coaching-personal" className="space-y-1">
-        <h2 id="coaching-personal" className="text-lg font-bold">
-          パーソナル指導
-        </h2>
-        <p className="text-sm text-slate-200">選んだコーチに、1対1で続けて見てもらえます。</p>
-        {coachingEnabled ? (
-          <Link href="/coaches" className="text-sm text-blue-300 underline">
-            コーチ一覧を見る
-          </Link>
-        ) : null}
       </section>
 
       <section aria-labelledby="coaching-price" className="space-y-3">
@@ -113,11 +59,22 @@ export default function CoachingPage() {
           {prices.map((item) => (
             <div key={item.menu} className="flex items-baseline justify-between gap-3 px-3 py-2.5">
               <dt className="text-sm font-semibold text-white">{item.menu}</dt>
-              <dd className="shrink-0 text-sm text-blue-300">{item.price}</dd>
+              <dd className="shrink-0 text-sm font-semibold text-blue-300">{item.price}</dd>
             </div>
           ))}
         </dl>
-        <p className={tag}>返事が目安の時刻より遅れたら自動で返金。</p>
+        <p className={tag}>返事が目安の時刻より遅れたら自動で返金されます</p>
+        {coachingEnabled ? (
+          <p className={tag}>
+            <Link href="/coaches" className="text-blue-300 underline">
+              コーチ一覧
+            </Link>
+            ・招待コードをお持ちの方は
+            <Link href="/coaching/new" className="text-blue-300 underline">
+              デモ版
+            </Link>
+          </p>
+        ) : null}
       </section>
     </div>
   );
