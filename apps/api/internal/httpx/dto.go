@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,11 +15,13 @@ type meta struct {
 }
 
 type postDTO struct {
-	ID             uuid.UUID `json:"id"`
-	Title          string    `json:"title"`
-	Body           string    `json:"body,omitempty"`
-	AuthorName     *string   `json:"author_name,omitempty"`
-	PostMaster     bool      `json:"author_post_master,omitempty"`
+	ID    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+	Body  string    `json:"body,omitempty"`
+	// Excerpt は一覧のカードに出す本文の冒頭。一覧では本文を返さないので、写真のない文章の投稿だけに付ける。
+	Excerpt        string  `json:"excerpt,omitempty"`
+	AuthorName     *string `json:"author_name,omitempty"`
+	PostMaster     bool    `json:"author_post_master,omitempty"`
 	authorID       uuid.UUID
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
@@ -152,8 +155,17 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	}
 	if !list {
 		p.Body = row.Body
+	} else if row.Kind == "text" && p.ImagePublicID == "" {
+		p.Excerpt = postExcerpt(row.Body)
 	}
 	return p
+}
+
+const postExcerptRunes = 120
+
+// postExcerpt は、本文の空白や改行をつめた冒頭を返す。
+func postExcerpt(body string) string {
+	return clipRunes(strings.Join(strings.Fields(body), " "), postExcerptRunes)
 }
 
 func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO {

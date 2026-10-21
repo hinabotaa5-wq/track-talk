@@ -423,6 +423,11 @@ type postReq struct {
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
+	return s.parsePostReqTitle(w, r, forceKind, false)
+}
+
+// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい（YouTube・Instagram の投稿の編集）。
+func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, forceKind string, titleOptional bool) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
@@ -437,8 +442,12 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	}
 	fields := map[string]string{}
 	if kind != "practice" {
-		if e := Title(req.Title); e != "" {
-			fields["title"] = e
+		titleError := Title(req.Title)
+		if titleOptional {
+			titleError = OptionalTitle(req.Title)
+		}
+		if titleError != "" {
+			fields["title"] = titleError
 		}
 	}
 	if e := PostBody(req.Body); e != "" {
@@ -657,7 +666,8 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updateInjury(w, r, p, id)
 		return
 	}
-	params, _, _, _, ok := s.parsePostReq(w, r, "")
+	// YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
+	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "youtube" || existing.Kind == "instagram")
 	if !ok {
 		return
 	}

@@ -132,7 +132,7 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 		fields["url"] = msg
 	}
 	customTitle := strings.TrimSpace(req.Title)
-	if e := Title(customTitle); e != "" {
+	if e := OptionalTitle(customTitle); e != "" {
 		fields["title"] = e
 	}
 	if e := PostBody(req.Body); e != "" {

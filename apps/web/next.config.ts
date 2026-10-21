@@ -32,7 +32,7 @@ function contentSecurityPolicy() {
     "form-action 'self'",
     `script-src ${script.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://upload.wikimedia.org https://thumb.wikimedia.org",
+    "img-src 'self' data: blob: https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://upload.wikimedia.org https://thumb.wikimedia.org https://www.instagram.com https://*.cdninstagram.com https://*.fbcdn.net",
     "media-src 'self' blob: https://res.cloudinary.com",
     "font-src 'self'",
     "frame-src https://www.youtube-nocookie.com https://www.instagram.com",

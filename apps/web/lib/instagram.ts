@@ -24,6 +24,11 @@ export function parseInstagramUrl(value: string): { type: InstagramType; shortco
   return { type, shortcode: parts[1] };
 }
 
+// 投稿・リールの表紙の画像。Instagram が公開の投稿に用意している URL で、読めないことがある。
+export function instagramMediaUrl(type: InstagramType, shortcode: string) {
+  return `${instagramPermalink(type, shortcode)}media/?size=m`;
+}
+
 export function instagramPermalink(type: InstagramType, shortcode: string) {
   return `https://www.instagram.com/${type}/${shortcode}/`;
 }

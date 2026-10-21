@@ -85,7 +85,7 @@ func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 		fields["url"] = msg
 	}
 	title := strings.TrimSpace(req.Title)
-	if e := Title(title); e != "" {
+	if e := OptionalTitle(title); e != "" {
 		fields["title"] = e
 	}
 	if e := PostBody(req.Body); e != "" {

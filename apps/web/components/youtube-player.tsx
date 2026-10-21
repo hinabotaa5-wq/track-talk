@@ -1,8 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
+
+const youtubeOrigin = "https://www.youtube-nocookie.com";
+const playRetryMs = 600;
+const playRetryLimit = 8;
+
+// ポスターを押した1回で再生を始める。autoplay が効かないと YouTube 自身の再生ボタンが出て、2回押すことになるので、
+// プレーヤーの準備ができたという知らせ(onReady)を待って再生を頼み、再生が始まるまで数回頼み直す。
+function YouTubeFrame({ videoId, title }: { videoId: string; title: string }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    let playing = false;
+    let tries = 0;
+    function post(message: object) {
+      frame?.contentWindow?.postMessage(JSON.stringify(message), youtubeOrigin);
+    }
+    function play() {
+      post({ event: "command", func: "playVideo", args: [] });
+    }
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== youtubeOrigin || e.source !== frame?.contentWindow) return;
+      let data: { event?: string; info?: { playerState?: number } } | null = null;
+      try {
+        data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+      } catch {
+        return;
+      }
+      if (data?.event === "onReady" || data?.event === "initialDelivery") play();
+      const state = data?.info?.playerState;
+      if (data?.event === "infoDelivery" && (state === 1 || state === 3)) playing = true;
+    }
+    window.addEventListener("message", onMessage);
+    // 準備の知らせは、こちらから「聞いています」と伝えると届く。iframe の読み込みが終わってから伝える。
+    function listen() {
+      post({ event: "listening", id: 1, channel: "widget" });
+      play();
+    }
+    frame.addEventListener("load", listen);
+    const timer = window.setInterval(() => {
+      if (playing || tries >= playRetryLimit) {
+        window.clearInterval(timer);
+        return;
+      }
+      tries++;
+      play();
+    }, playRetryMs);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      frame.removeEventListener("load", listen);
+      window.clearInterval(timer);
+    };
+  }, [videoId]);
+
+  return (
+    <iframe
+      ref={frameRef}
+      className="aspect-video w-full rounded-xl shadow-sm"
+      src={`${youtubeOrigin}/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`}
+      title={title}
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
+  );
+}
 
 export function YouTubePlayer({
   videoId,
@@ -17,23 +84,7 @@ export function YouTubePlayer({
   const poster = thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   if (isPlaying) {
-    return (
-      <iframe
-        className="aspect-video w-full rounded-xl shadow-sm"
-        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`}
-        title={title}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        onLoad={(e) => {
-          // autoplay が効かない環境でも、ポスターを押した1回で再生が始まるようにする
-          e.currentTarget.contentWindow?.postMessage(
-            JSON.stringify({ event: "command", func: "playVideo", args: [] }),
-            "https://www.youtube-nocookie.com"
-          );
-        }}
-      />
-    );
+    return <YouTubeFrame videoId={videoId} title={title} />;
   }
 
   return (
