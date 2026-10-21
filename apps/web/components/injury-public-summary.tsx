@@ -7,28 +7,52 @@ function Waiting({ min }: { min: number }) {
   return <p className="text-sm text-slate-400">{min}人そろうと表示</p>;
 }
 
+function BarRow({ label, people, total }: { label: string; people: number; total: number }) {
+  const percent = injuryPercent(people, total);
+  return (
+    <li className="text-sm">
+      <div className="flex items-baseline justify-between gap-3">
+        <span>{label}</span>
+        <span className="shrink-0 tabular-nums">
+          <span className="font-semibold text-slate-100">{percent}%</span>
+          <span className="ml-1 text-xs text-slate-400">{people}人</span>
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 rounded-full bg-white/10" aria-hidden>
+        <div className="h-1.5 rounded-full bg-blue-400" style={{ width: `${percent}%` }} />
+      </div>
+    </li>
+  );
+}
+
 // まだ集計が出ていない項目は見出しごと出さない。全部まだのときは、呼ぶ側で1行だけ出す。
-export function Bars({ title, tally }: { title: string; tally: InjuryTally }) {
+// top を渡すと、多い順に top 件だけ出し、残りは「ほかの回答」を開くと見られる(長い一覧で読みにくくならないように)。
+export function Bars({ title, tally, top }: { title: string; tally: InjuryTally; top?: number }) {
   if (tally.items.length === 0) return null;
+  const items = [...tally.items].sort((a, b) => b.people - a.people);
+  const shown = top ? items.slice(0, top) : items;
+  const rest = top ? items.slice(top) : [];
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-bold text-slate-100">{title}</h3>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-bold text-slate-100">{title}</h3>
+        <span className="shrink-0 text-xs text-slate-400">{tally.people}人が回答</span>
+      </div>
       <ul className="space-y-1.5">
-        {tally.items.map((item) => {
-          const percent = injuryPercent(item.people, tally.people);
-          return (
-            <li key={item.code} className="text-sm">
-              <div className="flex justify-between gap-3">
-                <span>{item.label}</span>
-                <span className="shrink-0 text-slate-300">{percent}%</span>
-              </div>
-              <div className="mt-1 h-1.5 rounded-full bg-white/10" aria-hidden>
-                <div className="h-1.5 rounded-full bg-blue-400" style={{ width: `${percent}%` }} />
-              </div>
-            </li>
-          );
-        })}
+        {shown.map((item) => (
+          <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} />
+        ))}
       </ul>
+      {rest.length > 0 ? (
+        <details className="group">
+          <summary className="cursor-pointer list-none text-xs text-blue-300 group-open:hidden">ほかの回答を見る({rest.length})</summary>
+          <ul className="mt-1.5 space-y-1.5">
+            {rest.map((item) => (
+              <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} />
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

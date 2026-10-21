@@ -14,6 +14,7 @@ import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
+import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
 import { umamiBeforeSendName, umamiBeforeSendScript } from "@/lib/analytics";
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </main>
           <BottomNav />
           <ScrollTopOnTabChange />
+          <CaretGuard />
           <InstallGuide />
           </ConfirmProvider>
           </LeaveGuardProvider>

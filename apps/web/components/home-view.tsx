@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { HomeFeed } from "@/components/home-feed";
 import { ReviewHome } from "@/components/review-home";
 import type { PostsPage } from "@/lib/fetch-posts";
-import { homeFeedPath, isRenderFresh, readFeed, seedFeed } from "@/lib/home-feed-cache";
+import { homeFeedPath, isRenderFresh, readFeed, renderSeedTime, seedFeed } from "@/lib/home-feed-cache";
 import { parseHomeSort, parseProductKind } from "@/lib/home-sort";
 import { parseReviewFilters, reviewFiltersQuery } from "@/lib/review-filters";
 
@@ -28,7 +28,7 @@ export function HomeView({
   const page = Math.max(1, Number(sp.get("page")) || 1);
 
   useState(() => {
-    if (initial && typeof window !== "undefined") seedFeed(initialPath, initial);
+    if (initial && typeof window !== "undefined") seedFeed(initialPath, initial, renderSeedTime(renderedAt));
   });
 
   if (sort === "review") {

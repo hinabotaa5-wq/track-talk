@@ -3,8 +3,10 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -159,5 +161,78 @@ func TestTextPostsInTheFeedCarryAnExcerpt(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
 	if len(list.Posts) == 0 || list.Posts[0].Body != "" || !strings.HasPrefix(list.Posts[0].Excerpt, "決勝は向かい風だった。 ああ") || len([]rune(list.Posts[0].Excerpt)) > 120 {
 		t.Fatalf("feed = %s", rec.Body.String())
+	}
+}
+
+// Instagram の表紙は外から確実に取れないので、投稿者が任意で付けた画像をカードに出す。投稿を消すと画像も消す。
+func TestInstagramPostWithCoverImage(t *testing.T) {
+	deleted := make(chan []string, 4)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			deleted <- r.URL.Query()["public_ids[]"]
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/image/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"image","format":"jpg","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	ta := token(t, uuid.New())
+	cover := "track-talk/" + uuid.NewString()
+
+	// 自分に発行されていない画像は付けられない。
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
+		"url": "https://www.instagram.com/p/G1a2B3c4D5e/", "image_public_id": cover})
+	if rec.Code < 400 {
+		t.Fatalf("cover not issued to me = %d %s", rec.Code, rec.Body.String())
+	}
+
+	grantUpload(t, h, ta, cover)
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
+		"url": "https://www.instagram.com/p/G1a2B3c4D5e/", "image_public_id": cover})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Post struct {
+			ID           string `json:"id"`
+			ThumbnailURL string `json:"thumbnail_url"`
+		} `json:"post"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if !strings.Contains(created.Post.ThumbnailURL, cover) {
+		t.Fatalf("thumbnail_url = %q", created.Post.ThumbnailURL)
+	}
+	// フィードのカードにも出る。
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	if !strings.Contains(rec.Body.String(), cover) {
+		t.Fatalf("feed has no cover: %s", rec.Body.String())
+	}
+
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+created.Post.ID, ta, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete %d", rec.Code)
+	}
+	select {
+	case ids := <-deleted:
+		if len(ids) != 1 || ids[0] != cover {
+			t.Fatalf("deleted %v", ids)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cover was not deleted")
 	}
 }

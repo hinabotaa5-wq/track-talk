@@ -133,7 +133,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.With(s.requireSenseSummary).Get("/me/sense-notes/summary", s.getSenseSummary)
 			r.With(s.requireSenseSummary).Post("/me/sense-notes/summary", s.createSenseSummary)
 			r.Post("/me/sense-notes", s.createSenseNote)
-			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)
 			r.Get("/me/race-records", s.listRaceRecords)
 			r.Get("/race-records/pb-stats", s.pbStats)
@@ -328,7 +327,7 @@ func (s *Server) present(p postDTO) postDTO {
 		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}
-	if (p.Kind == "text" || p.Kind == "recruitment") && p.ImagePublicID != "" {
+	if (p.Kind == "text" || p.Kind == "recruitment" || p.Kind == "instagram") && p.ImagePublicID != "" {
 		p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
 	}
 	return p

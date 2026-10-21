@@ -33,7 +33,7 @@ func (s *Server) postMediaOf(ctx context.Context, id uuid.UUID) postMedia {
 		switch post.Kind {
 		case "video":
 			m.Videos = append(m.Videos, *post.CloudinaryPublicID)
-		case "text":
+		case "text", "instagram":
 			m.Images = append(m.Images, *post.CloudinaryPublicID)
 		}
 	}

@@ -2,25 +2,23 @@ import { senseGrainColor, senseJarLevel, senseJarSize } from "@/lib/sense-notes"
 
 // 感覚がたまっていくビン。1件書くごとに粒が1つ増え、6粒で満杯になって次のビンに移る。
 // dropLatest を付けると、いちばん新しい粒が上から落ちてくる(「動きを減らす」設定の人には動かさない)。
-// 粒の並びは、senseJarSize 粒でビンの中がほぼ埋まる形(2列×3段)。粒の数を変えたら大きさと並びを合わせ直す。
-const columns = 2;
-const grainRadius = 16.5;
-const grainStep = 44;
-const rowStep = 34;
-const bottomY = 131.5;
-
-function grainPosition(index: number) {
-  const row = Math.floor(index / columns);
-  const col = index % columns;
-  return { cx: 60 + (col - 0.5) * grainStep, cy: bottomY - row * rowStep };
-}
+// 粒は大きめにして少し重ね、senseJarSize 粒でビンの口までぎゅうぎゅうに詰まって見える並び(下から2つずつ3段)。
+// 大きさと位置を少しずつずらして、手で詰めたように見せる。粒の数を変えたら、この並びも合わせ直す。
+const grains = [
+  { cx: 38, cy: 127, r: 24 },
+  { cx: 83, cy: 128, r: 23 },
+  { cx: 35, cy: 91, r: 23 },
+  { cx: 81, cy: 89, r: 24 },
+  { cx: 40, cy: 55, r: 24 },
+  { cx: 84, cy: 57, r: 23 },
+];
 
 export function SenseNoteJar({ total, dropLatest = false, className = "" }: { total: number; dropLatest?: boolean; className?: string }) {
   const { filled, current } = senseJarLevel(total);
   // 満杯になった直後は、空のビンではなく満杯のビンを見せる。
   const shown = total > 0 && current === 0 ? senseJarSize : current;
   const jarIndex = total > 0 && current === 0 ? filled : filled + 1;
-  const fillTop = shown === 0 ? 146 : bottomY - (Math.ceil(shown / columns) - 1) * rowStep - grainRadius + 6;
+  const fillTop = shown === 0 ? 146 : Math.max(44, Math.min(...grains.slice(0, shown).map((g) => g.cy - g.r)) + 6);
   return (
     <div className={`relative shrink-0 ${className}`}>
       <svg viewBox="0 0 120 160" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
@@ -49,14 +47,14 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
         <g clipPath="url(#sense-jar-inside)">
           <rect x="0" y={fillTop} width="120" height={160 - fillTop} fill="url(#sense-jar-glow)" className="transition-all duration-700" />
           {Array.from({ length: shown }, (_, i) => {
-            const { cx, cy } = grainPosition(i);
+            const { cx, cy, r } = grains[i % grains.length];
             const latest = dropLatest && i === shown - 1;
             return (
               <circle
                 key={`${jarIndex}-${i}`}
                 cx={cx}
                 cy={cy}
-                r={grainRadius}
+                r={r}
                 fill={senseGrainColor(i + filled * 7)}
                 stroke="rgb(15 23 42 / 0.25)"
                 strokeWidth="1"

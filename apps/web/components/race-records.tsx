@@ -332,6 +332,8 @@ function PBStatsCard({ token }: { token: string | null }) {
   );
 }
 
+const noRecords: RaceRecords = { events: [], records: [] };
+
 // 記録のタブ。書く欄、種目の切り替え、グラフ、記録の一覧(新しい順)。
 export function RaceRecordsPanel({ token }: { token: string | null }) {
   const [data, setData] = useState<RaceRecords | null>(null);
@@ -350,11 +352,13 @@ export function RaceRecordsPanel({ token }: { token: string | null }) {
   }, [token]);
 
   if (failed) return <ErrorState message="記録の取得に失敗しました。APIの起動を確認してください。" />;
-  if (!data) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  // ログインしていない人には、空の記録の画面を見せる(書こうとするとログインへ案内する)。
+  const shown = token ? data : noRecords;
+  if (!shown) return <p className="text-sm text-slate-200">読み込み中...</p>;
 
-  const events = sortRaceEvents(data.events);
+  const events = sortRaceEvents(shown.events);
   const current = events.find((item) => item.event === selected) ?? events[0];
-  const records = current ? data.records.filter((record) => record.event === current.event) : [];
+  const records = current ? shown.records.filter((record) => record.event === current.event) : [];
 
   function onSaved(next: RaceRecords, event: string) {
     setData(next);

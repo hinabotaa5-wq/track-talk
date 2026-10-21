@@ -15,15 +15,6 @@ WHERE author_id = sqlc.arg('author_id')
 ORDER BY day DESC, created_at DESC, id DESC
 LIMIT sqlc.arg('page_size');
 
--- name: UpdateSenseNote :one
-UPDATE sense_notes
-SET body = sqlc.arg('body'),
-    event = sqlc.narg('event'),
-    updated_at = now()
-WHERE id = sqlc.arg('id')
-  AND author_id = sqlc.arg('author_id')
-RETURNING id, body, event, day, created_at, updated_at;
-
 -- name: DeleteSenseNote :execrows
 DELETE FROM sense_notes
 WHERE id = $1
