@@ -202,6 +202,18 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
 		"nickname": "変更後", "nickname_public": false,
 	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("update without event %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "変更後", "nickname_public": false, "event": "marathon",
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("update with unknown event %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "変更後", "nickname_public": false, "event": "100m",
+	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
 	}
@@ -212,6 +224,13 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 		t.Fatalf("private post %d %+v", rec.Code, post)
 	}
 
+	// 種目を選んだあとは、ニックネームだけ送っても種目は変わらない。
+	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
+		"nickname": "また変更", "nickname_public": false,
+	})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"event":"100m"`) {
+		t.Fatalf("keep event %d %s", rec.Code, rec.Body.String())
+	}
 	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
 		"nickname": "", "nickname_public": true,
 	})
@@ -1051,7 +1070,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 
 	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
 		"kind": "practice", "body": "流しをします", "venue": "織田フィールド",
-		"starts_at": starts.Format(time.RFC3339), "event": "other", "event_other": "ハードル", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "relay", "capacity": 2,
 	})
 	if rec.Code != 200 {
 		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
@@ -1065,7 +1084,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 		} `json:"practice"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &updated)
-	if updated.Title != "ハードル "+starts.Format("1月2日 15:04") || updated.Practice.Venue != "織田フィールド" || updated.Practice.Capacity != 2 {
+	if updated.Title != "リレー "+starts.Format("1月2日 15:04") || updated.Practice.Venue != "織田フィールド" || updated.Practice.Capacity != 2 {
 		t.Fatalf("updated %+v", updated)
 	}
 }

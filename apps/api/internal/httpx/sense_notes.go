@@ -69,7 +69,7 @@ func normalizeSenseNote(req senseNoteReq) (body string, event *string, fields ma
 	if req.Event != nil {
 		code := strings.TrimSpace(*req.Event)
 		if code != "" {
-			if !validPracticeEvent(code) {
+			if !validEvent(code) {
 				fields["event"] = "種目を選び直してください"
 			} else {
 				event = &code

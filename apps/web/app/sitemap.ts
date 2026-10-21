@@ -16,7 +16,6 @@ const staticPages = [
   "/injury",
   ...injuryBodyParts.map((part) => `/injury/${part.value}`),
   "/injury/data",
-  "/injury/stats",
   // 大会の日程と県ページは、ログインなしで読める。県ページは「◯◯県 陸上 大会」で探す人の入口にする。
   "/competitions",
   "/competitions/major-hosts",

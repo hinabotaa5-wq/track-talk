@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { InjuryView } from "./injury-view";
+import { InjuryHome } from "./injury-home";
 
 export const metadata: Metadata = {
   title: "ケガ部｜同じケガをした陸上選手が集まる場所",
@@ -16,7 +16,7 @@ export default function InjuryPage() {
   return (
     <div className="min-h-svh md:min-h-0">
       <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
-        <InjuryView />
+        <InjuryHome initialView="share" />
       </Suspense>
     </div>
   );

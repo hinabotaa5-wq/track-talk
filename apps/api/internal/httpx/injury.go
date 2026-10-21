@@ -42,8 +42,9 @@ var injuryStages = []struct{ Code, Label string }{
 	{"resting", "安静中"},
 	{"rehab", "リハビリ中"},
 	{"jogging", "ジョグ再開"},
-	{"practice", "練習に復帰"},
-	{"race", "大会に復帰"},
+	{"half", "50%を出せる"},
+	{"full", "全力を出せる"},
+	{"race", "大会に復帰した"},
 }
 
 func injuryStageLabel(code string) string {
@@ -75,14 +76,17 @@ type injuryUpdateReq struct {
 }
 
 // injuryBodyParts は、ケガのグループ。API と DB では名前を「部位（body part）」のままにしているが、
-// 今は各グループが1つの診断名で、8つに当てはまらないものは "other" に入る。
+// 今は各グループが1つの診断名で、当てはまらないものは "other" に入る。並びは発症が多い順(その他は最後)。
 var injuryBodyParts = []struct{ Code, Label string }{
 	{"hamstring-strain", "ハムストリングの肉離れ"},
-	{"quad-strain", "太もも前の肉離れ"},
-	{"sprain", "捻挫"},
-	{"achilles-tendinitis", "アキレス腱炎"},
-	{"jumpers-knee", "ジャンパー膝(膝蓋腱炎)"},
+	{"sprain", "足首の捻挫"},
 	{"shin-splints", "シンスプリント"},
+	{"stress-fracture", "疲労骨折"},
+	{"calf-strain", "ふくらはぎの肉離れ"},
+	{"jumpers-knee", "ジャンパー膝(膝蓋腱炎)"},
+	{"achilles-tendinitis", "アキレス腱炎"},
+	{"lower-back", "腰の痛み"},
+	{"quad-strain", "太もも前の肉離れ"},
 	{"shoulder", "肩の痛み"},
 	{"elbow", "肘の痛み"},
 	{"other", "その他"},

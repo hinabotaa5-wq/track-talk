@@ -134,7 +134,7 @@ export function NotificationBell() {
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (
-          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] leading-4 font-semibold text-white">
+          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-xs leading-4 font-semibold text-white">
             {badgeText(unread)}
           </span>
         ) : null}

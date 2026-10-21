@@ -380,7 +380,7 @@ export function PostDetail({
             {renderQuote(c)}
             <p className="whitespace-pre-wrap break-words">{c.body}</p>
           </div>
-          <span className="shrink-0 pb-0.5 text-[11px] text-slate-300">{formatRelativeTime(c.created_at)}</span>
+          <span className="shrink-0 pb-0.5 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</span>
         </div>
       </div>
     );
@@ -593,7 +593,7 @@ export function PostDetail({
         {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
         {activeThread ? (
           <div className="space-y-3">
-            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、返信・編集・削除などができます</p>
+            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、メンション・編集・削除・通報ができます</p>
             <div className="space-y-3">
               {renderBubble(activeThread.top)}
               {activeThread.replies.map((r) => renderBubble(r))}
@@ -923,7 +923,7 @@ function RecruitmentFacts({ post }: { post: Post }) {
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
           {info.prefectures.map((code) => (
             <Link key={code} href={prefecturePageHref(code)} className="text-blue-300 underline">
-              {prefectureName(code)}の大会と募集
+              {prefectureName(code)}の大会
             </Link>
           ))}
         </p>

@@ -22,7 +22,7 @@ func TestBuildInjuryProgress(t *testing.T) {
 		{BodyPart: "hamstring-strain", Stage: "resting", Reached: 9, MedianDays: 0.2},
 		{BodyPart: "hamstring-strain", Stage: "rehab", Reached: 6, MedianDays: 13.6},
 		{BodyPart: "hamstring-strain", Stage: "jogging", Reached: 5, MedianDays: 30},
-		{BodyPart: "hamstring-strain", Stage: "practice", Reached: 4, MedianDays: 41},
+		{BodyPart: "hamstring-strain", Stage: "half", Reached: 4, MedianDays: 41},
 		{BodyPart: "sprain", Stage: "race", Reached: 8, MedianDays: 20},
 	}
 	got := buildInjuryProgress(posts, reports, stats)
@@ -31,7 +31,7 @@ func TestBuildInjuryProgress(t *testing.T) {
 		t.Fatalf("unexpected shape %+v", got)
 	}
 	p := got.Posts[0]
-	if p.BodyPartLabel != "ハムストリングの肉離れ" || p.PostedOn != "2026-09-01" || len(p.Stages) != 5 {
+	if p.BodyPartLabel != "ハムストリングの肉離れ" || p.PostedOn != "2026-09-01" || len(p.Stages) != 6 {
 		t.Fatalf("post %+v", p)
 	}
 	want := []struct {
@@ -41,8 +41,9 @@ func TestBuildInjuryProgress(t *testing.T) {
 		{"resting", ptr(0), nil},
 		{"rehab", ptr(12), ptr(14)},
 		{"jogging", nil, ptr(30)},
-		{"practice", nil, nil}, // 報告が5人未満なので中央値は出さない。
-		{"race", nil, nil},     // 他のケガの中央値は使わない。
+		{"half", nil, nil}, // 報告が5人未満なので中央値は出さない。
+		{"full", nil, nil},
+		{"race", nil, nil}, // 他のケガの中央値は使わない。
 	}
 	for i, w := range want {
 		s := p.Stages[i]

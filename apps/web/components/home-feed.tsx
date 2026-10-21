@@ -77,13 +77,7 @@ export function HomeFeed({
       {posts.length === 0 ? (
         <EmptyState
           title={q ? "一致する投稿がありません" : kind === "recruitment" ? "まだ募集がありません" : "まだ投稿がありません"}
-          body={
-            q
-              ? "別の言葉で探してください。"
-              : kind === "recruitment"
-                ? "クラブチームの募集と練習相手募集から探せます。"
-                : "最初のレース感想を書いてみましょう。"
-          }
+          body={q ? "別の言葉で探してください。" : kind === "recruitment" ? undefined : "最初のレース感想を書いてみましょう。"}
         />
       ) : null}
       {posts.length > 0 ? (

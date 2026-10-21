@@ -1,7 +1,7 @@
 // シューズ・スパイクのレビューを、書いた人の種目・レベル・足のサイズ・足幅・使い方で絞り込む。
 // 商品の公式ページの仕様は使わない(商品の更新でページが変わるため)。値のコードは API と同じ。
 
-import { practiceEvents } from "./practice-events";
+import { appEvents } from "./practice-events";
 
 export const reviewLevels = [
   { value: "junior-high", label: "中学" },
@@ -23,7 +23,7 @@ export const reviewUsages = [
   { value: "both", label: "練習・試合" },
 ] as const;
 
-export const reviewEvents = practiceEvents;
+export const reviewEvents = appEvents;
 
 // レビューを書くときの足のサイズ(22.0〜30.0cm、0.5cm刻み)。
 export const reviewFootSizes = Array.from({ length: 17 }, (_, i) => 22 + i * 0.5);

@@ -42,10 +42,10 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       >
         <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
           <div className="flex items-center justify-between">
-            <span className="w-fit rounded-full bg-blue-950/80 px-2.5 py-0.5 text-[11px] font-bold text-blue-400 border border-blue-800/60">
+            <span className="w-fit rounded-full bg-blue-950/80 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-800/60">
               PRACTICE 練習
             </span>
-            <span className="font-mono text-[10px] font-bold tracking-wider text-slate-300">MEET</span>
+            <span className="font-mono text-xs font-bold tracking-wider text-slate-300">MEET</span>
           </div>
           {info ? (
             <div className="space-y-1 text-sm leading-snug">
@@ -65,7 +65,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           ) : (
             <p className="line-clamp-3 text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
           )}
-          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-[10px] font-mono text-slate-300">
+          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
             <span>TrackTalk</span>
             <span className="font-semibold text-blue-400">JOIN &gt;</span>
           </div>
@@ -82,11 +82,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           <div className="flex flex-wrap items-center gap-1.5">
             {info ? (
               <>
-                <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 border border-white/20">
+                <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-slate-200 border border-white/20">
                   {info.body_part_label}
                 </span>
                 {info.stage_label ? (
-                  <span className="w-fit rounded-full bg-emerald-950/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-800/60">
+                  <span className="w-fit rounded-full bg-emerald-950/70 px-2.5 py-0.5 text-xs font-bold text-emerald-300 border border-emerald-800/60">
                     {info.stage_label}
                   </span>
                 ) : null}
@@ -96,7 +96,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           <p className="line-clamp-4 text-sm font-bold leading-snug text-slate-100 transition-colors group-hover:text-blue-400">
             {title}
           </p>
-          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-[10px] font-mono text-slate-300">
+          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
             <span>TrackTalk</span>
             <span className="font-semibold text-rose-300">わかる {post.like_count}</span>
           </div>

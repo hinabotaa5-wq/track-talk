@@ -32,8 +32,8 @@ export function ComposerPage({
 export function TitleField(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block text-sm font-medium">
-      タイトル<span className="text-red-400">*</span>
-      <Input className="mt-1" maxLength={120} required {...props} />
+      タイトル
+      <Input className="mt-1" maxLength={120} {...props} />
     </label>
   );
 }

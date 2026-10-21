@@ -13,13 +13,17 @@ html {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
+  /* 一番小さい文字が小さすぎるので、標準の 12px を 13px に上げる。11px 以下は使わない。 */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
 }
 
 /* iOS Liquid Glass: blur and a light top edge. Fill comes from bg-white utilities. */
 @layer utilities {
   .glass {
-    -webkit-backdrop-filter: blur(32px) saturate(1.8);
-    backdrop-filter: blur(32px) saturate(1.8);
+    /* ガラスの数が多い画面では、ぼかしが重いとタップの反応が遅れる。見た目を保てる範囲で軽くする。 */
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    backdrop-filter: blur(16px) saturate(1.6);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.38);
   }
 }
@@ -30,6 +34,17 @@ html {
     backdrop-filter: none;
     background-color: rgb(24 40 64 / 0.94);
   }
+}
+
+/* ダブルタップのズーム待ちをなくして、タップにすぐ反応させる。 */
+a,
+button,
+summary,
+label,
+select,
+[role="button"],
+[role="tab"] {
+  touch-action: manipulation;
 }
 
 body {

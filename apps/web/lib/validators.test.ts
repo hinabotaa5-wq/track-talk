@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { authErrorMessage } from "./auth-errors";
 import { cloudinaryErrorMessage } from "./cloudinary-upload";
 import {
+  changeEmailSchema,
+  changePasswordSchema,
   commentSchema,
   hasTextPostContent,
   inquirySchema,
@@ -125,10 +127,14 @@ describe("validators", () => {
   });
 
   it("validates nicknames and their visibility setting", () => {
-    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false }).success).toBe(false);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false }).success).toBe(true);
-    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "100m" }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: " ", nickname_public: false, event: "100m" }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(10), nickname_public: false, event: "5000m" }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: "あ".repeat(11), nickname_public: true, event: "5000m" }).success).toBe(false);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true }).success).toBe(false);
+    // 種目は、コーチの担当種目と同じ一覧(リレーも選べる)。以前の区分や「その他」は選べない。
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "relay" }).success).toBe(true);
+    expect(nicknameSchema.safeParse({ nickname: "ランナー", nickname_public: true, event: "sprint" }).success).toBe(false);
   });
 
   it("translates auth and upload errors", () => {
@@ -141,5 +147,20 @@ describe("validators", () => {
     expect(cloudinaryErrorMessage("File size too large. Got 20. Maximum is 10.")).toBe(
       "ファイルサイズが大きすぎます",
     );
+  });
+});
+
+describe("account change schemas", () => {
+  it("requires the current password and a matching new password", () => {
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "newpassword", confirm: "newpassword" }).success).toBe(true);
+    expect(changePasswordSchema.safeParse({ current: "", password: "newpassword", confirm: "newpassword" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "short", confirm: "short" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ current: "oldpassword", password: "newpassword", confirm: "different1" }).success).toBe(false);
+  });
+
+  it("checks the new email address", () => {
+    expect(changeEmailSchema.safeParse({ email: "new@example.com", current: "oldpassword" }).success).toBe(true);
+    expect(changeEmailSchema.safeParse({ email: "not-an-email", current: "oldpassword" }).success).toBe(false);
+    expect(changeEmailSchema.safeParse({ email: "new@example.com", current: "" }).success).toBe(false);
   });
 });

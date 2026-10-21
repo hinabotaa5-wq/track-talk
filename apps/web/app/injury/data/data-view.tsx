@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { InjuryTabs } from "@/components/injury-tabs";
 import { Bars, hasItems } from "@/components/injury-public-summary";
 import { apiFetch } from "@/lib/api";
 import { injuryGroupPath, type InjuryPublicGroup } from "@/lib/injury";
@@ -60,7 +59,7 @@ function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: num
   );
 }
 
-// 「データ」タブ。ケガ共有のグループで集まった回答を、全体とケガごとに集計して見せるだけで、ここでは何も集めない。
+// 「データ」タブ。共有のグループで集まった回答を、全体とケガごとに集計して見せるだけで、ここでは何も集めない。
 export function DataView() {
   const [data, setData] = useState<InjuryData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -77,22 +76,14 @@ export function DataView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">ケガ</h1>
-        <p className="mt-1 text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
-      </div>
-      <InjuryTabs current="data" />
-      <p className="text-sm text-slate-200">
-        ケガ共有のグループに入った人が答えた、ケガをしたときの状況と、復帰までにやったことの集計です。匿名で、
-        {data?.min_people ?? 5}人そろった項目だけ表示します。
-      </p>
+      <p className="text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
 
       {failed ? (
         <ErrorState message="データの取得に失敗しました。APIの起動を確認してください。" />
       ) : data === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>
       ) : data.groups.length === 0 ? (
-        <EmptyState title="まだデータがありません" body="ケガ共有のグループに参加する人が増えると、ここに集計が出ます。" />
+        <EmptyState title="まだデータがありません" body="共有のグループに参加する人が増えると、ここに集計が出ます。" />
       ) : (
         <>
           <GroupCard group={data.overall} min={data.min_people} overall />
@@ -105,12 +96,6 @@ export function DataView() {
           </ul>
         </>
       )}
-
-      <p className="text-sm text-slate-300">
-        <Link href="/injury/stats" className="underline-offset-2 hover:underline">
-          みんなの復帰データ（復帰までの日数の目安）→
-        </Link>
-      </p>
     </div>
   );
 }

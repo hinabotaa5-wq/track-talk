@@ -31,7 +31,7 @@ const (
 	raceMarkPoints raceMarkKind = "points"
 )
 
-// raceEvents は、記録を付けられる練習の種目（"other" は単位が分からないので外す）。
+// raceEvents は、記録を付けられる練習の種目（"other" は単位が分からないので外す。七種・十種・リレーは以前に付けた記録を見られるように残してある）。
 // maxMark は、打ち間違い（桁が1つ多いなど）がグラフに入らないようにする。
 var raceEvents = map[string]struct {
 	kind    raceMarkKind
@@ -49,6 +49,8 @@ var raceEvents = map[string]struct {
 	"110mh":       {raceMarkTime, true, 6000},
 	"400mh":       {raceMarkTime, false, 24000},
 	"3000msc":     {raceMarkTime, false, 240000},
+	"race-walk":   {raceMarkTime, false, 1800000},
+	"relay":       {raceMarkTime, false, 90000},
 	"4x100":       {raceMarkTime, false, 24000},
 	"4x400":       {raceMarkTime, false, 90000},
 	"long-jump":   {raceMarkDistance, true, 1200},

@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type CloudinaryUpload struct {
+	PublicID  string    `json:"public_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type CoachEarning struct {
 	ID              uuid.UUID  `json:"id"`
 	CoachID         *uuid.UUID `json:"coach_id"`
@@ -235,6 +241,7 @@ type GuardianConsent struct {
 	GuardianEmail   *string    `json:"guardian_email"`
 	LinkSentOn      *time.Time `json:"link_sent_on"`
 	LinkSends       int32      `json:"link_sends"`
+	LinkIssuedAt    time.Time  `json:"link_issued_at"`
 }
 
 type InjuryDetail struct {
@@ -243,22 +250,30 @@ type InjuryDetail struct {
 	GroupStage *string   `json:"group_stage"`
 }
 
+type InjuryGroupHindsight struct {
+	UserID    uuid.UUID `json:"user_id"`
+	BodyPart  string    `json:"body_part"`
+	Codes     []string  `json:"codes"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type InjuryGroupMember struct {
-	UserID        uuid.UUID `json:"user_id"`
-	BodyPart      string    `json:"body_part"`
-	InjuredOn     time.Time `json:"injured_on"`
-	PlaceNote     *string   `json:"place_note"`
-	SituationNote *string   `json:"situation_note"`
-	Stage         string    `json:"stage"`
-	JoinedAt      time.Time `json:"joined_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	Diagnosis     *string   `json:"diagnosis"`
-	Severity      *string   `json:"severity"`
-	SawDoctor     *bool     `json:"saw_doctor"`
-	Place         *string   `json:"place"`
-	Activity      *string   `json:"activity"`
-	PreChanges    []string  `json:"pre_changes"`
-	Event         *string   `json:"event"`
+	UserID         uuid.UUID `json:"user_id"`
+	BodyPart       string    `json:"body_part"`
+	InjuredOn      time.Time `json:"injured_on"`
+	PlaceNote      *string   `json:"place_note"`
+	SituationNote  *string   `json:"situation_note"`
+	Stage          string    `json:"stage"`
+	JoinedAt       time.Time `json:"joined_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Diagnosis      *string   `json:"diagnosis"`
+	Severity       *string   `json:"severity"`
+	SawDoctor      *bool     `json:"saw_doctor"`
+	Place          *string   `json:"place"`
+	Activity       *string   `json:"activity"`
+	PreChanges     []string  `json:"pre_changes"`
+	Event          *string   `json:"event"`
+	InjuredOnExact bool      `json:"injured_on_exact"`
 }
 
 type InjuryGroupStageLog struct {
@@ -451,12 +466,6 @@ type ProductReview struct {
 	Usage     *string    `json:"usage"`
 }
 
-type CloudinaryUpload struct {
-	PublicID  string    `json:"public_id"`
-	OwnerID   uuid.UUID `json:"owner_id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type Profile struct {
 	ID                    uuid.UUID  `json:"id"`
 	IsAdmin               bool       `json:"is_admin"`
@@ -467,6 +476,7 @@ type Profile struct {
 	BirthMonth            *time.Time `json:"birth_month"`
 	CoachingDemo          bool       `json:"coaching_demo"`
 	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
+	Event                 *string    `json:"event"`
 }
 
 type PushSubscription struct {

@@ -172,19 +172,19 @@ export function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind
       <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label="記録の推移のグラフ">
         <line x1={box.left} x2={box.width - box.right} y1={box.top} y2={box.top} className="stroke-white/15" />
         <line x1={box.left} x2={box.width - box.right} y1={box.height - box.bottom} y2={box.height - box.bottom} className="stroke-white/25" />
-        <text x={box.left - 6} y={(best === worst ? points[0].y : box.top) + 4} textAnchor="end" className="fill-slate-300 text-[10px]">
+        <text x={box.left - 6} y={(best === worst ? points[0].y : box.top) + 4} textAnchor="end" className="fill-slate-300 text-xs">
           {formatRaceMark(best, kind)}
         </text>
         {best !== worst ? (
-          <text x={box.left - 6} y={box.height - box.bottom} textAnchor="end" className="fill-slate-400 text-[10px]">
+          <text x={box.left - 6} y={box.height - box.bottom} textAnchor="end" className="fill-slate-400 text-xs">
             {formatRaceMark(worst, kind)}
           </text>
         ) : null}
-        <text x={box.left} y={box.height - 8} className="fill-slate-400 text-[10px]">
+        <text x={box.left} y={box.height - 8} className="fill-slate-400 text-xs">
           {senseDayLabel(first)}
         </text>
         {first !== last ? (
-          <text x={box.width - box.right} y={box.height - 8} textAnchor="end" className="fill-slate-400 text-[10px]">
+          <text x={box.width - box.right} y={box.height - 8} textAnchor="end" className="fill-slate-400 text-xs">
             {senseDayLabel(last)}
           </text>
         ) : null}

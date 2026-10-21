@@ -17,7 +17,7 @@ const injuryPublicMinPeople = 5
 const injuryPublicNotes = 20
 
 // 復帰の目安を出す段階。安静中・リハビリ中は「着いた」というより始まりなので出さない。
-var injuryRecoveryStages = []string{"jogging", "practice", "race"}
+var injuryRecoveryStages = []string{"jogging", "half", "full", "race"}
 
 type injuryCountDTO struct {
 	Code   string `json:"code"`
@@ -224,14 +224,13 @@ func injuryTally(options []injuryOption, counts map[string]int, people int) inju
 	return out
 }
 
-// injuryMiddleHalf は、25パーセンタイルと75パーセンタイルを日単位で返す。分かっているのはケガをした月だけで、
-// 1日として保存しているので、ケガはその月の真ん中にしたものとみなす。
+// injuryMiddleHalf は、25パーセンタイルと75パーセンタイルを日単位で返す。
+// 月までしか答えていない人の分は、日数を出す SQL の側で、その月の半ばにケガをしたものとして数えている。
 func injuryMiddleHalf(days []float64) (int, int) {
 	sorted := append([]float64(nil), days...)
 	sort.Float64s(sorted)
 	at := func(p float64) int {
-		v := sorted[int(math.Round(p*float64(len(sorted)-1)))] - 14
-		return int(math.Max(0, math.Round(v)))
+		return int(math.Max(0, math.Round(sorted[int(math.Round(p*float64(len(sorted)-1)))])))
 	}
 	return at(0.25), at(0.75)
 }

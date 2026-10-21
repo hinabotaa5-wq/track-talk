@@ -5,7 +5,7 @@ import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { practiceEvents } from "@/lib/practice-events";
+import { appEvents } from "@/lib/practice-events";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
@@ -52,7 +52,7 @@ function SenseNoteFields({
           <span className="sr-only">種目(任意)</span>
           <select className={selectClass} value={event} onChange={(e) => onEvent(e.target.value)}>
             <option value="">種目(任意)</option>
-            {practiceEvents.map((item) => (
+            {appEvents.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -264,7 +264,7 @@ export function SenseNoteStatsRow({ stats }: { stats: SenseNoteStats }) {
     <dl className="grid grid-cols-3 gap-2">
       {items.map((item) => (
         <div key={item.label} className="rounded-xl border border-white/15 bg-white/8 px-2 py-2 text-center">
-          <dt className="text-[11px] text-slate-300">{item.label}</dt>
+          <dt className="text-xs text-slate-300">{item.label}</dt>
           <dd className="font-bold text-slate-50">
             <span className="text-xl tabular-nums">{item.value}</span>
             <span className="ml-0.5 text-xs font-medium text-slate-300">{item.unit}</span>

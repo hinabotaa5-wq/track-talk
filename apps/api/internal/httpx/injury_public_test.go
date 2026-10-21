@@ -60,6 +60,7 @@ func TestInjuryPublicGroupShowsAggregatesFromFivePeople(t *testing.T) {
 	members := make([]string, 0, 5)
 	for i := 0; i < 5; i++ {
 		tok := token(t, uuid.New())
+		setProfileEvent(t, h, tok, "100m")
 		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/shin-splints/join", tok, joinBody("rehab")); rec.Code != http.StatusOK {
 			t.Fatalf("join %d %s", rec.Code, rec.Body.String())
 		}
@@ -112,7 +113,7 @@ func TestInjuryPublicGroupShowsAggregatesFromFivePeople(t *testing.T) {
 	}
 
 	// 公開してよいと選んだ一言だけが出て、ニックネームは出ない。
-	if len(g.Notes) != 1 || g.Notes[0]["note"] != "焦らずに週3から" || g.Notes[0]["stage_label"] != "ジョグ再開" || g.Notes[0]["event_label"] != "短距離" {
+	if len(g.Notes) != 1 || g.Notes[0]["note"] != "焦らずに週3から" || g.Notes[0]["stage_label"] != "ジョグ再開" || g.Notes[0]["event_label"] != "100m" {
 		t.Fatalf("notes %+v", g.Notes)
 	}
 	if strings.Contains(raw, "仲間だけに") || strings.Contains(raw, "nickname") || strings.Contains(raw, "user_id") {

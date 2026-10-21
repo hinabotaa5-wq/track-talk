@@ -12,8 +12,8 @@ import (
 
 func joinBody(stage string) map[string]any {
 	return map[string]any{
-		"severity": "moderate", "saw_doctor": true, "injured_month": "2026-09", "place": "tartan",
-		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "event": "sprint", "stage": stage,
+		"severity": "moderate", "saw_doctor": true, "injured_on": "2026-09-20", "place": "tartan",
+		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "stage": stage,
 	}
 }
 
@@ -63,15 +63,15 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 		"no severity":      joinBodyWith("rehab", map[string]any{"severity": nil}),
 		"bad severity":     joinBodyWith("rehab", map[string]any{"severity": "light"}),
 		"no doctor answer": joinBodyWith("rehab", map[string]any{"saw_doctor": nil}),
-		"no month":         joinBodyWith("rehab", map[string]any{"injured_month": nil}),
-		"exact date":       joinBodyWith("rehab", map[string]any{"injured_month": "2026-09-20"}),
-		"future month":     joinBodyWith("rehab", map[string]any{"injured_month": "2999-01"}),
+		"no date":          joinBodyWith("rehab", map[string]any{"injured_on": nil}),
+		"month only":       joinBodyWith("rehab", map[string]any{"injured_on": "2026-09"}),
+		"future date":      joinBodyWith("rehab", map[string]any{"injured_on": "2999-01-01"}),
+		"too old":          joinBodyWith("rehab", map[string]any{"injured_on": "2000-01-01"}),
 		"bad place":        joinBodyWith("rehab", map[string]any{"place": "練習中のトラック"}),
 		"bad activity":     joinBodyWith("rehab", map[string]any{"activity": "run"}),
 		"no pre changes":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{}}),
 		"none with others": joinBodyWith("rehab", map[string]any{"pre_changes": []string{"none", "fatigue"}}),
 		"bad pre change":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{"rain"}}),
-		"bad event":        joinBodyWith("rehab", map[string]any{"event": "relay"}),
 		"bad stage":        joinBodyWith("sprint", nil),
 	} {
 		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", tok, body); rec.Code != http.StatusUnprocessableEntity {
@@ -80,9 +80,19 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 	}
 }
 
+// 種目は登録のときに選ぶので、ケガのグループに入る前に、プロフィールに種目を入れておく。
+func setProfileEvent(t *testing.T, h http.Handler, tok, event string) {
+	t.Helper()
+	body := map[string]any{"nickname": "テスト", "nickname_public": false, "event": event}
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", tok, body); rec.Code != http.StatusOK {
+		t.Fatalf("set event %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestInjuryGroupJoinAnswers(t *testing.T) {
 	h := setup(t)
 	tok := token(t, uuid.New())
+	setProfileEvent(t, h, tok, "100m")
 
 	// 「その他」では、グループ名がケガを表さないので、ケガの名前を書いてもらう。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/other/join", tok, joinBody("resting")); rec.Code != http.StatusUnprocessableEntity {
@@ -93,7 +103,7 @@ func TestInjuryGroupJoinAnswers(t *testing.T) {
 		t.Fatalf("join other: %d %s", rec.Code, rec.Body.String())
 	}
 	var me struct {
-		InjuredMonth  string   `json:"injured_month"`
+		InjuredOn     string   `json:"injured_on"`
 		Diagnosis     string   `json:"diagnosis"`
 		SeverityLabel string   `json:"severity_label"`
 		SawDoctor     *bool    `json:"saw_doctor"`
@@ -105,9 +115,9 @@ func TestInjuryGroupJoinAnswers(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &me); err != nil {
 		t.Fatal(err)
 	}
-	if me.InjuredMonth != "2026-09" || me.Diagnosis != "脛骨の疲労骨折" || me.SeverityLabel != "中くらい(練習を数週間休む)" ||
+	if me.InjuredOn != "2026-09-20" || me.Diagnosis != "脛骨の疲労骨折" || me.SeverityLabel != "中くらい(練習を数週間休む)" ||
 		me.SawDoctor == nil || !*me.SawDoctor || me.PlaceLabel != "タータン" || me.ActivityLabel != "中間から後半を全力疾走" ||
-		len(me.PreChanges) != 2 || me.EventLabel != "短距離" {
+		len(me.PreChanges) != 2 || me.EventLabel != "100m" {
 		t.Fatalf("answers %+v", me)
 	}
 
@@ -164,7 +174,7 @@ func TestInjuryGroupStagesMoveForwardAndBack(t *testing.T) {
 	}
 
 	g := getGroup(t, h, "jumpers-knee", a)
-	if g.Members != 2 || g.Me.Stage != "resting" || len(g.Stages) != 5 {
+	if g.Members != 2 || g.Me.Stage != "resting" || len(g.Stages) != 6 {
 		t.Fatalf("group %+v", g)
 	}
 	if g.Stages[0].Stage != "resting" || g.Stages[0].Members != 1 || g.Stages[2].Members != 1 {
@@ -360,10 +370,10 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 	h := setup(t)
 	public, private := token(t, uuid.New()), token(t, uuid.New())
 
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "100m"}); rec.Code != http.StatusOK {
 		t.Fatalf("public nickname %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "100m"}); rec.Code != http.StatusOK {
 		t.Fatalf("private nickname %d %s", rec.Code, rec.Body.String())
 	}
 	for _, tok := range []string{public, private} {

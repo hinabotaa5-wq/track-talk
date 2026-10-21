@@ -71,7 +71,7 @@ export function RegionalCompetitionsView() {
       <CompetitionFilters month={month} prefecture={prefecture} />
       {prefecture && isPrefecturePageCode(prefecture) ? (
         <Link href={prefecturePageHref(prefecture)} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-          {prefectureName(prefecture)}の大会と募集をまとめて見る
+          {prefectureName(prefecture)}の大会をまとめて見る
         </Link>
       ) : null}
       {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}

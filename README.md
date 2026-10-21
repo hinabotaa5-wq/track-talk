@@ -199,6 +199,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | API | フォーム添削の Web Push 通知（空なら通知は送らない）。`VAPID_SUBJECT` は `mailto:` の連絡先 |
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | API / Web | オンラインコーチング（生年月・保護者の同意・プッシュ通知・添削動画・パーソナル指導・コーチの報酬と送金）を使えるようにする。提供前なので本番では空のまま（空なら API は 404、画面は Not Found） |
 | `COACHING_TICK_SECRET` | API | Cloud Scheduler が `POST /internal/coaching/tick` を呼ぶときに `X-Coaching-Tick-Secret` ヘッダーで送る値（空なら tick は使えない） |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | API | 独自ドメインなしで無料で送るときの設定。Gmail なら `smtp.gmail.com` / `465` / Gmail のアドレス / アプリパスワード。入っていれば Resend より優先する。`MAIL_FROM` は Gmail のアドレス(例: `TrackTalk <xxx@gmail.com>`)にする |
 | `RESEND_API_KEY` / `MAIL_FROM` | API | 保護者の同意のリンクを保護者のメールあてに送る（Resend）。`MAIL_FROM` は Resend で認証したドメインの送り主（例: `TrackTalk <no-reply@example.com>`）。空ならリンクを出せない |
 | `MAIL_DEV_LOG` | API | `1` なら、メールを送らずに本文を API のログに出す。手元で保護者の同意を試すためのもので、本番では空のまま |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | API | パーソナル指導の支払い（空なら支払いなしのデモ版）。Webhook の送り先は `POST /webhooks/stripe` |

@@ -1,12 +1,15 @@
 // ケガ部のグループ。API とデータベースでは今も body_part と呼ぶが、1つのグループが1つのケガ(診断名)にあたる。
-// 8つに当てはまらない人は「その他」に入り、ケガの名前を自由に書く。
+// 11に当てはまらない人は「その他」に入り、ケガの名前を自由に書く。
 export const injuryBodyParts = [
   { value: "hamstring-strain", label: "ハムストリングの肉離れ" },
-  { value: "quad-strain", label: "太もも前の肉離れ" },
-  { value: "sprain", label: "捻挫" },
-  { value: "achilles-tendinitis", label: "アキレス腱炎" },
-  { value: "jumpers-knee", label: "ジャンパー膝(膝蓋腱炎)" },
+  { value: "sprain", label: "足首の捻挫" },
   { value: "shin-splints", label: "シンスプリント" },
+  { value: "stress-fracture", label: "疲労骨折" },
+  { value: "calf-strain", label: "ふくらはぎの肉離れ" },
+  { value: "jumpers-knee", label: "ジャンパー膝" },
+  { value: "achilles-tendinitis", label: "アキレス腱炎" },
+  { value: "lower-back", label: "腰の痛み" },
+  { value: "quad-strain", label: "太もも前の肉離れ" },
   { value: "shoulder", label: "肩の痛み" },
   { value: "elbow", label: "肘の痛み" },
   { value: "other", label: "その他" },
@@ -16,8 +19,9 @@ export const injuryStages = [
   { value: "resting", label: "安静中" },
   { value: "rehab", label: "リハビリ中" },
   { value: "jogging", label: "ジョグ再開" },
-  { value: "practice", label: "練習に復帰" },
-  { value: "race", label: "大会に復帰" },
+  { value: "half", label: "50%を出せる" },
+  { value: "full", label: "全力を出せる" },
+  { value: "race", label: "大会に復帰した" },
 ] as const;
 
 export type InjuryStage = (typeof injuryStages)[number]["value"];
@@ -131,8 +135,9 @@ export function injuryBodyPartLabel(code: string) {
 export type InjuryGroupMember = {
   stage: InjuryStage;
   stage_label: string;
-  // "YYYY-MM"。いつケガをしたかは、だいたいの月だけ聞く。
-  injured_month: string;
+  // "YYYY-MM-DD"。月だけ答えた以前の人は、その月の1日が入り injured_on_exact が false。
+  injured_on: string;
+  injured_on_exact: boolean;
   // 以下は選択式になる前に入った人にはない。
   diagnosis?: string;
   severity?: InjurySeverity;
@@ -143,7 +148,8 @@ export type InjuryGroupMember = {
   activity?: InjuryActivity;
   activity_label?: string;
   pre_changes: InjuryPreChange[];
-  event?: InjuryEvent;
+  // 登録のときに選んだ種目。
+  event?: string;
   event_label?: string;
 };
 
@@ -180,12 +186,10 @@ export type InjurySeverity = (typeof injurySeverities)[number]["value"];
 export const injuryPlaces = [
   { value: "tartan", label: "タータン" },
   { value: "grass", label: "芝生" },
-  { value: "dirt", label: "土" },
   { value: "asphalt", label: "アスファルト" },
   { value: "slope", label: "坂" },
   { value: "stairs", label: "階段" },
-  { value: "weight-room", label: "ウエイト場" },
-  { value: "gym", label: "体育館" },
+  { value: "weight-room", label: "ジム" },
 ] as const;
 export type InjuryPlace = (typeof injuryPlaces)[number]["value"];
 
@@ -205,7 +209,7 @@ export const injuryPreChanges = [
   { value: "new-shoes", label: "シューズを替えた" },
   { value: "comeback", label: "休み明け・久しぶりの再開" },
   { value: "fatigue", label: "疲れがたまっていた" },
-  { value: "played-through-pain", label: "痛みをがまんしていた" },
+  { value: "played-through-pain", label: "痛みを我慢していた" },
   { value: "none", label: "とくになし" },
 ] as const;
 export type InjuryPreChange = (typeof injuryPreChanges)[number]["value"];
@@ -223,18 +227,6 @@ export const injuryHindsights = [
 ] as const;
 export type InjuryHindsight = (typeof injuryHindsights)[number]["value"];
 
-export const injuryEvents = [
-  { value: "sprint", label: "短距離" },
-  { value: "hurdles", label: "ハードル" },
-  { value: "middle", label: "中距離" },
-  { value: "long", label: "長距離" },
-  { value: "jumps", label: "跳躍" },
-  { value: "throws", label: "投てき" },
-  { value: "combined", label: "混成" },
-  { value: "race-walk", label: "競歩" },
-] as const;
-export type InjuryEvent = (typeof injuryEvents)[number]["value"];
-
 export const injuryDiagnosisMaxLength = 40;
 
 // 参加時に1問ずつ聞く質問。順番がそのまま画面の順。ケガの名前は「その他」のときだけ聞く。
@@ -242,12 +234,11 @@ export const injuryJoinSteps = [
   "diagnosis",
   "severity",
   "sawDoctor",
-  "injuredMonth",
+  "injuredOn",
   "place",
   "activity",
   "preChanges",
   "hindsight",
-  "event",
   "stage",
 ] as const;
 export type InjuryJoinStep = (typeof injuryJoinSteps)[number];
@@ -260,12 +251,11 @@ export type InjuryJoinAnswers = {
   diagnosis: string;
   severity: InjurySeverity | "";
   sawDoctor: boolean | null;
-  injuredMonth: string;
+  injuredOn: string;
   place: InjuryPlace | "";
   activity: InjuryActivity | "";
   preChanges: InjuryPreChange[];
   hindsight: InjuryHindsight[];
-  event: InjuryEvent | "";
   stage: InjuryStage | "";
 };
 
@@ -273,40 +263,17 @@ export const emptyInjuryJoinAnswers: InjuryJoinAnswers = {
   diagnosis: "",
   severity: "",
   sawDoctor: null,
-  injuredMonth: "",
+  injuredOn: "",
   place: "",
   activity: "",
   preChanges: [],
   hindsight: [],
-  event: "",
   stage: "",
 };
 
-// 日本時間の年と月（1〜12）。サーバーは「今月」を日本時間で決めるので、端末のタイムゾーンは使わない。
-function jstYearMonth(now: Date) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" })
-      .formatToParts(now)
-      .map((part) => [part.type, part.value]),
-  );
-  return { year: Number(parts.year), month: Number(parts.month) };
-}
-
-// 日本時間の月を YYYY-MM で返す(「今月より先」を選べなくするため)。
-export function localMonthString(now: Date) {
-  const { year, month } = jstYearMonth(now);
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-// 今月(日本時間)から過去 count か月を、新しい順に返す。いつごろケガをしたかの選択肢。
-export function recentMonths(now: Date, count = 24) {
-  const { year, month } = jstYearMonth(now);
-  return Array.from({ length: count }, (_, i) => {
-    const day = new Date(Date.UTC(year, month - 1 - i, 1));
-    const y = day.getUTCFullYear();
-    const m = day.getUTCMonth() + 1;
-    return { value: `${y}-${String(m).padStart(2, "0")}`, label: `${y}年${m}月` };
-  });
+// 日本時間の今日を YYYY-MM-DD で返す。サーバーは「今日」を日本時間で決めるので、端末のタイムゾーンは使わない。
+export function jstToday(now: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
 // 複数選べる質問で、「なし」にあたる選択肢はほかと一緒に選べない。どちらかを選ぶと他方を外す。
@@ -329,7 +296,7 @@ function hasValue(options: readonly { value: string }[], value: string) {
 }
 
 // その質問の答えに問題があれば、画面に出す文言を返す。問題なければ空文字。
-export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAnswers, thisMonth: string) {
+export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAnswers, today: string) {
   switch (step) {
     case "diagnosis": {
       const length = [...answers.diagnosis.trim()].length;
@@ -341,9 +308,9 @@ export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAns
       return hasValue(injurySeverities, answers.severity) ? "" : "ケガの重さを選んでください";
     case "sawDoctor":
       return answers.sawDoctor === null ? "病院でみてもらったかを選んでください" : "";
-    case "injuredMonth":
-      if (!/^\d{4}-\d{2}$/.test(answers.injuredMonth)) return "いつごろケガをしたかを選んでください";
-      if (answers.injuredMonth > thisMonth) return "これから先の月は選べません";
+    case "injuredOn":
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.injuredOn)) return "ケガをした日を選んでください";
+      if (answers.injuredOn > today) return "これから先の日は選べません";
       return "";
     case "place":
       return hasValue(injuryPlaces, answers.place) ? "" : "ケガをした場所を選んでください";
@@ -353,8 +320,6 @@ export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAns
       return answers.preChanges.length > 0 ? "" : "当てはまるものを選んでください(なければ「とくになし」)";
     case "hindsight":
       return answers.hindsight.length > 0 ? "" : "当てはまるものを選んでください(なければ「わからない・とくにない」)";
-    case "event":
-      return hasValue(injuryEvents, answers.event) ? "" : "種目を選んでください";
     case "stage":
       return isInjuryStage(answers.stage) ? "" : "いまの段階を選んでください";
   }
@@ -365,12 +330,11 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
     ...(part === "other" ? { diagnosis: answers.diagnosis.trim() } : {}),
     severity: answers.severity,
     saw_doctor: answers.sawDoctor,
-    injured_month: answers.injuredMonth,
+    injured_on: answers.injuredOn,
     place: answers.place,
     activity: answers.activity,
     pre_changes: answers.preChanges,
     hindsight: answers.hindsight,
-    event: answers.event,
     stage: answers.stage,
   };
 }
@@ -418,11 +382,12 @@ export function injuryStageChangePayload(answers: InjuryStageChangeAnswers) {
   return { stage: answers.stage, actions: answers.actions, note, note_public: note !== "" && answers.notePublic };
 }
 
-// マイページに出す「ケガから約◯か月」。ケガをした日は月までしか聞いていないので、月の差で言う。
-export function injuryElapsedText(injuredMonth: string, now: Date) {
-  const match = /^(\d{4})-(\d{2})$/.exec(injuredMonth);
+// マイページに出す「ケガから約◯か月」。月だけ答えた以前の人もいるので、月の差で言う。
+export function injuryElapsedText(injuredOn: string, now: Date) {
+  const match = /^(\d{4})-(\d{2})/.exec(injuredOn);
   if (!match) return "";
-  const months = (now.getFullYear() - Number(match[1])) * 12 + now.getMonth() + 1 - Number(match[2]);
+  const [year, month] = jstToday(now).split("-").map(Number);
+  const months = (year - Number(match[1])) * 12 + month - Number(match[2]);
   if (months <= 0) return "今月ケガ";
   if (months < 12) return `ケガから約${months}か月`;
   const years = Math.floor(months / 12);
@@ -494,6 +459,9 @@ export const injuryGroupDescriptions: Record<string, string> = {
   "hamstring-strain": "太もも裏の肉離れ。加速やスプリント後半に多い。",
   "quad-strain": "太もも前の肉離れ。スタートや踏み切りに多い。",
   sprain: "足首の捻挫。着地でひねって起きる。くり返しやすい。",
+  "stress-fracture": "骨にたまった疲れによる痛み。すねや足の甲に多い。",
+  "calf-strain": "ふくらはぎの肉離れ。ダッシュや急な加速で起きやすい。",
+  "lower-back": "腰の痛み。ジャンプや投てき、走りすぎで起きやすい。",
   "achilles-tendinitis": "アキレス腱まわりの痛み。走る量が増えたときに多い。",
   "jumpers-knee": "膝のお皿の下の痛み。ジャンプやダッシュに多い。",
   "shin-splints": "すねの内側の痛み。練習量が急に増えたときに多い。",
@@ -525,7 +493,7 @@ export type InjuryPublicGroup = {
   events: InjuryTally;
   actions: InjuryTally;
   hindsight: InjuryTally;
-  notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: InjuryEvent; event_label?: string; created_at: string }[];
+  notes: { id: string; note: string; stage: InjuryStage; stage_label: string; event?: string; event_label?: string; created_at: string }[];
 };
 
 // 復帰の目安は幅で出す。2か月までは週、それより長いと月で言う。

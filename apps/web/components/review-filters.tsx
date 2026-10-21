@@ -8,8 +8,6 @@ import {
   reviewFootSizes,
   reviewFootWidths,
   reviewLevels,
-  reviewSizeBandLabel,
-  reviewSizeBands,
   reviewUsages,
   type ReviewAttrsInput,
   type ReviewFilters,
@@ -47,7 +45,6 @@ function Select({
   );
 }
 
-const sizeBandOptions = reviewSizeBands.map((band) => ({ value: String(band), label: reviewSizeBandLabel(band) }));
 const footSizeOptions = reviewFootSizes.map((size) => ({ value: String(size), label: `${size.toFixed(1)}cm` }));
 
 // レビューを書いた人の属性で絞り込む欄。開いたり閉じたりできる。
@@ -55,7 +52,7 @@ export function ReviewFilterBar({ filters, onChange }: { filters: ReviewFilters;
   const count = activeReviewFilterCount(filters);
   const [open, setOpen] = useState(count > 0);
   const set = (key: keyof ReviewFilters, value: string) =>
-    onChange({ ...filters, [key]: value === "" ? undefined : key === "size" ? Number(value) : value });
+    onChange({ ...filters, [key]: value === "" ? undefined : value });
 
   return (
     <div className="space-y-2">
@@ -81,10 +78,7 @@ export function ReviewFilterBar({ filters, onChange }: { filters: ReviewFilters;
         <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
           <div className="grid grid-cols-2 gap-2">
             <Select label="種目" value={filters.event ?? ""} onChange={(v) => set("event", v)} options={reviewEvents} empty="すべて" />
-            <Select label="レベル" value={filters.level ?? ""} onChange={(v) => set("level", v)} options={reviewLevels} empty="すべて" />
-            <Select label="足のサイズ" value={filters.size !== undefined ? String(filters.size) : ""} onChange={(v) => set("size", v)} options={sizeBandOptions} empty="すべて" />
             <Select label="足幅" value={filters.width ?? ""} onChange={(v) => set("width", v)} options={reviewFootWidths} empty="すべて" />
-            <Select label="使い方" value={filters.usage ?? ""} onChange={(v) => set("usage", v)} options={reviewUsages} empty="すべて" />
           </div>
           <p className="text-xs text-slate-300">書いた人がこれらを選んだレビューだけで数えます。選んでいない以前のレビューは、絞り込むと対象から外れます。</p>
         </div>
@@ -119,7 +113,7 @@ export function ReviewAttrChips({ review }: { review: ProductReview }) {
   return (
     <p className="flex flex-wrap gap-1">
       {chips.map((chip) => (
-        <span key={chip} className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200">
+        <span key={chip} className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
           {chip}
         </span>
       ))}
