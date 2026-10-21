@@ -2,15 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCap, HeartPulse, Home, NotebookPen, Trophy, UserRound } from "lucide-react";
+import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 import { isInjuryBodyPart } from "@/lib/injury";
 
+// メモのアイコン。lucide の NotebookPen から、左の4本線(ノートのリング)を外した形。
+const MemoIcon = createLucideIcon("memo", [
+  ["path", { d: "M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4", key: "body" }],
+  [
+    "path",
+    {
+      d: "M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z",
+      key: "pen",
+    },
+  ],
+]);
+
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "memo", href: "/memo", label: "メモ", icon: NotebookPen },
+  { id: "memo", href: "/memo", label: "メモ", icon: MemoIcon },
   { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
   { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
 ] as const;
