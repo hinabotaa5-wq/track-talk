@@ -12,19 +12,17 @@ import (
 )
 
 // 感覚メモは本人だけが読み書きする。投稿とは別のテーブルで、フィードにも公開ページにも出さない。
-// 書ける感覚は1日に1つで、書く日は今日か過去の日から選べる。
+// 書ける感覚は1日に1つで、書けるのはその日(日本時間の今日)の分だけ。
 const (
 	maxSenseNoteBody     = 300
 	senseNotesPageSize   = 30
 	senseNoteCursorSplit = "_"
-	// 何日前の日まで選べるか。
-	senseNoteMaxDaysBack = 365
 )
 
 type senseNoteReq struct {
 	Body  string  `json:"body"`
 	Event *string `json:"event"`
-	// Day は書く日（日本時間、YYYY-MM-DD）。省略すると今日。
+	// Day は書く日（日本時間、YYYY-MM-DD）。省略すると今日。今日以外は受け付けない。
 	Day *string `json:"day"`
 }
 
@@ -82,14 +80,15 @@ func normalizeSenseNote(req senseNoteReq) (body string, event *string, fields ma
 	return body, event, fields
 }
 
-// parseSenseNoteDay は、書く日を決める。省略は今日。未来の日と、遠い過去の日は選べない。
+// parseSenseNoteDay は、書く日を決める。書けるのはその日(日本時間の今日)の感覚だけで、省略も今日。
+// あとから別の日の分をまとめて書けると、その日に感じたことの記録にならないので、ほかの日は受け付けない。
 func parseSenseNoteDay(v *string, now time.Time) (time.Time, bool) {
 	today := dateOnly(now.In(jst.Zone))
 	if v == nil || strings.TrimSpace(*v) == "" {
 		return today, true
 	}
 	day, err := time.Parse(time.DateOnly, strings.TrimSpace(*v))
-	if err != nil || day.After(today) || day.Before(today.AddDate(0, 0, -senseNoteMaxDaysBack)) {
+	if err != nil || !day.Equal(today) {
 		return time.Time{}, false
 	}
 	return day, true
@@ -220,7 +219,7 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 	}
 	day, ok := parseSenseNoteDay(req.Day, time.Now())
 	if !ok {
-		FieldError(w, map[string]string{"day": "今日か、過去の日を選んでください"})
+		FieldError(w, map[string]string{"day": "感覚は、その日の分だけ書けます"})
 		return
 	}
 	// 同時に送られても1日に1つを超えないよう、作成者ごとのロックの中で数えて保存する。

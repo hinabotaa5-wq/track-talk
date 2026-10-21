@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds } from "@/lib/home-feed-cache";
-import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedCard } from "@/components/feed-card";
+import { FeedGrid } from "@/components/feed-grid";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
@@ -81,11 +82,11 @@ export function HomeFeed({
         />
       ) : null}
       {posts.length > 0 ? (
-        <div className={feedGridClass}>
+        <FeedGrid>
           {posts.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}
-        </div>
+        </FeedGrid>
       ) : null}
       {hasNext ? (
         <Link

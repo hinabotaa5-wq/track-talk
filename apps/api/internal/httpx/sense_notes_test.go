@@ -30,7 +30,8 @@ type senseNoteItem struct {
 
 func TestSenseNotesStayWithTheWriter(t *testing.T) {
 	h := setup(t)
-	me := token(t, uuid.New())
+	id := uuid.New()
+	me := token(t, id)
 	other := token(t, uuid.New())
 
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes", "", nil); rec.Code != http.StatusUnauthorized {
@@ -65,22 +66,15 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "同じ日の2つ目"}); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("second note of the day = %d", rec.Code)
 	}
-	// 日付を選べるが、未来の日は選べない。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "あした", "day": time.Now().AddDate(0, 0, 2).Format(time.DateOnly)}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("future day = %d", rec.Code)
-	}
+	// 書けるのはその日の分だけ。前の日や先の日は選べない。
 	yesterday := time.Now().In(jst.Zone).AddDate(0, 0, -1).Format(time.DateOnly)
-	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "腕振りが軽い", "day": yesterday})
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("yesterday create = %d %s", rec.Code, rec.Body.String())
+	for _, day := range []string{time.Now().In(jst.Zone).AddDate(0, 0, 2).Format(time.DateOnly), yesterday} {
+		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "別の日", "day": day}); rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("day %s = %d", day, rec.Code)
+		}
 	}
-	var back struct {
-		Note senseNoteItem `json:"note"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &back)
-	if back.Note.Day != yesterday {
-		t.Fatalf("day = %s want %s", back.Note.Day, yesterday)
-	}
+	// 前の日のメモ(書けたころのもの)も一覧と連続日数に入る。
+	execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body, day) VALUES (gen_random_uuid(), $1, '腕振りが軽い', $2::date)`, id, yesterday)
 
 	var list struct {
 		Notes []senseNoteItem `json:"notes"`

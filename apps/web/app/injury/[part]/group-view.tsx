@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedCard } from "@/components/feed-card";
+import { FeedGrid } from "@/components/feed-grid";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
@@ -189,11 +190,11 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       ) : current.posts.length === 0 ? (
         <EmptyState title="まだ投稿がありません" body={own ? "最初の一言を書いてみましょう。" : "この段階の投稿は、まだありません。"} />
       ) : (
-        <div className={feedGridClass}>
+        <FeedGrid>
           {current.posts.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}
-        </div>
+        </FeedGrid>
       )}
 
       {summary ? (

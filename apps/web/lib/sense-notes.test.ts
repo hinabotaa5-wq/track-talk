@@ -6,7 +6,6 @@ import {
   senseJarLevel,
   senseJarSize,
   senseSummaryMinNotes,
-  senseNoteDayRange,
   sortSenseNotes,
   senseSummaryRangeLabel,
   type SenseNote,
@@ -54,10 +53,6 @@ describe("sense notes", () => {
   it("sorts notes by day, newest first, even when an old day was written last", () => {
     const notes = [note("a", "2026-10-16"), { ...note("b", "2026-10-10"), created_at: "2026-10-17T10:00:00Z" }, note("c", "2026-10-14")];
     expect(sortSenseNotes(notes).map((n) => n.id)).toEqual(["a", "c", "b"]);
-  });
-
-  it("limits the days to pick from the last year up to today", () => {
-    expect(senseNoteDayRange(new Date("2026-10-16T20:00:00Z"))).toEqual({ min: "2025-10-17", max: "2026-10-17" });
   });
 
   it("labels the range of a summary", () => {

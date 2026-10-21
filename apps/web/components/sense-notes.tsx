@@ -7,7 +7,7 @@ import { Textarea } from "./ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { appEvents } from "@/lib/practice-events";
 import { useActionLock } from "@/lib/use-action-lock";
-import { senseCheer, senseNoteDayRange, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
+import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 const selectClass =
   "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
@@ -52,17 +52,18 @@ function SenseNoteFields({
   );
 }
 
-// 今日の感覚を書く欄。書けたら、ねぎらいの言葉を出す。
+// 今日の感覚を書く欄。書けるのはその日の分だけ(1日に1つ)。書けたら、ねぎらいの言葉を出す。
 export function SenseNoteComposer({
   token,
+  writtenToday,
   onCreated,
 }: {
   token: string | null;
+  writtenToday: boolean;
   onCreated: (note: SenseNote, stats: SenseNoteStats) => void;
 }) {
   const [body, setBody] = useState("");
   const [event, setEvent] = useState("");
-  const [day, setDay] = useState(() => senseNoteDayRange().max);
   const [error, setError] = useState("");
   const [cheer, setCheer] = useState<{ title: string; body: string } | null>(null);
   const lock = useActionLock();
@@ -84,7 +85,7 @@ export function SenseNoteComposer({
       const res = await apiFetch<{ note: SenseNote; stats: SenseNoteStats }>("/v1/me/sense-notes", {
         method: "POST",
         token,
-        body: JSON.stringify({ body: text, event: event || null, day }),
+        body: JSON.stringify({ body: text, event: event || null }),
       });
       setBody("");
       setEvent("");
@@ -102,27 +103,21 @@ export function SenseNoteComposer({
       <div role="status" className="sense-cheer space-y-3 rounded-xl border border-sky-300/40 bg-sky-950/40 p-4 text-center">
         <p className="text-lg font-bold text-sky-100">{cheer.title}</p>
         <p className="text-sm text-sky-100/90">{cheer.body}</p>
-        <Button variant="secondary" onClick={() => setCheer(null)}>
-          別の日も書く
-        </Button>
+        <p className="text-xs text-sky-100/80">また明日、その日の感覚を書こう。</p>
       </div>
+    );
+  }
+
+  if (writtenToday) {
+    return (
+      <p className="rounded-xl border border-white/15 bg-white/8 p-3 text-center text-sm text-slate-200">
+        今日の感覚はためました。また明日、その日の感覚を書こう。
+      </p>
     );
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
-      <label className="block">
-        <span className="sr-only">日付</span>
-        <input
-          type="date"
-          required
-          value={day}
-          min={senseNoteDayRange().min}
-          max={senseNoteDayRange().max}
-          onChange={(e) => setDay(e.target.value)}
-          className={selectClass}
-        />
-      </label>
       <SenseNoteFields body={body} event={event} onBody={setBody} onEvent={setEvent} />
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex items-center justify-between gap-3">

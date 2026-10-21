@@ -107,13 +107,3 @@ export type SenseSummaryResponse = {
 export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | "to_day">, now = new Date()) {
   return `${senseDayLabel(summary.from_day, now)}〜${senseDayLabel(summary.to_day, now)}`;
 }
-
-// 日付の入力欄に選べる範囲。今日から1年前まで(API と同じ)。
-const senseNoteMaxDaysBack = 365;
-
-export function senseNoteDayRange(now = new Date()) {
-  const today = todayInTokyo(now);
-  const [y, m, d] = today.split("-").map(Number);
-  const min = new Date(Date.UTC(y, m - 1, d - senseNoteMaxDaysBack)).toISOString().slice(0, 10);
-  return { min, max: today };
-}
