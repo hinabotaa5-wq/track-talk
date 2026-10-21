@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminStatsView } from "@/components/admin-stats";
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachingContractsAdmin } from "@/components/coaching-admin";
 import { PayoutsAdmin } from "@/components/coach-payouts";
@@ -94,7 +95,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   );
 }
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   // ページごとに持つ。トークンの更新で同じページを読み直しても、行が二重に足されない。
@@ -607,7 +608,7 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets";
+  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
@@ -621,6 +622,7 @@ export default function AdminPage() {
     ...(coachingEnabled ? ([{ id: "payouts", label: "送金", total: -1 }] as { id: Tab; label: string; total: number }[]) : []),
     { id: "menu", label: "エグ練", total: -1 },
     { id: "meets", label: "タイムテーブル", total: -1 },
+    { id: "stats", label: "数字", total: -1 },
   ];
 
   return (
@@ -648,6 +650,7 @@ export default function AdminPage() {
       {tab === "payouts" ? <PayoutsAdmin token={token} /> : null}
       {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
+      {tab === "stats" ? <AdminStatsView token={token} /> : null}
       {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
       {custom ? null : tab === "reports" ? (
         <ul className="space-y-3">

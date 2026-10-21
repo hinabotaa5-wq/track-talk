@@ -34,6 +34,8 @@ type Config struct {
 	CoachingEnabled bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
+	// ReminderSecret は Cloud Scheduler が月1回の記録のお知らせを呼ぶときのヘッダーの値。空なら使えない。
+	ReminderSecret string
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
 	StripeSecretKey     string
 	StripeWebhookSecret string
@@ -95,6 +97,7 @@ func Load() (Config, error) {
 		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
+		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
 		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),

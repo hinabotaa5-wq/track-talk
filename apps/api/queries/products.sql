@@ -127,3 +127,26 @@ WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL;
 UPDATE product_reviews
 SET hidden_at = now()
 WHERE id = $1 AND deleted_at IS NULL AND hidden_at IS NULL;
+
+-- name: RankProductsByEvent :many
+-- 種目ごとのランキング。その種目の人が書いたレビューだけで平均★を出し、min_reviews 件に満たない商品は外す。
+SELECT
+    p.id,
+    p.kind,
+    p.brand,
+    p.name,
+    p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
+    count(r.id)::bigint AS review_count,
+    avg(r.rating)::float8 AS avg_rating
+FROM products p
+JOIN product_reviews r ON r.product_id = p.id
+WHERE p.hidden_at IS NULL
+  AND p.kind = sqlc.arg(kind)
+  AND r.deleted_at IS NULL AND r.hidden_at IS NULL
+  AND r.event = sqlc.arg(event)::text
+GROUP BY p.id
+HAVING count(r.id) >= sqlc.arg(min_reviews)::bigint
+ORDER BY avg(r.rating) DESC, count(r.id) DESC, p.created_at DESC
+LIMIT sqlc.arg(row_limit);

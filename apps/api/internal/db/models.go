@@ -362,6 +362,13 @@ type MenuContestVote struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+type MonthlyReminder struct {
+	Month      time.Time  `json:"month"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+	Recipients int32      `json:"recipients"`
+}
+
 type Notification struct {
 	ID              uuid.UUID  `json:"id"`
 	RecipientID     uuid.UUID  `json:"recipient_id"`

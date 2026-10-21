@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Award, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
@@ -18,6 +18,7 @@ const accountLinks = [
   { href: "/me/email", label: "メールアドレスの変更", icon: AtSign },
   { href: "/me/password", label: "パスワードの変更", icon: KeyRound },
   { href: "/me/badge", label: "バッジ", icon: Award },
+  { href: "/me/push", label: "通知", icon: Bell },
 ] as const;
 
 const infoLinks = [
