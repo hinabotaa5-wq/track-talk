@@ -42,3 +42,14 @@ RETURNING month;
 UPDATE monthly_reminders
 SET finished_at = now(), recipients = sqlc.arg(recipients)::int
 WHERE month = sqlc.arg(month)::date;
+
+-- name: TrimPushSubscriptions :exec
+-- 新しいものから max_devices 台だけ残し、古い端末の登録を消す。
+DELETE FROM push_subscriptions
+WHERE profile_id = sqlc.arg(profile_id)::uuid
+  AND id NOT IN (
+    SELECT keep.id FROM push_subscriptions keep
+    WHERE keep.profile_id = sqlc.arg(profile_id)::uuid
+    ORDER BY keep.created_at DESC, keep.id DESC
+    LIMIT sqlc.arg(max_devices)::int
+  );

@@ -23,6 +23,10 @@ func (s *Server) pushPublicKey(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"public_key": s.push.PublicKey})
 }
 
+// maxPushDevices は、1人が通知を受け取れる端末の数。超えたら古い端末から外す。
+// 上限が無いと、偽の宛先を大量に登録されて、月1回のお知らせやテスト送信が外部への大量の通信になる。
+const maxPushDevices = 10
+
 type pushSubscriptionReq struct {
 	Endpoint string `json:"endpoint"`
 	Keys     struct {
@@ -91,6 +95,10 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		P256dh:    p256dh,
 		Auth:      auth,
 	}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := s.q.TrimPushSubscriptions(r.Context(), db.TrimPushSubscriptionsParams{ProfileID: p.ID, MaxDevices: maxPushDevices}); err != nil {
 		MapDBError(w, err)
 		return
 	}
