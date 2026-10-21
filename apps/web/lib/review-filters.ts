@@ -29,7 +29,7 @@ export const reviewEvents = appEvents;
 export const reviewFootSizes = Array.from({ length: 17 }, (_, i) => 22 + i * 0.5);
 
 // 絞り込みの足のサイズは 1cm 幅(「25cm台」= 25.0〜25.5cm)。
-export const reviewSizeBands = Array.from({ length: 8 }, (_, i) => 22 + i);
+const reviewSizeBands = Array.from({ length: 8 }, (_, i) => 22 + i);
 
 export type ReviewFilters = {
   event?: string;
@@ -89,10 +89,6 @@ export function withReviewFilters(href: string, filters: ReviewFilters) {
   const extra = reviewFiltersQuery(filters).toString();
   if (!extra) return href;
   return `${href}${href.includes("?") ? "&" : "?"}${extra}`;
-}
-
-export function reviewSizeBandLabel(band: number) {
-  return `${band}cm台`;
 }
 
 // レビューを書くときの属性。前回の入力を端末に覚えて、次の初期値にする(保存できなくても動く)。

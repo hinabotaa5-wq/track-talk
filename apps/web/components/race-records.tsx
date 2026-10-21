@@ -167,7 +167,7 @@ function RaceRecordForm({
 }
 
 // 1つの種目の推移。よい記録ほど上。自己ベストは色を変え、追い風参考は白抜きにする。
-export function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceMarkKind }) {
+function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceMarkKind }) {
   const points = raceChartPoints(records, kind);
   if (points.length === 0) return null;
   const box = raceChartBox;

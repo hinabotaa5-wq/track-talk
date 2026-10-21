@@ -24,8 +24,6 @@ export type SenseNoteStats = {
   today: number;
 };
 
-export const emptySenseNoteStats: SenseNoteStats = { total: 0, days: 0, streak: 0, today: 0 };
-
 export const senseNotePlaceholder = "例: スタートの1歩目、地面を真下に押せた感じがした。腕は小さく速く振れた";
 
 // いまの器の中身。満杯になったら次の器に移り、満杯にした器の数を filled で返す。

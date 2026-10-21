@@ -38,7 +38,7 @@ export const coachPledgeItems = [
   "守らなかったときは、利用停止と報酬の没収になることに同意します。",
 ];
 
-export const contractStatusLabels: Record<CoachingContractStatus, string> = {
+const contractStatusLabels: Record<CoachingContractStatus, string> = {
   applied: "コーチの返事待ち",
   accepted: "保護者の同意待ち",
   active: "期間中",

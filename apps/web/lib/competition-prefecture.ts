@@ -4,7 +4,7 @@ const storageKey = "track-talk.competition-prefecture";
 
 export const competitionPrefectureCookie = "tt_competition_prefecture";
 
-export const competitionPrefectureEvent = "track-talk:competition-prefecture";
+const competitionPrefectureEvent = "track-talk:competition-prefecture";
 
 export function readSavedCompetitionPrefecture() {
   if (typeof window === "undefined") return "";

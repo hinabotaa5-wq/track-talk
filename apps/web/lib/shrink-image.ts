@@ -1,5 +1,5 @@
 // 表示は長辺1600pxまでなので、少し余裕を持たせて2048pxまで縮めてから送る。
-export const maxPhotoEdge = 2048;
+const maxPhotoEdge = 2048;
 const jpegQuality = 0.85;
 
 export function fitWithin(width: number, height: number, maxEdge = maxPhotoEdge): { width: number; height: number } {
