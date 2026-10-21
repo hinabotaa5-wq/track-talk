@@ -1,5 +1,6 @@
 "use client";
 
+import { PlanIncludesList } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
@@ -61,6 +62,7 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
         <dd className="text-slate-100">
           {contract.plan_title}（{planKindLabels[contract.plan_kind]} · {planDurationLabel(contract.plan_kind, contract.duration_days)} ·{" "}
           {formatYen(contract.price_yen)}）
+          <PlanIncludesList plan={contract} />
         </dd>
       </div>
       <div>

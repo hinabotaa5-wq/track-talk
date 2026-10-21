@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatYen } from "./format";
-import { planDurationLabel, planSummary, sortTrialFirst } from "./coaching-plan";
+import { planDurationLabel, planIncludes, planSummary, sortTrialFirst } from "./coaching-plan";
 
 describe("planDurationLabel", () => {
   it("期間プランは2週間か1か月、単発は日数で出す", () => {
@@ -8,6 +8,18 @@ describe("planDurationLabel", () => {
     expect(planDurationLabel("period", 30)).toBe("1か月");
     expect(planDurationLabel("single", 7)).toBe("7日以内");
     expect(planDurationLabel("trial", 7)).toBe("7日以内");
+  });
+});
+
+describe("planIncludes", () => {
+  it("書いた項目だけを出す", () => {
+    expect(planIncludes({ video_reviews: null, menu_updates: null, reply_formats: [] })).toEqual([]);
+    expect(planIncludes({ video_reviews: 4, menu_updates: "weekly", reply_formats: ["text", "video"] })).toEqual([
+      { label: "動画への返答", value: "4回まで" },
+      { label: "練習メニュー", value: "毎週見直す" },
+      { label: "返し方", value: "文章・解説の動画" },
+    ]);
+    expect(planIncludes({ video_reviews: 0, menu_updates: "none", reply_formats: [] })[0].value).toBe("回数を決めない（期間中いつでも）");
   });
 });
 

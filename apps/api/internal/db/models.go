@@ -105,6 +105,9 @@ type CoachingContract struct {
 	SuspendedAt      *time.Time `json:"suspended_at"`
 	PaymentRequired  bool       `json:"payment_required"`
 	MessagesPurgedAt *time.Time `json:"messages_purged_at"`
+	VideoReviews     *int16     `json:"video_reviews"`
+	MenuUpdates      *string    `json:"menu_updates"`
+	ReplyFormats     []string   `json:"reply_formats"`
 }
 
 type CoachingContractConsent struct {
@@ -171,6 +174,9 @@ type CoachingPlan struct {
 	Published    bool      `json:"published"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	VideoReviews *int16    `json:"video_reviews"`
+	MenuUpdates  *string   `json:"menu_updates"`
+	ReplyFormats []string  `json:"reply_formats"`
 }
 
 type Comment struct {

@@ -1,5 +1,5 @@
 import { formatYen } from "./format";
-import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind } from "./types";
+import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind, PlanIncludes, PlanMenuUpdates, PlanReplyFormat } from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
@@ -31,6 +31,33 @@ export function planDurationLabel(kind: CoachingPlanKind, days: number): string 
 
 export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | "price_yen">): string {
   return `${planKindLabels[plan.kind]} · ${planDurationLabel(plan.kind, plan.duration_days)} · ${formatYen(plan.price_yen)}`;
+}
+
+export const planMenuUpdatesLabels: Record<PlanMenuUpdates, string> = {
+  none: "なし",
+  once: "最初に1回作る",
+  weekly: "毎週見直す",
+};
+
+export const planReplyFormatLabels: Record<PlanReplyFormat, string> = {
+  text: "文章",
+  video: "解説の動画",
+};
+
+// フォームで選べる動画への返答の回数。0 は回数を決めない。
+export const planVideoReviewChoices = [1, 2, 4, 8, 0];
+
+export function videoReviewsLabel(n: number): string {
+  return n === 0 ? "回数を決めない（期間中いつでも）" : `${n}回まで`;
+}
+
+// planIncludes は、「何が返ってくるか」を1項目1行にする。書いていない項目は出さない。
+export function planIncludes(p: PlanIncludes): { label: string; value: string }[] {
+  const out: { label: string; value: string }[] = [];
+  if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
+  if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
+  if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });
+  return out;
 }
 
 // sortTrialFirst は、お試しプランを先頭にする。ほかの並び（安い順）はそのまま。

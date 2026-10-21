@@ -11,12 +11,24 @@ import {
   minPlanPriceYen,
   planDurationLabel,
   planDurations,
+  planIncludes,
   planKindLabels,
+  planMenuUpdatesLabels,
+  planReplyFormatLabels,
   planSummary,
+  planVideoReviewChoices,
   sortTrialFirst,
+  videoReviewsLabel,
 } from "@/lib/coaching-plan";
 import { formatYen } from "@/lib/format";
-import type { CoachApplication, CoachingPlan, CoachingPlanKind } from "@/lib/types";
+import type {
+  CoachApplication,
+  CoachingPlan,
+  CoachingPlanKind,
+  PlanIncludes,
+  PlanMenuUpdates,
+  PlanReplyFormat,
+} from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -70,7 +82,7 @@ function CoachPledgeForm({ token, onSaved }: { token: string | null; onSaved: (c
   );
 }
 
-type PlanDraft = {
+type PlanDraft = PlanIncludes & {
   kind: CoachingPlanKind;
   duration_days: number;
   title: string;
@@ -80,7 +92,19 @@ type PlanDraft = {
 };
 
 function draftOf(plan: CoachingPlan | null): PlanDraft {
-  if (!plan) return { kind: "period", duration_days: 30, title: "", description: "", price: "", capacity: "3" };
+  if (!plan) {
+    return {
+      kind: "period",
+      duration_days: 30,
+      title: "",
+      description: "",
+      price: "",
+      capacity: "3",
+      video_reviews: null,
+      menu_updates: null,
+      reply_formats: [],
+    };
+  }
   return {
     kind: plan.kind,
     duration_days: plan.duration_days,
@@ -88,7 +112,125 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
     description: plan.description,
     price: String(plan.price_yen),
     capacity: String(plan.capacity),
+    video_reviews: plan.video_reviews,
+    menu_updates: plan.menu_updates,
+    reply_formats: plan.reply_formats,
   };
+}
+
+// PlanIncludesList は、プランで「何が返ってくるか」。書いていない項目は出さない。
+export function PlanIncludesList({ plan }: { plan: PlanIncludes }) {
+  const rows = planIncludes(plan);
+  if (rows.length === 0) return null;
+  return (
+    <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+      {rows.map((r) => (
+        <div key={r.label} className="contents">
+          <dt className="text-slate-300">{r.label}</dt>
+          <dd className="text-slate-100">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// PlanIncludesFields は、プランの「何が返ってくるか」を選ぶ欄。どれも「書かない」を選べる。
+function PlanIncludesFields({
+  draft,
+  setDraft,
+  fields,
+}: {
+  draft: PlanDraft;
+  setDraft: (f: (d: PlanDraft) => PlanDraft) => void;
+  fields: Record<string, string>;
+}) {
+  // 前に別の回数を保存していたら、その回数も選べるように並べる。
+  const reviewChoices =
+    draft.video_reviews === null || planVideoReviewChoices.includes(draft.video_reviews)
+      ? planVideoReviewChoices
+      : [draft.video_reviews, ...planVideoReviewChoices];
+  const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);
+  const toggleFormat = (f: PlanReplyFormat) =>
+    setDraft((d) => ({
+      ...d,
+      reply_formats: d.reply_formats.includes(f) ? d.reply_formats.filter((x) => x !== f) : [...d.reply_formats, f],
+    }));
+
+  return (
+    <div className="space-y-3 rounded-lg border border-white/15 p-3">
+      <div className="space-y-0.5">
+        <p className="text-sm font-semibold text-white">何が返ってくるか</p>
+        <p className="text-xs text-slate-300">書いておくと、コーチ一覧で利用者が比べやすくなります。書かなくても保存できます。</p>
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm text-slate-200">動画への返答</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={draft.video_reviews === null}
+            onClick={() => setDraft((d) => ({ ...d, video_reviews: null }))}
+            className={chip(draft.video_reviews === null)}
+          >
+            書かない
+          </button>
+          {reviewChoices.map((n) => (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={draft.video_reviews === n}
+              onClick={() => setDraft((d) => ({ ...d, video_reviews: n }))}
+              className={chip(draft.video_reviews === n)}
+            >
+              {videoReviewsLabel(n)}
+            </button>
+          ))}
+        </div>
+        {fieldError("video_reviews")}
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm text-slate-200">練習メニュー</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={draft.menu_updates === null}
+            onClick={() => setDraft((d) => ({ ...d, menu_updates: null }))}
+            className={chip(draft.menu_updates === null)}
+          >
+            書かない
+          </button>
+          {(Object.keys(planMenuUpdatesLabels) as PlanMenuUpdates[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={draft.menu_updates === m}
+              onClick={() => setDraft((d) => ({ ...d, menu_updates: m }))}
+              className={chip(draft.menu_updates === m)}
+            >
+              {planMenuUpdatesLabels[m]}
+            </button>
+          ))}
+        </div>
+        {fieldError("menu_updates")}
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm text-slate-200">返し方（いくつでも）</p>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(planReplyFormatLabels) as PlanReplyFormat[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={draft.reply_formats.includes(f)}
+              onClick={() => toggleFormat(f)}
+              className={chip(draft.reply_formats.includes(f))}
+            >
+              {planReplyFormatLabels[f]}
+            </button>
+          ))}
+        </div>
+        {fieldError("reply_formats")}
+      </div>
+    </div>
+  );
 }
 
 function PlanForm({
@@ -131,6 +273,9 @@ function PlanForm({
       capacity: Number.isFinite(capacity) ? Math.trunc(capacity) : null,
       published: plan ? plan.published : true,
       confirm_high_price: confirmHigh,
+      video_reviews: draft.video_reviews,
+      menu_updates: draft.menu_updates,
+      reply_formats: draft.reply_formats,
     };
     try {
       const d = await apiFetch<{ plan: CoachingPlan }>(plan ? `/v1/coach/me/plans/${plan.id}` : "/v1/coach/me/plans", {
@@ -218,6 +363,7 @@ function PlanForm({
         <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
         {fieldError("price_yen")}
       </label>
+      <PlanIncludesFields draft={draft} setDraft={setDraft} fields={fields} />
       <label className="block space-y-1.5 text-sm text-slate-200">
         <span>同時に受ける人数（1〜50人）</span>
         <Input inputMode="numeric" value={draft.capacity} onChange={(e) => setDraft((d) => ({ ...d, capacity: e.target.value }))} />
@@ -293,6 +439,9 @@ export function CoachPlansSection({
           price_yen: p.price_yen,
           capacity: p.capacity,
           published: !p.published,
+          video_reviews: p.video_reviews,
+          menu_updates: p.menu_updates,
+          reply_formats: p.reply_formats,
         }),
       });
       saved(d.plan);
@@ -331,6 +480,7 @@ export function CoachPlansSection({
                       <p className="text-xs text-slate-300">
                         {planSummary(p)} · {p.capacity}人まで
                       </p>
+                      <PlanIncludesList plan={p} />
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-white" : "bg-white/15 text-slate-300"}`}>
                       {p.published ? "公開中" : "非公開"}
@@ -394,6 +544,7 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
             {p.kind === "trial" ? <TrialBadge /> : null}
             <p className="font-semibold text-white">{p.title}</p>
             <p className="text-xs text-slate-300">{planSummary(p)}</p>
+            <PlanIncludesList plan={p} />
             <p className="mt-1 whitespace-pre-wrap text-slate-200">{p.description}</p>
             {p.full ? (
               <p className="mt-2 text-xs font-semibold text-amber-300">いまは満員です</p>

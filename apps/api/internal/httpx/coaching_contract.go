@@ -58,6 +58,7 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	plan := coachingPlanJSON(db.CoachingPlan{
 		ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 		DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
+		VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
 	JSON(w, http.StatusOK, map[string]any{
@@ -177,6 +178,9 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 			Message:       req.Message,
 			Minor:         minor,
 			RespondBy:     time.Now().Add(contractRespondWindow),
+			VideoReviews:  plan.VideoReviews,
+			MenuUpdates:   plan.MenuUpdates,
+			ReplyFormats:  nonNilStrings(plan.ReplyFormats),
 		})
 		if err != nil {
 			return err
@@ -228,6 +232,10 @@ func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 		"created_at":       ct.CreatedAt,
 		// 保存期間（終了から1年）を過ぎて、やりとりを消した日時。
 		"messages_purged_at": ct.MessagesPurgedAt,
+		// 申し込んだ時点で、プランに書いてあった「何が返ってくるか」。
+		"video_reviews": ct.VideoReviews,
+		"menu_updates":  ct.MenuUpdates,
+		"reply_formats": nonNilStrings(ct.ReplyFormats),
 	}
 }
 
@@ -249,6 +257,7 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		out = append(out, c)
@@ -274,6 +283,7 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		})
 		// コーチには利用者のニックネームだけを見せる。
 		c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -307,6 +317,7 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 	})
 	role := "requester"
 	if row.CoachID == me.ID {

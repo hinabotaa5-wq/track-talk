@@ -43,9 +43,9 @@ func (q *Queries) CountOtherTrialPlans(ctx context.Context, arg CountOtherTrialP
 }
 
 const createCoachingPlan = `-- name: CreateCoachingPlan :one
-INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at
+INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats
 `
 
 type CreateCoachingPlanParams struct {
@@ -58,6 +58,9 @@ type CreateCoachingPlanParams struct {
 	PriceYen     int32     `json:"price_yen"`
 	Capacity     int16     `json:"capacity"`
 	Published    bool      `json:"published"`
+	VideoReviews *int16    `json:"video_reviews"`
+	MenuUpdates  *string   `json:"menu_updates"`
+	ReplyFormats []string  `json:"reply_formats"`
 }
 
 func (q *Queries) CreateCoachingPlan(ctx context.Context, arg CreateCoachingPlanParams) (CoachingPlan, error) {
@@ -71,6 +74,9 @@ func (q *Queries) CreateCoachingPlan(ctx context.Context, arg CreateCoachingPlan
 		arg.PriceYen,
 		arg.Capacity,
 		arg.Published,
+		arg.VideoReviews,
+		arg.MenuUpdates,
+		arg.ReplyFormats,
 	)
 	var i CoachingPlan
 	err := row.Scan(
@@ -85,12 +91,15 @@ func (q *Queries) CreateCoachingPlan(ctx context.Context, arg CreateCoachingPlan
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
 	)
 	return i, err
 }
 
 const getCoachingPlan = `-- name: GetCoachingPlan :one
-SELECT id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at FROM coaching_plans
+SELECT id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats FROM coaching_plans
 WHERE id = $1 AND coach_id = $2
 `
 
@@ -114,12 +123,15 @@ func (q *Queries) GetCoachingPlan(ctx context.Context, arg GetCoachingPlanParams
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
 	)
 	return i, err
 }
 
 const listMyCoachingPlans = `-- name: ListMyCoachingPlans :many
-SELECT id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at FROM coaching_plans
+SELECT id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats FROM coaching_plans
 WHERE coach_id = $1
 ORDER BY created_at, id
 `
@@ -145,6 +157,9 @@ func (q *Queries) ListMyCoachingPlans(ctx context.Context, coachID uuid.UUID) ([
 			&i.Published,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
 		); err != nil {
 			return nil, err
 		}
@@ -157,7 +172,7 @@ func (q *Queries) ListMyCoachingPlans(ctx context.Context, coachID uuid.UUID) ([
 }
 
 const listPublicCoachingPlans = `-- name: ListPublicCoachingPlans :many
-SELECT pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at,
+SELECT pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at, pl.video_reviews, pl.menu_updates, pl.reply_formats,
     (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status IN ('accepted', 'active', 'suspended'))::int AS active_count
 FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
@@ -179,6 +194,9 @@ type ListPublicCoachingPlansRow struct {
 	Published    bool      `json:"published"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	VideoReviews *int16    `json:"video_reviews"`
+	MenuUpdates  *string   `json:"menu_updates"`
+	ReplyFormats []string  `json:"reply_formats"`
 	ActiveCount  int32     `json:"active_count"`
 }
 
@@ -204,6 +222,9 @@ func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int
 			&i.Published,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
 			&i.ActiveCount,
 		); err != nil {
 			return nil, err
@@ -280,9 +301,12 @@ SET kind = $3,
     price_yen = $7,
     capacity = $8,
     published = $9,
+    video_reviews = $10,
+    menu_updates = $11,
+    reply_formats = $12,
     updated_at = now()
 WHERE id = $1 AND coach_id = $2
-RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at
+RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats
 `
 
 type UpdateCoachingPlanParams struct {
@@ -295,6 +319,9 @@ type UpdateCoachingPlanParams struct {
 	PriceYen     int32     `json:"price_yen"`
 	Capacity     int16     `json:"capacity"`
 	Published    bool      `json:"published"`
+	VideoReviews *int16    `json:"video_reviews"`
+	MenuUpdates  *string   `json:"menu_updates"`
+	ReplyFormats []string  `json:"reply_formats"`
 }
 
 func (q *Queries) UpdateCoachingPlan(ctx context.Context, arg UpdateCoachingPlanParams) (CoachingPlan, error) {
@@ -308,6 +335,9 @@ func (q *Queries) UpdateCoachingPlan(ctx context.Context, arg UpdateCoachingPlan
 		arg.PriceYen,
 		arg.Capacity,
 		arg.Published,
+		arg.VideoReviews,
+		arg.MenuUpdates,
+		arg.ReplyFormats,
 	)
 	var i CoachingPlan
 	err := row.Scan(
@@ -322,6 +352,9 @@ func (q *Queries) UpdateCoachingPlan(ctx context.Context, arg UpdateCoachingPlan
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
 	)
 	return i, err
 }

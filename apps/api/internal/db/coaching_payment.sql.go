@@ -172,7 +172,7 @@ func (q *Queries) HasGuardianContractConsent(ctx context.Context, contractID uui
 }
 
 const listSilentPaidContracts = `-- name: ListSilentPaidContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at FROM coaching_contracts ct
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats FROM coaching_contracts ct
 WHERE ct.status = 'active' AND ct.payment_required
   AND ct.ends_at - make_interval(days => ct.duration_days) <= now() - interval '72 hours'
   AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
@@ -218,6 +218,9 @@ func (q *Queries) ListSilentPaidContracts(ctx context.Context) ([]CoachingContra
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
 		); err != nil {
 			return nil, err
 		}
@@ -393,7 +396,7 @@ SET status = 'refunded',
     ends_at = LEAST(ends_at, now()),
     updated_at = now()
 WHERE id = $1 AND status IN ('active', 'suspended')
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats
 `
 
 // 返金して、期間の途中で閉じる。
@@ -425,6 +428,9 @@ func (q *Queries) RefundCoachingContract(ctx context.Context, id uuid.UUID) (Coa
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
 	)
 	return i, err
 }
@@ -439,7 +445,7 @@ SET status = 'active',
 WHERE ct.id = $1 AND ct.payment_required AND ct.status = 'accepted'
   AND (NOT ct.minor OR EXISTS (
       SELECT 1 FROM coaching_contract_consents c WHERE c.contract_id = ct.id AND c.party = 'guardian'))
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats
 `
 
 // 支払いが済んだら、その時から期間が始まる。18歳未満は保護者の同意があるものだけ。
@@ -471,6 +477,9 @@ func (q *Queries) StartPaidCoachingContract(ctx context.Context, id uuid.UUID) (
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
 	)
 	return i, err
 }

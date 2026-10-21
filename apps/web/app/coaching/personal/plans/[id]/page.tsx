@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { DemoCodeForm } from "@/components/coaching-demo";
-import { TrialBadge } from "@/components/coaching-plans";
+import { PlanIncludesList, TrialBadge } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,6 +132,7 @@ export default function ApplyCoachingPlanPage() {
           {plan.kind === "trial" ? <TrialBadge /> : null}
           <p className="font-semibold text-white">{plan.title}</p>
           <p className="text-xs text-slate-300">{planSummary(plan)}</p>
+          <PlanIncludesList plan={plan} />
           <p className="whitespace-pre-wrap text-slate-200">{plan.description}</p>
           {plan.kind === "trial" ? (
             <p className="text-xs text-slate-300">このコーチの指導を前に受けたことがある人は、お試しには申し込めません。</p>

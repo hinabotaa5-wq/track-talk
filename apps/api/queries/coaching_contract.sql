@@ -18,8 +18,9 @@ WHERE pl.id = sqlc.arg(id)
 -- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,
-    event, goal, current_record, message, minor, respond_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    event, goal, current_record, message, minor, respond_by,
+    video_reviews, menu_updates, reply_formats
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 RETURNING *;
 
 -- name: InsertContractConsent :exec
