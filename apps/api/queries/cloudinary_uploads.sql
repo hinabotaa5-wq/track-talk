@@ -17,3 +17,7 @@ SELECT EXISTS (
 SELECT count(*)::int FROM cloudinary_uploads
 WHERE owner_id = $1
   AND created_at > now() - interval '1 day';
+
+-- name: LockUploadOwner :exec
+-- 同じ人への署名を1つずつにする。1日の上限の確認と記録のあいだに、別の署名を割り込ませない。
+SELECT pg_advisory_xact_lock(hashtext('uploads:' || sqlc.arg(owner_id)::uuid::text));

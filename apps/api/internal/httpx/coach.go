@@ -64,6 +64,17 @@ func coachTextError(label, value string, max int) string {
 	return ""
 }
 
+// coachPublicTextError は、コーチ一覧で誰でも見る欄を確かめる。coachTextError に加えて、連絡先を書かせない。
+func coachPublicTextError(label, value string, max int) string {
+	if e := coachTextError(label, value, max); e != "" {
+		return e
+	}
+	if looksLikeContact(value) {
+		return "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
+	}
+	return ""
+}
+
 func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 	return map[string]any{
 		"tier":         c.Tier,
@@ -205,10 +216,10 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if !known || len(events) == 0 {
 		fields["events"] = "担当種目を1つ以上選んでください"
 	}
-	if e := coachTextError("記録", req.BestRecord, 200); e != "" {
+	if e := coachPublicTextError("記録", req.BestRecord, 200); e != "" {
 		fields["best_record"] = e
 	}
-	if e := coachTextError("成績", req.Achievements, 500); e != "" {
+	if e := coachPublicTextError("成績", req.Achievements, 500); e != "" {
 		fields["achievements"] = e
 	}
 	if req.Years == nil || *req.Years < 0 || *req.Years > 60 {

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
@@ -511,17 +512,7 @@ func (s *Server) signCoachingVideoUpload(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	if !s.uploadQuotaLeft(w, r, p.ID) {
-		return
-	}
-	signed, err := s.cloud.SignedCoachingUpload(time.Now())
-	if err != nil {
-		writeAssetReadyError(w, err, "動画")
-		return
-	}
-	if err := s.q.RecordUpload(r.Context(), db.RecordUploadParams{PublicID: signed.PublicID, OwnerID: p.ID}); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, signed)
+	s.issueUpload(w, r, p.ID, "動画", func() (cloudinary.UploadSignature, error) {
+		return s.cloud.SignedCoachingUpload(time.Now())
+	})
 }

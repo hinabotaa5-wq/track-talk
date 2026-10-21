@@ -11,6 +11,10 @@ on:
       - "**.md"
       - "docs/**"
 
+# リポジトリは読むだけ。GITHUB_TOKEN に書き込みの権限を持たせない。
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

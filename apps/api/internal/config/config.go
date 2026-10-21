@@ -24,6 +24,7 @@ type Config struct {
 	CloudAPIKey            string
 	CloudAPISecret         string
 	CloudAPIBase           string
+	CloudAuthTokenKey      string // Cloudinary のトークン認証の鍵。あれば非公開の動画の URL に期限を付ける。
 	VAPIDPublicKey         string
 	VAPIDPrivateKey        string
 	VAPIDSubject           string
@@ -88,6 +89,7 @@ func Load() (Config, error) {
 		CloudAPIKey:                os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret:             os.Getenv("CLOUDINARY_API_SECRET"),
 		CloudAPIBase:               os.Getenv("CLOUDINARY_API_BASE"),
+		CloudAuthTokenKey:          os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
 		VAPIDPublicKey:             os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),

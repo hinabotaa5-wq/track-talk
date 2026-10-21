@@ -15,7 +15,7 @@
 ## Cloud Run（Go API）
 
 - 初回は [Cloud Run で動かす手順](cloud-run-deploy.md) の `deploy/cloud-run/setup.sh` で作る。以降は Actions の「Deploy API」を手動で流してデプロイする（マージでは自動デプロイしない）
-- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_AUTH_TOKEN_KEY`(任意。空なら非公開の動画は API シークレットの署名付き URL で配信する。Cloudinary の有料のトークン認証を有効にしたときだけ鍵を入れると、URL が3時間で切れる), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - `COACHING_ENABLED` はオンラインコーチングを提供するまで設定しない（Web の `NEXT_PUBLIC_COACHING_ENABLED` も同じ）。空のうちは保護者の同意・決済、パーソナル指導、フォーム添削、プッシュ通知、コーチの報酬と送金、運営の送金が 404 になり、コーチの応募と運営の審査だけが残る
 - `CORS_ORIGINS` は画面の本番 URL
 - ヘルスチェック: `/health`

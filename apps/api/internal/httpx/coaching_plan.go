@@ -122,10 +122,11 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 			fields["duration_days"] = "期間は2週間か1か月を選んでください"
 		}
 	}
-	if e := coachTextError("プラン名", req.Title, 60); e != "" {
+	// プランはコーチ一覧で誰でも見るので、連絡先は書けない。
+	if e := coachPublicTextError("プラン名", req.Title, 60); e != "" {
 		fields["title"] = e
 	}
-	if e := coachTextError("内容", req.Description, 1000); e != "" {
+	if e := coachPublicTextError("内容", req.Description, 1000); e != "" {
 		fields["description"] = e
 	}
 	switch {
@@ -177,7 +178,18 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	n, err := s.q.CountCoachingPlans(r.Context(), c.ProfileID)
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	n, err := q.CountCoachingPlans(r.Context(), c.ProfileID)
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -190,7 +202,7 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	if req.Published != nil {
 		published = *req.Published
 	}
-	p, err := s.q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
+	p, err := q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
 		ID:           uuid.New(),
 		CoachID:      c.ProfileID,
 		Kind:         req.Kind,
@@ -202,6 +214,10 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Published:    published,
 	})
 	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}

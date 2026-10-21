@@ -134,6 +134,17 @@ func (q *Queries) AttachEarningsToPayout(ctx context.Context, arg AttachEarnings
 	return result.RowsAffected(), nil
 }
 
+const coachStripeAccountExists = `-- name: CoachStripeAccountExists :one
+SELECT EXISTS (SELECT 1 FROM coach_profiles WHERE stripe_account_id = $1::text)
+`
+
+func (q *Queries) CoachStripeAccountExists(ctx context.Context, stripeAccountID string) (bool, error) {
+	row := q.db.QueryRow(ctx, coachStripeAccountExists, stripeAccountID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const deleteUnpaidContractEarning = `-- name: DeleteUnpaidContractEarning :exec
 DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL
 `

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -25,6 +26,7 @@ export default function DeleteAccountPage() {
 
   async function leave() {
     leaving.current = true;
+    await unsubscribePushOnThisDevice(null);
     const supabase = createClient();
     await supabase?.auth.signOut();
     router.replace("/");

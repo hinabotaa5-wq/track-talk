@@ -75,3 +75,45 @@ func TestRecruitmentAndPracticeTablesHaveRLS(t *testing.T) {
 		}
 	}
 }
+
+// public スキーマの表は、公開の anon キーで PostgREST から読み書きされないよう、すべて RLS を有効にする。
+// 新しい表で付け忘れたら、ここで落ちる。
+func TestEveryPublicTableHasRLS(t *testing.T) {
+	dsn := testDSN(t)
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("postgres unavailable: %v", err)
+	}
+	if err := migrate.Up(dsn); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT c.relname
+		FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = 'public'
+		  AND c.relkind IN ('r', 'p')
+		  AND NOT c.relrowsecurity
+		ORDER BY c.relname
+	`)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		t.Errorf("%s does not have row level security", name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows: %v", err)
+	}
+}

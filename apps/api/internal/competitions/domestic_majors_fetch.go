@@ -13,10 +13,8 @@ import (
 // FetchDomesticMajors は、日本陸連の今シーズンと次のシーズンの月ごとの一覧を読み、DomesticMeets のどれかに当たる行の詳細ページを読む。
 // 読めないページはログに残して飛ばし、1か所が落ちていてもほかの大会は残す。
 func FetchDomesticMajors(ctx context.Context, now time.Time) ([]DomesticMajor, error) {
-	season := now.Year()
-	if now.Month() < time.April {
-		season--
-	}
+	// 年度は日本時間で決める(9時前に手で流すと、UTC ではまだ前の月のことがある)。
+	season := SeasonYear(now)
 	meets := map[string]DomesticMeet{}
 	for _, meet := range DomesticMeets {
 		meets[meet.Slug] = meet

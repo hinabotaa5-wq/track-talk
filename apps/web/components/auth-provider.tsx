@@ -9,6 +9,7 @@ import { clearCompetitions } from "@/lib/competition-list";
 import { clearDomesticMajors } from "@/lib/domestic-majors";
 import { clearMajorHosts } from "@/lib/major-hosts";
 import { clearSavedFeeds } from "@/lib/home-feed-cache";
+import { clearPersonalStorage } from "@/lib/sign-out";
 
 type AuthState = {
   session: Session | null;
@@ -63,6 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearMajorHosts();
         clearDomesticMajors();
         clearSavedFeeds();
+        try {
+          clearPersonalStorage(window.localStorage);
+        } catch {
+          // 保存領域が使えない端末では、消すものもない。
+        }
       }
       loadProfile(next?.access_token ?? null);
     });

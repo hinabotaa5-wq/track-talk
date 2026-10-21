@@ -54,9 +54,9 @@ func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id
 }
 
 // minorMonthlyBlock は、18歳未満がこの値段を払うと月の上限を超えるときの文言を返す。超えないなら空。
-func (s *Server) minorMonthlyBlock(ctx context.Context, minorID uuid.UUID, requestID uuid.UUID, price int32) (string, error) {
+func (s *Server) minorMonthlyBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID, requestID uuid.UUID, price int32) (string, error) {
 	limit := int32(defaultMinorMonthlyLimit)
-	consent, err := s.q.GetGuardianConsentByMinor(ctx, minorID)
+	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
@@ -66,7 +66,7 @@ func (s *Server) minorMonthlyBlock(ctx context.Context, minorID uuid.UUID, reque
 		}
 		limit = *consent.MonthlyLimitYen
 	}
-	used, err := s.q.SumMonthlyReviewPayments(ctx, db.SumMonthlyReviewPaymentsParams{PayerID: &minorID, ExcludeRequestID: requestID})
+	used, err := q.SumMonthlyReviewPayments(ctx, db.SumMonthlyReviewPaymentsParams{PayerID: &minorID, ExcludeRequestID: requestID})
 	if err != nil {
 		return "", err
 	}
@@ -78,8 +78,8 @@ func (s *Server) minorMonthlyBlock(ctx context.Context, minorID uuid.UUID, reque
 }
 
 // reviewCheckoutURL は、依頼の支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。
-func (s *Server) reviewCheckoutURL(ctx context.Context, rr db.ReviewRequest, method string) (string, error) {
-	p, err := s.q.GetReusableReviewPayment(ctx, db.GetReusableReviewPaymentParams{RequestID: &rr.ID, Method: method})
+func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.ReviewRequest, method string) (string, error) {
+	p, err := q.GetReusableReviewPayment(ctx, db.GetReusableReviewPaymentParams{RequestID: &rr.ID, Method: method})
 	if err == nil {
 		return p.CheckoutUrl, nil
 	}
@@ -118,7 +118,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, rr db.ReviewRequest, met
 	if sess.ExpiresAt > 0 {
 		expires = time.Unix(sess.ExpiresAt, 0)
 	}
-	if _, err := s.q.CreateReviewPayment(ctx, db.CreateReviewPaymentParams{
+	if _, err := q.CreateReviewPayment(ctx, db.CreateReviewPaymentParams{
 		ID: id, RequestID: &rr.ID, PayerID: &rr.RequesterID, Method: method, AmountYen: price,
 		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires,
 	}); err != nil {
@@ -153,25 +153,56 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 
 // writeReviewCheckout は、月の上限を確かめてから支払い画面を作り、依頼と一緒に返す。
 func (s *Server) writeReviewCheckout(w http.ResponseWriter, r *http.Request, rr db.ReviewRequest, p db.Profile, method string, status int) {
-	if p.BirthMonth != nil && isMinor(*p.BirthMonth, time.Now()) {
-		msg, err := s.minorMonthlyBlock(r.Context(), p.ID, rr.ID, reviewPrices[rr.Tier])
-		if err != nil {
-			MapDBError(w, err)
-			return
-		}
-		if msg != "" {
-			Error(w, http.StatusUnprocessableEntity, "monthly_limit", msg)
-			return
-		}
-	}
-	url, err := s.reviewCheckoutURL(r.Context(), rr, method)
+	url, code, msg, err := s.reviewCheckoutFor(r.Context(), rr, p, method)
 	if err != nil {
 		writeCheckoutError(w, err)
+		return
+	}
+	if code != "" {
+		Error(w, http.StatusUnprocessableEntity, code, msg)
 		return
 	}
 	out := s.reviewRequestJSON(rr)
 	out["checkout_url"] = url
 	JSON(w, status, out)
+}
+
+// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、保護者が同意しないと答えていないことと
+// 月の上限を確かめ、払えないときは code と文言を返す。同時に開かれても上限を超えないよう、
+// 確かめてから支払いの行を作るまでを本人ごとのロックの中で行う。
+func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string) (url, code, msg string, err error) {
+	if p.BirthMonth == nil || !isMinor(*p.BirthMonth, time.Now()) {
+		url, err = s.reviewCheckoutURL(ctx, s.q, rr, method)
+		return url, "", "", err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer tx.Rollback(ctx)
+	q := s.q.WithTx(tx)
+	if err := q.LockReviewRequester(ctx, p.ID); err != nil {
+		return "", "", "", err
+	}
+	consent, err := q.GetGuardianConsentByMinor(ctx, p.ID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", "", err
+	}
+	if err == nil && (consent.Status == "declined" || consent.Status == "revoked") {
+		return "", "guardian_declined", "保護者の同意がないため、フォーム添削は使えません", nil
+	}
+	msg, err = s.minorMonthlyBlock(ctx, q, p.ID, rr.ID, reviewPrices[rr.Tier])
+	if err != nil {
+		return "", "", "", err
+	}
+	if msg != "" {
+		return "", "monthly_limit", msg, nil
+	}
+	// 支払いの行もロックを持つ接続で作る。別の接続を待つと、同時に来たときに接続が尽きて止まる。
+	if url, err = s.reviewCheckoutURL(ctx, q, rr, method); err != nil {
+		return "", "", "", err
+	}
+	return url, "", "", tx.Commit(ctx)
 }
 
 // completeReviewCheckout は、添削の支払い（カードは仮押さえ）が届いたら依頼を割り当ての待ち行列に入れる。

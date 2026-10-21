@@ -625,3 +625,8 @@ type SenseNoteSummary struct {
 	Summary   []byte    `json:"summary"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type SenseNoteSummaryClaim struct {
+	AuthorID  uuid.UUID `json:"author_id"`
+	ClaimedAt time.Time `json:"claimed_at"`
+}

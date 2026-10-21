@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -174,7 +175,8 @@ func (s *Server) getInjuryGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	facesByStage := map[string][]string{}
 	for _, row := range faces {
-		facesByStage[row.Stage] = append(facesByStage[row.Stage], row.Nickname)
+		// 画面に出すのは頭文字だけ。ニックネームそのものを返すと、誰がどのケガかが結びつく。
+		facesByStage[row.Stage] = append(facesByStage[row.Stage], firstRune(row.Nickname))
 	}
 	out := injuryGroupDTO{
 		BodyPart:      part,
@@ -351,4 +353,12 @@ func (s *Server) leaveInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// firstRune は、空白を除いた最初の1文字を返す。空なら空。
+func firstRune(s string) string {
+	for _, r := range strings.TrimSpace(s) {
+		return string(r)
+	}
+	return ""
 }

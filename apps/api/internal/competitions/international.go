@@ -291,11 +291,11 @@ func parseDiamondLeague(body []byte, pageURL string) ([]diamondMeeting, error) {
 }
 
 func diamondCard(n *html.Node, base *url.URL, year int) (diamondMeeting, bool) {
-	href, err := url.Parse(strings.TrimSpace(attr(n, "href")))
-	if err != nil || href.String() == "" {
+	// 画面にリンクとして出すので、http(s) のものだけ受け取る。
+	absolute, ok := absoluteURL(base, attr(n, "href"))
+	if !ok {
 		return diamondMeeting{}, false
 	}
-	absolute := base.ResolveReference(href).String()
 	var dateLine, place string
 	for _, text := range textParts(n) {
 		if diamondDatePattern.MatchString(text) {

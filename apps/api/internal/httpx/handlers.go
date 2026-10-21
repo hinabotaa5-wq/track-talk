@@ -892,15 +892,14 @@ func commentJSON(r *http.Request, id, postID, authorID uuid.UUID, body string, c
 }
 
 // replyToName は返信先コメントの投稿者を表示用の名前にする。
-// 投稿者は「投稿者」、閲覧者本人は「あなた」、それ以外は公開ニックネーム(非公開なら「匿名」)。
-func replyToName(viewer uuid.UUID, viewerOK bool, postAuthor, target uuid.UUID, nickname *string, public bool) string {
+// 投稿者は「投稿者」、閲覧者本人は「あなた」、それ以外は「匿名」。
+// コメントは匿名の場なので、ニックネームを公開にしていても出さない。
+func replyToName(viewer uuid.UUID, viewerOK bool, postAuthor, target uuid.UUID) string {
 	switch {
 	case viewerOK && target == viewer:
 		return "あなた"
 	case target == postAuthor:
 		return "投稿者"
-	case public && nickname != nil && *nickname != "":
-		return *nickname
 	default:
 		return "匿名"
 	}
@@ -930,13 +929,13 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		c := commentJSON(r, row.ID, row.PostID, row.AuthorID, row.Body, row.CreatedAt, row.UpdatedAt, row.ParentID, row.ReplyToID)
-		c["author_name"] = replyToName(viewer, viewerOK, post.AuthorID, row.AuthorID, row.AuthorNickname, row.AuthorNicknamePublic)
+		c["author_name"] = replyToName(viewer, viewerOK, post.AuthorID, row.AuthorID)
 		if row.ReplyToID != nil {
 			if row.ReplyToRemoved || row.ReplyToAuthorID == nil {
 				c["reply_to_name"] = nil
 				c["reply_to_removed"] = true
 			} else {
-				c["reply_to_name"] = replyToName(viewer, viewerOK, post.AuthorID, *row.ReplyToAuthorID, row.ReplyToNickname, row.ReplyToNicknamePublic)
+				c["reply_to_name"] = replyToName(viewer, viewerOK, post.AuthorID, *row.ReplyToAuthorID)
 				c["reply_to_removed"] = false
 			}
 		}
@@ -1153,6 +1152,22 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
+	}
+	// 投稿とコメントは、本人が読めるものだけ通報できる(ない ID や消えたもので運営の一覧を埋めさせない)。
+	if req.TargetType == "post" {
+		if _, ok := s.getReadablePost(w, r, tid); !ok {
+			return
+		}
+	}
+	if req.TargetType == "comment" {
+		c, err := s.q.GetComment(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if _, ok := s.getReadablePost(w, r, c.PostID); !ok {
+			return
+		}
 	}
 	if req.TargetType == "injury_note" {
 		public, err := s.q.InjuryNoteIsPublic(r.Context(), tid)

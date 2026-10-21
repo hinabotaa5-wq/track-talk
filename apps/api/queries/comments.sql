@@ -9,15 +9,9 @@ SELECT
     c.parent_id,
     c.reply_to_id,
     t.author_id AS reply_to_author_id,
-    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed,
-    tp.nickname AS reply_to_nickname,
-    COALESCE(tp.nickname_public, false)::boolean AS reply_to_nickname_public,
-    ap.nickname AS author_nickname,
-    COALESCE(ap.nickname_public, false)::boolean AS author_nickname_public
+    COALESCE(t.deleted_at IS NOT NULL OR t.hidden_at IS NOT NULL, false)::boolean AS reply_to_removed
 FROM comments c
-LEFT JOIN profiles ap ON ap.id = c.author_id
 LEFT JOIN comments t ON t.id = c.reply_to_id
-LEFT JOIN profiles tp ON tp.id = t.author_id
 WHERE c.post_id = $1
   AND c.deleted_at IS NULL
   AND c.hidden_at IS NULL

@@ -37,6 +37,8 @@ type fakeStripe struct {
 	failTransfers int
 	// 返金に答えるまで待つ時間（同時に送ったときの確かめに使う）。
 	refundDelay time.Duration
+	// 返金の Idempotency-Key ごとの中身。Stripe と同じく、同じキーなら前の返金を返し、中身が違えば断る。
+	refundKeys map[string]url.Values
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -46,9 +48,13 @@ func (f *fakeStripe) transferList() []url.Values {
 }
 
 func (f *fakeStripe) enable(account string) {
+	f.setEnabled(account, true)
+}
+
+func (f *fakeStripe) setEnabled(account string, enabled bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.enabled[account] = true
+	f.enabled[account] = enabled
 }
 
 func (f *fakeStripe) failNextTransfers(n int) {
@@ -143,6 +149,21 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
 		case r.URL.Path == "/v1/refunds":
 			time.Sleep(f.refundDelay)
+			if key := r.Header.Get("Idempotency-Key"); key != "" {
+				if f.refundKeys == nil {
+					f.refundKeys = map[string]url.Values{}
+				}
+				if prev, ok := f.refundKeys[key]; ok {
+					if prev.Encode() != r.PostForm.Encode() {
+						w.WriteHeader(http.StatusBadRequest)
+						_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "idempotency_error", "message": "Keys for idempotent requests can only be used with the same parameters"}})
+						return
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": "re_again", "status": "succeeded"})
+					return
+				}
+				f.refundKeys[key] = r.PostForm
+			}
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
 		default:
@@ -308,6 +329,7 @@ func TestCoachingPaymentStartsTheContract(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": "full"}); rec.Code != http.StatusConflict {
 		t.Fatalf("second refund %d", rec.Code)
 	}
+
 	// 返金して閉じたあとも、やりとりは読める。送れない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/coaching/contracts/"+id+"/messages", tu, nil); rec.Code != http.StatusOK {
 		t.Fatalf("read after refund %d", rec.Code)
@@ -317,6 +339,15 @@ func TestCoachingPaymentStartsTheContract(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/coaching/contracts", ta, nil); !strings.Contains(rec.Body.String(), `"payment_status":"partially_refunded"`) {
 		t.Fatalf("admin list %s", rec.Body.String())
+	}
+
+	// Stripe で返金できたのに記録の前に落ちて(DB は元のまま)、時間がたってから押し直しても、2回目の返金は送らない。
+	// 残りの日数分は時間で額が変わるので、額を返金のキーに入れると別の返金になってしまう。
+	execSQLArgs(t, `UPDATE coaching_payments SET status = 'paid', refunded_yen = 0, refund_reason = NULL, refunded_at = NULL WHERE payment_intent_id = 'pi_1'`)
+	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'active', starts_at = now() - interval '16 days', ends_at = now() + interval '14 days' WHERE id = $1`, id)
+	doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+id+"/refund", ta, map[string]any{"kind": "remaining"})
+	if refunds := f.refundList(); len(refunds) != 2 {
+		t.Fatalf("refunded the same payment again %v", refunds)
 	}
 }
 
@@ -336,7 +367,12 @@ func TestCoachingPaymentRefundsWhenTheCoachIsSilent(t *testing.T) {
 	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":0`) {
 		t.Fatalf("tick early %d %s", rec.Code, rec.Body.String())
 	}
-	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = now() - interval '73 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
+	// 止めていた時間は数えない。100時間前に始まっても、95時間止めていたら(終了日がその分延びる)まだ返金しない。
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = starts_at - interval '100 hours', ends_at = ends_at - interval '5 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":0`) {
+		t.Fatalf("tick after suspension %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = ends_at - interval '68 hours' WHERE id = ANY($1::uuid[])`, []string{a, b})
 	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"payments_refunded":1`) {
 		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
 	}
@@ -488,4 +524,36 @@ func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
 		}
 	}
 	t.Fatal("plan not listed")
+}
+
+// 返金を記録したあとで指導を閉じられなかったら、返金の記録も戻す。次の tick で返金をやり直し
+// (Stripe には同じキーなので2回目の返金は起きない)、返金済みの支払いのまま指導が続くことがない。
+func TestCoachingPaymentSilentRefundClosesContractTogether(t *testing.T) {
+	h, f := setupStripe(t)
+	tu, _, id := adultAccepted(t, h)
+	checkout(t, h, tu, id)
+	paidSession(t, h, sessionIDFor(t, id), "pi_silent", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET starts_at = starts_at - interval '73 hours', ends_at = ends_at - interval '73 hours' WHERE id = $1`, id)
+	execSQLArgs(t, `CREATE OR REPLACE FUNCTION test_block_refund_close() RETURNS trigger AS $$
+		BEGIN RAISE EXCEPTION 'blocked for test'; END $$ LANGUAGE plpgsql`)
+	execSQLArgs(t, `CREATE TRIGGER test_block_refund_close BEFORE UPDATE ON coaching_contracts
+		FOR EACH ROW WHEN (NEW.status = 'refunded') EXECUTE FUNCTION test_block_refund_close()`)
+	t.Cleanup(func() { execSQLArgs(t, `DROP TRIGGER IF EXISTS test_block_refund_close ON coaching_contracts`) })
+
+	tick(t, h, "tick-secret")
+	var status string
+	queryRowArgs(t, `SELECT status FROM coaching_payments WHERE contract_id = $1`, []any{id}, &status)
+	if status != "paid" || contractStatus(t, id) != "active" {
+		t.Fatalf("payment %s contract %s: refund recorded without closing the contract", status, contractStatus(t, id))
+	}
+
+	execSQLArgs(t, `DROP TRIGGER test_block_refund_close ON coaching_contracts`)
+	tick(t, h, "tick-secret")
+	queryRowArgs(t, `SELECT status FROM coaching_payments WHERE contract_id = $1`, []any{id}, &status)
+	if status != "refunded" || contractStatus(t, id) != "refunded" {
+		t.Fatalf("payment %s contract %s after retry", status, contractStatus(t, id))
+	}
+	if refunds := f.refundList(); len(refunds) != 1 {
+		t.Fatalf("refunds %v", refunds)
+	}
 }

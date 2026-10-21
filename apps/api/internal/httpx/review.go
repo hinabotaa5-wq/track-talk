@@ -281,7 +281,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if payments {
-			msg, err := s.minorMonthlyBlock(r.Context(), p.ID, uuid.Nil, reviewPrices[req.Tier])
+			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, reviewPrices[req.Tier])
 			if err != nil {
 				MapDBError(w, err)
 				return
@@ -348,13 +348,17 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, err := s.reviewCheckoutURL(r.Context(), rr, req.Method)
-		if err != nil {
+		url, code, msg, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
+		if err != nil || code != "" {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.q.DeleteAwaitingReviewRequest(r.Context(), rr.ID); derr != nil {
 				slog.Warn("delete unpaid review request", "err", derr)
 			}
-			writeCheckoutError(w, err)
+			if err != nil {
+				writeCheckoutError(w, err)
+			} else {
+				Error(w, http.StatusUnprocessableEntity, code, msg)
+			}
 			return
 		}
 		out := s.reviewRequestJSON(rr)
