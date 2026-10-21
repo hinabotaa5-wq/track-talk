@@ -12,6 +12,7 @@ import { FeedLoadingFrame } from "@/components/loading-frame";
 import { ProductImage } from "@/components/product-image";
 import { ProductRequest } from "@/components/product-request";
 import { ReviewFilterBar } from "@/components/review-filters";
+import { ViewSwitch } from "@/components/view-switch";
 
 const kinds: ProductKind[] = ["shoe", "spike"];
 
@@ -46,25 +47,17 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
 
   return (
     <>
-      <div className="mb-3 flex gap-2" role="tablist" aria-label="種類">
-        {kinds.map((k) => (
-          <a
-            key={k}
-            href={href(undefined, k)}
-            role="tab"
-            aria-selected={kind === k}
-            onClick={(e) => {
-              if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-              e.preventDefault();
-              if (k !== kind) window.history.pushState(null, "", href(undefined, k));
-            }}
-            className={`inline-flex min-h-9 cursor-pointer items-center rounded-full border px-4 text-sm font-medium transition active:scale-95 ${
-              kind === k ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
-            }`}
-          >
-            {productKindLabels[k]}
-          </a>
-        ))}
+      <div className="mb-3">
+        <ViewSwitch
+          label="種類"
+          layoutId="review-kind-pill"
+          views={kinds.map((k) => ({ id: k, label: productKindLabels[k] }))}
+          current={kind}
+          href={(k) => href(undefined, k)}
+          onSelect={(k) => {
+            if (k !== kind) window.history.pushState(null, "", href(undefined, k));
+          }}
+        />
       </div>
       <div className="mb-3">
         <ReviewFilterBar filters={filters} onChange={(next) => window.history.pushState(null, "", withReviewFilters(homeHref("review", q, undefined, kind), next))} />

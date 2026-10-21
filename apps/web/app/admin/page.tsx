@@ -6,6 +6,7 @@ import { PayoutsAdmin } from "@/components/coach-payouts";
 import { useAuth } from "@/components/auth-provider";
 import { MeetSessionsAdmin } from "@/components/meet-sessions-admin";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
+import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
@@ -249,18 +250,13 @@ function ProductsAdmin({ token }: { token: string | null }) {
   return (
     <div className="space-y-4">
       <form onSubmit={add} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
-        <div className="flex gap-2">
-          {(["shoe", "spike"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              className={`rounded-full border px-4 py-1.5 text-sm ${kind === k ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"}`}
-            >
-              {productKindLabels[k]}
-            </button>
-          ))}
-        </div>
+        <ViewSwitch
+          label="商品の種類"
+          layoutId="admin-product-kind-pill"
+          views={(["shoe", "spike"] as const).map((k) => ({ id: k, label: productKindLabels[k] }))}
+          current={kind}
+          onSelect={setKind}
+        />
         <label className="block text-sm">
           ブランド
           <input className={input} value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} required />

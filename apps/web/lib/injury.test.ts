@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, jstToday, togglePreChange,
-  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
+  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangeStepError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -178,6 +178,13 @@ describe("injury stage change", () => {
     expect(injuryStageChangeError({ ...answers, actions: [] }, "rehab")).toContain("1つ以上");
     expect(injuryStageChangeError({ ...answers, note: "あ".repeat(301) }, "rehab")).toContain("300文字");
     expect(injuryStageChangeError({ ...answers, note: "あ".repeat(300) }, "rehab")).toBe("");
+  });
+
+  it("checks only the question being asked", () => {
+    expect(injuryStageChangeStepError("stage", { ...answers, actions: [] }, "rehab")).toBe("");
+    expect(injuryStageChangeStepError("actions", { ...answers, actions: [] }, "rehab")).toContain("1つ以上");
+    expect(injuryStageChangeStepError("note", { ...answers, stage: "", actions: [] }, "rehab")).toBe("");
+    expect(injuryStageChangeStepError("note", { ...answers, note: "あ".repeat(301) }, "rehab")).toContain("300文字");
   });
 
   it("keeps 何もしなかった apart from the other choices", () => {
