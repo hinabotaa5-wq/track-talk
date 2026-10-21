@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <AuthProvider>
           <LeaveGuardProvider>
+          <ConfirmProvider>
           <ProfileGate />
           <AmbientBackground />
           <CompetitionPrefetch />
@@ -86,6 +88,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </main>
           <BottomNav />
           <InstallGuide />
+          </ConfirmProvider>
           </LeaveGuardProvider>
         </AuthProvider>
       </body>

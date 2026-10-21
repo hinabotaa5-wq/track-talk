@@ -8,6 +8,11 @@ export const postSchema = z.object({
   body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
 });
 
+// YouTube・Instagram の URL の投稿は、タイトルを書かなくてもよい。
+export const urlPostSchema = postSchema.extend({
+  title: z.string().trim().max(120, "120文字以内"),
+});
+
 export function hasTextPostContent(title: string) {
   return title.trim() !== "";
 }

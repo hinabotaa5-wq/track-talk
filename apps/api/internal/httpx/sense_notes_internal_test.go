@@ -28,15 +28,38 @@ func TestSenseNoteStreak(t *testing.T) {
 }
 
 func TestSenseNoteCursorRoundTrip(t *testing.T) {
-	n := senseNoteFrom([16]byte{1}, "x", nil, time.Date(2026, 10, 16, 3, 4, 5, 123456000, time.UTC), time.Now())
-	at, id, ok := decodeSenseNoteCursor(encodeSenseNoteCursor(n))
-	if !ok || !at.Equal(n.CreatedAt) || *id != n.ID {
-		t.Fatalf("round trip failed: %v %v %v", at, id, ok)
+	n := senseNoteFrom([16]byte{1}, "x", nil, time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 16, 3, 4, 5, 123456000, time.UTC), time.Now())
+	day, at, id, ok := decodeSenseNoteCursor(encodeSenseNoteCursor(n))
+	if !ok || !at.Equal(n.CreatedAt) || *id != n.ID || day.Format(time.DateOnly) != "2026-10-15" {
+		t.Fatalf("round trip failed: %v %v %v %v", day, at, id, ok)
 	}
-	if n.Day != "2026-10-16" {
+	if n.Day != "2026-10-15" {
 		t.Fatalf("day = %s", n.Day)
 	}
-	if _, _, ok := decodeSenseNoteCursor("bad"); ok {
+	if _, _, _, ok := decodeSenseNoteCursor("bad"); ok {
 		t.Fatal("bad cursor accepted")
+	}
+}
+
+func TestParseSenseNoteDay(t *testing.T) {
+	now := time.Date(2026, 10, 16, 20, 0, 0, 0, time.UTC) // 日本時間では 10/17 5:00
+	str := func(v string) *string { return &v }
+	for _, tc := range []struct {
+		name string
+		in   *string
+		want string
+		ok   bool
+	}{
+		{"omitted is today in Tokyo", nil, "2026-10-17", true},
+		{"blank is today", str(" "), "2026-10-17", true},
+		{"past day", str("2026-10-01"), "2026-10-01", true},
+		{"tomorrow", str("2026-10-18"), "", false},
+		{"too old", str("2025-10-01"), "", false},
+		{"garbage", str("10/01"), "", false},
+	} {
+		day, ok := parseSenseNoteDay(tc.in, now)
+		if ok != tc.ok || (ok && day.Format(time.DateOnly) != tc.want) {
+			t.Errorf("%s: got %v %v", tc.name, day, ok)
+		}
 	}
 }

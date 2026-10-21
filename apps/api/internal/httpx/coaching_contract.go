@@ -181,7 +181,7 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	s.pushQuietly(r.Context(), ct.CoachID, push.Message{
+	s.notify(r.Context(), ct.CoachID, notifyCoaching, push.Message{
 		Title: "パーソナル指導の申し込みが届きました",
 		Body:  "「" + ct.PlanTitle + "」に申し込みがありました。48時間以内に返事をしてください",
 		URL:   "/coach",
@@ -381,7 +381,7 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 			msg.Body = "72時間以内にお支払いを済ませると始まります"
 		}
 	}
-	s.pushQuietly(r.Context(), ct.RequesterID, msg, 24*time.Hour)
+	s.notify(r.Context(), ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
 }
 
@@ -403,7 +403,7 @@ func (s *Server) declineCoachingContract(w http.ResponseWriter, r *http.Request)
 		MapDBError(w, err)
 		return
 	}
-	s.pushQuietly(r.Context(), ct.RequesterID, push.Message{
+	s.notify(r.Context(), ct.RequesterID, notifyCoaching, push.Message{
 		Title: "パーソナル指導の申し込みの結果",
 		Body:  "今回はコーチの都合で受けられませんでした。ほかのコーチも探してみてください",
 		URL:   "/coaching/personal/" + ct.ID.String(),
@@ -475,12 +475,12 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 		}
 		msg := push.Message{Title: "パーソナル指導は始まりませんでした", Body: body, Tag: "contract-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
-		s.pushQuietly(ctx, ct.RequesterID, msg, 24*time.Hour)
+		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 		msg.URL = "/coach"
-		s.pushQuietly(ctx, ct.CoachID, msg, 24*time.Hour)
+		s.notify(ctx, ct.CoachID, notifyCoaching, msg, 24*time.Hour)
 	}
 	for _, ct := range ex {
-		s.pushQuietly(ctx, ct.RequesterID, push.Message{
+		s.notify(ctx, ct.RequesterID, notifyCoaching, push.Message{
 			Title: "パーソナル指導の申し込みの期限が過ぎました",
 			Body:  "48時間のうちにコーチから返事がありませんでした。ほかのコーチも探してみてください",
 			URL:   "/coaching/personal/" + ct.ID.String(),
@@ -494,9 +494,9 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 	for _, ct := range en {
 		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました", Tag: "contract-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
-		s.pushQuietly(ctx, ct.RequesterID, msg, 24*time.Hour)
+		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 		msg.URL = "/coach"
-		s.pushQuietly(ctx, ct.CoachID, msg, 24*time.Hour)
+		s.notify(ctx, ct.CoachID, notifyCoaching, msg, 24*time.Hour)
 	}
 	return len(ex) + len(starts), len(en), nil
 }

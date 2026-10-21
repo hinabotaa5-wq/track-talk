@@ -5,7 +5,7 @@ import { todayInTokyo } from "./format";
 export const senseNoteMaxLength = 300;
 
 // 器(ためるビン)1杯に入る感覚の数。
-export const senseJarSize = 9;
+export const senseJarSize = 6;
 
 // まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。ビン1杯と同じ数にして、満杯になったらまとめられるようにする。
 // API の senseSummaryMinNotes と揃えること。
@@ -54,6 +54,11 @@ export function senseCheer(stats: SenseNoteStats) {
   return { title: "今日も頑張ったね", body: `感覚が${stats.total}個たまったよ。また明日の体の声も聞かせてね。` };
 }
 
+// 日付の新しい順(同じ日は保存の新しい順)に並べる。日付を選んで書けるので、書いた順とは限らない。
+export function sortSenseNotes(notes: SenseNote[]) {
+  return [...notes].sort((a, b) => b.day.localeCompare(a.day) || b.created_at.localeCompare(a.created_at));
+}
+
 // 一覧を日ごとにまとめる。notes は新しい順のまま渡す。
 export function groupSenseNotesByDay(notes: SenseNote[]) {
   const groups: { day: string; notes: SenseNote[] }[] = [];
@@ -91,10 +96,8 @@ export type SenseSummary = {
   created_at: string;
 };
 
-// next_available_at は、次のまとめを作れる時刻。すぐ作れるなら null。
 export type SenseSummaryResponse = {
   summary: SenseSummary | null;
-  next_available_at: string | null;
   // 前のまとめのあとに書いた数と、まとめに要る数。作ったときの応答には入らない。
   pending_notes?: number;
   min_notes?: number;
@@ -105,8 +108,12 @@ export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | 
   return `${senseDayLabel(summary.from_day, now)}〜${senseDayLabel(summary.to_day, now)}`;
 }
 
-// 次のまとめを作れる日。"10月27日(火)"。すぐ作れるなら null。
-export function senseSummaryNextLabel(nextAvailableAt: string | null, now = new Date()) {
-  if (!nextAvailableAt) return null;
-  return senseDayLabel(todayInTokyo(new Date(nextAvailableAt)), now);
+// 日付の入力欄に選べる範囲。今日から1年前まで(API と同じ)。
+export const senseNoteMaxDaysBack = 365;
+
+export function senseNoteDayRange(now = new Date()) {
+  const today = todayInTokyo(now);
+  const [y, m, d] = today.split("-").map(Number);
+  const min = new Date(Date.UTC(y, m - 1, d - senseNoteMaxDaysBack)).toISOString().slice(0, 10);
+  return { min, max: today };
 }

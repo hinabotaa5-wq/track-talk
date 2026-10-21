@@ -1,5 +1,6 @@
 "use client";
 
+import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,9 +57,10 @@ function contractPath(contract: CoachingContract, access: Access): string {
 function ReportButton({ message, access }: { message: CoachingMessage; access: Access }) {
   const [state, setState] = useState<"idle" | "done" | "error">("idle");
   const { pending, acquire, release } = useActionLock();
+  const confirmDialog = useConfirm();
 
   async function report() {
-    if (!confirm("このメッセージを運営に通報しますか？通報すると、運営がこのやりとりを確認します。")) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: "このメッセージを運営に通報しますか？", body: "通報すると、運営がこのやりとりを確認します。" })))) return;
     if (!acquire()) return;
     try {
       if (access.guardianToken) {

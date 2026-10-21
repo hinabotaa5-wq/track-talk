@@ -349,8 +349,12 @@ func (s *Server) createInjuryUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 通知は補足なので、失敗しても経過報告そのものは成功として返す。
-	if err := s.q.NotifyInjuryFollowers(r.Context(), db.NotifyInjuryFollowersParams{PostID: postID, AuthorID: p.ID}); err != nil {
+	pushTo, err := s.q.NotifyInjuryFollowers(r.Context(), db.NotifyInjuryFollowersParams{PostID: postID, AuthorID: p.ID})
+	if err != nil {
 		slog.Error("injury update notification failed", "err", err, "post_id", postID.String())
+	}
+	for _, id := range pushTo {
+		s.pushQuietly(r.Context(), id, notifyInjury, postPushMessage("復帰の経過が更新されました", postID), 24*time.Hour)
 	}
 	JSON(w, http.StatusCreated, injuryUpdateFromRow(row))
 }

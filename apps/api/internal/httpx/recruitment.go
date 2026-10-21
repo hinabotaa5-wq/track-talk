@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -260,6 +261,7 @@ func (s *Server) createRecruitment(w http.ResponseWriter, r *http.Request, autho
 		MapDBError(w, err)
 		return
 	}
+	s.pushToMany(r.Context(), notifyRecruitment, []uuid.UUID{author.ID}, postPushMessage("新しい募集", row.ID), 24*time.Hour)
 	s.writePost(w, r, row.ID, http.StatusCreated)
 }
 

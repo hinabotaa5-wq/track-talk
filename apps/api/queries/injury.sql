@@ -93,30 +93,48 @@ WHERE p.author_id = $1
   AND p.hidden_at IS NULL
 GROUP BY u.post_id, u.stage;
 
--- name: NotifyInjuryFollowers :exec
+-- name: NotifyInjuryFollowers :many
 -- 経過報告があったとき、その投稿に「わかる」か保存をした人(投稿者を除く)へ通知する。
 -- ケガの投稿は部位のグループのメンバーしか読めないので、いまそのグループに入っている人だけに送る。
 -- 同じ投稿の未読の通知がすでにある人には重ねて送らない。
-INSERT INTO notifications (id, recipient_id, kind, post_id)
-SELECT gen_random_uuid(), f.user_id, 'injury_update', sqlc.arg('post_id')::uuid
-FROM (
-    SELECT l.user_id FROM post_likes l WHERE l.post_id = sqlc.arg('post_id')::uuid
-    UNION
-    SELECT s.user_id FROM post_saves s WHERE s.post_id = sqlc.arg('post_id')::uuid
-) f
-WHERE f.user_id <> sqlc.arg('author_id')::uuid
-  AND EXISTS (
-    SELECT 1 FROM injury_group_members gm
-    JOIN injury_details d ON d.body_part = gm.body_part
-    WHERE gm.user_id = f.user_id AND d.post_id = sqlc.arg('post_id')::uuid
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM notifications n
-    WHERE n.recipient_id = f.user_id
-      AND n.post_id = sqlc.arg('post_id')::uuid
-      AND n.kind = 'injury_update'
-      AND n.read_at IS NULL
-  );
+-- ベルを受け取る人には通知を入れ、プッシュを受け取る人を返す(返すのは入れる前の状態で選んだ人)。
+WITH followers AS (
+    SELECT f.user_id
+    FROM (
+        SELECT l.user_id FROM post_likes l WHERE l.post_id = sqlc.arg('post_id')::uuid
+        UNION
+        SELECT s.user_id FROM post_saves s WHERE s.post_id = sqlc.arg('post_id')::uuid
+    ) f
+    WHERE f.user_id <> sqlc.arg('author_id')::uuid
+      AND EXISTS (
+        SELECT 1 FROM injury_group_members gm
+        JOIN injury_details d ON d.body_part = gm.body_part
+        WHERE gm.user_id = f.user_id AND d.post_id = sqlc.arg('post_id')::uuid
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM notifications n
+        WHERE n.recipient_id = f.user_id
+          AND n.post_id = sqlc.arg('post_id')::uuid
+          AND n.kind = 'injury_update'
+          AND n.read_at IS NULL
+      )
+),
+inserted AS (
+    INSERT INTO notifications (id, recipient_id, kind, post_id)
+    SELECT gen_random_uuid(), f.user_id, 'injury_update', sqlc.arg('post_id')::uuid
+    FROM followers f
+    WHERE NOT EXISTS (
+        SELECT 1 FROM notification_settings ns
+        WHERE ns.profile_id = f.user_id AND ns.category = 'injury' AND NOT ns.in_app
+    )
+    RETURNING recipient_id
+)
+SELECT f.user_id
+FROM followers f
+WHERE NOT EXISTS (
+    SELECT 1 FROM notification_settings ns
+    WHERE ns.profile_id = f.user_id AND ns.category = 'injury' AND NOT ns.push
+);
 
 -- name: UpdateInjuryUpdate :one
 UPDATE injury_updates u

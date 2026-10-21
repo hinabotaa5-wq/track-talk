@@ -13,6 +13,8 @@ const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<PostsPage>>();
 // 消したあとに、消す前に始めた読み込みが書き戻さないようにする世代の番号(ログアウト後に前の人の保存一覧が残らないように)。
 let generation = 0;
+// 投稿の作成・編集・削除でフィードを消した時刻。これより前にサーバーが描いた画面の一覧は古い。
+let homeClearedAt = 0;
 
 export function homeFeedPath(sort: FeedSort, q: string, page: number) {
   const qs = new URLSearchParams({
@@ -44,8 +46,19 @@ export function seedFeed(path: string, data: PostsPage) {
   cache.set(path, { data, at: Date.now() });
 }
 
+// サーバーが renderedAt に描いた一覧が、フィードを消したあとの新しいものか。
+// ブラウザは戻る・進むや同じ画面への移動で前に描いた画面を使い回すので、その中の一覧で作り直したキャッシュを上書きさせない。
+export function renderStamp() {
+  return Date.now();
+}
+
+export function isRenderFresh(renderedAt: number) {
+  return renderedAt > homeClearedAt;
+}
+
 export function clearHomeFeeds() {
   generation++;
+  homeClearedAt = Date.now();
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/posts")) {
       cache.delete(key);

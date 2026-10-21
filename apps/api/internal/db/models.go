@@ -379,6 +379,17 @@ type Notification struct {
 	ReadAt          *time.Time `json:"read_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	Title           *string    `json:"title"`
+	Body            *string    `json:"body"`
+	Url             *string    `json:"url"`
+}
+
+type NotificationSetting struct {
+	ProfileID uuid.UUID `json:"profile_id"`
+	Category  string    `json:"category"`
+	InApp     bool      `json:"in_app"`
+	Push      bool      `json:"push"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Post struct {
@@ -505,6 +516,7 @@ type RaceRecord struct {
 	Memo      string    `json:"memo"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	MeetName  string    `json:"meet_name"`
 }
 
 type RecruitmentDetail struct {

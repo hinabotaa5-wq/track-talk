@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -97,5 +98,66 @@ func TestCiteInstagramOpensOneThreadPerPost(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
 	if got.InstagramShortcode != "C1a2B3c4D5e" {
 		t.Fatalf("edit lost embed %s", rec.Body.String())
+	}
+}
+
+// YouTube・Instagram の URL の投稿は、タイトルを書かなくても作れて、タイトルを空にする編集もできる。
+// 文章の投稿は、タイトルが要る。
+func TestUrlPostsDoNotNeedATitle(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
+		"url": "https://www.instagram.com/p/E1a2B3c4D5e/", "body": "タイトルなし"})
+	if rec.Code != 201 {
+		t.Fatalf("create without title %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Post struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"post"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if created.Post.Title != "" {
+		t.Fatalf("title %q", created.Post.Title)
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
+		"url": "https://www.instagram.com/p/F1a2B3c4D5e/", "title": strings.Repeat("あ", 121)})
+	if rec.Code != 422 {
+		t.Fatalf("too long title %d", rec.Code)
+	}
+
+	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.Post.ID, ta, map[string]any{"title": "", "body": "タイトルなしのまま"})
+	if rec.Code != 200 {
+		t.Fatalf("edit without title %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"kind": "text", "title": "", "body": "本文だけ"})
+	if rec.Code != 422 {
+		t.Fatalf("text post without title %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 写真のない文章の投稿は、一覧に本文の冒頭（excerpt）が付く。
+func TestTextPostsInTheFeedCarryAnExcerpt(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	body := "決勝は向かい風だった。\n\n" + strings.Repeat("あ", 200)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"kind": "text", "title": "全国大会", "body": body}); rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	var list struct {
+		Posts []struct {
+			Title   string `json:"title"`
+			Body    string `json:"body"`
+			Excerpt string `json:"excerpt"`
+		} `json:"posts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if len(list.Posts) == 0 || list.Posts[0].Body != "" || !strings.HasPrefix(list.Posts[0].Excerpt, "決勝は向かい風だった。 ああ") || len([]rune(list.Posts[0].Excerpt)) > 120 {
+		t.Fatalf("feed = %s", rec.Body.String())
 	}
 }

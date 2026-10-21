@@ -3,11 +3,18 @@ import type { Post } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 import { practiceReputationLine } from "@/components/practice-reputation";
 import { PosterFallback } from "@/components/poster-card";
+import { InstagramThumb } from "@/components/instagram-thumb";
+import { isInstagramShortcode } from "@/lib/instagram";
 
 export const feedGridClass = "columns-2 gap-3 md:columns-3 xl:columns-4";
 
 const cardClass =
   "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-95";
+
+// タイトルを書かない投稿(YouTube・Instagram の URL など)では、カードの下のタイトル欄を出さない。
+export function hasFeedTitle(title: string) {
+  return title.trim() !== "";
+}
 
 export function feedTitle(title: string) {
   const trimmed = title.trim();
@@ -106,7 +113,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   }
   return (
     <Link href={href} className={cardClass}>
-      <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url ? "" : "aspect-[4/3]"}`}>
+      <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
@@ -119,11 +126,13 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         {post.thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
+        ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
+          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={title} />
         ) : (
-          <PosterFallback title={title} />
+          <PosterFallback title={title} excerpt={post.excerpt} />
         )}
       </div>
-      <CardTitle title={title} />
+      {hasFeedTitle(post.title) ? <CardTitle title={title} /> : null}
     </Link>
   );
 }

@@ -26,6 +26,14 @@ func Title(v string) string {
 	return ""
 }
 
+// OptionalTitle は、タイトルを書かなくてもよい投稿（YouTube・Instagram の URL）のタイトルを確かめる。
+func OptionalTitle(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return ""
+	}
+	return Title(v)
+}
+
 func Body(v string, max int) string {
 	v = strings.TrimSpace(v)
 	n := utf8.RuneCountInString(v)

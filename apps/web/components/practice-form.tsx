@@ -80,7 +80,8 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
             body: JSON.stringify(payload),
           });
       clearHomeFeeds();
-      router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
+      // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
+      (initial ? router.replace : router.push)(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
       setError(apiErrorText(e, "保存に失敗しました"));
       release();

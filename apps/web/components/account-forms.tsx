@@ -9,12 +9,24 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { changeEmailSchema, changePasswordSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
 // マイページの「メールアドレスの変更」「パスワードの変更」で使うフォーム。
+
+// いまのパスワードを思い出せない人が、再設定のメールを頼めるようにする。
+function ForgotPasswordLink() {
+  return (
+    <p className="text-sm">
+      <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-95">
+        パスワードを忘れた方はこちら
+      </Link>
+    </p>
+  );
+}
 
 // 変える前に、いまのパスワードで本人かどうかを確かめる。
 async function confirmCurrentPassword(email: string, password: string) {
@@ -69,6 +81,7 @@ export function EmailSection({ email }: { email: string }) {
         {form.formState.errors.email ? <p className="text-sm text-red-400">{form.formState.errors.email.message}</p> : null}
         <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
+        <ForgotPasswordLink />
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
         <Button type="submit" className="w-full" disabled={pending}>
@@ -116,6 +129,7 @@ export function PasswordSection({ email }: { email: string }) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
+        <ForgotPasswordLink />
         <Input type="password" autoComplete="new-password" placeholder="新しいパスワード(8文字以上)" {...form.register("password")} />
         {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
         <Input type="password" autoComplete="new-password" placeholder="もう一度" {...form.register("confirm")} />

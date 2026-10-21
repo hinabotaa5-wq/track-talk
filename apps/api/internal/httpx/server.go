@@ -150,6 +150,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/inquiries", s.listMyInquiries)
 			r.Post("/me/inquiries", s.createInquiry)
 			r.Get("/me/notifications", s.listNotifications)
+			r.Get("/me/notification-settings", s.listNotificationSettings)
+			r.Put("/me/notification-settings/{category}", s.updateNotificationSetting)
 			r.Post("/me/notifications/read", s.markAllNotificationsRead)
 			r.Post("/me/notifications/{id}/read", s.markNotificationRead)
 			// コーチの応募は提供前の準備にも使うので閉じない。応募の状態は /coach/me で読み、

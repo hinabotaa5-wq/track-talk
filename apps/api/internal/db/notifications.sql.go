@@ -55,6 +55,86 @@ func (q *Queries) CountUnreadNotifications(ctx context.Context, recipientID uuid
 	return count, err
 }
 
+const getNotificationSetting = `-- name: GetNotificationSetting :one
+SELECT in_app, push FROM notification_settings
+WHERE profile_id = $1 AND category = $2
+`
+
+type GetNotificationSettingParams struct {
+	ProfileID uuid.UUID `json:"profile_id"`
+	Category  string    `json:"category"`
+}
+
+type GetNotificationSettingRow struct {
+	InApp bool `json:"in_app"`
+	Push  bool `json:"push"`
+}
+
+func (q *Queries) GetNotificationSetting(ctx context.Context, arg GetNotificationSettingParams) (GetNotificationSettingRow, error) {
+	row := q.db.QueryRow(ctx, getNotificationSetting, arg.ProfileID, arg.Category)
+	var i GetNotificationSettingRow
+	err := row.Scan(&i.InApp, &i.Push)
+	return i, err
+}
+
+const insertMessageNotification = `-- name: InsertMessageNotification :exec
+WITH bumped AS (
+    UPDATE notifications
+    SET body = $4, created_at = now()
+    WHERE recipient_id = $2
+      AND kind = 'message'
+      AND title = $3
+      AND url = $5
+      AND read_at IS NULL
+    RETURNING id
+)
+INSERT INTO notifications (id, recipient_id, kind, title, body, url)
+SELECT $1, $2, 'message', $3, $4, $5
+WHERE NOT EXISTS (SELECT 1 FROM bumped)
+`
+
+type InsertMessageNotificationParams struct {
+	ID          uuid.UUID `json:"id"`
+	RecipientID uuid.UUID `json:"recipient_id"`
+	Title       *string   `json:"title"`
+	Body        *string   `json:"body"`
+	Url         *string   `json:"url"`
+}
+
+// 投稿や依頼にひもづかない知らせ。同じ場所への同じ見出しの未読があれば、新しく足さずにそれを最新にする。
+func (q *Queries) InsertMessageNotification(ctx context.Context, arg InsertMessageNotificationParams) error {
+	_, err := q.db.Exec(ctx, insertMessageNotification,
+		arg.ID,
+		arg.RecipientID,
+		arg.Title,
+		arg.Body,
+		arg.Url,
+	)
+	return err
+}
+
+const insertMonthlyReminderNotifications = `-- name: InsertMonthlyReminderNotifications :exec
+INSERT INTO notifications (id, recipient_id, kind, title, body, url)
+SELECT gen_random_uuid(), profiles.id, 'message', $1, $2, $3
+FROM profiles
+WHERE NOT EXISTS (
+    SELECT 1 FROM notification_settings ns
+    WHERE ns.profile_id = profiles.id AND ns.category = 'monthly' AND NOT ns.in_app
+)
+`
+
+type InsertMonthlyReminderNotificationsParams struct {
+	Title *string `json:"title"`
+	Body  *string `json:"body"`
+	Url   *string `json:"url"`
+}
+
+// 月1回の記録のお知らせを、ベルで受け取る人全員に入れる。
+func (q *Queries) InsertMonthlyReminderNotifications(ctx context.Context, arg InsertMonthlyReminderNotificationsParams) error {
+	_, err := q.db.Exec(ctx, insertMonthlyReminderNotifications, arg.Title, arg.Body, arg.Url)
+	return err
+}
+
 const insertNotification = `-- name: InsertNotification :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id, comment_id, application_id)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -86,6 +166,10 @@ INSERT INTO notifications (id, recipient_id, kind, post_id)
 SELECT gen_random_uuid(), profiles.id, 'recruitment_post', $1::uuid
 FROM profiles
 WHERE profiles.id <> $2
+  AND NOT EXISTS (
+    SELECT 1 FROM notification_settings ns
+    WHERE ns.profile_id = profiles.id AND ns.category = 'recruitment' AND NOT ns.in_app
+  )
 `
 
 type InsertRecruitmentPostNotificationsParams struct {
@@ -126,6 +210,9 @@ SELECT
     n.kind,
     n.post_id,
     n.review_request_id,
+    n.title,
+    n.body,
+    n.url,
     n.read_at,
     n.created_at,
     p.title AS post_title
@@ -154,6 +241,9 @@ type ListMyNotificationsRow struct {
 	Kind            string     `json:"kind"`
 	PostID          *uuid.UUID `json:"post_id"`
 	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	Title           *string    `json:"title"`
+	Body            *string    `json:"body"`
+	Url             *string    `json:"url"`
 	ReadAt          *time.Time `json:"read_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	PostTitle       *string    `json:"post_title"`
@@ -173,6 +263,9 @@ func (q *Queries) ListMyNotifications(ctx context.Context, arg ListMyNotificatio
 			&i.Kind,
 			&i.PostID,
 			&i.ReviewRequestID,
+			&i.Title,
+			&i.Body,
+			&i.Url,
 			&i.ReadAt,
 			&i.CreatedAt,
 			&i.PostTitle,
@@ -180,6 +273,74 @@ func (q *Queries) ListMyNotifications(ctx context.Context, arg ListMyNotificatio
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotificationSettings = `-- name: ListNotificationSettings :many
+SELECT category, in_app, push FROM notification_settings
+WHERE profile_id = $1
+`
+
+type ListNotificationSettingsRow struct {
+	Category string `json:"category"`
+	InApp    bool   `json:"in_app"`
+	Push     bool   `json:"push"`
+}
+
+func (q *Queries) ListNotificationSettings(ctx context.Context, profileID uuid.UUID) ([]ListNotificationSettingsRow, error) {
+	rows, err := q.db.Query(ctx, listNotificationSettings, profileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNotificationSettingsRow
+	for rows.Next() {
+		var i ListNotificationSettingsRow
+		if err := rows.Scan(&i.Category, &i.InApp, &i.Push); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPushRecipients = `-- name: ListPushRecipients :many
+SELECT DISTINCT ps.profile_id
+FROM push_subscriptions ps
+LEFT JOIN notification_settings ns
+  ON ns.profile_id = ps.profile_id AND ns.category = $1
+WHERE ps.profile_id <> ALL ($2::uuid[])
+  AND COALESCE(ns.push, $3::boolean)
+ORDER BY ps.profile_id
+`
+
+type ListPushRecipientsParams struct {
+	Category    string      `json:"category"`
+	Exclude     []uuid.UUID `json:"exclude"`
+	PushDefault bool        `json:"push_default"`
+}
+
+// 通知をオンにした端末があり、その種類のプッシュを受け取る人。設定の行がない人は push_default に従う。
+func (q *Queries) ListPushRecipients(ctx context.Context, arg ListPushRecipientsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listPushRecipients, arg.Category, arg.Exclude, arg.PushDefault)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var profile_id uuid.UUID
+		if err := rows.Scan(&profile_id); err != nil {
+			return nil, err
+		}
+		items = append(items, profile_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -217,4 +378,30 @@ func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotification
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertNotificationSetting = `-- name: UpsertNotificationSetting :exec
+INSERT INTO notification_settings (profile_id, category, in_app, push)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (profile_id, category) DO UPDATE
+SET in_app = EXCLUDED.in_app,
+    push = EXCLUDED.push,
+    updated_at = now()
+`
+
+type UpsertNotificationSettingParams struct {
+	ProfileID uuid.UUID `json:"profile_id"`
+	Category  string    `json:"category"`
+	InApp     bool      `json:"in_app"`
+	Push      bool      `json:"push"`
+}
+
+func (q *Queries) UpsertNotificationSetting(ctx context.Context, arg UpsertNotificationSettingParams) error {
+	_, err := q.db.Exec(ctx, upsertNotificationSetting,
+		arg.ProfileID,
+		arg.Category,
+		arg.InApp,
+		arg.Push,
+	)
+	return err
 }

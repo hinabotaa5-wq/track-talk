@@ -7,8 +7,8 @@ import { Search, X } from "lucide-react";
 import { homeHref, parseHomeSort, type HomeSort } from "@/lib/home-sort";
 
 const chips: { sort: HomeSort; label: string }[] = [
-  { sort: "popular", label: "人気" },
   { sort: "new", label: "新しい" },
+  { sort: "popular", label: "人気" },
   { sort: "recruitment", label: "募集" },
   { sort: "review", label: "レビュー" },
 ];

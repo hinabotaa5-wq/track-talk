@@ -29,10 +29,10 @@ export function ComposerPage({
   );
 }
 
-export function TitleField(props: InputHTMLAttributes<HTMLInputElement>) {
+export function TitleField({ optional = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { optional?: boolean }) {
   return (
     <label className="block text-sm font-medium">
-      タイトル
+      タイトル{optional ? "(任意)" : ""}
       <Input className="mt-1" maxLength={120} {...props} />
     </label>
   );

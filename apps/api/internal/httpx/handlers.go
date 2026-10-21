@@ -423,6 +423,11 @@ type postReq struct {
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
+	return s.parsePostReqTitle(w, r, forceKind, false)
+}
+
+// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい（YouTube・Instagram の投稿の編集）。
+func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, forceKind string, titleOptional bool) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
@@ -437,8 +442,12 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	}
 	fields := map[string]string{}
 	if kind != "practice" {
-		if e := Title(req.Title); e != "" {
-			fields["title"] = e
+		titleError := Title(req.Title)
+		if titleOptional {
+			titleError = OptionalTitle(req.Title)
+		}
+		if titleError != "" {
+			fields["title"] = titleError
 		}
 	}
 	if e := PostBody(req.Body); e != "" {
@@ -657,7 +666,8 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updateInjury(w, r, p, id)
 		return
 	}
-	params, _, _, _, ok := s.parsePostReq(w, r, "")
+	// YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
+	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "youtube" || existing.Kind == "instagram")
 	if !ok {
 		return
 	}
@@ -1008,22 +1018,26 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	// 返信先のコメント主には comment_reply、投稿者には comment を通知する。
 	// 同一人物が両方に当たる場合は comment_reply だけにして二重通知を避ける。
+	var pushes []postPush
 	if replyAuthor != nil && *replyAuthor != p.ID {
 		if err := insertNotification(r.Context(), q, *replyAuthor, "comment_reply", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+		pushes = append(pushes, postPush{*replyAuthor, notifyComment, postPushMessage("あなたのコメントに返信がありました", postID)})
 	}
 	if post.AuthorID != p.ID && (replyAuthor == nil || *replyAuthor != post.AuthorID) {
 		if err := insertNotification(r.Context(), q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+		pushes = append(pushes, postPush{post.AuthorID, notifyComment, postPushMessage("コメントがありました", postID)})
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
+	s.sendPostPushes(r.Context(), pushes)
 	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt, c.ParentID, c.ReplyToID))
 }
 

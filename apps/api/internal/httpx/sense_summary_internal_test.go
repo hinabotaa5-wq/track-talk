@@ -3,7 +3,6 @@ package httpx
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestParseSenseSummary(t *testing.T) {
@@ -19,15 +18,5 @@ func TestParseSenseSummary(t *testing.T) {
 	}
 	if _, err := parseSenseSummary("まとめです"); err == nil {
 		t.Fatal("text accepted")
-	}
-}
-
-func TestSenseSummaryNextAt(t *testing.T) {
-	last := time.Date(2026, 10, 13, 3, 0, 0, 0, time.UTC)
-	if next := senseSummaryNextAt(last, last.Add(6*24*time.Hour)); next == nil || !next.Equal(last.Add(7*24*time.Hour)) {
-		t.Fatalf("6 days later = %v", next)
-	}
-	if next := senseSummaryNextAt(last, last.Add(7*24*time.Hour)); next != nil {
-		t.Fatalf("7 days later = %v", next)
 	}
 }

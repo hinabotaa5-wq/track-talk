@@ -39,10 +39,28 @@ func (q *Queries) CountSenseNotes(ctx context.Context, authorID uuid.UUID) (int6
 	return count, err
 }
 
+const countSenseNotesOnDay = `-- name: CountSenseNotesOnDay :one
+SELECT count(*) FROM sense_notes
+WHERE author_id = $1
+  AND day = $2
+`
+
+type CountSenseNotesOnDayParams struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	Day      time.Time `json:"day"`
+}
+
+func (q *Queries) CountSenseNotesOnDay(ctx context.Context, arg CountSenseNotesOnDayParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSenseNotesOnDay, arg.AuthorID, arg.Day)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSenseNotesSince = `-- name: CountSenseNotesSince :one
 SELECT count(*) FROM sense_notes
 WHERE author_id = $1
-  AND created_at >= $2
+  AND created_at > $2
 `
 
 type CountSenseNotesSinceParams struct {
@@ -50,6 +68,7 @@ type CountSenseNotesSinceParams struct {
 	Since    time.Time `json:"since"`
 }
 
+// まとめにまだ使っていない感覚メモの数。since は前のまとめを作った時刻（まだ無ければ十分昔）。
 func (q *Queries) CountSenseNotesSince(ctx context.Context, arg CountSenseNotesSinceParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countSenseNotesSince, arg.AuthorID, arg.Since)
 	var count int64
@@ -58,9 +77,9 @@ func (q *Queries) CountSenseNotesSince(ctx context.Context, arg CountSenseNotesS
 }
 
 const createSenseNote = `-- name: CreateSenseNote :one
-INSERT INTO sense_notes (id, author_id, body, event)
-VALUES ($1, $2, $3, $4)
-RETURNING id, body, event, created_at, updated_at
+INSERT INTO sense_notes (id, author_id, body, event, day)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, body, event, day, created_at, updated_at
 `
 
 type CreateSenseNoteParams struct {
@@ -68,12 +87,14 @@ type CreateSenseNoteParams struct {
 	AuthorID uuid.UUID `json:"author_id"`
 	Body     string    `json:"body"`
 	Event    *string   `json:"event"`
+	Day      time.Time `json:"day"`
 }
 
 type CreateSenseNoteRow struct {
 	ID        uuid.UUID `json:"id"`
 	Body      string    `json:"body"`
 	Event     *string   `json:"event"`
+	Day       time.Time `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -84,12 +105,14 @@ func (q *Queries) CreateSenseNote(ctx context.Context, arg CreateSenseNoteParams
 		arg.AuthorID,
 		arg.Body,
 		arg.Event,
+		arg.Day,
 	)
 	var i CreateSenseNoteRow
 	err := row.Scan(
 		&i.ID,
 		&i.Body,
 		&i.Event,
+		&i.Day,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -192,7 +215,7 @@ func (q *Queries) LatestSenseNoteSummary(ctx context.Context, authorID uuid.UUID
 }
 
 const listSenseNoteDays = `-- name: ListSenseNoteDays :many
-SELECT DISTINCT (created_at AT TIME ZONE 'Asia/Tokyo')::date AS day
+SELECT DISTINCT day
 FROM sense_notes
 WHERE author_id = $1
 ORDER BY day DESC
@@ -220,36 +243,39 @@ func (q *Queries) ListSenseNoteDays(ctx context.Context, authorID uuid.UUID) ([]
 }
 
 const listSenseNotes = `-- name: ListSenseNotes :many
-SELECT id, body, event, created_at, updated_at
+SELECT id, body, event, day, created_at, updated_at
 FROM sense_notes
 WHERE author_id = $1
   AND (
-      $2::timestamptz IS NULL
-      OR (created_at, id) < ($2::timestamptz, $3::uuid)
+      $2::date IS NULL
+      OR (day, created_at, id) < ($2::date, $3::timestamptz, $4::uuid)
   )
-ORDER BY created_at DESC, id DESC
-LIMIT $4
+ORDER BY day DESC, created_at DESC, id DESC
+LIMIT $5
 `
 
 type ListSenseNotesParams struct {
-	AuthorID uuid.UUID  `json:"author_id"`
-	BeforeAt *time.Time `json:"before_at"`
-	BeforeID *uuid.UUID `json:"before_id"`
-	PageSize int32      `json:"page_size"`
+	AuthorID  uuid.UUID  `json:"author_id"`
+	BeforeDay *time.Time `json:"before_day"`
+	BeforeAt  *time.Time `json:"before_at"`
+	BeforeID  *uuid.UUID `json:"before_id"`
+	PageSize  int32      `json:"page_size"`
 }
 
 type ListSenseNotesRow struct {
 	ID        uuid.UUID `json:"id"`
 	Body      string    `json:"body"`
 	Event     *string   `json:"event"`
+	Day       time.Time `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// 新しい順。cursor の時刻と id より古いものを返す（最初のページは cursor を渡さない）。
+// 書いた日の新しい順。cursor の日・時刻・id より後ろのものを返す（最初のページは cursor を渡さない）。
 func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) ([]ListSenseNotesRow, error) {
 	rows, err := q.db.Query(ctx, listSenseNotes,
 		arg.AuthorID,
+		arg.BeforeDay,
 		arg.BeforeAt,
 		arg.BeforeID,
 		arg.PageSize,
@@ -265,6 +291,7 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 			&i.ID,
 			&i.Body,
 			&i.Event,
+			&i.Day,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -279,40 +306,34 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 }
 
 const listSenseNotesBetween = `-- name: ListSenseNotesBetween :many
-SELECT body, event, created_at
+SELECT body, event, day, created_at
 FROM (
-    SELECT id, body, event, created_at
+    SELECT body, event, day, created_at, id
     FROM sense_notes
     WHERE author_id = $1
-      AND created_at >= $2
-      AND created_at < $3
+      AND created_at > $2
     ORDER BY created_at DESC, id DESC
-    LIMIT $4
+    LIMIT $3
 ) AS recent
-ORDER BY created_at, id
+ORDER BY day, created_at, id
 `
 
 type ListSenseNotesBetweenParams struct {
 	AuthorID uuid.UUID `json:"author_id"`
 	Since    time.Time `json:"since"`
-	Until    time.Time `json:"until"`
 	MaxNotes int32     `json:"max_notes"`
 }
 
 type ListSenseNotesBetweenRow struct {
 	Body      string    `json:"body"`
 	Event     *string   `json:"event"`
+	Day       time.Time `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// まとめに渡す感覚メモ。多いときは新しい方から max_notes 個を選び、古い順に返す。
+// まとめに渡す感覚メモ（since より後に保存したもの）。多いときは新しい方から max_notes 件を、古い順に。
 func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesBetweenParams) ([]ListSenseNotesBetweenRow, error) {
-	rows, err := q.db.Query(ctx, listSenseNotesBetween,
-		arg.AuthorID,
-		arg.Since,
-		arg.Until,
-		arg.MaxNotes,
-	)
+	rows, err := q.db.Query(ctx, listSenseNotesBetween, arg.AuthorID, arg.Since, arg.MaxNotes)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +341,7 @@ func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesB
 	var items []ListSenseNotesBetweenRow
 	for rows.Next() {
 		var i ListSenseNotesBetweenRow
-		if err := rows.Scan(&i.Body, &i.Event, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.Body, &i.Event, &i.Day, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -335,7 +356,7 @@ const lockSenseNoteAuthor = `-- name: LockSenseNoteAuthor :exec
 SELECT pg_advisory_xact_lock(hashtext('sense_notes:' || $1::uuid::text))
 `
 
-// 同じ人の感覚メモの作成を1つずつにする。1日20件の上限の確認と作成のあいだに、別の作成を割り込ませない。
+// 同じ人の感覚メモの作成とまとめを1つずつにする。1日1件の確認と作成のあいだに、別の作成を割り込ませない。
 func (q *Queries) LockSenseNoteAuthor(ctx context.Context, authorID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, lockSenseNoteAuthor, authorID)
 	return err
@@ -357,7 +378,7 @@ SET body = $1,
     updated_at = now()
 WHERE id = $3
   AND author_id = $4
-RETURNING id, body, event, created_at, updated_at
+RETURNING id, body, event, day, created_at, updated_at
 `
 
 type UpdateSenseNoteParams struct {
@@ -371,6 +392,7 @@ type UpdateSenseNoteRow struct {
 	ID        uuid.UUID `json:"id"`
 	Body      string    `json:"body"`
 	Event     *string   `json:"event"`
+	Day       time.Time `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -387,6 +409,7 @@ func (q *Queries) UpdateSenseNote(ctx context.Context, arg UpdateSenseNoteParams
 		&i.ID,
 		&i.Body,
 		&i.Event,
+		&i.Day,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
