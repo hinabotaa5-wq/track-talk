@@ -106,7 +106,7 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
-	s.pushQuietly(ctx, coachID, push.Message{
+	s.pushQuietly(ctx, coachID, notifyImportant, push.Message{
 		Title: "フォーム添削の依頼が届きました",
 		Body:  "30分以内に、引き受けるかどうか決めてください",
 		URL:   "/coach",
@@ -136,13 +136,20 @@ func (s *Server) dispatchQueuedReviews(ctx context.Context) int {
 	return offered
 }
 
-// pushQuietly は Web プッシュを送る。届かなくても画面で見られるので、失敗は記録だけする。
-func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, msg push.Message, ttl time.Duration) {
+// pushQuietly は Web プッシュを送る。その種類のプッシュを本人がオフにしていたら送らない。
+// 届かなくても画面で見られるので、失敗は記録だけする。
+func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, category string, msg push.Message, ttl time.Duration) {
 	if !s.push.Configured() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
+	if ok, err := notificationWanted(ctx, s.q, to, category, false); err != nil || !ok {
+		if err != nil {
+			slog.Warn("notification setting", "err", err)
+		}
+		return
+	}
 	if _, err := s.sendPush(ctx, to, msg, ttl); err != nil {
 		slog.Warn("review push", "err", err)
 	}
@@ -206,7 +213,7 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 }
 
 func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueReviewRequestsRow) {
-	if err := s.q.InsertReviewNotification(ctx, db.InsertReviewNotificationParams{ID: uuid.New(), RecipientID: rr.RequesterID, Kind: "review_expired", ReviewRequestID: &rr.ID}); err != nil {
+	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review expired notification", "err", err)
 	}
 	body := "返却の目安までに引き受けるコーチが見つかりませんでした"
@@ -216,14 +223,14 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	if s.stripe.Configured() {
 		body += "。お支払いは取り消します（PayPay は返金します）"
 	}
-	s.pushQuietly(ctx, rr.RequesterID, push.Message{
+	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",
 		Body:  body,
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
 	if rr.OldStatus == "in_review" && rr.CoachID != nil {
-		s.pushQuietly(ctx, *rr.CoachID, push.Message{
+		s.notify(ctx, *rr.CoachID, notifyReview, push.Message{
 			Title: "添削中の依頼が期限を過ぎました",
 			Body:  "返却の目安を過ぎたため、この依頼は終わりました",
 			URL:   "/coach",

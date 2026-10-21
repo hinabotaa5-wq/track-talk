@@ -178,8 +178,8 @@ func (s *Server) consentGuardianContract(w http.ResponseWriter, r *http.Request)
 		URL:   "/coaching/personal/" + started.ID.String(),
 		Tag:   "contract-" + started.ID.String(),
 	}
-	s.pushQuietly(r.Context(), started.RequesterID, msg, 24*time.Hour)
-	s.pushQuietly(r.Context(), started.CoachID, msg, 24*time.Hour)
+	s.notify(r.Context(), started.RequesterID, notifyCoaching, msg, 24*time.Hour)
+	s.notify(r.Context(), started.CoachID, notifyCoaching, msg, 24*time.Hour)
 	s.writeGuardianContract(w, r, started.ID)
 }
 
@@ -203,9 +203,9 @@ func (s *Server) declineGuardianContract(w http.ResponseWriter, r *http.Request)
 		URL:   "/coaching/personal/" + declined.ID.String(),
 		Tag:   "contract-" + declined.ID.String(),
 	}
-	s.pushQuietly(r.Context(), declined.RequesterID, msg, 24*time.Hour)
+	s.notify(r.Context(), declined.RequesterID, notifyCoaching, msg, 24*time.Hour)
 	msg.URL = "/coach"
-	s.pushQuietly(r.Context(), declined.CoachID, msg, 24*time.Hour)
+	s.notify(r.Context(), declined.CoachID, notifyCoaching, msg, 24*time.Hour)
 	s.writeGuardianContract(w, r, declined.ID)
 }
 

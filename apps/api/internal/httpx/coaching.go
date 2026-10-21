@@ -393,23 +393,15 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, guardianPublicJSON(consent))
 }
 
-// notifyGuardianConsented は、保護者が同意したことを本人の端末に知らせる。
+// notifyGuardianConsented は、保護者が同意したことを本人に知らせる。
 // 届かなくても同意は済んでいるので、失敗は記録だけして返事を遅らせすぎない。
 func (s *Server) notifyGuardianConsented(ctx context.Context, consent db.GuardianConsent) {
-	if !s.push.Configured() {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer cancel()
-	_, err := s.sendPush(ctx, consent.MinorID, push.Message{
+	s.notify(ctx, consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意しました",
 		Body:  "フォーム添削を" + guardianLimitText(consent.MonthlyLimitYen) + "の範囲で頼めます",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)
-	if err != nil {
-		slog.Warn("guardian consent push", "err", err)
-	}
 }
 
 func guardianLimitText(limit *int32) string {

@@ -362,7 +362,7 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 		}
 		released++
 		if pay.PayerID != nil && pay.Status == "captured" {
-			s.pushQuietly(ctx, *pay.PayerID, push.Message{
+			s.notify(ctx, *pay.PayerID, notifyImportant, push.Message{
 				Title: "フォーム添削の代金を返金しました",
 				Body:  "返却の目安までに返せなかったため、全額を返金しました",
 				URL:   "/me/coaching/requests",

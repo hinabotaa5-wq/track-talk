@@ -22,7 +22,7 @@ func (s *Server) notifyAdminsMinorReport(ctx context.Context) {
 		return
 	}
 	for _, id := range ids {
-		s.pushQuietly(ctx, id, push.Message{
+		s.notify(ctx, id, notifyImportant, push.Message{
 			Title: "18歳未満のパーソナル指導に通報",
 			Body:  "管理者画面のパーソナル指導から確認してください",
 			URL:   "/admin",
@@ -159,7 +159,7 @@ func (s *Server) adminSetCoachingContract(w http.ResponseWriter, r *http.Request
 	}
 	msg.Tag = "contract-" + ct.ID.String()
 	msg.URL = "/coaching/personal/" + ct.ID.String()
-	s.pushQuietly(r.Context(), ct.RequesterID, msg, 24*time.Hour)
-	s.pushQuietly(r.Context(), ct.CoachID, msg, 24*time.Hour)
+	s.notify(r.Context(), ct.RequesterID, notifyImportant, msg, 24*time.Hour)
+	s.notify(r.Context(), ct.CoachID, notifyImportant, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
 }

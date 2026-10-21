@@ -1008,22 +1008,26 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	// 返信先のコメント主には comment_reply、投稿者には comment を通知する。
 	// 同一人物が両方に当たる場合は comment_reply だけにして二重通知を避ける。
+	var pushes []postPush
 	if replyAuthor != nil && *replyAuthor != p.ID {
 		if err := insertNotification(r.Context(), q, *replyAuthor, "comment_reply", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+		pushes = append(pushes, postPush{*replyAuthor, notifyComment, postPushMessage("あなたのコメントに返信がありました", postID)})
 	}
 	if post.AuthorID != p.ID && (replyAuthor == nil || *replyAuthor != post.AuthorID) {
 		if err := insertNotification(r.Context(), q, post.AuthorID, "comment", postID, &c.ID, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+		pushes = append(pushes, postPush{post.AuthorID, notifyComment, postPushMessage("コメントがありました", postID)})
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
+	s.sendPostPushes(r.Context(), pushes)
 	JSON(w, http.StatusCreated, commentJSON(r, c.ID, c.PostID, c.AuthorID, c.Body, c.CreatedAt, c.UpdatedAt, c.ParentID, c.ReplyToID))
 }
 

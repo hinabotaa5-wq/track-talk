@@ -267,14 +267,14 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 	toCoach := push.Message{Title: "パーソナル指導に新しいメッセージ", Body: body, URL: "/coaching/personal/" + ct.ID.String(), Tag: tag}
 	switch role {
 	case "requester":
-		s.pushQuietly(r.Context(), ct.CoachID, toCoach, 24*time.Hour)
+		s.notify(r.Context(), ct.CoachID, notifyCoaching, toCoach, 24*time.Hour)
 	case "coach":
-		s.pushQuietly(r.Context(), ct.RequesterID, toRequester, 24*time.Hour)
+		s.notify(r.Context(), ct.RequesterID, notifyCoaching, toRequester, 24*time.Hour)
 	case "guardian":
 		toRequester.Title = "保護者がメッセージを送りました"
 		toCoach.Title = "保護者からメッセージが届きました"
-		s.pushQuietly(r.Context(), ct.RequesterID, toRequester, 24*time.Hour)
-		s.pushQuietly(r.Context(), ct.CoachID, toCoach, 24*time.Hour)
+		s.notify(r.Context(), ct.RequesterID, notifyCoaching, toRequester, 24*time.Hour)
+		s.notify(r.Context(), ct.CoachID, notifyCoaching, toCoach, 24*time.Hour)
 	}
 	viewer := uuid.Nil
 	if sender != nil {

@@ -192,17 +192,31 @@ export type NotificationKind =
   | "review_returned"
   | "review_clarify"
   | "review_clarified"
-  | "review_helpful_ask";
+  | "review_helpful_ask"
+  | "message";
 
 // 添削の通知（review_*）は投稿にひもづかないので post_id が null になる。
+// message はパーソナル指導や支払い、月1回のお知らせなど。見出し・本文・開く場所をそのまま持つ。
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
   post_id: string | null;
   post_title: string | null;
   review_request_id: string | null;
+  title: string | null;
+  body: string | null;
+  url: string | null;
   read: boolean;
   created_at: string;
+};
+
+// 通知の種類ごとの受け取り設定。in_app はベルの一覧、push は通知をオンにした端末。
+export type NotificationCategory = "comment" | "practice" | "recruitment" | "injury" | "review" | "coaching" | "monthly";
+
+export type NotificationSetting = {
+  category: NotificationCategory;
+  in_app: boolean;
+  push: boolean;
 };
 
 export type Inquiry = {

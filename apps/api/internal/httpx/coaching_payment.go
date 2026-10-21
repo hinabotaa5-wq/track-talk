@@ -300,7 +300,7 @@ func (s *Server) alertDispute(ctx context.Context, ev stripe.Event) {
 		return
 	}
 	for _, id := range ids {
-		s.pushQuietly(ctx, id, push.Message{
+		s.notify(ctx, id, notifyImportant, push.Message{
 			Title: "支払いに異議が申し立てられました",
 			Body:  "Stripe のダッシュボードで、期限までに対応してください",
 			URL:   "/admin",
@@ -361,8 +361,8 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 		URL:   "/coaching/personal/" + started.ID.String(),
 		Tag:   "contract-" + started.ID.String(),
 	}
-	s.pushQuietly(ctx, started.RequesterID, msg, 24*time.Hour)
-	s.pushQuietly(ctx, started.CoachID, msg, 24*time.Hour)
+	s.notify(ctx, started.RequesterID, notifyCoaching, msg, 24*time.Hour)
+	s.notify(ctx, started.CoachID, notifyCoaching, msg, 24*time.Hour)
 	return nil
 }
 
@@ -416,7 +416,7 @@ func (s *Server) refundUnstarted(ctx context.Context, pay db.CoachingPayment) er
 	if err != nil {
 		return nil
 	}
-	s.pushQuietly(ctx, ct.RequesterID, push.Message{
+	s.notify(ctx, ct.RequesterID, notifyImportant, push.Message{
 		Title: "お支払いを返金しました",
 		Body:  "「" + ct.PlanTitle + "」は期限を過ぎていたなどの理由で始められなかったため、全額を返金しました",
 		URL:   "/coaching/personal/" + ct.ID.String(),
@@ -455,13 +455,13 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 			continue
 		}
 		n++
-		s.pushQuietly(ctx, ct.RequesterID, push.Message{
+		s.notify(ctx, ct.RequesterID, notifyImportant, push.Message{
 			Title: "パーソナル指導を返金しました",
 			Body:  "始まってから72時間、コーチから書き込みがなかったため、全額を返金して終了しました",
 			URL:   "/coaching/personal/" + ct.ID.String(),
 			Tag:   "contract-" + ct.ID.String(),
 		}, 24*time.Hour)
-		s.pushQuietly(ctx, ct.CoachID, push.Message{
+		s.notify(ctx, ct.CoachID, notifyImportant, push.Message{
 			Title: "パーソナル指導が終了しました",
 			Body:  "「" + ct.PlanTitle + "」は始まってから72時間書き込みがなかったため、全額を返金して終了しました",
 			URL:   "/coach",
@@ -581,8 +581,8 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 		URL:   "/coaching/personal/" + ct.ID.String(),
 		Tag:   "contract-" + ct.ID.String(),
 	}
-	s.pushQuietly(r.Context(), ct.RequesterID, msg, 24*time.Hour)
+	s.notify(r.Context(), ct.RequesterID, notifyImportant, msg, 24*time.Hour)
 	msg.URL = "/coach"
-	s.pushQuietly(r.Context(), ct.CoachID, msg, 24*time.Hour)
+	s.notify(r.Context(), ct.CoachID, notifyImportant, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct), "payment": paymentJSON(pay)})
 }

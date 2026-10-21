@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 月1回の記録のお知らせ。Cloud Scheduler が毎月1日に呼び、通知をオンにしたすべての人の端末へ送る。
+// 月1回の記録のお知らせ。Cloud Scheduler が毎月1日に呼び、全員のベルと、通知をオンにした人の端末へ送る(本人の設定に従う)。
 // 大会に出たかどうかはアプリでは分からないので、全員に同じ文面で送る。
 const (
 	// 同時に送る数。プッシュサービスへの接続を開きすぎない。
@@ -61,7 +61,8 @@ func (s *Server) monthlyReminder(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	ids, err := s.q.ListPushProfileIDs(ctx)
+	monthly, _ := findNotificationCategory(notifyMonthly)
+	ids, err := s.q.ListPushRecipients(ctx, db.ListPushRecipientsParams{Category: notifyMonthly, Exclude: []uuid.UUID{}, PushDefault: monthly.PushDefault})
 	if err != nil {
 		// まだ誰にも送っていないので、権利を返して呼び直しで送れるようにする。
 		if err := s.q.ReleaseMonthlyReminder(ctx, month); err != nil {
@@ -69,6 +70,14 @@ func (s *Server) monthlyReminder(w http.ResponseWriter, r *http.Request) {
 		}
 		MapDBError(w, err)
 		return
+	}
+	// ベルにも同じ知らせを入れる。補足なので、入れられなくてもプッシュは送る。
+	if err := s.q.InsertMonthlyReminderNotifications(ctx, db.InsertMonthlyReminderNotificationsParams{
+		Title: &monthlyReminderMessage.Title,
+		Body:  &monthlyReminderMessage.Body,
+		Url:   &monthlyReminderMessage.URL,
+	}); err != nil {
+		slog.Warn("monthly reminder: notifications", "err", err)
 	}
 	recipients := s.sendPushToAll(ctx, ids, monthlyReminderMessage, monthlyReminderTTL)
 	if err := s.q.FinishMonthlyReminder(ctx, db.FinishMonthlyReminderParams{Month: month, Recipients: int32(recipients)}); err != nil {

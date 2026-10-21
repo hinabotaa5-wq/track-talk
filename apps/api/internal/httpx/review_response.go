@@ -120,10 +120,10 @@ func (s *Server) requesterReview(w http.ResponseWriter, r *http.Request) (db.Rev
 }
 
 func (s *Server) notifyReview(ctx context.Context, to, requestID uuid.UUID, kind string, msg push.Message) {
-	if err := s.q.InsertReviewNotification(ctx, db.InsertReviewNotificationParams{ID: uuid.New(), RecipientID: to, Kind: kind, ReviewRequestID: &requestID}); err != nil {
+	if err := insertReviewNotification(ctx, s.q, to, kind, requestID); err != nil {
 		slog.Warn("review notification", "kind", kind, "err", err)
 	}
-	s.pushQuietly(ctx, to, msg, 24*time.Hour)
+	s.pushQuietly(ctx, to, notifyReview, msg, 24*time.Hour)
 }
 
 // getCoachReviewRequest は、引き受けたコーチに依頼と自分の返答を見せる。
