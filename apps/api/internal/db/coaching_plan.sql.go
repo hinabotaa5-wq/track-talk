@@ -24,6 +24,24 @@ func (q *Queries) CountCoachingPlans(ctx context.Context, coachID uuid.UUID) (in
 	return count, err
 }
 
+const countOtherTrialPlans = `-- name: CountOtherTrialPlans :one
+SELECT count(*) FROM coaching_plans
+WHERE coach_id = $1 AND kind = 'trial' AND id <> $2::uuid
+`
+
+type CountOtherTrialPlansParams struct {
+	CoachID   uuid.UUID `json:"coach_id"`
+	ExcludeID uuid.UUID `json:"exclude_id"`
+}
+
+// このコーチの、ほかのお試しプランの数。お試しプランは1人1つまで。
+func (q *Queries) CountOtherTrialPlans(ctx context.Context, arg CountOtherTrialPlansParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOtherTrialPlans, arg.CoachID, arg.ExcludeID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCoachingPlan = `-- name: CreateCoachingPlan :one
 INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

@@ -7,11 +7,13 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import {
   coachPledgeItems,
   highPlanPriceYen,
+  maxTrialPriceYen,
   minPlanPriceYen,
   planDurationLabel,
   planDurations,
   planKindLabels,
   planSummary,
+  sortTrialFirst,
 } from "@/lib/coaching-plan";
 import { formatYen } from "@/lib/format";
 import type { CoachApplication, CoachingPlan, CoachingPlanKind } from "@/lib/types";
@@ -161,7 +163,9 @@ function PlanForm({
         <p className="text-xs text-slate-300">
           {draft.kind === "period"
             ? "期間中、メニュー作りや動画への返答を続けて見ます。"
-            : "動画を詳しく見て返すなど、7日以内に終わる1回きりの指導です。"}
+            : draft.kind === "single"
+              ? "動画を詳しく見て返すなど、7日以内に終わる1回きりの指導です。"
+              : `あなたの指導をはじめて受ける人だけが申し込める、7日以内の安いお試しです（${formatYen(minPlanPriceYen)}〜${formatYen(maxTrialPriceYen)}、1つまで）。コーチ一覧ではいちばん上に出ます。`}
         </p>
         {fieldError("kind")}
       </div>
@@ -201,8 +205,16 @@ function PlanForm({
         {fieldError("description")}
       </label>
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>値段（{formatYen(minPlanPriceYen)}から）</span>
-        <Input inputMode="numeric" value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))} placeholder="8000" />
+        <span>
+          値段（{formatYen(minPlanPriceYen)}
+          {draft.kind === "trial" ? `〜${formatYen(maxTrialPriceYen)}` : "から"}）
+        </span>
+        <Input
+          inputMode="numeric"
+          value={draft.price}
+          onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
+          placeholder={draft.kind === "trial" ? "2500" : "8000"}
+        />
         <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
         {fieldError("price_yen")}
       </label>
@@ -361,6 +373,15 @@ export function CoachPlansSection({
   );
 }
 
+// TrialBadge は、お試しプランにつける印。
+export function TrialBadge() {
+  return (
+    <p className="mb-1 inline-flex rounded-full bg-blue-500/30 px-2 py-0.5 text-xs font-semibold text-blue-100">
+      はじめての人だけのお試し
+    </p>
+  );
+}
+
 // PublicPlanList は、コーチ一覧のカードに出すプラン。
 export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
   if (plans.length === 0) return null;
@@ -368,8 +389,9 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
     <div className="space-y-1.5 border-t border-white/15 pt-2">
       <p className="text-xs text-slate-300">パーソナル指導</p>
       <ul className="space-y-2">
-        {plans.map((p) => (
-          <li key={p.id} className="rounded-lg bg-white/5 p-2">
+        {sortTrialFirst(plans).map((p) => (
+          <li key={p.id} className={`rounded-lg p-2 ${p.kind === "trial" ? "border border-blue-400/40 bg-blue-500/10" : "bg-white/5"}`}>
+            {p.kind === "trial" ? <TrialBadge /> : null}
             <p className="font-semibold text-white">{p.title}</p>
             <p className="text-xs text-slate-300">{planSummary(p)}</p>
             <p className="mt-1 whitespace-pre-wrap text-slate-200">{p.description}</p>

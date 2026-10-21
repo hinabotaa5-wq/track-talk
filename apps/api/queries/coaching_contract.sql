@@ -236,3 +236,10 @@ LIMIT 100;
 
 -- name: ListAdminProfileIDs :many
 SELECT id FROM profiles WHERE is_admin;
+
+-- name: HasCoachingStarted :one
+-- この利用者が、このコーチの指導を受けたことがあるか（始まった申し込みがあるか）。お試しプランは、ない人だけが申し込める。
+SELECT EXISTS (
+    SELECT 1 FROM coaching_contracts
+    WHERE requester_id = $1 AND coach_id = $2 AND starts_at IS NOT NULL
+)::boolean;

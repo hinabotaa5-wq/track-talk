@@ -143,6 +143,19 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusUnprocessableEntity, "birth_month_required", "先に生まれた年月を登録してください")
 		return
 	}
+	// お試しプランは、このコーチの指導をはじめて受ける人だけ。
+	// 返事待ちか期間中の申し込みは同じコーチに1つまでなので、確かめてから作るまでのあいだに指導が始まることはない。
+	if plan.Kind == "trial" {
+		started, err := s.q.HasCoachingStarted(r.Context(), db.HasCoachingStartedParams{RequesterID: me.ID, CoachID: plan.CoachID})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if started {
+			Error(w, http.StatusConflict, "trial_used", "お試しプランは、このコーチの指導をはじめて受ける人だけが申し込めます")
+			return
+		}
+	}
 	minor := isMinor(*me.BirthMonth, time.Now())
 	// 18歳未満でも、申し込みの時点では保護者のメールアドレスは聞かない。
 	// コーチが承諾したあとに本人が保護者へリンクを送り、保護者がそのリンクから同意とお支払いをする。

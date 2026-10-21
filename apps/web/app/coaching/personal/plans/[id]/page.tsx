@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { DemoCodeForm } from "@/components/coaching-demo";
+import { TrialBadge } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -128,9 +129,13 @@ export default function ApplyCoachingPlanPage() {
           </div>
         </div>
         <div className="space-y-1 border-t border-white/15 pt-3">
+          {plan.kind === "trial" ? <TrialBadge /> : null}
           <p className="font-semibold text-white">{plan.title}</p>
           <p className="text-xs text-slate-300">{planSummary(plan)}</p>
           <p className="whitespace-pre-wrap text-slate-200">{plan.description}</p>
+          {plan.kind === "trial" ? (
+            <p className="text-xs text-slate-300">このコーチの指導を前に受けたことがある人は、お試しには申し込めません。</p>
+          ) : null}
         </div>
         <Link href="/coaches" className="text-xs text-blue-300 underline">
           コーチ一覧に戻る

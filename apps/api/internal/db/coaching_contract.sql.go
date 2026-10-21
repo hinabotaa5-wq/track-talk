@@ -777,6 +777,26 @@ func (q *Queries) GuardianStartCoachingContract(ctx context.Context, arg Guardia
 	return i, err
 }
 
+const hasCoachingStarted = `-- name: HasCoachingStarted :one
+SELECT EXISTS (
+    SELECT 1 FROM coaching_contracts
+    WHERE requester_id = $1 AND coach_id = $2 AND starts_at IS NOT NULL
+)::boolean
+`
+
+type HasCoachingStartedParams struct {
+	RequesterID uuid.UUID `json:"requester_id"`
+	CoachID     uuid.UUID `json:"coach_id"`
+}
+
+// この利用者が、このコーチの指導を受けたことがあるか（始まった申し込みがあるか）。お試しプランは、ない人だけが申し込める。
+func (q *Queries) HasCoachingStarted(ctx context.Context, arg HasCoachingStartedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasCoachingStarted, arg.RequesterID, arg.CoachID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const insertCoachingAccessLog = `-- name: InsertCoachingAccessLog :exec
 INSERT INTO coaching_access_logs (id, admin_id, contract_id, report_id)
 VALUES ($1, $2, $3, $4)

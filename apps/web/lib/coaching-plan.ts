@@ -6,20 +6,24 @@ import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind } from "./t
 export const planKindLabels: Record<CoachingPlanKind, string> = {
   period: "期間プラン",
   single: "単発",
+  trial: "お試し",
 };
 
-// 種類ごとに選べる日数。単発は7日だけ。
+// 種類ごとに選べる日数。単発とお試しは7日だけ。
 export const planDurations: Record<CoachingPlanKind, number[]> = {
   period: [14, 30],
   single: [7],
+  trial: [7],
 };
 
 export const minPlanPriceYen = 2000;
 // これを超える値段は、保存する前に打ち間違いでないか確かめる。
 export const highPlanPriceYen = 30000;
+// お試しの値段の上限。
+export const maxTrialPriceYen = 3000;
 
 export function planDurationLabel(kind: CoachingPlanKind, days: number): string {
-  if (kind === "single") return `${days}日以内`;
+  if (kind === "single" || kind === "trial") return `${days}日以内`;
   if (days === 14) return "2週間";
   if (days === 30) return "1か月";
   return `${days}日`;
@@ -27,6 +31,11 @@ export function planDurationLabel(kind: CoachingPlanKind, days: number): string 
 
 export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | "price_yen">): string {
   return `${planKindLabels[plan.kind]} · ${planDurationLabel(plan.kind, plan.duration_days)} · ${formatYen(plan.price_yen)}`;
+}
+
+// sortTrialFirst は、お試しプランを先頭にする。ほかの並び（安い順）はそのまま。
+export function sortTrialFirst<T extends Pick<CoachingPlan, "kind">>(plans: T[]): T[] {
+  return [...plans.filter((p) => p.kind === "trial"), ...plans.filter((p) => p.kind !== "trial")];
 }
 
 // パーソナル指導の誓約の文面。API の coachPledgeVersion と一緒に変える。

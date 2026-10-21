@@ -53,3 +53,8 @@ ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id;
 -- name: LockCoachingPlans :exec
 -- 同じコーチのプランの作成を1つずつにする。10個の上限の確認と作成のあいだに、別の作成を割り込ませない。
 SELECT pg_advisory_xact_lock(hashtext('coaching_plans:' || sqlc.arg(coach_id)::uuid::text));
+
+-- name: CountOtherTrialPlans :one
+-- このコーチの、ほかのお試しプランの数。お試しプランは1人1つまで。
+SELECT count(*) FROM coaching_plans
+WHERE coach_id = sqlc.arg(coach_id) AND kind = 'trial' AND id <> sqlc.arg(exclude_id)::uuid;

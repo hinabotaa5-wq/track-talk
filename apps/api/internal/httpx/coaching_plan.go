@@ -21,6 +21,8 @@ const (
 	// これを超える値段は、打ち間違いでないかを1回確かめてから保存する。
 	highPlanPriceYen = 30000
 	maxPlanCapacity  = 50
+	// お試しプランの値段の上限。月額プランの前に気軽に試せる値段にする。
+	maxTrialPriceYen = 3000
 )
 
 func pledged(c db.CoachProfile) bool {
@@ -31,7 +33,7 @@ func validPlanDuration(kind string, days int) bool {
 	switch kind {
 	case "period":
 		return days == 14 || days == 30
-	case "single":
+	case "single", "trial":
 		return days == 7
 	}
 	return false
@@ -113,12 +115,15 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Description = strings.TrimSpace(req.Description)
 	fields := map[string]string{}
-	if req.Kind != "period" && req.Kind != "single" {
+	if req.Kind != "period" && req.Kind != "single" && req.Kind != "trial" {
 		fields["kind"] = "プランの種類を選んでください"
 	} else if req.DurationDays == nil || !validPlanDuration(req.Kind, *req.DurationDays) {
-		if req.Kind == "single" {
+		switch req.Kind {
+		case "single":
 			fields["duration_days"] = "単発は7日です"
-		} else {
+		case "trial":
+			fields["duration_days"] = "お試しは7日です"
+		default:
 			fields["duration_days"] = "期間は2週間か1か月を選んでください"
 		}
 	}
@@ -132,6 +137,8 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	switch {
 	case req.PriceYen == nil || *req.PriceYen < minPlanPriceYen:
 		fields["price_yen"] = "値段は2,000円以上にしてください"
+	case req.Kind == "trial" && *req.PriceYen > maxTrialPriceYen:
+		fields["price_yen"] = "お試しの値段は2,000〜3,000円にしてください"
 	case *req.PriceYen > maxPlanPriceYen:
 		fields["price_yen"] = "値段が大きすぎます。桁を確かめてください"
 	case *req.PriceYen > highPlanPriceYen && *req.PriceYen != prevPrice && !req.ConfirmHighPrice:
@@ -141,6 +148,20 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 		fields["capacity"] = "同時に受ける人数は1〜50人にしてください"
 	}
 	return fields
+}
+
+// noOtherTrialPlan は、このコーチにほかのお試しプランがないかを確かめる。あれば 409 を返して false。
+func (s *Server) noOtherTrialPlan(w http.ResponseWriter, r *http.Request, q *db.Queries, coachID, exclude uuid.UUID) bool {
+	n, err := q.CountOtherTrialPlans(r.Context(), db.CountOtherTrialPlansParams{CoachID: coachID, ExcludeID: exclude})
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if n > 0 {
+		Error(w, http.StatusConflict, "conflict", "お試しプランは1つまでです。いまのお試しプランを直して使ってください")
+		return false
+	}
+	return true
 }
 
 func (s *Server) listMyCoachingPlans(w http.ResponseWriter, r *http.Request) {
@@ -198,6 +219,9 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "conflict", "プランは10個までです。使わないプランを直して使ってください")
 		return
 	}
+	if req.Kind == "trial" && !s.noOtherTrialPlan(w, r, q, c.ProfileID, uuid.Nil) {
+		return
+	}
 	published := true
 	if req.Published != nil {
 		published = *req.Published
@@ -245,6 +269,9 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	if fields := req.validate(int(current.PriceYen)); len(fields) > 0 {
 		FieldError(w, fields)
+		return
+	}
+	if req.Kind == "trial" && current.Kind != "trial" && !s.noOtherTrialPlan(w, r, s.q, c.ProfileID, id) {
 		return
 	}
 	published := current.Published

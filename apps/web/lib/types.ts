@@ -427,8 +427,9 @@ export type AdminCoachPayout = CoachPayout & {
   created_at: string;
 };
 
-// パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発。
-export type CoachingPlanKind = "period" | "single";
+// パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発、
+// trial はそのコーチの指導をはじめて受ける人だけが申し込める7日のお試し。
+export type CoachingPlanKind = "period" | "single" | "trial";
 export type CoachingPlan = {
   id: string;
   kind: CoachingPlanKind;
