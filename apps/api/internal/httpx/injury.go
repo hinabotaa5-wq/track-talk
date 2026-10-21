@@ -114,16 +114,6 @@ func normalizeInjury(req postReq) (injuryInput, map[string]string) {
 	return injuryInput{BodyPart: part}, fields
 }
 
-// titleFromBody は、タイトルのない投稿に本文の書き出しを付け、フィードのカードにも見出しが出るようにする。
-func titleFromBody(body string) string {
-	flat := strings.Join(strings.Fields(body), " ")
-	runes := []rune(flat)
-	if len(runes) > 40 {
-		return string(runes[:40]) + "…"
-	}
-	return flat
-}
-
 func injuryFromDetail(row db.InjuryDetail) *injuryDTO {
 	return &injuryDTO{
 		BodyPart:      row.BodyPart,

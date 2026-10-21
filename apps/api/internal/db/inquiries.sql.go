@@ -23,17 +23,6 @@ func (q *Queries) CountAdminInquiries(ctx context.Context, source string) (int64
 	return count, err
 }
 
-const countInquiries = `-- name: CountInquiries :one
-SELECT count(*) FROM inquiries
-`
-
-func (q *Queries) CountInquiries(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countInquiries)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countMyInquiries = `-- name: CountMyInquiries :one
 SELECT count(*) FROM inquiries WHERE user_id = $1
 `
@@ -140,58 +129,6 @@ func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiries
 			&i.ContactEmail,
 			&i.CreatedAt,
 			&i.UserNickname,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listInquiries = `-- name: ListInquiries :many
-SELECT id, user_id, category, subject, body, source, contact_email, created_at
-FROM inquiries
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2
-`
-
-type ListInquiriesParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-type ListInquiriesRow struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
-func (q *Queries) ListInquiries(ctx context.Context, arg ListInquiriesParams) ([]ListInquiriesRow, error) {
-	rows, err := q.db.Query(ctx, listInquiries, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListInquiriesRow
-	for rows.Next() {
-		var i ListInquiriesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Category,
-			&i.Subject,
-			&i.Body,
-			&i.Source,
-			&i.ContactEmail,
-			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

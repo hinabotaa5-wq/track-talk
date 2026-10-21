@@ -41,14 +41,6 @@ func NewVerifier(secret, supabaseURL, aud string) (*Verifier, error) {
 	return v, nil
 }
 
-func (v *Verifier) Parse(tokenString string) (uuid.UUID, error) {
-	identity, err := v.ParseIdentity(tokenString)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	return identity.UserID, nil
-}
-
 func (v *Verifier) ParseIdentity(tokenString string) (Identity, error) {
 	claims, err := v.parseClaims(tokenString)
 	if err != nil {

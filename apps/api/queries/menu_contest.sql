@@ -18,9 +18,6 @@ DELETE FROM menu_contest_entries
 WHERE round_start = $1
   AND author_id = $2;
 
--- name: CountMenuContestEntries :one
-SELECT count(*) FROM menu_contest_entries WHERE round_start = $1;
-
 -- name: ListMenuContestEntries :many
 -- 運営が読む一覧。古い順。ニックネームは公開設定にかかわらず運営には見せる。
 SELECT
