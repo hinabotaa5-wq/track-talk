@@ -142,6 +142,18 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, profileID uuid.UUID
 	return items, nil
 }
 
+const releaseMonthlyReminder = `-- name: ReleaseMonthlyReminder :exec
+DELETE FROM monthly_reminders
+WHERE month = $1::date
+  AND finished_at IS NULL
+`
+
+// 送る前に失敗したとき、その月の権利を返す。送り終えた月(finished_at がある月)は消さない。
+func (q *Queries) ReleaseMonthlyReminder(ctx context.Context, month time.Time) error {
+	_, err := q.db.Exec(ctx, releaseMonthlyReminder, month)
+	return err
+}
+
 const trimPushSubscriptions = `-- name: TrimPushSubscriptions :exec
 DELETE FROM push_subscriptions
 WHERE profile_id = $1::uuid

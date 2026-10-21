@@ -53,3 +53,9 @@ WHERE profile_id = sqlc.arg(profile_id)::uuid
     ORDER BY keep.created_at DESC, keep.id DESC
     LIMIT sqlc.arg(max_devices)::int
   );
+
+-- name: ReleaseMonthlyReminder :exec
+-- 送る前に失敗したとき、その月の権利を返す。送り終えた月(finished_at がある月)は消さない。
+DELETE FROM monthly_reminders
+WHERE month = sqlc.arg(month)::date
+  AND finished_at IS NULL;
