@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -208,6 +209,17 @@ export function InjuryJoinWizard({
             selected={(value) => answers.stage === value}
             onSelect={(stage) => change({ stage })}
           />
+        ) : null}
+
+        {last ? (
+          // ケガの情報は健康に関する情報なので、送る前に扱いを見せて同意をもらう(プライバシーポリシー第4条)。
+          <p className="text-xs leading-6 text-slate-300">
+            回答と段階の記録は、名前を出さずに人数の割合や日数に集計し、誰でも見られるページに表示します(5人に満たない項目は出しません)。グループに入ると、
+            <Link href="/privacy" target="_blank" className="text-blue-400 underline">
+              プライバシーポリシー
+            </Link>
+            第4条のケガの情報の取り扱いに同意したものとします。
+          </p>
         ) : null}
 
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
