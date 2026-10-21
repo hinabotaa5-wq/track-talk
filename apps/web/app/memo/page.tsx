@@ -9,6 +9,7 @@ import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteItem, SenseNoteStatsRow } from "@/components/sense-notes";
 import { SenseSummaryCard } from "@/components/sense-summary";
 import { Button } from "@/components/ui/button";
+import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { senseSummaryEnabled } from "@/lib/features";
 import { groupSenseNotesByDay, senseDayLabel, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
@@ -30,6 +31,12 @@ export default function MySenseNotesPage() {
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/memo");
   }, [loading, session, router]);
+
+  // 月1回の記録のお知らせ(プッシュ通知)は /memo?tab=records を開く。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get("tab") === "records") setTab("records");
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -64,30 +71,17 @@ export default function MySenseNotesPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">感覚メモ</h1>
-        <p className="mt-1 text-sm text-slate-200">練習で体を動かして感じたことを書き溜めます。あなただけに表示されます。</p>
-      </div>
-
-      <div role="tablist" aria-label="表示の切り替え" className="grid grid-cols-2 gap-1 rounded-xl border border-white/20 bg-white/10 p-1">
-        {(
-          [
-            ["sense", "感覚"],
-            ["records", "記録"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => setTab(value)}
-            className={`rounded-lg py-1.5 text-sm font-semibold ${tab === value ? "bg-white/20 text-white" : "text-slate-300"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <h1 className="sr-only">メモ</h1>
+      <ViewSwitch
+        label="感覚と記録の切り替え"
+        layoutId="memo-view-pill"
+        views={[
+          { id: "sense", label: "感覚" },
+          { id: "records", label: "記録" },
+        ]}
+        current={tab}
+        onSelect={setTab}
+      />
 
       {tab === "records" ? (
         <RaceRecordsPanel token={token} />

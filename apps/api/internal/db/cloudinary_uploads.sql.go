@@ -25,6 +25,16 @@ func (q *Queries) CountRecentUploads(ctx context.Context, ownerID uuid.UUID) (in
 	return column_1, err
 }
 
+const lockUploadOwner = `-- name: LockUploadOwner :exec
+SELECT pg_advisory_xact_lock(hashtext('uploads:' || $1::uuid::text))
+`
+
+// 同じ人への署名を1つずつにする。1日の上限の確認と記録のあいだに、別の署名を割り込ませない。
+func (q *Queries) LockUploadOwner(ctx context.Context, ownerID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockUploadOwner, ownerID)
+	return err
+}
+
 const recordUpload = `-- name: RecordUpload :exec
 INSERT INTO cloudinary_uploads (public_id, owner_id)
 VALUES ($1, $2)

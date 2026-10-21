@@ -23,15 +23,44 @@ func (s *Server) signUpload(w http.ResponseWriter, r *http.Request, resource, no
 	if !ok {
 		return
 	}
-	if !s.uploadQuotaLeft(w, r, p.ID) {
+	s.issueUpload(w, r, p.ID, noun, func() (cloudinary.UploadSignature, error) {
+		return s.cloud.SignedUpload(time.Now(), resource)
+	})
+}
+
+// issueUpload は、1日の上限を確かめてから署名を出し、出した相手を記録する。
+// 同時に頼まれても上限を超えないよう、確認から記録までを本人ごとのロックの中で行う。
+func (s *Server) issueUpload(w http.ResponseWriter, r *http.Request, owner uuid.UUID, noun string, sign func() (cloudinary.UploadSignature, error)) {
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
 		return
 	}
-	signed, err := s.cloud.SignedUpload(time.Now(), resource)
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if err := q.LockUploadOwner(r.Context(), owner); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	n, err := q.CountRecentUploads(r.Context(), owner)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if n >= maxUploadSignsPerDay {
+		Error(w, http.StatusTooManyRequests, "rate_limited", "アップロードの回数が1日の上限に達しました。明日またお試しください")
+		return
+	}
+	signed, err := sign()
 	if err != nil {
 		writeAssetReadyError(w, err, noun)
 		return
 	}
-	if err := s.q.RecordUpload(r.Context(), db.RecordUploadParams{PublicID: signed.PublicID, OwnerID: p.ID}); err != nil {
+	if err := q.RecordUpload(r.Context(), db.RecordUploadParams{PublicID: signed.PublicID, OwnerID: owner}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -63,20 +92,6 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 
 // maxUploadSignsPerDay は、1人が1日(24時間)に受け取れる署名の数。署名があれば Cloudinary に直接アップロードできるので、数を絞る。
 const maxUploadSignsPerDay = 30
-
-// uploadQuotaLeft は、署名の数が1日の上限に届いていないかを確かめる。届いていれば 429 を書いて false を返す。
-func (s *Server) uploadQuotaLeft(w http.ResponseWriter, r *http.Request, owner uuid.UUID) bool {
-	n, err := s.q.CountRecentUploads(r.Context(), owner)
-	if err != nil {
-		MapDBError(w, err)
-		return false
-	}
-	if n >= maxUploadSignsPerDay {
-		Error(w, http.StatusTooManyRequests, "rate_limited", "アップロードの回数が1日の上限に達しました。明日またお試しください")
-		return false
-	}
-	return true
-}
 
 // uploadIssuedToMe は、この public_id の署名を、ログイン中の本人に出したかを確かめる。
 // public_id は公開 URL や署名付き URL に出るので、ID を知っているだけでは他人の画像・動画を使えないようにする。

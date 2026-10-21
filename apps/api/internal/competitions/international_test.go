@@ -167,6 +167,27 @@ func TestParseDiamondLeagueReadsMeetingCards(t *testing.T) {
 	}
 }
 
+// 公式サイトのリンクは画面にそのまま出すので、http(s) 以外(javascript: など)は取り込まない。
+func TestParseDiamondLeagueSkipsNonHTTPLinks(t *testing.T) {
+	body := `<!doctype html><html><head><title>Calendar 2026 - Wanda Diamond League</title></head><body>
+<a href="javascript:alert(1)" class="group flex gap-4 border">
+  <span>16</span><span>May</span><span>16 May</span><span>Shanghai/Keqiao (CHN)</span>
+</a>
+<a href="https://rome.diamondleague.com/" class="group flex gap-4">
+  <span>04 June</span><span>Rome (ITA)</span>
+</a>
+</body></html>`
+	meetings, err := parseDiamondLeague([]byte(body), diamondLeagueCalendar)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range meetings {
+		if !strings.HasPrefix(m.URL, "http") {
+			t.Fatalf("took a non-http link %+v", m)
+		}
+	}
+}
+
 func TestParseWorldAthleticsRejectsAnUnfilteredCalendar(t *testing.T) {
 	body := `<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"initialEvents":{"hits":1,"results":[],"parameters":{"startDate":null,"endDate":null,"rankingCategoryId":null,"competitionGroupId":null}}}}}</script>`
 	_, _, err := parseWorldAthletics([]byte(body), time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), time.Date(2028, 3, 31, 0, 0, 0, 0, time.UTC), urlValues("rankingCategoryId", "5"))

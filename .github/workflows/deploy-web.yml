@@ -6,6 +6,10 @@ name: Deploy Web
 on:
   workflow_dispatch:
 
+# リポジトリは読むだけ。GITHUB_TOKEN に書き込みの権限を持たせない。
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-web
   cancel-in-progress: false

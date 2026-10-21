@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -102,23 +100,6 @@ func (v *Verifier) parseClaims(tokenString string) (jwt.MapClaims, error) {
 		return nil, fmt.Errorf("invalid audience")
 	}
 	return claims, nil
-}
-
-func numericTime(value any) (time.Time, bool) {
-	switch n := value.(type) {
-	case float64:
-		return time.Unix(int64(n), 0), true
-	case int64:
-		return time.Unix(n, 0), true
-	case json.Number:
-		unix, err := n.Int64()
-		if err != nil {
-			return time.Time{}, false
-		}
-		return time.Unix(unix, 0), true
-	default:
-		return time.Time{}, false
-	}
 }
 
 func audienceOK(claims jwt.MapClaims, want string) bool {

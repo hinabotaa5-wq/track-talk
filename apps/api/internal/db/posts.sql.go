@@ -349,11 +349,12 @@ SELECT
     p.like_count,
     p.comment_count,
     profile.nickname AS author_name,
-    -- 投稿マスターのバッジ用。ニックネームとバッジを公開している人だけ数える
+    -- 投稿マスターのバッジ用。ニックネームとバッジを公開している人だけ数える。
+    -- 自分でつけたいいねは数えない(自分の投稿にいいねを押すだけで付いてしまうので)。
     CASE WHEN profile.id IS NULL OR NOT profile.post_master_badge_public THEN 0 ELSE (
         SELECT count(*) FROM posts liked
         WHERE liked.author_id = p.author_id
-          AND liked.like_count > 0
+          AND EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = liked.id AND l.user_id <> liked.author_id)
           AND liked.deleted_at IS NULL
           AND liked.hidden_at IS NULL
     ) END::bigint AS author_liked_post_count,

@@ -29,6 +29,9 @@ func setup(t *testing.T) http.Handler {
 	return setupConfig(t, nil)
 }
 
+// testPoolMaxConns が 0 でなければ、setupConfig が作るサーバーの接続の数をそれに絞る。
+var testPoolMaxConns int32
+
 func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 	t.Helper()
 	dsn := testDSN(t)
@@ -37,7 +40,14 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		secret = "test-jwt-secret-for-ci-only"
 	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("pool config: %v", err)
+	}
+	if testPoolMaxConns > 0 {
+		poolCfg.MaxConns = testPoolMaxConns
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
 	}
@@ -1761,7 +1771,7 @@ func TestNotifications(t *testing.T) {
 	if len(notesFor(authorNotes, practicePost.ID, "practice_rate")) != 1 || authorUnread < 1 {
 		t.Fatalf("host rate notification %+v unread %d", authorNotes, authorUnread)
 	}
-	viewerNotes, viewerUnread = listNotifications(t, h, viewer)
+	viewerNotes, _ = listNotifications(t, h, viewer)
 	if len(notesFor(viewerNotes, practicePost.ID, "practice_rate")) != 1 {
 		t.Fatalf("guest rate notification %+v", viewerNotes)
 	}

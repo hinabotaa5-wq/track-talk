@@ -61,6 +61,19 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 依頼や契約は退会で消えるので、tick がまだ記録していないコーチの報酬を先に記録する。
+	// 記録は一度に100件までなので、残りがなくなるまでくり返す(返却・終了したものは退会を止めないため)。
+	for {
+		n, err := recordCoachEarningsWith(r.Context(), s.q.WithTx(tx))
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if n == 0 {
+			break
+		}
+	}
+
 	// 消える行が使っている写真・動画は、コミットしたあとで Cloudinary からも消す。
 	mediaRows, err := s.q.WithTx(tx).ListAccountMedia(r.Context(), uid)
 	if err != nil {

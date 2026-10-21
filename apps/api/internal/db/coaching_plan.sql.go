@@ -198,6 +198,16 @@ func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int
 	return items, nil
 }
 
+const lockCoachingPlans = `-- name: LockCoachingPlans :exec
+SELECT pg_advisory_xact_lock(hashtext('coaching_plans:' || $1::uuid::text))
+`
+
+// 同じコーチのプランの作成を1つずつにする。10個の上限の確認と作成のあいだに、別の作成を割り込ませない。
+func (q *Queries) LockCoachingPlans(ctx context.Context, coachID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockCoachingPlans, coachID)
+	return err
+}
+
 const pledgeCoach = `-- name: PledgeCoach :one
 UPDATE coach_profiles
 SET pledged_at = now(),

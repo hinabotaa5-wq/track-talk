@@ -391,8 +391,12 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 		t.Fatalf("faces %v", faces)
 	}
 	joined := strings.Join(faces, ",")
-	if strings.Contains(joined, "ひみつ") || !strings.Contains(joined, "こうかい") {
+	if strings.Contains(joined, "ひみつ") || strings.Contains(joined, "ひ") || !strings.Contains(joined, "こ") {
 		t.Fatalf("faces leak private nickname: %v", faces)
+	}
+	// 画面に出すのは頭文字だけなので、API もニックネームそのものは返さない(どのケガかと名前が結びつくため)。
+	if strings.Contains(joined, "こうかい") {
+		t.Fatalf("faces carry the full nickname: %v", faces)
 	}
 }
 

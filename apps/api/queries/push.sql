@@ -26,3 +26,19 @@ ORDER BY created_at DESC;
 -- name: CountPushSubscriptions :one
 SELECT count(*) FROM push_subscriptions
 WHERE profile_id = $1;
+
+-- name: ListPushProfileIDs :many
+-- 通知をオンにした端末がある人。
+SELECT DISTINCT profile_id FROM push_subscriptions
+ORDER BY profile_id;
+
+-- name: ClaimMonthlyReminder :one
+-- その月のお知らせを送る権利を取る。すでに送った(送っている)月は行が返らない。
+INSERT INTO monthly_reminders (month) VALUES (sqlc.arg(month)::date)
+ON CONFLICT (month) DO NOTHING
+RETURNING month;
+
+-- name: FinishMonthlyReminder :exec
+UPDATE monthly_reminders
+SET finished_at = now(), recipients = sqlc.arg(recipients)::int
+WHERE month = sqlc.arg(month)::date;

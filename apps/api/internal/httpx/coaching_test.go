@@ -57,15 +57,11 @@ func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 	}{
 		// 定期実行（Cloud Scheduler）
 		{http.MethodPost, "/internal/coaching/tick", ""},
-		// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
-		{http.MethodGet, "/v1/push/public-key", ""},
+		// 利用者の準備（年齢・保護者リンク・添削用の動画）。プッシュ通知は月1回の記録のお知らせにも使うので、閉じない。
 		{http.MethodGet, "/v1/me/coaching", ta},
 		{http.MethodGet, "/v1/me/coaching", ""},
 		{http.MethodPut, "/v1/me/birth-month", ta},
 		{http.MethodPost, "/v1/me/guardian-link", ta},
-		{http.MethodPost, "/v1/me/push-subscriptions", ta},
-		{http.MethodDelete, "/v1/me/push-subscriptions", ta},
-		{http.MethodPost, "/v1/me/push-subscriptions/test", ta},
 		{http.MethodPost, "/v1/uploads/coaching-video", ta},
 		// 保護者の同意と、保護者から見える契約・やりとり
 		{http.MethodGet, "/v1/guardian/abc", ""},

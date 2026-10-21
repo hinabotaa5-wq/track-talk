@@ -15,6 +15,7 @@ import {
   formatRaceWind,
   parseRaceMark,
   parseRaceWind,
+  toggleRaceWindSign,
   raceChartBox,
   raceChartPoints,
   raceEventHasWind,
@@ -126,7 +127,17 @@ function RaceRecordForm({
         {hasWind ? (
           <label className="block">
             <span className="mb-1 block text-xs text-slate-300">風(m/s・任意)</span>
-            <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" />
+            <span className="flex gap-1">
+              <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" className="min-w-0 flex-1" />
+              <button
+                type="button"
+                onClick={() => setWind((current) => toggleRaceWindSign(current))}
+                aria-label="追い風(+)と向かい風(-)を切り替える"
+                className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-3 text-sm font-semibold text-white transition active:scale-95"
+              >
+                +/−
+              </button>
+            </span>
           </label>
         ) : null}
       </div>
@@ -286,6 +297,39 @@ function RaceRecordRow({
   );
 }
 
+type PBStats = { days: number; min_authors: number; events: { event: string; event_label: string; authors: number }[] };
+
+// みんなの自己ベスト更新。直近30日に種目ごとに更新した人の数で、5人未満の種目は API が返さない。
+function PBStatsCard({ token }: { token: string | null }) {
+  const [stats, setStats] = useState<PBStats | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    apiFetch<PBStats>("/v1/race-records/pb-stats", { token, signal: controller.signal })
+      .then(setStats)
+      .catch(() => {
+        // おまけの表示なので、読めなければ出さない。
+      });
+    return () => controller.abort();
+  }, [token]);
+
+  if (!stats || stats.events.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-white/20 glass bg-white/10 p-4">
+      <h2 className="text-sm font-semibold text-slate-100">この{stats.days}日で自己ベストを更新した人</h2>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {stats.events.map((item) => (
+          <li key={item.event} className="rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-sm text-amber-100">
+            {item.event_label} <span className="font-semibold">{item.authors}人</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-slate-300">記録を残した人の数です。だれが更新したかは出しません（{stats.min_authors}人に満たない種目は出しません）。</p>
+    </section>
+  );
+}
+
 // 記録のタブ。書く欄、種目の切り替え、グラフ、記録の一覧(新しい順)。
 export function RaceRecordsPanel({ token }: { token: string | null }) {
   const [data, setData] = useState<RaceRecords | null>(null);
@@ -317,6 +361,7 @@ export function RaceRecordsPanel({ token }: { token: string | null }) {
 
   return (
     <div className="space-y-4">
+      <PBStatsCard token={token} />
       <section className="rounded-2xl border border-white/20 glass bg-white/10 p-4">
         <RaceRecordForm token={token} defaultEvent={current?.event ?? raceRecordEvents[0].value} onSaved={onSaved} />
       </section>

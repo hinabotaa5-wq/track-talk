@@ -23,6 +23,65 @@ func (q *Queries) CountRaceRecords(ctx context.Context, authorID uuid.UUID) (int
 	return count, err
 }
 
+const countRecentPBAuthors = `-- name: CountRecentPBAuthors :many
+WITH legal AS (
+    SELECT
+        author_id,
+        event,
+        raced_on,
+        CASE WHEN event = ANY($3::text[]) THEN -mark ELSE mark END AS score,
+        min(CASE WHEN event = ANY($3::text[]) THEN -mark ELSE mark END) OVER (
+            PARTITION BY author_id, event
+            ORDER BY raced_on, created_at, id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+        ) AS prev_best
+    FROM race_records
+    WHERE wind IS NULL OR wind <= 20
+)
+SELECT event, count(DISTINCT author_id)::bigint AS authors
+FROM legal
+WHERE prev_best IS NOT NULL
+  AND score < prev_best
+  AND raced_on >= $1::date
+  AND raced_on <= $2::date
+GROUP BY event
+ORDER BY authors DESC, event
+`
+
+type CountRecentPBAuthorsParams struct {
+	Since        time.Time `json:"since"`
+	Until        time.Time `json:"until"`
+	HigherEvents []string  `json:"higher_events"`
+}
+
+type CountRecentPBAuthorsRow struct {
+	Event   string `json:"event"`
+	Authors int64  `json:"authors"`
+}
+
+// 種目ごとに、期間内の日付で自己ベストを更新した人の数。自分の前の公認記録を上回った記録だけを数え、
+// その種目の最初の記録は数えない。追い風参考(+2.0m/s 超)は比べる対象にも入れない。
+// 記録が大きいほどよい種目は higher_events で受け取り、符号を反転して「小さいほどよい」にそろえる。
+func (q *Queries) CountRecentPBAuthors(ctx context.Context, arg CountRecentPBAuthorsParams) ([]CountRecentPBAuthorsRow, error) {
+	rows, err := q.db.Query(ctx, countRecentPBAuthors, arg.Since, arg.Until, arg.HigherEvents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountRecentPBAuthorsRow
+	for rows.Next() {
+		var i CountRecentPBAuthorsRow
+		if err := rows.Scan(&i.Event, &i.Authors); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createRaceRecord = `-- name: CreateRaceRecord :one
 INSERT INTO race_records (id, author_id, raced_on, event, mark, wind, memo)
 VALUES ($1, $2, $3, $4, $5, $6, $7)

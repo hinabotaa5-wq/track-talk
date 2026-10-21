@@ -222,7 +222,7 @@ func TestCoachPayoutsDemoMode(t *testing.T) {
 }
 
 func TestStripeWebhookSyncsCoachAccountAndAlertsDispute(t *testing.T) {
-	h, _ := setupStripe(t)
+	h, f := setupStripe(t)
 	tadmin := adminToken(t, h)
 	id := uuid.New()
 	tc := token(t, id)
@@ -247,10 +247,16 @@ func TestStripeWebhookSyncsCoachAccountAndAlertsDispute(t *testing.T) {
 	update := func(secret string, payouts bool) int {
 		return stripeWebhook(t, h, secret, "account.updated", map[string]any{"id": account, "payouts_enabled": payouts}).Code
 	}
+	f.setEnabled(account, true)
 	if code := update(testConnectWebhookSecret, true); code != http.StatusOK || !enabled() {
 		t.Fatalf("enable %d %v", code, enabled())
 	}
+	// 知らせは順番どおりに届くとは限らない。古い「受け取れない」が後から届いても、いまの状態を読んで決める。
+	if code := update(testConnectWebhookSecret, false); code != http.StatusOK || !enabled() {
+		t.Fatalf("stale disable %d %v", code, enabled())
+	}
 	// あとから受け取れなくなったら、送金の対象から外す。
+	f.setEnabled(account, false)
 	if code := update(testConnectWebhookSecret, false); code != http.StatusOK || enabled() {
 		t.Fatalf("disable %d %v", code, enabled())
 	}

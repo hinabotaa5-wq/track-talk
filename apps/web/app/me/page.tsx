@@ -1,13 +1,13 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { SenseNotesCard } from "@/components/sense-notes-card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Award, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { installGuideOpenEvent } from "@/lib/install-guide";
 
 const accountLinks = [
@@ -15,8 +15,10 @@ const accountLinks = [
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
   { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
-  { href: "/me/account", label: "メールアドレスとパスワードの変更", icon: KeyRound },
+  { href: "/me/email", label: "メールアドレスの変更", icon: AtSign },
+  { href: "/me/password", label: "パスワードの変更", icon: KeyRound },
   { href: "/me/badge", label: "バッジ", icon: Award },
+  { href: "/me/push", label: "通知", icon: Bell },
 ] as const;
 
 const infoLinks = [
@@ -59,6 +61,7 @@ export default function MePage() {
     if (!confirm("ログアウトしますか？")) return;
     if (!logoutLock.acquire()) return;
     leaving.current = true;
+    await unsubscribePushOnThisDevice(token);
     const supabase = createClient();
     await supabase?.auth.signOut();
     router.push("/");
@@ -75,7 +78,6 @@ export default function MePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <SenseNotesCard token={token} />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />

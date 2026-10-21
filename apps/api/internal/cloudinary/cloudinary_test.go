@@ -291,3 +291,25 @@ func TestCoachingVideoReadyChecksTypeAndLength(t *testing.T) {
 		t.Fatalf("folder: %v", err)
 	}
 }
+
+// トークン認証の鍵があれば、非公開の動画の URL に期限付きのトークンを付け、その動画だけに使えるようにする。
+func TestCoachingURLsCarryExpiringTokenWithAuthKey(t *testing.T) {
+	c := Client{
+		Cloud: "demo", Key: "key", Secret: "secret",
+		AuthTokenKey: "00112233445566778899aabbccddeeff",
+		Now:          func() time.Time { return time.Unix(1800000000, 0).Add(-AuthTokenTTL) },
+	}
+	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
+	// 期待値は Cloudinary の公式 Python SDK（cloudinary_url の auth_token）で、同じ鍵・期限・acl から作ったもの。
+	token := "?__cld_token__=exp=1800000000~acl=%2fvideo%2fauthenticated%2f*track-talk-coaching%2f0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11*~hmac=d4aea924058f847b18a5c8ed9a4a9b1e114fbdec9421de90650d1e185c53f7d8"
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/q_auto,du_30/v1/"+id+".mp4"+token; got != want {
+		t.Fatalf("playback\n got %s\nwant %s", got, want)
+	}
+	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"+token; got != want {
+		t.Fatalf("thumbnail\n got %s\nwant %s", got, want)
+	}
+	c.AuthTokenKey = "not-hex"
+	if c.CoachingPlaybackURL(id) != "" {
+		t.Fatal("a broken key must not fall back to a URL without expiry")
+	}
+}

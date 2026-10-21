@@ -11,7 +11,8 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /api ./cmd/a
  && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /budgetstop ./cmd/budgetstop
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates \
+ && adduser -D -H -u 10001 app
 WORKDIR /app
 COPY --from=build /api /app/api
 COPY --from=build /importmajors /app/importmajors
@@ -22,4 +23,6 @@ ENV API_ADDR=:8080
 # このイメージは Cloud Run などの本番で動かす前提なので、ローカル以外の DB への接続を許可する。
 # go run で直接起動する開発時はこの値が無く、ローカル DB 以外には接続できない。
 ENV ALLOW_REMOTE_DB=1
+# root では動かさない(ファイルに書かないので、書き込みの権限もいらない)。
+USER app
 CMD ["/app/api"]

@@ -165,3 +165,6 @@ SELECT * FROM coach_earnings WHERE contract_id = $1;
 -- name: DeleteUnpaidContractEarning :exec
 -- 期間が終わってから全額を返金した指導の、まだ送金に含めていない報酬を消す。
 DELETE FROM coach_earnings WHERE contract_id = $1 AND payout_id IS NULL;
+
+-- name: CoachStripeAccountExists :one
+SELECT EXISTS (SELECT 1 FROM coach_profiles WHERE stripe_account_id = sqlc.arg(stripe_account_id)::text);

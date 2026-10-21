@@ -92,6 +92,16 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
 
 tick が止まっていても、依頼した人が依頼を開いたときに期限切れは片付き、期限の過ぎた打診は引き受けられません。ただ、時間切れの打診が次のコーチに回るのは tick だけです。
 
+## 月1回の記録のお知らせ
+
+通知をオンにした全員に、毎月1日の19時(日本時間)に「大会の記録、残せていますか？」をプッシュ通知で送ります。Cloud Scheduler が API を呼びます。`VAPID_PUBLIC_KEY`・`VAPID_PRIVATE_KEY`・`VAPID_SUBJECT` が入っていることが前提です。setup.sh のあと、Cloud Shell で一度だけ流します。
+
+```bash
+PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/monthly-reminder.sh
+```
+
+秘密の値を作って API の `REMINDER_SECRET` に入れ、同じ値をヘッダーに付けて `/internal/monthly-reminder` を呼ぶジョブ `track-talk-monthly-reminder` を作ります。送った月は `monthly_reminders` に残り、同じ月に呼び直しても二度は送りません。止めるときは `gcloud scheduler jobs pause track-talk-monthly-reminder --location asia-northeast1`。
+
 ## トラブル
 
 - **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）

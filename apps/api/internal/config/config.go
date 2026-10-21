@@ -24,6 +24,7 @@ type Config struct {
 	CloudAPIKey            string
 	CloudAPISecret         string
 	CloudAPIBase           string
+	CloudAuthTokenKey      string // Cloudinary のトークン認証の鍵。あれば非公開の動画の URL に期限を付ける。
 	VAPIDPublicKey         string
 	VAPIDPrivateKey        string
 	VAPIDSubject           string
@@ -33,6 +34,8 @@ type Config struct {
 	CoachingEnabled bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
+	// ReminderSecret は Cloud Scheduler が月1回の記録のお知らせを呼ぶときのヘッダーの値。空なら使えない。
+	ReminderSecret string
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
 	StripeSecretKey     string
 	StripeWebhookSecret string
@@ -57,14 +60,12 @@ type Config struct {
 	// MailDevLog が true なら、メールを送らずに本文を API のログに出す。手元で試すためのもので、本番では立てない。
 	MailDevLog bool
 	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
-	// 感覚メモを OpenAI に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
+	// 感覚メモを Gemini に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
 	SenseSummaryEnabled bool
-	// OpenAI の API キー。感覚メモのまとめに使う。空ならまとめは作れない。
-	OpenAIAPIKey string
-	// OpenAIModel は、まとめに使うモデル。空なら openai.DefaultModel。
-	OpenAIModel string
-	// OpenAIAPIBase はテストで OpenAI の代わりのサーバーに向けるためのもの。
-	OpenAIAPIBase string
+	// Gemini の API キー。感覚メモのまとめに使う（大会の取り込みと同じキー）。空ならまとめは作れない。
+	GeminiAPIKey string
+	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
+	GeminiEndpoint string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
 	// Clock はテストで現在時刻を差し替えるためのもの。nil なら time.Now。
@@ -88,11 +89,13 @@ func Load() (Config, error) {
 		CloudAPIKey:                os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret:             os.Getenv("CLOUDINARY_API_SECRET"),
 		CloudAPIBase:               os.Getenv("CLOUDINARY_API_BASE"),
+		CloudAuthTokenKey:          os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
 		VAPIDPublicKey:             os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
+		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
 		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),
@@ -108,9 +111,8 @@ func Load() (Config, error) {
 		SMTPPassword:               os.Getenv("SMTP_PASSWORD"),
 		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
-		OpenAIAPIKey:               os.Getenv("OPENAI_API_KEY"),
-		OpenAIModel:                os.Getenv("OPENAI_MODEL"),
-		OpenAIAPIBase:              os.Getenv("OPENAI_API_BASE"),
+		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
+		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

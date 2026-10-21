@@ -61,36 +61,46 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
   if (!loaded) return null;
 
   const nextLabel = senseSummaryNextLabel(nextAt);
+  const hasDetails = summary !== null && summary.summary.good.length + summary.summary.concerns.length + summary.summary.next.length > 0;
+  // 書く欄とメモの一覧のあいだに置くので、縦に場所を取らないよう小さくまとめる。
+  // ボタンは書く欄の「残す」と並ばないよう控えめな見た目にする。
   return (
-    <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
+    <section className="space-y-2 rounded-2xl border border-white/15 bg-white/6 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 font-semibold">
-          <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />
+        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+          <Sparkles className="h-4 w-4 shrink-0 text-amber-200" aria-hidden />
           1週間のふりかえり
+          {summary ? <span className="truncate text-xs font-normal text-slate-300">{senseSummaryRangeLabel(summary)}</span> : null}
         </h2>
-        {summary ? <span className="text-xs text-slate-300">{senseSummaryRangeLabel(summary)}</span> : null}
+        {nextLabel ? (
+          <span className="shrink-0 text-xs text-slate-300">次は{nextLabel}から</span>
+        ) : (
+          <Button variant="secondary" className="shrink-0 px-3 py-1 text-xs" onClick={create} disabled={busy}>
+            {busy ? "まとめています..." : "まとめる"}
+          </Button>
+        )}
       </div>
 
       {summary ? (
-        <div className="space-y-3">
+        <>
           <p className="text-sm leading-relaxed text-slate-100">{summary.summary.overview}</p>
-          <SummaryList title="つかめてきた感覚" items={summary.summary.good} />
-          <SummaryList title="気になる感覚" items={summary.summary.concerns} />
-          <SummaryList title="来週意識すること" items={summary.summary.next} />
-          <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめました。内容はメモをもとにした目安です。</p>
-        </div>
+          {hasDetails ? (
+            <details>
+              <summary className="cursor-pointer text-xs font-semibold text-slate-300 hover:text-white">くわしく見る</summary>
+              <div className="mt-2 space-y-3">
+                <SummaryList title="つかめてきた感覚" items={summary.summary.good} />
+                <SummaryList title="気になる感覚" items={summary.summary.concerns} />
+                <SummaryList title="来週意識すること" items={summary.summary.next} />
+              </div>
+            </details>
+          ) : null}
+          <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめた目安です。まとめは1週間に1回です。</p>
+        </>
       ) : (
-        <p className="text-sm text-slate-200">この1週間に書いた感覚メモを、AI がふりかえりの形にまとめます。</p>
+        <p className="text-xs text-slate-300">この1週間の感覚メモを AI がふりかえりにまとめます(1週間に1回)。</p>
       )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={create} disabled={busy || nextLabel !== null}>
-          {busy ? "まとめています..." : summary ? "今週の分をまとめる" : "この1週間をまとめる"}
-        </Button>
-        <span className="text-xs text-slate-300">{nextLabel ? `次は${nextLabel}から作れます` : "まとめは1週間に1回です"}</span>
-      </div>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを OpenAI に送ります。</p>
+      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを Google の Gemini に送ります。</p>
     </section>
   );
 }

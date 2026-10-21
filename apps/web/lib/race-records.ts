@@ -100,6 +100,13 @@ export function parseRaceWind(text: string): number | null | undefined {
   return match[1] === "-" ? -tenths : tenths;
 }
 
+// 数字だけのキーボードでは + と - が打てないので、ボタンで符号を付け替える。符号が無ければ向かい風(-)にする。
+export function toggleRaceWindSign(text: string) {
+  const value = text.trim();
+  const rest = value.replace(/^[+＋\-－−ー±]+/, "");
+  return /^[\-－−ー]/.test(value) ? `+${rest}` : `-${rest}`;
+}
+
 export function formatRaceWind(wind: number) {
   const sign = wind > 0 ? "+" : wind < 0 ? "-" : "±";
   const abs = Math.abs(wind);

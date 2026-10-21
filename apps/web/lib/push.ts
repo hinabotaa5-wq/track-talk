@@ -32,6 +32,13 @@ export async function subscribePush(publicKey: string): Promise<PushSubscription
   return subscription.toJSON();
 }
 
+// この端末でいま通知を受け取る設定になっているか。service worker を新しく登録はしない。
+export async function currentPushSubscription(): Promise<PushSubscription | null> {
+  if (!pushSupported() || Notification.permission !== "granted") return null;
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
 export function monthlyLimitLabel(value: number | null): string {
   return value === null ? "上限なし" : `月${formatYen(value)}まで`;
 }

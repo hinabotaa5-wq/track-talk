@@ -69,6 +69,49 @@ func (s *Server) listProducts(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"products": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
 
+const (
+	// 種目ごとのランキングに載せるのに要る、その種目の人のレビューの件数。1〜2件の★だけで1位にならないようにする。
+	productRankingMinReviews = 3
+	productRankingLimit      = 5
+)
+
+// productRanking は、種目ごとのランキング。その種目を選んだ人のレビューだけで平均★を出す。
+func (s *Server) productRanking(w http.ResponseWriter, r *http.Request) {
+	kind := r.URL.Query().Get("kind")
+	if kind == "" {
+		kind = "shoe"
+	}
+	fields := map[string]string{}
+	if !validProductKind(kind) {
+		fields["kind"] = "シューズかスパイクを選んでください"
+	}
+	event := r.URL.Query().Get("event")
+	if !validEvent(event) {
+		fields["event"] = "種目を選んでください"
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	rows, err := s.q.RankProductsByEvent(r.Context(), db.RankProductsByEventParams{
+		Kind: kind, Event: event, MinReviews: productRankingMinReviews, RowLimit: productRankingLimit,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, productJSON(row.ID, row.Kind, row.Brand, row.Name, row.ImageUrl, row.ProductUrl, row.Discontinued, row.ReviewCount, row.AvgRating))
+	}
+	JSON(w, http.StatusOK, map[string]any{
+		"event":       event,
+		"event_label": eventLabel(event),
+		"min_reviews": productRankingMinReviews,
+		"products":    out,
+	})
+}
+
 func (s *Server) getProduct(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {

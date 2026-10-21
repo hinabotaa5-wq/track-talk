@@ -8,10 +8,10 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
+	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
-	"github.com/hinata/track-talk/apps/api/internal/openai"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +28,7 @@ type Server struct {
 	push      push.Sender
 	stripe    stripe.Client
 	mail      mail.Client
-	ai        openai.Client
+	gemini    competitions.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -43,10 +43,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		},
 		limit: NewRateLimiter(),
 		cloud: cloudinary.Client{
-			Cloud:   cfg.CloudName,
-			Key:     cfg.CloudAPIKey,
-			Secret:  cfg.CloudAPISecret,
-			APIBase: cfg.CloudAPIBase,
+			Cloud:        cfg.CloudName,
+			Key:          cfg.CloudAPIKey,
+			Secret:       cfg.CloudAPISecret,
+			APIBase:      cfg.CloudAPIBase,
+			AuthTokenKey: cfg.CloudAuthTokenKey,
 		},
 		push: push.Sender{
 			PublicKey:  cfg.VAPIDPublicKey,
@@ -65,10 +66,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			SMTPHost: cfg.SMTPHost, SMTPPort: cfg.SMTPPort, SMTPUser: cfg.SMTPUser, SMTPPassword: cfg.SMTPPassword,
 			DevLog: cfg.MailDevLog,
 		},
-		ai: openai.Client{
-			Key:     cfg.OpenAIAPIKey,
-			Model:   cfg.OpenAIModel,
-			APIBase: cfg.OpenAIAPIBase,
+		gemini: competitions.Client{
+			Key:      cfg.GeminiAPIKey,
+			Endpoint: cfg.GeminiEndpoint,
 		},
 	}
 	if cfg.PushHTTP != nil {
@@ -92,6 +92,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
 	// 支払いはコーチングの一部なので、提供していない間は Webhook も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
+	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
+	r.Post("/internal/monthly-reminder", s.monthlyReminder)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
@@ -103,10 +105,13 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/injury/groups", s.listInjuryGroups)
 		r.Get("/injury/groups/{part}/public", s.getPublicInjuryGroup)
 		r.Get("/products", s.listProducts)
+		r.Get("/products/ranking", s.productRanking)
 		r.Get("/products/{id}", s.getProduct)
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/menu-contest", s.getMenuContest)
 		r.Get("/meet-threads/today", s.todayMeetThreads)
+		// プッシュ通知はコーチングの知らせと月1回の記録のお知らせに使う。コーチングの提供前でも登録できる。
+		r.Get("/push/public-key", s.pushPublicKey)
 		// 大会の日程と県ページは、検索から来た人がログインなしで読めるようにする。
 		r.Get("/competitions", s.listCompetitions)
 		r.Get("/major-hosts", s.listMajorHosts)
@@ -131,6 +136,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Patch("/me/sense-notes/{id}", s.updateSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)
 			r.Get("/me/race-records", s.listRaceRecords)
+			r.Get("/race-records/pb-stats", s.pbStats)
+			r.Post("/me/push-subscriptions", s.savePushSubscription)
+			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
+			r.Post("/me/push-subscriptions/test", s.testPush)
 			r.Post("/me/race-records", s.createRaceRecord)
 			r.Patch("/me/race-records/{id}", s.updateRaceRecord)
 			r.Delete("/me/race-records/{id}", s.deleteRaceRecord)
@@ -209,6 +218,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/coaching/contracts/{id}/resume", s.adminResumeCoachingContract)
 			r.Post("/admin/coaching/coaches/{id}/reduced-fee", s.adminSetReducedFee)
 			r.Get("/admin/menu-contest", s.adminMenuContest)
+			r.Get("/admin/stats", s.adminStats)
+			r.Get("/admin/stats/coaching", s.adminCoachingStats)
 			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
 		})
 
@@ -220,7 +231,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		// お金の動き（送金・返金）は閉じる。
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
-			r.Get("/push/public-key", s.pushPublicKey)
 			r.Get("/coaches", s.listCoaches)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
@@ -244,9 +254,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/me/coaching", s.coachingMe)
 				r.Put("/me/birth-month", s.setBirthMonth)
 				r.Post("/me/guardian-link", s.issueGuardianLink)
-				r.Post("/me/push-subscriptions", s.savePushSubscription)
-				r.Delete("/me/push-subscriptions", s.deletePushSubscription)
-				r.Post("/me/push-subscriptions/test", s.testPush)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 				// パーソナル指導（利用者側）
 				r.Post("/coaching/contracts", s.createCoachingContract)

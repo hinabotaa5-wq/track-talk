@@ -12,6 +12,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const claimSenseNoteSummary = `-- name: ClaimSenseNoteSummary :one
+INSERT INTO sense_note_summary_claims (author_id, claimed_at)
+VALUES ($1, now())
+ON CONFLICT (author_id) DO UPDATE SET claimed_at = now()
+WHERE sense_note_summary_claims.claimed_at < now() - interval '2 minutes'
+RETURNING author_id
+`
+
+// まとめを作り始める印を取る。ほかのリクエストが作っている最中(2分以内)なら行は返らない。
+func (q *Queries) ClaimSenseNoteSummary(ctx context.Context, authorID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, claimSenseNoteSummary, authorID)
+	var author_id uuid.UUID
+	err := row.Scan(&author_id)
+	return author_id, err
+}
+
 const countSenseNotes = `-- name: CountSenseNotes :one
 SELECT count(*) FROM sense_notes WHERE author_id = $1
 `
@@ -318,6 +334,15 @@ SELECT pg_advisory_xact_lock(hashtext('sense_notes:' || $1::uuid::text))
 // 同じ人の感覚メモの作成を1つずつにする。1日20件の上限の確認と作成のあいだに、別の作成を割り込ませない。
 func (q *Queries) LockSenseNoteAuthor(ctx context.Context, authorID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, lockSenseNoteAuthor, authorID)
+	return err
+}
+
+const releaseSenseNoteSummaryClaim = `-- name: ReleaseSenseNoteSummaryClaim :exec
+DELETE FROM sense_note_summary_claims WHERE author_id = $1
+`
+
+func (q *Queries) ReleaseSenseNoteSummaryClaim(ctx context.Context, authorID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, releaseSenseNoteSummaryClaim, authorID)
 	return err
 }
 

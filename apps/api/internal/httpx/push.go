@@ -134,7 +134,7 @@ func (s *Server) testPush(w http.ResponseWriter, r *http.Request) {
 	sent, err := s.sendPush(r.Context(), p.ID, push.Message{
 		Title: "TrackTalk",
 		Body:  "通知の設定ができました",
-		URL:   "/me/coaching",
+		URL:   "/me/push",
 		Tag:   "push-test",
 	}, 10*time.Minute)
 	if err != nil {

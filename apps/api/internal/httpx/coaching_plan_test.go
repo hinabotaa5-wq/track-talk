@@ -1,9 +1,13 @@
 package httpx_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -57,6 +61,15 @@ func TestCoachingPlans(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tc, bad)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "duration_days") || !strings.Contains(rec.Body.String(), "price_yen") {
 		t.Fatalf("bad %d %s", rec.Code, rec.Body.String())
+	}
+
+	// プランはコーチ一覧で誰でも見るので、名前と内容にも連絡先は書けない。
+	contact := planBody()
+	contact["title"] = "インスタ @run_coach で質問OK"
+	contact["description"] = "詳しくは linktr.ee/run_coach を見てください"
+	rec = doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tc, contact)
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"title"`) || !strings.Contains(rec.Body.String(), `"description"`) {
+		t.Fatalf("contact in plan %d %s", rec.Code, rec.Body.String())
 	}
 
 	// 30,000円を超える値段は、確かめてからでないと保存しない。
@@ -154,5 +167,41 @@ func TestCoachingPlans(t *testing.T) {
 	execSQLArgs(t, `UPDATE coach_profiles SET pledge_version = 0 WHERE profile_id = $1`, coach)
 	if got := plansOf(); len(got) != 0 {
 		t.Fatalf("old pledge %v", got)
+	}
+}
+
+// 同時に作っても、プランは10個まで。
+func TestCoachingPlanLimitUnderConcurrency(t *testing.T) {
+	h := setup(t)
+	coach := uuid.New()
+	tc := token(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	withCoachPhoto(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", adminToken(t, h), nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tc, map[string]any{"agree": true}); rec.Code != http.StatusOK {
+		t.Fatalf("pledge %d", rec.Code)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 15; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			raw, _ := json.Marshal(planBody())
+			req := httptest.NewRequest(http.MethodPost, "/v1/coach/me/plans", bytes.NewReader(raw))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+tc)
+			req.RemoteAddr = fmt.Sprintf("203.0.113.%d:1234", i+1)
+			h.ServeHTTP(httptest.NewRecorder(), req)
+		}(i)
+	}
+	wg.Wait()
+	var n int
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_plans WHERE coach_id = $1`, []any{coach}, &n)
+	if n != 10 {
+		t.Fatalf("created %d plans, want 10", n)
 	}
 }
