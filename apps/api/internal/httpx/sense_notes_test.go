@@ -1,16 +1,16 @@
 package httpx_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type senseNoteStats struct {
@@ -61,8 +61,25 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 	if created.Stats != (senseNoteStats{Total: 1, Days: 1, Streak: 1, Today: 1}) {
 		t.Fatalf("stats = %+v", created.Stats)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "腕振りが軽い"}); rec.Code != http.StatusCreated {
-		t.Fatalf("second create = %d", rec.Code)
+	// 1日に1つだけ。同じ日にもう1つは書けない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "同じ日の2つ目"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("second note of the day = %d", rec.Code)
+	}
+	// 日付を選べるが、未来の日は選べない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "あした", "day": time.Now().AddDate(0, 0, 2).Format(time.DateOnly)}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("future day = %d", rec.Code)
+	}
+	yesterday := time.Now().In(jst.Zone).AddDate(0, 0, -1).Format(time.DateOnly)
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "腕振りが軽い", "day": yesterday})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("yesterday create = %d %s", rec.Code, rec.Body.String())
+	}
+	var back struct {
+		Note senseNoteItem `json:"note"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &back)
+	if back.Note.Day != yesterday {
+		t.Fatalf("day = %s want %s", back.Note.Day, yesterday)
 	}
 
 	var list struct {
@@ -71,7 +88,7 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if len(list.Notes) != 2 || list.Notes[0].Body != "腕振りが軽い" || list.Stats.Total != 2 || list.Stats.Days != 1 {
+	if len(list.Notes) != 2 || list.Notes[0].Body != "接地で地面を押せた" || list.Stats.Total != 2 || list.Stats.Days != 2 || list.Stats.Streak != 2 {
 		t.Fatalf("list = %+v", list)
 	}
 
@@ -110,37 +127,19 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 	}
 }
 
-func TestSenseNotesPageAndDailyLimit(t *testing.T) {
+func TestSenseNotesPage(t *testing.T) {
 	h := setup(t)
 	id := uuid.New()
 	me := token(t, id)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "今日の一件目"}); rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d", rec.Code)
 	}
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, testDSN(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	// 過去の日に1日1件ずつ35件、今日にさらに19件を入れる。
-	if _, err := pool.Exec(ctx, `
-		INSERT INTO sense_notes (id, author_id, body, created_at)
-		SELECT gen_random_uuid(), $1, 'past', now() - make_interval(days => g)
-		FROM generate_series(1, 35) AS g
-	`, id); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pool.Exec(ctx, `
-		INSERT INTO sense_notes (id, author_id, body, created_at)
-		SELECT gen_random_uuid(), $1, 'today', now() - make_interval(secs => g)
-		FROM generate_series(1, 19) AS g
-	`, id); err != nil {
-		t.Fatal(err)
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "21件目"}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("over the daily limit = %d", rec.Code)
-	}
+	// 過去の日に1日1件ずつ44件。
+	execSQLArgs(t, `
+		INSERT INTO sense_notes (id, author_id, body, day, created_at)
+		SELECT gen_random_uuid(), $1, 'past', (timezone('Asia/Tokyo', now()))::date - g, now() - make_interval(days => g)
+		FROM generate_series(1, 44) AS g
+	`, id)
 
 	type page struct {
 		Notes      []senseNoteItem `json:"notes"`
@@ -153,12 +152,12 @@ func TestSenseNotesPageAndDailyLimit(t *testing.T) {
 	if len(first.Notes) != 30 || first.NextCursor == nil || first.Notes[0].Body != "今日の一件目" {
 		t.Fatalf("first page = %d notes, cursor %v", len(first.Notes), first.NextCursor)
 	}
-	if first.Stats.Total != 55 || first.Stats.Today != 20 || first.Stats.Days != 36 || first.Stats.Streak != 36 {
+	if first.Stats.Total != 45 || first.Stats.Today != 1 || first.Stats.Days != 45 || first.Stats.Streak != 45 {
 		t.Fatalf("stats = %+v", first.Stats)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes?cursor="+url.QueryEscape(*first.NextCursor), me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &second)
-	if len(second.Notes) != 25 || second.NextCursor != nil || second.Notes[0].ID == first.Notes[29].ID {
+	if len(second.Notes) != 15 || second.NextCursor != nil || second.Notes[0].ID == first.Notes[29].ID {
 		t.Fatalf("second page = %d notes, cursor %v", len(second.Notes), second.NextCursor)
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes?cursor=bad", me, nil); rec.Code != http.StatusBadRequest {
@@ -166,15 +165,14 @@ func TestSenseNotesPageAndDailyLimit(t *testing.T) {
 	}
 }
 
-// 19件ある日に同時に送っても、20件を超えて作れない。
-func TestSenseNoteDailyLimitHoldsUnderConcurrency(t *testing.T) {
+// 同じ日に同時に送っても、1つしか作れない。
+func TestSenseNoteOnePerDayHoldsUnderConcurrency(t *testing.T) {
 	h := setup(t)
 	id := uuid.New()
 	me := token(t, id)
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes", me, nil); rec.Code != http.StatusOK {
 		t.Fatalf("list %d", rec.Code)
 	}
-	execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body) SELECT gen_random_uuid(), $1, 'メモ' FROM generate_series(1, 19)`, id)
 	var wg sync.WaitGroup
 	for range 5 {
 		wg.Add(1)
@@ -186,7 +184,7 @@ func TestSenseNoteDailyLimitHoldsUnderConcurrency(t *testing.T) {
 	wg.Wait()
 	var n int
 	queryRowArgs(t, `SELECT count(*) FROM sense_notes WHERE author_id = $1`, []any{id}, &n)
-	if n != 20 {
+	if n != 1 {
 		t.Fatalf("notes %d", n)
 	}
 }

@@ -7,7 +7,7 @@ import { Textarea } from "./ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { appEvents } from "@/lib/practice-events";
 import { useActionLock } from "@/lib/use-action-lock";
-import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
+import { senseCheer, senseNoteDayRange, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 const selectClass =
   "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
@@ -69,6 +69,7 @@ export function SenseNoteComposer({
 }) {
   const [body, setBody] = useState("");
   const [event, setEvent] = useState("");
+  const [day, setDay] = useState(() => senseNoteDayRange().max);
   const [error, setError] = useState("");
   const [cheer, setCheer] = useState<{ title: string; body: string } | null>(null);
   const lock = useActionLock();
@@ -90,7 +91,7 @@ export function SenseNoteComposer({
       const res = await apiFetch<{ note: SenseNote; stats: SenseNoteStats }>("/v1/me/sense-notes", {
         method: "POST",
         token,
-        body: JSON.stringify({ body: text, event: event || null }),
+        body: JSON.stringify({ body: text, event: event || null, day }),
       });
       setBody("");
       setEvent("");
@@ -109,7 +110,7 @@ export function SenseNoteComposer({
         <p className="text-lg font-bold text-sky-100">{cheer.title}</p>
         <p className="text-sm text-sky-100/90">{cheer.body}</p>
         <Button variant="secondary" onClick={() => setCheer(null)}>
-          もうひとつ書く
+          別の日も書く
         </Button>
       </div>
     );
@@ -117,6 +118,18 @@ export function SenseNoteComposer({
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
+      <label className="flex items-center gap-2 text-sm text-slate-200">
+        <span className="shrink-0">日付</span>
+        <input
+          type="date"
+          required
+          value={day}
+          min={senseNoteDayRange().min}
+          max={senseNoteDayRange().max}
+          onChange={(e) => setDay(e.target.value)}
+          className={`${selectClass} min-w-0 flex-1`}
+        />
+      </label>
       <SenseNoteFields body={body} event={event} onBody={setBody} onEvent={setEvent} />
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex items-center justify-between gap-3">
@@ -248,12 +261,11 @@ export function SenseNoteItem({
 
 export function SenseNoteStatsRow({ stats }: { stats: SenseNoteStats }) {
   const items = [
-    { label: "感覚", value: stats.total, unit: "個" },
     { label: "連続", value: stats.streak, unit: "日" },
-    { label: "書いた日", value: stats.days, unit: "日" },
+    { label: "これまでに書いた", value: stats.total, unit: "個" },
   ];
   return (
-    <dl className="grid grid-cols-3 gap-2">
+    <dl className="grid grid-cols-2 gap-2">
       {items.map((item) => (
         <div key={item.label} className="rounded-xl border border-white/15 bg-white/8 px-2 py-2 text-center">
           <dt className="text-xs text-slate-300">{item.label}</dt>

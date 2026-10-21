@@ -11,9 +11,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,7 +33,6 @@ type senseSummaryResponse struct {
 			Next     []string `json:"next"`
 		} `json:"summary"`
 	} `json:"summary"`
-	NextAvailableAt *string `json:"next_available_at"`
 }
 
 // fakeGemini は、Gemini の代わりに reply を返し、届いたプロンプトを残す。
@@ -62,16 +63,18 @@ func (f *fakeGemini) serve(t *testing.T) string {
 	return server.URL
 }
 
-// writeSenseNotes は、感覚メモを count 個書く。1つ目は種目つき、2つ目は「右のハムが張る」。
-func writeSenseNotes(t *testing.T, h http.Handler, tok string, count int) {
+// writeSenseNotes は、感覚メモを count 個、今日から daysBack 日前のようにさかのぼって1日1つずつ書く。
+// 1つ目は種目つき、2つ目は「右のハムが張る」。
+func writeSenseNotes(t *testing.T, h http.Handler, tok string, daysBack, count int) {
 	t.Helper()
 	for i := 0; i < count; i++ {
-		note := map[string]any{"body": fmt.Sprintf("感覚%d", i+1)}
+		day := time.Now().In(jst.Zone).AddDate(0, 0, -(daysBack + i)).Format(time.DateOnly)
+		note := map[string]any{"body": fmt.Sprintf("感覚%d", i+1), "day": day}
 		switch i {
 		case 0:
-			note = map[string]any{"body": "接地で地面を押せた", "event": "100m"}
+			note = map[string]any{"body": "接地で地面を押せた", "event": "100m", "day": day}
 		case 1:
-			note = map[string]any{"body": "右のハムが張る"}
+			note = map[string]any{"body": "右のハムが張る", "day": day}
 		}
 		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", tok, note); rec.Code != http.StatusCreated {
 			t.Fatalf("create note %d = %d", i+1, rec.Code)
@@ -89,7 +92,7 @@ func TestSenseSummaryIsHiddenUntilLaunch(t *testing.T) {
 	}
 }
 
-func TestSenseSummaryOfTheWeek(t *testing.T) {
+func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	gemini := &fakeGemini{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
 	url := gemini.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
@@ -103,7 +106,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	var got senseSummaryResponse
 	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if rec.Code != http.StatusOK || got.Summary != nil || got.NextAvailableAt != nil {
+	if rec.Code != http.StatusOK || got.Summary != nil {
 		t.Fatalf("empty get = %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusUnprocessableEntity {
@@ -113,23 +116,23 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatal("gemini was called without notes")
 	}
 
-	// 9個たまるまでは、まとめられない。あと何個かは、取得で分かる。
-	writeSenseNotes(t, h, me, 8)
+	// 6個たまるまでは、まとめられない。あと何個かは、取得で分かる。
+	writeSenseNotes(t, h, me, 0, 5)
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.PendingNotes != 8 || got.MinNotes != 9 {
+	if got.PendingNotes != 5 || got.MinNotes != 6 {
 		t.Fatalf("progress = %s", rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "あと1個") {
-		t.Fatalf("8 notes = %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("5 notes = %d %s", rec.Code, rec.Body.String())
 	}
 	if len(gemini.prompts) != 0 {
 		t.Fatal("gemini was called with too few notes")
 	}
-	writeSenseNotes(t, h, other, 9)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "9個目"}); rec.Code != http.StatusCreated {
-		t.Fatalf("ninth note = %d", rec.Code)
+	writeSenseNotes(t, h, other, 0, 6)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "6個目", "day": time.Now().In(jst.Zone).AddDate(0, 0, -5).Format(time.DateOnly)}); rec.Code != http.StatusCreated {
+		t.Fatalf("sixth note = %d", rec.Code)
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
@@ -137,20 +140,20 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatalf("create summary = %d %s", rec.Code, rec.Body.String())
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.Summary == nil || got.Summary.NoteCount != 9 || got.Summary.Summary.Overview == "" || len(got.Summary.Summary.Good) != 1 || got.NextAvailableAt == nil {
+	if got.Summary == nil || got.Summary.NoteCount != 6 || got.Summary.Summary.Overview == "" || len(got.Summary.Summary.Good) != 1 {
 		t.Fatalf("summary = %s", rec.Body.String())
 	}
 	if got.Summary.FromDay > got.Summary.ToDay {
 		t.Fatalf("range = %s..%s", got.Summary.FromDay, got.Summary.ToDay)
 	}
 	prompt := gemini.prompts[0]
-	if !strings.Contains(prompt, "[100m] 接地で地面を押せた") || !strings.Contains(prompt, "[種目なし] 右のハムが張る") || strings.Count(prompt, "[種目なし]") != 8 {
+	if !strings.Contains(prompt, "[100m] 接地で地面を押せた") || !strings.Contains(prompt, "[種目なし] 右のハムが張る") || strings.Count(prompt, "[種目なし]") != 5 {
 		t.Fatalf("prompt = %s", prompt)
 	}
 
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.Summary == nil || got.Summary.Summary.Concerns[0] != "右のハムに張りがある" || got.NextAvailableAt == nil {
+	if got.Summary == nil || got.Summary.Summary.Concerns[0] != "右のハムに張りがある" {
 		t.Fatalf("get = %s", rec.Body.String())
 	}
 	// 他の人には見えない。
@@ -166,17 +169,23 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	if got.PendingNotes != 0 {
 		t.Fatalf("pending after summary = %s", rec.Body.String())
 	}
-	writeSenseNotes(t, h, me, 1)
+	writeSenseNotes(t, h, me, 10, 1)
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
 	if got.PendingNotes != 1 || got.Summary == nil {
 		t.Fatalf("pending after one more note = %s", rec.Body.String())
 	}
-	// 1週間に1回。2回目は 429。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("second summary in a week = %d", rec.Code)
+	// 作った直後は、まとめていない感覚が足りないので作れない。時間の制限はないので、6個書けばすぐ作れる。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("second summary with one new note = %d", rec.Code)
 	}
-	// 他の人は別に数える。壊れた答えは 502 で、回数に数えない。
+	writeSenseNotes(t, h, me, 11, 5)
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if rec.Code != http.StatusCreated || got.Summary == nil || got.Summary.NoteCount != 6 {
+		t.Fatalf("second summary right after the first = %d %s", rec.Code, rec.Body.String())
+	}
+	// 他の人は別に数える。壊れた答えは 502 で、まとめを作ったことにならない。
 	gemini.reply = "not json"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusBadGateway {
 		t.Fatalf("broken reply = %d", rec.Code)
@@ -197,7 +206,7 @@ func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
 		c.GeminiEndpoint = url
 	})
 	me := token(t, uuid.New())
-	writeSenseNotes(t, h, me, 9)
+	writeSenseNotes(t, h, me, 0, 6)
 	var wg sync.WaitGroup
 	var created atomic.Int32
 	for i := 0; i < 10; i++ {
@@ -223,7 +232,7 @@ func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
 	}
 }
 
-// 古いメモでも、9個たまっていればまとめられる。
+// 古いメモでも、6個たまっていればまとめられる。
 func TestSenseSummaryCountsOldNotes(t *testing.T) {
 	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
 	url := ai.serve(t)
@@ -234,7 +243,7 @@ func TestSenseSummaryCountsOldNotes(t *testing.T) {
 	})
 	id := uuid.New()
 	me := token(t, id)
-	writeSenseNotes(t, h, me, 9)
+	writeSenseNotes(t, h, me, 0, 6)
 	pool, err := pgxpool.New(context.Background(), testDSN(t))
 	if err != nil {
 		t.Fatal(err)
@@ -247,12 +256,12 @@ func TestSenseSummaryCountsOldNotes(t *testing.T) {
 	var got senseSummaryResponse
 	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.PendingNotes != 9 {
+	if got.PendingNotes != 6 {
 		t.Fatalf("old notes are not counted = %s", rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if rec.Code != http.StatusCreated || got.Summary == nil || got.Summary.NoteCount != 9 || got.Summary.FromDay >= got.Summary.ToDay {
+	if rec.Code != http.StatusCreated || got.Summary == nil || got.Summary.NoteCount != 6 || got.Summary.FromDay >= got.Summary.ToDay {
 		t.Fatalf("summary of old notes = %d %s", rec.Code, rec.Body.String())
 	}
 }

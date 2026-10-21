@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { senseSummaryEnabled } from "@/lib/features";
-import { groupSenseNotesByDay, senseDayLabel, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
+import { groupSenseNotesByDay, senseDayLabel, sortSenseNotes, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 type Page = { notes: SenseNote[]; next_cursor: string | null; stats: SenseNoteStats };
 
@@ -101,7 +101,7 @@ export default function MySenseNotesPage() {
             <SenseNoteComposer
               token={token}
               onCreated={(note, next) => {
-                setNotes((list) => [note, ...(list ?? [])]);
+                setNotes((list) => sortSenseNotes([note, ...(list ?? [])]));
                 setStats(next);
                 setDropped(true);
               }}

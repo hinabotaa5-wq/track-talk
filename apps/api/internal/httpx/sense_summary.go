@@ -12,21 +12,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
 // 感覚メモのふりかえり。本人が頼んだときだけ、前のまとめのあとに書いた感覚メモ（はじめては、これまでの
-// すべて）を Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たち、
-// 前のまとめのあとに書いたメモが9個たまってから。
+// すべて）を Gemini に送ってまとめる。まとめは本人だけが読む。時間の制限はなく、前のまとめのあとに
+// 書いたメモが6個たまるたびに1回作れる。
 const (
 	// senseSummaryMinNotes は、まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。画面のビン1杯の数
 	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
-	senseSummaryMinNotes = 9
-	senseSummaryDays     = 7
-	senseSummaryInterval = senseSummaryDays * 24 * time.Hour
-	// 多くたまっていたら、新しい方から140個（1日20件の7日分）までを渡す。
-	maxSenseSummaryNotes    = senseSummaryDays * maxSenseNotesPerDay
+	senseSummaryMinNotes = 6
+	// 何日も作らずにためたときのために、一度に渡す数の上限。新しい方から選ぶ。
+	maxSenseSummaryNotes    = 60
 	maxSenseSummaryItems    = 3
 	maxSenseSummaryOverview = 300
 	maxSenseSummaryItem     = 100
@@ -75,15 +72,6 @@ func (s *Server) requireSenseSummary(next http.Handler) http.Handler {
 	})
 }
 
-// senseSummaryNextAt は、次のまとめを作れる時刻。もう作れるなら nil。
-func senseSummaryNextAt(lastCreatedAt, now time.Time) *time.Time {
-	next := lastCreatedAt.Add(senseSummaryInterval)
-	if !next.After(now) {
-		return nil
-	}
-	return &next
-}
-
 // getSenseSummary は、いちばん新しいまとめを返す。まだ無ければ summary は null。
 func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
@@ -106,28 +94,11 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	out := map[string]any{"summary": nil, "next_available_at": nil, "pending_notes": pending, "min_notes": senseSummaryMinNotes}
+	out := map[string]any{"summary": nil, "pending_notes": pending, "min_notes": senseSummaryMinNotes}
 	if hasLast {
 		out["summary"] = senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt)
-		out["next_available_at"] = senseSummaryNextAt(row.CreatedAt, s.now())
 	}
 	JSON(w, http.StatusOK, out)
-}
-
-// senseSummaryAvailable は、前のまとめから1週間たっているかを確かめる。まだなら 429 を書いて false を返す。
-func (s *Server) senseSummaryAvailable(w http.ResponseWriter, r *http.Request, author uuid.UUID, now time.Time) bool {
-	last, err := s.q.LatestSenseNoteSummary(r.Context(), author)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		MapDBError(w, err)
-		return false
-	}
-	if err == nil {
-		if next := senseSummaryNextAt(last.CreatedAt, now); next != nil {
-			Error(w, http.StatusTooManyRequests, "rate_limited", "まとめは1週間に1回です。"+next.In(jst.Zone).Format("1月2日 15:04")+"から、また作れます")
-			return false
-		}
-	}
-	return true
 }
 
 // createSenseSummary は、前のまとめのあとに書いた感覚メモを Gemini でまとめて残す。
@@ -140,12 +111,8 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusServiceUnavailable, "summary_unavailable", "いまはまとめを作れません。しばらくしてからお試しください")
 		return
 	}
-	now := s.now()
-	if !s.senseSummaryAvailable(w, r, me.ID, now) {
-		return
-	}
-	// AI の返事を待つあいだに、同じ人のまとめをもう1つ作らせない。印を取ったら、そのあいだに
-	// 別のリクエストが作り終えていないかをもう一度確かめる。
+	// AI の返事を待つあいだに、同じ人のまとめをもう1つ作らせない。まとめる対象は印を取ったあとに数えるので、
+	// 先に別のリクエストが作り終えていれば、対象は0個になって作られない。
 	if _, err := s.q.ClaimSenseNoteSummary(r.Context(), me.ID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			Error(w, http.StatusConflict, "conflict", "いままとめを作っています。少し待ってから開き直してください")
@@ -159,9 +126,6 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("release sense summary claim", "err", err)
 		}
 	}()
-	if !s.senseSummaryAvailable(w, r, me.ID, now) {
-		return
-	}
 	// 前のまとめのあとに書いたメモだけをまとめる。はじめては、これまでのすべて。
 	var since time.Time
 	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
@@ -174,7 +138,6 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
 		AuthorID: me.ID,
 		Since:    since,
-		Until:    now,
 		MaxNotes: maxSenseSummaryNotes,
 	})
 	if err != nil {
@@ -182,7 +145,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(notes) < senseSummaryMinNotes {
-		Error(w, http.StatusUnprocessableEntity, "validation_error", fmt.Sprintf("まとめるには、感覚メモがあと%d個必要です", senseSummaryMinNotes-len(notes)))
+		Error(w, http.StatusUnprocessableEntity, "validation_error", fmt.Sprintf("感覚が%d個たまるとまとめられます。あと%d個です", senseSummaryMinNotes, senseSummaryMinNotes-len(notes)))
 		return
 	}
 
@@ -206,8 +169,8 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	row, err := s.q.CreateSenseNoteSummary(r.Context(), db.CreateSenseNoteSummaryParams{
 		ID:        uuid.New(),
 		AuthorID:  me.ID,
-		FromDay:   dateOnly(notes[0].CreatedAt.In(jst.Zone)),
-		ToDay:     dateOnly(now.In(jst.Zone)),
+		FromDay:   notes[0].Day,
+		ToDay:     notes[len(notes)-1].Day,
 		NoteCount: int32(len(notes)),
 		Summary:   encoded,
 	})
@@ -216,8 +179,9 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusCreated, map[string]any{
-		"summary":           senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
-		"next_available_at": senseSummaryNextAt(row.CreatedAt, now),
+		"summary":       senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
+		"pending_notes": 0,
+		"min_notes":     senseSummaryMinNotes,
 	})
 }
 
@@ -228,7 +192,7 @@ func senseSummaryPrompt(notes []db.ListSenseNotesBetweenRow) string {
 - overview: このあいだの感覚の流れを、2〜3文で。
 - good: つかめてきた感覚、うまくいった感覚。3つまで。
 - concerns: 気になる感覚、うまくいかなかった感覚、痛みや違和感。3つまで。無ければ空の配列。
-- next: 来週の練習で意識するとよさそうなこと。メモに書かれた感覚から言えることだけ。3つまで。
+- next: 次の練習で意識するとよさそうなこと。メモに書かれた感覚から言えることだけ。3つまで。
 決まりごと:
 - 本人に話しかける、やさしい「です・ます」の日本語で書いてください。各項目は1文、60文字くらいまでにしてください。
 - メモに書かれていないことを足さないでください。練習メニューや記録を作らないでください。
@@ -239,7 +203,7 @@ func senseSummaryPrompt(notes []db.ListSenseNotesBetweenRow) string {
 <<<
 `)
 	for _, n := range notes {
-		day := n.CreatedAt.In(jst.Zone)
+		day := n.Day
 		week := []rune("日月火水木金土")[day.Weekday()]
 		event := "種目なし"
 		if n.Event != nil {
