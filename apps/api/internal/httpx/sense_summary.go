@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
@@ -112,6 +113,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.cfg.GeminiAPIKey == "" {
+		slog.Error("sense summary: GEMINI_API_KEY が入っていません")
 		Error(w, http.StatusServiceUnavailable, "summary_unavailable", "いまはまとめを作れません。しばらくしてからお試しください")
 		return
 	}
@@ -174,7 +176,13 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		content, err = parseSenseSummary(raw)
 	}
 	if err != nil {
-		slog.Warn("sense summary", "err", err)
+		// 本番で失敗の理由を追えるよう、Gemini の返事(先頭だけ)ごとエラーとして残す。
+		slog.Error("sense summary", "err", err, "notes", len(notes))
+		// 無料枠の回数(大会の取り込みと同じ鍵で分け合っている)を使い切ったときは、時間をおけば作れることを伝える。
+		if errors.Is(err, competitions.ErrRateLimited) {
+			Error(w, http.StatusServiceUnavailable, "summary_busy", "AI が混み合っていて、いまはまとめを作れません。時間をおいてもう一度お試しください")
+			return
+		}
 		Error(w, http.StatusBadGateway, "summary_failed", "まとめを作れませんでした。少したってからもう一度お試しください")
 		return
 	}
@@ -237,9 +245,20 @@ func parseSenseSummary(raw string) (senseSummaryContent, error) {
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")
 	raw = strings.TrimSuffix(raw, "```")
+	raw = strings.TrimSpace(raw)
 	var out senseSummaryContent
-	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &out); err != nil {
-		return senseSummaryContent{}, fmt.Errorf("sense summary json: %w", err)
+	// 形を決めずに JSON を頼むと、Gemini は [{...}] のように配列で包んで返すことがある。そのときは1つ目を使う。
+	if strings.HasPrefix(raw, "[") {
+		var list []senseSummaryContent
+		if err := json.Unmarshal([]byte(raw), &list); err != nil {
+			return senseSummaryContent{}, fmt.Errorf("sense summary json: %w: %s", err, clipRunes(raw, 200))
+		}
+		if len(list) == 0 {
+			return senseSummaryContent{}, errors.New("sense summary: 空の配列です")
+		}
+		out = list[0]
+	} else if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return senseSummaryContent{}, fmt.Errorf("sense summary json: %w: %s", err, clipRunes(raw, 200))
 	}
 	out = cleanSenseSummary(out)
 	if out.Overview == "" {
