@@ -90,7 +90,7 @@ SELECT
 -- name: ListAccountMedia :many
 -- 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。
 SELECT 'image'::text AS resource, p.cloudinary_public_id::text AS public_id
-FROM posts p WHERE p.author_id = sqlc.arg('user_id') AND p.kind = 'text' AND p.cloudinary_public_id IS NOT NULL
+FROM posts p WHERE p.author_id = sqlc.arg('user_id') AND p.kind IN ('text', 'instagram') AND p.cloudinary_public_id IS NOT NULL
 UNION ALL
 SELECT 'video'::text, p.cloudinary_public_id::text
 FROM posts p WHERE p.author_id = sqlc.arg('user_id') AND p.kind = 'video' AND p.cloudinary_public_id IS NOT NULL

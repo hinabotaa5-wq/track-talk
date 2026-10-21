@@ -15,15 +15,6 @@ WHERE author_id = sqlc.arg('author_id')
 ORDER BY day DESC, created_at DESC, id DESC
 LIMIT sqlc.arg('page_size');
 
--- name: UpdateSenseNote :one
-UPDATE sense_notes
-SET body = sqlc.arg('body'),
-    event = sqlc.narg('event'),
-    updated_at = now()
-WHERE id = sqlc.arg('id')
-  AND author_id = sqlc.arg('author_id')
-RETURNING id, body, event, day, created_at, updated_at;
-
 -- name: DeleteSenseNote :execrows
 DELETE FROM sense_notes
 WHERE id = $1
@@ -71,6 +62,12 @@ ORDER BY day, created_at, id;
 INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, summary)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, from_day, to_day, note_count, summary, created_at;
+
+-- name: CountSenseNoteSummariesSince :one
+-- その日(since は日本時間の0時)に作ったまとめの数。1日の上限に使う。
+SELECT count(*) FROM sense_note_summaries
+WHERE author_id = $1
+  AND created_at >= sqlc.arg('since');
 
 -- name: LatestSenseNoteSummary :one
 SELECT id, from_day, to_day, note_count, summary, created_at

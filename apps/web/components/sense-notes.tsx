@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Lock, Pencil, Trash2 } from "lucide-react";
+import { Lock, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
@@ -17,13 +17,11 @@ function SenseNoteFields({
   event,
   onBody,
   onEvent,
-  autoFocus = false,
 }: {
   body: string;
   event: string;
   onBody: (v: string) => void;
   onEvent: (v: string) => void;
-  autoFocus?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -35,7 +33,6 @@ function SenseNoteFields({
           placeholder={senseNotePlaceholder}
           rows={3}
           maxLength={senseNoteMaxLength + 20}
-          autoFocus={autoFocus}
         />
       </label>
       <div className="flex items-center gap-3">
@@ -141,47 +138,17 @@ export function SenseNoteComposer({
   );
 }
 
-// 一覧の1件。本人だけが見るので、編集と削除をその場で出す。
+// 一覧の1件。書いたときの感覚をそのまま残すため、あとから直せない(消すことはできる)。
 export function SenseNoteItem({
   note,
   token,
-  onUpdated,
   onDeleted,
 }: {
   note: SenseNote;
   token: string | null;
-  onUpdated: (note: SenseNote) => void;
   onDeleted: (id: string, stats: SenseNoteStats) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [body, setBody] = useState(note.body);
-  const [event, setEvent] = useState(note.event ?? "");
-  const [error, setError] = useState("");
   const lock = useActionLock();
-
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    const text = body.trim();
-    if (!text || [...text].length > senseNoteMaxLength) {
-      setError(`1〜${senseNoteMaxLength}文字で書いてください`);
-      return;
-    }
-    if (!lock.acquire()) return;
-    setError("");
-    try {
-      const updated = await apiFetch<SenseNote>(`/v1/me/sense-notes/${note.id}`, {
-        method: "PATCH",
-        token,
-        body: JSON.stringify({ body: text, event: event || null }),
-      });
-      onUpdated(updated);
-      setEditing(false);
-    } catch (err) {
-      setError(apiErrorText(err, "保存できませんでした"));
-    } finally {
-      lock.release();
-    }
-  }
 
   async function remove() {
     if (!confirm("この感覚メモを削除しますか？")) return;
@@ -195,32 +162,6 @@ export function SenseNoteItem({
     }
   }
 
-  if (editing) {
-    return (
-      <form onSubmit={save} className="space-y-2 rounded-xl border border-white/25 glass bg-white/12 p-3">
-        <SenseNoteFields body={body} event={event} onBody={setBody} onEvent={setEvent} autoFocus />
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setBody(note.body);
-              setEvent(note.event ?? "");
-              setError("");
-              setEditing(false);
-            }}
-          >
-            やめる
-          </Button>
-          <Button type="submit" disabled={lock.pending}>
-            保存する
-          </Button>
-        </div>
-      </form>
-    );
-  }
-
   return (
     <div className="flex items-start gap-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
       <div className="min-w-0 flex-1 space-y-1.5">
@@ -232,15 +173,6 @@ export function SenseNoteItem({
         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-100">{note.body}</p>
       </div>
       <div className="flex shrink-0 gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          disabled={lock.pending}
-          aria-label="編集"
-          className="inline-flex size-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 hover:text-white active:scale-95 disabled:opacity-50"
-        >
-          <Pencil className="size-4" aria-hidden />
-        </button>
         <button
           type="button"
           onClick={remove}

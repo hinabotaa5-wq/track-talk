@@ -498,11 +498,10 @@ export function PostDetail({
       ) : post.kind === "youtube" && post.youtube_video_id ? (
         <YouTubePlayer
           videoId={post.youtube_video_id}
-          title={feedTitle(post.title)}
-          thumbnailUrl={post.thumbnail_url}
+          title={feedTitle(post.title) || post.source_title || "YouTube動画"}
         />
       ) : post.kind === "instagram" && post.instagram_type && post.instagram_shortcode ? (
-        <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title)} />
+        <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title) || "投稿"} />
       ) : post.thumbnail_url ? (
         <ZoomableImage
           src={post.thumbnail_url}
@@ -513,7 +512,7 @@ export function PostDetail({
           priority
         />
       ) : null}
-      {post.kind === "practice" || ((post.kind === "youtube" || post.kind === "instagram") && !hasFeedTitle(post.title)) ? null : (
+      {post.kind === "practice" || !hasFeedTitle(post.title) ? null : (
         <h1 className="text-4xl font-bold [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
@@ -588,7 +587,7 @@ export function PostDetail({
       )}
       <section className={`space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="truncate text-xl font-semibold">{feedTitle(post.title)}</h2>
+          <h2 className="truncate text-xl font-semibold">{feedTitle(post.title) || "コメント"}</h2>
         ) : (
           <h2 className="text-xl font-semibold">コメント</h2>
         )}

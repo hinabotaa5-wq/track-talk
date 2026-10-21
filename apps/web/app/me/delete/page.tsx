@@ -7,6 +7,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
+import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -26,6 +27,9 @@ export default function DeleteAccountPage() {
 
   async function leave() {
     leaving.current = true;
+    // 退会で消えた投稿が、ホームの一覧に残らないようにする。
+    clearHomeFeeds();
+    clearSavedFeeds();
     await unsubscribePushOnThisDevice(null);
     const supabase = createClient();
     await supabase?.auth.signOut();

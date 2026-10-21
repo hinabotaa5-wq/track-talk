@@ -7,8 +7,9 @@ import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, hasBackOnlyHeader, mainTabHref, mainTabs, meTab, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, meTab, showsBackButton } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
+import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
@@ -83,6 +84,9 @@ export function Header() {
   }
 
   const current = activeMainTab(pathname);
+
+  // ヘッダーを出さない画面でも、iPhone の上の切り欠きに中身が重ならないよう余白だけ残す。
+  if (hidesHeader(pathname, search, profileIncomplete(profile))) return <div aria-hidden style={{ paddingTop: "env(safe-area-inset-top)" }} />;
 
   return (
     // 1 割でも透けると、下に流れた文字が blur でにじんでヘッダーがぼやけて見える。

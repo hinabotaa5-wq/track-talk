@@ -16,6 +16,8 @@ type citeInstagramReq struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
+	// 任意の表紙の画像。Instagram の表紙は外から確実に取れないので、投稿者が付けたものをカードに出す。
+	ImagePublicID string `json:"image_public_id"`
 }
 
 // InstagramFromURL は公開の投稿(/p/)とリール(/reel/)の URL から種類とショートコードを取り出す。
@@ -91,12 +93,30 @@ func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 	if e := PostBody(req.Body); e != "" {
 		fields["body"] = e
 	}
+	var cover *string
+	if id := strings.TrimSpace(req.ImagePublicID); id != "" {
+		if e := ImagePublicID(id); e != "" {
+			fields["image_public_id"] = e
+		}
+		cover = &id
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
 	}
+	// 同じ投稿のスレッドが既にあれば、そちらを返す(付けた表紙は使わない)。
 	if s.writeExistingInstagram(w, r, code) {
 		return
+	}
+	if cover != nil {
+		if !s.uploadIssuedToMe(w, r, profile.ID, *cover, "image_public_id", "表紙の画像") {
+			return
+		}
+		if err := s.cloud.ImageReady(r.Context(), *cover); err != nil {
+			s.purgeRejectedUpload(err, "image", *cover)
+			writeAssetReadyError(w, err, "表紙の画像")
+			return
+		}
 	}
 	created, err := s.q.CreatePost(r.Context(), db.CreatePostParams{
 		ID:                 uuid.New(),
@@ -106,6 +126,7 @@ func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 		Kind:               "instagram",
 		InstagramType:      &kind,
 		InstagramShortcode: &code,
+		CloudinaryPublicID: cover,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError

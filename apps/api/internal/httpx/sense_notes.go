@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
-	"github.com/jackc/pgx/v5"
 )
 
 // 感覚メモは本人だけが読み書きする。投稿とは別のテーブルで、フィードにも公開ページにも出さない。
@@ -258,38 +257,6 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 		"note":  senseNoteFrom(row.ID, row.Body, row.Event, row.Day, row.CreatedAt, row.UpdatedAt),
 		"stats": stats,
 	})
-}
-
-// updateSenseNote は、メモの文と種目を直す。メモの日は変えない。
-func (s *Server) updateSenseNote(w http.ResponseWriter, r *http.Request) {
-	me, ok := s.requireProfile(w, r)
-	if !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	var req senseNoteReq
-	if err := DecodeJSON(r, &req); err != nil {
-		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return
-	}
-	body, event, fields := normalizeSenseNote(req)
-	if len(fields) > 0 {
-		FieldError(w, fields)
-		return
-	}
-	row, err := s.q.UpdateSenseNote(r.Context(), db.UpdateSenseNoteParams{ID: id, AuthorID: me.ID, Body: body, Event: event})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			Error(w, http.StatusNotFound, "not_found", "感覚メモが見つかりません")
-			return
-		}
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, senseNoteFrom(row.ID, row.Body, row.Event, row.Day, row.CreatedAt, row.UpdatedAt))
 }
 
 func (s *Server) deleteSenseNote(w http.ResponseWriter, r *http.Request) {

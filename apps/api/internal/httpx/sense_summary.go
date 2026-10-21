@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -23,7 +24,10 @@ const (
 	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
 	senseSummaryMinNotes = 6
 	// 何日も作らずにためたときのために、一度に渡す数の上限。新しい方から選ぶ。
-	maxSenseSummaryNotes    = 60
+	maxSenseSummaryNotes = 60
+	// 1日(日本時間)に作れるまとめの数。日付をさかのぼって書けば6個はすぐにたまるので、上限が無いと1人で
+	// Gemini を何度でも呼べてしまう(無料枠の1日の回数は、大会の取り込みと同じ鍵で分け合っている)。
+	maxSenseSummariesPerDay = 3
 	maxSenseSummaryItems    = 3
 	maxSenseSummaryOverview = 300
 	maxSenseSummaryItem     = 100
@@ -126,6 +130,19 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("release sense summary claim", "err", err)
 		}
 	}()
+	y, m, d := s.now().In(jst.Zone).Date()
+	made, err := s.q.CountSenseNoteSummariesSince(r.Context(), db.CountSenseNoteSummariesSinceParams{
+		AuthorID: me.ID,
+		Since:    time.Date(y, m, d, 0, 0, 0, 0, jst.Zone),
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if made >= maxSenseSummariesPerDay {
+		Error(w, http.StatusTooManyRequests, "rate_limited", fmt.Sprintf("まとめは1日に%d回までです。明日またまとめられます", maxSenseSummariesPerDay))
+		return
+	}
 	// 前のまとめのあとに書いたメモだけをまとめる。はじめては、これまでのすべて。
 	var since time.Time
 	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)

@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { activeMainTab, hasBackOnlyHeader, mainTabs, mainTabHref, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabs, mainTabHref, showsBackButton } from "./bottom-nav";
 
 describe("mainTabHref", () => {
   it("下のメニューは ホーム→大会→メモ→コーチ→ケガ の順", () => {
     expect(mainTabs.map((tab) => tab.id)).toEqual(["home", "competitions", "memo", "coaching", "injury"]);
   });
 
-  it("ログインしていなくても、メモとマイページ以外のタブはそのまま開ける", () => {
+  it("ログインしていなくても、マイページ以外のタブはそのまま開ける", () => {
     expect(mainTabHref("home", false)).toBe("/");
+    expect(mainTabHref("memo", false)).toBe("/memo");
     expect(mainTabHref("competitions", false)).toBe("/competitions");
     expect(mainTabHref("coaching", false)).toBe("/coaching");
     expect(mainTabHref("injury", false)).toBe("/injury");
   });
 
-  it("メモとマイページは、ログインしていなければログイン画面に向ける", () => {
-    expect(mainTabHref("memo", false)).toBe("/login");
+  it("マイページは、ログインしていなければログイン画面に向ける", () => {
     expect(mainTabHref("memo", true)).toBe("/memo");
     expect(activeMainTab("/memo")).toBe("memo");
     expect(mainTabHref("me", false)).toBe("/login");
@@ -46,5 +46,20 @@ describe("hasBackOnlyHeader", () => {
     expect(showsBackButton("/injury/hamstring-strain")).toBe(true);
     expect(showsBackButton("/injury/hamstring-strain/stage")).toBe(true);
     expect(showsBackButton("/injury/data")).toBe(false);
+  });
+});
+
+describe("hidesHeader", () => {
+  it("はじめのニックネーム・種目の画面と、新しいパスワードの画面ではヘッダーを出さない", () => {
+    expect(hidesHeader("/me/profile", "?onboarding=1")).toBe(true);
+    expect(hidesHeader("/reset-password/update")).toBe(true);
+    expect(hidesHeader("/reset-password/update", "?code=x")).toBe(true);
+    expect(hidesHeader("/me/profile", "", true)).toBe(true);
+  });
+
+  it("マイページから開いたニックネームの変更や、ほかの画面では出す", () => {
+    expect(hidesHeader("/me/profile")).toBe(false);
+    expect(hidesHeader("/reset-password")).toBe(false);
+    expect(hidesHeader("/")).toBe(false);
   });
 });

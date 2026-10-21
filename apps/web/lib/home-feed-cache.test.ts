@@ -5,7 +5,7 @@ vi.mock("./api", () => ({
   apiFetch: () => new Promise((r) => (resolve = r)),
 }));
 
-import { clearHomeFeeds, clearSavedFeeds, isRenderFresh, loadSavedFeed, readFeed, savedFeedPath } from "./home-feed-cache";
+import { clearHomeFeeds, clearSavedFeeds, isRenderFresh, loadSavedFeed, readFeed, renderSeedTime, savedFeedPath } from "./home-feed-cache";
 
 describe("saved feed cache", () => {
   it("does not write back a request that started before clearing", async () => {
@@ -25,5 +25,13 @@ describe("server-rendered home feed", () => {
     clearHomeFeeds();
     expect(isRenderFresh(renderedAt)).toBe(false);
     expect(isRenderFresh(Date.now() + 1_000)).toBe(true);
+  });
+});
+
+describe("home feed rendered a while ago", () => {
+  it("is fetched again when it came from the edge cache", () => {
+    const now = 1_000_000;
+    expect(renderSeedTime(now - 2_000, now)).toBe(now);
+    expect(renderSeedTime(now - 60_000, now)).toBe(0);
   });
 });

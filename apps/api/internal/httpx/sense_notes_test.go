@@ -92,16 +92,13 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 		t.Fatalf("list = %+v", list)
 	}
 
-	// 他の人には見えず、編集・削除もできない。
+	// 他の人には見えず、削除もできない。
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes", other, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
 	if len(list.Notes) != 0 || list.Stats.Total != 0 {
 		t.Fatalf("other sees = %+v", list)
 	}
 	path := "/v1/me/sense-notes/" + created.Note.ID
-	if rec := doJSON(t, h, http.MethodPatch, path, other, map[string]any{"body": "乗っ取り"}); rec.Code != http.StatusNotFound {
-		t.Fatalf("other patch = %d", rec.Code)
-	}
 	if rec := doJSON(t, h, http.MethodDelete, path, other, nil); rec.Code != http.StatusNotFound {
 		t.Fatalf("other delete = %d", rec.Code)
 	}
@@ -110,11 +107,9 @@ func TestSenseNotesStayWithTheWriter(t *testing.T) {
 		t.Fatal("sense note leaked into the feed")
 	}
 
-	rec = doJSON(t, h, http.MethodPatch, path, me, map[string]any{"body": "接地で地面を強く押せた", "event": nil})
-	var updated senseNoteItem
-	_ = json.Unmarshal(rec.Body.Bytes(), &updated)
-	if rec.Code != http.StatusOK || updated.Body != "接地で地面を強く押せた" || updated.Event != nil {
-		t.Fatalf("patch = %d %+v", rec.Code, updated)
+	// 書いたあとの感覚は直せない(書いたときの感覚をそのまま残す)。
+	if rec := doJSON(t, h, http.MethodPatch, path, me, map[string]any{"body": "接地で地面を強く押せた"}); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("patch = %d, want 405", rec.Code)
 	}
 
 	rec = doJSON(t, h, http.MethodDelete, path, me, nil)

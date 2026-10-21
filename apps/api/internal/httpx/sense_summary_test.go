@@ -265,3 +265,33 @@ func TestSenseSummaryCountsOldNotes(t *testing.T) {
 		t.Fatalf("summary of old notes = %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// まとめは1日に3回まで。日付をさかのぼって書けば6個はすぐにたまるので、上限が無いと1人で
+// Gemini を何度でも呼べて、無料枠(大会の取り込みと同じ鍵)を使い切ってしまう。
+func TestSenseSummaryDailyLimit(t *testing.T) {
+	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	url := ai.serve(t)
+	h := setupConfig(t, func(c *config.Config) {
+		c.SenseSummaryEnabled = true
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = url
+	})
+	me := token(t, uuid.New())
+	for i := 0; i < 3; i++ {
+		writeSenseNotes(t, h, me, 6*i, 6)
+		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusCreated {
+			t.Fatalf("summary %d = %d %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+	writeSenseNotes(t, h, me, 18, 6)
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), "1日に3回") {
+		t.Fatalf("4th summary = %d %s", rec.Code, rec.Body.String())
+	}
+	ai.mu.Lock()
+	calls := len(ai.prompts)
+	ai.mu.Unlock()
+	if calls != 3 {
+		t.Fatalf("gemini calls = %d, want 3", calls)
+	}
+}
