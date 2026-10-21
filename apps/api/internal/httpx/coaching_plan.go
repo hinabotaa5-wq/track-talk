@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,6 +22,16 @@ const (
 	// これを超える値段は、打ち間違いでないかを1回確かめてから保存する。
 	highPlanPriceYen = 30000
 	maxPlanCapacity  = 50
+	// お試しプランの値段の上限。月額プランの前に気軽に試せる値段にする。
+	maxTrialPriceYen = 3000
+	// 動画への返答の回数の上限。0 は回数を決めない（期間中いつでも）。
+	maxVideoReviews = 30
+)
+
+// プランの「何が返ってくるか」で選べる値。DB の CHECK と合わせる。
+var (
+	planMenuUpdates  = []string{"none", "once", "weekly"}
+	planReplyFormats = []string{"text", "video"}
 )
 
 func pledged(c db.CoachProfile) bool {
@@ -31,7 +42,7 @@ func validPlanDuration(kind string, days int) bool {
 	switch kind {
 	case "period":
 		return days == 14 || days == 30
-	case "single":
+	case "single", "trial":
 		return days == 7
 	}
 	return false
@@ -47,6 +58,12 @@ func coachingPlanJSON(p db.CoachingPlan) map[string]any {
 		"price_yen":     p.PriceYen,
 		"capacity":      p.Capacity,
 		"published":     p.Published,
+		// 何が返ってくるか。null か空なら、コーチが書いていない。
+		"video_reviews": p.VideoReviews,
+		"menu_updates":  p.MenuUpdates,
+		"reply_formats": nonNilStrings(p.ReplyFormats),
+		// 期間を、最初の動画が届いた日から数えるか。
+		"start_on_first_video": p.StartOnFirstVideo,
 	}
 }
 
@@ -106,6 +123,29 @@ type coachingPlanReq struct {
 	Capacity         *int   `json:"capacity"`
 	Published        *bool  `json:"published"`
 	ConfirmHighPrice bool   `json:"confirm_high_price"`
+	// 何が返ってくるか。どれも書かなくてよい。
+	VideoReviews *int     `json:"video_reviews"`
+	MenuUpdates  *string  `json:"menu_updates"`
+	ReplyFormats []string `json:"reply_formats"`
+	// 期間を、最初の動画が届いた日から数えるか。
+	StartOnFirstVideo bool `json:"start_on_first_video"`
+}
+
+// includes は、「何が返ってくるか」を DB に入れる形にする。validate のあとで呼ぶ。
+func (req *coachingPlanReq) includes() (*int16, *string, []string) {
+	var reviews *int16
+	if req.VideoReviews != nil {
+		n := int16(*req.VideoReviews)
+		reviews = &n
+	}
+	// 選んだ順ではなく、決まった順で持つ。
+	formats := []string{}
+	for _, f := range planReplyFormats {
+		if slices.Contains(req.ReplyFormats, f) {
+			formats = append(formats, f)
+		}
+	}
+	return reviews, req.MenuUpdates, formats
 }
 
 // validate は入力を確かめる。prevPrice は直す前の値段（新しく作るときは 0）で、値段を変えないなら高い値段の確認はいらない。
@@ -113,12 +153,15 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Description = strings.TrimSpace(req.Description)
 	fields := map[string]string{}
-	if req.Kind != "period" && req.Kind != "single" {
+	if req.Kind != "period" && req.Kind != "single" && req.Kind != "trial" {
 		fields["kind"] = "プランの種類を選んでください"
 	} else if req.DurationDays == nil || !validPlanDuration(req.Kind, *req.DurationDays) {
-		if req.Kind == "single" {
+		switch req.Kind {
+		case "single":
 			fields["duration_days"] = "単発は7日です"
-		} else {
+		case "trial":
+			fields["duration_days"] = "お試しは7日です"
+		default:
 			fields["duration_days"] = "期間は2週間か1か月を選んでください"
 		}
 	}
@@ -132,6 +175,8 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	switch {
 	case req.PriceYen == nil || *req.PriceYen < minPlanPriceYen:
 		fields["price_yen"] = "値段は2,000円以上にしてください"
+	case req.Kind == "trial" && *req.PriceYen > maxTrialPriceYen:
+		fields["price_yen"] = "お試しの値段は2,000〜3,000円にしてください"
 	case *req.PriceYen > maxPlanPriceYen:
 		fields["price_yen"] = "値段が大きすぎます。桁を確かめてください"
 	case *req.PriceYen > highPlanPriceYen && *req.PriceYen != prevPrice && !req.ConfirmHighPrice:
@@ -140,7 +185,32 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	if req.Capacity == nil || *req.Capacity < 1 || *req.Capacity > maxPlanCapacity {
 		fields["capacity"] = "同時に受ける人数は1〜50人にしてください"
 	}
+	if req.VideoReviews != nil && (*req.VideoReviews < 0 || *req.VideoReviews > maxVideoReviews) {
+		fields["video_reviews"] = "動画への返答の回数は30回までにしてください"
+	}
+	if req.MenuUpdates != nil && !slices.Contains(planMenuUpdates, *req.MenuUpdates) {
+		fields["menu_updates"] = "メニューの作り方を選び直してください"
+	}
+	for _, f := range req.ReplyFormats {
+		if !slices.Contains(planReplyFormats, f) {
+			fields["reply_formats"] = "返し方を選び直してください"
+		}
+	}
 	return fields
+}
+
+// noOtherTrialPlan は、このコーチにほかのお試しプランがないかを確かめる。あれば 409 を返して false。
+func (s *Server) noOtherTrialPlan(w http.ResponseWriter, r *http.Request, q *db.Queries, coachID, exclude uuid.UUID) bool {
+	n, err := q.CountOtherTrialPlans(r.Context(), db.CountOtherTrialPlansParams{CoachID: coachID, ExcludeID: exclude})
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if n > 0 {
+		Error(w, http.StatusConflict, "conflict", "お試しプランは1つまでです。いまのお試しプランを直して使ってください")
+		return false
+	}
+	return true
 }
 
 func (s *Server) listMyCoachingPlans(w http.ResponseWriter, r *http.Request) {
@@ -198,20 +268,28 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "conflict", "プランは10個までです。使わないプランを直して使ってください")
 		return
 	}
+	if req.Kind == "trial" && !s.noOtherTrialPlan(w, r, q, c.ProfileID, uuid.Nil) {
+		return
+	}
 	published := true
 	if req.Published != nil {
 		published = *req.Published
 	}
+	reviews, menu, formats := req.includes()
 	p, err := q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
-		ID:           uuid.New(),
-		CoachID:      c.ProfileID,
-		Kind:         req.Kind,
-		Title:        req.Title,
-		Description:  req.Description,
-		DurationDays: int16(*req.DurationDays),
-		PriceYen:     int32(*req.PriceYen),
-		Capacity:     int16(*req.Capacity),
-		Published:    published,
+		ID:                uuid.New(),
+		CoachID:           c.ProfileID,
+		Kind:              req.Kind,
+		Title:             req.Title,
+		Description:       req.Description,
+		DurationDays:      int16(*req.DurationDays),
+		PriceYen:          int32(*req.PriceYen),
+		Capacity:          int16(*req.Capacity),
+		Published:         published,
+		VideoReviews:      reviews,
+		MenuUpdates:       menu,
+		ReplyFormats:      formats,
+		StartOnFirstVideo: req.StartOnFirstVideo,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -247,6 +325,9 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	if req.Kind == "trial" && current.Kind != "trial" && !s.noOtherTrialPlan(w, r, s.q, c.ProfileID, id) {
+		return
+	}
 	published := current.Published
 	if req.Published != nil {
 		published = *req.Published
@@ -255,16 +336,21 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "pledge_required", "先にパーソナル指導の誓約をしてください")
 		return
 	}
+	reviews, menu, formats := req.includes()
 	p, err := s.q.UpdateCoachingPlan(r.Context(), db.UpdateCoachingPlanParams{
-		ID:           id,
-		CoachID:      c.ProfileID,
-		Kind:         req.Kind,
-		Title:        req.Title,
-		Description:  req.Description,
-		DurationDays: int16(*req.DurationDays),
-		PriceYen:     int32(*req.PriceYen),
-		Capacity:     int16(*req.Capacity),
-		Published:    published,
+		ID:                id,
+		CoachID:           c.ProfileID,
+		Kind:              req.Kind,
+		Title:             req.Title,
+		Description:       req.Description,
+		DurationDays:      int16(*req.DurationDays),
+		PriceYen:          int32(*req.PriceYen),
+		Capacity:          int16(*req.Capacity),
+		Published:         published,
+		VideoReviews:      reviews,
+		MenuUpdates:       menu,
+		ReplyFormats:      formats,
+		StartOnFirstVideo: req.StartOnFirstVideo,
 	})
 	if err != nil {
 		MapDBError(w, err)

@@ -427,9 +427,21 @@ export type AdminCoachPayout = CoachPayout & {
   created_at: string;
 };
 
-// パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発。
-export type CoachingPlanKind = "period" | "single";
-export type CoachingPlan = {
+// パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発、
+// trial はそのコーチの指導をはじめて受ける人だけが申し込める7日のお試し。
+export type CoachingPlanKind = "period" | "single" | "trial";
+// プランで「何が返ってくるか」。null か空なら、コーチが書いていない。
+// video_reviews は動画への返答の回数（0 は回数を決めない）、menu_updates は練習メニューの作り方、reply_formats は返し方。
+export type PlanMenuUpdates = "none" | "once" | "weekly";
+export type PlanReplyFormat = "text" | "video";
+// start_on_first_video は、期間を最初の動画が届いた日から数えるか。
+export type PlanIncludes = {
+  video_reviews: number | null;
+  menu_updates: PlanMenuUpdates | null;
+  reply_formats: PlanReplyFormat[];
+  start_on_first_video: boolean;
+};
+export type CoachingPlan = PlanIncludes & {
   id: string;
   kind: CoachingPlanKind;
   title: string;
@@ -456,7 +468,9 @@ export type CoachingContractStatus =
   | "guardian_declined"
   | "expired"
   | "cancelled";
-export type CoachingContract = {
+export type CoachingContract = PlanIncludes & {
+  // 最初の動画から数えるプランで、動画が届いて期間を数え始めた時刻。
+  clock_started_at: string | null;
   id: string;
   plan_id: string;
   plan_kind: CoachingPlanKind;

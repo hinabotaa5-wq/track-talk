@@ -339,6 +339,8 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		plan := coachingPlanJSON(db.CoachingPlan{
 			ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 			DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
+			VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
+			StartOnFirstVideo: p.StartOnFirstVideo,
 		})
 		plan["full"] = p.ActiveCount >= int32(p.Capacity)
 		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)

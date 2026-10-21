@@ -19,7 +19,7 @@ SET status = CASE WHEN ct.minor OR $1::boolean THEN 'accepted' ELSE 'active' END
     responded_at = now(),
     start_by = CASE WHEN ct.minor OR $1::boolean THEN now() + interval '72 hours' END,
     starts_at = CASE WHEN ct.minor OR $1::boolean THEN NULL ELSE now() END,
-    ends_at = CASE WHEN ct.minor OR $1::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days) END,
+    ends_at = CASE WHEN ct.minor OR $1::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END) END,
     updated_at = now()
 FROM coaching_plans pl
 WHERE ct.id = $2
@@ -28,7 +28,7 @@ WHERE ct.id = $2
   AND ct.respond_by > now()
   AND pl.id = ct.plan_id
   AND (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity
-RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at
+RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at
 `
 
 type AcceptCoachingContractParams struct {
@@ -38,6 +38,7 @@ type AcceptCoachingContractParams struct {
 }
 
 // 返事待ちで期限内のものだけ承諾できる。
+// 最初の動画から数えるプラン（start_on_first_video）は、終了日を7日先に延ばしておき、動画が届いたら StartCoachingClock で数え直す。
 // 支払いがあるとき（payment_required）は、72時間以内に支払いが済んだら始まる（18歳未満は保護者が同意して払う）。
 // デモ版（支払いなし）は、大人は承諾したらそのまま期間が始まり、18歳未満は保護者が72時間以内に同意したら始まる。
 // 同じプランで枠を使っている人数が上限に届いていたら承諾できない（行が返らない）。
@@ -69,6 +70,11 @@ func (q *Queries) AcceptCoachingContract(ctx context.Context, arg AcceptCoaching
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
@@ -159,7 +165,7 @@ UPDATE coaching_contracts
 SET status = 'cancelled',
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND status = 'applied'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 type CancelCoachingContractParams struct {
@@ -196,6 +202,11 @@ func (q *Queries) CancelCoachingContract(ctx context.Context, arg CancelCoaching
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
@@ -224,26 +235,31 @@ func (q *Queries) CoachingReportOnContract(ctx context.Context, arg CoachingRepo
 const createCoachingContract = `-- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,
-    event, goal, current_record, message, minor, respond_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+    event, goal, current_record, message, minor, respond_by,
+    video_reviews, menu_updates, reply_formats, start_on_first_video
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 type CreateCoachingContractParams struct {
-	ID            uuid.UUID `json:"id"`
-	PlanID        uuid.UUID `json:"plan_id"`
-	CoachID       uuid.UUID `json:"coach_id"`
-	RequesterID   uuid.UUID `json:"requester_id"`
-	PlanKind      string    `json:"plan_kind"`
-	PlanTitle     string    `json:"plan_title"`
-	DurationDays  int16     `json:"duration_days"`
-	PriceYen      int32     `json:"price_yen"`
-	Event         string    `json:"event"`
-	Goal          string    `json:"goal"`
-	CurrentRecord string    `json:"current_record"`
-	Message       string    `json:"message"`
-	Minor         bool      `json:"minor"`
-	RespondBy     time.Time `json:"respond_by"`
+	ID                uuid.UUID `json:"id"`
+	PlanID            uuid.UUID `json:"plan_id"`
+	CoachID           uuid.UUID `json:"coach_id"`
+	RequesterID       uuid.UUID `json:"requester_id"`
+	PlanKind          string    `json:"plan_kind"`
+	PlanTitle         string    `json:"plan_title"`
+	DurationDays      int16     `json:"duration_days"`
+	PriceYen          int32     `json:"price_yen"`
+	Event             string    `json:"event"`
+	Goal              string    `json:"goal"`
+	CurrentRecord     string    `json:"current_record"`
+	Message           string    `json:"message"`
+	Minor             bool      `json:"minor"`
+	RespondBy         time.Time `json:"respond_by"`
+	VideoReviews      *int16    `json:"video_reviews"`
+	MenuUpdates       *string   `json:"menu_updates"`
+	ReplyFormats      []string  `json:"reply_formats"`
+	StartOnFirstVideo bool      `json:"start_on_first_video"`
 }
 
 func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoachingContractParams) (CoachingContract, error) {
@@ -262,6 +278,10 @@ func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoaching
 		arg.Message,
 		arg.Minor,
 		arg.RespondBy,
+		arg.VideoReviews,
+		arg.MenuUpdates,
+		arg.ReplyFormats,
+		arg.StartOnFirstVideo,
 	)
 	var i CoachingContract
 	err := row.Scan(
@@ -289,6 +309,11 @@ func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoaching
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
@@ -299,7 +324,7 @@ SET status = 'declined',
     responded_at = now(),
     updated_at = now()
 WHERE id = $1 AND coach_id = $2 AND status = 'applied'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 type DeclineCoachingContractParams struct {
@@ -335,6 +360,11 @@ func (q *Queries) DeclineCoachingContract(ctx context.Context, arg DeclineCoachi
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
@@ -344,7 +374,7 @@ UPDATE coaching_contracts
 SET status = 'ended',
     updated_at = now()
 WHERE status = 'active' AND ends_at <= now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 // 期間が終わったものを閉じる。
@@ -382,6 +412,11 @@ func (q *Queries) EndCoachingContracts(ctx context.Context) ([]CoachingContract,
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -398,7 +433,7 @@ UPDATE coaching_contracts
 SET status = 'expired',
     updated_at = now()
 WHERE status = 'applied' AND respond_by <= now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 // 48時間返事がなかった申し込みを閉じる。
@@ -436,6 +471,11 @@ func (q *Queries) ExpireCoachingApplications(ctx context.Context) ([]CoachingCon
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -452,7 +492,7 @@ UPDATE coaching_contracts
 SET status = 'expired',
     updated_at = now()
 WHERE status = 'accepted' AND start_by <= now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 // 承諾から72時間のうちに保護者の同意（支払いがあるときは支払い）がなかったものを閉じる。
@@ -490,6 +530,11 @@ func (q *Queries) ExpireCoachingStarts(ctx context.Context) ([]CoachingContract,
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -502,7 +547,7 @@ func (q *Queries) ExpireCoachingStarts(ctx context.Context) ([]CoachingContract,
 }
 
 const getCoachingContract = `-- name: GetCoachingContract :one
-SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at FROM coaching_contracts
+SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at FROM coaching_contracts
 WHERE id = $1
 `
 
@@ -534,12 +579,17 @@ func (q *Queries) GetCoachingContract(ctx context.Context, id uuid.UUID) (Coachi
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
 
 const getCoachingContractDetail = `-- name: GetCoachingContractDetail :one
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at,
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at,
     cp.nickname AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     rp.nickname AS requester_nickname
@@ -575,6 +625,11 @@ type GetCoachingContractDetailRow struct {
 	SuspendedAt        *time.Time `json:"suspended_at"`
 	PaymentRequired    bool       `json:"payment_required"`
 	MessagesPurgedAt   *time.Time `json:"messages_purged_at"`
+	VideoReviews       *int16     `json:"video_reviews"`
+	MenuUpdates        *string    `json:"menu_updates"`
+	ReplyFormats       []string   `json:"reply_formats"`
+	StartOnFirstVideo  bool       `json:"start_on_first_video"`
+	ClockStartedAt     *time.Time `json:"clock_started_at"`
 	CoachNickname      *string    `json:"coach_nickname"`
 	CoachPhotoPublicID *string    `json:"coach_photo_public_id"`
 	RequesterNickname  *string    `json:"requester_nickname"`
@@ -609,6 +664,11 @@ func (q *Queries) GetCoachingContractDetail(ctx context.Context, id uuid.UUID) (
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 		&i.CoachNickname,
 		&i.CoachPhotoPublicID,
 		&i.RequesterNickname,
@@ -618,7 +678,7 @@ func (q *Queries) GetCoachingContractDetail(ctx context.Context, id uuid.UUID) (
 
 const getPublicCoachingPlan = `-- name: GetPublicCoachingPlan :one
 SELECT
-    pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at,
+    pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at, pl.video_reviews, pl.menu_updates, pl.reply_formats, pl.start_on_first_video,
     p.nickname AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     c.tier AS coach_tier,
@@ -650,6 +710,10 @@ type GetPublicCoachingPlanRow struct {
 	Published          bool      `json:"published"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+	VideoReviews       *int16    `json:"video_reviews"`
+	MenuUpdates        *string   `json:"menu_updates"`
+	ReplyFormats       []string  `json:"reply_formats"`
+	StartOnFirstVideo  bool      `json:"start_on_first_video"`
 	CoachNickname      *string   `json:"coach_nickname"`
 	CoachPhotoPublicID *string   `json:"coach_photo_public_id"`
 	CoachTier          string    `json:"coach_tier"`
@@ -673,6 +737,10 @@ func (q *Queries) GetPublicCoachingPlan(ctx context.Context, arg GetPublicCoachi
 		&i.Published,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
 		&i.CoachNickname,
 		&i.CoachPhotoPublicID,
 		&i.CoachTier,
@@ -688,7 +756,7 @@ SET status = 'guardian_declined',
     start_by = NULL,
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND minor AND status = 'accepted'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 type GuardianDeclineCoachingContractParams struct {
@@ -724,6 +792,11 @@ func (q *Queries) GuardianDeclineCoachingContract(ctx context.Context, arg Guard
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }
@@ -732,11 +805,11 @@ const guardianStartCoachingContract = `-- name: GuardianStartCoachingContract :o
 UPDATE coaching_contracts
 SET status = 'active',
     starts_at = now(),
-    ends_at = now() + make_interval(days => duration_days),
+    ends_at = now() + make_interval(days => duration_days + CASE WHEN start_on_first_video THEN 7 ELSE 0 END),
     start_by = NULL,
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 type GuardianStartCoachingContractParams struct {
@@ -773,8 +846,33 @@ func (q *Queries) GuardianStartCoachingContract(ctx context.Context, arg Guardia
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
+}
+
+const hasCoachingStarted = `-- name: HasCoachingStarted :one
+SELECT EXISTS (
+    SELECT 1 FROM coaching_contracts
+    WHERE requester_id = $1 AND coach_id = $2 AND starts_at IS NOT NULL
+)::boolean
+`
+
+type HasCoachingStartedParams struct {
+	RequesterID uuid.UUID `json:"requester_id"`
+	CoachID     uuid.UUID `json:"coach_id"`
+}
+
+// この利用者が、このコーチの指導を受けたことがあるか（始まった申し込みがあるか）。お試しプランは、ない人だけが申し込める。
+func (q *Queries) HasCoachingStarted(ctx context.Context, arg HasCoachingStartedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasCoachingStarted, arg.RequesterID, arg.CoachID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const insertCoachingAccessLog = `-- name: InsertCoachingAccessLog :exec
@@ -846,12 +944,12 @@ func (q *Queries) ListAdminProfileIDs(ctx context.Context) ([]uuid.UUID, error) 
 }
 
 const listCoachContracts = `-- name: ListCoachContracts :many
-(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, p.nickname AS requester_nickname
+(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, p.nickname AS requester_nickname
  FROM coaching_contracts ct
  JOIN profiles p ON p.id = ct.requester_id
  WHERE ct.coach_id = $1 AND ct.status IN ('applied', 'accepted', 'active', 'suspended'))
 UNION ALL
-(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, p.nickname AS requester_nickname
+(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, p.nickname AS requester_nickname
  FROM coaching_contracts ct
  JOIN profiles p ON p.id = ct.requester_id
  WHERE ct.coach_id = $1 AND ct.status NOT IN ('applied', 'accepted', 'active', 'suspended')
@@ -885,6 +983,11 @@ type ListCoachContractsRow struct {
 	SuspendedAt       *time.Time `json:"suspended_at"`
 	PaymentRequired   bool       `json:"payment_required"`
 	MessagesPurgedAt  *time.Time `json:"messages_purged_at"`
+	VideoReviews      *int16     `json:"video_reviews"`
+	MenuUpdates       *string    `json:"menu_updates"`
+	ReplyFormats      []string   `json:"reply_formats"`
+	StartOnFirstVideo bool       `json:"start_on_first_video"`
+	ClockStartedAt    *time.Time `json:"clock_started_at"`
 	RequesterNickname *string    `json:"requester_nickname"`
 }
 
@@ -923,6 +1026,11 @@ func (q *Queries) ListCoachContracts(ctx context.Context, coachID uuid.UUID) ([]
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 			&i.RequesterNickname,
 		); err != nil {
 			return nil, err
@@ -1021,7 +1129,7 @@ func (q *Queries) ListCoachingBlockedAccounts(ctx context.Context) ([]ListCoachi
 }
 
 const listGuardianContracts = `-- name: ListGuardianContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1055,6 +1163,11 @@ type ListGuardianContractsRow struct {
 	SuspendedAt        *time.Time `json:"suspended_at"`
 	PaymentRequired    bool       `json:"payment_required"`
 	MessagesPurgedAt   *time.Time `json:"messages_purged_at"`
+	VideoReviews       *int16     `json:"video_reviews"`
+	MenuUpdates        *string    `json:"menu_updates"`
+	ReplyFormats       []string   `json:"reply_formats"`
+	StartOnFirstVideo  bool       `json:"start_on_first_video"`
+	ClockStartedAt     *time.Time `json:"clock_started_at"`
 	CoachNickname      *string    `json:"coach_nickname"`
 	CoachPhotoPublicID *string    `json:"coach_photo_public_id"`
 }
@@ -1094,6 +1207,11 @@ func (q *Queries) ListGuardianContracts(ctx context.Context, requesterID uuid.UU
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 			&i.CoachNickname,
 			&i.CoachPhotoPublicID,
 		); err != nil {
@@ -1108,7 +1226,7 @@ func (q *Queries) ListGuardianContracts(ctx context.Context, requesterID uuid.UU
 }
 
 const listMyCoachingContracts = `-- name: ListMyCoachingContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1142,6 +1260,11 @@ type ListMyCoachingContractsRow struct {
 	SuspendedAt        *time.Time `json:"suspended_at"`
 	PaymentRequired    bool       `json:"payment_required"`
 	MessagesPurgedAt   *time.Time `json:"messages_purged_at"`
+	VideoReviews       *int16     `json:"video_reviews"`
+	MenuUpdates        *string    `json:"menu_updates"`
+	ReplyFormats       []string   `json:"reply_formats"`
+	StartOnFirstVideo  bool       `json:"start_on_first_video"`
+	ClockStartedAt     *time.Time `json:"clock_started_at"`
 	CoachNickname      *string    `json:"coach_nickname"`
 	CoachPhotoPublicID *string    `json:"coach_photo_public_id"`
 }
@@ -1181,6 +1304,11 @@ func (q *Queries) ListMyCoachingContracts(ctx context.Context, requesterID uuid.
 			&i.SuspendedAt,
 			&i.PaymentRequired,
 			&i.MessagesPurgedAt,
+			&i.VideoReviews,
+			&i.MenuUpdates,
+			&i.ReplyFormats,
+			&i.StartOnFirstVideo,
+			&i.ClockStartedAt,
 			&i.CoachNickname,
 			&i.CoachPhotoPublicID,
 		); err != nil {
@@ -1215,7 +1343,7 @@ SET status = 'active',
     suspended_at = NULL,
     updated_at = now()
 WHERE id = $1 AND status = 'suspended'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 // 止めていた時間の分だけ終了日を延ばして再開する。
@@ -1247,8 +1375,32 @@ func (q *Queries) ResumeCoachingContract(ctx context.Context, id uuid.UUID) (Coa
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
+}
+
+const startCoachingClock = `-- name: StartCoachingClock :exec
+UPDATE coaching_contracts
+SET clock_started_at = now(),
+    ends_at = now() + make_interval(days => duration_days),
+    updated_at = now()
+WHERE id = $1
+  AND status = 'active'
+  AND start_on_first_video
+  AND clock_started_at IS NULL
+  AND now() < ends_at - make_interval(days => duration_days)
+`
+
+// 最初の動画から数えるプランで、利用者の最初の動画が届いたら、その時から期間を数え直す。
+// 始まってから7日を過ぎていたら（終了日から期間を引いた時を過ぎていたら）、もう数え直さない。
+func (q *Queries) StartCoachingClock(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, startCoachingClock, id)
+	return err
 }
 
 const suspendCoachingContract = `-- name: SuspendCoachingContract :one
@@ -1257,7 +1409,7 @@ SET status = 'suspended',
     suspended_at = now(),
     updated_at = now()
 WHERE id = $1 AND status = 'active'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at
 `
 
 // 通報などで運営がやりとりを止める。期間は止めている間も進まないよう、再開のときに延ばす。
@@ -1289,6 +1441,11 @@ func (q *Queries) SuspendCoachingContract(ctx context.Context, id uuid.UUID) (Co
 		&i.SuspendedAt,
 		&i.PaymentRequired,
 		&i.MessagesPurgedAt,
+		&i.VideoReviews,
+		&i.MenuUpdates,
+		&i.ReplyFormats,
+		&i.StartOnFirstVideo,
+		&i.ClockStartedAt,
 	)
 	return i, err
 }

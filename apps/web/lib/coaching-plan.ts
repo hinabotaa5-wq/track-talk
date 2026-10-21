@@ -1,25 +1,37 @@
-import { formatYen } from "./format";
-import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind } from "./types";
+import { formatDateTime, formatYen } from "./format";
+import type {
+  CoachingContract,
+  CoachingContractStatus,
+  CoachingPlan,
+  CoachingPlanKind,
+  PlanIncludes,
+  PlanMenuUpdates,
+  PlanReplyFormat,
+} from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
 export const planKindLabels: Record<CoachingPlanKind, string> = {
   period: "期間プラン",
   single: "単発",
+  trial: "お試し",
 };
 
-// 種類ごとに選べる日数。単発は7日だけ。
+// 種類ごとに選べる日数。単発とお試しは7日だけ。
 export const planDurations: Record<CoachingPlanKind, number[]> = {
   period: [14, 30],
   single: [7],
+  trial: [7],
 };
 
 export const minPlanPriceYen = 2000;
 // これを超える値段は、保存する前に打ち間違いでないか確かめる。
 export const highPlanPriceYen = 30000;
+// お試しの値段の上限。
+export const maxTrialPriceYen = 3000;
 
 export function planDurationLabel(kind: CoachingPlanKind, days: number): string {
-  if (kind === "single") return `${days}日以内`;
+  if (kind === "single" || kind === "trial") return `${days}日以内`;
   if (days === 14) return "2週間";
   if (days === 30) return "1か月";
   return `${days}日`;
@@ -27,6 +39,60 @@ export function planDurationLabel(kind: CoachingPlanKind, days: number): string 
 
 export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | "price_yen">): string {
   return `${planKindLabels[plan.kind]} · ${planDurationLabel(plan.kind, plan.duration_days)} · ${formatYen(plan.price_yen)}`;
+}
+
+export const planMenuUpdatesLabels: Record<PlanMenuUpdates, string> = {
+  none: "なし",
+  once: "最初に1回作る",
+  weekly: "毎週見直す",
+};
+
+export const planReplyFormatLabels: Record<PlanReplyFormat, string> = {
+  text: "文章",
+  video: "解説の動画",
+};
+
+// フォームで選べる動画への返答の回数。0 は回数を決めない。
+export const planVideoReviewChoices = [1, 2, 4, 8, 0];
+
+export function videoReviewsLabel(n: number): string {
+  return n === 0 ? "回数を決めない（期間中いつでも）" : `${n}回まで`;
+}
+
+// planIncludes は、「何が返ってくるか」を1項目1行にする。書いていない項目は出さない。
+export function planIncludes(p: PlanIncludes): { label: string; value: string }[] {
+  const out: { label: string; value: string }[] = [];
+  if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
+  if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
+  if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });
+  if (p.start_on_first_video) out.push({ label: "期間", value: "最初の動画を送った日から数える" });
+  return out;
+}
+
+// 最初の動画から数えるプランで、動画を待つ日数。API（coaching_contract.sql）と合わせる。
+export const firstVideoWaitDays = 7;
+
+// contractPeriodLabel は、期間中・終わった申し込みの期間の表示。
+// 最初の動画から数えるプランで、まだ動画を待っているあいだは、いつまでに送ればよいかを出す。
+export function contractPeriodLabel(
+  c: Pick<CoachingContract, "starts_at" | "ends_at" | "duration_days" | "start_on_first_video" | "clock_started_at" | "status">,
+  now: Date,
+): string {
+  if (!c.starts_at || !c.ends_at) return "";
+  if (c.start_on_first_video && !c.clock_started_at) {
+    // 待つ日数ぶん先に延ばしてある終了日から期間を引いた時が、数え始めの期限。
+    const waitUntil = new Date(new Date(c.ends_at).getTime() - c.duration_days * 24 * 60 * 60 * 1000);
+    if (c.status === "active" && now < waitUntil) {
+      return `最初の動画を送った日から${c.duration_days}日（${formatDateTime(waitUntil.toISOString())}までに送らなければ、その時から数えます）`;
+    }
+    return `${formatDateTime(waitUntil.toISOString())} 〜 ${formatDateTime(c.ends_at)}`;
+  }
+  return `${formatDateTime(c.clock_started_at ?? c.starts_at)} 〜 ${formatDateTime(c.ends_at)}`;
+}
+
+// sortTrialFirst は、お試しプランを先頭にする。ほかの並び（安い順）はそのまま。
+export function sortTrialFirst<T extends Pick<CoachingPlan, "kind">>(plans: T[]): T[] {
+  return [...plans.filter((p) => p.kind === "trial"), ...plans.filter((p) => p.kind !== "trial")];
 }
 
 // パーソナル指導の誓約の文面。API の coachPledgeVersion と一緒に変える。

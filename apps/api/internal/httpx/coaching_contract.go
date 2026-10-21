@@ -58,6 +58,8 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	plan := coachingPlanJSON(db.CoachingPlan{
 		ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 		DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
+		VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
+		StartOnFirstVideo: p.StartOnFirstVideo,
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
 	JSON(w, http.StatusOK, map[string]any{
@@ -143,6 +145,19 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusUnprocessableEntity, "birth_month_required", "先に生まれた年月を登録してください")
 		return
 	}
+	// お試しプランは、このコーチの指導をはじめて受ける人だけ。
+	// 返事待ちか期間中の申し込みは同じコーチに1つまでなので、確かめてから作るまでのあいだに指導が始まることはない。
+	if plan.Kind == "trial" {
+		started, err := s.q.HasCoachingStarted(r.Context(), db.HasCoachingStartedParams{RequesterID: me.ID, CoachID: plan.CoachID})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if started {
+			Error(w, http.StatusConflict, "trial_used", "お試しプランは、このコーチの指導をはじめて受ける人だけが申し込めます")
+			return
+		}
+	}
 	minor := isMinor(*me.BirthMonth, time.Now())
 	// 18歳未満でも、申し込みの時点では保護者のメールアドレスは聞かない。
 	// コーチが承諾したあとに本人が保護者へリンクを送り、保護者がそのリンクから同意とお支払いをする。
@@ -150,20 +165,24 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	err = s.tx(r.Context(), func(q *db.Queries) error {
 		var err error
 		ct, err = q.CreateCoachingContract(r.Context(), db.CreateCoachingContractParams{
-			ID:            uuid.New(),
-			PlanID:        plan.ID,
-			CoachID:       plan.CoachID,
-			RequesterID:   me.ID,
-			PlanKind:      plan.Kind,
-			PlanTitle:     plan.Title,
-			DurationDays:  plan.DurationDays,
-			PriceYen:      plan.PriceYen,
-			Event:         req.Event,
-			Goal:          req.Goal,
-			CurrentRecord: req.CurrentRecord,
-			Message:       req.Message,
-			Minor:         minor,
-			RespondBy:     time.Now().Add(contractRespondWindow),
+			ID:                uuid.New(),
+			PlanID:            plan.ID,
+			CoachID:           plan.CoachID,
+			RequesterID:       me.ID,
+			PlanKind:          plan.Kind,
+			PlanTitle:         plan.Title,
+			DurationDays:      plan.DurationDays,
+			PriceYen:          plan.PriceYen,
+			Event:             req.Event,
+			Goal:              req.Goal,
+			CurrentRecord:     req.CurrentRecord,
+			Message:           req.Message,
+			Minor:             minor,
+			RespondBy:         time.Now().Add(contractRespondWindow),
+			VideoReviews:      plan.VideoReviews,
+			MenuUpdates:       plan.MenuUpdates,
+			ReplyFormats:      nonNilStrings(plan.ReplyFormats),
+			StartOnFirstVideo: plan.StartOnFirstVideo,
 		})
 		if err != nil {
 			return err
@@ -215,6 +234,13 @@ func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 		"created_at":       ct.CreatedAt,
 		// 保存期間（終了から1年）を過ぎて、やりとりを消した日時。
 		"messages_purged_at": ct.MessagesPurgedAt,
+		// 申し込んだ時点で、プランに書いてあった「何が返ってくるか」。
+		"video_reviews": ct.VideoReviews,
+		"menu_updates":  ct.MenuUpdates,
+		"reply_formats": nonNilStrings(ct.ReplyFormats),
+		// 最初の動画から数えるプランか。clock_started_at は、動画が届いて数え始めた時刻。
+		"start_on_first_video": ct.StartOnFirstVideo,
+		"clock_started_at":     ct.ClockStartedAt,
 	}
 }
 
@@ -236,6 +262,8 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
+			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		out = append(out, c)
@@ -261,6 +289,8 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
+			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 		})
 		// コーチには利用者のニックネームだけを見せる。
 		c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -294,6 +324,8 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
 		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
+		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 	})
 	role := "requester"
 	if row.CoachID == me.ID {

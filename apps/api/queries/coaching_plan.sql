@@ -13,8 +13,8 @@ SELECT count(*) FROM coaching_plans
 WHERE coach_id = $1;
 
 -- name: CreateCoachingPlan :one
-INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats, start_on_first_video)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetCoachingPlan :one
@@ -30,6 +30,10 @@ SET kind = $3,
     price_yen = $7,
     capacity = $8,
     published = $9,
+    video_reviews = $10,
+    menu_updates = $11,
+    reply_formats = $12,
+    start_on_first_video = $13,
     updated_at = now()
 WHERE id = $1 AND coach_id = $2
 RETURNING *;
@@ -53,3 +57,8 @@ ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id;
 -- name: LockCoachingPlans :exec
 -- 同じコーチのプランの作成を1つずつにする。10個の上限の確認と作成のあいだに、別の作成を割り込ませない。
 SELECT pg_advisory_xact_lock(hashtext('coaching_plans:' || sqlc.arg(coach_id)::uuid::text));
+
+-- name: CountOtherTrialPlans :one
+-- このコーチの、ほかのお試しプランの数。お試しプランは1人1つまで。
+SELECT count(*) FROM coaching_plans
+WHERE coach_id = sqlc.arg(coach_id) AND kind = 'trial' AND id <> sqlc.arg(exclude_id)::uuid;

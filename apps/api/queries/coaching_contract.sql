@@ -18,8 +18,9 @@ WHERE pl.id = sqlc.arg(id)
 -- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,
-    event, goal, current_record, message, minor, respond_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    event, goal, current_record, message, minor, respond_by,
+    video_reviews, menu_updates, reply_formats, start_on_first_video
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING *;
 
 -- name: InsertContractConsent :exec
@@ -65,6 +66,7 @@ FOR UPDATE OF pl;
 
 -- name: AcceptCoachingContract :one
 -- 返事待ちで期限内のものだけ承諾できる。
+-- 最初の動画から数えるプラン（start_on_first_video）は、終了日を7日先に延ばしておき、動画が届いたら StartCoachingClock で数え直す。
 -- 支払いがあるとき（payment_required）は、72時間以内に支払いが済んだら始まる（18歳未満は保護者が同意して払う）。
 -- デモ版（支払いなし）は、大人は承諾したらそのまま期間が始まり、18歳未満は保護者が72時間以内に同意したら始まる。
 -- 同じプランで枠を使っている人数が上限に届いていたら承諾できない（行が返らない）。
@@ -74,7 +76,7 @@ SET status = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN 'acc
     responded_at = now(),
     start_by = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN now() + interval '72 hours' END,
     starts_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() END,
-    ends_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days) END,
+    ends_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END) END,
     updated_at = now()
 FROM coaching_plans pl
 WHERE ct.id = sqlc.arg(id)
@@ -152,7 +154,7 @@ LIMIT 50;
 UPDATE coaching_contracts
 SET status = 'active',
     starts_at = now(),
-    ends_at = now() + make_interval(days => duration_days),
+    ends_at = now() + make_interval(days => duration_days + CASE WHEN start_on_first_video THEN 7 ELSE 0 END),
     start_by = NULL,
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now()
@@ -236,3 +238,23 @@ LIMIT 100;
 
 -- name: ListAdminProfileIDs :many
 SELECT id FROM profiles WHERE is_admin;
+
+-- name: HasCoachingStarted :one
+-- この利用者が、このコーチの指導を受けたことがあるか（始まった申し込みがあるか）。お試しプランは、ない人だけが申し込める。
+SELECT EXISTS (
+    SELECT 1 FROM coaching_contracts
+    WHERE requester_id = $1 AND coach_id = $2 AND starts_at IS NOT NULL
+)::boolean;
+
+-- name: StartCoachingClock :exec
+-- 最初の動画から数えるプランで、利用者の最初の動画が届いたら、その時から期間を数え直す。
+-- 始まってから7日を過ぎていたら（終了日から期間を引いた時を過ぎていたら）、もう数え直さない。
+UPDATE coaching_contracts
+SET clock_started_at = now(),
+    ends_at = now() + make_interval(days => duration_days),
+    updated_at = now()
+WHERE id = $1
+  AND status = 'active'
+  AND start_on_first_video
+  AND clock_started_at IS NULL
+  AND now() < ends_at - make_interval(days => duration_days);
