@@ -13,15 +13,6 @@ LIMIT $2 OFFSET $3;
 -- name: CountMyInquiries :one
 SELECT count(*) FROM inquiries WHERE user_id = $1;
 
--- name: ListInquiries :many
-SELECT id, user_id, category, subject, body, source, contact_email, created_at
-FROM inquiries
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
-
--- name: CountInquiries :one
-SELECT count(*) FROM inquiries;
-
 -- name: ListAdminInquiries :many
 SELECT i.id, i.category, i.subject, i.body, i.source, i.contact_email, i.created_at, p.nickname AS user_nickname
 FROM inquiries i

@@ -157,23 +157,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 }
 
 func postFromPopular(row db.ListPostsPopularRow, liked bool, list bool) postDTO {
-	return postFromList(db.ListPostsNewRow{
-		ID:                  row.ID,
-		AuthorID:            row.AuthorID,
-		Title:               row.Title,
-		Body:                row.Body,
-		Kind:                row.Kind,
-		YoutubeVideoID:      row.YoutubeVideoID,
-		YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
-		InstagramType:       row.InstagramType,
-		InstagramShortcode:  row.InstagramShortcode,
-		CloudinaryPublicID:  row.CloudinaryPublicID,
-		SourceTitle:         row.SourceTitle,
-		LikeCount:           row.LikeCount,
-		CommentCount:        row.CommentCount,
-		CreatedAt:           row.CreatedAt,
-		UpdatedAt:           row.UpdatedAt,
-	}, liked, list)
+	return postFromList(db.ListPostsNewRow(row), liked, list)
 }
 
 func postFromGet(row db.GetPostRow, liked bool) postDTO {

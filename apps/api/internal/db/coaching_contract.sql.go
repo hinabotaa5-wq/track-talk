@@ -221,19 +221,6 @@ func (q *Queries) CoachingReportOnContract(ctx context.Context, arg CoachingRepo
 	return column_1, err
 }
 
-const countActiveContractsByPlan = `-- name: CountActiveContractsByPlan :one
-SELECT count(*)::int FROM coaching_contracts
-WHERE plan_id = $1 AND status IN ('accepted', 'active', 'suspended')
-`
-
-// 枠を使っている申し込み（承諾済みで始まる前のもの、期間中、止めているもの）。
-func (q *Queries) CountActiveContractsByPlan(ctx context.Context, planID uuid.UUID) (int32, error) {
-	row := q.db.QueryRow(ctx, countActiveContractsByPlan, planID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createCoachingContract = `-- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,

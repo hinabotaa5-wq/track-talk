@@ -15,11 +15,6 @@ WHERE pl.id = sqlc.arg(id)
   AND c.status = 'approved'
   AND c.pledge_version = sqlc.arg(pledge_version)::smallint;
 
--- name: CountActiveContractsByPlan :one
--- 枠を使っている申し込み（承諾済みで始まる前のもの、期間中、止めているもの）。
-SELECT count(*)::int FROM coaching_contracts
-WHERE plan_id = $1 AND status IN ('accepted', 'active', 'suspended');
-
 -- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,

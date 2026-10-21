@@ -17,6 +17,7 @@ import {
   menuContestName,
   menuContestPlaceholder,
   remainingParts,
+  winners,
   type MenuContestFinalist,
   type MenuContestResult,
   type MenuContestRound,
@@ -213,14 +214,14 @@ function Voting({ round, token, onVoted }: { round: MenuContestRound; token: str
 }
 
 function LastResult({ result }: { result: MenuContestResult }) {
-  const winners = result.finalists.filter((f) => f.winner);
+  const top = winners(result);
   const rest = result.finalists.filter((f) => !f.winner).sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
   return (
     <section className="space-y-3">
       <h2 className="font-bold">第{result.number}回の結果</h2>
-      {winners.length === 0 ? <p className="text-sm text-slate-200">投票がなかったため、1位はありませんでした。</p> : null}
+      {top.length === 0 ? <p className="text-sm text-slate-200">投票がなかったため、1位はありませんでした。</p> : null}
       <ul className="space-y-3">
-        {[...winners, ...rest].map((f) => (
+        {[...top, ...rest].map((f) => (
           <FinalistCard key={f.id} finalist={f} />
         ))}
       </ul>

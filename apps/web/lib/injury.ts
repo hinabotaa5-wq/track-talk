@@ -27,7 +27,7 @@ export const injuryStages = [
 export type InjuryStage = (typeof injuryStages)[number]["value"];
 
 // ゴールの段階。ここまで来たケガは、マイページの「いまのケガ」に出さない。
-export const injuryGoalStage: InjuryStage = "race";
+const injuryGoalStage: InjuryStage = "race";
 
 export function isCurrentInjuryStage(stage: string) {
   return stage !== injuryGoalStage;
@@ -36,8 +36,6 @@ export function isCurrentInjuryStage(stage: string) {
 export function isInjuryStage(value: string | null | undefined): value is InjuryStage {
   return injuryStages.some((item) => item.value === value);
 }
-
-export const injuryUpdateMaxLength = 2000;
 
 export function isInjuryBodyPart(value: string | null | undefined) {
   return injuryBodyParts.some((item) => item.value === value);
@@ -230,7 +228,7 @@ export type InjuryHindsight = (typeof injuryHindsights)[number]["value"];
 export const injuryDiagnosisMaxLength = 40;
 
 // 参加時に1問ずつ聞く質問。順番がそのまま画面の順。ケガの名前は「その他」のときだけ聞く。
-export const injuryJoinSteps = [
+const injuryJoinSteps = [
   "diagnosis",
   "severity",
   "sawDoctor",

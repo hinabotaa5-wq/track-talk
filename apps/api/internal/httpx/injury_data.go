@@ -55,6 +55,10 @@ func (s *Server) injuryData(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, err)
 			return
 		}
+		// 誰もいないケガは集計しないので、回答や記録を取りに行かない。
+		if len(counts) == 0 {
+			continue
+		}
 		answers, err := s.q.ListInjuryGroupAnswers(ctx, part.Code)
 		if err != nil {
 			MapDBError(w, err)
@@ -66,9 +70,6 @@ func (s *Server) injuryData(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		group := buildPublicInjuryGroup(part.Code, counts, answers, changes, nil)
-		if group.Members == 0 {
-			continue
-		}
 		group.Recovery = []injuryRecoveryDTO{}
 		hindsight, err := s.loadInjuryHindsight(ctx, part.Code)
 		if err != nil {

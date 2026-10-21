@@ -4,21 +4,13 @@ import { useState, type FormEvent } from "react";
 import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { appEvents } from "@/lib/practice-events";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 const selectClass =
   "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
-
-function errorText(e: unknown, fallback: string) {
-  if (e instanceof ApiRequestError) {
-    const field = e.fields ? Object.values(e.fields)[0] : "";
-    return field || e.message;
-  }
-  return fallback;
-}
 
 function SenseNoteFields({
   body,
@@ -105,7 +97,7 @@ export function SenseNoteComposer({
       setCheer(senseCheer(res.stats));
       onCreated(res.note, res.stats);
     } catch (err) {
-      setError(errorText(err, "保存できませんでした"));
+      setError(apiErrorText(err, "保存できませんでした"));
     } finally {
       lock.release();
     }
@@ -176,7 +168,7 @@ export function SenseNoteItem({
       onUpdated(updated);
       setEditing(false);
     } catch (err) {
-      setError(errorText(err, "保存できませんでした"));
+      setError(apiErrorText(err, "保存できませんでした"));
     } finally {
       lock.release();
     }
@@ -189,7 +181,7 @@ export function SenseNoteItem({
       const res = await apiFetch<{ stats: SenseNoteStats }>(`/v1/me/sense-notes/${note.id}`, { method: "DELETE", token });
       onDeleted(note.id, res.stats);
     } catch (err) {
-      alert(errorText(err, "削除できませんでした"));
+      alert(apiErrorText(err, "削除できませんでした"));
       lock.release();
     }
   }

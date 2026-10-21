@@ -12,17 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countMenuContestEntries = `-- name: CountMenuContestEntries :one
-SELECT count(*) FROM menu_contest_entries WHERE round_start = $1
-`
-
-func (q *Queries) CountMenuContestEntries(ctx context.Context, roundStart time.Time) (int64, error) {
-	row := q.db.QueryRow(ctx, countMenuContestEntries, roundStart)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countMenuContestVotes = `-- name: CountMenuContestVotes :one
 SELECT count(*) FROM menu_contest_votes WHERE round_start = $1
 `

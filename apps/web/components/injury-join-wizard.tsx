@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { InjuryChoices as Choices } from "./injury-choices";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { LeaveGuardArea, useLeaveGuard } from "./leave-guard";
 import { useActionLock } from "@/lib/use-action-lock";
 import {
@@ -93,11 +93,7 @@ export function InjuryJoinWizard({
       setDirty(false);
       onJoined(member);
     } catch (e) {
-      if (e instanceof ApiRequestError) {
-        setError((e.fields ? Object.values(e.fields)[0] : "") || e.message);
-      } else {
-        setError("参加に失敗しました");
-      }
+      setError(apiErrorText(e, "参加に失敗しました"));
       release();
     }
   }

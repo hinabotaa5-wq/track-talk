@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { homeHref, type ProductKind } from "@/lib/home-sort";
-import { productKindLabels, ratingText } from "@/lib/product";
+import { currentRanking, productKindLabels, ratingText } from "@/lib/product";
 import { activeReviewFilterCount, reviewFiltersApiQuery, withReviewFilters, type ReviewFilters } from "@/lib/review-filters";
 import type { Meta, Product } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -21,24 +21,25 @@ type Ranking = { event: string; event_label: string; min_reviews: number; produc
 
 // 種目ごとのランキング。その種目の人のレビューだけで平均★を出す。種目を絞り込んでいないときは、登録した種目で出す。
 function EventRanking({ kind, event, filters }: { kind: ProductKind; event: string; filters: ReviewFilters }) {
-  const [ranking, setRanking] = useState<Ranking | null>(null);
+  const [loaded, setLoaded] = useState<(Ranking & { kind: ProductKind }) | null>(null);
 
   useEffect(() => {
     let active = true;
     apiFetch<Ranking>(`/v1/products/ranking?${new URLSearchParams({ kind, event })}`)
       .then((d) => {
-        if (active) setRanking(d);
+        if (active) setLoaded({ ...d, kind });
       })
       .catch(() => {
         // ランキングは一覧のおまけなので、読めなければ出さない。
-        if (active) setRanking(null);
+        if (active) setLoaded(null);
       });
     return () => {
       active = false;
     };
   }, [kind, event]);
 
-  if (!ranking || ranking.event !== event || ranking.products.length === 0) return null;
+  const ranking = currentRanking(loaded, kind, event);
+  if (!ranking || ranking.products.length === 0) return null;
   return (
     <section className="mb-4 rounded-2xl border border-white/20 glass bg-white/10 p-3">
       <h2 className="text-sm font-semibold text-slate-100">

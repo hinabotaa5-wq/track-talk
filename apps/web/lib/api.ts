@@ -33,6 +33,15 @@ export class ApiRequestError extends Error {
   }
 }
 
+// 画面に出すエラーの文言。項目ごとの指摘があれば最初の1つ、なければ API のメッセージ、API 以外のエラーは fallback。
+export function apiErrorText(err: unknown, fallback: string): string {
+  if (err instanceof ApiRequestError) {
+    const field = err.fields ? Object.values(err.fields)[0] : "";
+    return field || err.message;
+  }
+  return fallback;
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit & { token?: string | null } = {},
