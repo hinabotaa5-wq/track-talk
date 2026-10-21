@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import type { Inquiry, Meta } from "@/lib/types";
@@ -69,12 +69,7 @@ export default function ContactPage() {
       form.reset({ category: values.category, email: values.email, subject: "", body: "" });
       setSent(true);
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        const field = err.fields ? Object.values(err.fields)[0] : "";
-        setError(field || err.message);
-        return;
-      }
-      setError("送信に失敗しました");
+      setError(apiErrorText(err, "送信に失敗しました"));
     } finally {
       release();
     }

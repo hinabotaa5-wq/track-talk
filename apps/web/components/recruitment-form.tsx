@@ -9,7 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { UploadProgress } from "./upload-progress";
 import type { Post } from "@/lib/types";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { shrinkImage } from "@/lib/shrink-image";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -153,12 +153,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       clearHomeFeeds();
       router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
     } catch (e) {
-      if (e instanceof ApiRequestError) {
-        const field = e.fields ? Object.values(e.fields)[0] : "";
-        setError(field || e.message);
-      } else {
-        setError(e instanceof Error ? e.message : "保存に失敗しました");
-      }
+      setError(apiErrorText(e, e instanceof Error ? e.message : "保存に失敗しました"));
       setStatus("");
       setUpload(null);
       setUploadFile(null);

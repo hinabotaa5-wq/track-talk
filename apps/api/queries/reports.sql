@@ -9,12 +9,6 @@ INSERT INTO reports (id, reporter_id, by_guardian, target_type, target_id, reaso
 VALUES ($1, $2, true, 'coaching_message', $3, $4, $5)
 RETURNING id, reporter_id, target_type, target_id, reason, detail, status, created_at;
 
--- name: ListReports :many
-SELECT id, reporter_id, target_type, target_id, reason, detail, status, created_at
-FROM reports
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
-
 -- name: CountReports :one
 SELECT count(*) FROM reports;
 

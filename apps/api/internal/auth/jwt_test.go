@@ -33,14 +33,14 @@ func TestParseHS256(t *testing.T) {
 		"iss": supabaseURL + "/auth/v1",
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
-	got, err := v.Parse(sign(valid))
+	got, err := v.ParseIdentity(sign(valid))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != id {
-		t.Fatalf("got %s", got)
+	if got.UserID != id {
+		t.Fatalf("got %s", got.UserID)
 	}
-	if _, err := v.Parse("abc"); err == nil {
+	if _, err := v.ParseIdentity("abc"); err == nil {
 		t.Fatal("expected error")
 	}
 	noExp := jwt.MapClaims{
@@ -48,7 +48,7 @@ func TestParseHS256(t *testing.T) {
 		"aud": "authenticated",
 		"iss": supabaseURL + "/auth/v1",
 	}
-	if _, err := v.Parse(sign(noExp)); err == nil {
+	if _, err := v.ParseIdentity(sign(noExp)); err == nil {
 		t.Fatal("missing exp")
 	}
 	wrongIss := jwt.MapClaims{
@@ -57,7 +57,7 @@ func TestParseHS256(t *testing.T) {
 		"iss": "https://evil.example/auth/v1",
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
-	if _, err := v.Parse(sign(wrongIss)); err == nil {
+	if _, err := v.ParseIdentity(sign(wrongIss)); err == nil {
 		t.Fatal("wrong issuer")
 	}
 }
@@ -84,7 +84,7 @@ func TestParseAcceptsLiveSupabaseIssuer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Parse(s); err != nil {
+	if _, err := v.ParseIdentity(s); err != nil {
 		t.Fatal(err)
 	}
 }

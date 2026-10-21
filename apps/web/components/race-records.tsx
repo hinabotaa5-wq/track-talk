@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { EmptyState, ErrorState } from "./empty-state";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { todayInTokyo } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseDayLabel } from "@/lib/sense-notes";
@@ -33,14 +33,6 @@ const selectClass =
   "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
 const markPlaceholder: Record<RaceMarkKind, string> = { time: "例: 10.85 / 1:58.32", distance: "例: 7.05", points: "例: 5800" };
-
-function errorText(e: unknown, fallback: string) {
-  if (e instanceof ApiRequestError) {
-    const field = e.fields ? Object.values(e.fields)[0] : "";
-    return field || e.message;
-  }
-  return fallback;
-}
 
 // 記録を書く欄。新しく書くときと、直すときの両方で使う。
 function RaceRecordForm({
@@ -97,7 +89,7 @@ function RaceRecordForm({
       }
       onSaved(res, event);
     } catch (err) {
-      setError(errorText(err, "保存できませんでした"));
+      setError(apiErrorText(err, "保存できませんでした"));
     } finally {
       lock.release();
     }
@@ -167,7 +159,7 @@ function RaceRecordForm({
 }
 
 // 1つの種目の推移。よい記録ほど上。自己ベストは色を変え、追い風参考は白抜きにする。
-export function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceMarkKind }) {
+function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceMarkKind }) {
   const points = raceChartPoints(records, kind);
   if (points.length === 0) return null;
   const box = raceChartBox;
@@ -250,7 +242,7 @@ function RaceRecordRow({
       const res = await apiFetch<RaceRecords>(`/v1/me/race-records/${record.id}`, { method: "DELETE", token });
       onChanged(res, record.event);
     } catch (err) {
-      alert(errorText(err, "削除できませんでした"));
+      alert(apiErrorText(err, "削除できませんでした"));
     } finally {
       lock.release();
     }

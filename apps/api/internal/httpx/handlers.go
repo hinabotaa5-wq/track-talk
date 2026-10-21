@@ -736,23 +736,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 	liked := s.likedSet(r.Context(), ids)
 	items := make([]postDTO, 0, len(rows))
 	for _, row := range rows {
-		item := withMine(r, s.present(postFromList(db.ListPostsNewRow{
-			ID:                  row.ID,
-			AuthorID:            row.AuthorID,
-			Title:               row.Title,
-			Body:                row.Body,
-			Kind:                row.Kind,
-			YoutubeVideoID:      row.YoutubeVideoID,
-			YoutubeThumbnailUrl: row.YoutubeThumbnailUrl,
-			InstagramType:       row.InstagramType,
-			InstagramShortcode:  row.InstagramShortcode,
-			CloudinaryPublicID:  row.CloudinaryPublicID,
-			SourceTitle:         row.SourceTitle,
-			LikeCount:           row.LikeCount,
-			CommentCount:        row.CommentCount,
-			CreatedAt:           row.CreatedAt,
-			UpdatedAt:           row.UpdatedAt,
-		}, liked[row.ID], true)))
+		item := withMine(r, s.present(postFromList(db.ListPostsNewRow(row), liked[row.ID], true)))
 		item.SavedByMe = true
 		items = append(items, item)
 	}
