@@ -199,9 +199,11 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `SUPABASE_URL` / `SUPABASE_JWT_SECRET` / `SUPABASE_JWT_AUD` | API | JWT の検証（URL か secret のどちらかが必須） |
 | `SUPABASE_SERVICE_ROLE_KEY` | API | 退会時に Auth ユーザーを削除する |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | API | アップロード署名 |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | API | フォーム添削の Web Push 通知（空なら通知は送らない）。`VAPID_SUBJECT` は `mailto:` の連絡先 |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | API | Web Push 通知（月1回の記録のお知らせとコーチングの知らせ。空なら通知は送らない）。`VAPID_SUBJECT` は `mailto:` の連絡先 |
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | API / Web | オンラインコーチング（生年月・保護者の同意・プッシュ通知・添削動画・パーソナル指導・コーチの報酬と送金）を使えるようにする。提供前なので本番では空のまま（空なら API は 404、画面は Not Found） |
 | `COACHING_TICK_SECRET` | API | Cloud Scheduler が `POST /internal/coaching/tick` を呼ぶときに `X-Coaching-Tick-Secret` ヘッダーで送る値（空なら tick は使えない） |
+| `REMINDER_SECRET` | API | Cloud Scheduler が `POST /internal/monthly-reminder` を呼ぶときに `X-Reminder-Secret` ヘッダーで送る値（空ならお知らせは送れない）。`deploy/cloud-run/monthly-reminder.sh` が作って入れる |
+| `SENSE_SUMMARY_ENABLED` | API | `1` なら感覚メモの1週間のまとめ（Gemini）の API を開く。空なら 404。Web の `NEXT_PUBLIC_SENSE_SUMMARY_ENABLED` と揃える |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | API | 独自ドメインなしで無料で送るときの設定。Gmail なら `smtp.gmail.com` / `465` / Gmail のアドレス / アプリパスワード。入っていれば Resend より優先する。`MAIL_FROM` は Gmail のアドレス(例: `TrackTalk <xxx@gmail.com>`)にする |
 | `RESEND_API_KEY` / `MAIL_FROM` | API | 保護者の同意のリンクを保護者のメールあてに送る（Resend）。`MAIL_FROM` は Resend で認証したドメインの送り主（例: `TrackTalk <no-reply@example.com>`）。空ならリンクを出せない |
 | `MAIL_DEV_LOG` | API | `1` なら、メールを送らずに本文を API のログに出す。手元で保護者の同意を試すためのもので、本番では空のまま |
@@ -210,7 +212,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `STRIPE_API_VERSION` | API | 入れると Stripe の API のバージョンを固定する（`Stripe-Version`）。空ならアカウントの既定 |
 | `WEB_BASE_URL` | API | 支払い画面から戻ってくる画面の URL（空なら `CORS_ORIGINS` の最初のもの） |
 | `API_ADDR` / `CORS_ORIGINS` / `LOG_LEVEL` | API | 既定は `:8080` / `http://localhost:3000` / `info` |
-| `GEMINI_API_KEY` | 大会取り込み | 都道府県の取り込みに必要 |
+| `GEMINI_API_KEY` | 大会取り込み・API | 都道府県の取り込みと、感覚メモの1週間のまとめに使う（API は空ならまとめが 503） |
 | `GEMINI_DAILY_REQUESTS` | 大会取り込み | 1回の実行で使う Gemini リクエストの上限（既定 15） |
 | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SITE_URL` | Web | ブラウザに公開される値 |
 

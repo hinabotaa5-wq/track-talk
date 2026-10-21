@@ -24,6 +24,8 @@ const (
 	monthlyReminderWorkers = 8
 	// 届かないまま1日たったら、もう出さない(月はじめの話なので遅れて届いても意味が薄い)。
 	monthlyReminderTTL = 24 * time.Hour
+	// 送り終えるまでの上限。Cloud Scheduler の締め切りで接続が切れても、ここまでは送り続ける。
+	monthlyReminderSendTimeout = 30 * time.Minute
 )
 
 var monthlyReminderMessage = push.Message{
@@ -44,7 +46,10 @@ func (s *Server) monthlyReminder(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusServiceUnavailable, "unavailable", "通知はまだ設定されていません")
 		return
 	}
-	ctx := r.Context()
+	// 送る権利を取ったあとは、呼び出し元の接続が切れても最後まで送る。途中で止めると、
+	// 今月は送った扱いになって残りの人に二度と届かない。
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), monthlyReminderSendTimeout)
+	defer cancel()
 	local := s.now().In(jst.Zone)
 	month := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, time.UTC)
 	if _, err := s.q.ClaimMonthlyReminder(ctx, month); err != nil {
@@ -58,6 +63,10 @@ func (s *Server) monthlyReminder(w http.ResponseWriter, r *http.Request) {
 	}
 	ids, err := s.q.ListPushProfileIDs(ctx)
 	if err != nil {
+		// まだ誰にも送っていないので、権利を返して呼び直しで送れるようにする。
+		if err := s.q.ReleaseMonthlyReminder(ctx, month); err != nil {
+			slog.Warn("monthly reminder: release", "err", err)
+		}
 		MapDBError(w, err)
 		return
 	}

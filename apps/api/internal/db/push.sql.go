@@ -142,6 +142,40 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, profileID uuid.UUID
 	return items, nil
 }
 
+const releaseMonthlyReminder = `-- name: ReleaseMonthlyReminder :exec
+DELETE FROM monthly_reminders
+WHERE month = $1::date
+  AND finished_at IS NULL
+`
+
+// 送る前に失敗したとき、その月の権利を返す。送り終えた月(finished_at がある月)は消さない。
+func (q *Queries) ReleaseMonthlyReminder(ctx context.Context, month time.Time) error {
+	_, err := q.db.Exec(ctx, releaseMonthlyReminder, month)
+	return err
+}
+
+const trimPushSubscriptions = `-- name: TrimPushSubscriptions :exec
+DELETE FROM push_subscriptions
+WHERE profile_id = $1::uuid
+  AND id NOT IN (
+    SELECT keep.id FROM push_subscriptions keep
+    WHERE keep.profile_id = $1::uuid
+    ORDER BY keep.created_at DESC, keep.id DESC
+    LIMIT $2::int
+  )
+`
+
+type TrimPushSubscriptionsParams struct {
+	ProfileID  uuid.UUID `json:"profile_id"`
+	MaxDevices int32     `json:"max_devices"`
+}
+
+// 新しいものから max_devices 台だけ残し、古い端末の登録を消す。
+func (q *Queries) TrimPushSubscriptions(ctx context.Context, arg TrimPushSubscriptionsParams) error {
+	_, err := q.db.Exec(ctx, trimPushSubscriptions, arg.ProfileID, arg.MaxDevices)
+	return err
+}
+
 const upsertPushSubscription = `-- name: UpsertPushSubscription :one
 INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
