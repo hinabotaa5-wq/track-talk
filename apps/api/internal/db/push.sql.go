@@ -7,9 +7,24 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const claimMonthlyReminder = `-- name: ClaimMonthlyReminder :one
+INSERT INTO monthly_reminders (month) VALUES ($1::date)
+ON CONFLICT (month) DO NOTHING
+RETURNING month
+`
+
+// その月のお知らせを送る権利を取る。すでに送った(送っている)月は行が返らない。
+func (q *Queries) ClaimMonthlyReminder(ctx context.Context, month time.Time) (time.Time, error) {
+	row := q.db.QueryRow(ctx, claimMonthlyReminder, month)
+	var month_2 time.Time
+	err := row.Scan(&month_2)
+	return month_2, err
+}
 
 const countPushSubscriptions = `-- name: CountPushSubscriptions :one
 SELECT count(*) FROM push_subscriptions
@@ -50,6 +65,48 @@ WHERE endpoint = $1
 func (q *Queries) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
 	_, err := q.db.Exec(ctx, deletePushSubscriptionByEndpoint, endpoint)
 	return err
+}
+
+const finishMonthlyReminder = `-- name: FinishMonthlyReminder :exec
+UPDATE monthly_reminders
+SET finished_at = now(), recipients = $1::int
+WHERE month = $2::date
+`
+
+type FinishMonthlyReminderParams struct {
+	Recipients int32     `json:"recipients"`
+	Month      time.Time `json:"month"`
+}
+
+func (q *Queries) FinishMonthlyReminder(ctx context.Context, arg FinishMonthlyReminderParams) error {
+	_, err := q.db.Exec(ctx, finishMonthlyReminder, arg.Recipients, arg.Month)
+	return err
+}
+
+const listPushProfileIDs = `-- name: ListPushProfileIDs :many
+SELECT DISTINCT profile_id FROM push_subscriptions
+ORDER BY profile_id
+`
+
+// 通知をオンにした端末がある人。
+func (q *Queries) ListPushProfileIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listPushProfileIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var profile_id uuid.UUID
+		if err := rows.Scan(&profile_id); err != nil {
+			return nil, err
+		}
+		items = append(items, profile_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPushSubscriptions = `-- name: ListPushSubscriptions :many

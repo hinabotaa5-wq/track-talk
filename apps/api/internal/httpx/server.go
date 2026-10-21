@@ -92,6 +92,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
 	// 支払いはコーチングの一部なので、提供していない間は Webhook も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
+	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
+	r.Post("/internal/monthly-reminder", s.monthlyReminder)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
@@ -108,6 +110,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/menu-contest", s.getMenuContest)
 		r.Get("/meet-threads/today", s.todayMeetThreads)
+		// プッシュ通知はコーチングの知らせと月1回の記録のお知らせに使う。コーチングの提供前でも登録できる。
+		r.Get("/push/public-key", s.pushPublicKey)
 		// 大会の日程と県ページは、検索から来た人がログインなしで読めるようにする。
 		r.Get("/competitions", s.listCompetitions)
 		r.Get("/major-hosts", s.listMajorHosts)
@@ -133,6 +137,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)
 			r.Get("/me/race-records", s.listRaceRecords)
 			r.Get("/race-records/pb-stats", s.pbStats)
+			r.Post("/me/push-subscriptions", s.savePushSubscription)
+			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
+			r.Post("/me/push-subscriptions/test", s.testPush)
 			r.Post("/me/race-records", s.createRaceRecord)
 			r.Patch("/me/race-records/{id}", s.updateRaceRecord)
 			r.Delete("/me/race-records/{id}", s.deleteRaceRecord)
@@ -224,7 +231,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		// お金の動き（送金・返金）は閉じる。
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
-			r.Get("/push/public-key", s.pushPublicKey)
 			r.Get("/coaches", s.listCoaches)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
@@ -248,9 +254,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/me/coaching", s.coachingMe)
 				r.Put("/me/birth-month", s.setBirthMonth)
 				r.Post("/me/guardian-link", s.issueGuardianLink)
-				r.Post("/me/push-subscriptions", s.savePushSubscription)
-				r.Delete("/me/push-subscriptions", s.deletePushSubscription)
-				r.Post("/me/push-subscriptions/test", s.testPush)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 				// パーソナル指導（利用者側）
 				r.Post("/coaching/contracts", s.createCoachingContract)
