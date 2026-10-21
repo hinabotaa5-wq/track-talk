@@ -91,7 +91,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
 	name := "フォーム添削（コーチ）"
 	if rr.Tier == "senpai" {
-		name = "フォーム添削（先輩・上司）"
+		name = "フォーム添削（社会人・大学生・上司）"
 	}
 	params := stripe.CheckoutParams{
 		Name:           name,

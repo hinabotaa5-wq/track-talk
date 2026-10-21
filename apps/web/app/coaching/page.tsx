@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // 1本の値段は API の reviewPrices(review_payment.go)と同じにする。
 const prices = [
   { menu: "動画1本(コーチ)", price: "1,000円" },
-  { menu: "動画1本(先輩)", price: "500円" },
+  { menu: "動画1本(社会人・大学生)", price: "500円" },
 ] as const;
 
 const tag = "text-xs text-slate-300";

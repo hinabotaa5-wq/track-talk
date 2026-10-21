@@ -514,7 +514,7 @@ export function PostDetail({
         />
       ) : null}
       {post.kind === "practice" || ((post.kind === "youtube" || post.kind === "instagram") && !hasFeedTitle(post.title)) ? null : (
-        <h1 className="text-4xl font-bold">{feedTitle(post.title)}</h1>
+        <h1 className="text-4xl font-bold [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
@@ -535,10 +535,10 @@ export function PostDetail({
       {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
           <h2 className="mb-2 text-2xl font-semibold text-slate-100">詳細</h2>
-          <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
+          <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
         </div>
       ) : post.body ? (
-        <div className="whitespace-pre-wrap rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
+        <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
       ) : null}
       {post.kind === "injury" && post.injury ? (
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />

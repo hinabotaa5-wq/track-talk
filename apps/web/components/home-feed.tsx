@@ -14,7 +14,7 @@ const loadError = "投稿の取得に失敗しました。APIの起動を確認�
 function nextHref(sort: "popular" | "new", q: string, page: number, kind?: "recruitment") {
   const params = new URLSearchParams();
   if (kind === "recruitment") params.set("sort", "recruitment");
-  else if (sort !== "popular") params.set("sort", sort);
+  else if (sort !== "new") params.set("sort", sort);
   if (q) params.set("q", q);
   params.set("page", String(page));
   return `/?${params}`;

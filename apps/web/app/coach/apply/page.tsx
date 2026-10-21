@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// コーチ（先輩を含む）の応募。集めるのは担当種目・記録・成績・競技年数だけ。
+// コーチ（社会人・大学生を含む）の応募。集めるのは担当種目・記録・成績・競技年数だけ。
 // 運営が審査し、結果はこの画面と通知で伝える。
 
 type Draft = {

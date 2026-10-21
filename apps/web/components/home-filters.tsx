@@ -63,7 +63,7 @@ export function HomeFilters() {
   return (
     <div className="md:mb-4 md:flex md:items-center md:gap-4">
       <form action="/" className="border-b border-white/20 bg-transparent px-4 py-3 md:w-72 md:shrink-0 md:border-0 md:p-0">
-        {sort !== "popular" ? <input type="hidden" name="sort" value={sort} /> : null}
+        {sort !== "new" ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="relative">
           <Search
             className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-slate-300"
