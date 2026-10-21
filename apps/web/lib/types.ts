@@ -243,6 +243,8 @@ export type Profile = {
   id: string;
   nickname: string | null;
   nickname_public: boolean;
+  // 登録のときに選ぶ種目(ケガ部の種目と同じコード)。以前から使っている人は、選ぶまで null。
+  event?: string | null;
   post_master_badge_public?: boolean;
   is_admin?: boolean;
   created_at: string;
@@ -338,7 +340,9 @@ export type CoachEvent =
   | "hammer"
   | "javelin"
   | "race-walk"
-  | "relay";
+  | "relay"
+  | "heptathlon"
+  | "decathlon";
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {

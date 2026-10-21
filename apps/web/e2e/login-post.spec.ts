@@ -8,6 +8,14 @@ test("login then publish a text post", async ({ page }) => {
   await page.getByPlaceholder("メール").fill("runner@example.com");
   await page.getByPlaceholder("パスワード").fill("password1");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  // はじめてのログインは、ニックネームと種目を決めるまで先に進めない。
+  await expect(page.getByRole("heading", { name: "ニックネームと種目を決めよう" })).toBeVisible({ timeout: 20_000 });
+  await page.getByPlaceholder("ニックネーム").fill("あされん");
+  await page.getByLabel("種目").selectOption("100m");
+  await page.getByRole("button", { name: "保存" }).click();
+  await expect(page).toHaveURL("/", { timeout: 20_000 });
+
+  await page.goto("/posts/new");
   await expect(page.getByRole("heading", { name: "文章" })).toBeVisible({ timeout: 20_000 });
 
   const title = `朝練の話 ${Date.now()}`;

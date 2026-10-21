@@ -9,7 +9,7 @@ import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
-const prompt = "思ったことをなんでも書いてね(欲しい機能、修正点、このアプリの悪口などなど)";
+const prompt = "欲しい機能・バグ発見・運営に対する質問、このアプリの良い所悪い所など";
 
 function subjectFrom(message: string) {
   return Array.from(message).slice(0, 80).join("");
@@ -91,7 +91,7 @@ export function FeedbackBox() {
             <Textarea
               rows={4}
               value={message}
-              placeholder="ここに書いてね"
+              placeholder="なんでも書いてね"
               aria-label={prompt}
               onChange={(event) => {
                 setMessage(event.target.value);

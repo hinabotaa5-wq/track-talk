@@ -31,6 +31,8 @@ export const coachEventLabels: Record<CoachEvent, string> = {
   "javelin": "やり投",
   "race-walk": "競歩",
   "relay": "リレー",
+  "heptathlon": "七種競技",
+  "decathlon": "十種競技",
 };
 
 export const coachEvents = Object.keys(coachEventLabels) as CoachEvent[];

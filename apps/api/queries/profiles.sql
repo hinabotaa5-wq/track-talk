@@ -15,6 +15,7 @@ RETURNING *;
 UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
+    event = COALESCE(sqlc.narg(event)::text, event),
     updated_at = now()
 WHERE id = $1
 RETURNING *;

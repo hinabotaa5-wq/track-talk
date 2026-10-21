@@ -1,31 +1,11 @@
-export const practiceEvents = [
-  { value: "100m", label: "100m" },
-  { value: "200m", label: "200m" },
-  { value: "400m", label: "400m" },
-  { value: "800m", label: "800m" },
-  { value: "1500m", label: "1500m" },
-  { value: "5000m", label: "5000m" },
-  { value: "10000m", label: "10000m" },
-  { value: "100mh", label: "100mH" },
-  { value: "110mh", label: "110mH" },
-  { value: "400mh", label: "400mH" },
-  { value: "3000msc", label: "3000mSC" },
-  { value: "long-jump", label: "走幅跳" },
-  { value: "triple-jump", label: "三段跳" },
-  { value: "high-jump", label: "走高跳" },
-  { value: "pole-vault", label: "棒高跳" },
-  { value: "shot-put", label: "砲丸投" },
-  { value: "discus", label: "円盤投" },
-  { value: "hammer", label: "ハンマー投" },
-  { value: "javelin", label: "やり投" },
-  { value: "heptathlon", label: "七種競技" },
-  { value: "decathlon", label: "十種競技" },
-  { value: "4x100", label: "4×100mR" },
-  { value: "4x400", label: "4×400mR" },
-  { value: "other", label: "その他" },
-] as const;
+import { coachEventLabels } from "./coach-recruit";
+import type { CoachEvent } from "./types";
 
-export const practiceEventValues = practiceEvents.map((event) => event.value) as [
-  (typeof practiceEvents)[number]["value"],
-  ...(typeof practiceEvents)[number]["value"][],
-];
+// アプリ内の種目は、すべてコーチの担当種目(coachEventLabels)と同じ一覧。
+// コーチ・練習相手募集・利用者の種目(登録のときに選ぶ)・感覚メモ・競技会の記録・レビュー・ケガで使う。
+export const appEvents: readonly { value: CoachEvent; label: string }[] = (Object.keys(coachEventLabels) as CoachEvent[]).map((value) => ({
+  value,
+  label: coachEventLabels[value],
+}));
+
+export const appEventValues = appEvents.map((event) => event.value) as [CoachEvent, ...CoachEvent[]];

@@ -63,7 +63,7 @@ export function SenseNotesCard({ token }: { token: string | null }) {
           ))}
         </ul>
       ) : null}
-      <Link href="/me/sense" className="flex min-h-11 items-center justify-between rounded-xl px-1 text-sm font-semibold text-sky-200 hover:underline">
+      <Link href="/memo" className="flex min-h-11 items-center justify-between rounded-xl px-1 text-sm font-semibold text-sky-200 hover:underline">
         これまでの感覚メモを見る
         <ChevronRight className="size-4" aria-hidden />
       </Link>

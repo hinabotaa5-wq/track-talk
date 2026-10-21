@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -52,5 +53,20 @@ func TestNotConfigured(t *testing.T) {
 	}
 	if err := (Client{DevLog: true}).Send(context.Background(), Message{To: "parent@example.com"}, ""); err != nil {
 		t.Fatalf("dev log: %v", err)
+	}
+}
+
+func TestSMTPConfiguredAndMessage(t *testing.T) {
+	c := Client{SMTPHost: "smtp.gmail.com", SMTPUser: "u@gmail.com", From: "TrackTalk <u@gmail.com>"}
+	if c.Configured() {
+		t.Fatal("no password should not be configured")
+	}
+	c.SMTPPassword = "app-password"
+	if !c.Configured() {
+		t.Fatal("smtp should be configured")
+	}
+	msg := string(smtpMessage(c.From, "parent@example.com", "同意のお願い\r\nBcc: x@example.com", "本文です"))
+	if !strings.Contains(msg, "Subject: =?utf-8?q?") || strings.Contains(msg, "\r\nBcc:") || !strings.Contains(msg, "To: parent@example.com\r\n") {
+		t.Fatalf("message %q", msg)
 	}
 }

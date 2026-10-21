@@ -11,12 +11,12 @@ DELETE FROM profiles WHERE id::text LIKE '00000000-0000-4000-8000-0000000000%';
 DO $$
 DECLARE
     -- グループごとの人数(診断名別。「その他」は自由記述の診断名つき)
-    groups text[]  := ARRAY['hamstring-strain', 'sprain', 'shin-splints', 'achilles-tendinitis', 'jumpers-knee', 'quad-strain', 'shoulder', 'elbow', 'other'];
-    counts int[]   := ARRAY[14, 10, 9, 7, 6, 6, 5, 4, 4];
-    stages text[]  := ARRAY['resting', 'rehab', 'jogging', 'practice', 'race'];
+    groups text[]  := ARRAY['hamstring-strain', 'sprain', 'shin-splints', 'stress-fracture', 'calf-strain', 'jumpers-knee', 'achilles-tendinitis', 'lower-back', 'quad-strain', 'shoulder', 'elbow', 'other'];
+    counts int[]   := ARRAY[14, 10, 9, 8, 7, 6, 6, 5, 5, 4, 3, 4];
+    stages text[]  := ARRAY['resting', 'rehab', 'jogging', 'half', 'full', 'race'];
     places text[]  := ARRAY['tartan', 'grass', 'dirt', 'asphalt', 'slope', 'stairs', 'weight-room', 'gym'];
     activities text[] := ARRAY['jog', 'start', 'sprint', 'jump-hurdle', 'throw', 'weights', 'outside'];
-    events text[]  := ARRAY['sprint', 'hurdles', 'middle', 'long', 'jumps', 'throws', 'combined', 'race-walk'];
+    events text[]  := ARRAY['100m', '200m', '400m', '800m', '1500m', '5000m', '110mh', 'high-jump', 'long-jump', 'shot-put', 'javelin', 'race-walk'];
     changes text[] := ARRAY['more-volume', 'new-shoes', 'comeback', 'fatigue', 'played-through-pain'];
     all_actions text[] := ARRAY['hospital-rehab', 'osteopath', 'stretch', 'bath', 'strength', 'icing', 'taping', 'rest'];
     others text[]  := ARRAY['腸脛靭帯炎', '腰椎分離症', '足底筋膜炎', '疲労骨折'];
@@ -68,7 +68,7 @@ BEGIN
 
             -- いまの段階: 回復の途中にいる人と、もう戻った人を混ぜる
             r := random();
-            final_idx := CASE WHEN r < 0.12 THEN 1 WHEN r < 0.32 THEN 2 WHEN r < 0.5 THEN 3 WHEN r < 0.7 THEN 4 ELSE 5 END;
+            final_idx := CASE WHEN r < 0.12 THEN 1 WHEN r < 0.32 THEN 2 WHEN r < 0.45 THEN 3 WHEN r < 0.6 THEN 4 WHEN r < 0.75 THEN 5 ELSE 6 END;
 
             -- 各段階に最初に着くまでの日数(ケガをした日から)。後の段階ほど遅く、ばらつきを入れる
             offsets := ARRAY[
@@ -76,9 +76,10 @@ BEGIN
                 round((3 + random() * 5) * mult),
                 round((10 + random() * 10) * mult),
                 round((18 + random() * 12) * mult),
-                round((28 + random() * 17) * mult)
+                round((26 + random() * 14) * mult),
+                round((36 + random() * 20) * mult)
             ];
-            FOR s IN 2 .. 5 LOOP
+            FOR s IN 2 .. 6 LOOP
                 offsets[s] := GREATEST(offsets[s], offsets[s - 1] + 1);
             END LOOP;
             day_total := offsets[final_idx];
@@ -92,7 +93,7 @@ BEGIN
 
             INSERT INTO injury_group_members (
                 user_id, body_part, injured_on, stage, joined_at, updated_at,
-                diagnosis, severity, saw_doctor, place, activity, pre_changes, event
+                diagnosis, severity, saw_doctor, place, activity, pre_changes, event, injured_on_exact
             ) VALUES (
                 uid, part, injured, stages[final_idx], started, started,
                 CASE WHEN part = 'other' THEN others[1 + floor(random() * array_length(others, 1))::int] END,
@@ -100,7 +101,7 @@ BEGIN
                 places[1 + floor(random() * array_length(places, 1))::int],
                 activities[1 + floor(random() * array_length(activities, 1))::int],
                 chg,
-                events[1 + floor(random() * array_length(events, 1))::int]
+                events[1 + floor(random() * array_length(events, 1))::int], true
             );
 
             -- 入った記録(最初の段階。やったことと一言はなし)

@@ -17,8 +17,10 @@ const injuryGroupFaces = 5
 type injuryGroupMemberDTO struct {
 	Stage      string `json:"stage"`
 	StageLabel string `json:"stage_label"`
-	// InjuredMonth は "YYYY-MM"。ケガをした時期は大まかにしか聞かない。
-	InjuredMonth string `json:"injured_month"`
+	// InjuredOn は "YYYY-MM-DD"。以前に月までしか答えなかった人は、その月の1日になっている。
+	InjuredOn string `json:"injured_on"`
+	// InjuredOnExact が false の人は、日までは答えていない(月だけ)。
+	InjuredOnExact bool `json:"injured_on_exact"`
 	// 質問が選択式になる前に入ったメンバーは、下の答えが空になっている。
 	Diagnosis     string   `json:"diagnosis,omitempty"`
 	Severity      string   `json:"severity,omitempty"`
@@ -57,11 +59,12 @@ type injuryGroupDTO struct {
 
 func injuryGroupMemberFromRow(row db.InjuryGroupMember) injuryGroupMemberDTO {
 	dto := injuryGroupMemberDTO{
-		Stage:        row.Stage,
-		StageLabel:   injuryStageLabel(row.Stage),
-		InjuredMonth: row.InjuredOn.Format("2006-01"),
-		SawDoctor:    row.SawDoctor,
-		PreChanges:   row.PreChanges,
+		Stage:          row.Stage,
+		StageLabel:     injuryStageLabel(row.Stage),
+		InjuredOn:      row.InjuredOn.Format("2006-01-02"),
+		InjuredOnExact: row.InjuredOnExact,
+		SawDoctor:      row.SawDoctor,
+		PreChanges:     row.PreChanges,
 	}
 	if dto.PreChanges == nil {
 		dto.PreChanges = []string{}
@@ -233,8 +236,9 @@ func (s *Server) joinInjuryGroup(w http.ResponseWriter, r *http.Request) {
 		Place:      &in.Place,
 		Activity:   &in.Activity,
 		PreChanges: in.PreChanges,
-		Event:      &in.Event,
-		Stage:      in.Stage,
+		// 種目は、登録のときに選んだものを使う(まだ選んでいない人は空のまま)。
+		Event: p.Event,
+		Stage: in.Stage,
 	})
 	if err != nil {
 		MapDBError(w, err)

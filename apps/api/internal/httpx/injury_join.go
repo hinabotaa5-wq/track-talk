@@ -20,12 +20,10 @@ var (
 	injuryPlaces = []injuryOption{
 		{"tartan", "タータン"},
 		{"grass", "芝生"},
-		{"dirt", "土"},
 		{"asphalt", "アスファルト"},
 		{"slope", "坂"},
 		{"stairs", "階段"},
-		{"weight-room", "ウエイト場"},
-		{"gym", "体育館"},
+		{"weight-room", "ジム"},
 	}
 	injuryActivities = []injuryOption{
 		{"jog", "ジョグ"},
@@ -41,7 +39,7 @@ var (
 		{"new-shoes", "シューズを替えた"},
 		{"comeback", "休み明け・久しぶりの再開"},
 		{"fatigue", "疲れがたまっていた"},
-		{"played-through-pain", "痛みをがまんしていた"},
+		{"played-through-pain", "痛みを我慢していた"},
 		{"none", "とくになし"},
 	}
 	// 「いま思うと、どうすればよかったか」。まだケガをしていない人の予防に使う。
@@ -55,16 +53,8 @@ var (
 		{"tell-coach", "顧問やコーチに早めに伝える"},
 		{"none", "わからない・とくにない"},
 	}
-	injuryEvents = []injuryOption{
-		{"sprint", "短距離"},
-		{"hurdles", "ハードル"},
-		{"middle", "中距離"},
-		{"long", "長距離"},
-		{"jumps", "跳躍"},
-		{"throws", "投てき"},
-		{"combined", "混成"},
-		{"race-walk", "競歩"},
-	}
+	// 種目は登録のときに選んだものを使う。以前の区分で答えた人の値も表示できるようにしておく。
+	injuryEvents = eventOptions()
 )
 
 const injuryDiagnosisMaxLength = 40
@@ -84,16 +74,15 @@ func validInjuryOption(options []injuryOption, code string) bool {
 
 type injuryJoinReq struct {
 	// Diagnosis を聞くのは "other" のグループだけ。そこではグループ自体がケガの名前を表していないから。
-	Diagnosis    string   `json:"diagnosis"`
-	Severity     string   `json:"severity"`
-	SawDoctor    *bool    `json:"saw_doctor"`
-	InjuredMonth string   `json:"injured_month"`
-	Place        string   `json:"place"`
-	Activity     string   `json:"activity"`
-	PreChanges   []string `json:"pre_changes"`
+	Diagnosis  string   `json:"diagnosis"`
+	Severity   string   `json:"severity"`
+	SawDoctor  *bool    `json:"saw_doctor"`
+	InjuredOn  string   `json:"injured_on"`
+	Place      string   `json:"place"`
+	Activity   string   `json:"activity"`
+	PreChanges []string `json:"pre_changes"`
 	// Hindsight は、前から入っている人の更新やむかしの画面からも来るので、空でもよい。
 	Hindsight []string `json:"hindsight"`
-	Event     string   `json:"event"`
 	Stage     string   `json:"stage"`
 }
 
@@ -106,7 +95,6 @@ type injuryJoin struct {
 	Activity   string
 	PreChanges []string
 	Hindsight  []string
-	Event      string
 	Stage      string
 }
 
@@ -131,17 +119,19 @@ func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJ
 	} else {
 		out.SawDoctor = *req.SawDoctor
 	}
-	month, err := time.Parse("2006-01", strings.TrimSpace(req.InjuredMonth))
-	// 「今月」は日本時間で決める（UTC のままだと、毎月1日の朝9時前は前月になる）。
+	day, err := time.Parse("2006-01-02", strings.TrimSpace(req.InjuredOn))
+	// 「今日」は日本時間で決める（UTC のままだと、毎日の朝9時前は前日になる）。
 	now = now.In(jst.Zone)
-	thisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	switch {
 	case err != nil:
-		fields["injured_month"] = "いつごろケガをしたかを選んでください"
-	case month.After(thisMonth):
-		fields["injured_month"] = "これから先の月は選べません"
+		fields["injured_on"] = "いつケガをしたかを選んでください"
+	case day.After(today):
+		fields["injured_on"] = "これから先の日は選べません"
+	case day.Before(today.AddDate(-10, 0, 0)):
+		fields["injured_on"] = "10年より前の日は選べません"
 	default:
-		out.InjuredOn = month
+		out.InjuredOn = day
 	}
 	out.Place = strings.TrimSpace(req.Place)
 	if !validInjuryOption(injuryPlaces, out.Place) {
@@ -184,10 +174,6 @@ func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJ
 	}
 	if fields["hindsight"] == "" && hindsight["none"] && len(out.Hindsight) > 1 {
 		fields["hindsight"] = "「わからない・とくにない」はほかと一緒に選べません"
-	}
-	out.Event = strings.TrimSpace(req.Event)
-	if !validInjuryOption(injuryEvents, out.Event) {
-		fields["event"] = "種目を選んでください"
 	}
 	out.Stage = strings.TrimSpace(req.Stage)
 	if !validInjuryStage(out.Stage) {

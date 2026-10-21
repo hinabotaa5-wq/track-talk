@@ -16,30 +16,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// コーチの担当種目。並びは画面に出す順。コードは練習相手募集の種目に合わせている。
-var coachEvents = []string{
-	"100m",
-	"200m",
-	"400m",
-	"800m",
-	"1500m",
-	"5000m",
-	"10000m",
-	"110mh",
-	"100mh",
-	"400mh",
-	"3000msc",
-	"high-jump",
-	"pole-vault",
-	"long-jump",
-	"triple-jump",
-	"shot-put",
-	"discus",
-	"hammer",
-	"javelin",
-	"race-walk",
-	"relay",
-}
+// コーチの担当種目。アプリ内の種目(appEvents)と同じ。並びは画面に出す順。
+var coachEvents = func() []string {
+	out := make([]string, 0, len(appEvents))
+	for _, event := range appEvents {
+		out = append(out, event.Code)
+	}
+	return out
+}()
 
 func validCoachTier(tier string) bool {
 	return tier == "coach" || tier == "senpai"

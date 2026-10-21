@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { practiceEventValues } from "./practice-events";
+import { appEventValues } from "./practice-events";
 
 z.config(z.locales.ja());
 
@@ -42,8 +42,7 @@ export const recruitmentSchema = z.object({
 export const practiceSchema = z.object({
   venue: z.string("練習場所を入力してください").trim().min(1, "練習場所を入力してください").max(80, "練習場所は80文字以内で入力してください"),
   starts_at: z.string("練習日時を入力してください").trim().min(1, "練習日時を入力してください"),
-  event: z.enum(practiceEventValues, "種目を選んでください"),
-  event_other: z.string().trim().max(40, "種目名は40文字以内で入力してください"),
+  event: z.enum(appEventValues, "種目を選んでください"),
   capacity: z
     .number("募集人数は1〜99で入力してください")
     .int("募集人数は1〜99で入力してください")
@@ -85,11 +84,25 @@ export const loginSchema = z.object({
 export const nicknameSchema = z.object({
   nickname: z.string("ニックネームを入力してください").trim().min(1, "ニックネームを入力してください").max(10, "10文字以内で入力してください"),
   nickname_public: z.boolean(),
+  event: z.enum(appEventValues, "種目を選んでください"),
 });
 
 export const resetSchema = z.object({
   email: z.string("メールアドレスを確認してください").email("メールアドレスを確認してください"),
 });
+
+export const changeEmailSchema = z.object({
+  email: z.string("メールアドレスを確認してください").trim().email("メールアドレスを確認してください").max(254, "254文字以内で入力してください"),
+  current: z.string("いまのパスワードを入力してください").min(1, "いまのパスワードを入力してください"),
+});
+
+export const changePasswordSchema = z
+  .object({
+    current: z.string("いまのパスワードを入力してください").min(1, "いまのパスワードを入力してください"),
+    password: z.string("パスワードを入力してください").min(8, "8文字以上にしてください"),
+    confirm: z.string("もう一度入力してください"),
+  })
+  .refine((v) => v.password === v.confirm, { message: "同じパスワードを入力してください", path: ["confirm"] });
 
 export const newPasswordSchema = z
   .object({

@@ -258,21 +258,22 @@ type InjuryGroupHindsight struct {
 }
 
 type InjuryGroupMember struct {
-	UserID        uuid.UUID `json:"user_id"`
-	BodyPart      string    `json:"body_part"`
-	InjuredOn     time.Time `json:"injured_on"`
-	PlaceNote     *string   `json:"place_note"`
-	SituationNote *string   `json:"situation_note"`
-	Stage         string    `json:"stage"`
-	JoinedAt      time.Time `json:"joined_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	Diagnosis     *string   `json:"diagnosis"`
-	Severity      *string   `json:"severity"`
-	SawDoctor     *bool     `json:"saw_doctor"`
-	Place         *string   `json:"place"`
-	Activity      *string   `json:"activity"`
-	PreChanges    []string  `json:"pre_changes"`
-	Event         *string   `json:"event"`
+	UserID         uuid.UUID `json:"user_id"`
+	BodyPart       string    `json:"body_part"`
+	InjuredOn      time.Time `json:"injured_on"`
+	PlaceNote      *string   `json:"place_note"`
+	SituationNote  *string   `json:"situation_note"`
+	Stage          string    `json:"stage"`
+	JoinedAt       time.Time `json:"joined_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Diagnosis      *string   `json:"diagnosis"`
+	Severity       *string   `json:"severity"`
+	SawDoctor      *bool     `json:"saw_doctor"`
+	Place          *string   `json:"place"`
+	Activity       *string   `json:"activity"`
+	PreChanges     []string  `json:"pre_changes"`
+	Event          *string   `json:"event"`
+	InjuredOnExact bool      `json:"injured_on_exact"`
 }
 
 type InjuryGroupStageLog struct {
@@ -475,6 +476,7 @@ type Profile struct {
 	BirthMonth            *time.Time `json:"birth_month"`
 	CoachingDemo          bool       `json:"coaching_demo"`
 	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
+	Event                 *string    `json:"event"`
 }
 
 type PushSubscription struct {

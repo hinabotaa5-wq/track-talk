@@ -231,7 +231,7 @@ func (q *Queries) GetInjuryDetail(ctx context.Context, postID uuid.UUID) (Injury
 }
 
 const getInjuryGroupMember = `-- name: GetInjuryGroupMember :one
-SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, injured_on_exact
 FROM injury_group_members
 WHERE user_id = $1 AND body_part = $2
 `
@@ -260,6 +260,7 @@ func (q *Queries) GetInjuryGroupMember(ctx context.Context, arg GetInjuryGroupMe
 		&i.Activity,
 		&i.PreChanges,
 		&i.Event,
+		&i.InjuredOnExact,
 	)
 	return i, err
 }
@@ -479,7 +480,7 @@ SELECT
     l.stage,
     l.actions,
     m.severity,
-    (EXTRACT(EPOCH FROM (l.created_at - m.injured_on::timestamptz)) / 86400.0)::float8 AS days
+    GREATEST(0, EXTRACT(EPOCH FROM (l.created_at - (m.injured_on + CASE WHEN m.injured_on_exact THEN 0 ELSE 14 END)::timestamptz)) / 86400.0)::float8 AS days
 FROM injury_group_stage_log l
 JOIN injury_group_members m ON m.user_id = l.user_id AND m.body_part = l.body_part
 WHERE l.body_part = $1
@@ -496,7 +497,8 @@ type ListInjuryGroupStageChangesRow struct {
 	Days     float64   `json:"days"`
 }
 
-// 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした月の1日からその記録までの日数。
+// 段階を変えた記録(入るときの記録は actions が空なので数えない)と、ケガをした日からその記録までの日数。
+// 月までしか答えていない以前の人は、1日として保存しているので、その月の半ば(14日後)にケガをしたものとみなす。
 func (q *Queries) ListInjuryGroupStageChanges(ctx context.Context, bodyPart string) ([]ListInjuryGroupStageChangesRow, error) {
 	rows, err := q.db.Query(ctx, listInjuryGroupStageChanges, bodyPart)
 	if err != nil {
@@ -625,7 +627,7 @@ func (q *Queries) ListMyInjuryFirstReports(ctx context.Context, authorID uuid.UU
 }
 
 const listMyInjuryGroupMembers = `-- name: ListMyInjuryGroupMembers :many
-SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
+SELECT user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, injured_on_exact
 FROM injury_group_members
 WHERE user_id = $1
 `
@@ -655,6 +657,7 @@ func (q *Queries) ListMyInjuryGroupMembers(ctx context.Context, userID uuid.UUID
 			&i.Activity,
 			&i.PreChanges,
 			&i.Event,
+			&i.InjuredOnExact,
 		); err != nil {
 			return nil, err
 		}
@@ -811,7 +814,7 @@ const setInjuryGroupStage = `-- name: SetInjuryGroupStage :one
 UPDATE injury_group_members
 SET stage = $3, updated_at = now()
 WHERE user_id = $1 AND body_part = $2
-RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, injured_on_exact
 `
 
 type SetInjuryGroupStageParams struct {
@@ -839,6 +842,7 @@ func (q *Queries) SetInjuryGroupStage(ctx context.Context, arg SetInjuryGroupSta
 		&i.Activity,
 		&i.PreChanges,
 		&i.Event,
+		&i.InjuredOnExact,
 	)
 	return i, err
 }
@@ -902,14 +906,15 @@ func (q *Queries) UpsertInjuryDetail(ctx context.Context, arg UpsertInjuryDetail
 
 const upsertInjuryGroupMember = `-- name: UpsertInjuryGroupMember :one
 INSERT INTO injury_group_members (
-    user_id, body_part, injured_on, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, stage
+    user_id, body_part, injured_on, injured_on_exact, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, stage
 )
 VALUES (
-    $1, $2, $3, $4, $5,
+    $1, $2, $3, true, $4, $5,
     $6, $7, $8, $9::text[], $10, $11
 )
 ON CONFLICT (user_id, body_part) DO UPDATE SET
     injured_on = EXCLUDED.injured_on,
+    injured_on_exact = EXCLUDED.injured_on_exact,
     place_note = NULL,
     situation_note = NULL,
     diagnosis = EXCLUDED.diagnosis,
@@ -921,7 +926,7 @@ ON CONFLICT (user_id, body_part) DO UPDATE SET
     event = EXCLUDED.event,
     stage = EXCLUDED.stage,
     updated_at = now()
-RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event
+RETURNING user_id, body_part, injured_on, place_note, situation_note, stage, joined_at, updated_at, diagnosis, severity, saw_doctor, place, activity, pre_changes, event, injured_on_exact
 `
 
 type UpsertInjuryGroupMemberParams struct {
@@ -970,6 +975,7 @@ func (q *Queries) UpsertInjuryGroupMember(ctx context.Context, arg UpsertInjuryG
 		&i.Activity,
 		&i.PreChanges,
 		&i.Event,
+		&i.InjuredOnExact,
 	)
 	return i, err
 }

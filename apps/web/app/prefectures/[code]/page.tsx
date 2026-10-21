@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
   if (!isPrefecturePageCode(code)) return { title: "都道府県" };
   const name = prefectureName(code);
   return {
-    title: `${name}の陸上競技の大会日程とクラブチーム募集`,
-    description: `${name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程と、${name}で活動するクラブチームのメンバー募集をまとめています。`,
+    title: `${name}の陸上競技の大会日程`,
+    description: `${name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程をまとめています。`,
     alternates: { canonical: `/prefectures/${code}` },
   };
 }

@@ -17,7 +17,7 @@ SELECT $1::uuid, $2::text, $3::boolean
 WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
 `
 
 type EnsureProfileParams struct {
@@ -40,12 +40,13 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 		&i.BirthMonth,
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
+		&i.Event,
 	)
 	return i, err
 }
 
 const getProfileByID = `-- name: GetProfileByID :one
-SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public FROM profiles WHERE id = $1
+SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event FROM profiles WHERE id = $1
 `
 
 // ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
@@ -62,6 +63,7 @@ func (q *Queries) GetProfileByID(ctx context.Context, id uuid.UUID) (Profile, er
 		&i.BirthMonth,
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
+		&i.Event,
 	)
 	return i, err
 }
@@ -71,7 +73,7 @@ UPDATE profiles
 SET post_master_badge_public = $2,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
 `
 
 type UpdatePostMasterBadgeParams struct {
@@ -92,6 +94,7 @@ func (q *Queries) UpdatePostMasterBadge(ctx context.Context, arg UpdatePostMaste
 		&i.BirthMonth,
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
+		&i.Event,
 	)
 	return i, err
 }
@@ -100,19 +103,26 @@ const updateProfile = `-- name: UpdateProfile :one
 UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
+    event = COALESCE($4::text, event),
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
 `
 
 type UpdateProfileParams struct {
 	ID             uuid.UUID `json:"id"`
 	Nickname       *string   `json:"nickname"`
 	NicknamePublic bool      `json:"nickname_public"`
+	Event          *string   `json:"event"`
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
-	row := q.db.QueryRow(ctx, updateProfile, arg.ID, arg.Nickname, arg.NicknamePublic)
+	row := q.db.QueryRow(ctx, updateProfile,
+		arg.ID,
+		arg.Nickname,
+		arg.NicknamePublic,
+		arg.Event,
+	)
 	var i Profile
 	err := row.Scan(
 		&i.ID,
@@ -124,6 +134,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.BirthMonth,
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
+		&i.Event,
 	)
 	return i, err
 }

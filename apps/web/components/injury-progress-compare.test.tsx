@@ -15,7 +15,7 @@ const progress: InjuryProgress = {
         { stage: "resting", stage_label: "安静中", my_days: 0, median_days: null },
         { stage: "rehab", stage_label: "リハビリ中", my_days: 12, median_days: 14 },
         { stage: "jogging", stage_label: "ジョグ再開", my_days: null, median_days: 30 },
-        { stage: "practice", stage_label: "練習に復帰", my_days: null, median_days: null },
+        { stage: "half", stage_label: "50%を出せる", my_days: null, median_days: null },
         { stage: "race", stage_label: "大会に復帰", my_days: null, median_days: 55 },
       ],
     },
@@ -41,7 +41,7 @@ describe("InjuryProgressCompareView", () => {
 
   it("does not show a number for a stage below the sample minimum", () => {
     const html = renderToStaticMarkup(<InjuryProgressCompareView progress={progress} />);
-    const practice = row(html, "練習に復帰");
+    const practice = row(html, "50%を出せる");
     expect(practice).toContain("5人未満のため非表示");
     expect(practice).not.toMatch(/\d+日/);
   });
