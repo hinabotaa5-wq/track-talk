@@ -4,7 +4,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
-import { feedTitle } from "@/components/feed-card";
+import { feedTitle, hasFeedTitle } from "@/components/feed-card";
 import { MeetThreadNowRunning } from "@/components/meet-now-running";
 import { DetailLoadingFrame } from "@/components/loading-frame";
 import { PracticeReputationSummary, practiceAttendanceLine } from "@/components/practice-reputation";
@@ -513,7 +513,7 @@ export function PostDetail({
           priority
         />
       ) : null}
-      {post.kind === "practice" ? null : (
+      {post.kind === "practice" || ((post.kind === "youtube" || post.kind === "instagram") && !hasFeedTitle(post.title)) ? null : (
         <h1 className="text-4xl font-bold">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}

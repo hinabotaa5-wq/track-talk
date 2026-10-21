@@ -36,10 +36,6 @@ export default function VideoUrlPostPage() {
       setError(urlError);
       return;
     }
-    if (!title.trim()) {
-      setError("タイトルを入力してください");
-      return;
-    }
     if (!acquire()) return;
     setError("");
     try {
@@ -75,7 +71,7 @@ export default function VideoUrlPostPage() {
         ) : (
           <p className="text-sm text-red-400">{urlError}</p>
         )}
-        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
+        <TitleField optional value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />

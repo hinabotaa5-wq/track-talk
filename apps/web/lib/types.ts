@@ -50,6 +50,8 @@ export type Post = {
   author_name?: string;
   author_post_master?: boolean;
   body?: string;
+  // 一覧のカードに出す本文の冒頭(写真のない文章の投稿だけ)。
+  excerpt?: string;
   mine: boolean;
   like_count: number;
   comment_count: number;

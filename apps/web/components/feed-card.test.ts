@@ -75,4 +75,29 @@ describe("FeedCard", () => {
     const html = renderToStaticMarkup(createElement(FeedCard, { post: postWithThumb }));
     expect(html).toContain("res.cloudinary.com");
   });
+
+  it("shows the start of the body on a text post without a photo", () => {
+    const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, excerpt: "決勝は向かい風だった。" } }));
+    expect(html).toContain("決勝は向かい風だった。");
+    expect(html).toContain("自分の投稿");
+  });
+
+  it("leaves out the title row when a url post has no title", () => {
+    const withTitle = renderToStaticMarkup(
+      createElement(FeedCard, { post: { ...post, kind: "youtube", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
+    );
+    expect(withTitle).toContain("自分の投稿");
+    const noTitle = renderToStaticMarkup(
+      createElement(FeedCard, { post: { ...post, title: "", kind: "youtube", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
+    );
+    expect(noTitle).not.toContain("（質問なし）");
+    expect(noTitle).not.toContain("<p ");
+  });
+
+  it("loads the cover of an instagram post", () => {
+    const html = renderToStaticMarkup(
+      createElement(FeedCard, { post: { ...post, kind: "instagram", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e" } }),
+    );
+    expect(html).toContain("https://www.instagram.com/reel/C1a2B3c4D5e/media/?size=m");
+  });
 });

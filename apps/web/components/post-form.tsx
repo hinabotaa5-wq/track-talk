@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { hasTextPostContent, postSchema } from "@/lib/validators";
+import { hasTextPostContent, postSchema, urlPostSchema } from "@/lib/validators";
 import type { z } from "zod";
 import { TitleField } from "./composer-page";
 import { Textarea } from "./ui/textarea";
@@ -32,7 +32,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   const [photo, setPhoto] = useState<File | null>(null);
   const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
-    resolver: zodResolver(postSchema),
+    resolver: zodResolver(initial?.kind === "youtube" || initial?.kind === "instagram" ? urlPostSchema : postSchema),
     defaultValues: {
       title: initial?.title ?? "",
       body: initial?.body ?? "",
@@ -125,7 +125,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         // eslint-disable-next-line @next/next/no-img-element
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
       ) : null}
-      <TitleField {...form.register("title")} />
+      <TitleField optional={initial?.kind === "youtube" || initial?.kind === "instagram"} {...form.register("title")} />
       {form.formState.errors.title ? (
         <p className="text-sm text-red-400">{form.formState.errors.title.message}</p>
       ) : null}
