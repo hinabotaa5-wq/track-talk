@@ -49,14 +49,18 @@ WHERE author_id = $1
 ORDER BY day DESC;
 
 -- name: ListSenseNotesBetween :many
--- まとめに渡す感覚メモ。古い順。
+-- まとめに渡す感覚メモ。多いときは新しい方から max_notes 個を選び、古い順に返す。
 SELECT body, event, created_at
-FROM sense_notes
-WHERE author_id = sqlc.arg('author_id')
-  AND created_at >= sqlc.arg('since')
-  AND created_at < sqlc.arg('until')
-ORDER BY created_at, id
-LIMIT sqlc.arg('max_notes');
+FROM (
+    SELECT id, body, event, created_at
+    FROM sense_notes
+    WHERE author_id = sqlc.arg('author_id')
+      AND created_at >= sqlc.arg('since')
+      AND created_at < sqlc.arg('until')
+    ORDER BY created_at DESC, id DESC
+    LIMIT sqlc.arg('max_notes')
+) AS recent
+ORDER BY created_at, id;
 
 -- name: CreateSenseNoteSummary :one
 INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, summary)

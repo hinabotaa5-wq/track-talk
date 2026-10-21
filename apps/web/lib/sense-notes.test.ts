@@ -4,6 +4,8 @@ import {
   senseCheer,
   senseDayLabel,
   senseJarLevel,
+  senseJarSize,
+  senseSummaryMinNotes,
   senseSummaryNextLabel,
   senseSummaryRangeLabel,
   type SenseNote,
@@ -14,11 +16,15 @@ function note(id: string, day: string): SenseNote {
 }
 
 describe("sense notes", () => {
-  it("fills one jar every 30 notes", () => {
+  it("fills one jar every 9 notes", () => {
     expect(senseJarLevel(0)).toEqual({ filled: 0, current: 0 });
-    expect(senseJarLevel(29)).toEqual({ filled: 0, current: 29 });
-    expect(senseJarLevel(30)).toEqual({ filled: 1, current: 0 });
-    expect(senseJarLevel(31)).toEqual({ filled: 1, current: 1 });
+    expect(senseJarLevel(8)).toEqual({ filled: 0, current: 8 });
+    expect(senseJarLevel(9)).toEqual({ filled: 1, current: 0 });
+    expect(senseJarLevel(10)).toEqual({ filled: 1, current: 1 });
+  });
+
+  it("lets a summary be made when the jar is full", () => {
+    expect(senseSummaryMinNotes).toBe(senseJarSize);
   });
 
   it("always opens the cheer with 今日も頑張ったね", () => {
@@ -27,7 +33,7 @@ describe("sense notes", () => {
     expect(first.body).toContain("はじめて");
     expect(senseCheer({ total: 5, days: 3, streak: 3, today: 1 }).body).toContain("3日続けて");
     expect(senseCheer({ total: 5, days: 3, streak: 1, today: 2 }).body).toContain("2つ目");
-    expect(senseCheer({ total: 30, days: 30, streak: 30, today: 1 }).body).toContain("1杯目");
+    expect(senseCheer({ total: 9, days: 9, streak: 9, today: 1 }).body).toContain("1杯目");
   });
 
   it("groups notes by day keeping the order", () => {

@@ -5,7 +5,11 @@ import { todayInTokyo } from "./format";
 export const senseNoteMaxLength = 300;
 
 // 器(ためるビン)1杯に入る感覚の数。
-export const senseJarSize = 30;
+export const senseJarSize = 9;
+
+// まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。ビン1杯と同じ数にして、満杯になったらまとめられるようにする。
+// API の senseSummaryMinNotes と揃えること。
+export const senseSummaryMinNotes = senseJarSize;
 
 export type SenseNote = {
   id: string;
@@ -77,7 +81,7 @@ export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];
 }
 
-// 1週間のまとめ(AI)。直近7日(今日を含む)の感覚メモから作る。
+// ふりかえり(AI)。前のまとめのあとに書いた感覚メモ(はじめては、これまでのすべて)から作る。
 export type SenseSummary = {
   id: string;
   from_day: string;
@@ -88,7 +92,13 @@ export type SenseSummary = {
 };
 
 // next_available_at は、次のまとめを作れる時刻。すぐ作れるなら null。
-export type SenseSummaryResponse = { summary: SenseSummary | null; next_available_at: string | null };
+export type SenseSummaryResponse = {
+  summary: SenseSummary | null;
+  next_available_at: string | null;
+  // 前のまとめのあとに書いた数と、まとめに要る数。作ったときの応答には入らない。
+  pending_notes?: number;
+  min_notes?: number;
+};
 
 // まとめた期間。"10月14日(火)〜10月20日(月)"。
 export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | "to_day">, now = new Date()) {
