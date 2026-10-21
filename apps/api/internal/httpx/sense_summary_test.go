@@ -30,26 +30,28 @@ type senseSummaryResponse struct {
 	NextAvailableAt *string `json:"next_available_at"`
 }
 
-// fakeAI は、OpenAI の代わりに reply を返し、届いたプロンプトを残す。
-type fakeAI struct {
+// fakeGemini は、Gemini の代わりに reply を返し、届いたプロンプトを残す。
+type fakeGemini struct {
 	mu      sync.Mutex
 	reply   string
 	prompts []string
 }
 
-func (f *fakeAI) serve(t *testing.T) string {
+func (f *fakeGemini) serve(t *testing.T) string {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
 		var body struct {
-			Messages []struct {
-				Content string `json:"content"`
-			} `json:"messages"`
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
 		}
 		_ = json.Unmarshal(raw, &body)
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		f.prompts = append(f.prompts, body.Messages[0].Content)
-		payload, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": f.reply}}}})
+		f.prompts = append(f.prompts, body.Contents[0].Parts[0].Text)
+		payload, _ := json.Marshal(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]string{"text": f.reply}}}}}})
 		_, _ = w.Write(payload)
 	}))
 	t.Cleanup(server.Close)
@@ -67,12 +69,12 @@ func TestSenseSummaryIsHiddenUntilLaunch(t *testing.T) {
 }
 
 func TestSenseSummaryOfTheWeek(t *testing.T) {
-	ai := &fakeAI{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
-	url := ai.serve(t)
+	gemini := &fakeGemini{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
+	url := gemini.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.OpenAIAPIKey = "test"
-		c.OpenAIAPIBase = url
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = url
 	})
 	me := token(t, uuid.New())
 	other := token(t, uuid.New())
@@ -86,8 +88,8 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("no notes = %d", rec.Code)
 	}
-	if len(ai.prompts) != 0 {
-		t.Fatal("ai was called without notes")
+	if len(gemini.prompts) != 0 {
+		t.Fatal("gemini was called without notes")
 	}
 
 	for _, note := range []map[string]any{{"body": "接地で地面を押せた", "event": "100m"}, {"body": "右のハムが張る"}} {
@@ -110,7 +112,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	if got.Summary.FromDay >= got.Summary.ToDay {
 		t.Fatalf("range = %s..%s", got.Summary.FromDay, got.Summary.ToDay)
 	}
-	prompt := ai.prompts[0]
+	prompt := gemini.prompts[0]
 	if !strings.Contains(prompt, "[100m] 接地で地面を押せた") || !strings.Contains(prompt, "[種目なし] 右のハムが張る") || strings.Contains(prompt, "他の人のメモ") {
 		t.Fatalf("prompt = %s", prompt)
 	}
@@ -132,11 +134,11 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatalf("second summary in a week = %d", rec.Code)
 	}
 	// 他の人は別に数える。壊れた答えは 502 で、回数に数えない。
-	ai.reply = "not json"
+	gemini.reply = "not json"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusBadGateway {
 		t.Fatalf("broken reply = %d", rec.Code)
 	}
-	ai.reply = `{"overview":"ok","good":[],"concerns":[],"next":[]}`
+	gemini.reply = `{"overview":"ok","good":[],"concerns":[],"next":[]}`
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusCreated {
 		t.Fatalf("other summary after failure = %d", rec.Code)
 	}
@@ -144,12 +146,12 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 
 // 同時に頼まれても、まとめは1回しか作らず、AI も1回しか呼ばない。
 func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
-	ai := &fakeAI{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
 	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.OpenAIAPIKey = "test"
-		c.OpenAIAPIBase = url
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = url
 	})
 	me := token(t, uuid.New())
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "接地で地面を押せた"}); rec.Code != http.StatusCreated {

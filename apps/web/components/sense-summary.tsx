@@ -100,7 +100,7 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
         <p className="text-xs text-slate-300">この1週間の感覚メモを AI がふりかえりにまとめます(1週間に1回)。</p>
       )}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを OpenAI に送ります。</p>
+      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを Google の Gemini に送ります。</p>
     </section>
   );
 }
