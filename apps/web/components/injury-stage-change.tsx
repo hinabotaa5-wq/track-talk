@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { InjuryChoices } from "./injury-choices";
 import { LeaveGuardArea, useLeaveGuard } from "./leave-guard";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
 import {
   claimCelebration,
@@ -83,11 +83,7 @@ export function InjuryStageChange({
       setDirty(false);
       onChanged(next, claimCelebration(part, next.stage));
     } catch (e) {
-      if (e instanceof ApiRequestError) {
-        setError((e.fields ? Object.values(e.fields)[0] : "") || e.message);
-      } else {
-        setError("段階を変えられませんでした");
-      }
+      setError(apiErrorText(e, "段階を変えられませんでした"));
     } finally {
       release();
     }

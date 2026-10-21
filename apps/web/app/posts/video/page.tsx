@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { ComposerPage, TitleField } from "@/components/composer-page";
 import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
@@ -81,12 +81,7 @@ export default function OwnVideoPage() {
     } catch (err) {
       // 動画そのものを断られたとき（項目の指定がないエラー）は、上げ直しが必要なので使い回さない。
       if (!(err instanceof ApiRequestError && err.fields)) uploaded.current = null;
-      if (err instanceof ApiRequestError) {
-        const field = err.fields ? Object.values(err.fields)[0] : "";
-        setError(field || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : "保存に失敗しました");
-      }
+      setError(apiErrorText(err, err instanceof Error ? err.message : "保存に失敗しました"));
       setStatus("");
       setUpload(null);
       release();

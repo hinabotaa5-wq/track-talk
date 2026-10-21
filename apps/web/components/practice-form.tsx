@@ -8,7 +8,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import type { Post } from "@/lib/types";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { fromJstInput, toJstInput } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
@@ -82,12 +82,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       clearHomeFeeds();
       router.push(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
-      if (e instanceof ApiRequestError) {
-        const field = e.fields ? Object.values(e.fields)[0] : "";
-        setError(field || e.message);
-      } else {
-        setError("保存に失敗しました");
-      }
+      setError(apiErrorText(e, "保存に失敗しました"));
       release();
     }
   }

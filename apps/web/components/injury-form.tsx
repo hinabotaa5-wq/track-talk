@@ -7,7 +7,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import type { Post } from "@/lib/types";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
@@ -51,12 +51,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
         initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : groupPart ? injuryGroupPath(groupPart) : "/injury",
       );
     } catch (e) {
-      if (e instanceof ApiRequestError) {
-        const field = e.fields ? Object.values(e.fields)[0] : "";
-        setError(field || e.message);
-      } else {
-        setError("保存に失敗しました");
-      }
+      setError(apiErrorText(e, "保存に失敗しました"));
       release();
     }
   }

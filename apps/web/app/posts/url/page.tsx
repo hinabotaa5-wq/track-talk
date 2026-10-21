@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, apiErrorText } from "@/lib/api";
 import { ComposerPage, TitleField } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,12 +51,7 @@ export default function VideoUrlPostPage() {
       clearHomeFeeds();
       router.push("/");
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        const field = err.fields ? Object.values(err.fields)[0] : "";
-        setError(field || err.message);
-      } else {
-        setError("保存に失敗しました");
-      }
+      setError(apiErrorText(err, "保存に失敗しました"));
       release();
     }
   }

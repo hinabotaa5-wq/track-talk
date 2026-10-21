@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
-import { apiFetch, ApiRequestError } from "@/lib/api";
+import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
@@ -194,12 +194,7 @@ function Composer({
       setFileKey((k) => k + 1);
       setMenu(null);
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        const field = err.fields ? Object.values(err.fields)[0] : "";
-        setError(field || err.message);
-      } else {
-        setError(err instanceof Error ? err.message : "送信に失敗しました");
-      }
+      setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
     } finally {
       setUpload(null);
       release();
