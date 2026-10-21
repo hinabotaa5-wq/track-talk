@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { loadSavedFeed, readFeed, savedFeedPath } from "@/lib/home-feed-cache";
-import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedCard } from "@/components/feed-card";
+import { FeedGrid } from "@/components/feed-grid";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
@@ -60,11 +61,11 @@ export function SavedFeed({ page }: { page: number }) {
         />
       ) : null}
       {posts.length > 0 ? (
-        <div className={feedGridClass}>
+        <FeedGrid>
           {posts.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}
-        </div>
+        </FeedGrid>
       ) : null}
       {hasNext ? (
         <Link href={`/me/saved?page=${meta.page + 1}`} className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95">

@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { FeedCard, feedGridClass } from "@/components/feed-card";
+import { FeedCard } from "@/components/feed-card";
+import { FeedGrid } from "@/components/feed-grid";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { fetchAllPages } from "@/lib/paging";
@@ -63,11 +64,11 @@ export default function MyPostsPage() {
       ) : posts.length === 0 ? (
         <p className="text-sm text-slate-200">まだ投稿がありません</p>
       ) : (
-        <div className={feedGridClass}>
+        <FeedGrid>
           {posts.map((p) => (
             <FeedCard key={p.id} post={p} returnTo="me" />
           ))}
-        </div>
+        </FeedGrid>
       )}
     </div>
   );
