@@ -42,7 +42,7 @@ function MenuLink({ href, label, icon: Icon }: { href: string; label: string; ic
 }
 
 export default function MePage() {
-  const { session, loading } = useAuth();
+  const { session, token, loading } = useAuth();
   const router = useRouter();
   const logoutLock = useActionLock();
   const [installed, setInstalled] = useState(true);
