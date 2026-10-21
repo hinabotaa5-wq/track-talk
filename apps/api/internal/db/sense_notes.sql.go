@@ -280,12 +280,16 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 
 const listSenseNotesBetween = `-- name: ListSenseNotesBetween :many
 SELECT body, event, created_at
-FROM sense_notes
-WHERE author_id = $1
-  AND created_at >= $2
-  AND created_at < $3
+FROM (
+    SELECT id, body, event, created_at
+    FROM sense_notes
+    WHERE author_id = $1
+      AND created_at >= $2
+      AND created_at < $3
+    ORDER BY created_at DESC, id DESC
+    LIMIT $4
+) AS recent
 ORDER BY created_at, id
-LIMIT $4
 `
 
 type ListSenseNotesBetweenParams struct {
@@ -301,7 +305,7 @@ type ListSenseNotesBetweenRow struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// まとめに渡す感覚メモ。古い順。
+// まとめに渡す感覚メモ。多いときは新しい方から max_notes 個を選び、古い順に返す。
 func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesBetweenParams) ([]ListSenseNotesBetweenRow, error) {
 	rows, err := q.db.Query(ctx, listSenseNotesBetween,
 		arg.AuthorID,

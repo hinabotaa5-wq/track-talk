@@ -1,6 +1,7 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,12 +14,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type senseSummaryResponse struct {
-	WeekNotes int `json:"week_notes"`
-	MinNotes  int `json:"min_notes"`
-	Summary   *struct {
+	PendingNotes int `json:"pending_notes"`
+	MinNotes     int `json:"min_notes"`
+	Summary      *struct {
 		FromDay   string `json:"from_day"`
 		ToDay     string `json:"to_day"`
 		NoteCount int    `json:"note_count"`
@@ -115,7 +117,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	writeSenseNotes(t, h, me, 8)
 	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.WeekNotes != 8 || got.MinNotes != 9 {
+	if got.PendingNotes != 8 || got.MinNotes != 9 {
 		t.Fatalf("progress = %s", rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
@@ -138,7 +140,7 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 	if got.Summary == nil || got.Summary.NoteCount != 9 || got.Summary.Summary.Overview == "" || len(got.Summary.Summary.Good) != 1 || got.NextAvailableAt == nil {
 		t.Fatalf("summary = %s", rec.Body.String())
 	}
-	if got.Summary.FromDay >= got.Summary.ToDay {
+	if got.Summary.FromDay > got.Summary.ToDay {
 		t.Fatalf("range = %s..%s", got.Summary.FromDay, got.Summary.ToDay)
 	}
 	prompt := gemini.prompts[0]
@@ -158,6 +160,18 @@ func TestSenseSummaryOfTheWeek(t *testing.T) {
 		t.Fatalf("other sees = %s", rec.Body.String())
 	}
 
+	// まとめたあとに書いたメモだけを数える。
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if got.PendingNotes != 0 {
+		t.Fatalf("pending after summary = %s", rec.Body.String())
+	}
+	writeSenseNotes(t, h, me, 1)
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if got.PendingNotes != 1 || got.Summary == nil {
+		t.Fatalf("pending after one more note = %s", rec.Body.String())
+	}
 	// 1週間に1回。2回目は 429。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("second summary in a week = %d", rec.Code)
@@ -206,5 +220,39 @@ func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
 	ai.mu.Unlock()
 	if created.Load() != 1 || calls != 1 {
 		t.Fatalf("created %d summaries with %d AI calls, want 1 and 1", created.Load(), calls)
+	}
+}
+
+// 古いメモでも、9個たまっていればまとめられる。
+func TestSenseSummaryCountsOldNotes(t *testing.T) {
+	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	url := ai.serve(t)
+	h := setupConfig(t, func(c *config.Config) {
+		c.SenseSummaryEnabled = true
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = url
+	})
+	id := uuid.New()
+	me := token(t, id)
+	writeSenseNotes(t, h, me, 9)
+	pool, err := pgxpool.New(context.Background(), testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	if _, err := pool.Exec(context.Background(), `UPDATE sense_notes SET created_at = now() - interval '40 days' WHERE author_id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	var got senseSummaryResponse
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summary", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if got.PendingNotes != 9 {
+		t.Fatalf("old notes are not counted = %s", rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if rec.Code != http.StatusCreated || got.Summary == nil || got.Summary.NoteCount != 9 || got.Summary.FromDay >= got.Summary.ToDay {
+		t.Fatalf("summary of old notes = %d %s", rec.Code, rec.Body.String())
 	}
 }

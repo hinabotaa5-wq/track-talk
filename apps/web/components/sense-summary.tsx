@@ -21,12 +21,12 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-// 直近7日の感覚メモを AI でまとめるカード。まとめは本人だけに表示する。
-// total は感覚メモの総数。メモが増えたら、直近7日の数を取り直す。
+// 前のまとめのあとに書いた感覚メモを AI でまとめるカード。まとめは本人だけに表示する。
+// total は感覚メモの総数。メモが増えたら、まとめられる数を取り直す。
 export function SenseSummaryCard({ token, total }: { token: string | null; total: number }) {
   const [summary, setSummary] = useState<SenseSummary | null>(null);
   const [nextAt, setNextAt] = useState<string | null>(null);
-  const [weekNotes, setWeekNotes] = useState(0);
+  const [pendingNotes, setPendingNotes] = useState(0);
   const [minNotes, setMinNotes] = useState(senseSummaryMinNotes);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +39,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
       .then((d) => {
         setSummary(d.summary);
         setNextAt(d.next_available_at);
-        setWeekNotes(d.week_notes ?? 0);
+        setPendingNotes(d.pending_notes ?? 0);
         setMinNotes(d.min_notes ?? senseSummaryMinNotes);
         setLoaded(true);
       })
@@ -66,7 +66,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
   if (!loaded) return null;
 
   const nextLabel = senseSummaryNextLabel(nextAt);
-  const shortBy = Math.max(0, minNotes - weekNotes);
+  const shortBy = Math.max(0, minNotes - pendingNotes);
   const hasDetails = summary !== null && summary.summary.good.length + summary.summary.concerns.length + summary.summary.next.length > 0;
   // 書く欄とメモの一覧のあいだに置くので、縦に場所を取らないよう小さくまとめる。
   // ボタンは書く欄の「残す」と並ばないよう控えめな見た目にする。
@@ -75,7 +75,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="h-4 w-4 shrink-0 text-amber-200" aria-hidden />
-          1週間のふりかえり
+          感覚のふりかえり
           {summary ? <span className="truncate text-xs font-normal text-slate-300">{senseSummaryRangeLabel(summary)}</span> : null}
         </h2>
         {nextLabel ? (
@@ -105,10 +105,10 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
           <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめた目安です。まとめは1週間に1回です。</p>
         </>
       ) : (
-        <p className="text-xs text-slate-300">この1週間の感覚メモを AI がふりかえりにまとめます(1週間に1回)。</p>
+        <p className="text-xs text-slate-300">前のまとめのあとに書いた感覚メモを AI がふりかえりにまとめます(1週間に1回)。</p>
       )}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを Google の Gemini に送ります。</p>
+      <p className="text-xs text-slate-400">まとめるときだけ、前のまとめのあとに書いた感覚メモを Google の Gemini に送ります。</p>
     </section>
   );
 }

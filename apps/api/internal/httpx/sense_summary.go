@@ -16,15 +16,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 感覚メモの1週間のまとめ。本人が頼んだときだけ、直近7日（今日を含む、日本時間）の感覚メモを
-// Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たってから。
+// 感覚メモのふりかえり。本人が頼んだときだけ、前のまとめのあとに書いた感覚メモ（はじめては、これまでの
+// すべて）を Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たち、
+// 前のまとめのあとに書いたメモが9個たまってから。
 const (
-	// senseSummaryMinNotes は、まとめを作るのに直近7日で要る感覚メモの数。画面のビン1杯の数
+	// senseSummaryMinNotes は、まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。画面のビン1杯の数
 	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
 	senseSummaryMinNotes = 9
 	senseSummaryDays     = 7
 	senseSummaryInterval = senseSummaryDays * 24 * time.Hour
-	// 1日20件までなので、7日分でも140件に収まる。
+	// 多くたまっていたら、新しい方から140個（1日20件の7日分）までを渡す。
 	maxSenseSummaryNotes    = senseSummaryDays * maxSenseNotesPerDay
 	maxSenseSummaryItems    = 3
 	maxSenseSummaryOverview = 300
@@ -33,7 +34,7 @@ const (
 )
 
 type senseSummaryContent struct {
-	// Overview は1週間の感覚の流れを2〜3文で。
+	// Overview はこのあいだの感覚の流れを2〜3文で。
 	Overview string `json:"overview"`
 	// Good はつかめてきた感覚、Concerns は気になる感覚（痛み・違和感を含む）、Next は来週意識すること。
 	Good     []string `json:"good"`
@@ -89,32 +90,28 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// 直近7日に書いた数。画面で「あと何個でまとめられるか」を出すのに使う。
-	weekNotes, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: senseSummaryWindowStart(s.now())})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
 	row, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		JSON(w, http.StatusOK, map[string]any{"summary": nil, "next_available_at": nil, "week_notes": weekNotes, "min_notes": senseSummaryMinNotes})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
 		return
 	}
+	hasLast := err == nil
+	// 前のまとめのあとに書いた数。画面で「あと何個でまとめられるか」を出すのに使う。
+	var after time.Time
+	if hasLast {
+		after = row.CreatedAt
+	}
+	pending, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: after})
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{
-		"summary":           senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
-		"next_available_at": senseSummaryNextAt(row.CreatedAt, s.now()),
-		"week_notes":        weekNotes,
-		"min_notes":         senseSummaryMinNotes,
-	})
-}
-
-// senseSummaryWindowStart は、まとめに入れる感覚メモの最初の時刻（7日前の日本時間の0時）。
-func senseSummaryWindowStart(now time.Time) time.Time {
-	return startOfTokyoDay(now).AddDate(0, 0, -(senseSummaryDays - 1))
+	out := map[string]any{"summary": nil, "next_available_at": nil, "pending_notes": pending, "min_notes": senseSummaryMinNotes}
+	if hasLast {
+		out["summary"] = senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt)
+		out["next_available_at"] = senseSummaryNextAt(row.CreatedAt, s.now())
+	}
+	JSON(w, http.StatusOK, out)
 }
 
 // senseSummaryAvailable は、前のまとめから1週間たっているかを確かめる。まだなら 429 を書いて false を返す。
@@ -133,7 +130,7 @@ func (s *Server) senseSummaryAvailable(w http.ResponseWriter, r *http.Request, a
 	return true
 }
 
-// createSenseSummary は、直近7日の感覚メモを Gemini でまとめて残す。
+// createSenseSummary は、前のまとめのあとに書いた感覚メモを Gemini でまとめて残す。
 func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
@@ -165,7 +162,15 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if !s.senseSummaryAvailable(w, r, me.ID, now) {
 		return
 	}
-	since := senseSummaryWindowStart(now)
+	// 前のまとめのあとに書いたメモだけをまとめる。はじめては、これまでのすべて。
+	var since time.Time
+	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
+	if err == nil {
+		since = last.CreatedAt
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
 		AuthorID: me.ID,
 		Since:    since,
@@ -177,7 +182,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(notes) < senseSummaryMinNotes {
-		Error(w, http.StatusUnprocessableEntity, "validation_error", fmt.Sprintf("まとめるには、この1週間の感覚メモがあと%d個必要です", senseSummaryMinNotes-len(notes)))
+		Error(w, http.StatusUnprocessableEntity, "validation_error", fmt.Sprintf("まとめるには、感覚メモがあと%d個必要です", senseSummaryMinNotes-len(notes)))
 		return
 	}
 
@@ -201,7 +206,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	row, err := s.q.CreateSenseNoteSummary(r.Context(), db.CreateSenseNoteSummaryParams{
 		ID:        uuid.New(),
 		AuthorID:  me.ID,
-		FromDay:   dateOnly(since),
+		FromDay:   dateOnly(notes[0].CreatedAt.In(jst.Zone)),
 		ToDay:     dateOnly(now.In(jst.Zone)),
 		NoteCount: int32(len(notes)),
 		Summary:   encoded,
@@ -218,9 +223,9 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 
 func senseSummaryPrompt(notes []db.ListSenseNotesBetweenRow) string {
 	var b strings.Builder
-	b.WriteString(`あなたは陸上競技の選手の練習ノートを読む、落ち着いた先輩です。次の「感覚メモ」は、選手本人が練習で体を動かして感じたことを、この1週間に書き溜めたものです。
+	b.WriteString(`あなたは陸上競技の選手の練習ノートを読む、落ち着いた先輩です。次の「感覚メモ」は、選手本人が練習で体を動かして感じたことを、前回のふりかえりのあとに書き溜めたものです。
 これを本人向けにまとめて、JSONだけで返してください。形式は {"overview":"","good":[],"concerns":[],"next":[]} です。
-- overview: この1週間の感覚の流れを、2〜3文で。
+- overview: このあいだの感覚の流れを、2〜3文で。
 - good: つかめてきた感覚、うまくいった感覚。3つまで。
 - concerns: 気になる感覚、うまくいかなかった感覚、痛みや違和感。3つまで。無ければ空の配列。
 - next: 来週の練習で意識するとよさそうなこと。メモに書かれた感覚から言えることだけ。3つまで。

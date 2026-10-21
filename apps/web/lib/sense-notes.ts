@@ -7,7 +7,7 @@ export const senseNoteMaxLength = 300;
 // 器(ためるビン)1杯に入る感覚の数。
 export const senseJarSize = 9;
 
-// まとめを作るのに、直近7日で要る感覚メモの数。ビン1杯と同じ数にして、満杯になったらまとめられるようにする。
+// まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。ビン1杯と同じ数にして、満杯になったらまとめられるようにする。
 // API の senseSummaryMinNotes と揃えること。
 export const senseSummaryMinNotes = senseJarSize;
 
@@ -83,7 +83,7 @@ export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];
 }
 
-// 1週間のまとめ(AI)。直近7日(今日を含む)の感覚メモから作る。
+// ふりかえり(AI)。前のまとめのあとに書いた感覚メモ(はじめては、これまでのすべて)から作る。
 export type SenseSummary = {
   id: string;
   from_day: string;
@@ -97,8 +97,8 @@ export type SenseSummary = {
 export type SenseSummaryResponse = {
   summary: SenseSummary | null;
   next_available_at: string | null;
-  // 直近7日に書いた数と、まとめに要る数。作ったときの応答には入らない。
-  week_notes?: number;
+  // 前のまとめのあとに書いた数と、まとめに要る数。作ったときの応答には入らない。
+  pending_notes?: number;
   min_notes?: number;
 };
 
