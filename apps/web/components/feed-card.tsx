@@ -70,7 +70,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
               ) : null}
             </div>
           ) : (
-            <p className="line-clamp-3 text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
+            <p className="line-clamp-3 break-words text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
           )}
           <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
             <span>TrackTalk</span>
@@ -100,7 +100,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
               </>
             ) : null}
           </div>
-          <p className="line-clamp-4 text-sm font-bold leading-snug text-slate-100 transition-colors group-hover:text-blue-400">
+          <p className="line-clamp-4 break-words text-sm font-bold leading-snug text-slate-100 transition-colors group-hover:text-blue-400">
             {title}
           </p>
           <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">

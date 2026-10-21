@@ -8,6 +8,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ProfileGate } from "@/components/profile-gate";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
+import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
           <BottomNav />
+          <ScrollTopOnTabChange />
           <InstallGuide />
           </ConfirmProvider>
           </LeaveGuardProvider>

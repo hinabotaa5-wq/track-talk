@@ -100,10 +100,9 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
           <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめた目安です。</p>
         </>
       ) : (
-        <p className="text-xs text-slate-300">感覚が{minNotes}個たまるたびに、前のまとめのあとに書いた感覚メモを AI がふりかえりにまとめます。</p>
+        <p className="text-xs text-slate-300">感覚が{minNotes}個たまればAIで要約ができます</p>
       )}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-400">まとめるときだけ、前のまとめのあとに書いた感覚メモを Google の Gemini に送ります。</p>
     </section>
   );
 }

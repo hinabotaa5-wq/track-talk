@@ -25,7 +25,6 @@ function SenseNoteFields({
   onEvent: (v: string) => void;
   autoFocus?: boolean;
 }) {
-  const length = [...body.trim()].length;
   return (
     <div className="space-y-2">
       <label className="block">
@@ -51,9 +50,6 @@ function SenseNoteFields({
             ))}
           </select>
         </label>
-        <span className={`shrink-0 text-xs tabular-nums ${length > senseNoteMaxLength ? "text-red-300" : "text-slate-300"}`}>
-          {length}/{senseNoteMaxLength}
-        </span>
       </div>
     </div>
   );
@@ -118,8 +114,8 @@ export function SenseNoteComposer({
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
-      <label className="flex items-center gap-2 text-sm text-slate-200">
-        <span className="shrink-0">日付</span>
+      <label className="block">
+        <span className="sr-only">日付</span>
         <input
           type="date"
           required
@@ -127,7 +123,7 @@ export function SenseNoteComposer({
           min={senseNoteDayRange().min}
           max={senseNoteDayRange().max}
           onChange={(e) => setDay(e.target.value)}
-          className={`${selectClass} min-w-0 flex-1`}
+          className={selectClass}
         />
       </label>
       <SenseNoteFields body={body} event={event} onBody={setBody} onEvent={setEvent} />
@@ -262,7 +258,7 @@ export function SenseNoteItem({
 export function SenseNoteStatsRow({ stats }: { stats: SenseNoteStats }) {
   const items = [
     { label: "連続", value: stats.streak, unit: "日" },
-    { label: "これまでに書いた", value: stats.total, unit: "個" },
+    { label: "これまでの数", value: stats.total, unit: "個" },
   ];
   return (
     <dl className="grid grid-cols-2 gap-2">

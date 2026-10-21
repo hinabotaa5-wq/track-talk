@@ -1,7 +1,7 @@
 -- 開発用のケガデータ。ケガ部の公開ページ・集計(予防・復帰の目安・みんなの一言)が表示される程度の人数を入れる。
 -- 何度流しても同じ結果になる(デモ用プロフィールを消してから入れ直し、乱数は固定)。
 -- 実行: make seed-injury(ローカルの docker の DB)。消すときは make unseed-injury。
--- 本番に流すとき(make は使わない。デモ用プロフィールは「デモ1」〜「デモ81」のニックネームで、公開の集計にも入る):
+-- 本番に流すとき(make は使わない。デモ用プロフィールは1文字のニックネームで、公開の集計にも入る):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo.sql
 -- 本番から消すとき:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo_remove.sql
@@ -38,6 +38,7 @@ DECLARE
         '最初の1週間は何もしないで寝るのがいちばんつらかった。',
         '段階を戻したくなったけど、一度戻して整えたら安定した。'
     ];
+    nicknames text[] := ARRAY['空', '海', '陽', '光', '風', '雪', '星', '月', '花', '葉', '岳', '川', '森', '雲', '虹', '波', '翼', '蓮', '葵', '凛', '蒼', '楓', '梓', '茜', '藍', '紬', '桜', '梅', '杏', '桃', '柚', '栞', '咲', '舞', '萌', '彩', '琴', '結', '凪', '響', '颯', '楽', '駿', '隼', '稜', '瑛', '嵐', '朔', '旭', '晴', '暁', '彗', '昴', '慧', '凱', '剛', '烈', '漣', '湊', '柊', '樹', '大', '悠', '碧', '渚', '汐', '凜', '澪', '莉', '彰', '誠', '悟', '匠', '巧', '叶', '玲', '雅', '嘉', '紗', '穂', '祐'];
     n int := 0;
     g int;
     i int;
@@ -64,7 +65,7 @@ BEGIN
             uid := ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid;
 
             INSERT INTO profiles (id, nickname, nickname_public)
-            VALUES (uid, 'デモ' || n, true);
+            VALUES (uid, nicknames[n], true);
 
             r := random();
             sev := CASE WHEN r < 0.45 THEN 'mild' WHEN r < 0.85 THEN 'moderate' ELSE 'severe' END;
