@@ -13,8 +13,8 @@ SELECT count(*) FROM coaching_plans
 WHERE coach_id = $1;
 
 -- name: CreateCoachingPlan :one
-INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats, start_on_first_video)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetCoachingPlan :one
@@ -33,6 +33,7 @@ SET kind = $3,
     video_reviews = $10,
     menu_updates = $11,
     reply_formats = $12,
+    start_on_first_video = $13,
     updated_at = now()
 WHERE id = $1 AND coach_id = $2
 RETURNING *;

@@ -81,33 +81,35 @@ type CoachingBlockedCount struct {
 }
 
 type CoachingContract struct {
-	ID               uuid.UUID  `json:"id"`
-	PlanID           uuid.UUID  `json:"plan_id"`
-	CoachID          uuid.UUID  `json:"coach_id"`
-	RequesterID      uuid.UUID  `json:"requester_id"`
-	PlanKind         string     `json:"plan_kind"`
-	PlanTitle        string     `json:"plan_title"`
-	DurationDays     int16      `json:"duration_days"`
-	PriceYen         int32      `json:"price_yen"`
-	Event            string     `json:"event"`
-	Goal             string     `json:"goal"`
-	CurrentRecord    string     `json:"current_record"`
-	Message          string     `json:"message"`
-	Minor            bool       `json:"minor"`
-	Status           string     `json:"status"`
-	RespondBy        time.Time  `json:"respond_by"`
-	RespondedAt      *time.Time `json:"responded_at"`
-	StartsAt         *time.Time `json:"starts_at"`
-	EndsAt           *time.Time `json:"ends_at"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	StartBy          *time.Time `json:"start_by"`
-	SuspendedAt      *time.Time `json:"suspended_at"`
-	PaymentRequired  bool       `json:"payment_required"`
-	MessagesPurgedAt *time.Time `json:"messages_purged_at"`
-	VideoReviews     *int16     `json:"video_reviews"`
-	MenuUpdates      *string    `json:"menu_updates"`
-	ReplyFormats     []string   `json:"reply_formats"`
+	ID                uuid.UUID  `json:"id"`
+	PlanID            uuid.UUID  `json:"plan_id"`
+	CoachID           uuid.UUID  `json:"coach_id"`
+	RequesterID       uuid.UUID  `json:"requester_id"`
+	PlanKind          string     `json:"plan_kind"`
+	PlanTitle         string     `json:"plan_title"`
+	DurationDays      int16      `json:"duration_days"`
+	PriceYen          int32      `json:"price_yen"`
+	Event             string     `json:"event"`
+	Goal              string     `json:"goal"`
+	CurrentRecord     string     `json:"current_record"`
+	Message           string     `json:"message"`
+	Minor             bool       `json:"minor"`
+	Status            string     `json:"status"`
+	RespondBy         time.Time  `json:"respond_by"`
+	RespondedAt       *time.Time `json:"responded_at"`
+	StartsAt          *time.Time `json:"starts_at"`
+	EndsAt            *time.Time `json:"ends_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	StartBy           *time.Time `json:"start_by"`
+	SuspendedAt       *time.Time `json:"suspended_at"`
+	PaymentRequired   bool       `json:"payment_required"`
+	MessagesPurgedAt  *time.Time `json:"messages_purged_at"`
+	VideoReviews      *int16     `json:"video_reviews"`
+	MenuUpdates       *string    `json:"menu_updates"`
+	ReplyFormats      []string   `json:"reply_formats"`
+	StartOnFirstVideo bool       `json:"start_on_first_video"`
+	ClockStartedAt    *time.Time `json:"clock_started_at"`
 }
 
 type CoachingContractConsent struct {
@@ -163,20 +165,21 @@ type CoachingPayment struct {
 }
 
 type CoachingPlan struct {
-	ID           uuid.UUID `json:"id"`
-	CoachID      uuid.UUID `json:"coach_id"`
-	Kind         string    `json:"kind"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	DurationDays int16     `json:"duration_days"`
-	PriceYen     int32     `json:"price_yen"`
-	Capacity     int16     `json:"capacity"`
-	Published    bool      `json:"published"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	VideoReviews *int16    `json:"video_reviews"`
-	MenuUpdates  *string   `json:"menu_updates"`
-	ReplyFormats []string  `json:"reply_formats"`
+	ID                uuid.UUID `json:"id"`
+	CoachID           uuid.UUID `json:"coach_id"`
+	Kind              string    `json:"kind"`
+	Title             string    `json:"title"`
+	Description       string    `json:"description"`
+	DurationDays      int16     `json:"duration_days"`
+	PriceYen          int32     `json:"price_yen"`
+	Capacity          int16     `json:"capacity"`
+	Published         bool      `json:"published"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	VideoReviews      *int16    `json:"video_reviews"`
+	MenuUpdates       *string   `json:"menu_updates"`
+	ReplyFormats      []string  `json:"reply_formats"`
+	StartOnFirstVideo bool      `json:"start_on_first_video"`
 }
 
 type Comment struct {

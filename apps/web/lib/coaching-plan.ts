@@ -1,5 +1,13 @@
-import { formatYen } from "./format";
-import type { CoachingContractStatus, CoachingPlan, CoachingPlanKind, PlanIncludes, PlanMenuUpdates, PlanReplyFormat } from "./types";
+import { formatDateTime, formatYen } from "./format";
+import type {
+  CoachingContract,
+  CoachingContractStatus,
+  CoachingPlan,
+  CoachingPlanKind,
+  PlanIncludes,
+  PlanMenuUpdates,
+  PlanReplyFormat,
+} from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
@@ -57,7 +65,29 @@ export function planIncludes(p: PlanIncludes): { label: string; value: string }[
   if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
   if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
   if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });
+  if (p.start_on_first_video) out.push({ label: "期間", value: "最初の動画を送った日から数える" });
   return out;
+}
+
+// 最初の動画から数えるプランで、動画を待つ日数。API（coaching_contract.sql）と合わせる。
+export const firstVideoWaitDays = 7;
+
+// contractPeriodLabel は、期間中・終わった申し込みの期間の表示。
+// 最初の動画から数えるプランで、まだ動画を待っているあいだは、いつまでに送ればよいかを出す。
+export function contractPeriodLabel(
+  c: Pick<CoachingContract, "starts_at" | "ends_at" | "duration_days" | "start_on_first_video" | "clock_started_at" | "status">,
+  now: Date,
+): string {
+  if (!c.starts_at || !c.ends_at) return "";
+  if (c.start_on_first_video && !c.clock_started_at) {
+    // 待つ日数ぶん先に延ばしてある終了日から期間を引いた時が、数え始めの期限。
+    const waitUntil = new Date(new Date(c.ends_at).getTime() - c.duration_days * 24 * 60 * 60 * 1000);
+    if (c.status === "active" && now < waitUntil) {
+      return `最初の動画を送った日から${c.duration_days}日（${formatDateTime(waitUntil.toISOString())}までに送らなければ、その時から数えます）`;
+    }
+    return `${formatDateTime(waitUntil.toISOString())} 〜 ${formatDateTime(c.ends_at)}`;
+  }
+  return `${formatDateTime(c.clock_started_at ?? c.starts_at)} 〜 ${formatDateTime(c.ends_at)}`;
 }
 
 // sortTrialFirst は、お試しプランを先頭にする。ほかの並び（安い順）はそのまま。

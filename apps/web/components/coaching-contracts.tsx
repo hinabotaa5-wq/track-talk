@@ -6,6 +6,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import {
   contractConsentItems,
+  contractPeriodLabel,
   contractStatusLabel,
   planDurationLabel,
   planKindLabels,
@@ -87,8 +88,7 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
 
 // contractPeriod は、期間中・終わったものの期間の表示。
 export function contractPeriod(c: CoachingContract): string {
-  if (!c.starts_at || !c.ends_at) return "";
-  return `${formatDateTime(c.starts_at)} 〜 ${formatDateTime(c.ends_at)}`;
+  return contractPeriodLabel(c, new Date());
 }
 
 function ApplicationCard({ contract, token, onDone }: { contract: CoachingContract; token: string | null; onDone: () => void }) {

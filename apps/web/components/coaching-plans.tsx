@@ -10,6 +10,7 @@ import {
   maxTrialPriceYen,
   minPlanPriceYen,
   planDurationLabel,
+  firstVideoWaitDays,
   planDurations,
   planIncludes,
   planKindLabels,
@@ -103,6 +104,7 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
       video_reviews: null,
       menu_updates: null,
       reply_formats: [],
+      start_on_first_video: false,
     };
   }
   return {
@@ -115,6 +117,7 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
     video_reviews: plan.video_reviews,
     menu_updates: plan.menu_updates,
     reply_formats: plan.reply_formats,
+    start_on_first_video: plan.start_on_first_video,
   };
 }
 
@@ -229,6 +232,20 @@ function PlanIncludesFields({
         </div>
         {fieldError("reply_formats")}
       </div>
+      <label className="flex items-start gap-2 text-sm text-slate-200">
+        <input
+          type="checkbox"
+          className="mt-1 size-4"
+          checked={draft.start_on_first_video}
+          onChange={(e) => setDraft((d) => ({ ...d, start_on_first_video: e.target.checked }))}
+        />
+        <span>
+          期間を、最初の動画が届いた日から数える
+          <span className="block text-xs text-slate-300">
+            払ったのに撮影できず日数が減る、を防げます。{firstVideoWaitDays}日のあいだに届かなければ、その時から数え始めます。
+          </span>
+        </span>
+      </label>
     </div>
   );
 }
@@ -276,6 +293,7 @@ function PlanForm({
       video_reviews: draft.video_reviews,
       menu_updates: draft.menu_updates,
       reply_formats: draft.reply_formats,
+      start_on_first_video: draft.start_on_first_video,
     };
     try {
       const d = await apiFetch<{ plan: CoachingPlan }>(plan ? `/v1/coach/me/plans/${plan.id}` : "/v1/coach/me/plans", {
@@ -442,6 +460,7 @@ export function CoachPlansSection({
           video_reviews: p.video_reviews,
           menu_updates: p.menu_updates,
           reply_formats: p.reply_formats,
+          start_on_first_video: p.start_on_first_video,
         }),
       });
       saved(d.plan);

@@ -62,6 +62,8 @@ func coachingPlanJSON(p db.CoachingPlan) map[string]any {
 		"video_reviews": p.VideoReviews,
 		"menu_updates":  p.MenuUpdates,
 		"reply_formats": nonNilStrings(p.ReplyFormats),
+		// 期間を、最初の動画が届いた日から数えるか。
+		"start_on_first_video": p.StartOnFirstVideo,
 	}
 }
 
@@ -125,6 +127,8 @@ type coachingPlanReq struct {
 	VideoReviews *int     `json:"video_reviews"`
 	MenuUpdates  *string  `json:"menu_updates"`
 	ReplyFormats []string `json:"reply_formats"`
+	// 期間を、最初の動画が届いた日から数えるか。
+	StartOnFirstVideo bool `json:"start_on_first_video"`
 }
 
 // includes は、「何が返ってくるか」を DB に入れる形にする。validate のあとで呼ぶ。
@@ -273,18 +277,19 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	reviews, menu, formats := req.includes()
 	p, err := q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
-		ID:           uuid.New(),
-		CoachID:      c.ProfileID,
-		Kind:         req.Kind,
-		Title:        req.Title,
-		Description:  req.Description,
-		DurationDays: int16(*req.DurationDays),
-		PriceYen:     int32(*req.PriceYen),
-		Capacity:     int16(*req.Capacity),
-		Published:    published,
-		VideoReviews: reviews,
-		MenuUpdates:  menu,
-		ReplyFormats: formats,
+		ID:                uuid.New(),
+		CoachID:           c.ProfileID,
+		Kind:              req.Kind,
+		Title:             req.Title,
+		Description:       req.Description,
+		DurationDays:      int16(*req.DurationDays),
+		PriceYen:          int32(*req.PriceYen),
+		Capacity:          int16(*req.Capacity),
+		Published:         published,
+		VideoReviews:      reviews,
+		MenuUpdates:       menu,
+		ReplyFormats:      formats,
+		StartOnFirstVideo: req.StartOnFirstVideo,
 	})
 	if err != nil {
 		MapDBError(w, err)
@@ -333,18 +338,19 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	reviews, menu, formats := req.includes()
 	p, err := s.q.UpdateCoachingPlan(r.Context(), db.UpdateCoachingPlanParams{
-		ID:           id,
-		CoachID:      c.ProfileID,
-		Kind:         req.Kind,
-		Title:        req.Title,
-		Description:  req.Description,
-		DurationDays: int16(*req.DurationDays),
-		PriceYen:     int32(*req.PriceYen),
-		Capacity:     int16(*req.Capacity),
-		Published:    published,
-		VideoReviews: reviews,
-		MenuUpdates:  menu,
-		ReplyFormats: formats,
+		ID:                id,
+		CoachID:           c.ProfileID,
+		Kind:              req.Kind,
+		Title:             req.Title,
+		Description:       req.Description,
+		DurationDays:      int16(*req.DurationDays),
+		PriceYen:          int32(*req.PriceYen),
+		Capacity:          int16(*req.Capacity),
+		Published:         published,
+		VideoReviews:      reviews,
+		MenuUpdates:       menu,
+		ReplyFormats:      formats,
+		StartOnFirstVideo: req.StartOnFirstVideo,
 	})
 	if err != nil {
 		MapDBError(w, err)

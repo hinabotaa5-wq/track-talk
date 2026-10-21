@@ -242,14 +242,23 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 			return
 		}
 	}
-	m, err := s.q.CreateCoachingMessage(r.Context(), db.CreateCoachingMessageParams{
-		ID:            uuid.New(),
-		ContractID:    ct.ID,
-		SenderID:      sender,
-		SenderRole:    role,
-		Body:          req.Body,
-		VideoPublicID: videoID,
-		Menu:          menu,
+	var m db.CoachingMessage
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		var err error
+		m, err = q.CreateCoachingMessage(r.Context(), db.CreateCoachingMessageParams{
+			ID:            uuid.New(),
+			ContractID:    ct.ID,
+			SenderID:      sender,
+			SenderRole:    role,
+			Body:          req.Body,
+			VideoPublicID: videoID,
+			Menu:          menu,
+		})
+		if err != nil || role != "requester" || videoID == nil || !ct.StartOnFirstVideo {
+			return err
+		}
+		// 最初の動画から数えるプランは、利用者の最初の動画が届いた時から期間を数え直す。
+		return q.StartCoachingClock(r.Context(), ct.ID)
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
