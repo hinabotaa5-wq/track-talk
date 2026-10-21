@@ -20,10 +20,7 @@ function GroupCard({ group, min, overall }: { group: InjuryPublicGroup; min: num
   const ready = hasItems(group.actions, group.hindsight, ...situation.map((item) => item.tally));
   return (
     <div className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <Heading className="text-lg font-bold">{group.body_part_label}</Heading>
-        <span className="text-sm text-slate-200">{group.members}人</span>
-      </div>
+      <Heading className="text-lg font-bold">{group.body_part_label}</Heading>
       {ready ? (
         <>
           {hasItems(...situation.map((item) => item.tally)) ? (
