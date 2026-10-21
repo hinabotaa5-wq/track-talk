@@ -16,6 +16,14 @@ func TestParseSenseSummary(t *testing.T) {
 	if _, err := parseSenseSummary(`{"overview":"","good":["a"]}`); err == nil {
 		t.Fatal("empty overview accepted")
 	}
+	// 配列で包んで返ってきても、1つ目をまとめとして使う。
+	got, err = parseSenseSummary(`[{"overview":"包まれた","good":["a"],"concerns":[],"next":[]}]`)
+	if err != nil || got.Overview != "包まれた" || len(got.Good) != 1 {
+		t.Fatalf("wrapped = %+v %v", got, err)
+	}
+	if _, err := parseSenseSummary(`[]`); err == nil {
+		t.Fatal("empty array accepted")
+	}
 	if _, err := parseSenseSummary("まとめです"); err == nil {
 		t.Fatal("text accepted")
 	}

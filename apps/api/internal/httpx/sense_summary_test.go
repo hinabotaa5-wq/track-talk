@@ -38,8 +38,10 @@ type senseSummaryResponse struct {
 
 // fakeGemini は、Gemini の代わりに reply を返し、届いたプロンプトを残す。
 type fakeGemini struct {
-	mu      sync.Mutex
-	reply   string
+	mu    sync.Mutex
+	reply string
+	// status が 0 でなければ、その HTTP ステータスで返す(無料枠の上限の 429 など)。
+	status  int
 	prompts []string
 }
 
@@ -57,6 +59,11 @@ func (f *fakeGemini) serve(t *testing.T) string {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.prompts = append(f.prompts, body.Contents[0].Parts[0].Text)
+		if f.status != 0 {
+			w.WriteHeader(f.status)
+			_, _ = w.Write([]byte(`{"error":{"status":"RESOURCE_EXHAUSTED"}}`))
+			return
+		}
 		payload, _ := json.Marshal(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]string{"text": f.reply}}}}}})
 		_, _ = w.Write(payload)
 	}))
@@ -220,7 +227,14 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusBadGateway {
 		t.Fatalf("broken reply = %d", rec.Code)
 	}
-	gemini.reply = `{"overview":"ok","good":[],"concerns":[],"next":[]}`
+	// 無料枠の上限に当たったときは 503 で、時間をおけば作れることを伝える。まとめを作ったことにはならない。
+	gemini.status = http.StatusTooManyRequests
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "summary_busy") {
+		t.Fatalf("rate limited = %d %s", rec.Code, rec.Body.String())
+	}
+	gemini.status = 0
+	// 配列で包まれた答えでも作れる。
+	gemini.reply = `[{"overview":"ok","good":[],"concerns":[],"next":[]}]`
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusCreated {
 		t.Fatalf("other summary after failure = %d", rec.Code)
 	}
