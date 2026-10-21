@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
-import { senseSummaryMinNotes, senseSummaryNextLabel, senseSummaryRangeLabel, type SenseSummary, type SenseSummaryResponse } from "@/lib/sense-notes";
+import { senseSummaryMinNotes, senseSummaryRangeLabel, type SenseSummary, type SenseSummaryResponse } from "@/lib/sense-notes";
 
 function SummaryList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
@@ -25,7 +25,6 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
 // total は感覚メモの総数。メモが増えたら、まとめられる数を取り直す。
 export function SenseSummaryCard({ token, total }: { token: string | null; total: number }) {
   const [summary, setSummary] = useState<SenseSummary | null>(null);
-  const [nextAt, setNextAt] = useState<string | null>(null);
   const [pendingNotes, setPendingNotes] = useState(0);
   const [minNotes, setMinNotes] = useState(senseSummaryMinNotes);
   const [loaded, setLoaded] = useState(false);
@@ -38,7 +37,6 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
     apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { token, signal: controller.signal })
       .then((d) => {
         setSummary(d.summary);
-        setNextAt(d.next_available_at);
         setPendingNotes(d.pending_notes ?? 0);
         setMinNotes(d.min_notes ?? senseSummaryMinNotes);
         setLoaded(true);
@@ -55,7 +53,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
     try {
       const d = await apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { method: "POST", token });
       setSummary(d.summary);
-      setNextAt(d.next_available_at);
+      setPendingNotes(d.pending_notes ?? 0);
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "まとめを作れませんでした");
     } finally {
@@ -65,7 +63,6 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
 
   if (!loaded) return null;
 
-  const nextLabel = senseSummaryNextLabel(nextAt);
   const shortBy = Math.max(0, minNotes - pendingNotes);
   const hasDetails = summary !== null && summary.summary.good.length + summary.summary.concerns.length + summary.summary.next.length > 0;
   // 書く欄とメモの一覧のあいだに置くので、縦に場所を取らないよう小さくまとめる。
@@ -78,9 +75,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
           感覚のふりかえり
           {summary ? <span className="truncate text-xs font-normal text-slate-300">{senseSummaryRangeLabel(summary)}</span> : null}
         </h2>
-        {nextLabel ? (
-          <span className="shrink-0 text-xs text-slate-300">次は{nextLabel}から</span>
-        ) : shortBy > 0 ? (
+        {shortBy > 0 ? (
           <span className="shrink-0 text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
         ) : (
           <Button variant="secondary" className="shrink-0 px-3 py-1 text-xs" onClick={create} disabled={busy}>
@@ -98,14 +93,14 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
               <div className="mt-2 space-y-3">
                 <SummaryList title="つかめてきた感覚" items={summary.summary.good} />
                 <SummaryList title="気になる感覚" items={summary.summary.concerns} />
-                <SummaryList title="来週意識すること" items={summary.summary.next} />
+                <SummaryList title="次に意識すること" items={summary.summary.next} />
               </div>
             </details>
           ) : null}
-          <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめた目安です。まとめは1週間に1回です。</p>
+          <p className="text-xs text-slate-400">{summary.note_count}個の感覚メモから AI がまとめた目安です。</p>
         </>
       ) : (
-        <p className="text-xs text-slate-300">前のまとめのあとに書いた感覚メモを AI がふりかえりにまとめます(1週間に1回)。</p>
+        <p className="text-xs text-slate-300">感覚が{minNotes}個たまるたびに、前のまとめのあとに書いた感覚メモを AI がふりかえりにまとめます。</p>
       )}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <p className="text-xs text-slate-400">まとめるときだけ、前のまとめのあとに書いた感覚メモを Google の Gemini に送ります。</p>

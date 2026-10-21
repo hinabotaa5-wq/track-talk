@@ -13,16 +13,20 @@ import (
 )
 
 // 感覚メモは本人だけが読み書きする。投稿とは別のテーブルで、フィードにも公開ページにも出さない。
+// 書ける感覚は1日に1つで、書く日は今日か過去の日から選べる。
 const (
 	maxSenseNoteBody     = 300
-	maxSenseNotesPerDay  = 20
 	senseNotesPageSize   = 30
 	senseNoteCursorSplit = "_"
+	// 何日前の日まで選べるか。
+	senseNoteMaxDaysBack = 365
 )
 
 type senseNoteReq struct {
 	Body  string  `json:"body"`
 	Event *string `json:"event"`
+	// Day は書く日（日本時間、YYYY-MM-DD）。省略すると今日。
+	Day *string `json:"day"`
 }
 
 type senseNoteDTO struct {
@@ -30,7 +34,7 @@ type senseNoteDTO struct {
 	Body       string    `json:"body"`
 	Event      *string   `json:"event"`
 	EventLabel *string   `json:"event_label"`
-	// Day はメモを書いた日（日本時間、YYYY-MM-DD）。
+	// Day はメモの日（日本時間、YYYY-MM-DD）。
 	Day       string    `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -44,12 +48,12 @@ type senseNoteStatsDTO struct {
 	Today  int64 `json:"today"`
 }
 
-func senseNoteFrom(id uuid.UUID, body string, event *string, createdAt, updatedAt time.Time) senseNoteDTO {
+func senseNoteFrom(id uuid.UUID, body string, event *string, day, createdAt, updatedAt time.Time) senseNoteDTO {
 	out := senseNoteDTO{
 		ID:        id,
 		Body:      body,
 		Event:     event,
-		Day:       createdAt.In(jst.Zone).Format(time.DateOnly),
+		Day:       day.Format(time.DateOnly),
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}
@@ -77,6 +81,19 @@ func normalizeSenseNote(req senseNoteReq) (body string, event *string, fields ma
 		}
 	}
 	return body, event, fields
+}
+
+// parseSenseNoteDay は、書く日を決める。省略は今日。未来の日と、遠い過去の日は選べない。
+func parseSenseNoteDay(v *string, now time.Time) (time.Time, bool) {
+	today := dateOnly(now.In(jst.Zone))
+	if v == nil || strings.TrimSpace(*v) == "" {
+		return today, true
+	}
+	day, err := time.Parse(time.DateOnly, strings.TrimSpace(*v))
+	if err != nil || day.After(today) || day.Before(today.AddDate(0, 0, -senseNoteMaxDaysBack)) {
+		return time.Time{}, false
+	}
+	return day, true
 }
 
 // senseNoteStreak は、今日か昨日で終わる連続した日数を数える。days は新しい順で、重なりがないこと。
@@ -109,18 +126,13 @@ func dateOnly(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-func startOfTokyoDay(now time.Time) time.Time {
-	y, m, d := now.In(jst.Zone).Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, jst.Zone)
-}
-
 func (s *Server) senseNoteStats(r *http.Request, authorID uuid.UUID) (senseNoteStatsDTO, error) {
 	now := time.Now()
 	total, err := s.q.CountSenseNotes(r.Context(), authorID)
 	if err != nil {
 		return senseNoteStatsDTO{}, err
 	}
-	today, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: authorID, Since: startOfTokyoDay(now)})
+	today, err := s.q.CountSenseNotesOnDay(r.Context(), db.CountSenseNotesOnDayParams{AuthorID: authorID, Day: dateOnly(now.In(jst.Zone))})
 	if err != nil {
 		return senseNoteStatsDTO{}, err
 	}
@@ -132,23 +144,27 @@ func (s *Server) senseNoteStats(r *http.Request, authorID uuid.UUID) (senseNoteS
 }
 
 func encodeSenseNoteCursor(n senseNoteDTO) string {
-	return n.CreatedAt.UTC().Format(time.RFC3339Nano) + senseNoteCursorSplit + n.ID.String()
+	return n.Day + senseNoteCursorSplit + n.CreatedAt.UTC().Format(time.RFC3339Nano) + senseNoteCursorSplit + n.ID.String()
 }
 
-func decodeSenseNoteCursor(v string) (*time.Time, *uuid.UUID, bool) {
-	at, id, ok := strings.Cut(v, senseNoteCursorSplit)
-	if !ok {
-		return nil, nil, false
+func decodeSenseNoteCursor(v string) (day, at *time.Time, id *uuid.UUID, ok bool) {
+	parts := strings.Split(v, senseNoteCursorSplit)
+	if len(parts) != 3 {
+		return nil, nil, nil, false
 	}
-	t, err := time.Parse(time.RFC3339Nano, at)
+	d, err := time.Parse(time.DateOnly, parts[0])
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
-	u, err := uuid.Parse(id)
+	t, err := time.Parse(time.RFC3339Nano, parts[1])
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
-	return &t, &u, true
+	u, err := uuid.Parse(parts[2])
+	if err != nil {
+		return nil, nil, nil, false
+	}
+	return &d, &t, &u, true
 }
 
 func (s *Server) listSenseNotes(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +174,12 @@ func (s *Server) listSenseNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	params := db.ListSenseNotesParams{AuthorID: me.ID, PageSize: senseNotesPageSize + 1}
 	if c := r.URL.Query().Get("cursor"); c != "" {
-		at, id, ok := decodeSenseNoteCursor(c)
+		day, at, id, ok := decodeSenseNoteCursor(c)
 		if !ok {
 			Error(w, http.StatusBadRequest, "validation_error", "cursorが不正です")
 			return
 		}
-		params.BeforeAt, params.BeforeID = at, id
+		params.BeforeDay, params.BeforeAt, params.BeforeID = day, at, id
 	}
 	rows, err := s.q.ListSenseNotes(r.Context(), params)
 	if err != nil {
@@ -172,7 +188,7 @@ func (s *Server) listSenseNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	notes := make([]senseNoteDTO, 0, len(rows))
 	for _, row := range rows {
-		notes = append(notes, senseNoteFrom(row.ID, row.Body, row.Event, row.CreatedAt, row.UpdatedAt))
+		notes = append(notes, senseNoteFrom(row.ID, row.Body, row.Event, row.Day, row.CreatedAt, row.UpdatedAt))
 	}
 	var next *string
 	if len(notes) > senseNotesPageSize {
@@ -203,25 +219,30 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	// 同時に送られても1日20件を超えないよう、作成者ごとのロックの中で数えて保存する。
-	errFull := errors.New("sense notes full")
+	day, ok := parseSenseNoteDay(req.Day, time.Now())
+	if !ok {
+		FieldError(w, map[string]string{"day": "今日か、過去の日を選んでください"})
+		return
+	}
+	// 同時に送られても1日に1つを超えないよう、作成者ごとのロックの中で数えて保存する。
+	errFull := errors.New("sense note of the day exists")
 	var row db.CreateSenseNoteRow
 	err := s.tx(r.Context(), func(q *db.Queries) error {
 		if err := q.LockSenseNoteAuthor(r.Context(), me.ID); err != nil {
 			return err
 		}
-		today, err := q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: startOfTokyoDay(time.Now())})
+		written, err := q.CountSenseNotesOnDay(r.Context(), db.CountSenseNotesOnDayParams{AuthorID: me.ID, Day: day})
 		if err != nil {
 			return err
 		}
-		if today >= maxSenseNotesPerDay {
+		if written > 0 {
 			return errFull
 		}
-		row, err = q.CreateSenseNote(r.Context(), db.CreateSenseNoteParams{ID: uuid.New(), AuthorID: me.ID, Body: body, Event: event})
+		row, err = q.CreateSenseNote(r.Context(), db.CreateSenseNoteParams{ID: uuid.New(), AuthorID: me.ID, Body: body, Event: event, Day: day})
 		return err
 	})
 	if errors.Is(err, errFull) {
-		Error(w, http.StatusUnprocessableEntity, "validation_error", "感覚メモは1日20件までです")
+		Error(w, http.StatusUnprocessableEntity, "validation_error", "感覚メモは1日に1つだけ書けます。その日はもう書いています")
 		return
 	}
 	if err != nil {
@@ -234,12 +255,12 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusCreated, map[string]any{
-		"note":  senseNoteFrom(row.ID, row.Body, row.Event, row.CreatedAt, row.UpdatedAt),
+		"note":  senseNoteFrom(row.ID, row.Body, row.Event, row.Day, row.CreatedAt, row.UpdatedAt),
 		"stats": stats,
 	})
 }
 
-// updateSenseNote は、メモの文と種目を直す。メモを書いた日は変えない。
+// updateSenseNote は、メモの文と種目を直す。メモの日は変えない。
 func (s *Server) updateSenseNote(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
@@ -268,7 +289,7 @@ func (s *Server) updateSenseNote(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, senseNoteFrom(row.ID, row.Body, row.Event, row.CreatedAt, row.UpdatedAt))
+	JSON(w, http.StatusOK, senseNoteFrom(row.ID, row.Body, row.Event, row.Day, row.CreatedAt, row.UpdatedAt))
 }
 
 func (s *Server) deleteSenseNote(w http.ResponseWriter, r *http.Request) {
