@@ -31,6 +31,12 @@ export default function MySenseNotesPage() {
     if (!loading && !session) router.replace("/login?next=/memo");
   }, [loading, session, router]);
 
+  // 月1回の記録のお知らせ(プッシュ通知)は /memo?tab=records を開く。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get("tab") === "records") setTab("records");
+  }, []);
+
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
