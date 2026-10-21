@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { z } from "zod";
@@ -48,7 +49,13 @@ export default function RegisterPage() {
       router.push("/me/profile?onboarding=1");
       return;
     }
-    setMessage("確認メールを送信しました。メール内のリンクを開いてください。");
+    // 登録済みのアドレスでも、Supabase はアドレスの有無を隠すためにエラーを返さず、メールも送らない。
+    // そのときは identities が空で返ってくるので、待たせずにログインへ案内する。
+    if (data.user && data.user.identities?.length === 0) {
+      setError("このメールアドレスはすでに登録されています。ログインするか、パスワードを再設定してください。");
+      return;
+    }
+    setMessage("確認メールを送信しました。メール内のリンクを開いてください。数分たっても届かないときは、迷惑メールのフォルダも見てください。");
   }
 
   return (
@@ -64,6 +71,24 @@ export default function RegisterPage() {
         </Button>
       </form>
       <GoogleSignInButton nextPath="/me/profile?onboarding=1" label="Googleで登録" />
+      <p className="text-xs leading-6 text-slate-300">
+        登録すると、
+        <Link href="/terms" className="text-blue-400 underline">
+          利用規約
+        </Link>
+        と
+        <Link href="/guidelines" className="text-blue-400 underline">
+          コミュニティガイドライン
+        </Link>
+        に同意したものとみなします。個人情報の扱いは
+        <Link href="/privacy" className="text-blue-400 underline">
+          プライバシーポリシー
+        </Link>
+        のとおりです。
+      </p>
+      <p className="text-sm">
+        アカウントがある場合は <Link href="/login" className="inline-block text-blue-400 transition active:scale-95">ログイン</Link>
+      </p>
     </div>
   );
 }
