@@ -271,6 +271,10 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// 古い通知はここで消す(読んだものは90日、読んでいないものは180日)。消せなくても一覧は返す。
+	if err := s.q.DeleteOldNotificationsFor(r.Context(), p.ID); err != nil {
+		slog.Warn("delete old notifications", "err", err)
+	}
 	page, per, offset := s.queryPage(r)
 	total, err := s.q.CountMyNotifications(r.Context(), p.ID)
 	if err != nil {

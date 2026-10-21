@@ -131,3 +131,18 @@ UPDATE notifications
 SET read_at = now()
 WHERE recipient_id = $1
   AND read_at IS NULL;
+
+-- name: DeleteOldNotificationsFor :exec
+-- その人の古い通知を消す。読んだものは届いてから90日、読んでいないものは180日で消す(プライバシーポリシー第10条)。
+DELETE FROM notifications
+WHERE recipient_id = $1
+  AND (
+      (read_at IS NOT NULL AND created_at < now() - interval '90 days')
+      OR created_at < now() - interval '180 days'
+  );
+
+-- name: DeleteOldNotifications :execrows
+-- 全員の古い通知を消す。月1回のお知らせのときに流し、ベルを開かない人の通知もたまらないようにする。
+DELETE FROM notifications
+WHERE (read_at IS NOT NULL AND created_at < now() - interval '90 days')
+   OR created_at < now() - interval '180 days';
