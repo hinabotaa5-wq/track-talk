@@ -32,9 +32,11 @@ function GoogleLogo() {
 export function GoogleSignInButton({
   nextPath,
   label = "Googleでログイン",
+  disabled = false,
 }: {
   nextPath?: string;
   label?: string;
+  disabled?: boolean;
 }) {
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -67,7 +69,7 @@ export function GoogleSignInButton({
         type="button"
         variant="secondary"
         className="w-full gap-2"
-        disabled={pending}
+        disabled={pending || disabled}
         onClick={signIn}
       >
         <GoogleLogo />
