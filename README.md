@@ -164,6 +164,7 @@ SQL を変更したら `make sqlc` でコードを再生成します（sqlc が�
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | 保護者の同意リンク送付。SMTP があれば優先。`MAIL_DEV_LOG=1` で手元確認 |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_CONNECT_WEBHOOK_SECRET` | 支払いと送金（空なら支払いなしのデモ版） |
 | `GEMINI_API_KEY` | 都道府県の取り込みと感覚メモのまとめ |
+| `GEMINI_SUMMARY_MODEL` / `SENSE_SUMMARY_DAILY_LIMIT` | 感覚メモのまとめのモデル（空なら `gemini-3.5-flash-lite`）と、全員の1日の上限（空か 0 なら無し） |
 | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SITE_URL` | ブラウザに公開される値 |
 
 フロントに置くのは `NEXT_PUBLIC_*` と **anon key のみ**です。`service_role`・`DATABASE_URL`・Cloudinary の secret・Gemini のキーは API／ホスティング／GitHub Secrets の秘密領域だけに置いてください。

@@ -69,6 +69,11 @@ SELECT count(*) FROM sense_note_summaries
 WHERE author_id = $1
   AND created_at >= sqlc.arg('since');
 
+-- name: CountAllSenseNoteSummariesSince :one
+-- その日(since は日本時間の0時)に全員で作ったまとめの数。全体の1日の上限に使う。
+SELECT count(*) FROM sense_note_summaries
+WHERE created_at >= sqlc.arg('since');
+
 -- name: LatestSenseNoteSummary :one
 SELECT id, from_day, to_day, note_count, summary, created_at
 FROM sense_note_summaries

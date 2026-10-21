@@ -68,6 +68,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		},
 		gemini: competitions.Client{
 			Key:      cfg.GeminiAPIKey,
+			Model:    senseSummaryModel(cfg.GeminiSummaryModel),
 			Endpoint: cfg.GeminiEndpoint,
 		},
 	}

@@ -28,6 +28,19 @@ func (q *Queries) ClaimSenseNoteSummary(ctx context.Context, authorID uuid.UUID)
 	return author_id, err
 }
 
+const countAllSenseNoteSummariesSince = `-- name: CountAllSenseNoteSummariesSince :one
+SELECT count(*) FROM sense_note_summaries
+WHERE created_at >= $1
+`
+
+// その日(since は日本時間の0時)に全員で作ったまとめの数。全体の1日の上限に使う。
+func (q *Queries) CountAllSenseNoteSummariesSince(ctx context.Context, since time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllSenseNoteSummariesSince, since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSenseNoteSummariesSince = `-- name: CountSenseNoteSummariesSince :one
 SELECT count(*) FROM sense_note_summaries
 WHERE author_id = $1
