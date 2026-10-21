@@ -2,6 +2,7 @@ package httpx_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -65,21 +66,51 @@ func (f *fakeGemini) serve(t *testing.T) string {
 
 // writeSenseNotes は、感覚メモを count 個、今日から daysBack 日前のようにさかのぼって1日1つずつ書く。
 // 1つ目は種目つき、2つ目は「右のハムが張る」。
+// API で書けるのは今日の分だけなので、今日の分は API で、それより前の日の分は DB に直接入れる。
 func writeSenseNotes(t *testing.T, h http.Handler, tok string, daysBack, count int) {
 	t.Helper()
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", tok, nil); rec.Code != http.StatusOK {
+		t.Fatalf("profile = %d", rec.Code)
+	}
+	author := tokenSubject(t, tok)
 	for i := 0; i < count; i++ {
-		day := time.Now().In(jst.Zone).AddDate(0, 0, -(daysBack + i)).Format(time.DateOnly)
-		note := map[string]any{"body": fmt.Sprintf("感覚%d", i+1), "day": day}
+		back := daysBack + i
+		day := time.Now().In(jst.Zone).AddDate(0, 0, -back).Format(time.DateOnly)
+		body, event := fmt.Sprintf("感覚%d", i+1), any(nil)
 		switch i {
 		case 0:
-			note = map[string]any{"body": "接地で地面を押せた", "event": "100m", "day": day}
+			body, event = "接地で地面を押せた", "100m"
 		case 1:
-			note = map[string]any{"body": "右のハムが張る", "day": day}
+			body = "右のハムが張る"
 		}
-		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", tok, note); rec.Code != http.StatusCreated {
-			t.Fatalf("create note %d = %d", i+1, rec.Code)
+		if back == 0 {
+			if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", tok, map[string]any{"body": body, "event": event}); rec.Code != http.StatusCreated {
+				t.Fatalf("create note %d = %d", i+1, rec.Code)
+			}
+			continue
 		}
+		execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body, event, day) VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`, author, body, event, day)
 	}
+}
+
+// tokenSubject は、テスト用のトークンの持ち主(sub)を取り出す。
+func tokenSubject(t *testing.T, tok string) uuid.UUID {
+	t.Helper()
+	parts := strings.Split(tok, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token = %q", tok)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var claims struct {
+		Sub string `json:"sub"`
+	}
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		t.Fatal(err)
+	}
+	return uuid.MustParse(claims.Sub)
 }
 
 func TestSenseSummaryIsHiddenUntilLaunch(t *testing.T) {
@@ -131,9 +162,8 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 		t.Fatal("gemini was called with too few notes")
 	}
 	writeSenseNotes(t, h, other, 0, 6)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes", me, map[string]any{"body": "6個目", "day": time.Now().In(jst.Zone).AddDate(0, 0, -5).Format(time.DateOnly)}); rec.Code != http.StatusCreated {
-		t.Fatalf("sixth note = %d", rec.Code)
-	}
+	execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body, day) VALUES (gen_random_uuid(), $1, '6個目', $2::date)`,
+		tokenSubject(t, me), time.Now().In(jst.Zone).AddDate(0, 0, -5).Format(time.DateOnly))
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
 	if rec.Code != http.StatusCreated {

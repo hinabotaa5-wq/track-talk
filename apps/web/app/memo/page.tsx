@@ -121,6 +121,7 @@ export default function MySenseNotesPage() {
               </div>
               <SenseNoteComposer
                 token={token}
+                writtenToday={shownStats.today > 0}
                 onCreated={(note, next) => {
                   setNotes((list) => sortSenseNotes([note, ...(list ?? [])]));
                   setStats(next);

@@ -52,7 +52,9 @@ func TestParseSenseNoteDay(t *testing.T) {
 	}{
 		{"omitted is today in Tokyo", nil, "2026-10-17", true},
 		{"blank is today", str(" "), "2026-10-17", true},
-		{"past day", str("2026-10-01"), "2026-10-01", true},
+		{"today", str("2026-10-17"), "2026-10-17", true},
+		{"yesterday", str("2026-10-16"), "", false},
+		{"past day", str("2026-10-01"), "", false},
 		{"tomorrow", str("2026-10-18"), "", false},
 		{"too old", str("2025-10-01"), "", false},
 		{"garbage", str("10/01"), "", false},
