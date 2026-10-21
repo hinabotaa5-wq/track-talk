@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +65,12 @@ type Config struct {
 	SenseSummaryEnabled bool
 	// Gemini の API キー。感覚メモのまとめに使う（大会の取り込みと同じキー）。空ならまとめは作れない。
 	GeminiAPIKey string
+	// GeminiSummaryModel は、感覚メモのまとめに使う Gemini のモデル。空なら httpx の既定(軽いモデル)。
+	// 無料枠の1日の回数はモデルごとなので、大会の取り込みと別のモデルにすると回数を分け合わずに済む。
+	GeminiSummaryModel string
+	// SenseSummaryDailyLimit は、全員で1日(日本時間)に作れるまとめの数。0 なら上限なし。
+	// 無料枠のあいだは、AI Studio に出ている1日の回数より少なくしておくと、超えたぶんは「混み合っています」になる。
+	SenseSummaryDailyLimit int
 	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
 	GeminiEndpoint string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
@@ -113,6 +120,14 @@ func Load() (Config, error) {
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
 		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
 		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
+		GeminiSummaryModel:         strings.TrimSpace(os.Getenv("GEMINI_SUMMARY_MODEL")),
+	}
+	if raw := strings.TrimSpace(os.Getenv("SENSE_SUMMARY_DAILY_LIMIT")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			return Config{}, fmt.Errorf("SENSE_SUMMARY_DAILY_LIMIT は0以上の整数にしてください: %q", raw)
+		}
+		cfg.SenseSummaryDailyLimit = n
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

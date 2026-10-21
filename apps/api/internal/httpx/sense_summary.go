@@ -33,7 +33,18 @@ const (
 	maxSenseSummaryOverview = 300
 	maxSenseSummaryItem     = 100
 	senseSummaryTimeout     = 60 * time.Second
+	// defaultSenseSummaryModel は、まとめに使う既定のモデル。短い文をまとめるだけなので軽いモデルで足り、
+	// 料金も安い。無料枠の1日の回数はモデルごとなので、大会の取り込み(competitions.Model)と回数を分け合わない。
+	defaultSenseSummaryModel = "gemini-3.5-flash-lite"
 )
+
+// senseSummaryModel は、GEMINI_SUMMARY_MODEL が空なら既定のモデルを返す。
+func senseSummaryModel(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	return defaultSenseSummaryModel
+}
 
 type senseSummaryContent struct {
 	// Overview はこのあいだの感覚の流れを2〜3文で。
@@ -144,6 +155,20 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	if made >= maxSenseSummariesPerDay {
 		Error(w, http.StatusTooManyRequests, "rate_limited", fmt.Sprintf("まとめは1日に%d回までです。明日またまとめられます", maxSenseSummariesPerDay))
 		return
+	}
+	// 全員の1日の上限。無料枠の回数を使い切って全員が失敗する前に、ここで止める。
+	// 取り置きは人ごとなので、別の人が同時に頼むと数回だけ超えることがある。
+	if limit := s.cfg.SenseSummaryDailyLimit; limit > 0 {
+		all, err := s.q.CountAllSenseNoteSummariesSince(r.Context(), time.Date(y, m, d, 0, 0, 0, 0, jst.Zone))
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if all >= int64(limit) {
+			slog.Warn("sense summary: 全体の1日の上限に達しました", "limit", limit)
+			Error(w, http.StatusServiceUnavailable, "summary_busy", "AI が混み合っていて、いまはまとめを作れません。時間をおいてもう一度お試しください")
+			return
+		}
 	}
 	// 前のまとめのあとに書いたメモだけをまとめる。はじめては、これまでのすべて。
 	var since time.Time

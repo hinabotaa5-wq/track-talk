@@ -339,3 +339,44 @@ func TestSenseSummaryDailyLimit(t *testing.T) {
 		t.Fatalf("gemini calls = %d, want 3", calls)
 	}
 }
+
+// 全員の1日の上限(SENSE_SUMMARY_DAILY_LIMIT)を超えたら、AI を呼ばずに「混み合っています」を返す。
+// まとめには、大会の取り込みと別の軽いモデルを使う。
+func TestSenseSummaryGlobalDailyLimit(t *testing.T) {
+	var mu sync.Mutex
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"overview\":\"ok\"}"}]}}]}`))
+	}))
+	t.Cleanup(server.Close)
+	h := setupConfig(t, func(c *config.Config) {
+		c.SenseSummaryEnabled = true
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = server.URL + "/models/%s"
+		c.SenseSummaryDailyLimit = 2
+	})
+	for i := 0; i < 2; i++ {
+		tok := token(t, uuid.New())
+		writeSenseNotes(t, h, tok, 0, 6)
+		if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", tok, nil); rec.Code != http.StatusCreated {
+			t.Fatalf("summary %d = %d %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+	third := token(t, uuid.New())
+	writeSenseNotes(t, h, third, 0, 6)
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", third, nil)
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "summary_busy") {
+		t.Fatalf("over the global limit = %d %s", rec.Code, rec.Body.String())
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 2 {
+		t.Fatalf("gemini calls = %d, want 2", len(paths))
+	}
+	if paths[0] != "/models/gemini-3.5-flash-lite" {
+		t.Fatalf("model path = %s", paths[0])
+	}
+}
