@@ -14,7 +14,7 @@ func TestPostMasterIgnoresSelfLikes(t *testing.T) {
 	h := setup(t)
 	authorID, fanID := uuid.New(), uuid.New()
 	author, fan := token(t, authorID), token(t, fanID)
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", author, map[string]any{"nickname": "はしる", "nickname_public": true}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", author, map[string]any{"nickname": "はしる", "nickname_public": true, "event": "100m"}); rec.Code != http.StatusOK {
 		t.Fatalf("nickname %d %s", rec.Code, rec.Body.String())
 	}
 	doJSON(t, h, http.MethodGet, "/v1/me", fan, nil)
