@@ -417,6 +417,84 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 	return items, nil
 }
 
+const rankProductsByEvent = `-- name: RankProductsByEvent :many
+SELECT
+    p.id,
+    p.kind,
+    p.brand,
+    p.name,
+    p.image_url,
+    p.product_url,
+    (p.discontinued_at IS NOT NULL)::boolean AS discontinued,
+    count(r.id)::bigint AS review_count,
+    avg(r.rating)::float8 AS avg_rating
+FROM products p
+JOIN product_reviews r ON r.product_id = p.id
+WHERE p.hidden_at IS NULL
+  AND p.kind = $1
+  AND r.deleted_at IS NULL AND r.hidden_at IS NULL
+  AND r.event = $2::text
+GROUP BY p.id
+HAVING count(r.id) >= $3::bigint
+ORDER BY avg(r.rating) DESC, count(r.id) DESC, p.created_at DESC
+LIMIT $4
+`
+
+type RankProductsByEventParams struct {
+	Kind       string `json:"kind"`
+	Event      string `json:"event"`
+	MinReviews int64  `json:"min_reviews"`
+	RowLimit   int32  `json:"row_limit"`
+}
+
+type RankProductsByEventRow struct {
+	ID           uuid.UUID `json:"id"`
+	Kind         string    `json:"kind"`
+	Brand        string    `json:"brand"`
+	Name         string    `json:"name"`
+	ImageUrl     string    `json:"image_url"`
+	ProductUrl   string    `json:"product_url"`
+	Discontinued bool      `json:"discontinued"`
+	ReviewCount  int64     `json:"review_count"`
+	AvgRating    float64   `json:"avg_rating"`
+}
+
+// 種目ごとのランキング。その種目の人が書いたレビューだけで平均★を出し、min_reviews 件に満たない商品は外す。
+func (q *Queries) RankProductsByEvent(ctx context.Context, arg RankProductsByEventParams) ([]RankProductsByEventRow, error) {
+	rows, err := q.db.Query(ctx, rankProductsByEvent,
+		arg.Kind,
+		arg.Event,
+		arg.MinReviews,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RankProductsByEventRow
+	for rows.Next() {
+		var i RankProductsByEventRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Brand,
+			&i.Name,
+			&i.ImageUrl,
+			&i.ProductUrl,
+			&i.Discontinued,
+			&i.ReviewCount,
+			&i.AvgRating,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const softDeleteProductReview = `-- name: SoftDeleteProductReview :execrows
 UPDATE product_reviews
 SET deleted_at = now()

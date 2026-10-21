@@ -3,11 +3,13 @@ package httpx
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -307,4 +309,50 @@ func (s *Server) deleteRaceRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeRaceRecords(w, r, me.ID, http.StatusOK)
+}
+
+const (
+	// 自己ベストを更新した人の数を数える日数(記録の日付で数える)。
+	pbStatsDays = 30
+	// これより少ない種目は出さない。少人数だと、誰が更新したか見当がついてしまう。
+	pbStatsMinAuthors = 5
+)
+
+// raceHigherEvents は、記録が大きいほどよい種目(跳躍・投てき・混成)。
+func raceHigherEvents() []string {
+	out := []string{}
+	for event, spec := range raceEvents {
+		if spec.kind != raceMarkTime {
+			out = append(out, event)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// pbStats は、直近30日に種目ごとに自己ベストを更新した人の数。個々の記録やアカウントは返さない。
+func (s *Server) pbStats(w http.ResponseWriter, r *http.Request) {
+	local := s.now().In(jst.Zone)
+	until := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	since := until.AddDate(0, 0, -(pbStatsDays - 1))
+	rows, err := s.q.CountRecentPBAuthors(r.Context(), db.CountRecentPBAuthorsParams{
+		Since: since, Until: until, HigherEvents: raceHigherEvents(),
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	type eventCount struct {
+		Event      string `json:"event"`
+		EventLabel string `json:"event_label"`
+		Authors    int64  `json:"authors"`
+	}
+	events := []eventCount{}
+	for _, row := range rows {
+		if row.Authors < pbStatsMinAuthors {
+			continue
+		}
+		events = append(events, eventCount{Event: row.Event, EventLabel: eventLabel(row.Event), Authors: row.Authors})
+	}
+	JSON(w, http.StatusOK, map[string]any{"days": pbStatsDays, "min_authors": pbStatsMinAuthors, "events": events})
 }
