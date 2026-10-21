@@ -127,7 +127,7 @@ jobs:
           done
           curl -sf http://127.0.0.1:8080/health
           curl -sf -o /dev/null -X POST http://127.0.0.1:54321/auth/v1/token
-          npx playwright test e2e/login-post.spec.ts
+          npx playwright test e2e/home.spec.ts e2e/login-post.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

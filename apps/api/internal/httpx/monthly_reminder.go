@@ -42,6 +42,12 @@ func (s *Server) monthlyReminder(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
+	// ベルを開かない人の古い通知も、ここでまとめて消す。補足なので、消せなくてもお知らせは送る。
+	if n, err := s.q.DeleteOldNotifications(r.Context()); err != nil {
+		slog.Warn("monthly reminder: delete old notifications", "err", err)
+	} else if n > 0 {
+		slog.Info("monthly reminder: deleted old notifications", "count", n)
+	}
 	if !s.push.Configured() {
 		Error(w, http.StatusServiceUnavailable, "unavailable", "通知はまだ設定されていません")
 		return

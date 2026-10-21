@@ -109,7 +109,7 @@ export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | 
 }
 
 // 日付の入力欄に選べる範囲。今日から1年前まで(API と同じ)。
-export const senseNoteMaxDaysBack = 365;
+const senseNoteMaxDaysBack = 365;
 
 export function senseNoteDayRange(now = new Date()) {
   const today = todayInTokyo(now);

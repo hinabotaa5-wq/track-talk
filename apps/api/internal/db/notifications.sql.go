@@ -55,6 +55,36 @@ func (q *Queries) CountUnreadNotifications(ctx context.Context, recipientID uuid
 	return count, err
 }
 
+const deleteOldNotifications = `-- name: DeleteOldNotifications :execrows
+DELETE FROM notifications
+WHERE (read_at IS NOT NULL AND created_at < now() - interval '90 days')
+   OR created_at < now() - interval '180 days'
+`
+
+// 全員の古い通知を消す。月1回のお知らせのときに流し、ベルを開かない人の通知もたまらないようにする。
+func (q *Queries) DeleteOldNotifications(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOldNotifications)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteOldNotificationsFor = `-- name: DeleteOldNotificationsFor :exec
+DELETE FROM notifications
+WHERE recipient_id = $1
+  AND (
+      (read_at IS NOT NULL AND created_at < now() - interval '90 days')
+      OR created_at < now() - interval '180 days'
+  )
+`
+
+// その人の古い通知を消す。読んだものは届いてから90日、読んでいないものは180日で消す(プライバシーポリシー第10条)。
+func (q *Queries) DeleteOldNotificationsFor(ctx context.Context, recipientID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOldNotificationsFor, recipientID)
+	return err
+}
+
 const getNotificationSetting = `-- name: GetNotificationSetting :one
 SELECT in_app, push FROM notification_settings
 WHERE profile_id = $1 AND category = $2
