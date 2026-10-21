@@ -72,6 +72,12 @@ INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, s
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, from_day, to_day, note_count, summary, created_at;
 
+-- name: CountSenseNoteSummariesSince :one
+-- その日(since は日本時間の0時)に作ったまとめの数。1日の上限に使う。
+SELECT count(*) FROM sense_note_summaries
+WHERE author_id = $1
+  AND created_at >= sqlc.arg('since');
+
 -- name: LatestSenseNoteSummary :one
 SELECT id, from_day, to_day, note_count, summary, created_at
 FROM sense_note_summaries
