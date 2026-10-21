@@ -1,3 +1,4 @@
+import { callbackExchangeError, callbackParamsError } from "@/lib/auth-callback";
 import { nextCookiePath } from "@/lib/safe-next";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
@@ -18,12 +19,10 @@ export async function GET(request: NextRequest) {
     return finish(NextResponse.redirect(login));
   }
 
+  const failed = callbackParamsError(request.nextUrl.searchParams);
   const code = request.nextUrl.searchParams.get("code");
-  const oauthError =
-    request.nextUrl.searchParams.get("error_description") ??
-    request.nextUrl.searchParams.get("error");
-  if (!code || oauthError) {
-    login.searchParams.set("error", "google");
+  if (failed || !code) {
+    login.searchParams.set("error", failed ?? "google");
     return finish(NextResponse.redirect(login));
   }
 
@@ -46,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    login.searchParams.set("error", "google");
+    login.searchParams.set("error", callbackExchangeError);
     return finish(NextResponse.redirect(login));
   }
   return finish(success);

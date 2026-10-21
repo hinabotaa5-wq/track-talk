@@ -1,5 +1,6 @@
 "use client";
 
+import { callbackErrorMessages } from "@/lib/auth-callback";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/safe-next";
@@ -13,11 +14,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import type { z } from "zod";
-
-const callbackErrors: Record<string, string> = {
-  config: "Supabase の公開設定がありません。",
-  google: "Googleログインに失敗しました。",
-};
 
 function subscribeToNothing() {
   return () => {};
@@ -36,7 +32,7 @@ export default function LoginPage() {
   const { pending, acquire, release } = useActionLock();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
   const next = useSyncExternalStore(subscribeToNothing, nextParam, () => null);
-  const error = submitError || (code ? (callbackErrors[code] ?? "") : "");
+  const error = submitError || (code ? (callbackErrorMessages[code] ?? "") : "");
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),

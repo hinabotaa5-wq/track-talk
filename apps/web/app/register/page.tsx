@@ -54,7 +54,13 @@ export default function RegisterPage() {
       router.push("/me/profile?onboarding=1");
       return;
     }
-    setMessage("確認メールを送信しました。メール内のリンクを開いてください。");
+    // 登録済みのアドレスでも、Supabase はアドレスの有無を隠すためにエラーを返さず、メールも送らない。
+    // そのときは identities が空で返ってくるので、待たせずにログインへ案内する。
+    if (data.user && data.user.identities?.length === 0) {
+      setError("このメールアドレスはすでに登録されています。ログインするか、パスワードを再設定してください。");
+      return;
+    }
+    setMessage("確認メールを送信しました。メール内のリンクを開いてください。数分たっても届かないときは、迷惑メールのフォルダも見てください。");
   }
 
   return (
@@ -92,6 +98,9 @@ export default function RegisterPage() {
         </Button>
       </form>
       <GoogleSignInButton nextPath="/me/profile?onboarding=1" label="Googleで登録" disabled={!agreed} />
+      <p className="text-sm">
+        アカウントがある場合は <Link href="/login" className="inline-block text-blue-400 transition active:scale-95">ログイン</Link>
+      </p>
     </div>
   );
 }
