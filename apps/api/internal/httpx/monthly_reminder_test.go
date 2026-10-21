@@ -63,6 +63,12 @@ func TestMonthlyReminderReachesEveryoneOnce(t *testing.T) {
 	subscribe(a, "/a-phone")
 	subscribe(a, "/a-pc")
 	subscribe(token(t, uuid.New()), "/b")
+	// 月1回のお知らせのプッシュをオフにした人には、端末があっても送らない。ベルには入る。
+	muted := token(t, uuid.New())
+	subscribe(muted, "/muted")
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/monthly", muted, map[string]any{"in_app": true, "push": false}); rec.Code != http.StatusOK {
+		t.Fatalf("mute monthly %d %s", rec.Code, rec.Body.String())
+	}
 	// 通知をオンにしていない人には送らない。
 	if rec := doJSON(t, h, http.MethodGet, "/v1/me", token(t, uuid.New()), nil); rec.Code != http.StatusOK {
 		t.Fatalf("profile %d", rec.Code)
@@ -89,6 +95,12 @@ func TestMonthlyReminderReachesEveryoneOnce(t *testing.T) {
 	}
 	if received.Load() != 3 {
 		t.Fatalf("pushes %d", received.Load())
+	}
+	for _, tok := range []string{a, muted} {
+		items, _ := listNotifications(t, h, tok)
+		if len(items) != 1 || items[0].Kind != "message" || items[0].URL != "/memo?tab=records" {
+			t.Fatalf("monthly bell %+v", items)
+		}
 	}
 	// Cloud Scheduler が呼び直しても、同じ月に二度は送らない。
 	rec = call("monthly-secret")

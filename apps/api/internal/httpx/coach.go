@@ -3,7 +3,6 @@ package httpx
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -409,19 +408,12 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
-// notifyCoachReviewed は、審査の結果を応募した人の端末に知らせる。
+// notifyCoachReviewed は、審査の結果を応募した人に知らせる。
 // 届かなくても結果は応募の画面で見られるので、失敗は記録だけする。
 func (s *Server) notifyCoachReviewed(ctx context.Context, c db.CoachProfile) {
-	if !s.push.Configured() {
-		return
-	}
 	msg := push.Message{Title: "コーチの応募が承認されました", Body: "応募の画面から次の準備に進めます", URL: "/coach/apply", Tag: "coach-review"}
 	if c.Status == "rejected" {
 		msg = push.Message{Title: "コーチの応募の審査が終わりました", Body: "結果を応募の画面で確認してください", URL: "/coach/apply", Tag: "coach-review"}
 	}
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer cancel()
-	if _, err := s.sendPush(ctx, c.ProfileID, msg, 24*time.Hour); err != nil {
-		slog.Warn("coach review push", "err", err)
-	}
+	s.notify(ctx, c.ProfileID, notifyCoaching, msg, 24*time.Hour)
 }

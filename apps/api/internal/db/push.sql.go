@@ -83,32 +83,6 @@ func (q *Queries) FinishMonthlyReminder(ctx context.Context, arg FinishMonthlyRe
 	return err
 }
 
-const listPushProfileIDs = `-- name: ListPushProfileIDs :many
-SELECT DISTINCT profile_id FROM push_subscriptions
-ORDER BY profile_id
-`
-
-// 通知をオンにした端末がある人。
-func (q *Queries) ListPushProfileIDs(ctx context.Context) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listPushProfileIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []uuid.UUID
-	for rows.Next() {
-		var profile_id uuid.UUID
-		if err := rows.Scan(&profile_id); err != nil {
-			return nil, err
-		}
-		items = append(items, profile_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPushSubscriptions = `-- name: ListPushSubscriptions :many
 SELECT id, profile_id, endpoint, p256dh, auth, created_at FROM push_subscriptions
 WHERE profile_id = $1

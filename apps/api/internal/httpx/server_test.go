@@ -1501,6 +1501,8 @@ type noteItem struct {
 	Kind      string `json:"kind"`
 	PostID    string `json:"post_id"`
 	PostTitle string `json:"post_title"`
+	Title     string `json:"title"`
+	URL       string `json:"url"`
 	Read      bool   `json:"read"`
 }
 

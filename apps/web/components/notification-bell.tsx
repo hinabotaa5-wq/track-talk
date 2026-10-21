@@ -23,18 +23,22 @@ const labels: Record<NotificationKind, string> = {
   review_clarify: "添削の補足を頼まれました",
   review_clarified: "添削の補足が届きました",
   review_helpful_ask: "アドバイスは役に立ちましたか",
+  message: "お知らせ",
 };
 
 // 通知を開いたときの行き先。添削の通知は投稿ではなく、コーチ画面か依頼の画面へ。
 function hrefFor(item: AppNotification) {
+  // サイト内のパスだけを開く。
+  if (item.url?.startsWith("/") && !item.url.startsWith("//")) return item.url;
   if (item.kind === "review_offer") return "/coach";
   if (item.kind === "review_clarify" && item.review_request_id) return `/coach/requests/${item.review_request_id}`;
   if (item.review_request_id) return `/coaching/requests/${item.review_request_id}`;
   return `/posts/${item.post_id}`;
 }
 
-function labelFor(kind: string) {
-  return kind in labels ? labels[kind as NotificationKind] : "通知";
+function labelFor(item: AppNotification) {
+  if (item.title) return item.title;
+  return item.kind in labels ? labels[item.kind] : "通知";
 }
 
 function badgeText(count: number) {
@@ -172,9 +176,10 @@ export function NotificationBell() {
                     className="block px-3 py-3 transition hover:bg-white/16 active:scale-95"
                   >
                     <p className="text-sm text-slate-100">
-                      {labelFor(item.kind)}
+                      {labelFor(item)}
                       {item.post_title ? `: ${item.post_title}` : ""}
                     </p>
+                    {item.body ? <p className="mt-1 text-xs text-slate-300">{item.body}</p> : null}
                     <p className="mt-1 text-xs text-slate-200">{formatRelativeTime(item.created_at)}</p>
                   </Link>
                 </li>

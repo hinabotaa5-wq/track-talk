@@ -535,6 +535,7 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.pushQuietly(r.Context(), post.AuthorID, notifyPractice, postPushMessage("参加申請がありました", post.ID), 24*time.Hour)
 	s.writePost(w, r, post.ID, http.StatusCreated)
 }
 
@@ -626,6 +627,9 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		MapDBError(w, err)
 		return
 	}
+	if status == "accepted" {
+		s.pushQuietly(r.Context(), application.UserID, notifyPractice, postPushMessage("参加が承認されました", post.ID), 24*time.Hour)
+	}
 	s.writePost(w, r, post.ID, http.StatusOK)
 }
 
@@ -669,22 +673,27 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 練習の日時より前の解散は中止なので、評価のお願いは送らない。
+	var pushes []postPush
 	if len(accepted) > 0 && !time.Now().Before(detail.StartsAt) {
+		msg := postPushMessage("解散しました。評価しあってください", post.ID)
 		if err := insertNotification(r.Context(), q, post.AuthorID, "practice_rate", post.ID, nil, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
+		pushes = append(pushes, postPush{post.AuthorID, notifyPractice, msg})
 		for _, application := range accepted {
 			if err := insertNotification(r.Context(), q, application.UserID, "practice_rate", post.ID, nil, &application.ID); err != nil {
 				MapDBError(w, err)
 				return
 			}
+			pushes = append(pushes, postPush{application.UserID, notifyPractice, msg})
 		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
+	s.sendPostPushes(r.Context(), pushes)
 	s.writePost(w, r, post.ID, http.StatusOK)
 }
 
