@@ -8,10 +8,10 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
+	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
-	"github.com/hinata/track-talk/apps/api/internal/openai"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +28,7 @@ type Server struct {
 	push      push.Sender
 	stripe    stripe.Client
 	mail      mail.Client
-	ai        openai.Client
+	gemini    competitions.Client
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -65,10 +65,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			SMTPHost: cfg.SMTPHost, SMTPPort: cfg.SMTPPort, SMTPUser: cfg.SMTPUser, SMTPPassword: cfg.SMTPPassword,
 			DevLog: cfg.MailDevLog,
 		},
-		ai: openai.Client{
-			Key:     cfg.OpenAIAPIKey,
-			Model:   cfg.OpenAIModel,
-			APIBase: cfg.OpenAIAPIBase,
+		gemini: competitions.Client{
+			Key:      cfg.GeminiAPIKey,
+			Endpoint: cfg.GeminiEndpoint,
 		},
 	}
 	if cfg.PushHTTP != nil {

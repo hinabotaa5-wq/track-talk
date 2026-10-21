@@ -90,7 +90,7 @@ export function SenseSummaryCard({ token }: { token: string | null }) {
         <span className="text-xs text-slate-300">{nextLabel ? `次は${nextLabel}から作れます` : "まとめは1週間に1回です"}</span>
       </div>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを OpenAI に送ります。</p>
+      <p className="text-xs text-slate-400">まとめるときだけ、直近7日の感覚メモを Google の Gemini に送ります。</p>
     </section>
   );
 }

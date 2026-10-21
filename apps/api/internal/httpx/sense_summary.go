@@ -17,7 +17,7 @@ import (
 )
 
 // 感覚メモの1週間のまとめ。本人が頼んだときだけ、直近7日（今日を含む、日本時間）の感覚メモを
-// OpenAI に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たってから。
+// Gemini に送ってまとめる。まとめは本人だけが読む。作れるのは、前のまとめから7日たってから。
 const (
 	senseSummaryDays     = 7
 	senseSummaryInterval = senseSummaryDays * 24 * time.Hour
@@ -101,13 +101,13 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// createSenseSummary は、直近7日の感覚メモを OpenAI でまとめて残す。
+// createSenseSummary は、直近7日の感覚メモを Gemini でまとめて残す。
 func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
 		return
 	}
-	if s.cfg.OpenAIAPIKey == "" {
+	if s.cfg.GeminiAPIKey == "" {
 		Error(w, http.StatusServiceUnavailable, "summary_unavailable", "いまはまとめを作れません。しばらくしてからお試しください")
 		return
 	}
@@ -141,7 +141,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), senseSummaryTimeout)
 	defer cancel()
-	raw, err := s.ai.GenerateJSON(ctx, senseSummaryPrompt(notes))
+	raw, err := s.gemini.GenerateJSON(ctx, senseSummaryPrompt(notes))
 	var content senseSummaryContent
 	if err == nil {
 		content, err = parseSenseSummary(raw)
