@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./auth-provider";
+import { reportConfirmOptions, useConfirm } from "./confirm-dialog";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
 
@@ -23,13 +24,14 @@ export function TargetReport({
   const router = useRouter();
   const [reported, setReported] = useState(false);
   const { pending, acquire, release } = useActionLock();
+  const confirmDialog = useConfirm();
 
   async function report() {
     if (!session) {
       router.push(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
-    if (!confirm(`この${noun}を通報しますか？`)) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: `この${noun}を通報しますか？` })))) return;
     if (!acquire()) return;
     try {
       await apiFetch("/v1/reports", {

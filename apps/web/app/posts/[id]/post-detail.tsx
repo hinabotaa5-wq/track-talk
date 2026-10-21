@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
 import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
+import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -48,6 +49,7 @@ export function PostDetail({
   const [loading, setLoading] = useState(!initial);
   const form = useForm({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
   const action = useActionLock();
+  const confirmDialog = useConfirm();
   const commentLock = useActionLock();
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -189,7 +191,7 @@ export function PostDetail({
       router.push("/login");
       return;
     }
-    if (!confirm("この内容を通報しますか？")) return;
+    if (!(await confirmDialog(reportConfirmOptions()))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch("/v1/reports", {

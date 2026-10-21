@@ -56,7 +56,7 @@ export default function BadgePage() {
           「投稿マスター」のバッジを表示する
         </label>
         <p className="text-xs text-slate-400">
-          いいねがついた投稿が30件以上になると、投稿の詳細でニックネームの横に出ます。ニックネームを公開していないときは出ません。
+          いいねがついた投稿が30件以上になると、ニックネームの横にバッジが付きます。ニックネームを公開していないときは出ません。
         </p>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}

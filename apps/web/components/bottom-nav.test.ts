@@ -31,6 +31,14 @@ describe("hasBackOnlyHeader", () => {
     expect(hasBackOnlyHeader("/reset-password/update")).toBe(true);
   });
 
+  it("マイページの中の画面は、どれも戻るボタンだけのヘッダーにする。マイページ本体は対象外", () => {
+    expect(hasBackOnlyHeader("/me")).toBe(false);
+    for (const path of ["/me/profile", "/me/badge", "/me/push", "/me/sense", "/me/coaching/requests"]) {
+      expect(hasBackOnlyHeader(path)).toBe(true);
+      expect(showsBackButton(path)).toBe(true);
+    }
+  });
+
   it("ケガのグループの画面は戻るボタンだけ。ケガタブの一覧とデータは対象外", () => {
     expect(hasBackOnlyHeader("/injury/hamstring-strain")).toBe(true);
     expect(hasBackOnlyHeader("/injury")).toBe(false);

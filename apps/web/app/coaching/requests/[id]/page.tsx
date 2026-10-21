@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -22,6 +23,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
   const { pending, acquire, release } = useActionLock();
+  const confirmDialog = useConfirm();
   const response = request.response;
   if (!response || response.hidden) return null;
   const stars = request.rating?.stars ?? 0;
@@ -40,7 +42,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
   }
 
   async function report() {
-    if (!confirm("この返答を運営に通報しますか？")) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: "この返答を運営に通報しますか？" })))) return;
     if (!acquire()) return;
     setError("");
     try {
