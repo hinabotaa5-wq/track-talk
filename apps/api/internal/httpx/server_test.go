@@ -328,7 +328,7 @@ func TestPostKindsShareOneList(t *testing.T) {
 	a := uuid.New()
 	ta := token(t, a)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "テキスト", "body": ""})
+		"title": "", "body": "テキスト"})
 	if rec.Code != 201 {
 		t.Fatalf("text %d %s", rec.Code, rec.Body.String())
 	}
@@ -423,7 +423,7 @@ func TestTextPostRequiresBodyOrPhoto(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "編集前", "body": "",
+		"title": "", "body": "編集前の本文",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create for update %d %s", rec.Code, rec.Body.String())
