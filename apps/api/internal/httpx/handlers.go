@@ -467,7 +467,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 			fields["kind"] = "文字の投稿に動画情報は付けられません"
 		}
 		imageID := strings.TrimSpace(req.ImagePublicID)
-		if !titleOptional && strings.TrimSpace(req.Title) == "" && strings.TrimSpace(req.Body) == "" && imageID == "" {
+		if !titleOptional && strings.TrimSpace(req.Body) == "" && imageID == "" {
 			fields["body"] = "本文か写真を入力してください"
 		}
 		if imageID != "" {
@@ -670,9 +670,13 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updateInjury(w, r, p, id)
 		return
 	}
-	// YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
+	// 文章・YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
 	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "text" || existing.Kind == "youtube" || existing.Kind == "instagram")
 	if !ok {
+		return
+	}
+	if existing.Kind == "text" && existing.CloudinaryPublicID == nil && strings.TrimSpace(params.Body) == "" {
+		FieldError(w, map[string]string{"body": "本文を入力してください"})
 		return
 	}
 	_, err = s.q.UpdatePost(r.Context(), db.UpdatePostParams{

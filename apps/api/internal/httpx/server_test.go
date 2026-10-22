@@ -394,13 +394,12 @@ func TestPostKindsShareOneList(t *testing.T) {
 	}
 }
 
-func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
+func TestTextPostRequiresBodyOrPhoto(t *testing.T) {
 	h := setup(t)
 	ta := token(t, uuid.New())
 
 	for name, payload := range map[string]map[string]any{
-		"title only": {"title": "タイトルだけ", "body": ""},
-		"body only":  {"title": "本文だけのタイトル", "body": "本文だけ"},
+		"body only": {"title": "", "body": "本文だけ"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, payload)
@@ -409,8 +408,14 @@ func TestTextPostRequiresTitleBodyOrPhoto(t *testing.T) {
 			}
 		})
 	}
-
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "タイトルだけ", "body": "",
+	})
+	if rec.Code != 422 {
+		t.Fatalf("title only %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"title": " \t", "body": "\n",
 	})
 	if rec.Code != 422 {
