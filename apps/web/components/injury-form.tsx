@@ -6,6 +6,7 @@ import { injuryBodyPartLabel, injuryBodyParts, injuryGroupPath, isInjuryBodyPart
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
+import { SubmittingProgress } from "./submitting-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -95,6 +96,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
           onChange={(e) => setBody(e.target.value)}
         />
       </label>
+      {pending ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}

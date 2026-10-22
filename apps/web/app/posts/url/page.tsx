@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { ComposerPage } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
+import { SubmittingProgress } from "@/components/submitting-progress";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { detectVideoUrl } from "@/lib/video-url";
@@ -113,6 +114,7 @@ export default function VideoUrlPostPage() {
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
+        {submitting ? <SubmittingProgress label="投稿を送信しています" /> : null}
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting || !kind}>

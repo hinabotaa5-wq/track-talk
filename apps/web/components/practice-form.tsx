@@ -7,6 +7,7 @@ import { appEvents } from "@/lib/practice-events";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
+import { SubmittingProgress } from "./submitting-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { fromJstInput, toJstInput } from "@/lib/format";
@@ -140,6 +141,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         詳細
         <Textarea rows={8} className="mt-1" maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
+      {submitting ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
