@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
     return finish(NextResponse.redirect(login));
   }
 
-  const success = NextResponse.redirect(new URL(nextCookiePath(request.cookies.get("tracktalk-next")?.value), origin));
+  const dest = new URL(nextCookiePath(request.cookies.get("tracktalk-next")?.value), origin);
+  if (dest.origin !== origin) {
+    dest.href = new URL("/", origin).href;
+  }
+  const success = NextResponse.redirect(dest);
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
