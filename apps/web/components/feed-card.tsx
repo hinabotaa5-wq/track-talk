@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Post } from "@/lib/types";
-import { formatDateTime } from "@/lib/format";
-import { practiceReputationLine } from "@/components/practice-reputation";
+import { formatDate } from "@/lib/format";
 import { PosterFallback } from "@/components/poster-card";
 import { InstagramThumb } from "@/components/instagram-thumb";
 import { isInstagramShortcode } from "@/lib/instagram";
@@ -47,37 +46,19 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         href={href}
         className={cardClass}
       >
-        <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
-          <div className="flex items-center justify-between">
-            <span className="w-fit rounded-full bg-blue-950/80 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-800/60">
-              PRACTICE 練習
-            </span>
-            <span className="font-mono text-xs font-bold tracking-wider text-slate-300">MEET</span>
-          </div>
+        <div className="flex aspect-[4/3] flex-col justify-center gap-2 bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
           {info ? (
-            <div className="space-y-1 text-sm leading-snug">
-              <p className="font-bold text-slate-100 transition-colors group-hover:text-blue-400 line-clamp-1">{info.event_label}</p>
-              <p className="text-xs text-slate-200">{formatDateTime(info.starts_at)}</p>
-              <p className="line-clamp-1 text-xs text-slate-200">{info.venue}</p>
-              <p className="text-xs font-semibold text-slate-300">
-                募集 {info.accepted_count}/{info.capacity}人
-                <span className="font-normal text-slate-300">
-                  {info.status === "full" ? "・満員" : info.status === "dissolved" ? "・解散" : "・募集中"}
-                </span>
-              </p>
-              {practiceReputationLine(info.reputation) ? (
-                <p className="text-xs text-slate-200">{practiceReputationLine(info.reputation)}</p>
-              ) : null}
+            <div className="space-y-2 text-xs leading-snug text-slate-200">
+              <p className="line-clamp-1 text-sm font-bold text-slate-100 transition-colors group-hover:text-blue-400">{info.event_label}</p>
+              <p>日付　{formatDate(info.starts_at)}</p>
+              <p>時間　{formatPracticeTime(info.starts_at)}</p>
+              <p className="line-clamp-1">競技場　{info.venue}</p>
+              <p className="font-semibold">募集 {info.accepted_count}/{info.capacity}人</p>
             </div>
           ) : (
             <p className="line-clamp-3 break-words text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
           )}
-          <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
-            <span>TrackTalk</span>
-            <span className="font-semibold text-blue-400">JOIN &gt;</span>
-          </div>
         </div>
-        <CardTitle title={title} />
       </Link>
     );
   }
@@ -135,4 +116,14 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       {hasFeedTitle(post.title) ? <CardTitle title={title} /> : null}
     </Link>
   );
+}
+
+function formatPracticeTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }

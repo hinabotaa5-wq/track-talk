@@ -11,7 +11,7 @@ export function YouTubePlayer({ videoId, title, shorts }: { videoId: string; tit
           ? "mx-auto aspect-[9/16] max-h-[70vh] w-full max-w-[39.375vh] rounded-xl bg-black shadow-sm"
           : "aspect-video w-full rounded-xl bg-black shadow-sm"
       }
-      src={`${youtubeOrigin}/embed/${videoId}?playsinline=1&rel=0`}
+      src={`${youtubeOrigin}/embed/${videoId}?playsinline=1&rel=0&cc_load_policy=0`}
       title={title}
       loading="lazy"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
