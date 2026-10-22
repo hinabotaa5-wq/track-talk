@@ -59,6 +59,7 @@ export type Post = {
   saved_by_me: boolean;
   kind: "text" | "youtube" | "instagram" | "video" | "recruitment" | "practice" | "injury" | "meet";
   thumbnail_url?: string;
+  youtube_shorts?: boolean;
   youtube_video_id?: string;
   source_title?: string;
   instagram_type?: "p" | "reel";

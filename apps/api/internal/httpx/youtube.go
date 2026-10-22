@@ -63,6 +63,24 @@ func YouTubeIDFromURL(raw string) (string, string) {
 	return id, ""
 }
 
+// isYouTubeShortsURL は、Shorts の URL（/shorts/ から始まるもの）かどうかをみる。
+// Shorts は縦長の動画なので、縦に表示するために投稿時に残す。
+func isYouTubeShortsURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	host = strings.TrimPrefix(host, "www.")
+	host = strings.TrimPrefix(host, "m.")
+	if host != "youtube.com" && host != "youtube-nocookie.com" && host != "music.youtube.com" {
+		return false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	return len(parts) >= 2 && parts[0] == "shorts" && parts[1] != ""
+}
+
 func firstSegment(path string) string {
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -159,6 +177,7 @@ func (s *Server) citeYouTube(w http.ResponseWriter, r *http.Request) {
 		Kind:                "youtube",
 		YoutubeVideoID:      &videoID,
 		YoutubeThumbnailUrl: &thumb,
+		YoutubeShorts:       isYouTubeShortsURL(req.URL),
 		SourceTitle:         &sourceTitle,
 	})
 	if err != nil {

@@ -499,6 +499,7 @@ export function PostDetail({
         <YouTubePlayer
           videoId={post.youtube_video_id}
           title={feedTitle(post.title) || post.source_title || "YouTube動画"}
+          shorts={post.youtube_shorts}
         />
       ) : post.kind === "instagram" && post.instagram_type && post.instagram_shortcode ? (
         <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title) || "投稿"} />
