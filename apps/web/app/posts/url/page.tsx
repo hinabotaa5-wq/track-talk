@@ -48,12 +48,12 @@ export default function VideoUrlPostPage() {
     try {
       let imagePublicId: string | undefined;
       if (kind === "instagram" && cover) {
-        setStatus("表紙の画像を送っています…");
+        setStatus("サムネの画像を送っています…");
         const sending = await shrinkImage(cover);
         if (sending.size > maxCoverBytes) throw new Error("10MB以内の画像にしてください");
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         const result = await uploadToCloudinary("image", sending, signed, () => {});
-        if (result.public_id !== signed.public_id) throw new Error("表紙の画像を送れませんでした");
+        if (result.public_id !== signed.public_id) throw new Error("サムネの画像を送れませんでした");
         imagePublicId = result.public_id;
         setStatus("");
       }
@@ -97,9 +97,9 @@ export default function VideoUrlPostPage() {
         )}
         {kind === "instagram" ? (
           <label className="block text-sm font-medium">
-            表紙の画像（任意）
+            サムネの画像（任意）
             <span className="mt-0.5 block text-xs font-normal text-slate-300">
-              Instagramの表紙はこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。
+              Instagramのサムネはこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。
             </span>
             <input
               className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"

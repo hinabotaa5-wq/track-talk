@@ -156,7 +156,7 @@ func (s *Server) createInjury(w http.ResponseWriter, r *http.Request, author db.
 }
 
 func (s *Server) updateInjury(w http.ResponseWriter, r *http.Request, author db.Profile, id uuid.UUID) {
-	params, _, _, in, ok := s.parsePostReq(w, r, "injury")
+	params, _, _, in, ok := s.parsePostReqTitle(w, r, "injury", true)
 	if !ok {
 		return
 	}

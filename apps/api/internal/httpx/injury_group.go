@@ -329,7 +329,7 @@ func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	params, _, _, in, ok := s.parsePostReq(w, r, "injury")
+	params, _, _, in, ok := s.parsePostReqTitle(w, r, "injury", true)
 	if !ok {
 		return
 	}

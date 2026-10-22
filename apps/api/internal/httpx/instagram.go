@@ -109,12 +109,12 @@ func (s *Server) citeInstagram(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cover != nil {
-		if !s.uploadIssuedToMe(w, r, profile.ID, *cover, "image_public_id", "表紙の画像") {
+		if !s.uploadIssuedToMe(w, r, profile.ID, *cover, "image_public_id", "サムネの画像") {
 			return
 		}
 		if err := s.cloud.ImageReady(r.Context(), *cover); err != nil {
 			s.purgeRejectedUpload(err, "image", *cover)
-			writeAssetReadyError(w, err, "表紙の画像")
+			writeAssetReadyError(w, err, "サムネの画像")
 			return
 		}
 	}

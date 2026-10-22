@@ -441,3 +441,34 @@ func TestSavedInjuryPostsNeedMembership(t *testing.T) {
 		t.Fatal("saved post missing after joining again")
 	}
 }
+
+// ケガのグループの投稿は、画面のとおりタイトルを書かなくてもよい。編集でも同じ。
+func TestInjuryGroupPostTitleIsOptional(t *testing.T) {
+	h := setup(t)
+	a := token(t, uuid.New())
+	doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", a, joinBody("resting"))
+
+	rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", a, map[string]any{
+		"kind": "injury", "title": "  ", "body": "階段がつらい", "body_part": "jumpers-knee",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("post without title %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	edit := doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, a, map[string]any{
+		"kind": "injury", "title": "", "body": "階段が少し楽になった", "body_part": "jumpers-knee",
+	})
+	if edit.Code != http.StatusOK {
+		t.Fatalf("edit without title %d %s", edit.Code, edit.Body.String())
+	}
+	// 長すぎるタイトルは、これまでどおり受け付けない。
+	long := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/posts", a, map[string]any{
+		"kind": "injury", "title": strings.Repeat("あ", 121), "body": "本文", "body_part": "jumpers-knee",
+	})
+	if long.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("long title %d", long.Code)
+	}
+}

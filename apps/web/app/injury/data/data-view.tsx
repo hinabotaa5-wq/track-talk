@@ -39,7 +39,7 @@ function Highlights({ group }: { group: InjuryPublicGroup }) {
           <dt className="text-xs text-slate-300">{row.short}でいちばん多い</dt>
           <dd className="mt-0.5 text-sm font-bold leading-snug text-slate-50">{row.item.label}</dd>
           <dd className="text-xs tabular-nums text-sky-200">
-            {injuryPercent(row.item.people, row.tally.people)}%({row.tally.people}人中{row.item.people}人)
+            {injuryPercent(row.item.people, row.tally.people)}%
           </dd>
         </div>
       ))}
