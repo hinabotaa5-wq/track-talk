@@ -47,7 +47,7 @@ export default function VideoUrlPostPage() {
     try {
       let imagePublicId: string | undefined;
       if (kind === "instagram" && cover) {
-        setStatus("サムネの画像を送っています…");
+        setStatus("送信しています…");
         const sending = await shrinkImage(cover);
         if (sending.size > maxCoverBytes) throw new Error("10MB以内の画像にしてください");
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
@@ -110,7 +110,7 @@ export default function VideoUrlPostPage() {
           </label>
         ) : null}
         <label className="block text-sm font-medium">
-          本文
+          詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}

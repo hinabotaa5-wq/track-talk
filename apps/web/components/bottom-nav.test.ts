@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabs, mainTabHref, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabs, mainTabHref, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 
 describe("mainTabHref", () => {
   it("下のメニューは ホーム→大会→メモ→コーチ→ケガ の順", () => {
@@ -61,5 +61,17 @@ describe("hidesHeader", () => {
     expect(hidesHeader("/me/profile")).toBe(false);
     expect(hidesHeader("/reset-password")).toBe(false);
     expect(hidesHeader("/")).toBe(false);
+  });
+});
+
+
+describe("showsHeaderAccountActions", () => {
+  it("通知・マイページ・管理アイコンを通常ページで表示し、戻る画面や投稿画面では隠す", () => {
+    expect(showsHeaderAccountActions("/")).toBe(true);
+    expect(showsHeaderAccountActions("/me")).toBe(true);
+    expect(showsHeaderAccountActions("/me/push")).toBe(true);
+    expect(showsHeaderAccountActions("/upload")).toBe(false);
+    expect(showsHeaderAccountActions("/posts/new")).toBe(false);
+    expect(showsHeaderAccountActions("/menu-contest")).toBe(false);
   });
 });

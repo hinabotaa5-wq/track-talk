@@ -18,7 +18,7 @@ type postDTO struct {
 	ID    uuid.UUID `json:"id"`
 	Title string    `json:"title"`
 	Body  string    `json:"body,omitempty"`
-	// Excerpt は一覧カードに出す本文の冒頭。一覧では本文を返さないので、本文見出しを出す投稿に付ける。
+	// Excerpt は一覧カードに出す詳細の冒頭。一覧では本文を返さないので、カードに詳細を出す投稿に付ける。
 	Excerpt        string  `json:"excerpt,omitempty"`
 	AuthorName     *string `json:"author_name,omitempty"`
 	PostMaster     bool    `json:"author_post_master,omitempty"`
@@ -157,7 +157,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	}
 	if !list {
 		p.Body = row.Body
-	} else if (row.Kind == "text" && p.ImagePublicID == "") || row.Kind == "youtube" || row.Kind == "instagram" {
+	} else if (row.Kind == "text" && p.ImagePublicID == "") || row.Kind == "video" || row.Kind == "youtube" || row.Kind == "instagram" {
 		p.Excerpt = postExcerpt(row.Body)
 	}
 	return p

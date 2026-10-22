@@ -500,20 +500,34 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
-		"title": "動画タイトル", "body": "", "kind": "video",
+		"title": "", "body": "走った動画の詳細", "kind": "video",
 		"video_public_id": signed.PublicID,
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
 	var created struct {
+		Title        string `json:"title"`
+		Body         string `json:"body"`
 		Kind         string `json:"kind"`
 		ThumbnailURL string `json:"thumbnail_url"`
 		PlaybackURL  string `json:"playback_url"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	if created.Kind != "video" || created.ThumbnailURL == "" || created.PlaybackURL == "" {
+	if created.Title != "" || created.Body != "走った動画の詳細" || created.Kind != "video" || created.ThumbnailURL == "" || created.PlaybackURL == "" {
 		t.Fatalf("created %+v", created)
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	var videoList struct {
+		Posts []struct {
+			Kind    string `json:"kind"`
+			Title   string `json:"title"`
+			Excerpt string `json:"excerpt"`
+		} `json:"posts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &videoList)
+	if len(videoList.Posts) == 0 || videoList.Posts[0].Kind != "video" || videoList.Posts[0].Title != "" || videoList.Posts[0].Excerpt != "走った動画の詳細" {
+		t.Fatalf("video feed = %s", rec.Body.String())
 	}
 
 	assetBytes.Store(cloudinary.MaxVideoBytes + 1)

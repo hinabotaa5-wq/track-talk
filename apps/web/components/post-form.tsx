@@ -44,7 +44,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
     }
     const validatesTextContent = !initial || initial.kind === "text";
     if (validatesTextContent && !values.body.trim() && !photo && !initial?.thumbnail_url) {
-      setError("本文か写真を入力してください");
+      setError("詳細か写真を入力してください");
       return;
     }
     if (!acquire()) return;
@@ -124,7 +124,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
       ) : null}
       <label className="block text-sm font-medium">
-        本文
+        詳細
         <Textarea rows={3} className="mt-1" {...form.register("body")} />
       </label>
       {form.formState.errors.body ? (

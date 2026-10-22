@@ -427,7 +427,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 }
 
 // parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい。
-// 文章投稿もタイトル欄を持たず、本文または写真で投稿できる。
+// 文章投稿と自分の動画投稿はタイトル欄を持たず、詳細で投稿できる。
 func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, forceKind string, titleOptional bool) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
@@ -444,7 +444,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 	fields := map[string]string{}
 	if kind != "practice" {
 		titleError := Title(req.Title)
-		if titleOptional || kind == "text" {
+		if titleOptional || kind == "text" || kind == "video" {
 			titleError = OptionalTitle(req.Title)
 		}
 		if titleError != "" {
@@ -468,7 +468,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 		}
 		imageID := strings.TrimSpace(req.ImagePublicID)
 		if !titleOptional && strings.TrimSpace(req.Body) == "" && imageID == "" {
-			fields["body"] = "本文か写真を入力してください"
+			fields["body"] = "詳細か写真を入力してください"
 		}
 		if imageID != "" {
 			if e := ImagePublicID(imageID); e != "" {
@@ -548,7 +548,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 		if strings.TrimSpace(req.ImagePublicID) != "" || len(req.ImagePublicIDs) > 0 {
 			fields["image_public_id"] = "ケガの投稿に写真は付けられません"
 		}
-		body, bodyErr := textLimit(req.Body, 5000, "いまの気持ちや状況を入力してください", "本文は5000文字以内で入力してください", true)
+		body, bodyErr := textLimit(req.Body, 5000, "いまの気持ちや状況を入力してください", "詳細は5000文字以内で入力してください", true)
 		if bodyErr != "" {
 			fields["body"] = bodyErr
 		} else {
@@ -670,13 +670,13 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		s.updateInjury(w, r, p, id)
 		return
 	}
-	// 文章・YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
-	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "text" || existing.Kind == "youtube" || existing.Kind == "instagram")
+	// 文章・自分の動画・YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
+	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "text" || existing.Kind == "video" || existing.Kind == "youtube" || existing.Kind == "instagram")
 	if !ok {
 		return
 	}
 	if existing.Kind == "text" && existing.CloudinaryPublicID == nil && strings.TrimSpace(params.Body) == "" {
-		FieldError(w, map[string]string{"body": "本文を入力してください"})
+		FieldError(w, map[string]string{"body": "詳細を入力してください"})
 		return
 	}
 	_, err = s.q.UpdatePost(r.Context(), db.UpdatePostParams{

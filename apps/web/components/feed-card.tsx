@@ -38,7 +38,7 @@ function KindBadge({ children }: { children: string }) {
 
 export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   const title = feedTitle(post.title);
-  const cardTitle = post.kind === "text" || post.kind === "youtube" || post.kind === "instagram"
+  const cardTitle = post.kind === "text" || post.kind === "video" || post.kind === "youtube" || post.kind === "instagram"
     ? feedTitle(post.excerpt ?? "") || title
     : title;
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
