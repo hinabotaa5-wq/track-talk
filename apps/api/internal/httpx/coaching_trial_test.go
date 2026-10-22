@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -53,6 +54,51 @@ func TestTrialCoachingPlanRules(t *testing.T) {
 	edit["price_yen"] = 3000
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+created.Plan.ID, tc, edit); rec.Code != http.StatusOK {
 		t.Fatalf("edit trial %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 2つのプランを同時にお試しに直しても、お試しプランは1つまでになる。
+func TestTrialCoachingPlanConcurrentUpdates(t *testing.T) {
+	h := setup(t)
+	_, tc, first := planCoach(t, h, 3)
+	rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tc, planBody())
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("second plan %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Plan struct {
+			ID string `json:"id"`
+		} `json:"plan"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	ids := []string{first, created.Plan.ID}
+
+	for round := 0; round < 5; round++ {
+		codes := make([]int, len(ids))
+		var wg sync.WaitGroup
+		for i, id := range ids {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				codes[i] = doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+id, tc, trialPlanBody()).Code
+			}()
+		}
+		wg.Wait()
+		ok := 0
+		for _, c := range codes {
+			if c == http.StatusOK {
+				ok++
+			}
+		}
+		if ok != 1 {
+			t.Fatalf("round %d: お試しに直せた数 %d (%v)", round, ok, codes)
+		}
+		// 両方を期間プランに戻して、もう一度試す。
+		for _, id := range ids {
+			if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+id, tc, planBody()); rec.Code != http.StatusOK {
+				t.Fatalf("reset %d %s", rec.Code, rec.Body.String())
+			}
+		}
 	}
 }
 

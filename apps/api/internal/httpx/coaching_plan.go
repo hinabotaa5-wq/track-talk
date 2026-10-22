@@ -325,9 +325,6 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	if req.Kind == "trial" && current.Kind != "trial" && !s.noOtherTrialPlan(w, r, s.q, c.ProfileID, id) {
-		return
-	}
 	published := current.Published
 	if req.Published != nil {
 		published = *req.Published
@@ -336,8 +333,25 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "pledge_required", "先にパーソナル指導の誓約をしてください")
 		return
 	}
+	// お試しに直すときは、作るときと同じロックの中で数える。2つのプランを同時にお試しに直されても1つまでにする。
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	if req.Kind == "trial" && current.Kind != "trial" {
+		if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !s.noOtherTrialPlan(w, r, q, c.ProfileID, id) {
+			return
+		}
+	}
 	reviews, menu, formats := req.includes()
-	p, err := s.q.UpdateCoachingPlan(r.Context(), db.UpdateCoachingPlanParams{
+	p, err := q.UpdateCoachingPlan(r.Context(), db.UpdateCoachingPlanParams{
 		ID:                id,
 		CoachID:           c.ProfileID,
 		Kind:              req.Kind,
@@ -353,6 +367,10 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		StartOnFirstVideo: req.StartOnFirstVideo,
 	})
 	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
