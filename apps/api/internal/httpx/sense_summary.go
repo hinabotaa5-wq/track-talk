@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
@@ -276,20 +277,32 @@ func parseSenseSummary(raw string) (senseSummaryContent, error) {
 	if strings.HasPrefix(raw, "[") {
 		var list []senseSummaryContent
 		if err := json.Unmarshal([]byte(raw), &list); err != nil {
-			return senseSummaryContent{}, fmt.Errorf("sense summary json: %w: %s", err, clipRunes(raw, 200))
+			return senseSummaryContent{}, fmt.Errorf("sense summary json: %w (%s)", err, senseSummaryReplyShape(raw))
 		}
 		if len(list) == 0 {
 			return senseSummaryContent{}, errors.New("sense summary: 空の配列です")
 		}
 		out = list[0]
 	} else if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		return senseSummaryContent{}, fmt.Errorf("sense summary json: %w: %s", err, clipRunes(raw, 200))
+		return senseSummaryContent{}, fmt.Errorf("sense summary json: %w (%s)", err, senseSummaryReplyShape(raw))
 	}
 	out = cleanSenseSummary(out)
 	if out.Overview == "" {
 		return senseSummaryContent{}, errors.New("sense summary: overview が空です")
 	}
 	return out, nil
+}
+
+// senseSummaryReplyShape は、読めなかった返事の形だけを表す。返事は感覚メモをもとに書かれるので、
+// 中身はログに残さず、長さと最初の1文字(JSON の { か [ か)だけで原因を追う。
+func senseSummaryReplyShape(raw string) string {
+	first := "空"
+	if r := []rune(raw); len(r) > 0 && (r[0] == '{' || r[0] == '[') {
+		first = string(r[0])
+	} else if len(r) > 0 {
+		first = "JSON以外"
+	}
+	return fmt.Sprintf("返事 %d文字、先頭 %s", utf8.RuneCountInString(raw), first)
 }
 
 // cleanSenseSummary は、空の項目を落とし、数と長さを決まりに収める。配列は null にしない。

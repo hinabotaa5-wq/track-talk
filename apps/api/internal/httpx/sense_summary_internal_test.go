@@ -28,3 +28,16 @@ func TestParseSenseSummary(t *testing.T) {
 		t.Fatal("text accepted")
 	}
 }
+
+// 読めなかった返事の中身(メモをもとに書かれる)は、エラーに入れない。ログに出るため。
+func TestParseSenseSummaryErrorHidesReply(t *testing.T) {
+	for _, raw := range []string{"左ひざが痛くて走れなかった", `[{"overview":"左ひざが痛い"`, `{"overview":"左ひざが痛い"`} {
+		_, err := parseSenseSummary(raw)
+		if err == nil {
+			t.Fatalf("%q: エラーになるはず", raw)
+		}
+		if strings.Contains(err.Error(), "左ひざ") {
+			t.Fatalf("返事の中身がエラーに入っている: %v", err)
+		}
+	}
+}
