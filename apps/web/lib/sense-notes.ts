@@ -9,7 +9,7 @@ export const senseJarSize = 6;
 
 // まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。ビン1杯と同じ数にして、満杯になったらまとめられるようにする。
 // API の senseSummaryMinNotes と揃えること。
-export const senseSummaryMinNotes = senseJarSize;
+export const senseSummaryMinNotes = 6;
 
 export type SenseNote = {
   id: string;

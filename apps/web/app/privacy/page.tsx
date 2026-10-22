@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "TrackTalk のプライバシーポリシー",
 };
 
-const privacyUpdated = "2026年10月21日";
+const privacyUpdated = "2026年10月22日";
 
 export default function PrivacyPage() {
   return (
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
 
       <Article n={8} title="第三者への提供">
         <p>
-          運営者は、法令に基づく場合、人の生命、身体または財産の保護に必要で本人の同意を得ることが困難な場合を除き、個人情報を第三者に提供しません。Google ログインと YouTube の動画の再生は、利用者の操作に伴って各事業者へ接続します。YouTube と Instagram の投稿が一覧や投稿の画面に出ると、その表紙の画像を表示するために、あなたのブラウザが Google と Meta へ接続します。Instagram の投稿を開くと、その投稿を表示するために Meta へ接続します。個人がわからない形にしたケガの集計は、第4条のとおり本サービス上で公開します。オンラインコーチングの支払いでは、決済のために Stripe へ接続します。感覚メモのふりかえりは、利用者が「まとめる」を押したときだけ、そのメモを Google の Gemini へ送って作ります。送ったメモは、第7条のとおり Google の製品の改善にも使われることがあります。
+          運営者は、法令に基づく場合、人の生命、身体または財産の保護に必要で本人の同意を得ることが困難な場合を除き、個人情報を第三者に提供しません。Google ログインは、利用者の操作に伴って Google へ接続します。YouTube と Instagram の投稿が一覧や投稿の画面に出ると、その表紙の画像を表示するために、あなたのブラウザが Google と Meta へ接続します。YouTube の投稿を開くと、動画のプレーヤーを表示するために、再生を押す前から Google（YouTube）へ接続します。Instagram の投稿を開くと、その投稿を表示するために Meta へ接続します。個人がわからない形にしたケガの集計は、第4条のとおり本サービス上で公開します。オンラインコーチングの支払いでは、決済のために Stripe へ接続します。感覚メモのふりかえりは、利用者が「まとめる」を押したときだけ、そのメモを Google の Gemini へ送って作ります。送ったメモは、第7条のとおり Google の製品の改善にも使われることがあります。
         </p>
       </Article>
 

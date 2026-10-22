@@ -28,16 +28,34 @@ export function splitIntoColumns<T>(items: T[], columns: number) {
   return result;
 }
 
+// 列の数ごとの見せ方。画面の幅がわからないあいだ(サーバーで描くとき)は3つとも描き、CSS で幅に合うものだけを見せる。
+const layouts = [
+  { columns: 2, className: "flex md:hidden" },
+  { columns: 3, className: "hidden md:flex xl:hidden" },
+  { columns: 4, className: "hidden xl:flex" },
+] as const;
+
+// layoutsFor は、描く列の数を返す。0(幅がわからない)ならすべて。
+export function layoutsFor(columns: number) {
+  return columns === 0 ? layouts : layouts.filter((layout) => layout.columns === columns);
+}
+
 export function FeedGrid({ children }: { children: ReactNode }) {
-  const columns = useSyncExternalStore(subscribe, columnCount, () => 2);
+  // サーバーでは幅がわからないので 0。2列で描いて PC で組み直すと、読み込んだあとに一覧が動いて見えるため。
+  const columns = useSyncExternalStore(subscribe, columnCount, () => 0);
   const items = Children.toArray(children);
   return (
-    <div className="flex items-start gap-3">
-      {splitIntoColumns(items, columns).map((column, index) => (
-        <div key={index} className="min-w-0 flex-1">
-          {column}
+    <>
+      {layoutsFor(columns).map((layout) => (
+        // key を列の数にして、幅がわかったあとも見えていた並びをそのまま使う(作り直さない)。
+        <div key={layout.columns} className={`items-start gap-3 ${columns === 0 ? layout.className : "flex"}`}>
+          {splitIntoColumns(items, layout.columns).map((column, index) => (
+            <div key={index} className="min-w-0 flex-1">
+              {column}
+            </div>
+          ))}
         </div>
       ))}
-    </div>
+    </>
   );
 }
