@@ -80,9 +80,11 @@ describe("HomeFeed", () => {
       }),
     );
     expect(html).toContain("クラブ");
-    expect(html).toContain("練習");
+    expect(html).toContain("100m");
+    expect(html).toContain("日付");
+    expect(html).toContain("時間");
     expect(html).toContain("駒沢競技場");
     expect(html).toContain("募集 1/3人");
-    expect(html).toContain("まだ評価がありません");
+    expect(html).not.toContain("まだ評価がありません");
   });
 });
