@@ -4,18 +4,11 @@ import { appEventValues } from "./practice-events";
 z.config(z.locales.ja());
 
 export const postSchema = z.object({
-  title: z.string("タイトルを入力してください").trim().min(1, "タイトルを入力してください").max(120, "120文字以内"),
   body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
 });
 
-// YouTube・Instagram の URL の投稿は、タイトルを書かなくてもよい。
-export const urlPostSchema = postSchema.extend({
-  title: z.string().trim().max(120, "120文字以内"),
-});
-
-export function hasTextPostContent(title: string) {
-  return title.trim() !== "";
-}
+// 動画URLと文章投稿はタイトル欄を持たず、本文だけを入力する。
+export const urlPostSchema = postSchema;
 
 export function isYouTubeUrl(value: string) {
   return /^https?:\/\/(((www\.|m\.)?youtube\.com\/(watch\?v=|shorts\/))|youtu\.be\/)[^\s]+$/i.test(value.trim());

@@ -38,6 +38,9 @@ function KindBadge({ children }: { children: string }) {
 
 export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   const title = feedTitle(post.title);
+  const cardTitle = post.kind === "text" || post.kind === "youtube" || post.kind === "instagram"
+    ? feedTitle(post.excerpt ?? "") || title
+    : title;
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
   if (post.kind === "practice") {
     const info = post.practice;
@@ -108,12 +111,12 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
         ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
-          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={title} />
+          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={cardTitle || title || "Instagram"} />
         ) : (
           <PosterFallback title={title} excerpt={post.excerpt} />
         )}
       </div>
-      {hasFeedTitle(post.title) ? <CardTitle title={title} /> : null}
+      {hasFeedTitle(cardTitle) ? <CardTitle title={cardTitle} /> : null}
     </Link>
   );
 }

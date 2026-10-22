@@ -76,17 +76,18 @@ describe("FeedCard", () => {
     expect(html).toContain("res.cloudinary.com");
   });
 
-  it("shows the start of the body on a text post without a photo", () => {
+  it("uses the body in place of the title on a text post card", () => {
     const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, excerpt: "決勝は向かい風だった。" } }));
     expect(html).toContain("決勝は向かい風だった。");
-    expect(html).toContain("自分の投稿");
+    expect(html).not.toContain("自分の投稿");
   });
 
-  it("leaves out the title row when a url post has no title", () => {
+  it("uses the body in place of the title on a url post card", () => {
     const withTitle = renderToStaticMarkup(
-      createElement(FeedCard, { post: { ...post, kind: "youtube", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
+      createElement(FeedCard, { post: { ...post, kind: "youtube", excerpt: "動画についての本文", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
     );
-    expect(withTitle).toContain("自分の投稿");
+    expect(withTitle).toContain("動画についての本文");
+    expect(withTitle).not.toContain("自分の投稿");
     const noTitle = renderToStaticMarkup(
       createElement(FeedCard, { post: { ...post, title: "", kind: "youtube", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
     );
