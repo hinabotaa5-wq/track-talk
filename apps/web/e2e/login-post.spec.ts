@@ -18,9 +18,8 @@ test("login then publish a text post", async ({ page }) => {
   await page.goto("/posts/new");
   await expect(page.getByRole("heading", { name: "文章" })).toBeVisible({ timeout: 20_000 });
 
-  const title = `朝練の話 ${Date.now()}`;
-  await page.getByLabel("タイトル").fill(title);
-  await page.getByLabel("本文").fill("今日のスタートを共有します");
+  const body = `朝練の話 ${Date.now()}\n今日のスタートを共有します`;
+  await page.getByLabel("本文").fill(body);
   await page.getByRole("button", { name: "投稿する" }).click();
-  await expect(page.getByRole("link", { name: title })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("link", { name: new RegExp(body.split("\n")[0]) })).toBeVisible({ timeout: 20_000 });
 });

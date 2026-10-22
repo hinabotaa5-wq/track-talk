@@ -426,7 +426,8 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	return s.parsePostReqTitle(w, r, forceKind, false)
 }
 
-// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい（YouTube・Instagram の投稿の編集と、ケガの投稿）。
+// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい。
+// 文章投稿もタイトル欄を持たず、本文または写真で投稿できる。
 func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, forceKind string, titleOptional bool) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
@@ -443,7 +444,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 	fields := map[string]string{}
 	if kind != "practice" {
 		titleError := Title(req.Title)
-		if titleOptional {
+		if titleOptional || kind == "text" {
 			titleError = OptionalTitle(req.Title)
 		}
 		if titleError != "" {
@@ -466,6 +467,9 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 			fields["kind"] = "文字の投稿に動画情報は付けられません"
 		}
 		imageID := strings.TrimSpace(req.ImagePublicID)
+		if !titleOptional && strings.TrimSpace(req.Title) == "" && strings.TrimSpace(req.Body) == "" && imageID == "" {
+			fields["body"] = "本文か写真を入力してください"
+		}
 		if imageID != "" {
 			if e := ImagePublicID(imageID); e != "" {
 				fields["image_public_id"] = e
@@ -667,7 +671,7 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// YouTube・Instagram の投稿は、タイトルを書かなくてもよい。
-	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "youtube" || existing.Kind == "instagram")
+	params, _, _, _, ok := s.parsePostReqTitle(w, r, "", existing.Kind == "text" || existing.Kind == "youtube" || existing.Kind == "instagram")
 	if !ok {
 		return
 	}

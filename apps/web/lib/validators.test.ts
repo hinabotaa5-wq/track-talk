@@ -5,7 +5,6 @@ import {
   changeEmailSchema,
   changePasswordSchema,
   commentSchema,
-  hasTextPostContent,
   inquirySchema,
   isYouTubeUrl,
   loginSchema,
@@ -32,24 +31,18 @@ describe("validators", () => {
 
   it("accepts a valid post", () => {
     const parsed = postSchema.parse({
-      title: "100m決勝",
       body: "展開が熱かった",
     });
-    expect(parsed.title).toBe("100m決勝");
+    expect(parsed.body).toBe("展開が熱かった");
   });
 
-  it("accepts optional text fields and requires a title", () => {
-    expect(postSchema.safeParse({ title: "タイトルだけ", body: "" }).success).toBe(true);
-    expect(postSchema.safeParse({ title: "", body: "本文だけ" }).success).toBe(false); // タイトル必須化により false
-    expect(postSchema.safeParse({ title: "", body: "" }).success).toBe(false); // タイトル必須化により false
-    expect(hasTextPostContent("タイトルだけ")).toBe(true);
-    expect(hasTextPostContent("")).toBe(false);
-    expect(hasTextPostContent("  ")).toBe(false);
+  it("accepts a body without requiring a title", () => {
+    expect(postSchema.safeParse({ body: "本文だけ" }).success).toBe(true);
+    expect(postSchema.safeParse({ body: "" }).success).toBe(true); // 写真だけの投稿も許可する
   });
 
   it("keeps text post length limits", () => {
-    expect(postSchema.safeParse({ title: "あ".repeat(121), body: "" }).success).toBe(false);
-    expect(postSchema.safeParse({ title: "", body: "あ".repeat(10001) }).success).toBe(false);
+    expect(postSchema.safeParse({ body: "あ".repeat(10001) }).success).toBe(false);
   });
 
   it("accepts a club recruitment and rejects a missing prefecture", () => {

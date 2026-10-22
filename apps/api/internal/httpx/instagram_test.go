@@ -103,8 +103,7 @@ func TestCiteInstagramOpensOneThreadPerPost(t *testing.T) {
 	}
 }
 
-// YouTube・Instagram の URL の投稿は、タイトルを書かなくても作れて、タイトルを空にする編集もできる。
-// 文章の投稿は、タイトルが要る。
+// YouTube・Instagram・文章の投稿は、タイトル欄なしで作成・編集できる。
 func TestUrlPostsDoNotNeedATitle(t *testing.T) {
 	h := setup(t)
 	ta := token(t, uuid.New())
@@ -137,8 +136,13 @@ func TestUrlPostsDoNotNeedATitle(t *testing.T) {
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"kind": "text", "title": "", "body": "本文だけ"})
-	if rec.Code != 422 {
+	if rec.Code != 201 {
 		t.Fatalf("text post without title %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{"kind": "text", "title": "", "body": ""})
+	if rec.Code != 422 {
+		t.Fatalf("empty text post %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -162,6 +166,37 @@ func TestTextPostsInTheFeedCarryAnExcerpt(t *testing.T) {
 	if len(list.Posts) == 0 || list.Posts[0].Body != "" || !strings.HasPrefix(list.Posts[0].Excerpt, "決勝は向かい風だった。 ああ") || len([]rune(list.Posts[0].Excerpt)) > 120 {
 		t.Fatalf("feed = %s", rec.Body.String())
 	}
+}
+
+func TestUrlPostsInTheFeedCarryBodyExcerpt(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	body := "リールの内容をメモしました。"
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts/instagram", ta, map[string]any{
+		"url": "https://www.instagram.com/reel/H1a2B3c4D5e/", "body": body,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts?sort=new", "", nil)
+	var list struct {
+		Posts []struct {
+			Kind    string `json:"kind"`
+			Title   string `json:"title"`
+			Excerpt string `json:"excerpt"`
+		} `json:"posts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	for _, post := range list.Posts {
+		if post.Kind == "instagram" {
+			if post.Title != "" || post.Excerpt != body {
+				t.Fatalf("Instagram feed card title=%q excerpt=%q", post.Title, post.Excerpt)
+			}
+			return
+		}
+	}
+	t.Fatalf("Instagram post not in feed: %s", rec.Body.String())
 }
 
 // Instagram の表紙は外から確実に取れないので、投稿者が任意で付けた画像をカードに出す。投稿を消すと画像も消す。

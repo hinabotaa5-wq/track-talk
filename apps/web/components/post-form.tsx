@@ -2,9 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { hasTextPostContent, postSchema, urlPostSchema } from "@/lib/validators";
+import { postSchema, urlPostSchema } from "@/lib/validators";
 import type { z } from "zod";
-import { TitleField } from "./composer-page";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { UploadProgress } from "./upload-progress";
@@ -34,7 +33,6 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   const form = useForm<Values>({
     resolver: zodResolver(initial?.kind === "youtube" || initial?.kind === "instagram" ? urlPostSchema : postSchema),
     defaultValues: {
-      title: initial?.title ?? "",
       body: initial?.body ?? "",
     },
   });
@@ -45,8 +43,8 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       return;
     }
     const validatesTextContent = !initial || initial.kind === "text";
-    if (validatesTextContent && !hasTextPostContent(values.title)) {
-      setError("タイトルを入力してください");
+    if (validatesTextContent && !values.body.trim() && !photo && !initial?.thumbnail_url) {
+      setError("本文か写真を入力してください");
       return;
     }
     if (!acquire()) return;
@@ -54,7 +52,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
     setStatus("");
     setUpload(null);
     const payload: { title: string; body: string; image_public_id?: string } = {
-      title: values.title,
+      title: "",
       body: values.body,
     };
     try {
@@ -124,10 +122,6 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       ) : initial.thumbnail_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
-      ) : null}
-      <TitleField optional={initial?.kind === "youtube" || initial?.kind === "instagram"} {...form.register("title")} />
-      {form.formState.errors.title ? (
-        <p className="text-sm text-red-400">{form.formState.errors.title.message}</p>
       ) : null}
       <label className="block text-sm font-medium">
         本文

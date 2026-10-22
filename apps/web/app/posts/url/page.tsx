@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, apiErrorText } from "@/lib/api";
-import { ComposerPage, TitleField } from "@/components/composer-page";
+import { ComposerPage } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +24,6 @@ export default function VideoUrlPostPage() {
   const { session, token } = useAuth();
   const router = useRouter();
   const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   // Instagram の表紙は外から確実に取れないので、投稿者が任意で画像を付けられる。付けるとフィードのカードに出る。
@@ -60,7 +59,7 @@ export default function VideoUrlPostPage() {
       const res = await apiFetch<{ post: Post; existing: boolean }>(`/v1/posts/${kind}`, {
         method: "POST",
         token,
-        body: JSON.stringify({ url: url.trim(), title, body, ...(imagePublicId ? { image_public_id: imagePublicId } : {}) }),
+        body: JSON.stringify({ url: url.trim(), body, ...(imagePublicId ? { image_public_id: imagePublicId } : {}) }),
       });
       // 同じ動画のスレッドが既にあるときだけ、そのスレッドの詳細を開く。新しく立てたときはホームに戻る。
       if (res.existing) {
@@ -110,9 +109,8 @@ export default function VideoUrlPostPage() {
             />
           </label>
         ) : null}
-        <TitleField optional value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
-          詳細
+          本文
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
