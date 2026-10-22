@@ -426,7 +426,7 @@ func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind 
 	return s.parsePostReqTitle(w, r, forceKind, false)
 }
 
-// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい（YouTube・Instagram の投稿の編集）。
+// parsePostReqTitle は parsePostReq と同じで、titleOptional が true ならタイトルが空でもよい（YouTube・Instagram の投稿の編集と、ケガの投稿）。
 func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, forceKind string, titleOptional bool) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
 	var req postReq
 	if err := DecodeJSON(r, &req); err != nil {
