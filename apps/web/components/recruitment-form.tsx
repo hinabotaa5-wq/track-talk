@@ -8,6 +8,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { UploadProgress } from "./upload-progress";
+import { SubmittingProgress } from "./submitting-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
@@ -338,7 +339,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           fileName={uploadFile?.name}
           fileSize={uploadFile?.size}
         />
-      ) : null}
+      ) : submitting ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
       {status ? <p className="text-sm text-slate-200">{status}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>

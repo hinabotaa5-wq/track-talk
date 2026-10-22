@@ -771,7 +771,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
           解散する
         </Button>
       ) : null}
-      {!mine && info.my_application === "pending" ? <p className="text-sm">申請中です</p> : null}
+      {!mine && info.my_application === "pending" ? <p className="text-sm">申請中です。投稿者の承認をお待ちください。</p> : null}
       {!mine && info.my_application === "accepted" ? <p className="text-sm">参加が承認されました</p> : null}
       {!mine && info.my_application === "declined" ? <p className="text-sm">見送りになりました</p> : null}
       {!mine && !info.my_application && info.status === "full" ? <p className="text-sm">満員です</p> : null}
