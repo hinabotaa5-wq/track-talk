@@ -65,10 +65,7 @@ function hasData(group: InjuryPublicGroup) {
 function OverallCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-bold">{group.body_part_label}</h2>
-        <span className="text-sm text-slate-300">{group.members}人</span>
-      </div>
+      <h2 className="text-lg font-bold">{group.body_part_label}</h2>
       {hasData(group) ? (
         <>
           <Highlights group={group} />
@@ -94,8 +91,7 @@ function GroupCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
             {ready ? (first ? `多かったのは「${first.label}」` : "データを見る") : `${min}人そろうと表示`}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-sm text-slate-300">
-          {group.members}人
+        <span className="flex shrink-0 items-center text-sm text-slate-300">
           <ChevronDown className="size-4 transition group-open:rotate-180" aria-hidden />
         </span>
       </summary>
