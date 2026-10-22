@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
-import { ComposerPage, TitleField } from "@/components/composer-page";
+import { ComposerPage } from "@/components/composer-page";
 import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +18,6 @@ const maxBytes = 100 * 1024 * 1024;
 export default function OwnVideoPage() {
   const { session, token } = useAuth();
   const router = useRouter();
-  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
@@ -48,7 +47,7 @@ export default function OwnVideoPage() {
     try {
       let publicId: string;
       if (uploaded.current?.file === file) {
-        // タイトルなどの直しで送り直すときは、上げ済みの動画を使い回す（同じ動画を上げ直して孤児を増やさない）。
+        // 詳細などの直しで送り直すときは、上げ済みの動画を使い回す（同じ動画を上げ直して孤児を増やさない）。
         publicId = uploaded.current.id;
       } else {
         setStatus("アップロードの準備をしています…");
@@ -70,7 +69,6 @@ export default function OwnVideoPage() {
         method: "POST",
         token,
         body: JSON.stringify({
-          title,
           body,
           kind: "video",
           video_public_id: publicId,
@@ -102,7 +100,6 @@ export default function OwnVideoPage() {
             required
           />
         </label>
-        <TitleField value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="block text-sm font-medium">
           詳細
           <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />

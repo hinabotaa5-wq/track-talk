@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, type InputHTMLAttributes, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { FormLoadingFrame } from "@/components/loading-frame";
 import { LeaveGuardArea } from "@/components/leave-guard";
-import { Input } from "@/components/ui/input";
 
 export function ComposerPage({
   title,
@@ -26,14 +25,5 @@ export function ComposerPage({
       <h1 className="text-2xl font-bold">{title}</h1>
       {loading || !session ? <FormLoadingFrame /> : children}
     </LeaveGuardArea>
-  );
-}
-
-export function TitleField({ optional = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { optional?: boolean }) {
-  return (
-    <label className="block text-sm font-medium">
-      タイトル{optional ? "(任意)" : ""}
-      <Input className="mt-1" maxLength={120} {...props} />
-    </label>
   );
 }

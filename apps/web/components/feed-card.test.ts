@@ -39,12 +39,14 @@ describe("FeedCard", () => {
     expect(html).not.toContain(">4<");
   });
 
-  it("opens a video post from the thumbnail and the title", () => {
+  it("opens a video post and uses its details instead of a title", () => {
     const html = renderToStaticMarkup(
       createElement(FeedCard, {
         post: {
           ...post,
           kind: "video",
+          title: "",
+          excerpt: "走った動画の詳細",
           playback_url: "https://example.com/v.mp4",
           thumbnail_url: "https://example.com/t.jpg",
         },
@@ -53,6 +55,7 @@ describe("FeedCard", () => {
     const postLinks = html.match(/href="\/posts\/[^"]+"/g);
     expect(postLinks).toEqual(['href="/posts/4020b4de-956e-4819-97e6-90cb82f83fc0"']);
     expect(html).not.toContain("play=1");
+    expect(html).toContain("走った動画の詳細");
   });
 
   it("keeps the my-page return path on a youtube card", () => {

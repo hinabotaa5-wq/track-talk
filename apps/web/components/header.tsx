@@ -7,7 +7,7 @@ import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, meTab, showsBackButton } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, meTab, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
@@ -71,6 +71,7 @@ export function Header() {
   const pathname = usePathname();
   const search = useLocationSearch();
   const showBack = showsBackButton(pathname, search);
+  const showHeaderAccountActions = showsHeaderAccountActions(pathname, search);
   const backOnly = hasBackOnlyHeader(pathname, search);
   const { confirmLeave } = useLeaveGuard();
   const guardedClick = useGuardedLinkClick();
@@ -136,7 +137,7 @@ export function Header() {
                 );
               })}
             </nav>
-            {profile?.is_admin ? (
+            {profile?.is_admin && showHeaderAccountActions ? (
               <Link
                 href="/admin"
                 onClick={(event) => guardedClick(event, "/admin")}
@@ -146,14 +147,14 @@ export function Header() {
                 <Shield className="size-5" strokeWidth={2} aria-hidden />
               </Link>
             ) : null}
-            {session && (!showBack || pathname.startsWith("/me")) ? (
+            {session && showHeaderAccountActions ? (
               <>
                 {pathname === "/" ? <TodayMeetBalloon /> : null}
                 <FeedbackBox />
                 <NotificationBell />
               </>
             ) : null}
-            {!showBack || pathname.startsWith("/me") ? (
+            {showHeaderAccountActions ? (
               <Link
                 href={mainTabHref("me", !!session)}
                 onClick={(event) => guardedClick(event, mainTabHref("me", !!session))}

@@ -4,10 +4,10 @@ import { appEventValues } from "./practice-events";
 z.config(z.locales.ja());
 
 export const postSchema = z.object({
-  body: z.string("本文を入力してください").trim().max(10000, "10000文字以内"),
+  body: z.string("詳細を入力してください").trim().max(10000, "10000文字以内"),
 });
 
-// 動画URLと文章投稿はタイトル欄を持たず、本文だけを入力する。
+// 動画URLと文章投稿はタイトル欄を持たず、詳細だけを入力する。
 export const urlPostSchema = postSchema;
 
 export function isYouTubeUrl(value: string) {

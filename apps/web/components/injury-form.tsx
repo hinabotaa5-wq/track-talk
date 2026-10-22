@@ -79,13 +79,13 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
         <Input
           className="mt-1"
           maxLength={120}
-          placeholder="空欄なら本文の冒頭が表示されます"
+          placeholder="空欄なら詳細の冒頭が表示されます"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
       </label>
       <label className="block text-sm font-medium">
-        本文
+        詳細
         <Textarea
           rows={8}
           className="mt-1"

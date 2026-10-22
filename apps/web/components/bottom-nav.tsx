@@ -98,6 +98,11 @@ export function showsBackButton(pathname: string, search = "") {
   return false;
 }
 
+// 通知・マイページ・管理アイコンを戻るボタンと同じ画面条件で表示する。
+export function showsHeaderAccountActions(pathname: string, search = "") {
+  return !showsBackButton(pathname, search) || pathname === "/me" || isMeSubPage(pathname);
+}
+
 // 投稿はホームの「＋」から開く詳細画面なので、そこから先の作成画面でも下のメニューは出さない。
 // ログイン画面では出す(ログインしていなければ、ホームとコーチ以外のタブはログイン画面に戻る)。
 const bottomNavHidden = new Set([
