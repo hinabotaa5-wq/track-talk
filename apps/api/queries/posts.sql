@@ -7,6 +7,7 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
@@ -94,6 +95,7 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
@@ -267,6 +269,7 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,
@@ -296,10 +299,10 @@ WHERE p.id = $1
 -- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
-    kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id,
+    kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id,
     instagram_type, instagram_shortcode, source_title
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at;
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at;
 
 -- name: UpdatePost :one
 UPDATE posts
@@ -339,6 +342,7 @@ SELECT
     p.kind,
     p.youtube_video_id,
     p.youtube_thumbnail_url,
+    p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
     p.cloudinary_public_id,

@@ -419,6 +419,7 @@ type Post struct {
 	InstagramType       *string    `json:"instagram_type"`
 	InstagramShortcode  *string    `json:"instagram_shortcode"`
 	SourceTitle         *string    `json:"source_title"`
+	YoutubeShorts       bool       `json:"youtube_shorts"`
 }
 
 type PostLike struct {

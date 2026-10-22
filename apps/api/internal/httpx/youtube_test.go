@@ -28,6 +28,33 @@ func TestYouTubeIDFromURL(t *testing.T) {
 	}
 }
 
+func TestIsYouTubeShortsURL(t *testing.T) {
+	for _, raw := range []string{
+		"https://www.youtube.com/shorts/abcdefghijk",
+		"https://youtube.com/shorts/abcdefghijk?feature=share",
+		"https://m.youtube.com/shorts/abcdefghijk",
+		" https://www.youtube.com/shorts/abcdefghijk ",
+	} {
+		if !isYouTubeShortsURL(raw) {
+			t.Fatalf("expected shorts: %s", raw)
+		}
+	}
+	for _, raw := range []string{
+		"https://www.youtube.com/watch?v=abcdefghijk",
+		"https://youtu.be/abcdefghijk",
+		"https://www.youtube.com/embed/abcdefghijk",
+		"https://www.youtube.com/live/abcdefghijk",
+		"https://www.youtube.com/shorts/",
+		"https://example.com/shorts/abcdefghijk",
+		"not a url",
+		"",
+	} {
+		if isYouTubeShortsURL(raw) {
+			t.Fatalf("expected not shorts: %s", raw)
+		}
+	}
+}
+
 func TestYouTubeThumbnailURL(t *testing.T) {
 	if YouTubeThumbnailURL("https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg") != "" {
 		t.Fatal("i.ytimg.com")
