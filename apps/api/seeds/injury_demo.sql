@@ -3,8 +3,7 @@
 -- 実行: make seed-injury(ローカルの docker の DB)。消すときは make unseed-injury。
 -- 本番に流すとき(make は使わない。デモ用プロフィールは公開の集計にも入る):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo.sql
--- 本番に入っているデモの名前と種目だけを今のものにそろえるとき:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo_update.sql
+-- 本番のデモを入れ直すときも同じ(先頭で前のデモ用プロフィールを消してから入れる)。
 -- 本番から消すとき:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/seeds/injury_demo_remove.sql
 BEGIN;
@@ -18,7 +17,8 @@ DO $$
 DECLARE
     -- グループごとの人数(診断名別。「その他」は自由記述の診断名つき)
     groups text[]  := ARRAY['hamstring-strain', 'sprain', 'shin-splints', 'stress-fracture', 'calf-strain', 'jumpers-knee', 'achilles-tendinitis', 'lower-back', 'quad-strain', 'shoulder', 'elbow', 'other'];
-    counts int[]   := ARRAY[14, 10, 9, 8, 7, 6, 6, 5, 5, 4, 3, 4];
+    -- 全員で30人。集計は5人そろったグループから出るので、上の4つのグループを5〜6人にして、残りは1〜2人にする。
+    counts int[]   := ARRAY[6, 5, 5, 5, 2, 2, 1, 1, 1, 1, 1, 0];
     stages text[]  := ARRAY['resting', 'rehab', 'jogging', 'half', 'full', 'race'];
     places text[]  := ARRAY['tartan', 'grass', 'dirt', 'asphalt', 'slope', 'stairs', 'weight-room', 'gym'];
     activities text[] := ARRAY['jog', 'start', 'sprint', 'jump-hurdle', 'throw', 'weights', 'outside'];
@@ -40,8 +40,9 @@ DECLARE
         '最初の1週間は何もしないで寝るのがいちばんつらかった。',
         '段階を戻したくなったけど、一度戻して整えたら安定した。'
     ];
-    -- 漢字・ひらがな・カタカナ・アルファベットと、それを組み合わせた名前。injury_demo_update.sql と同じ並び。
-    nicknames text[] := ARRAY['そら', 'Haru', '陽', 'ミナト', 'kei', 'ゆい', 'リク', '蒼', 'Mio', 'はるき', 'ソウタ', '凛', 'yuto', 'あおい', 'ケンタ', '楓', 'Sora', 'ひなこ', 'カイ', '湊', 'リク07', 'めい', 'ユウキ', '大地', 'Nao', 'こはる', 'タクミ', '結衣', 'ren', 'さくら', '陽ちゃん', '翼', 'Aoi', 'りん', 'シュン', '智也', 'hina', 'ゆうと', 'ミユ', '健太', 'Taiga', 'なつき', 'コウ', '美咲', 'sho', 'いぶき', 'アカリ', '颯太', 'Yuna', 'ちひろ', 'レン', '悠斗', 'kaito', 'まなと', 'サキ', '拓海', 'Rio', 'ほのか', 'ダイチ', '優花', 'めいRun', 'つばさ', 'ナナ', '陸斗', 'Kenji', 'あやね', 'ショウ', '千夏', 'yui', 'しゅんた', 'アオ', '航', 'Kaiくん', 'ことね', 'ヒロ', '瑞希', 'haruto', 'みずき', 'ジン', '紗良', '走るタロウ'];
+    -- 漢字・ひらがな・カタカナ・アルファベットと、それを組み合わせた名前。
+    -- ニックネームは全員で重ならない決まりなので、本物の利用者が同じ名前を使っていたら後ろに番号を付ける。
+    nicknames text[] := ARRAY['そら', 'Haru', '陽', 'ミナト', 'kei', 'ゆい', 'リク', '蒼', 'Mio', 'はるき', 'ソウタ', '凛', 'yuto', 'あおい', 'ケンタ', '楓', 'Sora', 'ひなこ', 'カイ', '湊', 'リク07', 'めい', 'ユウキ', '大地', 'Nao', 'こはる', 'タクミ', '結衣', 'めいRun', '陽ちゃん'];
     n int := 0;
     g int;
     i int;
@@ -68,7 +69,7 @@ BEGIN
             uid := ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid;
 
             INSERT INTO profiles (id, nickname, nickname_public)
-            VALUES (uid, nicknames[n], true);
+            VALUES (uid, CASE WHEN EXISTS (SELECT 1 FROM profiles WHERE nickname = nicknames[n]) THEN nicknames[n] || n ELSE nicknames[n] END, true);
 
             r := random();
             sev := CASE WHEN r < 0.45 THEN 'mild' WHEN r < 0.85 THEN 'moderate' ELSE 'severe' END;
@@ -109,11 +110,11 @@ BEGIN
                 places[1 + floor(random() * array_length(places, 1))::int],
                 activities[1 + floor(random() * array_length(activities, 1))::int],
                 chg,
-                -- 種目は、グループの中の奇数番目の人を 100m にして、どのグループでも 100m がいちばん多くなるようにする。
-                -- ほかの人は 100m 以外から n で決める(injury_demo_update.sql と同じ決め方)。random() は前と同じ回数だけ呼び、
-                -- ほかの答えが前のデモと変わらないようにする。
+                -- 種目は、グループの中の1・4番目の人を 100m にして、全体でも集計が出るグループでも 100m がいちばん多くなるようにする。
+                -- ほかの人は 100m 以外から n で決める(同じグループの中では重ならない)。random() は前と同じ回数だけ呼び、
+                -- ほかの答えの並びを前のデモと変えない。
                 CASE WHEN random() >= 0 THEN
-                    CASE WHEN i % 2 = 1 THEN '100m' ELSE other_events[1 + (n * 7) % array_length(other_events, 1)] END
+                    CASE WHEN i % 3 = 1 THEN '100m' ELSE other_events[1 + (n * 7) % array_length(other_events, 1)] END
                 END, true
             );
 
