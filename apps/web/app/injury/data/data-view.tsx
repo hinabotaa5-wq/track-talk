@@ -39,7 +39,7 @@ function Highlights({ group }: { group: InjuryPublicGroup }) {
           <dt className="text-xs text-slate-300">{row.short}でいちばん多い</dt>
           <dd className="mt-0.5 text-sm font-bold leading-snug text-slate-50">{row.item.label}</dd>
           <dd className="text-xs tabular-nums text-sky-200">
-            {injuryPercent(row.item.people, row.tally.people)}%({row.tally.people}人中{row.item.people}人)
+            {injuryPercent(row.item.people, row.tally.people)}%
           </dd>
         </div>
       ))}
@@ -65,7 +65,10 @@ function hasData(group: InjuryPublicGroup) {
 function OverallCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <h2 className="text-lg font-bold">{group.body_part_label}</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-bold">{group.body_part_label}</h2>
+        <span className="text-sm text-slate-300">{group.members}人</span>
+      </div>
       {hasData(group) ? (
         <>
           <Highlights group={group} />
@@ -91,7 +94,8 @@ function GroupCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
             {ready ? (first ? `多かったのは「${first.label}」` : "データを見る") : `${min}人そろうと表示`}
           </span>
         </span>
-        <span className="flex shrink-0 items-center text-sm text-slate-300">
+        <span className="flex shrink-0 items-center gap-1 text-sm text-slate-300">
+          {group.members}人
           <ChevronDown className="size-4 transition group-open:rotate-180" aria-hidden />
         </span>
       </summary>
