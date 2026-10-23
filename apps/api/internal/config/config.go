@@ -38,6 +38,8 @@ type Config struct {
 	CoachingNewAcceptance bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
+	// StorageCleanupSecret は日次の保存期限処理に使う。空なら呼び出せない。
+	StorageCleanupSecret string
 	// ReminderSecret は Cloud Scheduler が月1回の記録のお知らせを呼ぶときのヘッダーの値。空なら使えない。
 	ReminderSecret string
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
@@ -108,6 +110,7 @@ func Load() (Config, error) {
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
+		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
 		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
 		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),

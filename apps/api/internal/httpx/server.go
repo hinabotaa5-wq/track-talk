@@ -96,6 +96,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
 	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
 	r.Post("/internal/monthly-reminder", s.monthlyReminder)
+	r.Post("/internal/storage/cleanup", s.storageCleanup)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v))
