@@ -22,7 +22,7 @@ describe("packMosaic", () => {
     const { tiles } = packMosaic([9 / 16, 16 / 9, 16 / 9, 16 / 9, 16 / 9, 9 / 16, 16 / 9, 9 / 16].map(item), 992, 479);
     expect(tiles[7].height).toBeLessThan(tiles[0].height);
   });
-  it("順番を変えず、元の比率を保って、重ならずに右へ続ける", () => {
+  it("元の比率を保って、重ならずに画面内の空きへ配置する", () => {
     const items = Array.from({ length: 25 }, (_, index) => item([9 / 16, 16 / 9, 1, 4 / 3, 0.3][index % 5]));
     for (const width of [288, 358, 720, 1000]) {
       const { tiles, width: contentWidth } = packMosaic(items, width, 540);
@@ -32,10 +32,6 @@ describe("packMosaic", () => {
         expect((tile.width - 2) / (tile.height - 42)).toBeCloseTo(items[index].ratio);
         expect(tile.y).toBeGreaterThanOrEqual(0);
         expect(tile.y + tile.height).toBeLessThanOrEqual(540.1);
-        if (index) {
-          expect(tile.x).toBeGreaterThanOrEqual(tiles[index - 1].x);
-          if (tile.x === tiles[index - 1].x) expect(tile.y).toBeGreaterThanOrEqual(tiles[index - 1].y);
-        }
         for (const earlier of tiles.slice(0, index)) {
           const overlaps = tile.x < earlier.x + earlier.width && tile.x + tile.width > earlier.x
             && tile.y < earlier.y + earlier.height && tile.y + tile.height > earlier.y;
@@ -43,6 +39,12 @@ describe("packMosaic", () => {
         }
       });
     }
+  });
+  it("後の投稿が手前に残った空きへ戻って詰まる", () => {
+    const { tiles } = packMosaic([16 / 9, 16 / 9, 9 / 16, 16 / 9].map(item), 358, 540);
+    expect(tiles[2].x).toBeGreaterThan(0);
+    expect(tiles[3].x).toBe(0);
+    expect(tiles[3].y).toBeGreaterThan(tiles[1].y + tiles[1].height);
   });
   it("同じ投稿順と画面サイズでは配置を毎回変えない", () => {
     const items = [item(9 / 16), item(16 / 9), item(1), item(4 / 3)];
