@@ -20,7 +20,7 @@ export function homeFeedPath(sort: FeedSort, q: string, page: number) {
   const qs = new URLSearchParams({
     sort: sort === "recruitment" ? "new" : sort,
     page: String(page),
-    per_page: "20",
+    per_page: "12",
   });
   if (q) qs.set("q", q);
   if (sort === "recruitment") qs.set("kind", "recruitment");

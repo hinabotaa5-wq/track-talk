@@ -118,7 +118,8 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
 
-test("投稿を左へ横送りでき、末尾から次のページを開ける", async ({ page }) => {
+test("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   // CIのAPIに投稿がある場合も、古いSSRデータをブラウザの固定テストデータで更新させる。
   await page.clock.setFixedTime(Date.now() + 120_000);
@@ -137,13 +138,11 @@ test("投稿を左へ横送りでき、末尾から次のページを開ける",
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track).toBeVisible();
-  await expect(track.getByRole("link")).toHaveCount(7);
+  await expect(track.getByRole("link")).toHaveCount(6);
   const first = track.getByRole("link").first();
   const second = track.getByRole("link").nth(1);
   const before = await first.boundingBox();
-  const secondBox = await second.boundingBox();
-  expect(Math.abs(before!.y - secondBox!.y)).toBeLessThan(2);
-  expect(secondBox!.x).toBeGreaterThan(before!.x);
+  await expect(second).toBeAttached();
   expect(await track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   const originalY = await page.evaluate(() => window.scrollY);
   await expect(page.getByRole("button", { name: "次の投稿へ", exact: true })).toHaveCount(0);
@@ -154,19 +153,15 @@ test("投稿を左へ横送りでき、末尾から次のページを開ける",
   expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
   // 横長の一覧がページ全体にはみ出したり、縦長画像でカードが伸びたりしない。
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const trackBox = await track.boundingBox();
-  expect(trackBox!.height).toBeLessThan(600);
   await track.focus();
   const beforeKey = await track.evaluate((el) => el.scrollLeft);
   await page.keyboard.press("ArrowRight");
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(beforeKey);
-  const next = track.getByRole("link", { name: "次の投稿を読み込む" });
-  await next.scrollIntoViewIfNeeded();
-  await expect(next).toBeVisible();
-  await next.click();
-  await expect(page).toHaveURL(/page=2/);
-  await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-7");
-  await expect(track.getByRole("link", { name: "次の投稿を読み込む" })).toHaveCount(0);
+  await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; el.dispatchEvent(new Event("scroll")); });
+  await expect(track.getByRole("link")).toHaveCount(12);
+  await expect(page).not.toHaveURL(/page=2/);
+  await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-1");
+  await expect(track.getByRole("button", { name: "続きを読み込む" })).toHaveCount(0);
 });
 
 test("PCでは複数の商品が見え、縦ホイールで左右に進める", async ({ page }) => {
@@ -211,32 +206,69 @@ test("PCでは複数の商品が見え、縦ホイールで左右に進める", 
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(edgeY);
 });
 
-test("横送りの縦動画・横動画が同じ高さの枠に収まり、詳細リンクを隠さない", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
+test("サムネイルの縦横比と異なる高さを保ち、右側の投稿を左へ送れる", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   await page.route("**/api/v1/posts?**", (route) => route.fulfill({ json: {
-    posts: ["vertical", "horizontal"].map((name) => ({
-      id: `bounded-${name}`, title: `${name}動画`, body: "動画の表示確認", kind: "video",
+    posts: Array.from({ length: 8 }, (_, index) => index % 2 ? "vertical" : "horizontal").map((name, index) => ({
+      id: `ratio-${index}`, title: `${name}動画${index}`, body: "サムネイルの表示確認", kind: "video",
       playback_url: `/samples/${name}.mp4`, thumbnail_url: `/samples/${name}.jpg`,
       mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
       created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
-    })), meta: { page: 1, per_page: 20, total: 2 },
+    })), meta: { page: 1, per_page: 20, total: 8 },
   } }));
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
-  await expect(track.locator("video")).toHaveCount(2);
-  for (const name of ["vertical", "horizontal"]) {
-    const video = track.locator(`video[aria-label="${name}動画"]`);
-    await expect(video).toBeVisible();
-    await expect(track.getByRole("link", { name: `${name}動画`, exact: true })).toBeVisible();
-    const bounds = await video.evaluate((el) => {
-      const media = el.getBoundingClientRect();
-      const slide = el.closest(".horizontal-feed-slide")!.getBoundingClientRect();
-      return { mediaBottom: media.bottom, slideBottom: slide.bottom, mediaHeight: media.height, slideHeight: slide.height };
-    });
-    expect(bounds.mediaHeight).toBeGreaterThan(100);
-    expect(bounds.mediaBottom).toBeLessThan(bounds.slideBottom);
-    expect(bounds.slideHeight).toBeLessThan(600);
-  }
+  await expect(track.locator("img")).toHaveCount(8);
+  await expect(track.locator("video, iframe")).toHaveCount(0);
+  await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  const sizes = await track.locator("img").evaluateAll((images) => images.map((image) => {
+    const img = image as HTMLImageElement;
+    const bounds = img.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height, ratio: img.naturalWidth / img.naturalHeight };
+  }));
+  for (const image of sizes) expect(image.width / image.height).toBeCloseTo(image.ratio, 2);
+  expect(sizes[0].width).toBeGreaterThan(sizes[0].height);
+  expect(sizes[1].height).toBeGreaterThan(sizes[1].width);
+  expect(Math.abs(sizes[0].height - sizes[1].height)).toBeGreaterThan(100);
+  const first = track.locator("img").first();
+  const before = (await first.boundingBox())!.x;
+  await track.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  expect((await first.boundingBox())!.x).toBeLessThan(before);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("空きに組み合わせても新しい順・人気順と固定タブを保つ", async ({ page }) => {
+  await page.clock.setFixedTime(Date.now() + 120_000);
+  const newOrder = ["newest", "middle", "oldest", "fourth", "fifth", "sixth", "seventh", "eighth"];
+  const popularOrder = ["oldest", "fourth", "newest", "middle", "fifth", "sixth", "seventh", "eighth"];
+  await page.route("**/api/v1/posts?**", (route) => {
+    const order = new URL(route.request().url()).searchParams.get("sort") === "popular" ? popularOrder : newOrder;
+    return route.fulfill({ json: { posts: order.map((id, index) => ({
+      id, title: id, body: id, kind: "video", playback_url: "/samples/vertical.mp4",
+      thumbnail_url: `/samples/${index % 3 === 0 ? "vertical" : "horizontal"}.jpg`,
+      mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
+      created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
+    })), meta: { page: 1, per_page: 20, total: order.length } } });
+  });
+  await page.goto("/");
+  const track = page.getByRole("region", { name: "投稿一覧", exact: true });
+  const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
+  await expect(track.locator('.masonry-feed-canvas[data-ready="true"]')).toBeVisible();
+  await expect(track.getByRole("link")).toHaveText(newOrder);
+  const before = await nav.boundingBox();
+  const originalY = await page.evaluate(() => window.scrollY);
+  await track.hover();
+  await page.mouse.wheel(0, 200);
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  expect((await nav.boundingBox())!.x).toBe(before!.x);
+  expect((await nav.boundingBox())!.y).toBe(before!.y);
+  expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
+  await nav.getByRole("link", { name: "人気", exact: true }).click();
+  await expect(track.getByRole("link")).toHaveText(popularOrder);
+  await expect(nav.getByRole("link", { name: "人気", exact: true })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("link", { name: "新しい", exact: true }).click();
+  await expect(track.getByRole("link")).toHaveText(newOrder);
 });

@@ -171,9 +171,11 @@ select:-webkit-autofill {
   }
 }
 
-/* ホームのカードは1列で横へ進む。ほかの画面の縦の一覧には適用しない。 */
+/* サムネイルは元の比率で並べ、右側の投稿を左へ送って見る。 */
 .horizontal-feed-track {
+  --feed-card-max-width: min(80vw, 24rem);
   display: flex;
+  align-items: flex-start;
   gap: 0.75rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -183,52 +185,39 @@ select:-webkit-autofill {
 }
 
 .horizontal-feed-slide {
-  flex: 0 0 86%;
+  flex: 0 0 auto;
+  width: var(--feed-card-max-width);
   min-width: 0;
-  height: clamp(14rem, calc(100dvh - 18rem), 34rem);
   scroll-snap-align: start;
 }
 
-.horizontal-feed-slide > a,
-.horizontal-feed-slide > article {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+.horizontal-feed-slide:has(> .feed-card-has-thumbnail) {
+  width: max-content;
+  max-width: var(--feed-card-max-width);
+}
+
+.horizontal-feed-slide > a {
   margin-bottom: 0;
 }
 
-.horizontal-feed-slide > a > :first-child,
-.horizontal-feed-slide > article > :first-child {
-  flex: 1 1 0%;
-  min-height: 0;
+.horizontal-feed-slide > .feed-card-has-thumbnail {
+  width: max-content;
+  max-width: var(--feed-card-max-width);
 }
 
-.horizontal-feed-slide > article > video {
-  width: 100%;
-  height: 100%;
+.horizontal-feed-slide .feed-card-thumbnail img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: var(--feed-card-max-width);
+  max-height: min(70dvh, 36rem);
   object-fit: contain;
 }
 
-.horizontal-feed-slide > article > a {
-  flex: 0 0 auto;
-}
-
-.horizontal-feed-slide img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-@media (min-width: 48rem) {
-  .horizontal-feed-slide {
-    flex-basis: calc((100% - 0.75rem) / 2);
-  }
-}
-
-@media (min-width: 80rem) {
-  .horizontal-feed-slide {
-    flex-basis: calc((100% - 1.5rem) / 3);
-  }
+/* 長い説明文ではなく画像の幅でカード幅を決める。 */
+.horizontal-feed-slide .feed-card-has-thumbnail .feed-card-title {
+  width: 0;
+  min-width: 100%;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -237,3 +226,44 @@ select:-webkit-autofill {
     scroll-snap-type: none;
   }
 }
+
+
+/* タブを含むページではなく、この投稿領域だけを横へ送る。 */
+.masonry-feed-strip {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 4px 0;
+}
+.masonry-feed-strip::-webkit-scrollbar {
+  display: none;
+}
+.masonry-feed-canvas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+.masonry-feed-canvas[data-ready="true"] {
+  display: block;
+  position: relative;
+}
+.masonry-feed-canvas[data-ready="true"] > .masonry-feed-tile {
+  position: absolute;
+}
+.masonry-feed-tile {
+  min-width: 0;
+}
+.masonry-feed-tile > a {
+  display: block;
+  width: 100%;
+  margin-bottom: 0;
+}
+.masonry-feed-tile .feed-card-thumbnail img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.masonry-feed-tile > .masonry-feed-next { display: flex; }
