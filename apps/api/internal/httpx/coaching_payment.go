@@ -58,7 +58,34 @@ func (s *Server) attachPayment(ctx context.Context, c map[string]any, id uuid.UU
 
 // checkoutURL は、支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。
 func (s *Server) checkoutURL(ctx context.Context, ct db.CoachingContract, payer, successURL, cancelURL string) (string, error) {
-	p, err := s.q.GetReusableCoachingPayment(ctx, db.GetReusableCoachingPaymentParams{ContractID: &ct.ID, Payer: payer})
+	if !ct.Minor {
+		return s.checkoutURLWith(ctx, s.q, ct, payer, successURL, cancelURL)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+	q := s.q.WithTx(tx)
+	if err := q.LockReviewRequester(ctx, ct.RequesterID); err != nil {
+		return "", err
+	}
+	msg, err := s.coachingMonthlyBlock(ctx, q, ct.RequesterID, uuid.Nil, ct.ID, uuid.Nil, ct.PriceYen)
+	if err != nil {
+		return "", err
+	}
+	if msg != "" {
+		return "", &ticketRuleError{"monthly_limit", msg}
+	}
+	url, err := s.checkoutURLWith(ctx, q, ct, payer, successURL, cancelURL)
+	if err != nil {
+		return "", err
+	}
+	return url, tx.Commit(ctx)
+}
+
+func (s *Server) checkoutURLWith(ctx context.Context, q *db.Queries, ct db.CoachingContract, payer, successURL, cancelURL string) (string, error) {
+	p, err := q.GetReusableCoachingPayment(ctx, db.GetReusableCoachingPaymentParams{ContractID: &ct.ID, Payer: payer})
 	if err == nil {
 		return p.CheckoutUrl, nil
 	}
@@ -66,7 +93,17 @@ func (s *Server) checkoutURL(ctx context.Context, ct db.CoachingContract, payer,
 		return "", err
 	}
 	now := time.Now()
+	if ct.CompetitionDate != nil && ct.CompetitionDate.Add(24*time.Hour-9*time.Hour).Before(now.Add(checkoutMinLife)) {
+		return "", &ticketRuleError{"support_closed", "大会までの支払い期限を過ぎました"}
+	}
 	expires := now.Add(checkoutMaxLife)
+	if ct.CompetitionDate != nil {
+		end := ct.CompetitionDate.Add(24*time.Hour - 9*time.Hour)
+		if end.Before(expires) {
+			expires = end
+		}
+	}
+
 	if ct.StartBy != nil && ct.StartBy.Before(expires) {
 		expires = *ct.StartBy
 	}
@@ -91,7 +128,7 @@ func (s *Server) checkoutURL(ctx context.Context, ct db.CoachingContract, payer,
 	if sess.ExpiresAt > 0 {
 		expires = time.Unix(sess.ExpiresAt, 0)
 	}
-	if _, err := s.q.CreateCoachingPayment(ctx, db.CreateCoachingPaymentParams{
+	if _, err := q.CreateCoachingPayment(ctx, db.CreateCoachingPaymentParams{
 		ID: id, ContractID: &ct.ID, Payer: payer, AmountYen: ct.PriceYen,
 		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires,
 	}); err != nil {
@@ -102,6 +139,9 @@ func (s *Server) checkoutURL(ctx context.Context, ct db.CoachingContract, payer,
 
 // writeCheckoutError は、支払い画面を作れなかったときの返事。
 func writeCheckoutError(w http.ResponseWriter, err error) {
+	if writeTicketRuleError(w, err) {
+		return
+	}
 	if errors.Is(err, errStripe) {
 		slog.Warn("stripe checkout", "err", err)
 		Error(w, http.StatusBadGateway, "payment_unavailable", "支払い画面を開けませんでした。少したってからもう一度お試しください")
@@ -224,8 +264,17 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		complete := s.completeCoachingCheckout
-		if sess.Metadata["kind"] == "review" {
+		switch sess.Metadata["kind"] {
+		case "review":
 			complete = s.completeReviewCheckout
+		case "consultation":
+			complete = s.completeConsultationCheckout
+		case "tickets":
+			complete = s.completeTicketCheckout
+		case "", "personal":
+		default:
+			Error(w, 400, "unknown_payment_kind", "支払いの種類が不正です")
+			return
 		}
 		if err := complete(r.Context(), sess); err != nil {
 			slog.Error("stripe webhook", "event", ev.ID, "err", err)
@@ -330,6 +379,13 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 		}
 		if pay.ContractID == nil {
 			return nil
+		}
+		snapshot, e := q.GetCoachingContract(ctx, *pay.ContractID)
+		if e != nil {
+			return e
+		}
+		if snapshot.FulfillmentVersion == 1 && (sess.AmountTotal != int(pay.AmountYen) || sess.Currency != "jpy" || sess.ClientReferenceID != pay.ID.String()) {
+			return errors.New("support checkout mismatch")
 		}
 		ct, err := q.StartPaidCoachingContract(ctx, *pay.ContractID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -528,6 +584,10 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 	}
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	if ct.FulfillmentVersion == 1 {
+		s.adminRefundSupport(w, r, ct.ID, req.Kind)
 		return
 	}
 	pay, err := s.q.GetPaidCoachingPayment(r.Context(), &ct.ID)

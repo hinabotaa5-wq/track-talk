@@ -1,5 +1,9 @@
 "use client";
 
+import { CoachingSupportPanel } from "@/components/coaching-support";
+
+import { CoachingConsultations } from "@/components/coaching-consultations";
+
 import { CoachAvatar } from "@/components/coach-photo";
 import { ContractDetails, contractPeriod } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
@@ -52,6 +56,10 @@ export default function GuardianContractPage() {
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={null} guardianToken={token} onContractChange={setContract} />
       ) : null}
+      {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={null} guardianToken={token} /> : null}
+
+      <CoachingConsultations rootID={contract.id} kind="contract" token={null} guardianToken={token} />
+
       <Link href={`/guardian/${encodeURIComponent(token)}`} className="block text-center text-sm text-blue-300 underline">
         保護者のページへ
       </Link>

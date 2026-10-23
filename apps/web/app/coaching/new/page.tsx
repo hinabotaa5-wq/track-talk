@@ -16,6 +16,7 @@ import {
   tooLong,
   videoDuration,
 } from "@/lib/review";
+import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
 import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -47,7 +48,8 @@ export default function NewReviewRequestPage() {
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
-  const [method, setMethod] = useState<ReviewPayMethod>("card");
+  const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
+  const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -77,6 +79,15 @@ export default function NewReviewRequestPage() {
     return () => {
       cancelled = true;
     };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
+      if (!cancelled) { setTicketSummary(data); if (data.balance.available > 0) setMethod("tickets"); }
+    }).catch(() => { if (!cancelled) setTicketSummary(null); });
+    return () => { cancelled = true; };
   }, [token]);
 
   // 枠と種目を選ぶと、返ってくる目安（送った翌日の12時）と、いま受付中のコーチがいるかを出す。
@@ -121,6 +132,10 @@ export default function NewReviewRequestPage() {
     }
     if (file.size > maxBytes) {
       setError("100MB以内の動画にしてください");
+      return;
+    }
+    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < (tier === "coach" ? 2 : 1)) {
+      setError("チケットが不足しています。先に購入してから動画を選んでください。");
       return;
     }
     if (!acquire()) return;
@@ -228,6 +243,11 @@ export default function NewReviewRequestPage() {
             </div>
           </fieldset>
 
+          {ticketSummary ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
+            <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
+            <p className="text-xs text-slate-300">この添削は{tier === "coach" ? 2 : 1}枚です。先に購入してから動画を選んでください。</p>
+            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="text-blue-300 underline">チケットを購入・確認する</Link>
+          </div> : null}
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">動画({maxReviewSeconds}秒まで)</span>
             <input
@@ -256,18 +276,19 @@ export default function NewReviewRequestPage() {
               </span>
             </p>
           ) : null}
-          {estimate?.payments ? (
+          {estimate?.payments || (ticketSummary?.balance.available ?? 0) > 0 ? (
             <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate.price_yen)}）</legend>
+              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate?.price_yen ?? (tier === "coach" ? 1000 : 500))}）</legend>
               <div className="flex flex-wrap gap-2">
-                {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
+                {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（{tier === "coach" ? 2 : 1}枚）</button> : null}
+                {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}
                   </button>
                 ))}
               </div>
               <p className="text-xs text-slate-300">
-                {method === "card"
+                {method === "tickets" ? "依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。" : method === "card"
                   ? "送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。"
                   : "送るとお支払いの画面に進み、その場でお支払いが済みます。目安までに返ってこなければ全額を返金します。"}
               </p>
@@ -276,7 +297,7 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
           <Button type="submit" className="w-full" disabled={pending || !file}>
-            {pending ? "送っています" : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
+            {pending ? "送っています" : method === "tickets" ? `チケット${tier === "coach" ? 2 : 1}枚を確保して送る` : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
           </Button>
         </form>
       )}

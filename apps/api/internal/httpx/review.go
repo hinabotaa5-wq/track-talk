@@ -262,7 +262,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
-	payments := s.stripe.Configured()
+	useTickets := req.Method == "tickets"
+	payments := s.stripe.Configured() && !useTickets
 	if payments && !validReviewPayMethod(req.Method) {
 		fields["method"] = "支払い方法を選んでください"
 	}
@@ -312,16 +313,25 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
-	if minor {
+	if minor || useTickets {
 		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			MapDBError(w, err)
 			return
 		}
-		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); code != "" {
+		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); minor && code != "" {
 			Error(w, http.StatusUnprocessableEntity, code, message)
 			return
 		}
+	}
+	if err := lockUnusedCoachingVideo(r.Context(), q, &req.VideoPublicID, nil); err != nil {
+		var rule *ticketRuleError
+		if errors.As(err, &rule) {
+			Error(w, 409, "conflict", rule.message)
+		} else {
+			MapDBError(w, err)
+		}
+		return
 	}
 	rr, err := q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
 		ID:            uuid.New(),
@@ -342,6 +352,12 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if useTickets {
+		if err := s.reserveReviewTickets(r.Context(), q, p, rr); err != nil {
+			writeCheckoutError(w, err)
+			return
+		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)

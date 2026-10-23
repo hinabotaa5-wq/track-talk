@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
 import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
@@ -125,26 +124,9 @@ export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   const guardedClick = useGuardedLinkClick();
-  const lastMainTab = useSyncExternalStore(
-    (onChange) => {
-      window.addEventListener("storage", onChange);
-      return () => window.removeEventListener("storage", onChange);
-    },
-    () => window.sessionStorage.getItem("tracktalk:last-main-tab") ?? "",
-    () => "",
-  );
-
-  useEffect(() => {
-    const pathTab = activeMainTab(pathname);
-    if (pathTab && pathTab !== "me") {
-      window.sessionStorage.setItem("tracktalk:last-main-tab", pathTab);
-    }
-  }, [pathname]);
-
   if (hidesBottomNav(pathname)) return null;
 
-  const pathTab = activeMainTab(pathname);
-  const current = pathTab === "me" || pathname.startsWith("/me/") ? lastMainTab : pathTab;
+  const current = activeMainTab(pathname);
 
   return (
     <>

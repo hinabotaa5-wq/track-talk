@@ -237,7 +237,7 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message" | "practice_rating";
+  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message" | "coaching_consultation" | "practice_rating";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;
@@ -363,6 +363,7 @@ export type CoachEvent =
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {
+  service_types: CoachingServiceType[];
   tier: CoachTier;
   events: CoachEvent[];
   best_record: string;
@@ -392,7 +393,7 @@ export type CoachPayout = {
 };
 export type CoachEarning = {
   id: string;
-  source: "review" | "personal";
+  source: "review" | "personal" | "consultation";
   gross_yen: number;
   share_percent: number;
   amount_yen: number;
@@ -430,6 +431,7 @@ export type AdminCoachPayout = CoachPayout & {
 
 // パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発、
 // trial はそのコーチの指導をはじめて受ける人だけが申し込める7日のお試し。
+export type CoachingServiceType = "video_review" | "competition_support" | "in_person";
 export type CoachingPlanKind = "period" | "single" | "trial";
 // プランで「何が返ってくるか」。null か空なら、コーチが書いていない。
 // video_reviews は動画への返答の回数（0 は回数を決めない）、menu_updates は練習メニューの作り方、reply_formats は返し方。
@@ -437,6 +439,14 @@ export type PlanMenuUpdates = "none" | "once" | "weekly";
 export type PlanReplyFormat = "text" | "video";
 // start_on_first_video は、期間を最初の動画が届いた日から数えるか。
 export type PlanIncludes = {
+  competition_name?: string | null;
+  competition_date?: string | null;
+  support_start_date?: string | null;
+  call_count?: number;
+  call_minutes?: number;
+  // 未設定は以前からある指名プラン。
+  service_type?: CoachingServiceType | null;
+  additional_consultation_price_yen?: number | null;
   video_reviews: number | null;
   menu_updates: PlanMenuUpdates | null;
   reply_formats: PlanReplyFormat[];
@@ -470,12 +480,15 @@ export type CoachingContractStatus =
   | "expired"
   | "cancelled";
 export type CoachingContract = PlanIncludes & {
+  fulfillment_version?: number;
+  fulfillment_state?: string;
   // 最初の動画から数えるプランで、動画が届いて期間を数え始めた時刻。
   clock_started_at: string | null;
   id: string;
   plan_id: string;
   plan_kind: CoachingPlanKind;
   plan_title: string;
+  plan_description?: string | null;
   duration_days: number;
   price_yen: number;
   event: CoachEvent;
@@ -516,6 +529,10 @@ export type CoachingPayment = {
 
 // 運営のパーソナル指導の一覧。会話の中身は含まない。
 export type AdminCoachingContract = {
+  fulfillment_version?: number;
+  fulfillment_state?: string;
+  delivered_units?: number;
+  total_units?: number;
   id: string;
   plan_title: string;
   plan_kind: CoachingPlanKind;
@@ -557,6 +574,7 @@ export type PlanMenu = { title: string; days: { day: string; content: string }[]
 
 // パーソナル指導のやりとり欄の1通。
 export type CoachingMessage = {
+  review_submission_id?: string | null;
   id: string;
   sender_role: "requester" | "coach" | "guardian";
   mine: boolean;
@@ -593,6 +611,7 @@ export type ReviewResponse =
       demo_video_url: string | null;
       created_at: string;
       clarify_reason: ClarifyReason | null;
+      clarify_body?: string | null;
       clarify_requested_at: string | null;
       clarification: string | null;
       clarified_at: string | null;
@@ -605,6 +624,7 @@ export type ReviewRating = {
 };
 
 export type ReviewRequest = {
+  tickets?: { quantity: number; status: "reserved" | "consumed" | "released"; nominal_yen: number };
   id: string;
   tier: CoachTier;
   event: CoachEvent;
@@ -698,6 +718,7 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
 
 // 依頼する前に見られるコーチ一覧の1人。★はこれまでの全部。
 export type PublicCoach = {
+  service_types: CoachingServiceType[];
   id: string;
   nickname: string | null;
   photo_url: string;
@@ -721,6 +742,7 @@ export type CoachRatingSummary = {
 
 // 返答と一緒に利用者へ見せるコーチのプロフィール。
 export type ReviewCoach = {
+  id?: string;
   nickname: string | null;
   photo_url: string;
   tier: CoachTier;

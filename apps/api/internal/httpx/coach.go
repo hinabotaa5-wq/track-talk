@@ -76,17 +76,18 @@ func coachPublicTextError(label, value string, max int) string {
 
 func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 	return map[string]any{
-		"tier":         c.Tier,
-		"events":       c.Events,
-		"best_record":  c.BestRecord,
-		"achievements": c.Achievements,
-		"years":        c.Years,
-		"status":       c.Status,
-		"applied_at":   c.AppliedAt,
-		"reviewed_at":  c.ReviewedAt,
-		"on_duty":      c.OnDuty,
-		"daily_cap":    c.DailyCap,
-		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
+		"tier":          c.Tier,
+		"events":        c.Events,
+		"service_types": nonNilStrings(c.ServiceTypes),
+		"best_record":   c.BestRecord,
+		"achievements":  c.Achievements,
+		"years":         c.Years,
+		"status":        c.Status,
+		"applied_at":    c.AppliedAt,
+		"reviewed_at":   c.ReviewedAt,
+		"on_duty":       c.OnDuty,
+		"daily_cap":     c.DailyCap,
+		"photo_url":     s.coachPhotoURL(c.PhotoPublicID),
 		// いまの版のパーソナル指導の誓約をしたか。
 		"pledged": pledged(c),
 		// 報酬の受け取り口座（Stripe）の登録が済み、受付やパーソナル指導の承諾ができるか。
@@ -341,6 +342,8 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
 			VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
 			StartOnFirstVideo: p.StartOnFirstVideo,
+			CompetitionName:   p.CompetitionName, CompetitionDate: p.CompetitionDate, SupportStartDate: p.SupportStartDate, CallCount: p.CallCount, CallMinutes: p.CallMinutes,
+			ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 		})
 		plan["full"] = p.ActiveCount >= int32(p.Capacity)
 		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)
@@ -353,6 +356,7 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			"photo_url":      s.coachPhotoURL(c.PhotoPublicID),
 			"tier":           c.Tier,
 			"events":         c.Events,
+			"service_types":  nonNilStrings(c.ServiceTypes),
 			"best_record":    c.BestRecord,
 			"achievements":   c.Achievements,
 			"years":          c.Years,

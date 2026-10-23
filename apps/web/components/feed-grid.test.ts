@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { layoutsFor, splitIntoColumns } from "./feed-grid";
+import { FeedGrid, splitIntoColumns } from "./feed-grid";
 
 describe("splitIntoColumns", () => {
   it("新しい順の投稿を、左から右へ順番に配る", () => {
@@ -11,13 +13,9 @@ describe("splitIntoColumns", () => {
   });
 });
 
-describe("layoutsFor", () => {
-  it("幅がわからないあいだは、2・3・4列をすべて描いて CSS で選ぶ", () => {
-    expect(layoutsFor(0).map((l) => l.columns)).toEqual([2, 3, 4]);
-    expect(layoutsFor(0).map((l) => l.className)).toEqual(["flex md:hidden", "hidden md:flex xl:hidden", "hidden xl:flex"]);
-  });
-
-  it("幅がわかったら、その列の数だけを描く", () => {
-    expect(layoutsFor(3).map((l) => l.columns)).toEqual([3]);
-  });
+it("画面幅に依存せず2列に配置し、カードを重複して描かない", () => {
+  const html = renderToStaticMarkup(createElement(FeedGrid, { children: ["投稿1", "投稿2", "投稿3"].map((text) => createElement("article", { key: text }, text)) }));
+  expect(html.match(/class="min-w-0 flex-1"/g)).toHaveLength(2);
+  expect(html.match(/<article>/g)).toHaveLength(3);
+  expect(html).toContain("<article>投稿1</article><article>投稿3</article>");
 });

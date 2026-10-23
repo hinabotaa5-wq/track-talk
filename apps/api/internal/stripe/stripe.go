@@ -180,6 +180,7 @@ type CheckoutSession struct {
 	PaymentIntent     string            `json:"payment_intent"`
 	ClientReferenceID string            `json:"client_reference_id"`
 	AmountTotal       int               `json:"amount_total"`
+	Currency          string            `json:"currency"`
 	Metadata          map[string]string `json:"metadata"`
 }
 
@@ -213,9 +214,10 @@ func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (Ch
 }
 
 type Refund struct {
-	ID     string `json:"id"`
-	Amount int    `json:"amount"`
-	Status string `json:"status"`
+	Metadata map[string]string `json:"metadata"`
+	ID       string            `json:"id"`
+	Amount   int               `json:"amount"`
+	Status   string            `json:"status"`
 }
 
 // CreateRefund は、支払いの一部か全部を返金する。

@@ -41,6 +41,9 @@ func reviewPaymentJSON(p db.ReviewPayment) map[string]any {
 
 // attachReviewPayment は、依頼の JSON に支払いを足す。支払いがなければ null。
 func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id uuid.UUID) error {
+	if err := s.attachTicketReservation(ctx, out, id); err != nil {
+		return err
+	}
 	out["payment"] = nil
 	p, err := s.q.GetLatestReviewPayment(ctx, &id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -55,26 +58,7 @@ func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id
 
 // minorMonthlyBlock は、18歳未満がこの値段を払うと月の上限を超えるときの文言を返す。超えないなら空。
 func (s *Server) minorMonthlyBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID, requestID uuid.UUID, price int32) (string, error) {
-	limit := int32(defaultMinorMonthlyLimit)
-	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", err
-	}
-	if err == nil && consent.Status == "consented" {
-		if consent.MonthlyLimitYen == nil {
-			return "", nil
-		}
-		limit = *consent.MonthlyLimitYen
-	}
-	used, err := q.SumMonthlyReviewPayments(ctx, db.SumMonthlyReviewPaymentsParams{PayerID: &minorID, ExcludeRequestID: requestID})
-	if err != nil {
-		return "", err
-	}
-	if used+price <= limit {
-		return "", nil
-	}
-	return fmt.Sprintf("今月の上限（%s円）を超えるため送れません。今月はあと%s円です。上限は保護者が変えられます（毎月1日にリセットされます）",
-		formatYenNumber(limit), formatYenNumber(max(limit-used, 0))), nil
+	return s.coachingMonthlyBlock(ctx, q, minorID, requestID, uuid.Nil, uuid.Nil, price)
 }
 
 // reviewCheckoutURL は、依頼の支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。

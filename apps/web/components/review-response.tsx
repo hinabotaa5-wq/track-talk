@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CoachAvatar } from "@/components/coach-photo";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { clarifyReasonLabels } from "@/lib/review";
@@ -33,6 +34,7 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
           <dd className="text-slate-100">{coach.years}年</dd>
         </div>
       </dl>
+      {coach.id ? <Link href={`/coaches#coach-${coach.id}`} className="block text-sm text-blue-300 underline">このコーチに指名で依頼する</Link> : null}
     </section>
   );
 }
@@ -70,6 +72,7 @@ export function ReviewResponseView({ response }: { response: ReviewResponse }) {
       ) : null}
       {response.clarify_reason ? (
         <div className="space-y-1 border-t border-white/15 pt-3">
+          {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">確認質問：{response.clarify_body}</p> : null}
           <h2 className="text-xs font-semibold text-slate-300">補足（「{clarifyReasonLabels[response.clarify_reason]}」への答え）</h2>
           <p className="whitespace-pre-wrap text-slate-100">{response.clarification ?? "コーチの補足を待っています"}</p>
         </div>

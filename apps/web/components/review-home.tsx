@@ -10,6 +10,7 @@ import { activeReviewFilterCount, reviewFiltersApiQuery, withReviewFilters, type
 import type { Meta, Product } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { FeedLoadingFrame } from "@/components/loading-frame";
+import { HorizontalFeed } from "@/components/horizontal-feed";
 import { ProductImage } from "@/components/product-image";
 import { ProductRequest } from "@/components/product-request";
 import { ReviewFilterBar } from "@/components/review-filters";
@@ -116,7 +117,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
       </div>
       {rankingEvent && !q && page === 1 ? <EventRanking kind={kind} event={rankingEvent} filters={filters} /> : null}
       {error ? <ErrorState message={error} /> : null}
-      {!error && products === null ? <FeedLoadingFrame /> : null}
+      {!error && products === null ? <FeedLoadingFrame horizontal /> : null}
       {products && products.length === 0 ? (
         <EmptyState
           title={filtered ? "条件に合うレビューがありません" : "商品がありません"}
@@ -124,7 +125,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
         />
       ) : null}
       {products && products.length > 0 ? (
-        <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
+        <HorizontalFeed label="レビューの商品一覧">
           {products.map((p) => (
             <Link
               key={p.id}
@@ -145,7 +146,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
               </div>
             </Link>
           ))}
-        </div>
+        </HorizontalFeed>
       ) : null}
       {products ? <ProductRequest kind={kind} /> : null}
       {products && (meta.page > 1 || hasNext) ? (

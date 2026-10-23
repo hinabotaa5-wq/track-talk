@@ -13,14 +13,16 @@ JOIN profiles p ON p.id = pl.coach_id
 WHERE pl.id = sqlc.arg(id)
   AND pl.published
   AND c.status = 'approved'
+  AND (pl.service_type IS NULL OR (pl.service_type IN ('video_review','competition_support') AND pl.service_type = ANY(c.service_types)))
+  AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
   AND c.pledge_version = sqlc.arg(pledge_version)::smallint;
 
 -- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,
     event, goal, current_record, message, minor, respond_by,
-    video_reviews, menu_updates, reply_formats, start_on_first_video
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, plan_description, additional_consultation_price_yen
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 RETURNING *;
 
 -- name: InsertContractConsent :exec
@@ -75,14 +77,15 @@ SET status = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN 'acc
     payment_required = sqlc.arg(payment_required)::boolean,
     responded_at = now(),
     start_by = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN now() + interval '72 hours' END,
-    starts_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() END,
-    ends_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END) END,
+    starts_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE GREATEST(now(),ct.support_start_date::timestamp AT TIME ZONE 'Asia/Tokyo') END,
+    ends_at = CASE WHEN ct.minor OR sqlc.arg(payment_required)::boolean THEN NULL ELSE COALESCE((ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo',now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END)) END,
     updated_at = now()
 FROM coaching_plans pl
 WHERE ct.id = sqlc.arg(id)
   AND ct.coach_id = sqlc.arg(coach_id)
   AND ct.status = 'applied'
   AND ct.respond_by > now()
+  AND (ct.competition_date IS NULL OR (ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
   AND pl.id = ct.plan_id
   AND (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity
 RETURNING ct.*;
@@ -124,7 +127,7 @@ RETURNING *;
 UPDATE coaching_contracts
 SET status = 'ended',
     updated_at = now()
-WHERE status = 'active' AND ends_at <= now()
+WHERE (status='active' OR (status='suspended' AND fulfillment_version=1)) AND ends_at<=now()
 RETURNING *;
 
 -- name: GetCoachingContractDetail :one
@@ -153,11 +156,11 @@ LIMIT 50;
 -- デモ版（支払いなし）では、保護者がこの契約に同意したら、その時から期間が始まる。
 UPDATE coaching_contracts
 SET status = 'active',
-    starts_at = now(),
-    ends_at = now() + make_interval(days => duration_days + CASE WHEN start_on_first_video THEN 7 ELSE 0 END),
+    starts_at = GREATEST(now(),support_start_date::timestamp AT TIME ZONE 'Asia/Tokyo'),
+    ends_at = COALESCE((competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo',now() + make_interval(days => duration_days + CASE WHEN start_on_first_video THEN 7 ELSE 0 END)),
     start_by = NULL,
     updated_at = now()
-WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now()
+WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now() AND (competition_date IS NULL OR (competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
 RETURNING *;
 
 -- name: GuardianDeclineCoachingContract :one
@@ -181,7 +184,7 @@ RETURNING *;
 -- 止めていた時間の分だけ終了日を延ばして再開する。
 UPDATE coaching_contracts
 SET status = 'active',
-    ends_at = ends_at + (now() - suspended_at),
+    ends_at = CASE WHEN fulfillment_version=1 THEN ends_at ELSE ends_at + (now() - suspended_at) END,
     suspended_at = NULL,
     updated_at = now()
 WHERE id = $1 AND status = 'suspended'
@@ -191,7 +194,9 @@ RETURNING *;
 -- 運営の契約一覧。会話の中身は含めない。通報の数と、連絡先の検出で止めた回数だけ数える。
 SELECT
     ct.id, ct.plan_title, ct.plan_kind, ct.duration_days, ct.price_yen, ct.minor, ct.status,
-    ct.starts_at, ct.ends_at, ct.created_at, ct.payment_required,
+    ct.starts_at, ct.ends_at, ct.created_at, ct.payment_required,ct.fulfillment_version,ct.fulfillment_state,
+    COALESCE(ct.video_reviews,0)::int+ct.call_count::int AS total_units,
+    (CASE WHEN ct.fulfillment_state='settled' THEN ct.delivered_video_count+ct.delivered_call_count ELSE ((SELECT count(*) FROM coaching_video_reviews v WHERE v.contract_id=ct.id AND v.answer_id IS NOT NULL)+(SELECT count(*) FROM coaching_calls c WHERE c.contract_id=ct.id AND c.status='completed')) END)::int AS delivered_units,
     COALESCE((SELECT pay.status FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status <> 'pending'
      ORDER BY pay.refund_reason IS NOT DISTINCT FROM 'not_started', pay.paid_at DESC LIMIT 1), '')::text AS payment_status,
     COALESCE((SELECT sum(pay.refunded_yen) FROM coaching_payments pay WHERE pay.contract_id = ct.id), 0)::int AS refunded_yen,

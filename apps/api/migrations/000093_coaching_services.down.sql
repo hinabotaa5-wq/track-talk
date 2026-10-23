@@ -1,0 +1,10 @@
+ALTER TABLE coaching_contracts
+    DROP COLUMN additional_consultation_price_yen,
+    DROP COLUMN plan_description,
+    DROP COLUMN service_type;
+ALTER TABLE coaching_plans
+    DROP COLUMN additional_consultation_price_yen,
+    DROP COLUMN service_type;
+ALTER TABLE coach_profiles
+    DROP CONSTRAINT coach_profiles_service_types_check,
+    DROP COLUMN service_types;

@@ -23,7 +23,7 @@ export function InstagramThumb({ type, shortcode, title }: { type: InstagramType
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
-      className="block aspect-[4/5] w-full bg-black/25 object-cover"
+      className="block h-auto w-full bg-black/25"
     />
   );
 }

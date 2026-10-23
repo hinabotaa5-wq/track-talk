@@ -1,13 +1,15 @@
 "use client";
 
+import { CoachingConsultations } from "@/components/coaching-consultations";
+
 import { useAuth } from "@/components/auth-provider";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { clarifyReasonLabels, helpfulLabels, reviewFocusLabels, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
-import type { ClarifyReason, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import { helpfulLabels, reviewFocusLabels, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
+import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +24,8 @@ const chip = (on: boolean) =>
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
+  const [clarifyBody, setClarifyBody] = useState("");
+  const [now] = useState(() => Date.now());
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
   const response = request.response;
@@ -95,25 +99,12 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
         </div>
       </section>
 
-      {response.clarify_reason ? null : (
+      {response.clarify_reason || !response.created_at || now >= new Date(response.created_at).getTime() + 7 * 86400000 ? null : (
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold">ここがわからなかった</h2>
-          <p className="text-xs text-slate-300">選ぶと、コーチが1回だけ補足を送ってくれます。押せるのは1回だけです。</p>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(clarifyReasonLabels) as ClarifyReason[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  if (confirm(`「${clarifyReasonLabels[r]}」でコーチに補足を頼みますか？`)) void post("clarify", { reason: r });
-                }}
-                className={chip(false)}
-              >
-                {clarifyReasonLabels[r]}
-              </button>
-            ))}
-          </div>
+          <h2 className="text-sm font-semibold">回答について確認する（1回無料）</h2>
+          <p className="text-xs text-slate-300">返却から7日以内に、回答のわからなかった点を1回確認できます。新しい相談は下の「追加相談」から送れます。</p>
+          <textarea aria-label="回答のわからなかった点" value={clarifyBody} onChange={(e) => setClarifyBody(e.target.value)} maxLength={2000} disabled={pending} className="w-full rounded-md border border-white/25 bg-white/10 p-2 text-sm" />
+          <button type="button" disabled={pending || !clarifyBody.trim()} onClick={() => void post("clarify", { reason: "other", body: clarifyBody })} className={chip(false)}>確認質問を送る（無料）</button>
         </section>
       )}
 
@@ -241,7 +232,8 @@ function ReviewRequestView() {
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p>
         ) : null}
-        {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
+        {request.tickets ? <p className="text-sm text-slate-200">チケット{request.tickets.quantity}枚：{request.tickets.status === "reserved" ? "添削のために確保中" : request.tickets.status === "consumed" ? "利用済み" : "残高に返却済み"}</p> : null}
+      {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
       </section>
 
       {request.status === "awaiting_payment" ? (
@@ -270,6 +262,8 @@ function ReviewRequestView() {
           <ResponseActions request={request} token={token} onChange={setRequest} />
         </>
       ) : null}
+
+      <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
         <div>

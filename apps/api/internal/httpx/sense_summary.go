@@ -18,15 +18,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 感覚メモのふりかえり。本人が頼んだときだけ、前のまとめのあとに書いた感覚メモ（はじめては、これまでの
-// すべて）を Gemini に送ってまとめる。まとめは本人だけが読む。時間の制限はなく、前のまとめのあとに
-// 書いたメモが6個たまるたびに1回作れる。
+// 感覚メモのふりかえり。本人が頼んだときだけ、未要約の感覚を保存順に6個ずつ
+// Gemini に送ってまとめる。まとめと元の感覚は本人だけが読む。
 const (
 	// senseSummaryMinNotes は、まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。画面のビン1杯の数
 	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
 	senseSummaryMinNotes = 6
-	// 何日も作らずにためたときのために、一度に渡す数の上限。新しい方から選ぶ。
-	maxSenseSummaryNotes = 60
+	// 1つのまとめには、保存順に6個の感覚を使う。
+	maxSenseSummaryNotes = senseSummaryMinNotes
 	// 1日(日本時間)に作れるまとめの数。日付をさかのぼって書けば6個はすぐにたまるので、上限が無いと1人で
 	// Gemini を何度でも呼べてしまう(無料枠の1日の回数は、大会の取り込みと同じ鍵で分け合っている)。
 	maxSenseSummariesPerDay = 3
@@ -56,8 +55,15 @@ type senseSummaryContent struct {
 	Next     []string `json:"next"`
 }
 
+// AIに送った元の感覚を同じJSONに保存する。古い要約には SourceNotes が無い。
+type storedSenseSummary struct {
+	senseSummaryContent
+	SourceNotes []senseNoteDTO `json:"source_notes"`
+}
+
 type senseSummaryDTO struct {
 	ID        uuid.UUID           `json:"id"`
+	Notes     []senseNoteDTO      `json:"notes"`
 	FromDay   string              `json:"from_day"`
 	ToDay     string              `json:"to_day"`
 	NoteCount int32               `json:"note_count"`
@@ -73,9 +79,62 @@ func senseSummaryFrom(id uuid.UUID, fromDay, toDay time.Time, noteCount int32, r
 		NoteCount: noteCount,
 		CreatedAt: createdAt,
 	}
-	_ = json.Unmarshal(raw, &out.Summary)
-	out.Summary = cleanSenseSummary(out.Summary)
+	var stored storedSenseSummary
+	_ = json.Unmarshal(raw, &stored)
+	out.Summary = cleanSenseSummary(stored.senseSummaryContent)
+	out.Notes = stored.SourceNotes
 	return out
+}
+
+// 元のメモの最後を境にする。AIの応答待ちに追加したメモと、6個に収まらない残りも次回に残す。
+func senseSummaryThrough(raw []byte, fallback time.Time) (time.Time, uuid.UUID) {
+	var stored storedSenseSummary
+	_ = json.Unmarshal(raw, &stored)
+	if len(stored.SourceNotes) == 0 {
+		return fallback, uuid.Nil
+	}
+	var at time.Time
+	var id uuid.UUID
+	for _, note := range stored.SourceNotes {
+		if note.CreatedAt.After(at) || (note.CreatedAt.Equal(at) && note.ID.String() > id.String()) {
+			at, id = note.CreatedAt, note.ID
+		}
+	}
+	return at, id
+}
+
+// 履歴は本人のものだけを、新しい順に20件ずつ返す。
+func (s *Server) listSenseSummaries(w http.ResponseWriter, r *http.Request) {
+	me, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	params := db.ListSenseNoteSummariesParams{AuthorID: me.ID, PageSize: 21}
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		_, at, id, valid := decodeSenseNoteCursor(c)
+		if !valid {
+			Error(w, http.StatusBadRequest, "validation_error", "cursorが不正です")
+			return
+		}
+		params.BeforeAt, params.BeforeID = at, *id
+	}
+	rows, err := s.q.ListSenseNoteSummaries(r.Context(), params)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	var next *string
+	if len(rows) > 20 {
+		rows = rows[:20]
+		last := rows[len(rows)-1]
+		cursor := encodeSenseNoteCursor(senseNoteDTO{ID: last.ID, Day: last.ToDay.Format(time.DateOnly), CreatedAt: last.CreatedAt})
+		next = &cursor
+	}
+	summaries := make([]senseSummaryDTO, 0, len(rows))
+	for _, row := range rows {
+		summaries = append(summaries, senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt))
+	}
+	JSON(w, http.StatusOK, map[string]any{"summaries": summaries, "next_cursor": next})
 }
 
 // requireSenseSummary は、まとめを提供していない間、その API を無いものとして扱う。
@@ -103,10 +162,11 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	hasLast := err == nil
 	// 前のまとめのあとに書いた数。画面で「あと何個でまとめられるか」を出すのに使う。
 	var after time.Time
+	var afterID uuid.UUID
 	if hasLast {
-		after = row.CreatedAt
+		after, afterID = senseSummaryThrough(row.Summary, row.CreatedAt)
 	}
-	pending, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: after})
+	pending, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: after, SinceID: afterID})
 	if err != nil {
 		MapDBError(w, err)
 		return
@@ -171,11 +231,12 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// 前のまとめのあとに書いたメモだけをまとめる。はじめては、これまでのすべて。
+	// 未要約のメモから、保存順に6個ずつまとめる。
 	var since time.Time
+	var sinceID uuid.UUID
 	last, err := s.q.LatestSenseNoteSummary(r.Context(), me.ID)
 	if err == nil {
-		since = last.CreatedAt
+		since, sinceID = senseSummaryThrough(last.Summary, last.CreatedAt)
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		MapDBError(w, err)
 		return
@@ -183,6 +244,7 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	notes, err := s.q.ListSenseNotesBetween(r.Context(), db.ListSenseNotesBetweenParams{
 		AuthorID: me.ID,
 		Since:    since,
+		SinceID:  sinceID,
 		MaxNotes: maxSenseSummaryNotes,
 	})
 	if err != nil {
@@ -212,7 +274,11 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadGateway, "summary_failed", "まとめを作れませんでした。少したってからもう一度お試しください")
 		return
 	}
-	encoded, err := json.Marshal(content)
+	sourceNotes := make([]senseNoteDTO, 0, len(notes))
+	for _, note := range notes {
+		sourceNotes = append(sourceNotes, senseNoteFrom(note.ID, note.Body, note.Event, note.Day, note.CreatedAt, note.CreatedAt))
+	}
+	encoded, err := json.Marshal(storedSenseSummary{senseSummaryContent: content, SourceNotes: sourceNotes})
 	if err != nil {
 		Error(w, http.StatusInternalServerError, "internal_error", "まとめを保存できませんでした")
 		return
@@ -229,9 +295,15 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	through, throughID := senseSummaryThrough(encoded, row.CreatedAt)
+	pending, err := s.q.CountSenseNotesSince(r.Context(), db.CountSenseNotesSinceParams{AuthorID: me.ID, Since: through, SinceID: throughID})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusCreated, map[string]any{
 		"summary":       senseSummaryFrom(row.ID, row.FromDay, row.ToDay, row.NoteCount, row.Summary, row.CreatedAt),
-		"pending_notes": 0,
+		"pending_notes": pending,
 		"min_notes":     senseSummaryMinNotes,
 	})
 }

@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
@@ -50,14 +51,17 @@ func validPlanDuration(kind string, days int) bool {
 
 func coachingPlanJSON(p db.CoachingPlan) map[string]any {
 	return map[string]any{
-		"id":            p.ID,
-		"kind":          p.Kind,
-		"title":         p.Title,
-		"description":   p.Description,
-		"duration_days": p.DurationDays,
-		"price_yen":     p.PriceYen,
-		"capacity":      p.Capacity,
-		"published":     p.Published,
+		"id":               p.ID,
+		"competition_name": p.CompetitionName, "competition_date": dateString(p.CompetitionDate), "support_start_date": dateString(p.SupportStartDate), "call_count": p.CallCount, "call_minutes": p.CallMinutes,
+		"kind":                              p.Kind,
+		"service_type":                      p.ServiceType,
+		"additional_consultation_price_yen": p.AdditionalConsultationPriceYen,
+		"title":                             p.Title,
+		"description":                       p.Description,
+		"duration_days":                     p.DurationDays,
+		"price_yen":                         p.PriceYen,
+		"capacity":                          p.Capacity,
+		"published":                         p.Published,
 		// 何が返ってくるか。null か空なら、コーチが書いていない。
 		"video_reviews": p.VideoReviews,
 		"menu_updates":  p.MenuUpdates,
@@ -115,6 +119,12 @@ func (s *Server) pledgeCoach(w http.ResponseWriter, r *http.Request) {
 }
 
 type coachingPlanReq struct {
+	supportPlanReq
+	ServiceType *string `json:"service_type"`
+	// 未送信は以前の価格を維持し、明示的な null は設定を解除する。
+	AdditionalConsultationPriceYen json.RawMessage `json:"additional_consultation_price_yen"`
+	additionalPrice                *int32
+
 	Kind             string `json:"kind"`
 	Title            string `json:"title"`
 	Description      string `json:"description"`
@@ -153,9 +163,21 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Description = strings.TrimSpace(req.Description)
 	fields := map[string]string{}
+	if req.ServiceType != nil && !slices.Contains(coachingServiceTypes, *req.ServiceType) {
+		fields["service_type"] = "担当するサービスを選んでください"
+	}
+	if len(req.AdditionalConsultationPriceYen) > 0 {
+		var price *int
+		if err := json.Unmarshal(req.AdditionalConsultationPriceYen, &price); err != nil || (price != nil && (*price < 500 || *price > maxPlanPriceYen)) {
+			fields["additional_consultation_price_yen"] = "追加相談の値段は500円以上で入力してください"
+		} else if price != nil {
+			n := int32(*price)
+			req.additionalPrice = &n
+		}
+	}
 	if req.Kind != "period" && req.Kind != "single" && req.Kind != "trial" {
 		fields["kind"] = "プランの種類を選んでください"
-	} else if req.DurationDays == nil || !validPlanDuration(req.Kind, *req.DurationDays) {
+	} else if req.DurationDays == nil || !(validPlanDuration(req.Kind, *req.DurationDays) || req.ServiceType != nil && *req.ServiceType == "competition_support" && req.Kind == "period" && *req.DurationDays >= 1 && *req.DurationDays <= 90) {
 		switch req.Kind {
 		case "single":
 			fields["duration_days"] = "単発は7日です"
@@ -244,7 +266,11 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	if fields := req.validate(0); len(fields) > 0 {
+	fields := req.supportFields(db.CoachingPlan{}, req.Published == nil || *req.Published)
+	for k, v := range req.validate(0) {
+		fields[k] = v
+	}
+	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
 	}
@@ -257,6 +283,9 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	q := s.q.WithTx(tx)
 	if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
 		MapDBError(w, err)
+		return
+	}
+	if !s.planServiceAllowed(w, r, q, c.ProfileID, req.ServiceType, req.Published == nil || *req.Published) {
 		return
 	}
 	n, err := q.CountCoachingPlans(r.Context(), c.ProfileID)
@@ -277,22 +306,28 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	reviews, menu, formats := req.includes()
 	p, err := q.CreateCoachingPlan(r.Context(), db.CreateCoachingPlanParams{
-		ID:                uuid.New(),
-		CoachID:           c.ProfileID,
-		Kind:              req.Kind,
-		Title:             req.Title,
-		Description:       req.Description,
-		DurationDays:      int16(*req.DurationDays),
-		PriceYen:          int32(*req.PriceYen),
-		Capacity:          int16(*req.Capacity),
-		Published:         published,
-		VideoReviews:      reviews,
-		MenuUpdates:       menu,
-		ReplyFormats:      formats,
-		StartOnFirstVideo: req.StartOnFirstVideo,
+		ID:                             uuid.New(),
+		CoachID:                        c.ProfileID,
+		Kind:                           req.Kind,
+		Title:                          req.Title,
+		Description:                    req.Description,
+		DurationDays:                   int16(*req.DurationDays),
+		PriceYen:                       int32(*req.PriceYen),
+		Capacity:                       int16(*req.Capacity),
+		Published:                      published,
+		VideoReviews:                   reviews,
+		MenuUpdates:                    menu,
+		ReplyFormats:                   formats,
+		StartOnFirstVideo:              req.StartOnFirstVideo,
+		ServiceType:                    req.ServiceType,
+		AdditionalConsultationPriceYen: req.additionalPrice,
 	})
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	p, ok = s.saveSupportPlan(w, r, q, req, p)
+	if !ok {
 		return
 	}
 	if err := tx.Commit(r.Context()); err != nil {
@@ -321,19 +356,8 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	if fields := req.validate(int(current.PriceYen)); len(fields) > 0 {
-		FieldError(w, fields)
-		return
-	}
-	published := current.Published
-	if req.Published != nil {
-		published = *req.Published
-	}
-	if published && !current.Published && !pledged(c) {
-		Error(w, http.StatusConflict, "pledge_required", "先にパーソナル指導の誓約をしてください")
-		return
-	}
-	// お試しに直すときは、作るときと同じロックの中で数える。2つのプランを同時にお試しに直されても1つまでにする。
+
+	// 担当サービスの変更・プランの作成と直列化する。
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
@@ -341,33 +365,70 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
+	if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	// 省略された設定は、ロック取得後の最新値を維持する。
+	current, err = q.GetCoachingPlan(r.Context(), db.GetCoachingPlanParams{ID: id, CoachID: c.ProfileID})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if req.ServiceType == nil {
+		req.ServiceType = current.ServiceType
+	}
+	if len(req.AdditionalConsultationPriceYen) == 0 {
+		req.additionalPrice = current.AdditionalConsultationPriceYen
+	}
+	published := current.Published
+	if req.Published != nil {
+		published = *req.Published
+	}
+	fields := req.supportFields(current, published)
+	for k, v := range req.validate(int(current.PriceYen)) {
+		fields[k] = v
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	if published && !current.Published && !pledged(c) {
+		Error(w, http.StatusConflict, "pledge_required", "先にパーソナル指導の誓約をしてください")
+		return
+	}
+	if !s.planServiceAllowed(w, r, q, c.ProfileID, req.ServiceType, published) {
+		return
+	}
 	if req.Kind == "trial" && current.Kind != "trial" {
-		if err := q.LockCoachingPlans(r.Context(), c.ProfileID); err != nil {
-			MapDBError(w, err)
-			return
-		}
 		if !s.noOtherTrialPlan(w, r, q, c.ProfileID, id) {
 			return
 		}
 	}
 	reviews, menu, formats := req.includes()
 	p, err := q.UpdateCoachingPlan(r.Context(), db.UpdateCoachingPlanParams{
-		ID:                id,
-		CoachID:           c.ProfileID,
-		Kind:              req.Kind,
-		Title:             req.Title,
-		Description:       req.Description,
-		DurationDays:      int16(*req.DurationDays),
-		PriceYen:          int32(*req.PriceYen),
-		Capacity:          int16(*req.Capacity),
-		Published:         published,
-		VideoReviews:      reviews,
-		MenuUpdates:       menu,
-		ReplyFormats:      formats,
-		StartOnFirstVideo: req.StartOnFirstVideo,
+		ID:                             id,
+		CoachID:                        c.ProfileID,
+		Kind:                           req.Kind,
+		Title:                          req.Title,
+		Description:                    req.Description,
+		DurationDays:                   int16(*req.DurationDays),
+		PriceYen:                       int32(*req.PriceYen),
+		Capacity:                       int16(*req.Capacity),
+		Published:                      published,
+		VideoReviews:                   reviews,
+		MenuUpdates:                    menu,
+		ReplyFormats:                   formats,
+		StartOnFirstVideo:              req.StartOnFirstVideo,
+		ServiceType:                    req.ServiceType,
+		AdditionalConsultationPriceYen: req.additionalPrice,
 	})
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	p, ok = s.saveSupportPlan(w, r, q, req, p)
+	if !ok {
 		return
 	}
 	if err := tx.Commit(r.Context()); err != nil {

@@ -130,6 +130,13 @@ func TestSenseSummaryIsHiddenUntilLaunch(t *testing.T) {
 	}
 }
 
+func TestSenseSummaryHistoryIsHiddenUntilLaunch(t *testing.T) {
+	h := setup(t)
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries", token(t, uuid.New()), nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("history while hidden = %d", rec.Code)
+	}
+}
+
 func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	gemini := &fakeGemini{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
 	url := gemini.serve(t)
@@ -378,5 +385,106 @@ func TestSenseSummaryGlobalDailyLimit(t *testing.T) {
 	}
 	if paths[0] != "/models/gemini-3.5-flash-lite" {
 		t.Fatalf("model path = %s", paths[0])
+	}
+}
+
+// 同時刻のメモも6個ずつ重複せずに使い、元の感覚は削除後もまとめから読める。
+func TestSenseSummaryHistoryKeepsSixSourceNotes(t *testing.T) {
+	ai := &fakeGemini{reply: `{"overview":"リズムをつかめました","good":[],"concerns":[],"next":[]}`}
+	endpoint := ai.serve(t)
+	h := setupConfig(t, func(c *config.Config) {
+		c.SenseSummaryEnabled = true
+		c.GeminiAPIKey = "test"
+		c.GeminiEndpoint = endpoint
+	})
+	me, other := token(t, uuid.New()), token(t, uuid.New())
+	writeSenseNotes(t, h, me, 0, 13)
+	execSQLArgs(t, `UPDATE sense_notes SET created_at = '2026-01-01T00:00:00Z' WHERE author_id = $1`, tokenSubject(t, me))
+	seen := map[uuid.UUID]bool{}
+	for batch := 0; batch < 2; batch++ {
+		rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil)
+		var got struct {
+			Summary struct {
+				Notes []struct {
+					ID   uuid.UUID `json:"id"`
+					Body string    `json:"body"`
+				} `json:"notes"`
+			} `json:"summary"`
+			Pending int `json:"pending_notes"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Code != http.StatusCreated || len(got.Summary.Notes) != 6 || got.Pending != 7-6*batch {
+			t.Fatalf("batch %d = %d %s", batch, rec.Code, rec.Body.String())
+		}
+		for _, note := range got.Summary.Notes {
+			if seen[note.ID] || note.Body == "" {
+				t.Fatalf("duplicate or empty note: %+v", note)
+			}
+			seen[note.ID] = true
+		}
+	}
+	execSQLArgs(t, `DELETE FROM sense_notes WHERE author_id = $1`, tokenSubject(t, me))
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries", me, nil)
+	var history struct {
+		Summaries []struct {
+			ID    uuid.UUID `json:"id"`
+			Notes []struct {
+				Body string `json:"body"`
+			} `json:"notes"`
+		} `json:"summaries"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &history)
+	if rec.Code != http.StatusOK || len(history.Summaries) != 2 || len(history.Summaries[0].Notes) != 6 || history.Summaries[0].Notes[0].Body == "" {
+		t.Fatalf("history after deletion = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries", other, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"summaries":[]`) {
+		t.Fatalf("other history = %s", rec.Body.String())
+	}
+}
+
+func TestSenseSummaryHistoryPagination(t *testing.T) {
+	h := setupConfig(t, func(c *config.Config) { c.SenseSummaryEnabled = true })
+	me := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me", me, nil); rec.Code != http.StatusOK {
+		t.Fatalf("profile = %d %s", rec.Code, rec.Body.String())
+	}
+	// 時刻が同じでも、IDを含むcursorで抜けなく読める。
+	execSQLArgs(t, `INSERT INTO sense_note_summaries (id, author_id, from_day, to_day, note_count, summary, created_at)
+	SELECT gen_random_uuid(), $1, '2026-10-01', '2026-10-06', 6, '{"overview":"以前のまとめ"}'::jsonb, '2026-10-06T00:00:00Z'
+	FROM generate_series(1, 21)`, tokenSubject(t, me))
+	var first struct {
+		Summaries []struct {
+			ID    uuid.UUID `json:"id"`
+			Notes any       `json:"notes"`
+		} `json:"summaries"`
+		Cursor string `json:"next_cursor"`
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries", me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &first)
+	if rec.Code != http.StatusOK || len(first.Summaries) != 20 || first.Cursor == "" || first.Summaries[0].Notes != nil {
+		t.Fatalf("first = %s", rec.Body.String())
+	}
+	var second struct {
+		Summaries []struct {
+			ID uuid.UUID `json:"id"`
+		} `json:"summaries"`
+		Cursor *string `json:"next_cursor"`
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries?cursor="+first.Cursor, me, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &second)
+	if rec.Code != http.StatusOK || len(second.Summaries) != 1 || second.Cursor != nil {
+		t.Fatalf("second = %s", rec.Body.String())
+	}
+	for _, summary := range first.Summaries {
+		if summary.ID == second.Summaries[0].ID {
+			t.Fatal("duplicate summary")
+		}
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me/sense-notes/summaries?cursor=invalid", me, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid cursor = %d", rec.Code)
 	}
 }

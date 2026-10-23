@@ -22,17 +22,9 @@ function SenseNoteFields({ body, onBody }: { body: string; onBody: (v: string) =
           maxLength={senseNoteMaxLength + 20}
         />
       </label>
-      <label className="block text-sm text-slate-200">
-        日付
-        <input
-          type="date"
-          value={todayInTokyo()}
-          readOnly
-          aria-describedby="sense-note-day-help"
-          className="mt-1 block w-full rounded-md border border-white/25 bg-white/10 px-3 py-2 text-base text-slate-100 [color-scheme:dark]"
-        />
-      </label>
-      <p id="sense-note-day-help" className="text-xs text-slate-300">日本時間の今日の日付で保存します。</p>
+      <p className="text-sm text-slate-200">
+        日付 <time dateTime={todayInTokyo()}>{todayInTokyo()}</time>
+      </p>
     </div>
   );
 }

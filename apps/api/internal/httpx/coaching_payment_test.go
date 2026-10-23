@@ -23,9 +23,10 @@ const (
 
 // fakeStripe は、Stripe の代わりに支払い画面と返金を受け付けるサーバー。
 type fakeStripe struct {
-	mu       sync.Mutex
-	sessions []url.Values
-	refunds  []url.Values
+	mu                 sync.Mutex
+	sessions           []url.Values
+	refunds            []url.Values
+	ticketRefundStatus string
 	// 仮押さえの確定・取り消しを受けた PaymentIntent。
 	captured []string
 	canceled []string
@@ -92,6 +93,10 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 		_ = r.ParseForm()
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		refundStatus := "succeeded"
+		if f.ticketRefundStatus != "" {
+			refundStatus = f.ticketRefundStatus
+		}
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/payment_intents/"):
 			// テストでは、pi_card で始まるものを仮押さえ済み、それ以外を確定済みとして答える。
@@ -147,6 +152,14 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 			}
 			f.transfers = append(f.transfers, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/refunds":
+			refunds := []map[string]any{}
+			for i, form := range f.refunds {
+				if form.Get("payment_intent") == r.URL.Query().Get("payment_intent") {
+					refunds = append(refunds, map[string]any{"id": fmt.Sprintf("re_%d", i+1), "amount": json.Number(form.Get("amount")), "status": refundStatus, "metadata": map[string]string{"ticket_refund_id": form.Get("metadata[ticket_refund_id]")}})
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": refunds, "has_more": false})
 		case r.URL.Path == "/v1/refunds":
 			time.Sleep(f.refundDelay)
 			if key := r.Header.Get("Idempotency-Key"); key != "" {
@@ -159,13 +172,13 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 						_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "idempotency_error", "message": "Keys for idempotent requests can only be used with the same parameters"}})
 						return
 					}
-					_ = json.NewEncoder(w).Encode(map[string]any{"id": "re_again", "status": "succeeded"})
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": "re_again", "status": refundStatus, "amount": json.Number(r.PostForm.Get("amount"))})
 					return
 				}
 				f.refundKeys[key] = r.PostForm
 			}
 			f.refunds = append(f.refunds, r.PostForm)
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": "succeeded"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": refundStatus, "amount": json.Number(r.PostForm.Get("amount"))})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -401,6 +414,13 @@ func TestCoachingPaymentByGuardian(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodPost, gpath+"/checkout", "", nil); rec.Code != http.StatusConflict {
 		t.Fatalf("checkout before consent %d", rec.Code)
+	}
+	// チケット・指名を合算する新しい上限では、8,000円の契約は既定の3,000円では払えない。
+	if rec := doJSON(t, h, http.MethodPost, gpath+"/consent", "", map[string]any{"agree_report": true, "agree_detection": true}); rec.Code != 422 || !strings.Contains(rec.Body.String(), "monthly_limit") {
+		t.Fatalf("guardian monthly limit %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/guardian/"+gt, "", map[string]any{"monthly_limit_yen": nil, "allow_publish": false}); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
 	}
 	rec := doJSON(t, h, http.MethodPost, gpath+"/consent", "", map[string]any{"agree_report": true, "agree_detection": true})
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"guardian_consented":true`) {

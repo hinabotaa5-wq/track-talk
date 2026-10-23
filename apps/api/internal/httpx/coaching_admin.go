@@ -108,6 +108,8 @@ func (s *Server) adminOpenCoachingContract(w http.ResponseWriter, r *http.Reques
 		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+		CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+		ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 	})
 	c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 	c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -118,7 +120,20 @@ func (s *Server) adminOpenCoachingContract(w http.ResponseWriter, r *http.Reques
 	if logs == nil {
 		logs = []db.ListCoachingAccessLogsRow{}
 	}
-	JSON(w, http.StatusOK, map[string]any{"contract": c, "messages": out, "access_logs": logs})
+	var support any
+	if row.FulfillmentVersion == 1 {
+		ct, e := s.q.GetCoachingContract(r.Context(), id)
+		if e != nil {
+			MapDBError(w, e)
+			return
+		}
+		support, e = s.supportJSON(r.Context(), s.q, ct)
+		if e != nil {
+			MapDBError(w, e)
+			return
+		}
+	}
+	JSON(w, http.StatusOK, map[string]any{"contract": c, "messages": out, "access_logs": logs, "support": support})
 }
 
 func (s *Server) adminSuspendCoachingContract(w http.ResponseWriter, r *http.Request) {

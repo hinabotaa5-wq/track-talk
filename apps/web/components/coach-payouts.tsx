@@ -97,7 +97,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
       <p className="text-xs text-slate-300">
         取り分は、フォーム添削が代金の{data.review_share}%、パーソナル指導が手数料{reduced ? 10 : data.personal_fee}%を引いた分
         {reduced ? `（初年10%、${formatDateTime(data.reduced_fee_until!)}までに始まった指導）` : ""}
-        です。添削は返却した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。
+        です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。
       </p>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">

@@ -84,6 +84,7 @@ SELECT
     c.best_record,
     c.achievements,
     c.years,
+    c.service_types,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -124,3 +125,16 @@ SET photo_public_id = NULL,
 FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $1) o
 WHERE c.profile_id = $1
 RETURNING o.old_photo_public_id;
+
+-- name: UpdateCoachServices :one
+UPDATE coach_profiles
+SET service_types = sqlc.arg(service_types)::text[], updated_at = now()
+WHERE profile_id = sqlc.arg(profile_id) AND status = 'approved'
+RETURNING *;
+
+-- name: HasPublishedPlanOutsideServices :one
+SELECT EXISTS (
+    SELECT 1 FROM coaching_plans
+    WHERE coach_id = sqlc.arg(coach_id) AND published AND service_type IS NOT NULL
+      AND NOT (service_type = ANY(sqlc.arg(service_types)::text[]))
+)::boolean;
