@@ -6,7 +6,7 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { Bars, hasItems } from "@/components/injury-public-summary";
 import { apiFetch } from "@/lib/api";
 import { ChevronDown } from "lucide-react";
-import { injuryGroupPath, injuryPercent, type InjuryPublicGroup, type InjuryTally } from "@/lib/injury";
+import { injuryGroupPath, type InjuryPublicGroup, type InjuryTally } from "@/lib/injury";
 
 type InjuryData = { min_people: number; overall: InjuryPublicGroup; groups: InjuryPublicGroup[] };
 
@@ -26,27 +26,6 @@ function topItem(tally: InjuryTally) {
   return [...tally.items].sort((a, b) => b.people - a.people)[0];
 }
 
-// いちばん多かった答えを、質問ごとに1行で並べる。棒グラフを読む前に、まずここで要点がわかる。
-function Highlights({ group }: { group: InjuryPublicGroup }) {
-  const rows = questionsOf(group)
-    .map((q) => ({ ...q, item: topItem(q.tally) }))
-    .filter((row) => row.item);
-  if (rows.length === 0) return null;
-  return (
-    <dl className="grid grid-cols-2 gap-2">
-      {rows.map((row) => (
-        <div key={row.short} className="rounded-xl border border-white/15 bg-white/8 p-2.5">
-          <dt className="text-xs text-slate-300">{row.short}でいちばん多い</dt>
-          <dd className="mt-0.5 text-sm font-bold leading-snug text-slate-50">{row.item.label}</dd>
-          <dd className="text-xs tabular-nums text-sky-200">
-            {injuryPercent(row.item.people, row.tally.people)}%
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 function Details({ group }: { group: InjuryPublicGroup }) {
   return (
     <div className="space-y-4">
@@ -61,7 +40,7 @@ function hasData(group: InjuryPublicGroup) {
   return hasItems(...questionsOf(group).map((q) => q.tally));
 }
 
-// 全体のデータ。要点のあとに、質問ごとの上位3つを出す。
+// 全体のデータ。質問ごとの上位3つを出す。
 function OverallCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
@@ -70,10 +49,7 @@ function OverallCard({ group, min }: { group: InjuryPublicGroup; min: number }) 
         <span className="text-sm text-slate-300">{group.members}人</span>
       </div>
       {hasData(group) ? (
-        <>
-          <Highlights group={group} />
-          <Details group={group} />
-        </>
+        <Details group={group} />
       ) : (
         <p className="text-sm text-slate-400">{min}人そろうと表示</p>
       )}
@@ -100,12 +76,7 @@ function GroupCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
         </span>
       </summary>
       <div className="mt-4 space-y-4">
-        {ready ? (
-          <>
-            <Highlights group={group} />
-            <Details group={group} />
-          </>
-        ) : null}
+        {ready ? <Details group={group} /> : null}
         <Link href={injuryGroupPath(group.body_part)} className="block text-sm text-blue-300 underline-offset-2 hover:underline">
           このグループを見る →
         </Link>
