@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -244,5 +245,123 @@ func TestRejectedPhotoIsRemovedFromCloudinary(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("rejected photo was not deleted")
+	}
+}
+
+// 動画の投稿を消したあと、Cloudinaryが一時的に失敗しても自動で送り直す。
+func TestDeletingAVideoRetriesCloudinaryFailure(t *testing.T) {
+	var calls atomic.Int32
+	deleted := make(chan string, 1)
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			if r.URL.Path != "/v1_1/demo/resources/video/upload" || r.URL.Query().Get("invalidate") != "true" {
+				t.Errorf("unexpected delete: %s", r.URL.String())
+			}
+			if calls.Add(1) == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			deleted <- r.URL.Query().Get("public_ids[]")
+			_, _ = w.Write([]byte(`{"deleted":{}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"video","format":"mp4","bytes":1024}`))
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+	h := setup(t)
+	tok := token(t, uuid.New())
+	video := "track-talk/" + uuid.NewString()
+	grantUpload(t, h, tok, video)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{"kind": "video", "body": "走りの動画", "video_public_id": video})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+created.ID, tok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete %d", rec.Code)
+	}
+	select {
+	case id := <-deleted:
+		if id != video || calls.Load() != 2 {
+			t.Fatalf("deleted=%s calls=%d", id, calls.Load())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("video deletion was not retried")
+	}
+}
+
+// 失敗後に別の投稿で使われた動画は、再試行時に調べ直して保護する。
+func TestVideoRetryRechecksReferences(t *testing.T) {
+	var calls atomic.Int32
+	first := make(chan struct{})
+	release := make(chan struct{})
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			if calls.Add(1) == 1 {
+				close(first)
+				<-release
+			}
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"resource_type":"video","format":"mp4","bytes":1024}`))
+	}))
+	defer asset.Close()
+	// テストが途中で止まっても代替サーバーを待たせたままにしない。
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+	h := setup(t)
+	video := "track-talk/" + uuid.NewString()
+	create := func(tok string) string {
+		grantUpload(t, h, tok, video)
+		rec := doJSON(t, h, http.MethodPost, "/v1/posts", tok, map[string]any{"kind": "video", "body": "走りの動画", "video_public_id": video})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+		}
+		var created struct {
+			ID string `json:"id"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &created)
+		return created.ID
+	}
+	tok := token(t, uuid.New())
+	id := create(tok)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+id, tok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete %d", rec.Code)
+	}
+	select {
+	case <-first:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first deletion did not start")
+	}
+	other := create(token(t, uuid.New()))
+	close(release)
+	released = true
+	// 再送間隔を過ぎても、使用中ならCloudinaryには再送しない。
+	timer := time.NewTimer(1500 * time.Millisecond)
+	defer timer.Stop()
+	<-timer.C
+	if calls.Load() != 1 {
+		t.Fatalf("video in use was retried: calls=%d", calls.Load())
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/posts/"+other, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("other post %d", rec.Code)
 	}
 }
