@@ -29,25 +29,21 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("ホームの大会をヘッダーに集約し、マイページを再タップで閉じる", async ({ page }) => {
+test("ホームの大会をヘッダーに集約し、マイページは独立した画面へ移動する", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "今日開催中の大会", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今日開催中", exact: true })).toHaveCount(0);
-  const account = page.getByRole("button", { name: "マイページ", exact: true });
+  const account = page.getByRole("link", { name: "マイページ", exact: true });
+  await expect(account).toHaveAttribute("href", "/me");
   await account.click();
-  await expect(page.getByRole("dialog", { name: "マイページ", exact: true })).toBeVisible();
-  // 前面の閉じる領域も同じタップ位置で閉じられる。
-  const box = await account.boundingBox();
-  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await expect(account).toHaveAttribute("aria-expanded", "false");
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/login.*next=.*me/);
+  await expect(page.getByRole("dialog", { name: "マイページ", exact: true })).toHaveCount(0);
 });
 
-test("開催中でもタイムテーブルは外部、実況スレッドは内部へ移動する", async ({ page }) => {
+test("大会のタイムテーブル導線を消し、実況スレッドは内部へ移動する", async ({ page }) => {
   await page.goto("/competitions");
   const timetable = page.getByRole("link", { name: "日程・タイムテーブル", exact: true });
-  await expect(timetable).toHaveAttribute("href", official);
-  await expect(timetable).toHaveAttribute("target", "_blank");
+  await expect(timetable).toHaveCount(0);
   await expect(page.getByRole("link", { name: /実況スレッドへ/ })).toHaveAttribute("href", meet.href);
   await expect(page.locator("a a")).toHaveCount(0);
 });
@@ -122,7 +118,7 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
 
-test("投稿を左へ横送りでき、末尾から次のページを開ける", async ({ page }) => {
+test("投稿を2列で表示し、末尾から次のページを開ける", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   // CIのAPIに投稿がある場合も、古いSSRデータをブラウザの固定テストデータで更新させる。
   await page.clock.setFixedTime(Date.now() + 120_000);
@@ -139,36 +135,24 @@ test("投稿を左へ横送りでき、末尾から次のページを開ける",
     } });
   });
   await page.goto("/");
-  const track = page.getByRole("region", { name: "投稿一覧", exact: true });
-  await expect(track).toBeVisible();
-  await expect(track.getByRole("link")).toHaveCount(7);
-  const first = track.getByRole("link").first();
-  const second = track.getByRole("link").nth(1);
-  const before = await first.boundingBox();
-  const secondBox = await second.boundingBox();
-  expect(Math.abs(before!.y - secondBox!.y)).toBeLessThan(2);
-  expect(secondBox!.x).toBeGreaterThan(before!.x);
-  expect(await track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
-  const originalY = await page.evaluate(() => window.scrollY);
-  await page.getByRole("button", { name: "次の投稿へ", exact: true }).click();
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
-  expect((await first.boundingBox())!.x).toBeLessThan(before!.x);
-  expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
-  // 横長の一覧がページ全体にはみ出したり、縦長画像でカードが伸びたりしない。
+  const cards = page.locator('main a[href^="/posts/horizontal-"]');
+  await expect(cards).toHaveCount(6);
+  const first = await page.locator('a[href="/posts/horizontal-1"]').boundingBox();
+  const second = await page.locator('a[href="/posts/horizontal-2"]').boundingBox();
+  const third = await page.locator('a[href="/posts/horizontal-3"]').boundingBox();
+  expect(Math.abs(first!.y - second!.y)).toBeLessThan(2);
+  expect(second!.x).toBeGreaterThan(first!.x);
+  expect(Math.abs(first!.x - third!.x)).toBeLessThan(2);
+  expect(third!.y).toBeGreaterThan(first!.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const trackBox = await track.boundingBox();
-  expect(trackBox!.height).toBeLessThan(600);
-  await track.focus();
-  const beforeKey = await track.evaluate((el) => el.scrollLeft);
-  await page.keyboard.press("ArrowRight");
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(beforeKey);
-  const next = track.getByRole("link", { name: "次の投稿を読み込む" });
+  await expect(page.getByRole("button", { name: "次の投稿へ", exact: true })).toHaveCount(0);
+  await expect(page.getByText("左にスワイプして次の投稿へ", { exact: true })).toHaveCount(0);
+  const next = page.getByRole("link", { name: "次の投稿", exact: true });
   await next.scrollIntoViewIfNeeded();
-  await expect(next).toBeVisible();
   await next.click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-7");
-  await expect(track.getByRole("link", { name: "次の投稿を読み込む" })).toHaveCount(0);
+  await expect(page.locator('a[href="/posts/horizontal-7"]')).toBeVisible();
+  await expect(next).toHaveCount(0);
 });
 
 test("PCでは複数の商品が見え、縦ホイールで左右に進める", async ({ page }) => {
@@ -188,10 +172,10 @@ test("PCでは複数の商品が見え、縦ホイールで左右に進める", 
   expect(third!.x + third!.width).toBeLessThanOrEqual(1280);
   await track.hover();
   const originalY = await page.evaluate(() => window.scrollY);
-  await page.mouse.wheel(0, -240);
+  await page.mouse.wheel(0, 240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
   expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
-  await page.mouse.wheel(0, 240);
+  await page.mouse.wheel(0, -240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeLessThan(2);
   // トラックパッドの横移動も、そのまま使える。
   await page.mouse.wheel(220, 0);
@@ -201,12 +185,12 @@ test("PCでは複数の商品が見え、縦ホイールで左右に進める", 
     el.dispatchEvent(event);
     return event.defaultPrevented;
   })).toBe(false);
-  await page.getByRole("button", { name: "次の商品へ" }).click();
+  await expect(page.getByRole("button", { name: "次の商品へ" })).toHaveCount(0);
+  await page.mouse.wheel(0, 240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(300);
   // 横方向の終端では、ページの縦スクロールへ自然に戻れる。
   await page.addStyleTag({ content: "body { padding-bottom: 1200px; }" });
-  await track.evaluate((el) => { el.scrollLeft = 0; });
-  await expect(page.getByRole("button", { name: "前の商品へ" })).toBeDisabled();
+  await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
   await track.hover();
   const edgeY = await page.evaluate(() => window.scrollY);
   await page.mouse.wheel(0, 180);

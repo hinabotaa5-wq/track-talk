@@ -14,7 +14,7 @@ beforeEach(async () => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root.render(<HorizontalFeed><a href="/posts/1">投稿1</a><a href="/posts/2">投稿2</a></HorizontalFeed>));
+  await act(async () => root.render(<HorizontalFeed><span>投稿1</span><span>投稿2</span></HorizontalFeed>));
 });
 afterEach(async () => {
   await act(async () => root.unmount());
