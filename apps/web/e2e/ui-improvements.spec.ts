@@ -66,11 +66,15 @@ test("検索アイコンと4つのタブを1行に並べ、検索中はタブを
   const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
   const search = nav.getByRole("button", { name: "キーワード検索を開く" });
   await expect(nav.getByRole("link")).toHaveText(["新しい", "人気", "募集", "レビュー"]);
-  const searchBox = await search.boundingBox();
-  for (const link of await nav.getByRole("link").all()) {
-    const box = await link.boundingBox();
-    expect(Math.abs((box!.y + box!.height / 2) - (searchBox!.y + searchBox!.height / 2))).toBeLessThan(2);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+  // フォントやヘッダーの読み込みで測定の途中に位置が変わらないよう、同じフレームで比較する。
+  const boxes = await nav.locator("button, a").evaluateAll((items) => items.map((item) => {
+    const rect = item.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  }));
+  const searchBox = boxes[0];
+  for (const box of boxes.slice(1)) {
+    expect(Math.abs((box.y + box.height / 2) - (searchBox.y + searchBox.height / 2))).toBeLessThan(2);
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
   }
   await nav.getByRole("link", { name: "人気", exact: true }).click();
   await expect(page).toHaveURL(/sort=popular/);
@@ -120,6 +124,8 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
 
 test("投稿を左へ横送りでき、末尾から次のページを開ける", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  // CIのAPIに投稿がある場合も、古いSSRデータをブラウザの固定テストデータで更新させる。
+  await page.clock.setFixedTime(Date.now() + 120_000);
   const portrait = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="1280"><rect width="320" height="1280" fill="skyblue"/></svg>')}`;
   await page.route("**/api/v1/posts?**", async (route) => {
     const current = Number(new URL(route.request().url()).searchParams.get("page") ?? 1);
@@ -135,6 +141,7 @@ test("投稿を左へ横送りでき、末尾から次のページを開ける",
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track).toBeVisible();
+  await expect(track.getByRole("link")).toHaveCount(7);
   const first = track.getByRole("link").first();
   const second = track.getByRole("link").nth(1);
   const before = await first.boundingBox();
