@@ -1,0 +1,129 @@
+name: tracktalk-current
+services:
+  # Docker プレビューは開発用 DB と分離し、異なるコード版の schema を混ぜない。
+  preview-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracktalk
+      POSTGRES_PASSWORD: tracktalk
+      POSTGRES_DB: tracktalk
+    volumes:
+      - preview_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracktalk -d tracktalk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ローカル確認専用の認証サービス(本番の Supabase Auth の代わり)。
+  # メール+パスワードの登録・ログイン・セッション更新を実際に動かし、
+  # パスワードは bcrypt で認証専用 DB(auth-db)に保存する。本番には接続しない。
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracktalk_auth
+      POSTGRES_PASSWORD: tracktalk_auth
+      POSTGRES_DB: tracktalk_auth
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracktalk_auth -d tracktalk_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile.localauth
+    environment:
+      AUTH_DATABASE_URL: postgres://tracktalk_auth:tracktalk_auth@auth-db:5432/tracktalk_auth?sslmode=disable
+      # API と同じ鍵で JWT に署名する(ローカル専用の値。本番の鍵は使わない)
+      SUPABASE_JWT_SECRET: local-dev-jwt-secret-change-me-not-for-production
+      SUPABASE_SERVICE_ROLE_KEY: local-service-role-key
+      LOCALAUTH_EXTERNAL_URL: http://localhost:9998/auth/v1
+      # デモユーザー。アプリ DB のサンプル投稿(local_demo.sql)の投稿者と ID を合わせる
+      LOCALAUTH_SEED_EMAIL: demo@tracktalk.local
+      LOCALAUTH_SEED_PASSWORD: demo-password
+      LOCALAUTH_SEED_USER_ID: "00000000-0000-4000-8000-000000000001"
+    ports:
+      - "127.0.0.1:9998:9999"
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://tracktalk:tracktalk@preview-db:5432/tracktalk?sslmode=disable
+      SUPABASE_JWT_SECRET: local-dev-jwt-secret-change-me-not-for-production
+      SUPABASE_SERVICE_ROLE_KEY: local-service-role-key
+      CORS_ORIGINS: http://localhost:3000
+      # サンプル動画(apps/web/public/samples/)を再生するためのローカル専用 URL
+      LOCAL_MEDIA_BASE_URL: http://localhost:3000/samples
+      MAIL_DEV_LOG: "1"
+      COACHING_ENABLED: "1"
+      COACHING_NEW_ACCEPTANCE_ENABLED: "1"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      preview-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # サンプル投稿(縦動画・横動画)をアプリ DB に入れる。何度起動しても同じ結果になる。
+  seed:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: tracktalk
+    volumes:
+      - ./apps/api/seeds/local_demo.sql:/seed.sql:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        until psql -h preview-db -U tracktalk -d tracktalk -tAc "SELECT 1 FROM posts LIMIT 1" >/dev/null 2>&1; do sleep 2; done
+        psql -h preview-db -U tracktalk -d tracktalk -v ON_ERROR_STOP=1 -f /seed.sql
+        echo "seed: ok"
+
+  web:
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+        NEXT_PUBLIC_SUPABASE_URL: http://localhost:9998
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: local-anon-key
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        NEXT_PUBLIC_COACHING_ENABLED: "1"
+    environment:
+      API_INTERNAL_URL: http://api:8080
+      SUPABASE_INTERNAL_URL: http://auth:9999
+      SUPABASE_COOKIE_NAME: sb-localhost-auth-token
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  preview_postgres_data:
+  auth_postgres_data:

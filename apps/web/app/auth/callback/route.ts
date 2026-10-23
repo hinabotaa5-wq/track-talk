@@ -11,7 +11,7 @@ function finish(response: NextResponse) {
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const login = new URL("/login", origin);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
   }
   const success = NextResponse.redirect(dest);
   const supabase = createServerClient(url, key, {
+    ...(process.env.SUPABASE_COOKIE_NAME
+      ? { cookieOptions: { name: process.env.SUPABASE_COOKIE_NAME } }
+      : {}),
     cookies: {
       getAll() {
         return request.cookies.getAll();

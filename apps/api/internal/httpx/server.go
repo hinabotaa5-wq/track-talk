@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -372,6 +373,12 @@ func (s *Server) now() time.Time {
 
 func (s *Server) present(p postDTO) postDTO {
 	if p.Kind == "video" && p.VideoPublicID != "" {
+		// ローカルのプレビュー用サンプルは外部ストレージに接続しない。
+		if name, ok := strings.CutPrefix(p.VideoPublicID, "local/"); ok && s.cfg.LocalMediaBaseURL != "" {
+			p.ThumbnailURL = s.cfg.LocalMediaBaseURL + "/" + name + ".jpg"
+			p.PlaybackURL = s.cfg.LocalMediaBaseURL + "/" + name + ".mp4"
+			return p
+		}
 		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}

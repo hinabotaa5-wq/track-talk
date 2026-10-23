@@ -74,6 +74,8 @@ type Config struct {
 	// SenseSummaryDailyLimit は、全員で1日(日本時間)に作れるまとめの数。0 なら上限なし。
 	// 無料枠のあいだは、AI Studio に出ている1日の回数より少なくしておくと、超えたぶんは「混み合っています」になる。
 	SenseSummaryDailyLimit int
+	// LocalMediaBaseURL はローカルプレビューの動画配信先。本番では設定しない。
+	LocalMediaBaseURL string
 	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
 	GeminiEndpoint string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
@@ -122,6 +124,7 @@ func Load() (Config, error) {
 		SMTPPassword:               os.Getenv("SMTP_PASSWORD"),
 		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
+		LocalMediaBaseURL:          strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),
 		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
 		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
 		GeminiSummaryModel:         strings.TrimSpace(os.Getenv("GEMINI_SUMMARY_MODEL")),
