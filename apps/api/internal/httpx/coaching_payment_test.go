@@ -84,6 +84,11 @@ func (f *fakeStripe) refundList() []url.Values {
 
 func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 	t.Helper()
+	return setupStripeConfig(t, nil)
+}
+
+func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler, *fakeStripe) {
+	t.Helper()
 	f := &fakeStripe{enabled: map[string]bool{}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user, _, _ := r.BasicAuth(); user != "sk_test_x" {
@@ -191,6 +196,9 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 		cfg.StripeAPIBase = srv.URL
 		cfg.WebBaseURL = "https://web.test"
 		cfg.CoachingTickSecret = "tick-secret"
+		if mutate != nil {
+			mutate(cfg)
+		}
 	})
 	return h, f
 }

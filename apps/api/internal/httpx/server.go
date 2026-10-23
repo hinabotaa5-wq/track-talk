@@ -257,7 +257,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/guardian/{token}/consultation-reviews", s.listGuardianConsultationReviews)
 			r.Get("/guardian/{token}/contracts/{id}/consultations", s.listConsultationRoom)
 			r.Get("/guardian/{token}/reviews/{id}/consultations", s.listConsultationRoom)
-			r.Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
+			r.With(s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
 			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
@@ -268,7 +268,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/me/guardian-link", s.issueGuardianLink)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 				// パーソナル指導（利用者側）
-				r.Post("/coaching/contracts", s.createCoachingContract)
+				r.With(s.requireNewAcceptance).Post("/coaching/contracts", s.createCoachingContract)
 				r.Get("/coaching/contracts/{id}", s.getCoachingContract)
 				r.Post("/coaching/contracts/{id}/cancel", s.cancelCoachingContract)
 				r.Post("/coaching/contracts/{id}/checkout", s.checkoutCoachingContract)
@@ -285,13 +285,13 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// フォーム添削（利用者側）
 				r.Get("/coaching/estimate", s.reviewEstimate)
 				r.Post("/coaching/demo", s.joinCoachingDemo)
-				r.Post("/coaching/requests", s.createReviewRequest)
+				r.With(s.requireNewAcceptance).Post("/coaching/requests", s.createReviewRequest)
 				r.Get("/coaching/requests/{id}/consultations", s.listConsultationRoom)
 				r.Post("/coaching/requests/{id}/consultations", s.saveConsultationDraft)
 				r.Get("/coaching/contracts/{id}/consultations", s.listConsultationRoom)
 				r.Post("/coaching/contracts/{id}/consultations", s.saveConsultationDraft)
-				r.Post("/coaching/consultations/{id}/submit", s.submitConsultation)
-				r.Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
 				r.Post("/coaching/consultations/{id}/{action}", s.actConsultation)
 				r.Get("/coach/consultations", s.coachConsultations)
 				r.Get("/admin/coaching/consultations", s.adminConsultations)
@@ -299,11 +299,12 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/admin/coaching/consultations/{id}/hide", s.adminHideConsultation)
 				r.Post("/admin/coaching/consultations/{id}/refund", s.adminRefundConsultation)
 				r.Get("/me/coaching/tickets", s.myTickets)
-				r.Post("/coaching/tickets/checkout", s.checkoutTickets)
+				r.With(s.requireNewAcceptance).Post("/coaching/tickets/checkout", s.checkoutTickets)
 				r.Get("/coaching/tickets/purchases/{id}", s.myTicketPurchase)
 				r.Get("/admin/coaching/tickets", s.adminTickets)
+				r.Get("/admin/coaching/reconciliation", s.adminReconciliation)
 				r.Post("/admin/coaching/tickets/{id}/refund", s.adminRefundTickets)
-				r.Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
+				r.With(s.requireNewAcceptance).Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
 				r.Post("/coaching/requests/{id}/clarify", s.clarifyReview)
@@ -336,6 +337,18 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		})
 	})
 	return r
+}
+
+// requireNewAcceptance は、新規受付を止めている間、新しい申し込み・購入だけを断る。
+// 既存の契約・会話・返金・精算はこの対象にしない。
+func (s *Server) requireNewAcceptance(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.CoachingNewAcceptance {
+			Error(w, http.StatusConflict, "new_acceptance_closed", "新しい申し込みは準備中です")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // requireCoaching は、オンラインコーチングを提供していない間、その API を無いものとして扱う。

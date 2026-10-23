@@ -70,11 +70,12 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		DatabaseURL: dsn,
 		// 本番は空（コーチングを閉じた状態）が既定だが、テストはコーチングの機能を
 		// 確かめるものがほとんどなので開けておく。閉じたときの 404 は coaching_test.go で確かめる。
-		CoachingEnabled: true,
-		CloudName:       os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:     os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:  os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:    os.Getenv("CLOUDINARY_API_BASE"),
+		CoachingEnabled:       true,
+		CoachingNewAcceptance: true,
+		CloudName:             os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:           os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:        os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:          os.Getenv("CLOUDINARY_API_BASE"),
 		// 保護者の同意のリンクは、Resend の代わりのサーバーに送る（mail_helper_test.go）。
 		ResendAPIKey: "re_test",
 		MailFrom:     "TrackTalk <no-reply@example.com>",
