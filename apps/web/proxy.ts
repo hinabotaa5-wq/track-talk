@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // ログインが必要なページは、画面を返す前にサーバー側で弾く。
 // 表示してから client 側で /login に飛ばす方式では、中身の枠が一瞬見えてしまう。
 export async function proxy(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   let response = NextResponse.next({ request });
@@ -12,6 +12,9 @@ export async function proxy(request: NextRequest) {
 
   if (url && key) {
     const supabase = createServerClient(url, key, {
+      ...(process.env.SUPABASE_COOKIE_NAME
+        ? { cookieOptions: { name: process.env.SUPABASE_COOKIE_NAME } }
+        : {}),
       cookies: {
         getAll() {
           return request.cookies.getAll();

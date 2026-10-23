@@ -9,6 +9,7 @@ import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
+import type { CoachingSupport } from "@/lib/coaching-support";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -93,7 +94,7 @@ function ReportButton({ message, access }: { message: CoachingMessage; access: A
 
 function MessageItem({ message, contract, access }: { message: CoachingMessage; contract: CoachingContract; access: Access }) {
   return (
-    <li className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
+    <li id={`message-${message.id}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
       <div
         className={`max-w-[85%] space-y-2 rounded-2xl p-3 text-sm ${
           message.mine ? "bg-blue-600/60 text-white" : "border border-white/20 bg-white/10 text-slate-100"
@@ -102,6 +103,7 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
         <p className="text-xs text-slate-300">
           {senderName(message, contract)} · {formatDateTime(message.created_at)}
         </p>
+        {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">この動画への回答</a> : null}
         {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
         {message.video_url ? (
           <video
@@ -134,6 +136,12 @@ function Composer({
   const token = access.token;
   // 保護者はログインしないので、動画のアップロードはできない。
   const canVideo = !access.guardianToken;
+  const [reviewID, setReviewID] = useState("");
+  const [support, setSupport] = useState<CoachingSupport | null>(null);
+  useEffect(() => { if (contract.fulfillment_version !== 1 || contract.role !== "coach") return; let live = true;
+    const load = () => { apiFetch<CoachingSupport>(`${contractPath(contract, access)}/support`, { token:access.token }).then((d) => { if (live) setSupport(d); }).catch(() => {}); };
+    load(); const t = window.setInterval(load,30000); return () => { live = false; window.clearInterval(t); };
+  }, [contract, access]);
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [menu, setMenu] = useState<PlanMenu | null>(null);
@@ -188,9 +196,11 @@ function Composer({
       const d = await apiFetch<{ message: CoachingMessage }>(`${contractPath(contract, access)}/messages`, {
         method: "POST",
         token,
-        body: JSON.stringify({ body, video_public_id: videoPublicID, menu }),
+        body: JSON.stringify({ body, video_public_id: videoPublicID, menu, review_submission_id:reviewID || undefined }),
       });
       onSent(d.message);
+      setSupport((prev) => prev ? { ...prev, videos:prev.videos.filter((v) => v.question_id !== reviewID) } : prev);
+      setReviewID("");
       setBody("");
       setFile(null);
       setFileKey((k) => k + 1);
@@ -205,6 +215,7 @@ function Composer({
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-3">
+      {support ? <label className="block text-sm">回答する動画<select aria-label="回答する動画" value={reviewID} onChange={(e) => setReviewID(e.target.value)} className="mt-1 block w-full rounded border border-white/25 bg-slate-900 p-2"><option value="">通常のメッセージ（回数に含めない）</option>{support.videos.filter((v) => !v.answer_id).map((v) => <option key={v.question_id} value={v.question_id}>{formatDateTime(v.created_at)} の動画</option>)}</select></label> : null}
       <Textarea
         rows={3}
         value={body}
@@ -441,7 +452,7 @@ export function CoachingMessages({
           }} />
       ) : contract.status === "suspended" ? (
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
-          運営が確認のため、やりとりを止めています。止めている日数の分、期間はあとで延びます。
+          運営が確認のため、やりとりを止めています。{contract.fulfillment_version === 1 ? "大会日までは延長せず、未提供分は回数に応じて返金します。" : "止めている日数の分、期間はあとで延びます。"}
         </p>
       ) : contract.status === "refunded" ? (
         <p className="text-sm text-slate-300">返金して終了したので、読むだけになりました。{readOnlyNote}</p>

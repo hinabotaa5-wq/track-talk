@@ -234,18 +234,16 @@ function StateBadge({ item, today }: { item: Scheduled; today: string }) {
   return null;
 }
 
-// 日程とタイムテーブルは大会の公式ページへ。実況スレッドは独立した入口にして、日程のタップと混ぜない。
+// 大会の公式ページと実況スレッドの入口。
 function ScheduleCard({
   href,
   linkLabel,
-  timetableHref,
   over,
   thread,
   children,
 }: {
   href: string;
   linkLabel: string;
-  timetableHref?: string;
   over: boolean;
   thread?: MeetThread;
   children: ReactNode;
@@ -258,11 +256,6 @@ function ScheduleCard({
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
       ) : children}
-      {timetableHref ? (
-        <a href={timetableHref} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-9 items-center text-sm font-semibold text-blue-300 underline transition active:scale-[0.98]">
-          日程・タイムテーブル
-        </a>
-      ) : null}
       {thread ? (
         <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
           <span className="min-w-0">
@@ -282,7 +275,7 @@ function ScheduleCard({
 
 function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: string; thread?: MeetThread }) {
   return (
-    <ScheduleCard href={major.site_url} timetableHref={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
+    <ScheduleCard href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {major.schedule_label}
         <StateBadge item={major} today={today} />
@@ -296,7 +289,7 @@ function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: s
 function InternationalCard({ competition, today, thread }: { competition: Competition; today: string; thread?: MeetThread }) {
   const link = destination(competition, INTERNATIONAL);
   return (
-    <ScheduleCard href={link.href} timetableHref={competition.organizer_url} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
+    <ScheduleCard href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {competitionDates(competition.starts_on, competition.ends_on)}
         <StateBadge item={competition} today={today} />

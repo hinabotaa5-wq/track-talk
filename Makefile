@@ -1,4 +1,4 @@
-.PHONY: db api web migrate seed-injury unseed-injury sqlc test-api test-web lint
+.PHONY: db api web migrate seed-injury unseed-injury sqlc test-api test-web lint local local-down
 
 # 開発用 DB(docker)。.env の DATABASE_URL が何であっても、これらのターゲットは必ずここに接続する。
 # 本番に流すときは make を使わず、ALLOW_REMOTE_DB=1 を付けて直接実行すること。
@@ -33,3 +33,10 @@ test-api:
 
 test-web:
 	cd apps/web && npm test
+
+# ローカル専用の認証・DB・API・Web を起動する。
+local:
+	docker compose -f docker-compose.preview.yml up -d --build --wait
+
+local-down:
+	docker compose -f docker-compose.preview.yml down

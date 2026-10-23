@@ -219,19 +219,9 @@ select:-webkit-autofill {
   }
 }
 
-.horizontal-feed-wheel-hint {
-  display: none;
-}
-
 @media (hover: hover) and (pointer: fine) {
   /* ホイールの小さな移動がスナップで元に戻らないようにする。 */
   .horizontal-feed-track {
     scroll-snap-type: none;
-  }
-  .horizontal-feed-touch-hint {
-    display: none;
-  }
-  .horizontal-feed-wheel-hint {
-    display: inline;
   }
 }

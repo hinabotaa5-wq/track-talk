@@ -15,7 +15,7 @@ import (
 const createReviewResponse = `-- name: CreateReviewResponse :one
 INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
 `
 
 type CreateReviewResponseParams struct {
@@ -51,6 +51,7 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		&i.ClarifiedAt,
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
+		&i.ClarifyBody,
 	)
 	return i, err
 }
@@ -161,7 +162,7 @@ func (q *Queries) GetReviewRating(ctx context.Context, requestID uuid.UUID) (Rev
 }
 
 const getReviewResponse = `-- name: GetReviewResponse :one
-SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at FROM review_responses
+SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body FROM review_responses
 WHERE request_id = $1
 `
 
@@ -182,6 +183,7 @@ func (q *Queries) GetReviewResponse(ctx context.Context, requestID uuid.UUID) (R
 		&i.ClarifiedAt,
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
+		&i.ClarifyBody,
 	)
 	return i, err
 }
@@ -356,6 +358,7 @@ SET status = 'clarifying',
 WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
+  AND returned_at > now()-interval '7 days'
 RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
 `
 
@@ -424,22 +427,24 @@ func (q *Queries) MarkReviewReturned(ctx context.Context, arg MarkReviewReturned
 
 const requestReviewClarification = `-- name: RequestReviewClarification :one
 UPDATE review_responses
-SET clarify_reason = $1::text,
+SET clarify_body = $1::text,
+    clarify_reason = $2::text,
     clarify_requested_at = now()
-WHERE request_id = $2
+WHERE request_id = $3
   AND clarify_requested_at IS NULL
   AND hidden_at IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
 `
 
 type RequestReviewClarificationParams struct {
+	Body      *string   `json:"body"`
 	Reason    string    `json:"reason"`
 	RequestID uuid.UUID `json:"request_id"`
 }
 
 // 「わからなかった」は1つの返答に1回だけ。
 func (q *Queries) RequestReviewClarification(ctx context.Context, arg RequestReviewClarificationParams) (ReviewResponse, error) {
-	row := q.db.QueryRow(ctx, requestReviewClarification, arg.Reason, arg.RequestID)
+	row := q.db.QueryRow(ctx, requestReviewClarification, arg.Body, arg.Reason, arg.RequestID)
 	var i ReviewResponse
 	err := row.Scan(
 		&i.RequestID,
@@ -455,6 +460,7 @@ func (q *Queries) RequestReviewClarification(ctx context.Context, arg RequestRev
 		&i.ClarifiedAt,
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
+		&i.ClarifyBody,
 	)
 	return i, err
 }
@@ -489,7 +495,7 @@ SET clarification = $1::text,
 WHERE request_id = $2
   AND clarify_requested_at IS NOT NULL
   AND clarification IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
 `
 
 type SaveReviewClarificationParams struct {
@@ -514,6 +520,7 @@ func (q *Queries) SaveReviewClarification(ctx context.Context, arg SaveReviewCla
 		&i.ClarifiedAt,
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
+		&i.ClarifyBody,
 	)
 	return i, err
 }

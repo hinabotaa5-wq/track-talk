@@ -28,7 +28,8 @@ WHERE id = sqlc.arg(id)
 -- name: RequestReviewClarification :one
 -- 「わからなかった」は1つの返答に1回だけ。
 UPDATE review_responses
-SET clarify_reason = sqlc.arg(reason)::text,
+SET clarify_body = sqlc.narg(body)::text,
+    clarify_reason = sqlc.arg(reason)::text,
     clarify_requested_at = now()
 WHERE request_id = sqlc.arg(request_id)
   AND clarify_requested_at IS NULL
@@ -42,6 +43,7 @@ SET status = 'clarifying',
 WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
+  AND returned_at > now()-interval '7 days'
 RETURNING *;
 
 -- name: SaveReviewClarification :one

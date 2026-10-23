@@ -1159,6 +1159,10 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	if req.TargetType == "coaching_consultation" {
+		s.reportConsultation(w, r, p.ID, tid, req.Reason, req.Detail, false)
+		return
+	}
 	// 投稿とコメントは、本人が読めるものだけ通報できる(ない ID や消えたもので運営の一覧を埋めさせない)。
 	if req.TargetType == "post" {
 		if _, ok := s.getReadablePost(w, r, tid); !ok {

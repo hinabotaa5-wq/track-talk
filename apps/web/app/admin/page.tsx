@@ -49,6 +49,7 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
   injury_note: "ケガ部の一言",
   review_response: "添削の返答",
   coaching_message: "パーソナル指導のやりとり",
+  coaching_consultation: "追加相談",
   practice_rating: "練習の評価のひとこと",
 };
 
@@ -646,7 +647,8 @@ export default function AdminPage() {
       </div>
       {tab === "products" ? <ProductsAdmin token={token} /> : null}
       {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
-      {tab === "personal" ? <CoachingContractsAdmin token={token} /> : null}
+      {tab === "personal" ? <><CoachingContractsAdmin token={token} />
+              <Link href="/admin/coaching/reconciliation" className="block text-sm text-blue-300 underline">コーチングの会計照合</Link><Link href="/admin/coaching/tickets" className="block text-sm text-blue-300 underline">チケット購入・返金管理</Link><Link href="/admin/coaching/consultations" className="block text-sm text-blue-300 underline">追加相談・返金管理</Link></> : null}
       {tab === "payouts" ? <PayoutsAdmin token={token} /> : null}
       {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
@@ -662,7 +664,7 @@ export default function AdminPage() {
                 {r.target_hidden ? " · 非表示済み" : ""}
               </p>
               {r.target_title ? <p className="font-medium">{r.target_title}</p> : null}
-              {r.target_type === "coaching_message" ? (
+              {r.target_type === "coaching_message" || r.target_type === "coaching_consultation" ? (
                 <p className="text-sm text-slate-300">中身は、開くと記録が残る画面で確認します。</p>
               ) : r.target_body ? (
                 <p className="line-clamp-4 whitespace-pre-wrap text-sm text-slate-300">{r.target_body}</p>
@@ -673,7 +675,7 @@ export default function AdminPage() {
               <p className="text-xs text-slate-300">
                 通報者: {r.by_guardian ? `保護者（${r.reporter_nickname ?? "名前なし"}さんの）` : (r.reporter_nickname ?? "名前なし")}
               </p>
-              {r.target_type === "coaching_message" ? (
+              {r.target_type === "coaching_consultation" ? <Link href={`/admin/coaching/consultations/${r.target_id}?report=${r.id}`} className="text-sm text-blue-300 underline">記録を残して追加相談を開く</Link> : r.target_type === "coaching_message" ? (
                 <CoachingReportActions report={r} token={token} />
               ) : !r.target_body ? null : hideTargets[r.target_type] ? (
                 <InjuryNoteActions report={r} token={token} />

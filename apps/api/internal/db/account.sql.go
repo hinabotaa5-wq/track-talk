@@ -181,7 +181,7 @@ SELECT
     EXISTS (
         SELECT 1 FROM coaching_contracts ct
         WHERE (ct.coach_id = $1 OR ct.requester_id = $1)
-          AND ct.status IN ('applied', 'accepted', 'active', 'suspended')
+          AND (ct.status IN ('applied', 'accepted', 'active', 'suspended') OR (ct.fulfillment_version=1 AND ct.fulfillment_state<>'settled' AND ct.status IN ('ended','refunded')))
     )::boolean AS open_contract,
     EXISTS (
         SELECT 1 FROM reports rp

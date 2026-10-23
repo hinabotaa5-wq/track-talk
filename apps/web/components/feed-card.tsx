@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { Post } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { PosterFallback } from "@/components/poster-card";
+import { YouTubePlayer } from "@/components/youtube-player";
 import { InstagramThumb } from "@/components/instagram-thumb";
 import { isInstagramShortcode } from "@/lib/instagram";
 
-export const feedGridClass = "columns-2 gap-3 md:columns-3 xl:columns-4";
+export const feedGridClass = "columns-2 gap-3";
 
 const cardClass =
   "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
@@ -42,6 +43,28 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     ? feedTitle(post.excerpt ?? "") || title
     : title;
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
+  if ((post.kind === "video" && post.playback_url) || (post.kind === "youtube" && post.youtube_video_id)) {
+    return (
+      <article className={cardClass}>
+        {post.kind === "youtube" ? (
+          <YouTubePlayer videoId={post.youtube_video_id!} title={cardTitle || "投稿動画"} shorts={post.youtube_shorts} />
+        ) : (
+          <video
+            src={post.playback_url}
+            poster={post.thumbnail_url}
+            controls
+            playsInline
+            preload="metadata"
+            aria-label={cardTitle || "投稿動画"}
+            className="block h-auto w-full bg-black object-contain"
+          />
+        )}
+        <Link href={href} className="block" aria-label={cardTitle || "投稿の詳細を開く"}>
+          <CardTitle title={cardTitle || "投稿の詳細を開く"} />
+        </Link>
+      </article>
+    );
+  }
   if (post.kind === "practice") {
     const info = post.practice;
     return (

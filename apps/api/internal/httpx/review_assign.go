@@ -156,10 +156,17 @@ func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, category string,
 }
 
 type coachingTickResult struct {
-	Expired    int `json:"expired"`
-	Requeued   int `json:"requeued"`
-	Offered    int `json:"offered"`
-	HelpfulAsk int `json:"helpful_ask"`
+	SupportSettled         int `json:"support_settled"`
+	InPersonSettled        int `json:"in_person_settled"`
+	ConsultationsExpired   int `json:"consultations_expired"`
+	ConsultationRefunds    int `json:"consultation_refunds"`
+	ConsultationsPurged    int `json:"consultations_purged"`
+	TicketsReleased        int `json:"tickets_released"`
+	TicketRefundsProcessed int `json:"ticket_refunds_processed"`
+	Expired                int `json:"expired"`
+	Requeued               int `json:"requeued"`
+	Offered                int `json:"offered"`
+	HelpfulAsk             int `json:"helpful_ask"`
 	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
 	ContractsExpired int `json:"contracts_expired"`
 	ContractsEnded   int `json:"contracts_ended"`
@@ -200,10 +207,31 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.PaymentsRefunded, err = s.refundCoachingPayments(ctx); err != nil {
 		return out, err
 	}
+	if out.TicketsReleased, err = s.releaseExpiredTickets(ctx); err != nil {
+		return out, err
+	}
+	if out.TicketRefundsProcessed, err = s.settleTicketRefunds(ctx); err != nil {
+		return out, err
+	}
 	if out.ReviewPaymentsReleased, err = s.settleReviewPayments(ctx); err != nil {
 		return out, err
 	}
+	if out.SupportSettled, err = s.settleSupportContracts(ctx); err != nil {
+		return out, err
+	}
+	if out.InPersonSettled, err = s.settleInPersonContracts(ctx); err != nil {
+		return out, err
+	}
 	if out.EarningsRecorded, err = s.recordCoachEarnings(ctx); err != nil {
+		return out, err
+	}
+	if out.ConsultationsExpired, err = s.expireConsultations(ctx); err != nil {
+		return out, err
+	}
+	if out.ConsultationRefunds, err = s.settleConsultationRefunds(ctx); err != nil {
+		return out, err
+	}
+	if out.ConsultationsPurged, err = s.purgeConsultations(ctx); err != nil {
 		return out, err
 	}
 	if out.MessagesPurged, err = s.purgeCoachingMessages(ctx); err != nil {

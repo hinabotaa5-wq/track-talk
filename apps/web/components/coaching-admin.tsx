@@ -79,7 +79,7 @@ function RefundButtons({
     const ask =
       kind === "full"
         ? `${formatYen(contract.price_yen)}を全額返金しますか？${running ? "期間中のものは、ここで終わります。" : ""}`
-        : "残りの日数分を返金して、ここで終わりにしますか？";
+        : contract.fulfillment_version === 1 ? "未提供の動画回答・通話の単位数に応じて返金し、ここで終了しますか？" : "残りの日数分を返金して、ここで終わりにしますか？";
     if (!confirm(ask)) return;
     if (!acquire()) return;
     setError("");
@@ -101,9 +101,9 @@ function RefundButtons({
       <button type="button" disabled={pending} onClick={() => void refund("full")} className="text-sm text-red-300 underline">
         全額を返金
       </button>
-      {running ? (
+      {running || contract.fulfillment_version === 1 ? (
         <button type="button" disabled={pending} onClick={() => void refund("remaining")} className="text-sm text-red-300 underline">
-          残りの日数分を返金
+          {contract.fulfillment_version === 1 ? "未提供分を返金・再試行" : "残りの日数分を返金"}
         </button>
       ) : null}
       {error ? <span className="text-xs text-red-400">{error}</span> : null}
@@ -160,6 +160,7 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
                 {c.minor ? " · 18歳未満" : ""}
               </p>
               <p className="font-semibold text-white">{c.plan_title}</p>
+              {c.fulfillment_version === 1 ? <p className="text-xs text-slate-300">提供済み {c.delivered_units} / {c.total_units}単位 · 精算 {c.fulfillment_state}</p> : null}
               <p className="text-slate-200">
                 {c.requester_nickname ?? "名前なし"}さん → コーチ {c.coach_nickname ?? "名前なし"}
               </p>

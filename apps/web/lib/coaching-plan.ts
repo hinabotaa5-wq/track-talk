@@ -4,12 +4,28 @@ import type {
   CoachingContractStatus,
   CoachingPlan,
   CoachingPlanKind,
+  CoachingServiceType,
   PlanIncludes,
   PlanMenuUpdates,
   PlanReplyFormat,
 } from "./types";
 
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
+
+export const coachingServiceLabels: Record<CoachingServiceType, string> = {
+  video_review: "動画添削",
+  competition_support: "大会までのサポート",
+  in_person: "対面指導",
+};
+
+export function serviceReady(service: CoachingServiceType | null | undefined): boolean {
+  void service;
+  return true;
+}
+
+export function serviceLabel(service: CoachingServiceType | null | undefined): string {
+  return service ? coachingServiceLabels[service] : "従来の指名プラン";
+}
 
 export const planKindLabels: Record<CoachingPlanKind, string> = {
   period: "期間プラン",
@@ -62,6 +78,12 @@ export function videoReviewsLabel(n: number): string {
 // planIncludes は、「何が返ってくるか」を1項目1行にする。書いていない項目は出さない。
 export function planIncludes(p: PlanIncludes): { label: string; value: string }[] {
   const out: { label: string; value: string }[] = [];
+  if (p.service_type !== undefined) out.push({ label: "サービス", value: serviceLabel(p.service_type) });
+  if (p.additional_consultation_price_yen != null) out.push({ label: "追加相談の料金", value: `${formatYen(p.additional_consultation_price_yen)}／回` });
+  if (p.competition_name) out.push({ label: "大会", value: p.competition_name });
+  if (p.support_start_date && p.competition_date) out.push({ label: "支援日程", value: `${p.support_start_date} 〜 ${p.competition_date}（大会当日まで）` });
+  if (p.call_count) out.push({ label: "ビデオ通話", value: `${p.call_count}回・1回${p.call_minutes ?? 30}分` });
+  if (p.service_type === "competition_support") out.push({ label: "未提供分の返金", value: "動画回答1組・実施確認済み通話1回を各1単位として按分。終了48時間後に精算" });
   if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
   if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
   if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });
@@ -98,7 +120,7 @@ export function sortTrialFirst<T extends Pick<CoachingPlan, "kind">>(plans: T[])
 // パーソナル指導の誓約の文面。API の coachPledgeVersion と一緒に変える。
 export const coachPledgeItems = [
   "LINE や SNS の ID、電話番号、メールアドレスなど、TrackTalk の外の連絡先を教えたり、聞いたりしません。",
-  "利用者と直接会う約束や、TrackTalk を通さないお金のやりとりをしません。",
+  "利用者と直接会うのは、TrackTalk で購入・予約された対面指導だけにします。それ以外の直接の約束や、TrackTalk を通さないお金のやりとりはしません。",
   "連絡先のやりとりを防ぐため、送る文章を機械で確かめ、連絡先らしいものは送れなくなることに同意します（添削の返答も同じです）。",
   "通報があったときは、安全の確認のために運営がやりとりを読むことに同意します。",
   "守らなかったときは、利用停止と報酬の没収になることに同意します。",

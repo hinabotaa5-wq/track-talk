@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import {
   coachPledgeItems,
+  coachingServiceLabels,
+  serviceReady,
   highPlanPriceYen,
   maxTrialPriceYen,
   minPlanPriceYen,
@@ -26,6 +28,7 @@ import type {
   CoachApplication,
   CoachingPlan,
   CoachingPlanKind,
+  CoachingServiceType,
   PlanIncludes,
   PlanMenuUpdates,
   PlanReplyFormat,
@@ -83,6 +86,34 @@ function CoachPledgeForm({ token, onSaved }: { token: string | null; onSaved: (c
   );
 }
 
+function CoachServicesForm({ coach, token, onSaved }: { coach: CoachApplication; token: string | null; onSaved: (coach: CoachApplication) => void }) {
+  const [services, setServices] = useState<CoachingServiceType[]>(coach.service_types ?? []);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const { pending, acquire, release } = useActionLock();
+  async function save() {
+    if (!acquire()) return;
+    setError(""); setSaved(false);
+    try {
+      const result = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/services", { method: "PATCH", token, body: JSON.stringify({ service_types: services }) });
+      onSaved(result.application); setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.fields?.service_types || err.message : "保存できませんでした");
+    } finally { release(); }
+  }
+  return <fieldset className="space-y-3 rounded-xl border border-white/20 p-3" disabled={pending}>
+    <legend className="text-sm font-semibold">担当するサービス（複数選択可）</legend>
+    {(Object.keys(coachingServiceLabels) as CoachingServiceType[]).map((service) => <label key={service} className="flex items-center gap-2 text-sm text-slate-100">
+      <input type="checkbox" checked={services.includes(service)} onChange={() => { setSaved(false); setServices((values) => values.includes(service) ? values.filter((v) => v !== service) : [...values, service]); }} />
+      {coachingServiceLabels[service]}{!serviceReady(service) ? "（公開準備中）" : ""}
+    </label>)}
+    <p className="text-xs text-slate-300">担当を外す場合は、そのサービスのプランを先に非公開にしてください。</p>
+    <Button type="button" disabled={pending} onClick={() => void save()}>担当サービスを保存</Button>
+    {saved ? <p role="status" className="text-xs text-slate-200">保存しました</p> : null}
+    {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
+  </fieldset>;
+}
+
 type PlanDraft = PlanIncludes & {
   kind: CoachingPlanKind;
   duration_days: number;
@@ -90,12 +121,20 @@ type PlanDraft = PlanIncludes & {
   description: string;
   price: string;
   capacity: string;
+  additionalPrice: string;
+  competitionName: string; competitionDate: string; supportStartDate: string; callCount: number; callMinutes: number;
+  venueArea: string; venueName: string; sessionCount: number; sessionMinutes: number; travelFee: string; maxParticipants: number;
+  published: boolean;
 };
 
 function draftOf(plan: CoachingPlan | null): PlanDraft {
   if (!plan) {
     return {
       kind: "period",
+      service_type: null,
+      additionalPrice: "",
+      competitionName: "",competitionDate: "",supportStartDate: "",callCount: 0,callMinutes: 30,venueArea:"",venueName:"",sessionCount:1,sessionMinutes:60,travelFee:"0",maxParticipants:1,
+      published: true,
       duration_days: 30,
       title: "",
       description: "",
@@ -108,7 +147,11 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
     };
   }
   return {
+    competitionName:plan.competition_name ?? "",competitionDate:plan.competition_date ?? "",supportStartDate:plan.support_start_date ?? "",callCount:plan.call_count ?? 0,callMinutes:plan.call_minutes ?? 30,venueArea:plan.venue_area ?? "",venueName:plan.venue_name ?? "",sessionCount:plan.session_count ?? 1,sessionMinutes:plan.session_minutes ?? 60,travelFee:String(plan.travel_fee_yen ?? 0),maxParticipants:plan.max_participants ?? 1,
     kind: plan.kind,
+    service_type: plan.service_type ?? null,
+    additionalPrice: plan.additional_consultation_price_yen == null ? "" : String(plan.additional_consultation_price_yen),
+    published: plan.published,
     duration_days: plan.duration_days,
     title: plan.title,
     description: plan.description,
@@ -253,11 +296,13 @@ function PlanIncludesFields({
 function PlanForm({
   plan,
   token,
+  services,
   onSaved,
   onCancel,
 }: {
   plan: CoachingPlan | null;
   token: string | null;
+  services: CoachingServiceType[];
   onSaved: (p: CoachingPlan) => void;
   onCancel: () => void;
 }) {
@@ -273,6 +318,11 @@ function PlanForm({
   async function submit() {
     const price = Number(draft.price.replace(/[,，円\s]/g, ""));
     const capacity = Number(draft.capacity);
+    const additionalPrice = Number(draft.additionalPrice.replace(/[,，円\s]/g, ""));
+    if (!plan && !draft.service_type) {
+      setFields({ service_type: "サービスを選んでください" });
+      return;
+    }
     let confirmHigh = false;
     if (Number.isFinite(price) && price > highPlanPriceYen && price !== plan?.price_yen) {
       if (!confirm(`${formatYen(price)}で保存します。打ち間違いではありませんか？`)) return;
@@ -282,13 +332,16 @@ function PlanForm({
     setError("");
     setFields({});
     const body = {
+      competition_name:draft.competitionName,competition_date:draft.competitionDate,support_start_date:draft.supportStartDate,call_count:draft.callCount,call_minutes:draft.callMinutes,venue_area:draft.venueArea,venue_name:draft.venueName,session_count:draft.sessionCount,session_minutes:draft.sessionMinutes,travel_fee_yen:Number(draft.travelFee)||0,max_participants:draft.maxParticipants,
       kind: draft.kind,
       duration_days: draft.duration_days,
       title: draft.title,
       description: draft.description,
       price_yen: Number.isFinite(price) ? Math.trunc(price) : null,
       capacity: Number.isFinite(capacity) ? Math.trunc(capacity) : null,
-      published: plan ? plan.published : true,
+      service_type: draft.service_type,
+      additional_consultation_price_yen: draft.additionalPrice.trim() === "" ? null : (Number.isFinite(additionalPrice) ? additionalPrice : -1),
+      published: serviceReady(draft.service_type) && draft.published,
       confirm_high_price: confirmHigh,
       video_reviews: draft.video_reviews,
       menu_updates: draft.menu_updates,
@@ -314,10 +367,42 @@ function PlanForm({
 
   return (
     <div className="space-y-3 rounded-xl border border-white/20 bg-white/5 p-3">
+      <fieldset className="space-y-1.5">
+        <legend className="text-sm text-slate-200">サービス</legend>
+        <div className="flex flex-wrap gap-2">
+          {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来の指名プラン（分類を選んで移行できます）</span> : null}
+          {services.map((service) => (
+            <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
+              onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
+              {coachingServiceLabels[service]}
+            </button>
+          ))}
+        </div>
+        {services.length === 0 ? <p className="text-xs text-slate-300">先に担当するサービスを登録してください。</p> : null}
+        {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">このサービスは準備中です。下書きとして保存されます。</p> : null}
+        {fieldError("service_type")}
+      </fieldset>
+      {draft.service_type === "competition_support" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">大会と支援日程</legend>
+        <label className="block text-sm">大会名<Input aria-label="大会名" maxLength={100} value={draft.competitionName} onChange={(e) => setDraft((d) => ({ ...d, competitionName:e.target.value }))} /></label>{fieldError("competition_name")}
+        <label className="block text-sm">支援開始日<Input aria-label="支援開始日" type="date" value={draft.supportStartDate} onChange={(e) => setDraft((d) => ({ ...d, supportStartDate:e.target.value }))} /></label>{fieldError("support_start_date")}
+        <label className="block text-sm">大会日（この日までサポート）<Input aria-label="大会日" type="date" value={draft.competitionDate} onChange={(e) => setDraft((d) => ({ ...d, competitionDate:e.target.value }))} /></label>{fieldError("competition_date")}
+        <label className="block text-sm">通話回数（0〜12回）<Input aria-label="通話回数" type="number" min={0} max={12} value={draft.callCount} onChange={(e) => setDraft((d) => ({ ...d, callCount:Number(e.target.value) }))} /></label>{fieldError("call_count")}
+        <label className="block text-sm">通話1回の長さ<select aria-label="通話の長さ" value={draft.callMinutes} onChange={(e) => setDraft((d) => ({ ...d, callMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[15,30,45,60].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
+        <p className="text-xs text-slate-300">支援期間は1〜90日。動画添削は有限回数を選び、通話は候補登録後に参加者が確定します。未成年は保護者が確定します。大会日を過ぎても延長せず、未提供分を回数に応じて返金します。</p>
+      </fieldset> : null}
+      {draft.service_type === "in_person" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">対面の場所と回数</legend>
+        <label className="block text-sm">地域<Input aria-label="対面の地域" maxLength={100} value={draft.venueArea} onChange={(e) => setDraft((d) => ({ ...d, venueArea:e.target.value }))} /></label>{fieldError("venue_area")}
+        <label className="block text-sm">会場<Input aria-label="対面の会場" maxLength={100} value={draft.venueName} onChange={(e) => setDraft((d) => ({ ...d, venueName:e.target.value }))} /></label>{fieldError("venue_name")}
+        <label className="block text-sm">対面回数（1〜12回）<Input aria-label="対面回数" type="number" min={1} max={12} value={draft.sessionCount} onChange={(e) => setDraft((d) => ({ ...d, sessionCount:Number(e.target.value) }))} /></label>{fieldError("session_count")}
+        <label className="block text-sm">1回の長さ<select aria-label="対面の長さ" value={draft.sessionMinutes} onChange={(e) => setDraft((d) => ({ ...d, sessionMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[30,60,90,120].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
+        <label className="block text-sm">交通費（円・料金に加算）<Input aria-label="交通費" type="number" min={0} value={draft.travelFee} onChange={(e) => setDraft((d) => ({ ...d, travelFee:e.target.value }))} /></label>{fieldError("travel_fee_yen")}
+        <label className="block text-sm">募集人数（1〜20人）<Input aria-label="募集人数" type="number" min={1} max={20} value={draft.maxParticipants} onChange={(e) => setDraft((d) => ({ ...d, maxParticipants:Number(e.target.value) }))} /></label>{fieldError("max_participants")}
+        <p className="text-xs text-slate-300">場所と集合方法は契約の専用欄だけに出します。未成年は保護者が日時・場所・料金を確認します。未実施分は期間終了48時間後に返金します。</p>
+      </fieldset> : null}
       <div className="space-y-1.5">
         <p className="text-sm text-slate-200">種類</p>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(planKindLabels) as CoachingPlanKind[]).map((k) => (
+          {(Object.keys(planKindLabels) as CoachingPlanKind[]).filter((k) => (draft.service_type !== "competition_support" && draft.service_type !== "in_person") || k === "period").map((k) => (
             <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => setKind(k)} className={chip(draft.kind === k)}>
               {planKindLabels[k]}
             </button>
@@ -332,7 +417,7 @@ function PlanForm({
         </p>
         {fieldError("kind")}
       </div>
-      {planDurations[draft.kind].length > 1 ? (
+      {draft.service_type !== "competition_support" && planDurations[draft.kind].length > 1 ? (
         <div className="space-y-1.5">
           <p className="text-sm text-slate-200">期間</p>
           <div className="flex flex-wrap gap-2">
@@ -381,6 +466,17 @@ function PlanForm({
         <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
         {fieldError("price_yen")}
       </label>
+      <label className="block space-y-1.5 text-sm text-slate-200">
+        <span>追加相談の料金（任意・500円以上）</span>
+        <Input inputMode="numeric" value={draft.additionalPrice} onChange={(e) => setDraft((d) => ({ ...d, additionalPrice: e.target.value }))} placeholder="例: 500" />
+        <p className="text-xs text-slate-300">質問1件と回答1件の料金です。契約期間内の文章相談は基本プランに含まれます。設定は新しい申し込みに反映し、空欄で解除できます。</p>
+        {fieldError("additional_consultation_price_yen")}
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-200">
+        <input type="checkbox" checked={serviceReady(draft.service_type) && draft.published} disabled={!serviceReady(draft.service_type)} onChange={(e) => setDraft((d) => ({ ...d, published: e.target.checked }))} />
+        公開する
+      </label>
+      {fieldError("published")}
       <PlanIncludesFields draft={draft} setDraft={setDraft} fields={fields} />
       <label className="block space-y-1.5 text-sm text-slate-200">
         <span>同時に受ける人数（1〜50人）</span>
@@ -451,12 +547,15 @@ export function CoachPlansSection({
         token,
         body: JSON.stringify({
           kind: p.kind,
+          service_type: p.service_type,
+          additional_consultation_price_yen: p.additional_consultation_price_yen,
           duration_days: p.duration_days,
           title: p.title,
           description: p.description,
           price_yen: p.price_yen,
           capacity: p.capacity,
           published: !p.published,
+          competition_name:p.competition_name,competition_date:p.competition_date,support_start_date:p.support_start_date,call_count:p.call_count,call_minutes:p.call_minutes,
           video_reviews: p.video_reviews,
           menu_updates: p.menu_updates,
           reply_formats: p.reply_formats,
@@ -477,19 +576,21 @@ export function CoachPlansSection({
         <h2 className="font-bold">パーソナル指導のプラン</h2>
         <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
       </div>
+      <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />
       {!coach.pledged ? (
         <div className="rounded-xl border border-white/20 glass bg-white/10 p-3">
           <CoachPledgeForm token={token} onSaved={onCoachChange} />
         </div>
       ) : (
         <>
+          {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
           {plans === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
           {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
           <ul className="space-y-2">
             {plans?.map((p) =>
               editing === p.id ? (
                 <li key={p.id}>
-                  <PlanForm plan={p} token={token} onSaved={saved} onCancel={() => setEditing(null)} />
+                  <PlanForm plan={p} token={token} services={coach.service_types ?? []} onSaved={saved} onCancel={() => setEditing(null)} />
                 </li>
               ) : (
                 <li key={p.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
@@ -517,11 +618,11 @@ export function CoachPlansSection({
                     </button>
                     <button
                       type="button"
-                      disabled={pending || editing !== null}
+                      disabled={pending || editing !== null || (!p.published && !serviceReady(p.service_type))}
                       onClick={() => void togglePublished(p)}
                       className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
                     >
-                      {p.published ? "非公開にする" : "公開する"}
+                      {p.published ? "非公開にする" : serviceReady(p.service_type) ? "公開する" : "公開準備中"}
                     </button>
                   </div>
                 </li>
@@ -529,7 +630,7 @@ export function CoachPlansSection({
             )}
           </ul>
           {editing === "new" ? (
-            <PlanForm plan={null} token={token} onSaved={saved} onCancel={() => setEditing(null)} />
+            <PlanForm plan={null} token={token} services={coach.service_types ?? []} onSaved={saved} onCancel={() => setEditing(null)} />
           ) : plans && plans.length < 10 ? (
             <Button type="button" className="w-full" disabled={editing !== null} onClick={() => setEditing("new")}>
               プランを追加する

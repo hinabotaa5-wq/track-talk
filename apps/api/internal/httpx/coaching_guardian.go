@@ -72,6 +72,8 @@ func (s *Server) listGuardianContracts(w http.ResponseWriter, r *http.Request) {
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+			CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+			ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		c["guardian_consented"] = false
@@ -102,6 +104,8 @@ func (s *Server) guardianContractJSON(ctx context.Context, id uuid.UUID) (map[st
 		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+		CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+		ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 	})
 	c["role"] = "guardian"
 	c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}

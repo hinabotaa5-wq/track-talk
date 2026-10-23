@@ -1,0 +1,18 @@
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /localauth ./cmd/localauth
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates \
+ && adduser -D -H -u 10001 app
+WORKDIR /app
+COPY --from=build /localauth /app/localauth
+EXPOSE 9999
+ENV LOCALAUTH_ADDR=:9999
+USER app
+CMD ["/app/localauth"]

@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -99,12 +100,13 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, vie
 		"sender_role": m.SenderRole,
 		"mine":        mine,
 		// 送った人が退会していれば false。保護者はアカウントを持たないので常に true。
-		"sender_active": m.SenderID != nil || m.SenderRole == "guardian",
-		"body":          m.Body,
-		"video_url":     nil,
-		"thumbnail_url": nil,
-		"menu":          nil,
-		"created_at":    m.CreatedAt,
+		"sender_active":        m.SenderID != nil || m.SenderRole == "guardian",
+		"body":                 m.Body,
+		"video_url":            nil,
+		"thumbnail_url":        nil,
+		"menu":                 nil,
+		"created_at":           m.CreatedAt,
+		"review_submission_id": m.ReviewSubmissionID,
 	}
 	if m.VideoPublicID != nil {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(*m.VideoPublicID)
@@ -147,9 +149,10 @@ func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 type coachingMessageReq struct {
-	Body          string    `json:"body"`
-	VideoPublicID string    `json:"video_public_id"`
-	Menu          *planMenu `json:"menu"`
+	ReviewSubmissionID *uuid.UUID `json:"review_submission_id"`
+	Body               string     `json:"body"`
+	VideoPublicID      string     `json:"video_public_id"`
+	Menu               *planMenu  `json:"menu"`
 }
 
 func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +247,39 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 	}
 	var m db.CoachingMessage
 	err := s.tx(r.Context(), func(q *db.Queries) error {
-		var err error
+		current, err := q.LockConsultationContract(r.Context(), ct.ID)
+		if err != nil {
+			return err
+		}
+		if current.Status != "active" {
+			return &ticketRuleError{"contract_closed", "期間中だけ送れます"}
+		}
+		support := current.FulfillmentVersion == 1
+		if support {
+			if err := supportWritable(current, false); err != nil {
+				return err
+			}
+			if current.StartsAt != nil && time.Now().Before(*current.StartsAt) {
+				return &ticketRuleError{"support_not_started", "支援開始日からメッセージを送れます"}
+			}
+			if req.ReviewSubmissionID != nil && (role != "coach" || req.Body == "" && videoID == nil) {
+				return &ticketRuleError{"invalid_review_answer", "動画への回答は担当コーチが文章または動画で送ってください"}
+			}
+		} else if req.ReviewSubmissionID != nil {
+			return &ticketRuleError{"invalid_review_answer", "この契約は動画ごとの回答管理に対応していません"}
+		}
+		if role == "requester" && videoID != nil && current.ServiceType != nil && current.VideoReviews != nil && *current.VideoReviews > 0 {
+			used, err := q.CountContractVideoSubmissions(r.Context(), ct.ID)
+			if err != nil {
+				return err
+			}
+			if used >= int32(*current.VideoReviews) {
+				return &ticketRuleError{"video_limit", "プランの動画添削回数を使い切りました。追加相談から送信できます"}
+			}
+		}
+		if err := lockUnusedCoachingVideo(r.Context(), q, videoID, nil); err != nil {
+			return err
+		}
 		m, err = q.CreateCoachingMessage(r.Context(), db.CreateCoachingMessageParams{
 			ID:            uuid.New(),
 			ContractID:    ct.ID,
@@ -254,6 +289,22 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 			VideoPublicID: videoID,
 			Menu:          menu,
 		})
+		if err == nil && support {
+			if role == "requester" && videoID != nil {
+				err = q.CreateSupportVideo(r.Context(), db.CreateSupportVideoParams{QuestionID: m.ID, ContractID: ct.ID})
+			}
+			if err == nil && req.ReviewSubmissionID != nil {
+				n, e := q.AnswerSupportVideo(r.Context(), db.AnswerSupportVideoParams{QuestionID: *req.ReviewSubmissionID, ContractID: ct.ID, AnswerID: &m.ID})
+				if e != nil {
+					return e
+				}
+				if n != 1 {
+					return &ticketRuleError{"review_already_answered", "この動画は回答済みか、別の契約の動画です"}
+				}
+				err = q.SetMessageReviewSubmission(r.Context(), db.SetMessageReviewSubmissionParams{ID: m.ID, ReviewSubmissionID: req.ReviewSubmissionID})
+				m.ReviewSubmissionID = req.ReviewSubmissionID
+			}
+		}
 		if err != nil || role != "requester" || videoID == nil || !ct.StartOnFirstVideo {
 			return err
 		}
@@ -266,7 +317,7 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 		return
 	}
 	if err != nil {
-		MapDBError(w, err)
+		writeCheckoutError(w, err)
 		return
 	}
 	// 中身は通知に載せない。保護者にはメッセージごとの通知はしない。
@@ -337,4 +388,25 @@ func (s *Server) coachingVideoFree(w http.ResponseWriter, r *http.Request, publi
 		return false
 	}
 	return true
+}
+
+// 動画は複数の種類の会話に同時利用させない。参照確認と保存を同じロック内で行う。
+func lockUnusedCoachingVideo(ctx context.Context, q *db.Queries, id, retained *string) error {
+	if id == nil {
+		return nil
+	}
+	if err := q.LockCoachingVideo(ctx, *id); err != nil {
+		return err
+	}
+	if retained != nil && *retained == *id {
+		return nil
+	}
+	used, err := q.CoachingVideoInUse(ctx, *id)
+	if err != nil {
+		return err
+	}
+	if used {
+		return &ticketRuleError{"video_in_use", "この動画は使用済みです。別の動画を選んでください"}
+	}
+	return nil
 }

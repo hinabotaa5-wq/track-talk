@@ -14,7 +14,8 @@ import (
 const coachingVideoInUse = `-- name: CoachingVideoInUse :one
 SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = $1::text)
      OR EXISTS (SELECT 1 FROM review_responses WHERE demo_video_public_id = $1::text)
-     OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = $1::text))::boolean AS in_use
+     OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = $1::text)
+     OR EXISTS (SELECT 1 FROM coaching_consultations WHERE video_public_id=$1::text OR answer_video_public_id=$1::text))::boolean AS in_use
 `
 
 // 非公開動画の ID がもうどこかで使われているか。ID は再生 URL に出るので、他人の動画の ID を
@@ -48,7 +49,7 @@ func (q *Queries) CountBlockedContact(ctx context.Context, arg CountBlockedConta
 const createCoachingMessage = `-- name: CreateCoachingMessage :one
 INSERT INTO coaching_messages (id, contract_id, sender_id, sender_role, body, video_public_id, menu)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at
+RETURNING id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id
 `
 
 type CreateCoachingMessageParams struct {
@@ -81,6 +82,7 @@ func (q *Queries) CreateCoachingMessage(ctx context.Context, arg CreateCoachingM
 		&i.VideoPublicID,
 		&i.Menu,
 		&i.CreatedAt,
+		&i.ReviewSubmissionID,
 	)
 	return i, err
 }
@@ -144,7 +146,7 @@ func (q *Queries) GetCoachingMessageContract(ctx context.Context, id uuid.UUID) 
 }
 
 const listCoachingMessages = `-- name: ListCoachingMessages :many
-SELECT id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at FROM coaching_messages
+SELECT id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id FROM coaching_messages
 WHERE contract_id = $1
 ORDER BY created_at, id
 LIMIT 1000
@@ -169,6 +171,7 @@ func (q *Queries) ListCoachingMessages(ctx context.Context, contractID uuid.UUID
 			&i.VideoPublicID,
 			&i.Menu,
 			&i.CreatedAt,
+			&i.ReviewSubmissionID,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +212,8 @@ const listContractsToPurge = `-- name: ListContractsToPurge :many
 SELECT ct.id FROM coaching_contracts ct
 WHERE ct.status IN ('ended', 'refunded')
   AND ct.ends_at <= now() - interval '1 year'
-  AND ct.messages_purged_at IS NULL
+  AND ct.messages_purged_at IS NULL AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
+  AND NOT EXISTS (SELECT 1 FROM coaching_consultations c WHERE c.contract_id=ct.id AND c.purged_at IS NULL)
   AND NOT EXISTS (
       SELECT 1 FROM reports rp
       JOIN coaching_messages m ON m.id = rp.target_id
@@ -237,6 +241,15 @@ func (q *Queries) ListContractsToPurge(ctx context.Context) ([]uuid.UUID, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCoachingVideo = `-- name: LockCoachingVideo :exec
+SELECT pg_advisory_xact_lock(hashtext('coaching-video:' || $1::text))
+`
+
+func (q *Queries) LockCoachingVideo(ctx context.Context, publicID string) error {
+	_, err := q.db.Exec(ctx, lockCoachingVideo, publicID)
+	return err
 }
 
 const markContractMessagesPurged = `-- name: MarkContractMessagesPurged :exec

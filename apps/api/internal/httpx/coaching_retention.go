@@ -20,24 +20,54 @@ func (s *Server) purgeCoachingMessages(ctx context.Context) (int, error) {
 	}
 	purged := 0
 	for _, id := range ids {
-		videos, err := s.q.ListContractMessageVideos(ctx, id)
-		if err != nil {
-			return purged, err
-		}
-		if err := s.cloud.DeleteCoachingVideos(ctx, videos); err != nil {
-			slog.Warn("delete coaching message videos", "contract", id, "err", err)
-			continue
-		}
+		done := false
 		err = s.tx(ctx, func(q *db.Queries) error {
+			if err := q.LockConsultationRoot(ctx, id); err != nil {
+				return err
+			}
+			if _, err := q.LockConsultationContract(ctx, id); err != nil {
+				return err
+			}
+			eligible, err := q.ListContractsToPurge(ctx)
+			if err != nil {
+				return err
+			}
+			found := false
+			for _, candidate := range eligible {
+				if candidate == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil
+			}
+			videos, err := q.ListContractMessageVideos(ctx, id)
+			if err != nil {
+				return err
+			}
+			if err := s.cloud.DeleteCoachingVideos(ctx, videos); err != nil {
+				return err
+			}
 			if _, err := q.DeleteContractMessages(ctx, id); err != nil {
 				return err
 			}
-			return q.MarkContractMessagesPurged(ctx, id)
+			if err := q.PurgeSupportLinks(ctx, id); err != nil {
+				return err
+			}
+			if err := q.MarkContractMessagesPurged(ctx, id); err != nil {
+				return err
+			}
+			done = true
+			return nil
 		})
 		if err != nil {
-			return purged, err
+			slog.Warn("delete coaching message videos", "contract", id, "err", err)
+			continue
 		}
-		purged++
+		if done {
+			purged++
+		}
 	}
 	return purged, nil
 }

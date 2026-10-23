@@ -1,5 +1,7 @@
 "use client";
 
+import { CoachingConsultations } from "@/components/coaching-consultations";
+
 import { useAuth } from "@/components/auth-provider";
 import { ReviewResponseView } from "@/components/review-response";
 import { Button } from "@/components/ui/button";
@@ -243,9 +245,12 @@ export default function CoachReviewRequestPage() {
       {needsClarification && response.clarify_reason ? (
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
           <p className="text-sm font-semibold text-white">「{clarifyReasonLabels[response.clarify_reason]}」と言われました</p>
+          {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
           <ClarificationForm request={request} token={token} onSent={setRequest} />
         </section>
       ) : null}
+
+      <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
         コーチ画面へ

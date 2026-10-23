@@ -3,6 +3,7 @@
 import { CoachAvatar } from "@/components/coach-photo";
 import { PublicPlanList } from "@/components/coaching-plans";
 import { apiFetch } from "@/lib/api";
+import { coachingServiceLabels, serviceReady } from "@/lib/coaching-plan";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import type { CoachTier, PublicCoach } from "@/lib/types";
 import { useEffect, useState } from "react";
@@ -51,7 +52,7 @@ export function CoachList() {
       {shown.length === 0 ? <p className="text-sm text-slate-200">まだいません</p> : null}
       <ul className="space-y-3">
         {shown.map((c) => (
-          <li key={c.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+          <li id={`coach-${c.id}`} key={c.id} className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
             <div className="flex items-center gap-3">
               <CoachAvatar url={c.photo_url} name={c.nickname} />
               <div className="min-w-0 flex-1">
@@ -62,6 +63,9 @@ export function CoachList() {
                 </p>
               </div>
             </div>
+            {(c.service_types ?? []).length > 0 ? <p className="text-xs text-slate-200">
+              担当サービス：{c.service_types.map((s) => `${coachingServiceLabels[s]}${serviceReady(s) ? "" : "（準備中）"}`).join("・")}
+            </p> : null}
             <dl className="space-y-1.5">
               <div>
                 <dt className="text-xs text-slate-300">担当種目</dt>

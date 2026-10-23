@@ -56,7 +56,7 @@ FROM (
     FROM coaching_contracts ct
     JOIN coaching_payments pay ON pay.contract_id = ct.id
     LEFT JOIN coach_profiles cp ON cp.profile_id = ct.coach_id
-    WHERE ct.status IN ('ended', 'refunded')
+    WHERE ct.status IN ('ended', 'refunded') AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
       AND pay.status IN ('paid', 'partially_refunded')
       AND pay.refund_reason IS DISTINCT FROM 'not_started'
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)

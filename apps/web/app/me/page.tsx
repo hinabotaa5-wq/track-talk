@@ -78,6 +78,7 @@ export default function MePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
+      <h1 className="text-xl font-bold text-slate-100">マイページ</h1>
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />

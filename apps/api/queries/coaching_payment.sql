@@ -24,11 +24,12 @@ RETURNING *;
 -- 支払いが済んだら、その時から期間が始まる。18歳未満は保護者の同意があるものだけ。
 UPDATE coaching_contracts ct
 SET status = 'active',
-    starts_at = now(),
-    ends_at = now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END),
+    starts_at = GREATEST(now(),ct.support_start_date::timestamp AT TIME ZONE 'Asia/Tokyo'),
+    ends_at = COALESCE((ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo',now() + make_interval(days => ct.duration_days + CASE WHEN ct.start_on_first_video THEN 7 ELSE 0 END)),
     start_by = NULL,
     updated_at = now()
 WHERE ct.id = $1 AND ct.payment_required AND ct.status = 'accepted'
+  AND (ct.competition_date IS NULL OR (ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
   AND (NOT ct.minor OR EXISTS (
       SELECT 1 FROM coaching_contract_consents c WHERE c.contract_id = ct.id AND c.party = 'guardian'))
 RETURNING *;
@@ -78,7 +79,7 @@ RETURNING *;
 -- 運営が止めていた時間(コーチは書けない)は数えない。再開で終了日をその分延ばすので、終了日から期間を引いた時を始まりとみなす。
 -- 最初の動画から数えるプランは、動画が届いた時（7日届かなければ8日目）が始まりになる。
 SELECT ct.* FROM coaching_contracts ct
-WHERE ct.status = 'active' AND ct.payment_required
+WHERE ct.status = 'active' AND ct.payment_required AND ct.fulfillment_version=0
   AND ct.ends_at - make_interval(days => ct.duration_days) <= now() - interval '72 hours'
   AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid')

@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -247,9 +248,18 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/guardian/{token}/contracts/{id}/consent", s.consentGuardianContract)
 			r.Post("/guardian/{token}/contracts/{id}/decline", s.declineGuardianContract)
 			r.Post("/guardian/{token}/contracts/{id}/checkout", s.checkoutGuardianContract)
+			r.Get("/guardian/{token}/contracts/{id}/support", s.getCoachingSupport)
+			r.Get("/guardian/{token}/contracts/{id}/in-person", s.getInPerson)
+			r.Post("/guardian/{token}/contracts/{id}/in-person/{cid}/{action}", s.actInPersonSession)
+			r.Post("/guardian/{token}/contracts/{id}/calls/{cid}/{action}", s.actSupportCall)
 			r.Get("/guardian/{token}/contracts/{id}/messages", s.listGuardianMessages)
 			r.Post("/guardian/{token}/contracts/{id}/messages", s.createGuardianMessage)
 			r.Post("/guardian/{token}/messages/{mid}/report", s.reportGuardianMessage)
+			r.Get("/guardian/{token}/consultation-reviews", s.listGuardianConsultationReviews)
+			r.Get("/guardian/{token}/contracts/{id}/consultations", s.listConsultationRoom)
+			r.Get("/guardian/{token}/reviews/{id}/consultations", s.listConsultationRoom)
+			r.With(s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
+			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireAuth(v))
@@ -259,10 +269,16 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/me/guardian-link", s.issueGuardianLink)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
 				// パーソナル指導（利用者側）
-				r.Post("/coaching/contracts", s.createCoachingContract)
+				r.With(s.requireNewAcceptance).Post("/coaching/contracts", s.createCoachingContract)
 				r.Get("/coaching/contracts/{id}", s.getCoachingContract)
 				r.Post("/coaching/contracts/{id}/cancel", s.cancelCoachingContract)
 				r.Post("/coaching/contracts/{id}/checkout", s.checkoutCoachingContract)
+				r.Get("/coaching/contracts/{id}/support", s.getCoachingSupport)
+				r.Get("/coaching/contracts/{id}/in-person", s.getInPerson)
+				r.Post("/coaching/contracts/{id}/in-person", s.createInPersonSession)
+				r.Post("/coaching/contracts/{id}/in-person/{cid}/{action}", s.actInPersonSession)
+				r.Post("/coaching/contracts/{id}/calls", s.createSupportCall)
+				r.Post("/coaching/contracts/{id}/calls/{cid}/{action}", s.actSupportCall)
 				r.Get("/coaching/contracts/{id}/messages", s.listCoachingMessages)
 				r.Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
 				r.Post("/coaching/contracts/{id}/rating", s.rateCoachingContract)
@@ -270,8 +286,26 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// フォーム添削（利用者側）
 				r.Get("/coaching/estimate", s.reviewEstimate)
 				r.Post("/coaching/demo", s.joinCoachingDemo)
-				r.Post("/coaching/requests", s.createReviewRequest)
-				r.Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
+				r.With(s.requireNewAcceptance).Post("/coaching/requests", s.createReviewRequest)
+				r.Get("/coaching/requests/{id}/consultations", s.listConsultationRoom)
+				r.Post("/coaching/requests/{id}/consultations", s.saveConsultationDraft)
+				r.Get("/coaching/contracts/{id}/consultations", s.listConsultationRoom)
+				r.Post("/coaching/contracts/{id}/consultations", s.saveConsultationDraft)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
+				r.Post("/coaching/consultations/{id}/{action}", s.actConsultation)
+				r.Get("/coach/consultations", s.coachConsultations)
+				r.Get("/admin/coaching/consultations", s.adminConsultations)
+				r.Get("/admin/coaching/consultations/{id}", s.adminOpenConsultation)
+				r.Post("/admin/coaching/consultations/{id}/hide", s.adminHideConsultation)
+				r.Post("/admin/coaching/consultations/{id}/refund", s.adminRefundConsultation)
+				r.Get("/me/coaching/tickets", s.myTickets)
+				r.With(s.requireNewAcceptance).Post("/coaching/tickets/checkout", s.checkoutTickets)
+				r.Get("/coaching/tickets/purchases/{id}", s.myTicketPurchase)
+				r.Get("/admin/coaching/tickets", s.adminTickets)
+				r.Get("/admin/coaching/reconciliation", s.adminReconciliation)
+				r.Post("/admin/coaching/tickets/{id}/refund", s.adminRefundTickets)
+				r.With(s.requireNewAcceptance).Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
 				r.Post("/coaching/requests/{id}/clarify", s.clarifyReview)
@@ -281,6 +315,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// 顔写真（PUT /coach/me/photo）は応募の審査に使うので、閉じない方に置いてある。
 				r.Patch("/coach/me", s.updateCoachDuty)
 				r.Post("/coach/me/pledge", s.pledgeCoach)
+				r.Patch("/coach/me/services", s.updateCoachServices)
 				r.Get("/coach/me/earnings", s.coachEarnings)
 				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
 				r.Get("/coach/me/plans", s.listMyCoachingPlans)
@@ -305,6 +340,18 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	return r
 }
 
+// requireNewAcceptance は、新規受付を止めている間、新しい申し込み・購入だけを断る。
+// 既存の契約・会話・返金・精算はこの対象にしない。
+func (s *Server) requireNewAcceptance(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.CoachingNewAcceptance {
+			Error(w, http.StatusConflict, "new_acceptance_closed", "新しい申し込みは準備中です")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // requireCoaching は、オンラインコーチングを提供していない間、その API を無いものとして扱う。
 func (s *Server) requireCoaching(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -326,6 +373,12 @@ func (s *Server) now() time.Time {
 
 func (s *Server) present(p postDTO) postDTO {
 	if p.Kind == "video" && p.VideoPublicID != "" {
+		// ローカルのプレビュー用サンプルは外部ストレージに接続しない。
+		if name, ok := strings.CutPrefix(p.VideoPublicID, "local/"); ok && s.cfg.LocalMediaBaseURL != "" {
+			p.ThumbnailURL = s.cfg.LocalMediaBaseURL + "/" + name + ".jpg"
+			p.PlaybackURL = s.cfg.LocalMediaBaseURL + "/" + name + ".mp4"
+			return p
+		}
 		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}

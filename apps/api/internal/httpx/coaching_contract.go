@@ -46,7 +46,7 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	p, err := s.q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: id, PledgeVersion: coachPledgeVersion})
+	p, err := s.q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: id, PledgeVersion: coachPledgeListedVersion})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusNotFound, "not_found", "このプランはいま申し込めません")
 		return
@@ -60,6 +60,8 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
 		VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
 		StartOnFirstVideo: p.StartOnFirstVideo,
+		CompetitionName:   p.CompetitionName, CompetitionDate: p.CompetitionDate, SupportStartDate: p.SupportStartDate, CallCount: p.CallCount, CallMinutes: p.CallMinutes,
+		ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
 	JSON(w, http.StatusOK, map[string]any{
@@ -99,7 +101,7 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	plan, err := s.q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: req.PlanID, PledgeVersion: coachPledgeVersion})
+	plan, err := s.q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: req.PlanID, PledgeVersion: coachPledgeListedVersion})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusNotFound, "not_found", "このプランはいま申し込めません")
 		return
@@ -163,29 +165,49 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	// コーチが承諾したあとに本人が保護者へリンクを送り、保護者がそのリンクから同意とお支払いをする。
 	var ct db.CoachingContract
 	err = s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockCoachingPlans(r.Context(), plan.CoachID); err != nil {
+			return err
+		}
 		var err error
+		plan, err = q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: req.PlanID, PledgeVersion: coachPledgeListedVersion})
+		if err != nil {
+			return err
+		}
 		ct, err = q.CreateCoachingContract(r.Context(), db.CreateCoachingContractParams{
-			ID:                uuid.New(),
-			PlanID:            plan.ID,
-			CoachID:           plan.CoachID,
-			RequesterID:       me.ID,
-			PlanKind:          plan.Kind,
-			PlanTitle:         plan.Title,
-			DurationDays:      plan.DurationDays,
-			PriceYen:          plan.PriceYen,
-			Event:             req.Event,
-			Goal:              req.Goal,
-			CurrentRecord:     req.CurrentRecord,
-			Message:           req.Message,
-			Minor:             minor,
-			RespondBy:         time.Now().Add(contractRespondWindow),
-			VideoReviews:      plan.VideoReviews,
-			MenuUpdates:       plan.MenuUpdates,
-			ReplyFormats:      nonNilStrings(plan.ReplyFormats),
-			StartOnFirstVideo: plan.StartOnFirstVideo,
+			ID:                             uuid.New(),
+			PlanID:                         plan.ID,
+			CoachID:                        plan.CoachID,
+			RequesterID:                    me.ID,
+			PlanKind:                       plan.Kind,
+			PlanTitle:                      plan.Title,
+			DurationDays:                   plan.DurationDays,
+			PriceYen:                       plan.PriceYen,
+			Event:                          req.Event,
+			Goal:                           req.Goal,
+			CurrentRecord:                  req.CurrentRecord,
+			Message:                        req.Message,
+			Minor:                          minor,
+			RespondBy:                      time.Now().Add(contractRespondWindow),
+			VideoReviews:                   plan.VideoReviews,
+			MenuUpdates:                    plan.MenuUpdates,
+			ReplyFormats:                   nonNilStrings(plan.ReplyFormats),
+			StartOnFirstVideo:              plan.StartOnFirstVideo,
+			ServiceType:                    plan.ServiceType,
+			PlanDescription:                &plan.Description,
+			AdditionalConsultationPriceYen: plan.AdditionalConsultationPriceYen,
 		})
 		if err != nil {
 			return err
+		}
+		if plan.ServiceType != nil && *plan.ServiceType == "in_person" {
+			ct, err = q.SnapshotInPersonContract(r.Context(), ct.ID)
+			if err != nil { return err }
+		}
+		if plan.ServiceType != nil && *plan.ServiceType == "competition_support" {
+			ct, err = q.SnapshotSupportContract(r.Context(), ct.ID)
+			if err != nil {
+				return err
+			}
 		}
 		return q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
 			ContractID: ct.ID, Party: "requester", ProfileID: &me.ID, Version: contractConsentVersion,
@@ -213,25 +235,29 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 	return map[string]any{
 		"id":               ct.ID,
-		"plan_id":          ct.PlanID,
-		"plan_kind":        ct.PlanKind,
-		"plan_title":       ct.PlanTitle,
-		"duration_days":    ct.DurationDays,
-		"price_yen":        ct.PriceYen,
-		"event":            ct.Event,
-		"goal":             ct.Goal,
-		"current_record":   ct.CurrentRecord,
-		"message":          ct.Message,
-		"minor":            ct.Minor,
-		"payment_required": ct.PaymentRequired,
-		"status":           ct.Status,
-		"respond_by":       ct.RespondBy,
-		"start_by":         ct.StartBy,
-		"suspended_at":     ct.SuspendedAt,
-		"responded_at":     ct.RespondedAt,
-		"starts_at":        ct.StartsAt,
-		"ends_at":          ct.EndsAt,
-		"created_at":       ct.CreatedAt,
+		"competition_name": ct.CompetitionName, "competition_date": dateString(ct.CompetitionDate), "support_start_date": dateString(ct.SupportStartDate), "call_count": ct.CallCount, "call_minutes": ct.CallMinutes, "venue_area": ct.VenueArea, "venue_name": ct.VenueName, "session_count": ct.SessionCount, "session_minutes": ct.SessionMinutes, "travel_fee_yen": ct.TravelFeeYen, "max_participants": ct.MaxParticipants, "fulfillment_version": ct.FulfillmentVersion, "fulfillment_state": ct.FulfillmentState,
+		"plan_id":                           ct.PlanID,
+		"plan_kind":                         ct.PlanKind,
+		"plan_title":                        ct.PlanTitle,
+		"plan_description":                  ct.PlanDescription,
+		"service_type":                      ct.ServiceType,
+		"additional_consultation_price_yen": ct.AdditionalConsultationPriceYen,
+		"duration_days":                     ct.DurationDays,
+		"price_yen":                         ct.PriceYen,
+		"event":                             ct.Event,
+		"goal":                              ct.Goal,
+		"current_record":                    ct.CurrentRecord,
+		"message":                           ct.Message,
+		"minor":                             ct.Minor,
+		"payment_required":                  ct.PaymentRequired,
+		"status":                            ct.Status,
+		"respond_by":                        ct.RespondBy,
+		"start_by":                          ct.StartBy,
+		"suspended_at":                      ct.SuspendedAt,
+		"responded_at":                      ct.RespondedAt,
+		"starts_at":                         ct.StartsAt,
+		"ends_at":                           ct.EndsAt,
+		"created_at":                        ct.CreatedAt,
 		// 保存期間（終了から1年）を過ぎて、やりとりを消した日時。
 		"messages_purged_at": ct.MessagesPurgedAt,
 		// 申し込んだ時点で、プランに書いてあった「何が返ってくるか」。
@@ -264,6 +290,8 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+			CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+			ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 		})
 		c["coach"] = map[string]any{"id": row.CoachID, "nickname": row.CoachNickname, "photo_url": s.coachPhotoURL(row.CoachPhotoPublicID)}
 		out = append(out, c)
@@ -291,6 +319,8 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+			CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+			ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 		})
 		// コーチには利用者のニックネームだけを見せる。
 		c["requester"] = map[string]any{"nickname": row.RequesterNickname}
@@ -326,6 +356,8 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
 		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
+		CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
+		ServiceType: row.ServiceType, PlanDescription: row.PlanDescription, AdditionalConsultationPriceYen: row.AdditionalConsultationPriceYen,
 	})
 	role := "requester"
 	if row.CoachID == me.ID {

@@ -1,5 +1,7 @@
 "use client";
 
+import { CoachConsultationQueue } from "@/components/coaching-consultations";
+
 import { useAuth } from "@/components/auth-provider";
 import { CoachEarningsSection } from "@/components/coach-payouts";
 import { CoachPhotoForm } from "@/components/coach-photo";
@@ -283,6 +285,7 @@ export function CoachDashboard() {
 
       <CoachEarningsSection token={token} onReady={onPayoutsReady} />
 
+      <CoachConsultationQueue token={token} />
       <CoachRequestsSection token={token} />
 
       <CoachContractsSection token={token} />

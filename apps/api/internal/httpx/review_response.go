@@ -63,6 +63,7 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		"drill":                rs.Drill,
 		"created_at":           rs.CreatedAt,
 		"clarify_reason":       rs.ClarifyReason,
+		"clarify_body":         rs.ClarifyBody,
 		"clarify_requested_at": rs.ClarifyRequestedAt,
 		"clarification":        rs.Clarification,
 		"clarified_at":         rs.ClarifiedAt,
@@ -240,6 +241,10 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if err := lockUnusedCoachingVideo(r.Context(), q, demo, nil); err != nil {
+		writeCheckoutError(w, err)
+		return
+	}
 	rs, err := q.CreateReviewResponse(r.Context(), db.CreateReviewResponseParams{
 		RequestID:         rr.ID,
 		CoachID:           &p.ID,
@@ -256,6 +261,17 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	reservation, ticketErr := q.GetTicketReservationForReview(r.Context(), &rr.ID)
+	if ticketErr != nil && !errors.Is(ticketErr, pgx.ErrNoRows) {
+		MapDBError(w, ticketErr)
+		return
+	}
+	if ticketErr == nil {
+		if err := settleReviewTickets(r.Context(), q, reservation, true); err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
@@ -275,6 +291,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 }
 
 type clarifyReq struct {
+	Body   string `json:"body"`
 	Reason string `json:"reason"`
 }
 
@@ -287,6 +304,14 @@ func (s *Server) clarifyReview(w http.ResponseWriter, r *http.Request) {
 	var req clarifyReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	req.Body = strings.TrimSpace(req.Body)
+	if req.Reason == "" && req.Body != "" {
+		req.Reason = "other"
+	}
+	if len([]rune(req.Body)) > 2000 || looksLikeContact(req.Body) {
+		FieldError(w, map[string]string{"body": "連絡先を含まない文章を2000文字以内で入力してください"})
 		return
 	}
 	if !oneOf(req.Reason, clarifyReasons) {
@@ -302,7 +327,12 @@ func (s *Server) clarifyReview(w http.ResponseWriter, r *http.Request) {
 	q := s.q.WithTx(tx)
 	updated, err := q.MarkReviewClarifying(r.Context(), db.MarkReviewClarifyingParams{ID: rr.ID, RequesterID: rr.RequesterID})
 	if err == nil {
-		_, err = q.RequestReviewClarification(r.Context(), db.RequestReviewClarificationParams{Reason: req.Reason, RequestID: rr.ID})
+		_, err = q.RequestReviewClarification(r.Context(), db.RequestReviewClarificationParams{Reason: req.Reason, RequestID: rr.ID, Body: func() *string {
+			if req.Body == "" {
+				return nil
+			}
+			return &req.Body
+		}()})
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "補足はもう頼めません")
@@ -484,6 +514,7 @@ func (s *Server) reviewCoachJSON(ctx context.Context, out map[string]any, rr db.
 		return nil, err
 	}
 	return map[string]any{
+		"id":           *rr.CoachID,
 		"nickname":     c.Nickname,
 		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
 		"tier":         c.Tier,

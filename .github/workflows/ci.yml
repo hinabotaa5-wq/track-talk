@@ -114,8 +114,14 @@ jobs:
         working-directory: apps/web
         run: npm ci
       - name: Install browser
+        timeout-minutes: 5
         working-directory: apps/web
-        run: npx playwright install --with-deps chromium
+        run: |
+          # Azure側のミラーが低速な場合も、検証環境の準備を長時間待たない。
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
       - name: Login to post
         working-directory: apps/web
         run: |

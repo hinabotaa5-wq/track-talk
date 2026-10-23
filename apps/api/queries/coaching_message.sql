@@ -43,7 +43,8 @@ WHERE m.id = $1;
 SELECT ct.id FROM coaching_contracts ct
 WHERE ct.status IN ('ended', 'refunded')
   AND ct.ends_at <= now() - interval '1 year'
-  AND ct.messages_purged_at IS NULL
+  AND ct.messages_purged_at IS NULL AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
+  AND NOT EXISTS (SELECT 1 FROM coaching_consultations c WHERE c.contract_id=ct.id AND c.purged_at IS NULL)
   AND NOT EXISTS (
       SELECT 1 FROM reports rp
       JOIN coaching_messages m ON m.id = rp.target_id
@@ -69,4 +70,8 @@ WHERE id = $1;
 -- 自分のやりとりや見本動画に付けて流用（保存期間が過ぎると元の動画まで消える）させないために見る。
 SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = sqlc.arg(public_id)::text)
      OR EXISTS (SELECT 1 FROM review_responses WHERE demo_video_public_id = sqlc.arg(public_id)::text)
-     OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = sqlc.arg(public_id)::text))::boolean AS in_use;
+     OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = sqlc.arg(public_id)::text)
+     OR EXISTS (SELECT 1 FROM coaching_consultations WHERE video_public_id=sqlc.arg(public_id)::text OR answer_video_public_id=sqlc.arg(public_id)::text))::boolean AS in_use;
+
+-- name: LockCoachingVideo :exec
+SELECT pg_advisory_xact_lock(hashtext('coaching-video:' || sqlc.arg(public_id)::text));

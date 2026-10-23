@@ -178,7 +178,7 @@ func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUI
 }
 
 const getContractEarning = `-- name: GetContractEarning :one
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at FROM coach_earnings WHERE contract_id = $1
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id FROM coach_earnings WHERE contract_id = $1
 `
 
 func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID) (CoachEarning, error) {
@@ -195,6 +195,7 @@ func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID)
 		&i.AmountYen,
 		&i.PayoutID,
 		&i.CreatedAt,
+		&i.ConsultationID,
 	)
 	return i, err
 }
@@ -211,7 +212,7 @@ FROM (
     FROM coaching_contracts ct
     JOIN coaching_payments pay ON pay.contract_id = ct.id
     LEFT JOIN coach_profiles cp ON cp.profile_id = ct.coach_id
-    WHERE ct.status IN ('ended', 'refunded')
+    WHERE ct.status IN ('ended', 'refunded') AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
       AND pay.status IN ('paid', 'partially_refunded')
       AND pay.refund_reason IS DISTINCT FROM 'not_started'
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)
@@ -220,7 +221,7 @@ FROM (
 WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id
 `
 
 type InsertPersonalEarningsParams struct {
@@ -251,6 +252,7 @@ func (q *Queries) InsertPersonalEarnings(ctx context.Context, arg InsertPersonal
 			&i.AmountYen,
 			&i.PayoutID,
 			&i.CreatedAt,
+			&i.ConsultationID,
 		); err != nil {
 			return nil, err
 		}
@@ -272,7 +274,7 @@ WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NO
   AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id
 `
 
 // 返却して代金が確定した添削の、コーチの取り分を記録する。
@@ -296,6 +298,7 @@ func (q *Queries) InsertReviewEarnings(ctx context.Context, sharePercent int16) 
 			&i.AmountYen,
 			&i.PayoutID,
 			&i.CreatedAt,
+			&i.ConsultationID,
 		); err != nil {
 			return nil, err
 		}
@@ -381,7 +384,7 @@ func (q *Queries) ListPayableCoachEarnings(ctx context.Context) ([]ListPayableCo
 }
 
 const listRecentCoachEarnings = `-- name: ListRecentCoachEarnings :many
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at FROM coach_earnings
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id FROM coach_earnings
 WHERE coach_id = $1
 ORDER BY created_at DESC
 LIMIT 30
@@ -407,6 +410,7 @@ func (q *Queries) ListRecentCoachEarnings(ctx context.Context, coachID *uuid.UUI
 			&i.AmountYen,
 			&i.PayoutID,
 			&i.CreatedAt,
+			&i.ConsultationID,
 		); err != nil {
 			return nil, err
 		}
@@ -532,7 +536,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
 `
 
 type SetCoachPayoutsEnabledParams struct {
@@ -565,6 +569,7 @@ func (q *Queries) SetCoachPayoutsEnabled(ctx context.Context, arg SetCoachPayout
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
+		&i.ServiceTypes,
 	)
 	return i, err
 }
@@ -574,7 +579,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE stripe_account_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
 `
 
 type SetCoachPayoutsEnabledByAccountParams struct {
@@ -608,6 +613,7 @@ func (q *Queries) SetCoachPayoutsEnabledByAccount(ctx context.Context, arg SetCo
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
+		&i.ServiceTypes,
 	)
 	return i, err
 }
@@ -617,7 +623,7 @@ UPDATE coach_profiles
 SET reduced_fee_until = CASE WHEN $1::boolean THEN now() + interval '1 year' END,
     updated_at = now()
 WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
 `
 
 type SetCoachReducedFeeParams struct {
@@ -651,6 +657,7 @@ func (q *Queries) SetCoachReducedFee(ctx context.Context, arg SetCoachReducedFee
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
+		&i.ServiceTypes,
 	)
 	return i, err
 }
@@ -660,7 +667,7 @@ UPDATE coach_profiles
 SET stripe_account_id = COALESCE(stripe_account_id, $1),
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
 `
 
 type SetCoachStripeAccountParams struct {
@@ -694,6 +701,7 @@ func (q *Queries) SetCoachStripeAccount(ctx context.Context, arg SetCoachStripeA
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
+		&i.ServiceTypes,
 	)
 	return i, err
 }

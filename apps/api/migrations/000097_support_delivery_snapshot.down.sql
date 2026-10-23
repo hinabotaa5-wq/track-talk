@@ -1,0 +1,1 @@
+ALTER TABLE coaching_contracts DROP COLUMN delivered_video_count,DROP COLUMN delivered_call_count;

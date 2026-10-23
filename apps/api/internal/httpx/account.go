@@ -42,6 +42,28 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	if err := s.q.WithTx(tx).LockReviewRequester(r.Context(), uid); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	consultationsOpen, err := s.q.WithTx(tx).HasOpenConsultationAccount(r.Context(), &uid)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if consultationsOpen {
+		Error(w, 409, "consultations_open", "対応中の追加相談・確認質問・返金があります。完了後に退会できます")
+		return
+	}
+	ticketsOpen, err := s.q.WithTx(tx).HasOpenTicketAccount(r.Context(), &uid)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if ticketsOpen {
+		Error(w, http.StatusConflict, "tickets_remaining", "未使用・予約中のチケットや処理中の購入・返金があります。利用を終えるか、お問い合わせから返金をご相談ください")
+		return
+	}
 	// 契約は退会でまとめて消えるので、進行中の指導や未解決の通報（運営が読む証拠）を消させない。
 	blockers, err := s.q.WithTx(tx).WithdrawBlockers(r.Context(), uid)
 	if err != nil {

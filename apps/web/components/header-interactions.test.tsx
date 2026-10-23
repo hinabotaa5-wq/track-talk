@@ -36,7 +36,7 @@ async function click(el: Element | null) {
 }
 
 describe("ヘッダーの開閉", () => {
-  for (const admin of [false, true]) {
+  for (const admin of [true]) {
     it(`${admin ? "管理" : "マイページ"}を同じアイコンで開閉し、Escapeでも閉じる`, async () => {
       await act(async () => root.render(<HeaderAccountPanel admin={admin} signedIn />));
       const button = container.querySelector("button");
@@ -51,6 +51,15 @@ describe("ヘッダーの開閉", () => {
       expect(button?.getAttribute("aria-expanded")).toBe("false");
     });
   }
+
+  it("マイページは独立したページへ移動する", async () => {
+    await act(async () => root.render(<HeaderAccountPanel signedIn />));
+    expect(container.querySelector('a[aria-label="マイページ"]')?.getAttribute("href")).toBe("/me");
+    expect(container.querySelector("button")).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await act(async () => root.render(<HeaderAccountPanel signedIn={false} />));
+    expect(container.querySelector("a")?.getAttribute("href")).toBe("/login");
+  });
 
   it("未読と既読を表示し、すべて既読で状態と件数が変わる", async () => {
     apiFetch.mockResolvedValue({ unread_count: 1, notifications: [
@@ -79,12 +88,12 @@ it("感覚メモの日付は日本時間の今日に固定し、保存日はAPI�
   const onCreated = vi.fn();
   apiFetch.mockResolvedValue({ note: { id: "new" }, stats: { total: 1, days: 1, streak: 1, today: 1 } });
   await act(async () => root.render(createElement(SenseNoteComposer, { token: "test-token", writtenToday: false, onCreated })));
-  const date = container.querySelector<HTMLInputElement>('input[type="date"]');
-  expect(date?.value).toBe("2026-10-23");
-  expect(date?.readOnly).toBe(true);
+  expect(container.querySelector("time")?.dateTime).toBe("2026-10-23");
+  expect(container.querySelector("input")).toBeNull();
+  expect(container.textContent).not.toContain("日本時間の今日の日付で保存します");
   expect(container.querySelector("select")).toBeNull();
   const textarea = container.querySelector("textarea")!;
-  expect(textarea.placeholder).toBe("がむしゃらに走りよりもリズムをつけて走った方が固くならなかった\n30m×5\n60m×3");
+  expect(textarea.placeholder).toBe("例) リズムをつけて走ったらリラックスできた");
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "リズムよく走れた");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));

@@ -154,6 +154,7 @@ export default function CoachingSetupPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-8">
+      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">チケットの残高・購入履歴</Link>
       <h1 className="text-2xl font-bold">フォーム添削の準備</h1>
 
       <section className="space-y-3">

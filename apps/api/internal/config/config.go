@@ -33,6 +33,9 @@ type Config struct {
 	// プッシュ通知・添削動画・パーソナル指導・コーチの報酬）を 404 にする。
 	// 提供を始めるまで本番では立てない。
 	CoachingEnabled bool
+	// CoachingNewAcceptance が false の間は、新しい申し込み・購入だけを止める。
+	// 既存の契約・会話・決済の処理は CoachingEnabled の側で続ける。
+	CoachingNewAcceptance bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
 	// ReminderSecret は Cloud Scheduler が月1回の記録のお知らせを呼ぶときのヘッダーの値。空なら使えない。
@@ -71,6 +74,8 @@ type Config struct {
 	// SenseSummaryDailyLimit は、全員で1日(日本時間)に作れるまとめの数。0 なら上限なし。
 	// 無料枠のあいだは、AI Studio に出ている1日の回数より少なくしておくと、超えたぶんは「混み合っています」になる。
 	SenseSummaryDailyLimit int
+	// LocalMediaBaseURL はローカルプレビューの動画配信先。本番では設定しない。
+	LocalMediaBaseURL string
 	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
 	GeminiEndpoint string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
@@ -101,6 +106,7 @@ func Load() (Config, error) {
 		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
+		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
 		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
@@ -118,6 +124,7 @@ func Load() (Config, error) {
 		SMTPPassword:               os.Getenv("SMTP_PASSWORD"),
 		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
+		LocalMediaBaseURL:          strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),
 		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
 		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
 		GeminiSummaryModel:         strings.TrimSpace(os.Getenv("GEMINI_SUMMARY_MODEL")),

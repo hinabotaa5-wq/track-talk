@@ -66,6 +66,10 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
           <PlanIncludesList plan={contract} />
         </dd>
       </div>
+      {contract.plan_description ? <div>
+        <dt className="text-xs text-slate-300">申し込み時のサービス内容</dt>
+        <dd className="whitespace-pre-wrap text-slate-100">{contract.plan_description}</dd>
+      </div> : null}
       <div>
         <dt className="text-xs text-slate-300">種目</dt>
         <dd className="text-slate-100">{coachEventLabels[contract.event]}</dd>

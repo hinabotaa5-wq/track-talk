@@ -1,5 +1,7 @@
 "use client";
 
+import { GuardianConsultationReviews } from "@/components/guardian-consultation-reviews";
+
 import { GuardianPersonalSection } from "@/components/coaching-guardian";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +35,8 @@ function LimitChoices({
 }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm text-slate-300">月の上限（毎月1日にリセットされます）</legend>
+      <legend className="text-sm text-slate-300">購入・お支払いの月の上限（毎月1日にリセットされます）</legend>
+      <p className="text-xs text-slate-300">チケット購入・フォーム添削・指名プランのお支払いを合算します。購入済みチケットの使用時は二重に数えません。</p>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => (
           <label
@@ -176,7 +179,7 @@ export default function GuardianPage() {
       {notice ? <p className="rounded-md bg-emerald-500/15 p-3 text-sm text-emerald-200">{notice}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
-      {consent.status === "consented" ? <GuardianPersonalSection token={token} /> : null}
+      {consent.status === "consented" ? <><GuardianPersonalSection token={token} /><GuardianConsultationReviews token={token} /></> : null}
 
       {consent.status === "consented" ? (
         <form onSubmit={onUpdate} className="space-y-5">

@@ -13,8 +13,8 @@ SELECT count(*) FROM coaching_plans
 WHERE coach_id = $1;
 
 -- name: CreateCoachingPlan :one
-INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats, start_on_first_video)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING *;
 
 -- name: GetCoachingPlan :one
@@ -34,6 +34,8 @@ SET kind = $3,
     menu_updates = $11,
     reply_formats = $12,
     start_on_first_video = $13,
+    service_type = $14,
+    additional_consultation_price_yen = $15,
     updated_at = now()
 WHERE id = $1 AND coach_id = $2
 RETURNING *;
@@ -51,7 +53,9 @@ FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 WHERE pl.published
   AND c.status = 'approved'
-  AND c.pledge_version = sqlc.arg(pledge_version)::smallint
+  AND (pl.service_type IS NULL OR (pl.service_type IN ('video_review','competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
+  AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
+  AND c.pledge_version >= sqlc.arg(pledge_version)::smallint
 ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id;
 
 -- name: LockCoachingPlans :exec

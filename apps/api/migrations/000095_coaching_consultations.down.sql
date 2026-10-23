@@ -1,0 +1,12 @@
+DELETE FROM reports WHERE target_type='coaching_consultation';
+ALTER TABLE reports DROP CONSTRAINT reports_target_type_check;
+ALTER TABLE reports ADD CONSTRAINT reports_target_type_check CHECK (target_type IN ('post','comment','injury_note','review_response','coaching_message','practice_rating'));
+ALTER TABLE reports DROP CONSTRAINT reports_by_guardian_check;
+ALTER TABLE reports ADD CONSTRAINT reports_by_guardian_check CHECK (NOT by_guardian OR target_type='coaching_message');
+ALTER TABLE coach_earnings DROP CONSTRAINT coach_earnings_source_check;
+DELETE FROM coach_earnings WHERE source='consultation';
+ALTER TABLE coach_earnings ADD CONSTRAINT coach_earnings_source_check CHECK (source IN ('review','personal'));
+ALTER TABLE coach_earnings DROP COLUMN consultation_id;
+ALTER TABLE coaching_ticket_reservations DROP COLUMN consultation_id;
+DROP TABLE coaching_consultation_access_logs,coaching_consultation_refunds,coaching_consultations;
+ALTER TABLE review_responses DROP COLUMN clarify_body;

@@ -95,7 +95,7 @@ describe("FeedCard", () => {
       createElement(FeedCard, { post: { ...post, title: "", kind: "youtube", youtube_video_id: "abcdefghijk", thumbnail_url: "https://i.ytimg.com/vi/x/hq.jpg" } }),
     );
     expect(noTitle).not.toContain("（質問なし）");
-    expect(noTitle).not.toContain("<p ");
+    expect(noTitle).toContain("投稿の詳細を開く");
   });
 
   it("does not show a placeholder when a post has no title", () => {
@@ -109,4 +109,22 @@ describe("FeedCard", () => {
     );
     expect(html).toContain("https://www.instagram.com/reel/C1a2B3c4D5e/media/?size=m");
   });
+});
+
+it("投稿動画は一覧内で再生でき、縦横の比率を保つ", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", playback_url: "https://example.com/video.mp4" } }));
+  expect(html).toContain("<video");
+  expect(html).toContain('controls=""');
+  expect(html).toContain('preload="metadata"');
+  expect(html).toContain("h-auto w-full");
+  expect(html).not.toMatch(/<a\b[^>]*><video/);
+});
+
+it("YouTubeの縦動画と横動画をそれぞれの比率で埋め込む", () => {
+  for (const shorts of [true, false]) {
+    const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "youtube", youtube_video_id: "abcdefghijk", youtube_shorts: shorts } }));
+    expect(html).toContain("https://www.youtube-nocookie.com/embed/abcdefghijk");
+    expect(html).toContain(shorts ? "aspect-[9/16]" : "aspect-video");
+    expect(html).not.toMatch(/<a\b[^>]*><iframe/);
+  }
 });

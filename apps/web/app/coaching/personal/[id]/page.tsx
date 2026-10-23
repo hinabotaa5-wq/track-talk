@@ -1,5 +1,10 @@
 "use client";
 
+import { CoachingSupportPanel } from "@/components/coaching-support";
+import { CoachingInPersonPanel } from "@/components/coaching-in-person";
+
+import { CoachingConsultations } from "@/components/coaching-consultations";
+
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
@@ -159,6 +164,11 @@ function CoachingContractView() {
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
       ) : null}
+
+      {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={token} /> : null}
+      {contract.fulfillment_version === 2 ? <CoachingInPersonPanel contract={contract} token={token} /> : null}
+
+      <CoachingConsultations rootID={contract.id} kind="contract" token={token} />
 
       {!isCoach && contract.status === "applied" ? (
         <button
