@@ -23,9 +23,10 @@ if not values.get('STORAGE_CLEANUP_SECRET'):
 run('services', 'enable', 'cloudscheduler.googleapis.com', '--project', project)
 existing = subprocess.run(['gcloud', 'scheduler', 'jobs', 'describe', job, '--project', project, '--location', region], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 action = 'update' if existing else 'create'
+headers_flag = '--update-headers' if existing else '--headers'
 run('scheduler', 'jobs', action, 'http', job, '--project', project, '--location', region,
     '--schedule', '0 4 * * *', '--time-zone', 'Asia/Tokyo',
     '--uri', service['status']['url']+'/internal/storage/cleanup', '--http-method', 'POST',
-    '--headers', 'X-Storage-Cleanup-Secret='+secret, '--attempt-deadline', '180s', '--quiet')
+    headers_flag, 'X-Storage-Cleanup-Secret='+secret, '--attempt-deadline', '180s', '--quiet')
 print('日本時間の毎日4時に保存期限の処理を実行する設定が完了しました。')
 PY
