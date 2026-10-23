@@ -132,6 +132,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/sense-notes", s.listSenseNotes)
 			// 感覚メモの1週間のまとめ（AI）。提供を始めるまで 404。
 			r.With(s.requireSenseSummary).Get("/me/sense-notes/summary", s.getSenseSummary)
+			r.With(s.requireSenseSummary).Get("/me/sense-notes/summaries", s.listSenseSummaries)
 			r.With(s.requireSenseSummary).Post("/me/sense-notes/summary", s.createSenseSummary)
 			r.Post("/me/sense-notes", s.createSenseNote)
 			r.Delete("/me/sense-notes/{id}", s.deleteSenseNote)

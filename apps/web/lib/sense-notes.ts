@@ -86,19 +86,22 @@ export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];
 }
 
-// ふりかえり(AI)。前のまとめのあとに書いた感覚メモ(はじめては、これまでのすべて)から作る。
+// ふりかえり(AI)。未要約の感覚メモを保存順に6個ずつまとめる。
 export type SenseSummary = {
   id: string;
   from_day: string;
   to_day: string;
   note_count: number;
+  notes: SenseNote[] | null;
   summary: { overview: string; good: string[]; concerns: string[]; next: string[] };
   created_at: string;
 };
 
+export type SenseSummaryHistory = { summaries: SenseSummary[]; next_cursor: string | null };
+
 export type SenseSummaryResponse = {
   summary: SenseSummary | null;
-  // 前のまとめのあとに書いた数と、まとめに要る数。作ったときの応答には入らない。
+  // まだまとめていない数と、まとめに要る数。
   pending_notes?: number;
   min_notes?: number;
 };

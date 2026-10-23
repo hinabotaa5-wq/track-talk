@@ -92,17 +92,18 @@ func (q *Queries) CountSenseNotesOnDay(ctx context.Context, arg CountSenseNotesO
 const countSenseNotesSince = `-- name: CountSenseNotesSince :one
 SELECT count(*) FROM sense_notes
 WHERE author_id = $1
-  AND created_at > $2
+  AND (created_at, id) > ($2, $3::uuid)
 `
 
 type CountSenseNotesSinceParams struct {
 	AuthorID uuid.UUID `json:"author_id"`
 	Since    time.Time `json:"since"`
+	SinceID  uuid.UUID `json:"since_id"`
 }
 
-// まとめにまだ使っていない感覚メモの数。since は前のまとめを作った時刻（まだ無ければ十分昔）。
+// まとめにまだ使っていない感覚メモの数。保存時刻とIDで同時刻のメモも区別する。
 func (q *Queries) CountSenseNotesSince(ctx context.Context, arg CountSenseNotesSinceParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSenseNotesSince, arg.AuthorID, arg.Since)
+	row := q.db.QueryRow(ctx, countSenseNotesSince, arg.AuthorID, arg.Since, arg.SinceID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -274,6 +275,64 @@ func (q *Queries) ListSenseNoteDays(ctx context.Context, authorID uuid.UUID) ([]
 	return items, nil
 }
 
+const listSenseNoteSummaries = `-- name: ListSenseNoteSummaries :many
+SELECT id, from_day, to_day, note_count, summary, created_at
+FROM sense_note_summaries
+WHERE author_id = $1
+  AND ($2::timestamptz IS NULL
+       OR (created_at, id) < ($2::timestamptz, $3::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $4
+`
+
+type ListSenseNoteSummariesParams struct {
+	AuthorID uuid.UUID  `json:"author_id"`
+	BeforeAt *time.Time `json:"before_at"`
+	BeforeID uuid.UUID  `json:"before_id"`
+	PageSize int32      `json:"page_size"`
+}
+
+type ListSenseNoteSummariesRow struct {
+	ID        uuid.UUID `json:"id"`
+	FromDay   time.Time `json:"from_day"`
+	ToDay     time.Time `json:"to_day"`
+	NoteCount int32     `json:"note_count"`
+	Summary   []byte    `json:"summary"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListSenseNoteSummaries(ctx context.Context, arg ListSenseNoteSummariesParams) ([]ListSenseNoteSummariesRow, error) {
+	rows, err := q.db.Query(ctx, listSenseNoteSummaries,
+		arg.AuthorID,
+		arg.BeforeAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSenseNoteSummariesRow
+	for rows.Next() {
+		var i ListSenseNoteSummariesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FromDay,
+			&i.ToDay,
+			&i.NoteCount,
+			&i.Summary,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSenseNotes = `-- name: ListSenseNotes :many
 SELECT id, body, event, day, created_at, updated_at
 FROM sense_notes
@@ -338,14 +397,14 @@ func (q *Queries) ListSenseNotes(ctx context.Context, arg ListSenseNotesParams) 
 }
 
 const listSenseNotesBetween = `-- name: ListSenseNotesBetween :many
-SELECT body, event, day, created_at
+SELECT id, body, event, day, created_at
 FROM (
     SELECT body, event, day, created_at, id
     FROM sense_notes
     WHERE author_id = $1
-      AND created_at > $2
-    ORDER BY created_at DESC, id DESC
-    LIMIT $3
+      AND (created_at, id) > ($2, $3::uuid)
+    ORDER BY created_at, id
+    LIMIT $4
 ) AS recent
 ORDER BY day, created_at, id
 `
@@ -353,19 +412,26 @@ ORDER BY day, created_at, id
 type ListSenseNotesBetweenParams struct {
 	AuthorID uuid.UUID `json:"author_id"`
 	Since    time.Time `json:"since"`
+	SinceID  uuid.UUID `json:"since_id"`
 	MaxNotes int32     `json:"max_notes"`
 }
 
 type ListSenseNotesBetweenRow struct {
+	ID        uuid.UUID `json:"id"`
 	Body      string    `json:"body"`
 	Event     *string   `json:"event"`
 	Day       time.Time `json:"day"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// まとめに渡す感覚メモ（since より後に保存したもの）。多いときは新しい方から max_notes 件を、古い順に。
+// 未要約の感覚を保存順に max_notes 件選び、表示とAI用には日付順にする。
 func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesBetweenParams) ([]ListSenseNotesBetweenRow, error) {
-	rows, err := q.db.Query(ctx, listSenseNotesBetween, arg.AuthorID, arg.Since, arg.MaxNotes)
+	rows, err := q.db.Query(ctx, listSenseNotesBetween,
+		arg.AuthorID,
+		arg.Since,
+		arg.SinceID,
+		arg.MaxNotes,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -374,6 +440,7 @@ func (q *Queries) ListSenseNotesBetween(ctx context.Context, arg ListSenseNotesB
 	for rows.Next() {
 		var i ListSenseNotesBetweenRow
 		if err := rows.Scan(
+			&i.ID,
 			&i.Body,
 			&i.Event,
 			&i.Day,
