@@ -25,7 +25,7 @@ export function HorizontalFeed({ children, label = "投稿一覧", itemLabel = "
       const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? Number.parseFloat(getComputedStyle(track).lineHeight) || 16
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? track.clientWidth : 1;
-      const delta = event.deltaY * unit;
+      const delta = -event.deltaY * unit;
       const max = track.scrollWidth - track.clientWidth;
       if (max <= 0 || (delta > 0 && track.scrollLeft >= max - 1) || (delta < 0 && track.scrollLeft <= 1)) return;
       event.preventDefault();

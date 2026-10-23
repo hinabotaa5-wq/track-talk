@@ -165,6 +165,7 @@ test("投稿を左へ横送りでき、末尾から次のページを開ける",
 });
 
 test("PCでは複数の商品が見え、縦ホイールで左右に進める", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.route("**/api/v1/products?**", (route) => route.fulfill({ json: {
     products: Array.from({ length: 6 }, (_, index) => ({ id: `product-${index}`, brand: "テスト", name: `シューズ${index}`, kind: "shoe", review_count: 0, avg_rating: 0, image_url: "" })),
@@ -180,10 +181,10 @@ test("PCでは複数の商品が見え、縦ホイールで左右に進める", 
   expect(third!.x + third!.width).toBeLessThanOrEqual(1280);
   await track.hover();
   const originalY = await page.evaluate(() => window.scrollY);
-  await page.mouse.wheel(0, 240);
+  await page.mouse.wheel(0, -240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
   expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
-  await page.mouse.wheel(0, -240);
+  await page.mouse.wheel(0, 240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeLessThan(2);
   // トラックパッドの横移動も、そのまま使える。
   await page.mouse.wheel(220, 0);
@@ -197,8 +198,8 @@ test("PCでは複数の商品が見え、縦ホイールで左右に進める", 
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(300);
   // 横方向の終端では、ページの縦スクロールへ自然に戻れる。
   await page.addStyleTag({ content: "body { padding-bottom: 1200px; }" });
-  await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
-  await expect(page.getByRole("button", { name: "次の商品へ" })).toBeDisabled();
+  await track.evaluate((el) => { el.scrollLeft = 0; });
+  await expect(page.getByRole("button", { name: "前の商品へ" })).toBeDisabled();
   await track.hover();
   const edgeY = await page.evaluate(() => window.scrollY);
   await page.mouse.wheel(0, 180);
