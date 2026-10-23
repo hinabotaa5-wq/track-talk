@@ -17,14 +17,30 @@ export function HorizontalFeed({ children, label = "投稿一覧", itemLabel = "
       if (!track) return;
       setEdges({ previous: track.scrollLeft > 2, next: track.scrollLeft + track.clientWidth < track.scrollWidth - 2 });
     }
+    // PCの縦ホイールを横移動へ変換する。横ジェスチャーと拡大操作はブラウザに任せる。
+    function onWheel(event: WheelEvent) {
+      if (!track || !event.cancelable || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+      if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+      const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? Number.parseFloat(getComputedStyle(track).lineHeight) || 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? track.clientWidth : 1;
+      const delta = event.deltaY * unit;
+      const max = track.scrollWidth - track.clientWidth;
+      if (max <= 0 || (delta > 0 && track.scrollLeft >= max - 1) || (delta < 0 && track.scrollLeft <= 1)) return;
+      event.preventDefault();
+      track.scrollLeft = Math.max(0, Math.min(max, track.scrollLeft + delta));
+    }
     const frame = requestAnimationFrame(updateEdges);
     const observer = new ResizeObserver(updateEdges);
     observer.observe(track);
     track.addEventListener("scroll", updateEdges, { passive: true });
+    track.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       track.removeEventListener("scroll", updateEdges);
+      track.removeEventListener("wheel", onWheel);
     };
   }, [items.length]);
 
@@ -43,7 +59,10 @@ export function HorizontalFeed({ children, label = "投稿一覧", itemLabel = "
   return (
     <section className="min-w-0 space-y-1">
       <div className="flex items-center justify-between gap-2 px-1">
-        <p id={hintID} className="text-xs text-slate-300">左にスワイプして次の{itemLabel}へ</p>
+        <p id={hintID} className="text-xs text-slate-300">
+          <span className="horizontal-feed-touch-hint">左にスワイプして次の{itemLabel}へ</span>
+          <span className="horizontal-feed-wheel-hint">ホイールで左右にスクロール</span>
+        </p>
         <div className="flex shrink-0 gap-1">
           <button type="button" aria-label={`前の${itemLabel}へ`} aria-controls={trackID} disabled={!edges.previous} onClick={() => move(-1)} className={buttonClass}>
             <ChevronLeft className="size-4" aria-hidden />
