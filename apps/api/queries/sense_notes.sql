@@ -30,10 +30,10 @@ WHERE author_id = $1
   AND day = sqlc.arg('day');
 
 -- name: CountSenseNotesSince :one
--- まとめにまだ使っていない感覚メモの数。since は前のまとめを作った時刻（まだ無ければ十分昔）。
+-- まとめにまだ使っていない感覚メモの数。保存時刻とIDで同時刻のメモも区別する。
 SELECT count(*) FROM sense_notes
 WHERE author_id = $1
-  AND created_at > sqlc.arg('since');
+  AND (created_at, id) > (sqlc.arg('since'), sqlc.arg('since_id')::uuid);
 
 -- name: CountSenseNotes :one
 SELECT count(*) FROM sense_notes WHERE author_id = $1;
@@ -46,14 +46,14 @@ WHERE author_id = $1
 ORDER BY day DESC;
 
 -- name: ListSenseNotesBetween :many
--- まとめに渡す感覚メモ（since より後に保存したもの）。多いときは新しい方から max_notes 件を、古い順に。
-SELECT body, event, day, created_at
+-- 未要約の感覚を保存順に max_notes 件選び、表示とAI用には日付順にする。
+SELECT id, body, event, day, created_at
 FROM (
     SELECT body, event, day, created_at, id
     FROM sense_notes
     WHERE author_id = sqlc.arg('author_id')
-      AND created_at > sqlc.arg('since')
-    ORDER BY created_at DESC, id DESC
+      AND (created_at, id) > (sqlc.arg('since'), sqlc.arg('since_id')::uuid)
+    ORDER BY created_at, id
     LIMIT sqlc.arg('max_notes')
 ) AS recent
 ORDER BY day, created_at, id;
@@ -91,3 +91,12 @@ RETURNING author_id;
 
 -- name: ReleaseSenseNoteSummaryClaim :exec
 DELETE FROM sense_note_summary_claims WHERE author_id = $1;
+
+-- name: ListSenseNoteSummaries :many
+SELECT id, from_day, to_day, note_count, summary, created_at
+FROM sense_note_summaries
+WHERE author_id = sqlc.arg('author_id')
+  AND (sqlc.narg('before_at')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('before_at')::timestamptz, sqlc.arg('before_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg('page_size');
