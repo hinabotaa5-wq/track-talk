@@ -1,0 +1,12 @@
+DROP TRIGGER guard_retired_media ON posts;
+DROP TRIGGER guard_retired_media ON recruitment_photos;
+DROP TRIGGER guard_retired_media ON coach_profiles;
+DROP TRIGGER guard_retired_media ON review_requests;
+DROP TRIGGER guard_retired_media ON review_responses;
+DROP TRIGGER guard_retired_media ON coaching_messages;
+DROP TRIGGER guard_retired_media ON coaching_consultations;
+DROP TRIGGER guard_retired_answer_media ON coaching_consultations;
+DROP TRIGGER guard_retired_media ON products;
+DROP TRIGGER guard_retired_media ON major_hosts;
+DROP FUNCTION guard_retired_cloudinary_media();
+DROP TABLE cloudinary_retirements;

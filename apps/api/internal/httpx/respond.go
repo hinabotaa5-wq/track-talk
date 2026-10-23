@@ -52,6 +52,10 @@ func MapDBError(w http.ResponseWriter, err error) bool {
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
+		if pgErr.ConstraintName == "cloudinary_media_retired" {
+			Error(w, http.StatusUnprocessableEntity, "validation_error", "保存期限が過ぎた画像・動画です。ファイルを選び直してアップロードしてください")
+			return true
+		}
 		if pgErr.Code == "23505" {
 			msg := "すでに登録されています"
 			if pgErr.ConstraintName == "posts_youtube_video_id_active_idx" {
