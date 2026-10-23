@@ -10,7 +10,14 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function FeedLoadingFrame() {
+export function FeedLoadingFrame({ horizontal = false }: { horizontal?: boolean }) {
+  if (horizontal) return (
+    <Frame label="投稿を読み込んでいます">
+      <div className="horizontal-feed-track" aria-hidden>
+        {Array.from({ length: 4 }, (_, index) => <div key={index} className="horizontal-feed-slide rounded-2xl glass bg-white/12 animate-pulse" />)}
+      </div>
+    </Frame>
+  );
   return (
     <Frame label="投稿を読み込んでいます">
       <div className={feedGridClass}>

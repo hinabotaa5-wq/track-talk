@@ -117,3 +117,65 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x).toBeGreaterThanOrEqual(0);
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
+
+test("投稿を左へ横送りでき、末尾から次のページを開ける", async ({ page }) => {
+  const portrait = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="1280"><rect width="320" height="1280" fill="skyblue"/></svg>')}`;
+  await page.route("**/api/v1/posts?**", async (route) => {
+    const current = Number(new URL(route.request().url()).searchParams.get("page") ?? 1);
+    await route.fulfill({ json: {
+      posts: Array.from({ length: 6 }, (_, index) => ({
+        id: `horizontal-${(current - 1) * 6 + index + 1}`, title: `横送りの投稿 ${(current - 1) * 6 + index + 1}`, body: "練習の話", kind: "text",
+        thumbnail_url: index === 0 ? portrait : undefined,
+        mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
+        created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
+      })), meta: { page: current, per_page: 6, total: 12 },
+    } });
+  });
+  await page.goto("/");
+  const track = page.getByRole("region", { name: "投稿一覧", exact: true });
+  await expect(track).toBeVisible();
+  const first = track.getByRole("link").first();
+  const second = track.getByRole("link").nth(1);
+  const before = await first.boundingBox();
+  const secondBox = await second.boundingBox();
+  expect(Math.abs(before!.y - secondBox!.y)).toBeLessThan(2);
+  expect(secondBox!.x).toBeGreaterThan(before!.x);
+  expect(await track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  const originalY = await page.evaluate(() => window.scrollY);
+  await page.getByRole("button", { name: "次の投稿へ", exact: true }).click();
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+  expect((await first.boundingBox())!.x).toBeLessThan(before!.x);
+  expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
+  // 横長の一覧がページ全体にはみ出したり、縦長画像でカードが伸びたりしない。
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const trackBox = await track.boundingBox();
+  expect(trackBox!.height).toBeLessThan(600);
+  await track.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(300);
+  const next = track.getByRole("link", { name: "次の投稿を読み込む" });
+  await next.scrollIntoViewIfNeeded();
+  await expect(next).toBeVisible();
+  await next.click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-7");
+  await expect(track.getByRole("link", { name: "次の投稿を読み込む" })).toHaveCount(0);
+});
+
+test("レビューも横並びになり、PCでは複数の商品が見える", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.route("**/api/v1/products?**", (route) => route.fulfill({ json: {
+    products: Array.from({ length: 6 }, (_, index) => ({ id: `product-${index}`, brand: "テスト", name: `シューズ${index}`, kind: "shoe", review_count: 0, avg_rating: 0, image_url: "" })),
+    meta: { page: 1, per_page: 20, total: 6 },
+  } }));
+  await page.goto("/?sort=review");
+  const track = page.getByRole("region", { name: "レビューの商品一覧" });
+  await expect(track).toBeVisible();
+  const cards = track.getByRole("link");
+  const first = await cards.nth(0).boundingBox();
+  const third = await cards.nth(2).boundingBox();
+  expect(Math.abs(first!.y - third!.y)).toBeLessThan(2);
+  expect(third!.x + third!.width).toBeLessThanOrEqual(1280);
+  await page.getByRole("button", { name: "次の商品へ" }).click();
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+});
