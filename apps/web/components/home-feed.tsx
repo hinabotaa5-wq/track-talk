@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds } from "@/lib/home-feed-cache";
 import { FeedCard } from "@/components/feed-card";
-import { FeedGrid } from "@/components/feed-grid";
+import { HorizontalFeed } from "@/components/horizontal-feed";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import type { Meta, Post } from "@/lib/types";
@@ -69,7 +69,7 @@ export function HomeFeed({
   }, [hasInitial, path, q]);
 
   if (error) return <ErrorState message={error} />;
-  if (posts === null) return <FeedLoadingFrame />;
+  if (posts === null) return <FeedLoadingFrame horizontal />;
 
   const hasNext = meta.page * meta.per_page < meta.total;
 
@@ -82,19 +82,18 @@ export function HomeFeed({
         />
       ) : null}
       {posts.length > 0 ? (
-        <FeedGrid>
-          {posts.map((post) => (
-            <FeedCard key={post.id} post={post} />
-          ))}
-        </FeedGrid>
-      ) : null}
-      {hasNext ? (
-        <Link
-          href={nextHref(sort, q, meta.page + 1, kind)}
-          className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-[0.98]"
-        >
-          次の投稿
-        </Link>
+        <HorizontalFeed>
+          {posts.map((post) => <FeedCard key={post.id} post={post} />)}
+          {hasNext ? (
+            <Link
+              key="next-page"
+              href={nextHref(sort, q, meta.page + 1, kind)}
+              className="items-center justify-center rounded-2xl border border-white/20 glass bg-white/10 px-4 text-center text-sm font-semibold text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
+            >
+              次の投稿を読み込む
+            </Link>
+          ) : null}
+        </HorizontalFeed>
       ) : null}
     </>
   );

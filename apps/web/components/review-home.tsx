@@ -125,7 +125,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
         />
       ) : null}
       {products && products.length > 0 ? (
-        <HorizontalFeed label="レビューの商品一覧">
+        <HorizontalFeed label="レビューの商品一覧" itemLabel="商品">
           {products.map((p) => (
             <Link
               key={p.id}

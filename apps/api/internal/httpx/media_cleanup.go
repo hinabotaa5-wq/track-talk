@@ -73,48 +73,102 @@ func unused(ids, inUse []string) []string {
 	return out
 }
 
+const (
+	mediaCleanupAttempts   = 4
+	mediaCleanupRetryDelay = time.Second
+	mediaCleanupTimeout    = 90 * time.Second
+)
+
+// retryMediaCleanup は失敗した削除を最大3回、1・2・4秒あけて再試行する。
+// 呼び出し元の終了・期限切れや、不正なID・未設定のような再試行で直らない失敗では止める。
+func retryMediaCleanup(ctx context.Context, delay time.Duration, cleanup func(context.Context) error) error {
+	var err error
+	for attempt := 0; attempt < mediaCleanupAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if attempt > 0 {
+			timer := time.NewTimer(delay << (attempt - 1))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		err = cleanup(ctx)
+		if err == nil || errors.Is(err, cloudinary.ErrInvalid) || errors.Is(err, cloudinary.ErrNotConfigured) {
+			return err
+		}
+	}
+	return err
+}
+
 // purgeMedia は使われなくなった写真・動画を裏で Cloudinary から消す。
-// 失敗しても投稿の操作は成功のままにして、ログだけ残す。
+// 失敗時は再試行し、上限に達したときはログを残す。投稿の操作は待たせない。
 func (s *Server) purgeMedia(m postMedia) {
 	if m.empty() || !s.cloud.Configured() {
 		return
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), mediaCleanupTimeout)
 		defer cancel()
 		s.deleteUnusedMedia(ctx, m)
 	}()
 }
 
-// deleteUnusedMedia は、まだどこかで使っている ID を除いてから Cloudinary から消す。
+// deleteUnusedMedia は再試行ごとに使用状況を調べ直し、削除に失敗した分だけ送り直す。
 func (s *Server) deleteUnusedMedia(ctx context.Context, m postMedia) {
 	if m.empty() || !s.cloud.Configured() {
 		return
 	}
-	inUse, err := s.q.ListMediaInUse(ctx, append(slices.Clone(m.Images), m.Videos...))
-	if err != nil {
-		slog.Warn("cloudinary cleanup skipped", "error", err)
-		return
-	}
-	m = postMedia{Images: unused(m.Images, inUse), Videos: unused(m.Videos, inUse)}
-	if err := s.cloud.Delete(ctx, "image", m.Images); err != nil {
-		slog.Warn("cloudinary image delete failed", "public_ids", m.Images, "error", err)
-	}
-	if err := s.cloud.Delete(ctx, "video", m.Videos); err != nil {
-		slog.Warn("cloudinary video delete failed", "public_ids", m.Videos, "error", err)
+	pending := m
+	if err := retryMediaCleanup(ctx, mediaCleanupRetryDelay, func(ctx context.Context) error {
+		var err error
+		pending, err = s.deleteUnusedMediaOnce(ctx, pending)
+		return err
+	}); err != nil {
+		slog.Warn("cloudinary cleanup failed after retries", "images", pending.Images, "videos", pending.Videos, "error", err)
 	}
 }
 
-// purgeCoachingVideos は、非公開の添削・やりとりの動画を裏で Cloudinary から消す。
+func (s *Server) deleteUnusedMediaOnce(ctx context.Context, m postMedia) (postMedia, error) {
+	if m.empty() {
+		return postMedia{}, nil
+	}
+	inUse, err := s.q.ListMediaInUse(ctx, append(slices.Clone(m.Images), m.Videos...))
+	if err != nil {
+		return m, err
+	}
+	m = postMedia{Images: unused(m.Images, inUse), Videos: unused(m.Videos, inUse)}
+	var pending postMedia
+	var failures []error
+	if err := s.cloud.Delete(ctx, "image", m.Images); err != nil {
+		pending.Images = m.Images
+		failures = append(failures, err)
+	}
+	if err := s.cloud.Delete(ctx, "video", m.Videos); err != nil {
+		pending.Videos = m.Videos
+		failures = append(failures, err)
+	}
+	return pending, errors.Join(failures...)
+}
+
+// purgeCoachingVideos は非公開の動画も同じ回数・間隔で再試行して消す。
 func (s *Server) purgeCoachingVideos(ids []string) {
 	if len(ids) == 0 || !s.cloud.Configured() {
 		return
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), mediaCleanupTimeout)
 		defer cancel()
-		if err := s.cloud.DeleteCoachingVideos(ctx, ids); err != nil {
-			slog.Warn("cloudinary coaching video delete failed", "public_ids", ids, "error", err)
+		if err := retryMediaCleanup(ctx, mediaCleanupRetryDelay, func(ctx context.Context) error {
+			return s.cloud.DeleteCoachingVideos(ctx, ids)
+		}); err != nil {
+			slog.Warn("cloudinary coaching video delete failed after retries", "public_ids", ids, "error", err)
 		}
 	}()
 }
