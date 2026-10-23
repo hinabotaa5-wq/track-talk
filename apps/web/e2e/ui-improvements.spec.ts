@@ -29,14 +29,14 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("ホームの大会をヘッダーに集約し、マイページは独立した画面へ移動する", async ({ page }) => {
+test("ホームの大会をヘッダーに集約し、未ログインのマイページはログインへ移動する", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "今日開催中の大会", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今日開催中", exact: true })).toHaveCount(0);
   const account = page.getByRole("link", { name: "マイページ", exact: true });
-  await expect(account).toHaveAttribute("href", "/me");
+  await expect(account).toHaveAttribute("href", "/login");
   await account.click();
-  await expect(page).toHaveURL(/\/login.*next=.*me/);
+  await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("dialog", { name: "マイページ", exact: true })).toHaveCount(0);
 });
 
