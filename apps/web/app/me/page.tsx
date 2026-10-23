@@ -29,7 +29,7 @@ const infoLinks = [
 ] as const;
 
 const menuRowClass =
-  "flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-100 transition hover:bg-white/12 active:scale-95 active:bg-white/16 disabled:opacity-50";
+  "flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-100 transition hover:bg-white/12 active:scale-[0.98] active:bg-white/16 disabled:opacity-50";
 
 function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (

@@ -29,7 +29,7 @@ type Draft = {
 const emptyDraft: Draft = { tier: "coach", events: [], best_record: "", achievements: "", years: "" };
 
 const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
+  `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 

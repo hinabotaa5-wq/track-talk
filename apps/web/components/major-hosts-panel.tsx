@@ -39,7 +39,6 @@ export function MajorHostsPanel({ initialHosts = null }: { initialHosts?: MajorH
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-100">今後の世界陸上・オリンピック</h1>
       {loading ? <p className="text-sm text-slate-200">読み込み中...</p> : <MajorHostList hosts={hosts ?? []} error={error} />}
-      <BackButton />
     </div>
   );
 }
@@ -95,7 +94,7 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
                   <div>
                     <dt className="text-sm text-slate-200">関連ページ</dt>
                     <dd className="mt-1">
-                      <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-blue-400 transition active:scale-95">
+                      <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-blue-400 transition active:scale-[0.98]">
                         Wikipedia
                       </a>
                     </dd>

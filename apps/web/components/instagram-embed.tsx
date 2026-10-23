@@ -51,13 +51,13 @@ export function InstagramEmbed({ type, shortcode, title }: { type: string; short
   );
 
   return (
-    <div className="mx-auto w-full max-w-[540px] space-y-2">
+    <div className={`mx-auto w-full space-y-2 ${type === "reel" ? "max-w-[320px]" : "max-w-[540px]"}`}>
       <iframe
         ref={frameRef}
         src={`${permalink}embed/`}
         title={`Instagram「${title}」`}
         className="w-full overflow-hidden rounded-xl border border-white/20 bg-white"
-        style={{ height: height ?? (type === "reel" ? 720 : 600) }}
+        style={{ height: height ?? 600 }}
         loading="lazy"
         scrolling="no"
         allow="encrypted-media; picture-in-picture; web-share"

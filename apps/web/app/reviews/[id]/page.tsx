@@ -160,7 +160,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
               href={product.product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-95"
+              className="mt-2 inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-[0.98]"
             >
               公式ページを見る ↗
             </a>

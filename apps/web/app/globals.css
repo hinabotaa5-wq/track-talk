@@ -170,3 +170,68 @@ select:-webkit-autofill {
     animation: none;
   }
 }
+
+/* ホームのカードは1列で横へ進む。ほかの画面の縦の一覧には適用しない。 */
+.horizontal-feed-track {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 0.25rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+}
+
+.horizontal-feed-slide {
+  flex: 0 0 86%;
+  min-width: 0;
+  height: clamp(14rem, calc(100dvh - 18rem), 34rem);
+  scroll-snap-align: start;
+}
+
+.horizontal-feed-slide > a {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.horizontal-feed-slide > a > :first-child {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.horizontal-feed-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (min-width: 48rem) {
+  .horizontal-feed-slide {
+    flex-basis: calc((100% - 0.75rem) / 2);
+  }
+}
+
+@media (min-width: 80rem) {
+  .horizontal-feed-slide {
+    flex-basis: calc((100% - 1.5rem) / 3);
+  }
+}
+
+.horizontal-feed-wheel-hint {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* ホイールの小さな移動がスナップで元に戻らないようにする。 */
+  .horizontal-feed-track {
+    scroll-snap-type: none;
+  }
+  .horizontal-feed-touch-hint {
+    display: none;
+  }
+  .horizontal-feed-wheel-hint {
+    display: inline;
+  }
+}

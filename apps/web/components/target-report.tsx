@@ -56,7 +56,7 @@ export function TargetReport({
       type="button"
       onClick={() => void report()}
       disabled={pending || reported}
-      className={reported ? "text-xs font-semibold text-amber-300" : "text-xs text-slate-300 transition active:scale-95 disabled:opacity-50"}
+      className={reported ? "text-xs font-semibold text-amber-300" : "text-xs text-slate-300 transition active:scale-[0.98] disabled:opacity-50"}
     >
       {reported ? "通報済み" : "通報"}
     </button>

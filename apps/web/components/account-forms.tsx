@@ -21,7 +21,7 @@ import type { z } from "zod";
 function ForgotPasswordLink() {
   return (
     <p className="text-sm">
-      <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-95">
+      <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">
         パスワードを忘れた方はこちら
       </Link>
     </p>

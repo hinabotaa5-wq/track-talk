@@ -490,7 +490,7 @@ export function PostDetail({
         </>
       ) : post.kind === "video" && post.playback_url ? (
         <ZoomableVideo
-          className="aspect-video w-full bg-black"
+          className="mx-auto h-auto max-h-[80dvh] w-auto max-w-full bg-black"
           src={post.playback_url}
           poster={post.thumbnail_url}
         />
@@ -564,14 +564,14 @@ export function PostDetail({
             <Link
               href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
               aria-disabled={action.pending}
-              className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-95 aria-disabled:pointer-events-none aria-disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-[0.98] aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
               編集
             </Link>
             <Button
               type="button"
               variant="danger"
-              className="rounded-full shadow-xs active:scale-95"
+              className="rounded-full shadow-xs active:scale-[0.98]"
               disabled={action.pending}
               onClick={remove}
             >
@@ -912,7 +912,7 @@ function RecruitmentFacts({ post }: { post: Post }) {
             <dt className="text-sm text-slate-200">SNS</dt>
             <dd className="mt-1 space-y-1">
               {info.links.map((link) => (
-                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-400 transition active:scale-95">
+                <a key={link} href={link} target="_blank" rel="noreferrer" className="block break-all text-blue-400 transition active:scale-[0.98]">
                   {link}
                 </a>
               ))}

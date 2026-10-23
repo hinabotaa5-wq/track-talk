@@ -10,6 +10,7 @@ import { activeReviewFilterCount, reviewFiltersApiQuery, withReviewFilters, type
 import type { Meta, Product } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { FeedLoadingFrame } from "@/components/loading-frame";
+import { HorizontalFeed } from "@/components/horizontal-feed";
 import { ProductImage } from "@/components/product-image";
 import { ProductRequest } from "@/components/product-request";
 import { ReviewFilterBar } from "@/components/review-filters";
@@ -116,7 +117,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
       </div>
       {rankingEvent && !q && page === 1 ? <EventRanking kind={kind} event={rankingEvent} filters={filters} /> : null}
       {error ? <ErrorState message={error} /> : null}
-      {!error && products === null ? <FeedLoadingFrame /> : null}
+      {!error && products === null ? <FeedLoadingFrame horizontal /> : null}
       {products && products.length === 0 ? (
         <EmptyState
           title={filtered ? "条件に合うレビューがありません" : "商品がありません"}
@@ -124,12 +125,12 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
         />
       ) : null}
       {products && products.length > 0 ? (
-        <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
+        <HorizontalFeed label="レビューの商品一覧" itemLabel="商品">
           {products.map((p) => (
             <Link
               key={p.id}
               href={withReviewFilters(`/reviews/${p.id}`, filters)}
-              className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/40 hover:shadow-xl hover:shadow-blue-950/30 active:scale-95"
+              className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/40 hover:shadow-xl hover:shadow-blue-950/30 active:scale-[0.98]"
             >
               <ProductImage product={p} />
               <div className="space-y-0.5 px-3.5 py-2.5">
@@ -145,7 +146,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
               </div>
             </Link>
           ))}
-        </div>
+        </HorizontalFeed>
       ) : null}
       {products ? <ProductRequest kind={kind} /> : null}
       {products && (meta.page > 1 || hasNext) ? (

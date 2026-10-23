@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, Shield } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { HeaderAccountPanel } from "./header-account-panel";
 import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, meTab, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
+import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
@@ -103,12 +104,12 @@ export function Header() {
               type="button"
               onClick={goBack}
               aria-label="戻る"
-              className="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
+              className="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-[0.98]"
             >
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-95">
+            <Link href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
               <TrackLogo />
             </Link>
           )}
@@ -125,7 +126,7 @@ export function Header() {
                     href={mainTabHref(tab.id, !!session)}
                     onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}
                     aria-current={active ? "page" : undefined}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-95 ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition active:scale-[0.98] ${
                       active
                         ? "border border-white/35 bg-white/20 font-semibold text-white"
                         : "text-slate-200 hover:bg-white/12 hover:text-white"
@@ -138,34 +139,17 @@ export function Header() {
               })}
             </nav>
             {profile?.is_admin && showHeaderAccountActions ? (
-              <Link
-                href="/admin"
-                onClick={(event) => guardedClick(event, "/admin")}
-                aria-label="管理"
-                className="inline-flex size-10 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-95"
-              >
-                <Shield className="size-5" strokeWidth={2} aria-hidden />
-              </Link>
+              <HeaderAccountPanel key={`admin:${pathname}`} admin signedIn={!!session} />
             ) : null}
+            {pathname === "/" ? <TodayMeetBalloon /> : null}
             {session && showHeaderAccountActions ? (
               <>
-                {pathname === "/" ? <TodayMeetBalloon /> : null}
                 <FeedbackBox />
                 <NotificationBell />
               </>
             ) : null}
             {showHeaderAccountActions ? (
-              <Link
-                href={mainTabHref("me", !!session)}
-                onClick={(event) => guardedClick(event, mainTabHref("me", !!session))}
-                aria-label={meTab.label}
-                aria-current={current === "me" ? "page" : undefined}
-                className={`inline-flex size-10 items-center justify-center rounded-full transition active:scale-95 ${
-                  current === "me" ? "bg-white/20 text-white" : "text-slate-300 hover:bg-white/16"
-                }`}
-              >
-                <meTab.icon className="size-5" strokeWidth={current === "me" ? 2.4 : 2} aria-hidden />
-              </Link>
+              <HeaderAccountPanel key={`me:${pathname}`} signedIn={!!session} />
             ) : null}
           </div>
         )}

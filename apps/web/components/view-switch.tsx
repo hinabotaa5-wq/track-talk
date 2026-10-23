@@ -25,7 +25,7 @@ export function ViewSwitch<T extends string>({
     <div role="group" aria-label={label} className="grid grid-cols-2 gap-1 rounded-full border border-white/25 glass bg-white/10 p-1 md:max-w-sm">
       {views.map((item) => {
         const active = item.id === current;
-        const className = `relative flex h-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200 active:scale-95 ${
+        const className = `relative flex h-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200 active:scale-[0.98] ${
           active ? "text-white" : "text-slate-200 hover:text-white"
         }`;
         const inner = (

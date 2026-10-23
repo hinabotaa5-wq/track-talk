@@ -22,7 +22,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 // Stripe の鍵がない間は支払いなしのデモ版で、承諾したら始まる。
 
 const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
+  `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 

@@ -37,7 +37,7 @@ import { useEffect, useState } from "react";
 // パーソナル指導のプラン。コーチ画面では誓約と、プランの作成・編集をする。コーチ一覧では公開中のプランを見せる。
 
 const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 ${
+  `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
@@ -395,7 +395,7 @@ function PlanForm({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
         >
           やめる
         </button>
@@ -511,7 +511,7 @@ export function CoachPlansSection({
                       type="button"
                       disabled={pending || editing !== null}
                       onClick={() => setEditing(p.id)}
-                      className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+                      className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
                     >
                       直す
                     </button>
@@ -519,7 +519,7 @@ export function CoachPlansSection({
                       type="button"
                       disabled={pending || editing !== null}
                       onClick={() => void togglePublished(p)}
-                      className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+                      className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
                     >
                       {p.published ? "非公開にする" : "公開する"}
                     </button>

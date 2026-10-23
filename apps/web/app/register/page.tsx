@@ -97,15 +97,15 @@ export default function RegisterPage() {
             onChange={(e) => setAgreed(e.target.checked)}
           />
           <span>
-            <Link href="/terms" className="inline-block text-blue-400 transition active:scale-95">
+            <Link href="/terms" className="inline-block text-blue-400 transition active:scale-[0.98]">
               利用規約
             </Link>
             ・
-            <Link href="/guidelines" className="inline-block text-blue-400 transition active:scale-95">
+            <Link href="/guidelines" className="inline-block text-blue-400 transition active:scale-[0.98]">
               コミュニティガイドライン
             </Link>
             ・
-            <Link href="/privacy" className="inline-block text-blue-400 transition active:scale-95">
+            <Link href="/privacy" className="inline-block text-blue-400 transition active:scale-[0.98]">
               プライバシーポリシー
             </Link>
             に同意する
@@ -117,7 +117,7 @@ export default function RegisterPage() {
       </form>
       <GoogleSignInButton nextPath="/me/profile?onboarding=1" label="Googleで登録" disabled={!agreed} />
       <p className="text-sm">
-        アカウントがある場合は <Link href="/login" className="inline-block text-blue-400 transition active:scale-95">ログイン</Link>
+        アカウントがある場合は <Link href="/login" className="inline-block text-blue-400 transition active:scale-[0.98]">ログイン</Link>
       </p>
     </div>
   );

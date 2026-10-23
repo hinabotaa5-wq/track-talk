@@ -68,7 +68,7 @@ export function FeedbackBox() {
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-95"
+        className="inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-[0.98]"
       >
         <Box className="size-5" strokeWidth={2} aria-hidden />
       </button>

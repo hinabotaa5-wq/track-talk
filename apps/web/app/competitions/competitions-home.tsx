@@ -68,7 +68,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
             <Link
               key={entry.href}
               href={entry.href}
-              className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-[0.98]"
             >
               <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
               <span className="truncate">{entry.label}</span>
@@ -234,71 +234,55 @@ function StateBadge({ item, today }: { item: Scheduled; today: string }) {
   return null;
 }
 
-// ふだんは公式サイト(要項)へ飛ぶ。開催中で実況スレッドがある大会だけ、カードのタップで実況スレッドへ入り、公式サイトは下の小さなリンクに残す。
+// 日程とタイムテーブルは大会の公式ページへ。実況スレッドは独立した入口にして、日程のタップと混ぜない。
 function ScheduleCard({
   href,
   linkLabel,
+  timetableHref,
   over,
   thread,
   children,
 }: {
   href: string;
   linkLabel: string;
+  timetableHref?: string;
   over: boolean;
   thread?: MeetThread;
   children: ReactNode;
 }) {
-  if (thread) {
-    return (
-      <div className={`${cardBase} border-amber-300/60`}>
-        <Link href={thread.href} className="block transition active:scale-[0.98]">
+  return (
+    <div className={`${cardBase} ${thread ? "border-amber-300/60" : ""} ${over ? "opacity-80" : ""}`}>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="block transition hover:text-blue-300 active:scale-[0.98]">
           {children}
-          <span className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30">
-            <span className="min-w-0">
-              <span className="block">実況スレッドへ</span>
-              <NowRunning events={thread.now_running} className="block truncate text-xs font-semibold text-emerald-200" />
-            </span>
-            <span className="flex shrink-0 items-center gap-1 text-xs text-amber-100/80">
-              <MessageCircle className="size-3.5" aria-hidden />
-              {thread.comment_count}
-              <ChevronRight className="size-4" aria-hidden />
-            </span>
+          {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
+        </a>
+      ) : children}
+      {timetableHref ? (
+        <a href={timetableHref} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-9 items-center text-sm font-semibold text-blue-300 underline transition active:scale-[0.98]">
+          日程・タイムテーブル
+        </a>
+      ) : null}
+      {thread ? (
+        <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
+          <span className="min-w-0">
+            <span className="block">実況スレッドへ</span>
+            <NowRunning events={thread.now_running} className="block truncate text-xs font-semibold text-emerald-200" />
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-xs text-amber-100/80">
+            <MessageCircle className="size-3.5" aria-hidden />
+            {thread.comment_count}
+            <ChevronRight className="size-4" aria-hidden />
           </span>
         </Link>
-        {href && linkLabel ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-blue-400 hover:underline">
-            {linkLabel}
-          </a>
-        ) : null}
-      </div>
-    );
-  }
-
-  const label = linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null;
-  if (!href) {
-    return (
-      <div className={cardBase}>
-        {children}
-        {label}
-      </div>
-    );
-  }
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${cardBase} transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95 ${over ? "opacity-80" : ""}`}
-    >
-      {children}
-      {label}
-    </a>
+      ) : null}
+    </div>
   );
 }
 
 function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: string; thread?: MeetThread }) {
   return (
-    <ScheduleCard href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
+    <ScheduleCard href={major.site_url} timetableHref={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {major.schedule_label}
         <StateBadge item={major} today={today} />
@@ -312,7 +296,7 @@ function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: s
 function InternationalCard({ competition, today, thread }: { competition: Competition; today: string; thread?: MeetThread }) {
   const link = destination(competition, INTERNATIONAL);
   return (
-    <ScheduleCard href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
+    <ScheduleCard href={link.href} timetableHref={competition.organizer_url} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {competitionDates(competition.starts_on, competition.ends_on)}
         <StateBadge item={competition} today={today} />

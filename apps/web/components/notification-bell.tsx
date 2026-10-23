@@ -134,7 +134,7 @@ export function NotificationBell() {
           if (willOpen) load(true);
           setOpen(willOpen);
         }}
-        className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-95"
+        className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-[0.98]"
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (
@@ -153,7 +153,7 @@ export function NotificationBell() {
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
             <p className="text-sm font-semibold text-slate-100">通知</p>
             {unread > 0 ? (
-              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:scale-95">
+              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:scale-[0.98]">
                 すべて既読
               </button>
             ) : null}
@@ -166,16 +166,17 @@ export function NotificationBell() {
           {items.length > 0 ? (
             <ul className="max-h-96 overflow-y-auto">
               {items.map((item) => (
-                <li key={item.id} className={item.read ? "" : "bg-blue-950/40"}>
+                <li key={item.id} className={item.read ? "border-l-4 border-transparent bg-white/5" : "border-l-4 border-sky-300 bg-sky-400/20"}>
                   <Link
                     href={hrefFor(item)}
                     onClick={() => {
                       setOpen(false);
                       if (!item.read) void markRead(item.id);
                     }}
-                    className="block px-3 py-3 transition hover:bg-white/16 active:scale-95"
+                    className="block px-3 py-3 transition hover:bg-white/16 active:scale-[0.98]"
                   >
-                    <p className="text-sm text-slate-100">
+                    <p className={`text-sm ${item.read ? "font-normal text-slate-300" : "font-bold text-white"}`}>
+                      <span className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs ${item.read ? "bg-white/10 text-slate-400" : "bg-sky-300 text-slate-950"}`}>{item.read ? "既読" : "未読"}</span>
                       {labelFor(item)}
                       {item.post_title ? `: ${item.post_title}` : ""}
                     </p>
