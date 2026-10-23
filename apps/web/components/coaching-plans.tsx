@@ -123,6 +123,7 @@ type PlanDraft = PlanIncludes & {
   capacity: string;
   additionalPrice: string;
   competitionName: string; competitionDate: string; supportStartDate: string; callCount: number; callMinutes: number;
+  venueArea: string; venueName: string; sessionCount: number; sessionMinutes: number; travelFee: string; maxParticipants: number;
   published: boolean;
 };
 
@@ -132,7 +133,7 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
       kind: "period",
       service_type: null,
       additionalPrice: "",
-      competitionName: "",competitionDate: "",supportStartDate: "",callCount: 0,callMinutes: 30,
+      competitionName: "",competitionDate: "",supportStartDate: "",callCount: 0,callMinutes: 30,venueArea:"",venueName:"",sessionCount:1,sessionMinutes:60,travelFee:"0",maxParticipants:1,
       published: true,
       duration_days: 30,
       title: "",
@@ -146,7 +147,7 @@ function draftOf(plan: CoachingPlan | null): PlanDraft {
     };
   }
   return {
-    competitionName:plan.competition_name ?? "",competitionDate:plan.competition_date ?? "",supportStartDate:plan.support_start_date ?? "",callCount:plan.call_count ?? 0,callMinutes:plan.call_minutes ?? 30,
+    competitionName:plan.competition_name ?? "",competitionDate:plan.competition_date ?? "",supportStartDate:plan.support_start_date ?? "",callCount:plan.call_count ?? 0,callMinutes:plan.call_minutes ?? 30,venueArea:plan.venue_area ?? "",venueName:plan.venue_name ?? "",sessionCount:plan.session_count ?? 1,sessionMinutes:plan.session_minutes ?? 60,travelFee:String(plan.travel_fee_yen ?? 0),maxParticipants:plan.max_participants ?? 1,
     kind: plan.kind,
     service_type: plan.service_type ?? null,
     additionalPrice: plan.additional_consultation_price_yen == null ? "" : String(plan.additional_consultation_price_yen),
@@ -331,7 +332,7 @@ function PlanForm({
     setError("");
     setFields({});
     const body = {
-      competition_name:draft.competitionName,competition_date:draft.competitionDate,support_start_date:draft.supportStartDate,call_count:draft.callCount,call_minutes:draft.callMinutes,
+      competition_name:draft.competitionName,competition_date:draft.competitionDate,support_start_date:draft.supportStartDate,call_count:draft.callCount,call_minutes:draft.callMinutes,venue_area:draft.venueArea,venue_name:draft.venueName,session_count:draft.sessionCount,session_minutes:draft.sessionMinutes,travel_fee_yen:Number(draft.travelFee)||0,max_participants:draft.maxParticipants,
       kind: draft.kind,
       duration_days: draft.duration_days,
       title: draft.title,
@@ -372,7 +373,7 @@ function PlanForm({
           {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来の指名プラン（分類を選んで移行できます）</span> : null}
           {services.map((service) => (
             <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
-              onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
+              onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
               {coachingServiceLabels[service]}
             </button>
           ))}
@@ -389,10 +390,19 @@ function PlanForm({
         <label className="block text-sm">通話1回の長さ<select aria-label="通話の長さ" value={draft.callMinutes} onChange={(e) => setDraft((d) => ({ ...d, callMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[15,30,45,60].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
         <p className="text-xs text-slate-300">支援期間は1〜90日。動画添削は有限回数を選び、通話は候補登録後に参加者が確定します。未成年は保護者が確定します。大会日を過ぎても延長せず、未提供分を回数に応じて返金します。</p>
       </fieldset> : null}
+      {draft.service_type === "in_person" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">対面の場所と回数</legend>
+        <label className="block text-sm">地域<Input aria-label="対面の地域" maxLength={100} value={draft.venueArea} onChange={(e) => setDraft((d) => ({ ...d, venueArea:e.target.value }))} /></label>{fieldError("venue_area")}
+        <label className="block text-sm">会場<Input aria-label="対面の会場" maxLength={100} value={draft.venueName} onChange={(e) => setDraft((d) => ({ ...d, venueName:e.target.value }))} /></label>{fieldError("venue_name")}
+        <label className="block text-sm">対面回数（1〜12回）<Input aria-label="対面回数" type="number" min={1} max={12} value={draft.sessionCount} onChange={(e) => setDraft((d) => ({ ...d, sessionCount:Number(e.target.value) }))} /></label>{fieldError("session_count")}
+        <label className="block text-sm">1回の長さ<select aria-label="対面の長さ" value={draft.sessionMinutes} onChange={(e) => setDraft((d) => ({ ...d, sessionMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[30,60,90,120].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
+        <label className="block text-sm">交通費（円・料金に加算）<Input aria-label="交通費" type="number" min={0} value={draft.travelFee} onChange={(e) => setDraft((d) => ({ ...d, travelFee:e.target.value }))} /></label>{fieldError("travel_fee_yen")}
+        <label className="block text-sm">募集人数（1〜20人）<Input aria-label="募集人数" type="number" min={1} max={20} value={draft.maxParticipants} onChange={(e) => setDraft((d) => ({ ...d, maxParticipants:Number(e.target.value) }))} /></label>{fieldError("max_participants")}
+        <p className="text-xs text-slate-300">場所と集合方法は契約の専用欄だけに出します。未成年は保護者が日時・場所・料金を確認します。未実施分は期間終了48時間後に返金します。</p>
+      </fieldset> : null}
       <div className="space-y-1.5">
         <p className="text-sm text-slate-200">種類</p>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(planKindLabels) as CoachingPlanKind[]).filter((k) => draft.service_type !== "competition_support" || k === "period").map((k) => (
+          {(Object.keys(planKindLabels) as CoachingPlanKind[]).filter((k) => (draft.service_type !== "competition_support" && draft.service_type !== "in_person") || k === "period").map((k) => (
             <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => setKind(k)} className={chip(draft.kind === k)}>
               {planKindLabels[k]}
             </button>
@@ -573,6 +583,7 @@ export function CoachPlansSection({
         </div>
       ) : (
         <>
+          {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
           {plans === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
           {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
           <ul className="space-y-2">

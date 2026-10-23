@@ -157,6 +157,7 @@ func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, category string,
 
 type coachingTickResult struct {
 	SupportSettled         int `json:"support_settled"`
+	InPersonSettled        int `json:"in_person_settled"`
 	ConsultationsExpired   int `json:"consultations_expired"`
 	ConsultationRefunds    int `json:"consultation_refunds"`
 	ConsultationsPurged    int `json:"consultations_purged"`
@@ -216,6 +217,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.SupportSettled, err = s.settleSupportContracts(ctx); err != nil {
+		return out, err
+	}
+	if out.InPersonSettled, err = s.settleInPersonContracts(ctx); err != nil {
 		return out, err
 	}
 	if out.EarningsRecorded, err = s.recordCoachEarnings(ctx); err != nil {

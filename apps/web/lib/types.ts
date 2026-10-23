@@ -378,6 +378,8 @@ export type CoachApplication = {
   photo_url: string;
   // いまの版のパーソナル指導の誓約をしたか。
   pledged: boolean;
+  pledged_current?: boolean;
+  pledge_version?: number | null;
   // 報酬の受け取り口座の登録が済み、受付やパーソナル指導の承諾ができるか。
   payouts_ready: boolean;
 };
@@ -444,6 +446,12 @@ export type PlanIncludes = {
   support_start_date?: string | null;
   call_count?: number;
   call_minutes?: number;
+  venue_area?: string | null;
+  venue_name?: string | null;
+  session_count?: number;
+  session_minutes?: number;
+  travel_fee_yen?: number;
+  max_participants?: number;
   // 未設定は以前からある指名プラン。
   service_type?: CoachingServiceType | null;
   additional_consultation_price_yen?: number | null;

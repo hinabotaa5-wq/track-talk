@@ -977,7 +977,7 @@ func (q *Queries) LockConsultation(ctx context.Context, id uuid.UUID) (CoachingC
 }
 
 const lockConsultationContract = `-- name: LockConsultationContract :one
-SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count FROM coaching_contracts WHERE id=$1 FOR UPDATE
+SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count FROM coaching_contracts WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockConsultationContract(ctx context.Context, id uuid.UUID) (CoachingContract, error) {
@@ -1028,6 +1028,13 @@ func (q *Queries) LockConsultationContract(ctx context.Context, id uuid.UUID) (C
 		&i.SupportRefundReason,
 		&i.DeliveredVideoCount,
 		&i.DeliveredCallCount,
+		&i.VenueArea,
+		&i.VenueName,
+		&i.SessionCount,
+		&i.SessionMinutes,
+		&i.TravelFeeYen,
+		&i.MaxParticipants,
+		&i.DeliveredSessionCount,
 	)
 	return i, err
 }

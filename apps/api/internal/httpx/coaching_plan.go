@@ -13,7 +13,10 @@ import (
 )
 
 // パーソナル指導の誓約の文面の版。文面を変えたら上げる。上がると、コーチはもう一度誓約するまでプランが一覧に出ない。
-const coachPledgeVersion = 1
+const coachPledgeVersion = 2
+
+// 再同意期間中も、前の版で誓約したコーチの既存プランは一覧に出す。
+const coachPledgeListedVersion = 1
 
 const (
 	maxCoachingPlans = 10
@@ -36,6 +39,9 @@ var (
 )
 
 func pledged(c db.CoachProfile) bool {
+	return c.PledgeVersion != nil && *c.PledgeVersion >= coachPledgeListedVersion
+}
+func pledgedCurrent(c db.CoachProfile) bool {
 	return c.PledgeVersion != nil && *c.PledgeVersion == coachPledgeVersion
 }
 
@@ -52,7 +58,7 @@ func validPlanDuration(kind string, days int) bool {
 func coachingPlanJSON(p db.CoachingPlan) map[string]any {
 	return map[string]any{
 		"id":               p.ID,
-		"competition_name": p.CompetitionName, "competition_date": dateString(p.CompetitionDate), "support_start_date": dateString(p.SupportStartDate), "call_count": p.CallCount, "call_minutes": p.CallMinutes,
+		"competition_name": p.CompetitionName, "competition_date": dateString(p.CompetitionDate), "support_start_date": dateString(p.SupportStartDate), "call_count": p.CallCount, "call_minutes": p.CallMinutes, "venue_area": p.VenueArea, "venue_name": p.VenueName, "session_count": p.SessionCount, "session_minutes": p.SessionMinutes, "travel_fee_yen": p.TravelFeeYen, "max_participants": p.MaxParticipants,
 		"kind":                              p.Kind,
 		"service_type":                      p.ServiceType,
 		"additional_consultation_price_yen": p.AdditionalConsultationPriceYen,
@@ -120,6 +126,7 @@ func (s *Server) pledgeCoach(w http.ResponseWriter, r *http.Request) {
 
 type coachingPlanReq struct {
 	supportPlanReq
+	inPersonPlanReq
 	ServiceType *string `json:"service_type"`
 	// 未送信は以前の価格を維持し、明示的な null は設定を解除する。
 	AdditionalConsultationPriceYen json.RawMessage `json:"additional_consultation_price_yen"`
@@ -267,6 +274,7 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fields := req.supportFields(db.CoachingPlan{}, req.Published == nil || *req.Published)
+	for k, v := range req.inPersonFields(db.CoachingPlan{}, req.Published == nil || *req.Published) { fields[k]=v }
 	for k, v := range req.validate(0) {
 		fields[k] = v
 	}
@@ -327,9 +335,9 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, ok = s.saveSupportPlan(w, r, q, req, p)
-	if !ok {
-		return
-	}
+	if !ok { return }
+	p, ok = s.saveInPersonPlan(w, r, q, req, p)
+	if !ok { return }
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
@@ -386,6 +394,7 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		published = *req.Published
 	}
 	fields := req.supportFields(current, published)
+	for k, v := range req.inPersonFields(current, published) { fields[k]=v }
 	for k, v := range req.validate(int(current.PriceYen)) {
 		fields[k] = v
 	}
@@ -428,9 +437,9 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, ok = s.saveSupportPlan(w, r, q, req, p)
-	if !ok {
-		return
-	}
+	if !ok { return }
+	p, ok = s.saveInPersonPlan(w, r, q, req, p)
+	if !ok { return }
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return

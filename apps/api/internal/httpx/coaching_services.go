@@ -97,8 +97,8 @@ func (s *Server) planServiceAllowed(w http.ResponseWriter, r *http.Request, q *d
 		FieldError(w, map[string]string{"service_type": "先に担当するサービスとして登録してください"})
 		return false
 	}
-	if published && *service == "in_person" {
-		FieldError(w, map[string]string{"published": "対面指導は準備中です。下書きとして保存してください"})
+	if published && *service == "in_person" && !pledgedCurrent(coach) {
+		FieldError(w, map[string]string{"published": "対面指導を含む新しい誓約をしてから公開してください"})
 		return false
 	}
 	return true

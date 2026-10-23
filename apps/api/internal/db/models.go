@@ -198,6 +198,13 @@ type CoachingContract struct {
 	SupportRefundReason            *string    `json:"support_refund_reason"`
 	DeliveredVideoCount            int32      `json:"delivered_video_count"`
 	DeliveredCallCount             int32      `json:"delivered_call_count"`
+	VenueArea                      *string    `json:"venue_area"`
+	VenueName                      *string    `json:"venue_name"`
+	SessionCount                   int16      `json:"session_count"`
+	SessionMinutes                 int16      `json:"session_minutes"`
+	TravelFeeYen                   int32      `json:"travel_fee_yen"`
+	MaxParticipants                int16      `json:"max_participants"`
+	DeliveredSessionCount          int32      `json:"delivered_session_count"`
 }
 
 type CoachingContractConsent struct {
@@ -221,6 +228,26 @@ type CoachingDemoCode struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UsedBy    *uuid.UUID `json:"used_by"`
 	UsedAt    *time.Time `json:"used_at"`
+}
+
+type CoachingInPersonSession struct {
+	ID           uuid.UUID  `json:"id"`
+	ContractID   uuid.UUID  `json:"contract_id"`
+	CoachID      uuid.UUID  `json:"coach_id"`
+	RequesterID  uuid.UUID  `json:"requester_id"`
+	RequestKey   uuid.UUID  `json:"request_key"`
+	StartsAt     time.Time  `json:"starts_at"`
+	EndsAt       time.Time  `json:"ends_at"`
+	VenueName    string     `json:"venue_name"`
+	VenueArea    string     `json:"venue_area"`
+	MeetingNote  string     `json:"meeting_note"`
+	Participants int16      `json:"participants"`
+	Status       string     `json:"status"`
+	ReportedAt   *time.Time `json:"reported_at"`
+	CompletedAt  *time.Time `json:"completed_at"`
+	CancelledAt  *time.Time `json:"cancelled_at"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 type CoachingMessage struct {
@@ -276,6 +303,12 @@ type CoachingPlan struct {
 	SupportStartDate               *time.Time `json:"support_start_date"`
 	CallCount                      int16      `json:"call_count"`
 	CallMinutes                    int16      `json:"call_minutes"`
+	VenueArea                      *string    `json:"venue_area"`
+	VenueName                      *string    `json:"venue_name"`
+	SessionCount                   int16      `json:"session_count"`
+	SessionMinutes                 int16      `json:"session_minutes"`
+	TravelFeeYen                   int32      `json:"travel_fee_yen"`
+	MaxParticipants                int16      `json:"max_participants"`
 }
 
 type CoachingTicketAllocation struct {

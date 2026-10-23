@@ -42,16 +42,16 @@ async function render(plans: CoachingPlan[] = []) {
   await act(async () => root.render(<CoachPlansSection coach={coach} token="test" onCoachChange={vi.fn()} />));
 }
 
-it("対面指導は下書きとして保存し、公開はできない", async () => {
+it("対面指導は公開して保存できる", async () => {
   await render();
   await click("プランを追加する");
   await click("対面指導");
   const checkbox = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((el) => el.parentElement?.textContent?.includes("公開する"));
-  expect(checkbox?.disabled).toBe(true);
-  expect(checkbox?.checked).toBe(false);
+  expect(checkbox?.disabled).toBe(false);
+  expect(checkbox?.checked).toBe(true);
   await click("保存する");
   const save = apiFetch.mock.calls.find(([, options]) => options?.method === "POST");
-  expect(JSON.parse(save![1].body)).toMatchObject({ service_type: "in_person", published: false });
+  expect(JSON.parse(save![1].body)).toMatchObject({ service_type: "in_person", published: true });
 });
 
 it("既存プランの非公開操作で、設定済みの分類と追加相談料金を消さない", async () => {

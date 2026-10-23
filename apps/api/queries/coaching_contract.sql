@@ -13,9 +13,9 @@ JOIN profiles p ON p.id = pl.coach_id
 WHERE pl.id = sqlc.arg(id)
   AND pl.published
   AND c.status = 'approved'
-  AND (pl.service_type IS NULL OR (pl.service_type IN ('video_review','competition_support') AND pl.service_type = ANY(c.service_types)))
+  AND (pl.service_type IS NULL OR (pl.service_type IN ('video_review','competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
-  AND c.pledge_version = sqlc.arg(pledge_version)::smallint;
+  AND c.pledge_version >= sqlc.arg(pledge_version)::smallint;
 
 -- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (

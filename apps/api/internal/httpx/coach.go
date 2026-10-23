@@ -89,7 +89,7 @@ func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 		"daily_cap":     c.DailyCap,
 		"photo_url":     s.coachPhotoURL(c.PhotoPublicID),
 		// いまの版のパーソナル指導の誓約をしたか。
-		"pledged": pledged(c),
+		"pledged": pledged(c), "pledged_current": pledgedCurrent(c), "pledge_version": c.PledgeVersion,
 		// 報酬の受け取り口座（Stripe）の登録が済み、受付やパーソナル指導の承諾ができるか。
 		"payouts_ready": s.payoutsReady(c),
 	}
@@ -330,7 +330,7 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	plans, err := s.q.ListPublicCoachingPlans(r.Context(), coachPledgeVersion)
+	plans, err := s.q.ListPublicCoachingPlans(r.Context(), coachPledgeListedVersion)
 	if err != nil {
 		MapDBError(w, err)
 		return

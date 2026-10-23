@@ -18,9 +18,9 @@ export const coachingServiceLabels: Record<CoachingServiceType, string> = {
   in_person: "対面指導",
 };
 
-// 大会・対面は、後続フェーズで予約や提供管理を追加してから公開する。
 export function serviceReady(service: CoachingServiceType | null | undefined): boolean {
-  return service == null || service !== "in_person";
+  void service;
+  return true;
 }
 
 export function serviceLabel(service: CoachingServiceType | null | undefined): string {
@@ -120,7 +120,7 @@ export function sortTrialFirst<T extends Pick<CoachingPlan, "kind">>(plans: T[])
 // パーソナル指導の誓約の文面。API の coachPledgeVersion と一緒に変える。
 export const coachPledgeItems = [
   "LINE や SNS の ID、電話番号、メールアドレスなど、TrackTalk の外の連絡先を教えたり、聞いたりしません。",
-  "利用者と直接会う約束や、TrackTalk を通さないお金のやりとりをしません。",
+  "利用者と直接会うのは、TrackTalk で購入・予約された対面指導だけにします。それ以外の直接の約束や、TrackTalk を通さないお金のやりとりはしません。",
   "連絡先のやりとりを防ぐため、送る文章を機械で確かめ、連絡先らしいものは送れなくなることに同意します（添削の返答も同じです）。",
   "通報があったときは、安全の確認のために運営がやりとりを読むことに同意します。",
   "守らなかったときは、利用停止と報酬の没収になることに同意します。",
