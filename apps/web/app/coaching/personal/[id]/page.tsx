@@ -165,7 +165,7 @@ function CoachingContractView() {
           type="button"
           disabled={pending}
           onClick={() => void cancel()}
-          className="min-h-11 w-full rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+          className="min-h-11 w-full rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
         >
           申し込みを取り下げる
         </button>

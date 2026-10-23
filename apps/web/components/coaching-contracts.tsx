@@ -144,7 +144,7 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
           type="button"
           disabled={pending}
           onClick={() => void answer("decline")}
-          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-95 disabled:opacity-50"
+          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
         >
           断る
         </button>

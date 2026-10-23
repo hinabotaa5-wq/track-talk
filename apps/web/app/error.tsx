@@ -7,10 +7,10 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
     <div className="space-y-3">
       <h1 className="text-2xl font-bold">ページを表示できません</h1>
       <p className="text-sm text-slate-200">しばらくしてからもう一度試してください。</p>
-      <button type="button" onClick={reset} className="text-blue-400 transition active:scale-95">
+      <button type="button" onClick={reset} className="text-blue-400 transition active:scale-[0.98]">
         再読み込み
       </button>
-      <Link href="/" className="block text-blue-400 transition active:scale-95">
+      <Link href="/" className="block text-blue-400 transition active:scale-[0.98]">
         トップへ戻る
       </Link>
     </div>

@@ -128,7 +128,7 @@ function RaceRecordForm({
                 type="button"
                 onClick={() => setWind((current) => toggleRaceWindSign(current))}
                 aria-label="追い風(+)と向かい風(-)を切り替える"
-                className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-3 text-sm font-semibold text-white transition active:scale-95"
+                className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-3 text-sm font-semibold text-white transition active:scale-[0.98]"
               >
                 +/−
               </button>

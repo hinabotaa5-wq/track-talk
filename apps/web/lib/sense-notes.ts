@@ -28,7 +28,7 @@ export type SenseNoteStats = {
   today: number;
 };
 
-export const senseNotePlaceholder = "例: スタートの1歩目、地面を真下に押せた感じがした。腕は小さく速く振れた";
+export const senseNotePlaceholder = "がむしゃらに走りよりもリズムをつけて走った方が固くならなかった\n30m×5\n60m×3";
 
 // いまの器の中身。満杯になったら次の器に移り、満杯にした器の数を filled で返す。
 export function senseJarLevel(total: number) {

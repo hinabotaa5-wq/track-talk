@@ -133,9 +133,6 @@ export function DataView() {
     <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
-        <p className="text-xs text-slate-400">
-          グループに入るときの質問への答えを集計しています。%は、その質問に答えた人のうち、その答えを選んだ人の割合です(いくつでも選べる質問は、合計が100%をこえます)。
-        </p>
       </div>
 
       {failed ? (

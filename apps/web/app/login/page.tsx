@@ -70,10 +70,10 @@ export default function LoginPage() {
       {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
       <GoogleSignInButton nextPath={safeNextPath(next)} />
       <p className="text-sm">
-        アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-95">登録</Link>
+        アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">登録</Link>
       </p>
       <p className="text-sm">
-        <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-95">
+        <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">
           パスワードを忘れた
         </Link>
       </p>

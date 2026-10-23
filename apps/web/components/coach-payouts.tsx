@@ -77,7 +77,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
             type="button"
             disabled={pending}
             onClick={() => void onboard()}
-            className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-50"
+            className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
           >
             {data.stripe_linked ? "登録を続ける" : "受け取り口座を登録する"}
           </button>
@@ -188,7 +188,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
         type="button"
         disabled={pending || !payments}
         onClick={() => void run()}
-        className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-50"
+        className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
       >
         前の月までの報酬を送金する
       </button>

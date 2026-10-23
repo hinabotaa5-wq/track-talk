@@ -636,7 +636,7 @@ export default function AdminPage() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition active:scale-95 ${
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${
               tab === t.id ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
             }`}
           >

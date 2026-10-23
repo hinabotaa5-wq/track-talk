@@ -319,7 +319,7 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
             aria-label={`${n}つ星`}
             disabled={pending || !!contract.rating}
             onClick={() => void rate(n)}
-            className={`text-3xl leading-none transition active:scale-90 disabled:opacity-80 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
+            className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-80 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
           >
             ★
           </button>

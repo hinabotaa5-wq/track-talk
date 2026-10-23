@@ -5,24 +5,11 @@ import { Lock, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
-import { appEvents } from "@/lib/practice-events";
+import { todayInTokyo } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
-const selectClass =
-  "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
-
-function SenseNoteFields({
-  body,
-  event,
-  onBody,
-  onEvent,
-}: {
-  body: string;
-  event: string;
-  onBody: (v: string) => void;
-  onEvent: (v: string) => void;
-}) {
+function SenseNoteFields({ body, onBody }: { body: string; onBody: (v: string) => void }) {
   return (
     <div className="space-y-2">
       <label className="block">
@@ -31,23 +18,21 @@ function SenseNoteFields({
           value={body}
           onChange={(e) => onBody(e.target.value)}
           placeholder={senseNotePlaceholder}
-          rows={3}
+          rows={4}
           maxLength={senseNoteMaxLength + 20}
         />
       </label>
-      <div className="flex items-center gap-3">
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">種目(任意)</span>
-          <select className={selectClass} value={event} onChange={(e) => onEvent(e.target.value)}>
-            <option value="">種目(任意)</option>
-            {appEvents.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <label className="block text-sm text-slate-200">
+        日付
+        <input
+          type="date"
+          value={todayInTokyo()}
+          readOnly
+          aria-describedby="sense-note-day-help"
+          className="mt-1 block w-full rounded-md border border-white/25 bg-white/10 px-3 py-2 text-base text-slate-100 [color-scheme:dark]"
+        />
+      </label>
+      <p id="sense-note-day-help" className="text-xs text-slate-300">日本時間の今日の日付で保存します。</p>
     </div>
   );
 }
@@ -63,7 +48,6 @@ export function SenseNoteComposer({
   onCreated: (note: SenseNote, stats: SenseNoteStats) => void;
 }) {
   const [body, setBody] = useState("");
-  const [event, setEvent] = useState("");
   const [error, setError] = useState("");
   const [cheer, setCheer] = useState<{ title: string; body: string } | null>(null);
   const lock = useActionLock();
@@ -85,10 +69,9 @@ export function SenseNoteComposer({
       const res = await apiFetch<{ note: SenseNote; stats: SenseNoteStats }>("/v1/me/sense-notes", {
         method: "POST",
         token,
-        body: JSON.stringify({ body: text, event: event || null }),
+        body: JSON.stringify({ body: text }),
       });
       setBody("");
-      setEvent("");
       setCheer(senseCheer(res.stats));
       onCreated(res.note, res.stats);
     } catch (err) {
@@ -118,7 +101,7 @@ export function SenseNoteComposer({
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
-      <SenseNoteFields body={body} event={event} onBody={setBody} onEvent={setEvent} />
+      <SenseNoteFields body={body} onBody={setBody} />
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1 text-xs text-slate-300">
@@ -173,7 +156,7 @@ export function SenseNoteItem({
           onClick={remove}
           disabled={lock.pending}
           aria-label="削除"
-          className="inline-flex size-9 items-center justify-center rounded-full text-red-300 transition hover:bg-red-950/40 active:scale-95 disabled:opacity-50"
+          className="inline-flex size-9 items-center justify-center rounded-full text-red-300 transition hover:bg-red-950/40 active:scale-[0.98] disabled:opacity-50"
         >
           <Trash2 className="size-4" aria-hidden />
         </button>

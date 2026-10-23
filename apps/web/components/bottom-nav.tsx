@@ -164,7 +164,7 @@ export function BottomNav() {
                 <Link
                   href={href}
                   onClick={(event) => guardedClick(event, href)}
-                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-transform duration-150 active:scale-95 ${
+                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-transform duration-150 active:scale-[0.98] ${
                     active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}
                   aria-current={active ? "page" : undefined}

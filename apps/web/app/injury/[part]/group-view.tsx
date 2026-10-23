@@ -114,7 +114,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       {cta}
     </div>
   );
-  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95";
+  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-[0.98]";
 
   if (!loading && !session) {
     return intro(
@@ -174,7 +174,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         </div>
         <Link
           href={`/injury/${part}/stage`}
-          className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/15 active:scale-95"
+          className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/15 active:scale-[0.98]"
         >
           段階を変える
         </Link>
@@ -213,7 +213,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
         {own ? (
           <Link
             href={`/injury/${part}/new`}
-            className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-95"
+            className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-[0.98]"
           >
             {selectedLabel}に投稿
           </Link>

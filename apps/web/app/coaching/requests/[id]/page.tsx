@@ -14,7 +14,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-sm transition active:scale-95 disabled:opacity-50 ${
+  `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] disabled:opacity-50 ${
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
@@ -87,7 +87,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
               aria-label={`${n}つ星`}
               disabled={pending}
               onClick={() => void post("rating", { stars: n })}
-              className={`text-3xl leading-none transition active:scale-90 disabled:opacity-50 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
+              className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-50 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
             >
               ★
             </button>
@@ -176,7 +176,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
           type="button"
           disabled={pending}
           onClick={() => void pay(m)}
-          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-50"
+          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
         >
           {reviewPayMethodLabels[m]}で払う
         </button>

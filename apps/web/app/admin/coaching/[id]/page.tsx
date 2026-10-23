@@ -64,7 +64,7 @@ function OpenContract() {
           type="button"
           disabled={pending || !report}
           onClick={() => void open()}
-          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-50"
+          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
         >
           記録を残して開く
         </button>

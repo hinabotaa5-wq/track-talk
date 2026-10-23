@@ -22,7 +22,7 @@ export function InjuryGoalCelebration({ onClose }: { onClose: () => void }) {
       <button
         type="button"
         onClick={onClose}
-        className="mt-3 rounded-full border border-emerald-400/60 px-4 py-1.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900/50 active:scale-95"
+        className="mt-3 rounded-full border border-emerald-400/60 px-4 py-1.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900/50 active:scale-[0.98]"
       >
         閉じる
       </button>

@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { BackButton } from "@/components/major-hosts-panel";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { formatDate } from "@/lib/format";
 import { competitionCacheKey, loadCompetitions, readCompetitions } from "@/lib/competition-list";
@@ -90,7 +89,7 @@ export function RegionalCompetitionsView() {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-95"
+                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-[0.98]"
               >
                 <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
                 <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
@@ -101,7 +100,6 @@ export function RegionalCompetitionsView() {
           })}
         </div>
       ) : null}
-      <BackButton />
     </div>
   );
 }

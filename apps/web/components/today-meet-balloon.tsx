@@ -37,7 +37,6 @@ export function TodayMeetBalloon() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
     let active = true;
     fetchTodayMeetThreads(token).then((next) => {
       if (!active) return;
@@ -65,7 +64,7 @@ export function TodayMeetBalloon() {
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => (open ? close() : setOpen(true))}
-        className="relative inline-flex size-11 items-center justify-center rounded-full text-amber-300 transition hover:bg-white/16 active:scale-95"
+        className="relative inline-flex size-11 items-center justify-center rounded-full text-amber-300 transition hover:bg-white/16 active:scale-[0.98]"
       >
         <Trophy className="size-5" strokeWidth={2} aria-hidden />
         <span className="absolute top-2 right-2 size-2 rounded-full bg-amber-400 ring-2 ring-[#16243a]" aria-hidden />
@@ -91,7 +90,7 @@ export function TodayMeetBalloon() {
             type="button"
             onClick={close}
             aria-label="閉じる"
-            className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-amber-100 active:scale-95"
+            className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-amber-100 active:scale-[0.98]"
           >
             <X className="size-4" aria-hidden />
           </button>
@@ -102,7 +101,7 @@ export function TodayMeetBalloon() {
                 <Link
                   href={meet.href}
                   onClick={close}
-                  className="block rounded-xl bg-white px-3 py-2 shadow-xs transition hover:bg-amber-100 active:scale-95"
+                  className="block rounded-xl bg-white px-3 py-2 shadow-xs transition hover:bg-amber-100 active:scale-[0.98]"
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="min-w-0">

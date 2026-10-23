@@ -38,7 +38,7 @@ export default function UploadPage() {
           <Link
             key={door.href}
             href={door.href}
-            className={`flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl border border-l-4 border-white/20 glass bg-white/10 px-3 py-2 transition hover:bg-white/16 active:scale-95 ${door.border}`}
+            className={`flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl border border-l-4 border-white/20 glass bg-white/10 px-3 py-2 transition hover:bg-white/16 active:scale-[0.98] ${door.border}`}
           >
             <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${door.tile}`}>
               <door.icon className="size-5" aria-hidden />

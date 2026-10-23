@@ -68,7 +68,7 @@ export function SavedFeed({ page }: { page: number }) {
         </FeedGrid>
       ) : null}
       {hasNext ? (
-        <Link href={`/me/saved?page=${meta.page + 1}`} className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-95">
+        <Link href={`/me/saved?page=${meta.page + 1}`} className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-[0.98]">
           次の投稿
         </Link>
       ) : null}

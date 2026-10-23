@@ -70,7 +70,7 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
                 type="button"
                 autoFocus
                 onClick={() => setPending(null)}
-                className="h-11 rounded-full bg-blue-500 font-semibold text-white transition active:scale-95"
+                className="h-11 rounded-full bg-blue-500 font-semibold text-white transition active:scale-[0.98]"
               >
                 入力を続ける
               </button>
@@ -82,7 +82,7 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
                   setPending(null);
                   go();
                 }}
-                className="h-11 rounded-full border border-white/25 text-slate-200 transition hover:bg-white/10 active:scale-95"
+                className="h-11 rounded-full border border-white/25 text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
               >
                 ページを離れる
               </button>

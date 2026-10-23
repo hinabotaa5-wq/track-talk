@@ -129,7 +129,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
             <Link
               key={p.id}
               href={withReviewFilters(`/reviews/${p.id}`, filters)}
-              className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/40 hover:shadow-xl hover:shadow-blue-950/30 active:scale-95"
+              className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/40 hover:shadow-xl hover:shadow-blue-950/30 active:scale-[0.98]"
             >
               <ProductImage product={p} />
               <div className="space-y-0.5 px-3.5 py-2.5">
