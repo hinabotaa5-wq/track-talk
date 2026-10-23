@@ -59,3 +59,61 @@ test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({
     await expect(page.locator("main").getByRole("button", { name: /戻る/ })).toHaveCount(0);
   }
 });
+
+test("検索アイコンと4つのタブを1行に並べ、検索中はタブを隠す", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
+  const search = nav.getByRole("button", { name: "キーワード検索を開く" });
+  await expect(nav.getByRole("link")).toHaveText(["新しい", "人気", "募集", "レビュー"]);
+  const searchBox = await search.boundingBox();
+  for (const link of await nav.getByRole("link").all()) {
+    const box = await link.boundingBox();
+    expect(Math.abs((box!.y + box!.height / 2) - (searchBox!.y + searchBox!.height / 2))).toBeLessThan(2);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+  }
+  await nav.getByRole("link", { name: "人気", exact: true }).click();
+  await expect(page).toHaveURL(/sort=popular/);
+  await search.click();
+  await expect(nav).toHaveCount(0);
+  const keyword = page.getByRole("searchbox", { name: "キーワード" });
+  await expect(keyword).toBeFocused();
+  await keyword.fill("朝練");
+  await keyword.press("Enter");
+  await expect(page).toHaveURL(/sort=popular/);
+  await expect(page).toHaveURL(/q=/);
+  await expect(keyword).toHaveValue("朝練");
+  await page.getByRole("button", { name: "検索を閉じる" }).click();
+  await expect(nav).toBeVisible();
+  await expect(page).not.toHaveURL(/q=/);
+  await page.goBack();
+  await expect(keyword).toBeVisible();
+  await expect(keyword).toHaveValue("朝練");
+  await keyword.press("Escape");
+  await expect(nav).toBeVisible();
+  await expect(search).toBeFocused();
+});
+
+test("リールの詳細は中央に小さく表示する", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.route("**/api/v1/posts/reel-preview**", async (route) => {
+    const comments = new URL(route.request().url()).pathname.endsWith("/comments");
+    await route.fulfill({ json: comments ? { comments: [], meta: { page: 1, total_pages: 0 } } : {
+      id: "reel-preview", title: "リール表示テスト", body: "走りの動画", kind: "instagram", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e",
+      mine: false, like_count: 0, comment_count: 0, liked_by_me: false, saved_by_me: false,
+      created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
+    } });
+  });
+  // 外部サービスに依存せず、iframe自体の寸法と枠内の配置を確認する。
+  await page.route("https://www.instagram.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>リール動画</p>" }));
+  await page.goto("/posts/reel-preview");
+  const frame = page.getByTitle("Instagram「リール表示テスト」");
+  await expect(frame).toBeVisible();
+  const bounds = await frame.boundingBox();
+  expect(bounds!.width).toBeLessThanOrEqual(320);
+  expect(bounds!.height).toBe(600);
+  await page.setViewportSize({ width: 320, height: 740 });
+  const mobile = await frame.boundingBox();
+  expect(mobile!.x).toBeGreaterThanOrEqual(0);
+  expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
+});
