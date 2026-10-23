@@ -51,7 +51,7 @@ export default async function HomePage({
   const path = homeFeedPath(sort, q, page);
   return (
     <>
-      <Suspense key={path} fallback={<FeedLoadingFrame />}>
+      <Suspense key={path} fallback={<FeedLoadingFrame horizontal />}>
         <ServerHomeFeed path={path} />
       </Suspense>
     </>

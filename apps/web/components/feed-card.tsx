@@ -23,7 +23,7 @@ export function feedTitle(title: string) {
 
 function CardTitle({ title }: { title: string }) {
   return (
-    <div className="px-3.5 py-2.5">
+    <div className="feed-card-title px-3.5 py-2.5">
       <p className="truncate text-sm font-medium text-slate-200 transition-colors group-hover:text-blue-400">{title}</p>
     </div>
   );
@@ -37,28 +37,16 @@ function KindBadge({ children }: { children: string }) {
   );
 }
 
-export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
+export function FeedCard({ post, returnTo, thumbnailOnly = false }: { post: Post; returnTo?: "me"; thumbnailOnly?: boolean }) {
   const title = feedTitle(post.title);
   const cardTitle = post.kind === "text" || post.kind === "video" || post.kind === "youtube" || post.kind === "instagram"
     ? feedTitle(post.excerpt ?? "") || title
     : title;
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
-  if ((post.kind === "video" && post.playback_url) || (post.kind === "youtube" && post.youtube_video_id)) {
+  if (!thumbnailOnly && post.kind === "youtube" && post.youtube_video_id) {
     return (
       <article className={cardClass}>
-        {post.kind === "youtube" ? (
-          <YouTubePlayer videoId={post.youtube_video_id!} title={cardTitle || "投稿動画"} shorts={post.youtube_shorts} />
-        ) : (
-          <video
-            src={post.playback_url}
-            poster={post.thumbnail_url}
-            controls
-            playsInline
-            preload="metadata"
-            aria-label={cardTitle || "投稿動画"}
-            className="block h-auto w-full bg-black object-contain"
-          />
-        )}
+        <YouTubePlayer videoId={post.youtube_video_id} title={cardTitle || "投稿動画"} shorts={post.youtube_shorts} />
         <Link href={href} className="block" aria-label={cardTitle || "投稿の詳細を開く"}>
           <CardTitle title={cardTitle || "投稿の詳細を開く"} />
         </Link>
@@ -118,9 +106,10 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       </Link>
     );
   }
+  const hasThumbnail = Boolean(post.thumbnail_url || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
-    <Link href={href} className={cardClass}>
-      <div className={`relative overflow-hidden bg-black/25 ${post.thumbnail_url || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
+    <Link href={href} className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}`}>
+      <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${post.thumbnail_url || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
@@ -133,7 +122,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         {post.thumbnail_url ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.thumbnail_url} alt="" className="block h-auto w-full" />
+            <img src={post.thumbnail_url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
             {post.kind === "text" && hasFeedTitle(cardTitle) ? (
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-3.5 pb-3 pt-10">
                 <p className="line-clamp-3 break-words text-sm font-semibold leading-snug text-white">{cardTitle}</p>

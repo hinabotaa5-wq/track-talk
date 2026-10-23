@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CompetitionFilters } from "@/components/competition-filters";
@@ -9,8 +8,7 @@ import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { formatDate } from "@/lib/format";
 import { competitionCacheKey, loadCompetitions, readCompetitions } from "@/lib/competition-list";
 import { regionalPrefecture, saveCompetitionPrefecture } from "@/lib/competition-prefecture";
-import { isPrefecturePageCode, prefecturePageHref } from "@/lib/prefecture-page";
-import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber, prefectureName } from "@/lib/prefectures";
+import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber } from "@/lib/prefectures";
 import type { Competition } from "@/lib/types";
 
 export function destination(competition: Competition, prefecture: string) {
@@ -68,11 +66,6 @@ export function RegionalCompetitionsView() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-slate-100">都道府県の大会</h1>
       <CompetitionFilters month={month} prefecture={prefecture} />
-      {prefecture && isPrefecturePageCode(prefecture) ? (
-        <Link href={prefecturePageHref(prefecture)} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-          {prefectureName(prefecture)}の大会をまとめて見る
-        </Link>
-      ) : null}
       {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}
       {prefecture && loading ? <CompetitionLoadingFrame /> : null}
       {prefecture && !loading && shownError ? <ErrorState message={shownError} /> : null}

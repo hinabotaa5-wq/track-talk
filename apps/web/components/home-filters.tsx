@@ -89,7 +89,7 @@ export function HomeFilters() {
   }
 
   return (
-    <div className="border-b border-white/20 px-4 py-3 md:mb-4 md:border-0 md:px-0">
+    <div className="px-4 py-3 md:mb-4 md:px-0">
       {searchOpen ? (
         <div className="flex items-center gap-2" onKeyDown={(event) => {
           if (event.key === "Escape") {

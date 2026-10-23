@@ -14,7 +14,7 @@ export function FeedLoadingFrame({ horizontal = false }: { horizontal?: boolean 
   if (horizontal) return (
     <Frame label="投稿を読み込んでいます">
       <div className="horizontal-feed-track" aria-hidden>
-        {Array.from({ length: 4 }, (_, index) => <div key={index} className="horizontal-feed-slide rounded-2xl glass bg-white/12 animate-pulse" />)}
+        {["h-48", "h-80", "h-56", "h-72"].map((height, index) => <div key={index} className={`horizontal-feed-slide ${height} rounded-2xl glass bg-white/12 animate-pulse`} />)}
       </div>
     </Frame>
   );

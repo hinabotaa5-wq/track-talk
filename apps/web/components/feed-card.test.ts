@@ -111,13 +111,13 @@ describe("FeedCard", () => {
   });
 });
 
-it("投稿動画は一覧内で再生でき、縦横の比率を保つ", () => {
-  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", playback_url: "https://example.com/video.mp4" } }));
-  expect(html).toContain("<video");
-  expect(html).toContain('controls=""');
-  expect(html).toContain('preload="metadata"');
+it("投稿動画のサムネイルは再生せずに詳細を開く", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", playback_url: "https://example.com/video.mp4", thumbnail_url: "https://example.com/thumb.jpg" } }));
+  expect(html).not.toContain("<video");
+  expect(html).toContain(`href="/posts/${post.id}"`);
+  expect(html).toContain('src="https://example.com/thumb.jpg"');
+  expect(html).toContain('loading="lazy"');
   expect(html).toContain("h-auto w-full");
-  expect(html).not.toMatch(/<a\b[^>]*><video/);
 });
 
 it("YouTubeの縦動画と横動画をそれぞれの比率で埋め込む", () => {
@@ -127,4 +127,16 @@ it("YouTubeの縦動画と横動画をそれぞれの比率で埋め込む", () 
     expect(html).toContain(shorts ? "aspect-[9/16]" : "aspect-video");
     expect(html).not.toMatch(/<a\b[^>]*><iframe/);
   }
+});
+
+
+it("ホームでは再生プレーヤーではなく元のサムネイルを詳細リンクとして表示する", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, {
+    post: { ...post, kind: "video", playback_url: "/samples/vertical.mp4", thumbnail_url: "/samples/vertical.jpg" },
+    thumbnailOnly: true,
+  }));
+  expect(html).toContain('/samples/vertical.jpg');
+  expect(html).toContain(`/posts/${post.id}`);
+  expect(html).not.toContain('<video');
+  expect(html).not.toContain('<iframe');
 });
