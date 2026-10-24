@@ -86,3 +86,18 @@ it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復�
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   expect((container.querySelector('[role="region"]') as HTMLDivElement).scrollLeft).toBe(8000);
 });
+
+it("配置の計算後に先頭へ戻す操作を、古い復元位置で上書きしない", async () => {
+  const content = <MasonryFeed storageKey="scroll-interruption" ratios={Array(12).fill(1)}>{Array.from({ length: 12 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  const track = container.querySelector('[role="region"]') as HTMLDivElement;
+  track.scrollLeft = 400;
+  await act(async () => {
+    window.dispatchEvent(new Event("resize"));
+    frames.splice(0).forEach((callback) => callback(0));
+    track.scrollLeft = 0;
+    track.dispatchEvent(new Event("scroll"));
+  });
+  expect(track.scrollLeft).toBe(0);
+});

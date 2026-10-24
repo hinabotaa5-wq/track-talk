@@ -132,6 +132,8 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     function schedule() { cancelAnimationFrame(frame); frame = requestAnimationFrame(layoutNow); }
     scheduleRef.current = schedule;
     function onScroll() {
+      // レイアウト計算と描画の間に移動した場合は、新しい操作を優先する。
+      pendingPosition.current = undefined;
       savePosition();
       cancelAnimationFrame(scrollFrame);
       scrollFrame = requestAnimationFrame(() => setViewport({ left: track!.scrollLeft, width: track!.clientWidth }));

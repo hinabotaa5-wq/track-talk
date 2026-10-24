@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+test.use({ trace: "retain-on-failure" });
 
 test("720件を読んでも描画を絞り、過去ページの再取得と戻る位置を保つ", async ({ page }) => {
   test.setTimeout(120_000);
@@ -44,6 +45,7 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   }
   const firstPageReads = requests.filter((n) => n === 1).length;
   await track.evaluate((el) => { el.scrollLeft = 0; el.dispatchEvent(new Event("scroll")); });
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBe(0);
   await expect(track.locator('a[href="/posts/perf-0"]')).toBeVisible();
   expect(requests.filter((n) => n === 1).length).toBeGreaterThan(firstPageReads);
   await track.evaluate((el) => { el.scrollLeft = el.scrollWidth / 2; el.dispatchEvent(new Event("scroll")); });
