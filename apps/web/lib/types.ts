@@ -2,6 +2,8 @@ export type Meta = {
   page: number;
   per_page: number;
   total: number;
+  has_more?: boolean;
+  next_cursor?: string;
 };
 
 export type MajorHost = {

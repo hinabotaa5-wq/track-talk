@@ -72,3 +72,18 @@ describe("packMosaic", () => {
     expect(tiles[0].height).toBeGreaterThan(250);
   });
 });
+
+it("600件でも表示付近のカードだけ選び、遠い過去のカードを含めない", async () => {
+  const { visibleMosaicIndices, createMosaicPacker } = await import("./masonry-feed");
+  const items = Array.from({ length: 600 }, (_, i) => item([9 / 16, 16 / 9, 1, 4 / 3][i % 4]));
+  const pack = createMosaicPacker();
+  const layout = pack(items, 390, 560);
+  for (const left of [0, layout.width / 2, layout.width - 390]) {
+    const indices = visibleMosaicIndices(layout, left, 390);
+    expect(indices.length).toBeGreaterThan(0);
+    expect(indices.length).toBeLessThan(40);
+    expect(indices.every((i) => layout.tiles[i].x <= left + 780 && layout.tiles[i].x + layout.tiles[i].width >= left - 390)).toBe(true);
+  }
+  const extended = pack([...items, ...items.slice(0, 12)], 390, 560);
+  expect(extended.tiles.slice(0, 600)).toEqual(layout.tiles);
+});

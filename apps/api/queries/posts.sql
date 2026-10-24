@@ -519,3 +519,122 @@ UNION
 SELECT cp.photo_public_id::text AS public_id
 FROM coach_profiles cp
 WHERE cp.photo_public_id = ANY(sqlc.arg('public_ids')::text[]);
+
+-- name: ListHomePostsNew :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM posts p
+WHERE p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.kind NOT IN ('injury', 'meet')
+  AND (sqlc.narg('kind')::text IS NULL OR p.kind IN ('recruitment', 'practice'))
+  AND p.created_at <= sqlc.arg('as_of')::timestamptz
+  AND (p.created_at, p.id) < (sqlc.arg('cursor_time')::timestamptz, sqlc.arg('cursor_id')::uuid)
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
+  )
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT sqlc.arg('limit_n');
+
+-- name: ListHomePostsPopular :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM posts p
+WHERE p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.kind NOT IN ('injury', 'meet')
+  AND (sqlc.narg('kind')::text IS NULL OR p.kind IN ('recruitment', 'practice'))
+  AND p.created_at <= sqlc.arg('as_of')::timestamptz
+  AND p.created_at >= sqlc.arg('as_of')::timestamptz - interval '14 days'
+  AND (p.like_count, p.created_at, p.id) < (sqlc.arg('cursor_likes')::int, sqlc.arg('cursor_time')::timestamptz, sqlc.arg('cursor_id')::uuid)
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
+  )
+ORDER BY p.like_count DESC, p.created_at DESC, p.id DESC
+LIMIT sqlc.arg('limit_n');

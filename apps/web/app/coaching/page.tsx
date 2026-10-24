@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, GraduationCap, Shuffle, UserRound } from "lucide-react";
+import { ArrowRight, ClipboardCheck, Shuffle, UserRound } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "コーチング",
@@ -21,10 +21,10 @@ const choices = [
     icon: UserRound,
   },
   {
-    title: "コーチ画面",
+    title: "コーチ専用画面",
     description: "依頼・プランを管理",
     href: "/coach",
-    icon: GraduationCap,
+    icon: ClipboardCheck,
   },
 ] as const;
 

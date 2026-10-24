@@ -204,6 +204,10 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	} else if value == "recruitment" {
 		kind = &value
 	}
+	if r.URL.Query().Get("pagination") == "cursor" {
+		s.listHomePosts(w, r, kind)
+		return
+	}
 	s.listPostsFiltered(w, r, r.URL.Query().Get("sort"), nil, kind)
 }
 

@@ -529,6 +529,277 @@ func (q *Queries) LikedByUser(ctx context.Context, arg LikedByUserParams) (bool,
 	return exists, err
 }
 
+const listHomePostsNew = `-- name: ListHomePostsNew :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM posts p
+WHERE p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.kind NOT IN ('injury', 'meet')
+  AND ($1::text IS NULL OR p.kind IN ('recruitment', 'practice'))
+  AND p.created_at <= $2::timestamptz
+  AND (p.created_at, p.id) < ($3::timestamptz, $4::uuid)
+  AND (
+    $5::text IS NULL
+    OR p.title ILIKE '%' || $5 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $5 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $5 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $5 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($6::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($6::text[])
+      )
+    )
+  )
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $7
+`
+
+type ListHomePostsNewParams struct {
+	Kind            *string   `json:"kind"`
+	AsOf            time.Time `json:"as_of"`
+	CursorTime      time.Time `json:"cursor_time"`
+	CursorID        uuid.UUID `json:"cursor_id"`
+	Keyword         *string   `json:"keyword"`
+	PrefectureCodes []string  `json:"prefecture_codes"`
+	LimitN          int32     `json:"limit_n"`
+}
+
+type ListHomePostsNewRow struct {
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	YoutubeShorts       bool      `json:"youtube_shorts"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListHomePostsNew(ctx context.Context, arg ListHomePostsNewParams) ([]ListHomePostsNewRow, error) {
+	rows, err := q.db.Query(ctx, listHomePostsNew,
+		arg.Kind,
+		arg.AsOf,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.Keyword,
+		arg.PrefectureCodes,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListHomePostsNewRow
+	for rows.Next() {
+		var i ListHomePostsNewRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AuthorID,
+			&i.Title,
+			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.YoutubeShorts,
+			&i.InstagramType,
+			&i.InstagramShortcode,
+			&i.CloudinaryPublicID,
+			&i.SourceTitle,
+			&i.LikeCount,
+			&i.CommentCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHomePostsPopular = `-- name: ListHomePostsPopular :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM posts p
+WHERE p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.kind NOT IN ('injury', 'meet')
+  AND ($1::text IS NULL OR p.kind IN ('recruitment', 'practice'))
+  AND p.created_at <= $2::timestamptz
+  AND p.created_at >= $2::timestamptz - interval '14 days'
+  AND (p.like_count, p.created_at, p.id) < ($3::int, $4::timestamptz, $5::uuid)
+  AND (
+    $6::text IS NULL
+    OR p.title ILIKE '%' || $6 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $6 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $6 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $6 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $6 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $6 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $6 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $6 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $6 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($7::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($7::text[])
+      )
+    )
+  )
+ORDER BY p.like_count DESC, p.created_at DESC, p.id DESC
+LIMIT $8
+`
+
+type ListHomePostsPopularParams struct {
+	Kind            *string   `json:"kind"`
+	AsOf            time.Time `json:"as_of"`
+	CursorLikes     int32     `json:"cursor_likes"`
+	CursorTime      time.Time `json:"cursor_time"`
+	CursorID        uuid.UUID `json:"cursor_id"`
+	Keyword         *string   `json:"keyword"`
+	PrefectureCodes []string  `json:"prefecture_codes"`
+	LimitN          int32     `json:"limit_n"`
+}
+
+type ListHomePostsPopularRow struct {
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	YoutubeShorts       bool      `json:"youtube_shorts"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListHomePostsPopular(ctx context.Context, arg ListHomePostsPopularParams) ([]ListHomePostsPopularRow, error) {
+	rows, err := q.db.Query(ctx, listHomePostsPopular,
+		arg.Kind,
+		arg.AsOf,
+		arg.CursorLikes,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.Keyword,
+		arg.PrefectureCodes,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListHomePostsPopularRow
+	for rows.Next() {
+		var i ListHomePostsPopularRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AuthorID,
+			&i.Title,
+			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.YoutubeShorts,
+			&i.InstagramType,
+			&i.InstagramShortcode,
+			&i.CloudinaryPublicID,
+			&i.SourceTitle,
+			&i.LikeCount,
+			&i.CommentCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLikedPostIDs = `-- name: ListLikedPostIDs :many
 SELECT post_id
 FROM post_likes

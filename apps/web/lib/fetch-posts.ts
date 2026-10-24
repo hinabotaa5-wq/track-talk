@@ -1,7 +1,7 @@
 import { apiFetch } from "./api";
 import type { Meta, Post } from "./types";
 
-export type PostsPage = { posts: Post[]; meta: Meta };
+export type PostsPage = { posts: Post[]; meta: Meta; request_path?: string; unloaded?: boolean; unavailable_ids?: string[] };
 
 type FetchPosts = (path: string, signal: AbortSignal) => Promise<PostsPage>;
 
@@ -74,4 +74,30 @@ export async function fetchPostsRetrying(
 
   if (lastError instanceof Error) throw lastError;
   throw new Error("投稿の取得に失敗しました。");
+}
+
+// 画面から遠いページはID・形だけ残し、本文などのデータを解放する。
+// 座標を保ったまま、再表示されたページだけ同じ取得条件で読み直す。
+export function retainHomeFeedWindow(chunks: PostsPage[], visibleIDs: Set<string>, maxPosts = 600): PostsPage[] {
+  if (chunks.reduce((n, chunk) => n + (chunk.unloaded ? 0 : chunk.posts.length), 0) <= maxPosts) return chunks;
+  const center = Math.max(0, chunks.findIndex((chunk) => chunk.posts.some((post) => visibleIDs.has(post.id))));
+  const retained = new Set<number>();
+  let count = 0;
+  const isVisible = chunks.map((chunk) => chunk.posts.some((post) => visibleIDs.has(post.id)));
+  const order = chunks.map((_, i) => i).sort((a, b) => Number(isVisible[b]) - Number(isVisible[a]) || Math.abs(a - center) - Math.abs(b - center));
+  for (const index of order) {
+    const chunk = chunks[index];
+    if (!chunk.unloaded && (count + chunk.posts.length <= maxPosts || chunk.posts.some((post) => visibleIDs.has(post.id)))) {
+      retained.add(index); count += chunk.posts.length;
+    }
+  }
+  return chunks.map((chunk, i) => chunk.unloaded || retained.has(i) ? chunk : {
+    ...chunk, unloaded: true,
+    posts: chunk.posts.map((post) => ({
+      id: post.id, title: "", kind: post.kind, thumbnail_url: post.thumbnail_url,
+      youtube_shorts: post.youtube_shorts, instagram_type: post.instagram_type,
+      mine: false, like_count: 0, comment_count: 0, liked_by_me: false, saved_by_me: false,
+      created_at: post.created_at, updated_at: post.updated_at,
+    })),
+  });
 }

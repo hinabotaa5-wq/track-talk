@@ -1,5 +1,6 @@
+import { BoundedCache } from "./bounded-cache";
 import { apiFetch } from "./api";
-import { fetchPostsRetrying, type PostsPage } from "./fetch-posts";
+import { fetchPostsRetrying, retainHomeFeedWindow, type PostsPage } from "./fetch-posts";
 import type { HomeSort } from "./home-sort";
 
 export type FeedSort = HomeSort;
@@ -9,12 +10,15 @@ const prefetchSorts: FeedSort[] = ["popular", "new", "recruitment"];
 
 type Entry = { data: PostsPage; at: number };
 
-const cache = new Map<string, Entry>();
-const chunksCache = new Map<string, PostsPage[]>();
+const cache = new BoundedCache<Entry>(48, 15 * 60_000);
+const chunksCache = new BoundedCache<PostsPage[]>(4, 15 * 60_000);
 export function readHomeFeedChunks(path: string) { return chunksCache.get(path); }
 export function homeFeedGeneration() { return generation; }
 export function saveHomeFeedChunks(path: string, chunks: PostsPage[], atGeneration: number) {
-  if (atGeneration === generation) chunksCache.set(path, chunks);
+  // 大きな一覧を複数タブ分保持しない。表示中の一覧はコンポーネントが持つ。
+  if (atGeneration !== generation) return;
+  if (chunks.reduce((n, chunk) => n + chunk.posts.length, 0) <= 6000) chunksCache.set(path, retainHomeFeedWindow(chunks, new Set()));
+  else chunksCache.delete(path);
 }
 
 const inflight = new Map<string, Promise<PostsPage>>();
@@ -29,9 +33,21 @@ export function homeFeedPath(sort: FeedSort, q: string, page: number) {
     page: String(page),
     per_page: "12",
   });
+  if (page === 1) qs.set("pagination", "cursor");
   if (q) qs.set("q", q);
   if (sort === "recruitment") qs.set("kind", "recruitment");
   return `/v1/posts?${qs}`;
+}
+
+// pageは位置表示用。cursor指定時のAPIはOFFSETを使わない。
+export function nextHomeFeedPath(sort: FeedSort, q: string, page: number, cursor?: string) {
+  const path = homeFeedPath(sort, q, page);
+  if (!cursor) return path;
+  const [base, query] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("pagination", "cursor");
+  params.set("cursor", cursor);
+  return `${base}?${params}`;
 }
 
 export function savedFeedPath(q: string, page: number) {
@@ -98,7 +114,7 @@ function start(path: string, request: () => Promise<{ posts?: PostsPage["posts"]
   const startedAt = generation;
   const pending: Promise<PostsPage> = request()
     .then((data) => {
-      const page = { posts: data.posts ?? [], meta: data.meta };
+      const page = { posts: data.posts ?? [], meta: data.meta, request_path: path };
       if (startedAt === generation) seedFeed(path, page);
       return page;
     })
@@ -115,6 +131,7 @@ export function loadHomeFeed(path: string, retry = false): Promise<PostsPage> {
     start(path, () => (retry ? fetchPostsRetrying(path) : apiFetch<PostsPage>(path)));
   const pending = inflight.get(path);
   if (pending) return retry ? pending.catch(run) : pending;
+  if (!retry && isFeedFresh(path)) return Promise.resolve(readFeed(path)!);
   return run();
 }
 
@@ -123,6 +140,10 @@ export function loadSavedFeed(path: string, token: string): Promise<PostsPage> {
 }
 
 export function prefetchHomeFeeds(q: string) {
+  // 検索のたびに全タブを先読みしない。従量課金・低速回線でも表示中を優先する。
+  if (q) return;
+  const connection = typeof navigator !== "undefined" ? (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection : undefined;
+  if (connection?.saveData || ["slow-2g", "2g", "3g"].includes(connection?.effectiveType ?? "")) return;
   for (const sort of prefetchSorts) {
     const path = homeFeedPath(sort, q, 1);
     if (isFeedFresh(path) || inflight.has(path)) continue;

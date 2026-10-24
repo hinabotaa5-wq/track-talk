@@ -9,6 +9,7 @@ import type { Post } from "@/lib/types";
 
 vi.mock("@/lib/home-feed-cache", () => ({
   homeFeedPath: (sort: string, q: string, page: number) => `/v1/posts?sort=${sort}&q=${q}&page=${page}&per_page=12`,
+  nextHomeFeedPath: (sort: string, q: string, page: number, cursor: string) => `/v1/posts?sort=${sort}&q=${q}&page=${page}&pagination=cursor&cursor=${cursor}`,
   isFeedFresh: () => true,
   loadHomeFeed: vi.fn(),
   prefetchHomeFeeds: vi.fn(),
@@ -79,4 +80,25 @@ it("詳細から戻ったときは追加ページを復元し、その続きか�
   await act(async () => end());
   expect(request).toHaveBeenCalledWith(expect.stringContaining("page=3"));
   expect(ids()).toEqual(["a", "b", "c"]);
+});
+
+
+it("総件数がなくてもカーソルを使って続きを読み、終端で止まる", async () => {
+  const first = { ...chunk(1, ["a"], 0), meta: { page: 1, per_page: 12, total: 0, has_more: true, next_cursor: "next-token" } };
+  request.mockResolvedValueOnce({ ...chunk(2, ["b"], 0), meta: { page: 2, per_page: 12, total: 0, has_more: false, next_cursor: "" } });
+  await act(async () => root.render(<HomeFeed sort="new" q="陸上" page={1} initial={first} />));
+  await act(async () => end());
+  expect(request).toHaveBeenCalledWith(expect.stringContaining("pagination=cursor&cursor=next-token"));
+  expect(ids()).toEqual(["a", "b"]);
+  await act(async () => end());
+  expect(request).toHaveBeenCalledTimes(1);
+});
+
+it("古いページの未取得状態より、後のページの実データを優先する", async () => {
+  vi.mocked(readHomeFeedChunks).mockReturnValueOnce([
+    { ...chunk(1, ["a"]), unloaded: true, unavailable_ids: ["a"] },
+    chunk(2, ["a", "b"]),
+  ]);
+  await act(async () => root.render(<HomeFeed sort="new" q="" page={1} initial={chunk(1, ["a"])} />));
+  expect(ids()).toEqual(["a", "b"]);
 });

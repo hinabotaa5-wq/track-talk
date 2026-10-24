@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 let resolve: (v: unknown) => void = () => {};
 vi.mock("./api", () => ({
-  apiFetch: () => new Promise((r) => (resolve = r)),
+  apiFetch: vi.fn(() => new Promise((r) => (resolve = r))),
 }));
 
 import { clearHomeFeeds, clearSavedFeeds, isRenderFresh, loadSavedFeed, readFeed, renderSeedTime, savedFeedPath, readHomeFeedChunks, saveHomeFeedChunks, homeFeedGeneration } from "./home-feed-cache";
@@ -45,4 +45,52 @@ it("詳細から戻るための追加ページを保持し、無効化前の一�
   clearHomeFeeds();
   saveHomeFeedChunks(path, chunks, atGeneration);
   expect(readHomeFeedChunks(path)).toBeUndefined();
+});
+
+it("別の条件のキャッシュは上限を超えたら古いものから削除する", async () => {
+  const { seedFeed } = await import("./home-feed-cache");
+  clearHomeFeeds();
+  const data = { posts: [], meta: { page: 1, per_page: 12, total: 0 } };
+  for (let i = 0; i < 60; i++) seedFeed(`/v1/posts?q=${i}`, data);
+  expect(readFeed("/v1/posts?q=0")).toBeUndefined();
+  expect(readFeed("/v1/posts?q=59")).toEqual(data);
+});
+
+it("カーソルの続きでも検索条件と募集タブを保つ", async () => {
+  const { homeFeedPath, nextHomeFeedPath } = await import("./home-feed-cache");
+  const first = new URL(homeFeedPath("recruitment", "東京", 1), "https://test.invalid");
+  expect(first.searchParams.get("pagination")).toBe("cursor");
+  const next = new URL(nextHomeFeedPath("recruitment", "東京", 2, "abc+/="), "https://test.invalid");
+  expect(next.searchParams.get("cursor")).toBe("abc+/=");
+  expect(next.searchParams.get("q")).toBe("東京");
+  expect(next.searchParams.get("kind")).toBe("recruitment");
+  expect(next.searchParams.get("pagination")).toBe("cursor");
+});
+
+
+it("新鮮な一覧を再利用し、検索と低速回線では別タブを先読みしない", async () => {
+  const { apiFetch } = await import("./api");
+  const { seedFeed, homeFeedPath, loadHomeFeed, prefetchHomeFeeds } = await import("./home-feed-cache");
+  clearHomeFeeds();
+  vi.mocked(apiFetch).mockClear();
+  const data = { posts: [], meta: { page: 1, per_page: 12, total: 0 } };
+  const path = homeFeedPath("new", "", 1);
+  seedFeed(path, data);
+  expect(await loadHomeFeed(path)).toEqual(data);
+  prefetchHomeFeeds("検索語");
+  vi.stubGlobal("navigator", { connection: { saveData: true } });
+  try {
+    prefetchHomeFeeds("");
+    expect(apiFetch).not.toHaveBeenCalled();
+  } finally { vi.unstubAllGlobals(); }
+});
+
+it("古い世代の保存処理で新しい一覧を消さない", () => {
+  const path = "/v1/posts?generation-test";
+  const oldGeneration = homeFeedGeneration();
+  clearHomeFeeds();
+  const chunks = [{ posts: [], meta: { page: 1, per_page: 12, total: 0 } }];
+  saveHomeFeedChunks(path, chunks, homeFeedGeneration());
+  saveHomeFeedChunks(path, chunks, oldGeneration);
+  expect(readHomeFeedChunks(path)).toEqual(chunks);
 });

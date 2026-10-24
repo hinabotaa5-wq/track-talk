@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Geist } from "next/font/google";
 import { preconnect } from "react-dom";
 import Script from "next/script";
@@ -9,6 +9,7 @@ import { ProfileGate } from "@/components/profile-gate";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
+import { LastTabRestorer } from "@/components/last-tab-restorer";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -84,6 +85,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <LeaveGuardProvider>
           <ConfirmProvider>
           <ProfileGate />
+          <Suspense fallback={null}>
+            <LastTabRestorer />
+          </Suspense>
           <AmbientBackground />
           <CompetitionPrefetch />
           <Header />

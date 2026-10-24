@@ -70,3 +70,19 @@ it("同じフィードの高さを保存し、更新後もカードの形を保�
   expect(container.querySelector<HTMLElement>(".masonry-feed-canvas")!.style.height).toBe(height);
   expect(container.querySelector<HTMLElement>(".masonry-feed-tile")!.style.width).toBe(width);
 });
+
+it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復元する", async () => {
+  const content = <MasonryFeed storageKey="large-feed" ratios={Array(600).fill(4 / 3)}>{Array.from({ length: 600 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  const track = container.querySelector('[role="region"]') as HTMLDivElement;
+  expect(container.querySelectorAll("a").length).toBeLessThan(40);
+  track.scrollLeft = 8000;
+  await act(async () => { track.dispatchEvent(new Event("scroll")); frames.splice(0).forEach((callback) => callback(0)); });
+  expect(container.querySelectorAll("a").length).toBeLessThan(40);
+  expect(container.textContent).not.toContain("投稿0投稿1");
+  await act(async () => root.render(null));
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  expect((container.querySelector('[role="region"]') as HTMLDivElement).scrollLeft).toBe(8000);
+});
