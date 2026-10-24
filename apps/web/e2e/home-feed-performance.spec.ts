@@ -57,7 +57,9 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   await expect(link).toBeVisible();
   const before = await track.evaluate((el) => el.scrollLeft);
   const href = await link.getAttribute("href");
-  await link.click();
+  // 再取得と画像の測定中でも、フォーカス保持したカードから確実に詳細へ進む。
+  await link.focus();
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(new RegExp(`${href}$`));
   await page.goBack();
   await expect(canvas).toHaveAttribute("data-count", "720");

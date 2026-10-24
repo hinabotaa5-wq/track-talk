@@ -10,6 +10,28 @@ const heights = new BoundedCache<number>(40, 30 * 60_000);
 const measuredRatios = new BoundedCache<number>(6000, 30 * 60_000);
 const imageRatios = new BoundedCache<number>(512, 24 * 60 * 60_000);
 
+let heightsLoaded = false;
+function readHeight(key: string) {
+  if (!heightsLoaded) {
+    heightsLoaded = true;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("masonry-heights-v1") ?? "null");
+      if (saved && Date.now() - saved.at < 30 * 60_000 && Array.isArray(saved.entries)) {
+        for (const [name, value] of saved.entries.slice(-40)) {
+          if (typeof name === "string" && typeof value === "number" && Number.isFinite(value) && value >= 280) heights.set(name, value);
+        }
+      }
+    } catch { /* 保存できない環境ではメモリ上で固定する。 */ }
+  }
+  return heights.get(key);
+}
+function saveHeight(key: string, height: number) {
+  heights.set(key, height);
+  try {
+    sessionStorage.setItem("masonry-heights-v1", JSON.stringify({ at: Date.now(), entries: [...heights.keys()].map((name) => [name, heights.get(name)]) }));
+  } catch { /* メモリ上の高さを使う。 */ }
+}
+
 // 画像比率は一つの保存領域にまとめ、画像ごとにsessionStorageの項目を増やさない。
 let ratiosLoaded = false;
 function readRatio(key: string) {
@@ -80,8 +102,8 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
         const header = document.querySelector("header");
         if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
         const heightKey = `${storageKey}:${width}`;
-        fixedAvailable = heights.get(heightKey) ?? Math.max(280, window.innerHeight - (track!.getBoundingClientRect().top + window.scrollY) - (bottomNav?.getBoundingClientRect().height ?? 0) - 8);
-        heights.set(heightKey, fixedAvailable);
+        fixedAvailable = readHeight(heightKey) ?? Math.max(280, window.innerHeight - (track!.getBoundingClientRect().top + window.scrollY) - (bottomNav?.getBoundingClientRect().height ?? 0) - 8);
+        saveHeight(heightKey, fixedAvailable);
         measuredWidth = width;
       }
       // 描画中の画像だけ測る。画面外の座標はDOMに依存しない。

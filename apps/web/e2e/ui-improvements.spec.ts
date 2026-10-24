@@ -286,7 +286,7 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
   await expect(track.locator("img")).toHaveCount(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
-  expect(await layout()).toEqual(before);
+  await expect.poll(layout).toEqual(before);
 });
 
 test("空きに組み合わせても新しい順・人気順と固定タブを保つ", async ({ page }) => {
