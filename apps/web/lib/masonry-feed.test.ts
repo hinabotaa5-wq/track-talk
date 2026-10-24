@@ -41,7 +41,7 @@ describe("packMosaic", () => {
     }
   });
   it("後の投稿が手前に残った空きへ戻って詰まる", () => {
-    const { tiles } = packMosaic([16 / 9, 16 / 9, 9 / 16, 16 / 9].map(item), 358, 540);
+    const { tiles } = packMosaic([4 / 3, 16 / 9, 9 / 16, 16 / 9].map(item), 358, 540);
     expect(tiles[2].x).toBeGreaterThan(0);
     expect(tiles[3].x).toBe(0);
     expect(tiles[3].y).toBeGreaterThan(tiles[1].y + tiles[1].height);
