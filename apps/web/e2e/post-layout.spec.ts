@@ -6,6 +6,32 @@ const post = {
   created_at: "2026-10-24T00:00:00Z", updated_at: "2026-10-24T00:00:00Z",
 };
 const longBody = "折り返しのない英数字" + "A".repeat(1000);
+test("実況ルームは大会名、会場、配信、公式サイト、タイムテーブルの順に表示し、運営名を出さない", async ({ page }) => {
+  const meet = { ...post, kind: "meet", title: "秋季陸上大会", body: "会場: 国立競技場", author_name: "TrackTalk", author_post_master: true, playback_url: null, thumbnail_url: null };
+  await page.route(`**/api/v1/posts/${post.id}`, (route) => route.fulfill({ json: meet }));
+  await page.route(`**/api/v1/posts/${post.id}/meet-resources`, (route) => route.fulfill({ json: {
+    official_url: "https://example.com/", timetable_url: "https://example.com/time.pdf", youtube_video_id: "abcdefghijk",
+  } }));
+  await page.route("https://www.youtube-nocookie.com/**", (route) => route.abort());
+  await page.goto(`/posts/${post.id}`);
+  const main = page.locator("main");
+  await expect(main.getByRole("heading", { name: meet.title, exact: true })).toHaveCount(1);
+  await expect(main.getByText("TrackTalk", { exact: true })).toHaveCount(0);
+  await expect(main.getByText("投稿マスター", { exact: true })).toHaveCount(0);
+  await expect(main.getByRole("link", { name: "タイムテーブル", exact: true })).toBeVisible();
+  const order = await main.evaluate((element) => {
+    const nodes = [
+      element.querySelector("h1")!,
+      [...element.querySelectorAll("div")].find((node) => node.textContent === "会場: 国立競技場")!,
+      element.querySelector('section[aria-label="YouTube生配信"]')!,
+      element.querySelector('a[href="https://example.com/"]')!,
+      element.querySelector('a[href="https://example.com/time.pdf"]')!,
+    ];
+    return nodes.slice(1).every((node, index) => !!(nodes[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(order).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("meet-room.png") });
+});
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.route("**/api/v1/**", async (route) => {
