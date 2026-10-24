@@ -37,6 +37,8 @@ services:
       context: apps/api
       dockerfile: Dockerfile.localauth
     environment:
+      # ローカル専用。ホストへの公開は下の 127.0.0.1 に限定する。
+      LOCALAUTH_ALLOW_INSECURE_HTTP: "1"
       AUTH_DATABASE_URL: postgres://tracktalk_auth:tracktalk_auth@auth-db:5432/tracktalk_auth?sslmode=disable
       # API と同じ鍵で JWT に署名する(ローカル専用の値。本番の鍵は使わない)
       SUPABASE_JWT_SECRET: local-dev-jwt-secret-change-me-not-for-production

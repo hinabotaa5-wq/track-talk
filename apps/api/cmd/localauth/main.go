@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -150,7 +151,14 @@ type server struct {
 }
 
 func main() {
-	addr := env("LOCALAUTH_ADDR", ":9999")
+	addr := env("LOCALAUTH_ADDR", "127.0.0.1:9999")
+	certFile := os.Getenv("LOCALAUTH_TLS_CERT_FILE")
+	keyFile := os.Getenv("LOCALAUTH_TLS_KEY_FILE")
+	allowHTTP := os.Getenv("LOCALAUTH_ALLOW_INSECURE_HTTP") == "1"
+	if err := validateTransport(certFile, keyFile, allowHTTP); err != nil {
+		slog.Error("localauth transport", "err", err)
+		os.Exit(1)
+	}
 	dsn := os.Getenv("AUTH_DATABASE_URL")
 	if dsn == "" {
 		slog.Error("AUTH_DATABASE_URL is required")
@@ -215,11 +223,35 @@ func main() {
 		slog.Error("seed demo user", "err", err)
 		os.Exit(1)
 	}
-	slog.Info("localauth listen", "addr", addr)
-	if err := http.ListenAndServe(addr, s.routes()); err != nil {
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           s.routes(),
+		ReadHeaderTimeout: 5 * time.Second,
+		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12},
+	}
+	if certFile != "" {
+		slog.Info("localauth listen with TLS", "addr", addr)
+		err = httpServer.ListenAndServeTLS(certFile, keyFile)
+	} else {
+		slog.Warn("localauth insecure HTTP enabled for local preview only", "addr", addr)
+		// Docker プレビューはホストの 127.0.0.1 にのみ公開する。上の検証で明示的な許可を必須にする。
+		// nosemgrep: go.lang.security.audit.net.use-tls.use-tls
+		err = http.ListenAndServe(addr, s.routes())
+	}
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("http", "err", err)
 		os.Exit(1)
 	}
+}
+
+func validateTransport(certFile, keyFile string, allowHTTP bool) error {
+	if (certFile == "") != (keyFile == "") {
+		return errors.New("LOCALAUTH_TLS_CERT_FILE and LOCALAUTH_TLS_KEY_FILE must be set together")
+	}
+	if certFile == "" && !allowHTTP {
+		return errors.New("TLS certificates are required; LOCALAUTH_ALLOW_INSECURE_HTTP=1 is for local preview only")
+	}
+	return nil
 }
 
 func env(key, fallback string) string {
@@ -438,7 +470,7 @@ func (s *server) signup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id": uuid.New().String(), "aud": "authenticated", "role": "authenticated",
 			"email": email, "identities": []any{}, "created_at": time.Now().UTC().Format(time.RFC3339),
-			"updated_at": time.Now().UTC().Format(time.RFC3339),
+			"updated_at":   time.Now().UTC().Format(time.RFC3339),
 			"app_metadata": map[string]any{}, "user_metadata": map[string]any{},
 		})
 		return
@@ -584,6 +616,18 @@ func (s *server) verify(w http.ResponseWriter, r *http.Request) {
 		authError(w, http.StatusBadRequest, "validation_failed", "対応していない type です")
 		return
 	}
+	// ローカルの再設定先だけを許可し、リクエストの URL を転送先へ直接流さない。
+	// 検証はワンタイムトークンを消費する前に行う。
+	var redirectTo string
+	switch r.URL.Query().Get("redirect_to") {
+	case "", "http://localhost:3000/reset-password/update":
+		redirectTo = "http://localhost:3000/reset-password/update"
+	case "http://localhost:3000/auth/callback":
+		redirectTo = "http://localhost:3000/auth/callback"
+	default:
+		authError(w, http.StatusBadRequest, "validation_failed", "許可されていない転送先です")
+		return
+	}
 	id, err := s.store.ConsumeRecovery(r.Context(), tokenHash(r.URL.Query().Get("token")))
 	if err != nil {
 		authError(w, http.StatusBadRequest, "otp_expired", "リンクの期限が切れています")
@@ -598,10 +642,6 @@ func (s *server) verify(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		authError(w, http.StatusInternalServerError, "unexpected_failure", "再設定に失敗しました")
 		return
-	}
-	redirectTo := r.URL.Query().Get("redirect_to")
-	if redirectTo == "" {
-		redirectTo = "http://localhost:3000/reset-password/update"
 	}
 	target := fmt.Sprintf("%s#access_token=%s&expires_at=%v&expires_in=3600&refresh_token=%s&token_type=bearer&type=recovery",
 		redirectTo, sess["access_token"], sess["expires_at"], sess["refresh_token"])

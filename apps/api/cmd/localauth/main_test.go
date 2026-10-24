@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +13,32 @@ import (
 
 	"github.com/google/uuid"
 )
+
+func TestValidateTransport(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		cert      string
+		key       string
+		allowHTTP bool
+		wantError bool
+	}{
+		{name: "reject HTTP by default", wantError: true},
+		{name: "explicit local HTTP", allowHTTP: true},
+		{name: "TLS certificate pair", cert: "cert.pem", key: "key.pem"},
+		{name: "TLS with local HTTP allowed", cert: "cert.pem", key: "key.pem", allowHTTP: true},
+		{name: "missing key", cert: "cert.pem", wantError: true},
+		{name: "missing certificate", key: "key.pem", wantError: true},
+		{name: "no HTTP fallback for partial TLS", cert: "cert.pem", allowHTTP: true, wantError: true},
+		{name: "no HTTP fallback for key only", key: "key.pem", allowHTTP: true, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateTransport(tc.cert, tc.key, tc.allowHTTP)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("validateTransport() = %v, wantError %v", err, tc.wantError)
+			}
+		})
+	}
+}
 
 type memStore struct {
 	mu       sync.Mutex
@@ -190,5 +217,78 @@ func TestLoginRejectsWrongPassword(t *testing.T) {
 	code, _ := do(t, s, http.MethodPost, "/auth/v1/token?grant_type=password", `{"email":"b@example.com","password":"wrong-pass"}`, "")
 	if code != http.StatusBadRequest {
 		t.Fatalf("wrong password: %d", code)
+	}
+}
+
+func TestRecoveryRedirect(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		redirect string
+		want     string
+	}{
+		{name: "default", want: "http://localhost:3000/reset-password/update"},
+		{name: "password update", redirect: "http://localhost:3000/reset-password/update", want: "http://localhost:3000/reset-password/update"},
+		{name: "callback", redirect: "http://localhost:3000/auth/callback", want: "http://localhost:3000/auth/callback"},
+		{name: "external", redirect: "https://evil.example/"},
+		{name: "protocol relative", redirect: "//evil.example/"},
+		{name: "javascript", redirect: "javascript:alert(1)"},
+		{name: "userinfo", redirect: "http://localhost:3000@evil.example/auth/callback"},
+		{name: "host suffix", redirect: "http://localhost.evil.example:3000/auth/callback"},
+		{name: "different port", redirect: "http://localhost:4000/auth/callback"},
+		{name: "other local path", redirect: "http://localhost:3000/other"},
+		{name: "query redirect", redirect: "http://localhost:3000/auth/callback?next=https://evil.example"},
+		{name: "fragment", redirect: "http://localhost:3000/auth/callback#https://evil.example"},
+		{name: "encoded path", redirect: "http://localhost:3000/auth/%63allback"},
+		{name: "backslash", redirect: `http://localhost:3000\@evil.example/auth/callback`},
+		{name: "header injection", redirect: "http://localhost:3000/auth/callback\r\nLocation: https://evil.example"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testServer()
+			store := s.store.(*memStore)
+			u, err := store.CreateUser(context.Background(), "a@example.com", "unused", uuid.New())
+			if err != nil {
+				t.Fatal(err)
+			}
+			const token = "one-time-recovery-token"
+			if err := store.SaveRecovery(context.Background(), u.ID, tokenHash(token), time.Now().Add(time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+			query := url.Values{"type": {"recovery"}, "token": {token}, "redirect_to": {tc.redirect}}
+			req := httptest.NewRequest(http.MethodGet, "/auth/v1/verify?"+query.Encode(), nil)
+			rec := httptest.NewRecorder()
+			s.routes().ServeHTTP(rec, req)
+			if tc.want == "" {
+				if rec.Code != http.StatusBadRequest || rec.Header().Get("Location") != "" {
+					t.Fatalf("unsafe redirect: status=%d location=%q", rec.Code, rec.Header().Get("Location"))
+				}
+				if _, ok := store.recovery[tokenHash(token)]; !ok || len(store.refresh) != 0 {
+					t.Fatal("rejected redirect consumed recovery token or created a session")
+				}
+				return
+			}
+			if rec.Code != http.StatusFound {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			target, err := url.Parse(rec.Header().Get("Location"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			fragment, err := url.ParseQuery(target.Fragment)
+			if err != nil || fragment.Get("access_token") == "" || fragment.Get("refresh_token") == "" || fragment.Get("type") != "recovery" {
+				t.Fatal("missing recovery session in redirect")
+			}
+			target.Fragment = ""
+			if target.String() != tc.want {
+				t.Fatalf("target=%q want=%q", target.String(), tc.want)
+			}
+			if _, ok := store.recovery[tokenHash(token)]; ok {
+				t.Fatal("successful recovery must consume token")
+			}
+			replay := httptest.NewRecorder()
+			s.routes().ServeHTTP(replay, req)
+			if replay.Code != http.StatusBadRequest {
+				t.Fatal("recovery token was reusable")
+			}
+		})
 	}
 }

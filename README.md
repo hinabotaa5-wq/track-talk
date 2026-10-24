@@ -80,6 +80,8 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 
 外部サービスを使わないDockerプレビューは `make local`、停止は `make local-down`。専用DBとローカル認証を使い、デモログインは `demo@tracktalk.local` / `demo-password` です。プレビューではコーチング機能を有効にできます。本番のGoogleログイン・決済・アップロードの確認とは別です。
 
+ローカル認証は通常 `LOCALAUTH_TLS_CERT_FILE` と `LOCALAUTH_TLS_KEY_FILE` を必須とし、証明書を読み込めない場合は起動しません。Dockerプレビューだけは `LOCALAUTH_ALLOW_INSECURE_HTTP=1` でHTTPを明示的に許可し、ホストの `127.0.0.1:9998` に限定して公開します。`cmd/localauth` を直接起動する場合の待受先は既定で `127.0.0.1:9999` です。このサービスは本番では使用しません。
+
 ## 設定と募集のみの運用
 
 環境変数の全項目は `.env.example`、Cloud Runの雛形は `deploy/cloud-run/env.example.yaml` を参照してください。

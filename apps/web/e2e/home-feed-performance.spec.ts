@@ -63,7 +63,7 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   await link.focus();
   await page.keyboard.press("Enter");
   // CIの開発サーバーで初めて詳細ルートをコンパイルする時間も待つ。
-  await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 20_000 });
+  await expect(page).toHaveURL((url) => url.pathname === href, { timeout: 20_000 });
   await page.goBack();
   await expect(canvas).toHaveAttribute("data-count", "720");
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeCloseTo(before, 0);
