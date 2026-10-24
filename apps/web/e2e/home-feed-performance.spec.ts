@@ -25,8 +25,8 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
       json = { posts: Array.from({ length: 12 }, (_, j) => post((number - 1) * 12 + j)), meta: {
         page: number, per_page: 12, total: 0, has_more: number < 60, next_cursor: number < 60 ? `page-${number+1}` : "",
       } };
-    } else if (url.pathname.includes("/posts/perf-")) json = { ...post(Number(url.pathname.split("perf-")[1])), body: "投稿の本文" };
-    else if (url.pathname.endsWith("/comments")) json = { comments: [], meta: { total: 0 } };
+    } else if (url.pathname.endsWith("/comments")) json = { comments: [], meta: { total: 0 } };
+    else if (url.pathname.includes("/posts/perf-")) json = { ...post(Number(url.pathname.split("perf-")[1])), body: "投稿の本文" };
     else if (url.pathname.endsWith("/meet-threads/today")) json = { meets: [] };
     else if (url.pathname.endsWith("/domestic-majors")) json = { majors: [] };
     else if (url.pathname.endsWith("/major-hosts")) json = { hosts: [] };
@@ -60,7 +60,8 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   // 再取得と画像の測定中でも、フォーカス保持したカードから確実に詳細へ進む。
   await link.focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(new RegExp(`${href}$`));
+  // CIの開発サーバーで初めて詳細ルートをコンパイルする時間も待つ。
+  await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 20_000 });
   await page.goBack();
   await expect(canvas).toHaveAttribute("data-count", "720");
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeCloseTo(before, 0);
