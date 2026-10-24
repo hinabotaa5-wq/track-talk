@@ -140,7 +140,7 @@ LIMIT 100;
 
 -- name: GetReviewCoach :one
 -- 返答と一緒に利用者へ見せるコーチのプロフィール。
-SELECT p.nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
+SELECT COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 WHERE c.profile_id = $1;

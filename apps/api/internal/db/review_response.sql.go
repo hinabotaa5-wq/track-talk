@@ -112,14 +112,14 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 }
 
 const getReviewCoach = `-- name: GetReviewCoach :one
-SELECT p.nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
+SELECT COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 WHERE c.profile_id = $1
 `
 
 type GetReviewCoachRow struct {
-	Nickname      *string  `json:"nickname"`
+	Nickname      string   `json:"nickname"`
 	PhotoPublicID *string  `json:"photo_public_id"`
 	Tier          string   `json:"tier"`
 	Events        []string `json:"events"`

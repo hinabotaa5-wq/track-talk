@@ -7,15 +7,17 @@ import { CoachList } from "./coach-list";
 import CoachDetailPage from "./[id]/page";
 
 const apiFetch = vi.fn();
+const routerBack = vi.fn();
+const routerPush = vi.fn();
 vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...args) }));
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "coach-1" }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: "coach-1" }), useRouter: () => ({ back: routerBack, push: routerPush }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("@/components/coach-photo", () => ({ CoachAvatar: ({ name }: { name: string }) => <span>{name}の顔写真</span> }));
 vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { plans: { title: string }[] }) => <div>{plans.map((plan) => plan.title).join("、")}</div> }));
 
 const coach: PublicCoach = {
   id: "coach-1", nickname: "テストコーチ", photo_url: "", tier: "coach", events: ["100m"],
-  best_record: "10秒台", achievements: "全国大会出場", years: 10, rating_count: 0, rating_average: 0,
+  best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/"], rating_count: 0, rating_average: 0,
   service_types: ["video_review"],
   plans: [{ id: "plan-1", title: "公開中の動画添削", kind: "single", description: "説明", duration_days: 7,
     price_yen: 2000, capacity: 3, published: true, service_type: "video_review",
@@ -27,6 +29,8 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   apiFetch.mockReset();
+  routerBack.mockReset();
+  routerPush.mockReset();
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
@@ -44,8 +48,20 @@ it("詳細URLを直接開いても対象コーチのプロフィールと公開�
   expect(apiFetch).toHaveBeenCalledWith("/v1/coaches");
   expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
   expect(container.textContent).toContain("全国大会出場");
+  expect(container.textContent).toContain("成績や指導経験");
+  expect(container.textContent).not.toContain("公開中の動画添削");
+  const video = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("動画添削"));
+  await act(async () => video!.click());
   expect(container.textContent).toContain("公開中の動画添削");
-  expect(container.querySelector("a")?.getAttribute("href")).toBe("/coaches");
+  const sns = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "https://www.instagram.com/testcoach/");
+  expect(sns?.getAttribute("target")).toBe("_blank");
+});
+
+it("詳細内には戻るボタンを重複表示せず、ヘッダーに任せる", async () => {
+  apiFetch.mockResolvedValue({ coaches: [coach] });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "戻る")).toBe(false);
+  expect(container.textContent).not.toContain("競技年数");
 });
 
 it("非公開または存在しないコーチの詳細には案内を出す", async () => {

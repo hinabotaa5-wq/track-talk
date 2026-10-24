@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Post } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { PosterFallback } from "@/components/poster-card";
-import { YouTubePlayer } from "@/components/youtube-player";
 import { InstagramThumb } from "@/components/instagram-thumb";
 import { isInstagramShortcode } from "@/lib/instagram";
 
@@ -11,7 +10,7 @@ export const feedGridClass = "columns-2 gap-3";
 const cardClass =
   "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
 
-// タイトルを書かない投稿(YouTube・Instagram の URL など)では、カードの下のタイトル欄を出さない。
+// 空の見出しを投稿詳細に表示しない。
 export function hasFeedTitle(title: string) {
   return title.trim() !== "";
 }
@@ -21,10 +20,17 @@ export function feedTitle(title: string) {
   return title.trim();
 }
 
-function CardTitle({ title }: { title: string }) {
+function CardCaption({ text }: { text: string }) {
   return (
-    <div className="feed-card-title px-3.5 py-2.5">
-      <p className="truncate text-sm font-medium text-slate-200 transition-colors group-hover:text-blue-400">{title}</p>
+    <div className="feed-card-caption absolute inset-x-0 bottom-0 isolate px-3.5 pb-3 pt-8">
+      <span aria-hidden="true" className="feed-card-caption-background pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background: "linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.5) 65%, transparent)",
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+          maskImage: "linear-gradient(to top, black 65%, transparent)",
+          WebkitMaskImage: "linear-gradient(to top, black 65%, transparent)",
+        }} />
+      <p className="relative line-clamp-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm font-medium leading-snug text-white">{text}</p>
     </div>
   );
 }
@@ -37,22 +43,12 @@ function KindBadge({ children }: { children: string }) {
   );
 }
 
-export function FeedCard({ post, returnTo, thumbnailOnly = false }: { post: Post; returnTo?: "me"; thumbnailOnly?: boolean }) {
+export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   const title = feedTitle(post.title);
-  const cardTitle = post.kind === "text" || post.kind === "video" || post.kind === "youtube" || post.kind === "instagram"
-    ? feedTitle(post.excerpt ?? "") || title
-    : title;
+  const description = feedTitle(post.body ?? "") || feedTitle(post.excerpt ?? "") || title;
+  const thumbnail = post.thumbnail_url || (post.kind === "youtube" && post.youtube_video_id
+    ? `https://i.ytimg.com/vi/${post.youtube_video_id}/hqdefault.jpg` : "");
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;
-  if (!thumbnailOnly && post.kind === "youtube" && post.youtube_video_id) {
-    return (
-      <article className={cardClass}>
-        <YouTubePlayer videoId={post.youtube_video_id} title={cardTitle || "投稿動画"} shorts={post.youtube_shorts} />
-        <Link href={href} className="block" aria-label={cardTitle || "投稿の詳細を開く"}>
-          <CardTitle title={cardTitle || "投稿の詳細を開く"} />
-        </Link>
-      </article>
-    );
-  }
   if (post.kind === "practice") {
     const info = post.practice;
     return (
@@ -106,10 +102,11 @@ export function FeedCard({ post, returnTo, thumbnailOnly = false }: { post: Post
       </Link>
     );
   }
-  const hasThumbnail = Boolean(post.thumbnail_url || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
+  const hasThumbnail = Boolean(thumbnail || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
-    <Link href={href} className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}`}>
-      <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${post.thumbnail_url || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
+    <Link href={href} aria-label={description ? undefined : "投稿の詳細を開く"}
+      className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}`}>
+      <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${thumbnail || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
@@ -119,23 +116,16 @@ export function FeedCard({ post, returnTo, thumbnailOnly = false }: { post: Post
             <KindBadge>Instagram</KindBadge>
           </span>
         ) : null}
-        {post.thumbnail_url ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.thumbnail_url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
-            {post.kind === "text" && hasFeedTitle(cardTitle) ? (
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-3.5 pb-3 pt-10">
-                <p className="line-clamp-3 break-words text-sm font-semibold leading-snug text-white">{cardTitle}</p>
-              </div>
-            ) : null}
-          </>
+        {thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumbnail} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
         ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
-          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={cardTitle || title || "Instagram"} />
+          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={description || "Instagram"} />
         ) : (
-          <PosterFallback title={title} excerpt={post.excerpt || post.body} />
+          <PosterFallback title={description} />
         )}
+        {hasThumbnail && description ? <CardCaption text={description} /> : null}
       </div>
-      {hasFeedTitle(cardTitle) && post.kind !== "text" ? <CardTitle title={cardTitle} /> : null}
     </Link>
   );
 }

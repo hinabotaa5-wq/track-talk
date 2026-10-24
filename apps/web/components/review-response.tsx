@@ -26,15 +26,11 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
           <dd className="whitespace-pre-wrap text-slate-100">{coach.best_record}</dd>
         </div>
         <div>
-          <dt className="text-xs text-slate-300">成績</dt>
+          <dt className="text-xs text-slate-300">成績や指導経験</dt>
           <dd className="whitespace-pre-wrap text-slate-100">{coach.achievements}</dd>
         </div>
-        <div>
-          <dt className="text-xs text-slate-300">競技年数</dt>
-          <dd className="text-slate-100">{coach.years}年</dd>
-        </div>
       </dl>
-      {coach.id ? <Link href={`/coaches#coach-${coach.id}`} className="block text-sm text-blue-300 underline">このコーチに指名で依頼する</Link> : null}
+      {coach.id ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">このコーチに指名で依頼する</Link> : null}
     </section>
   );
 }

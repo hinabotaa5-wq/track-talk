@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -76,12 +77,14 @@ func coachPublicTextError(label, value string, max int) string {
 
 func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 	return map[string]any{
+		"name":          c.Name,
 		"tier":          c.Tier,
 		"events":        c.Events,
 		"service_types": nonNilStrings(c.ServiceTypes),
 		"best_record":   c.BestRecord,
 		"achievements":  c.Achievements,
 		"years":         c.Years,
+		"sns_urls":      nonNilStrings(c.SnsUrls),
 		"status":        c.Status,
 		"applied_at":    c.AppliedAt,
 		"reviewed_at":   c.ReviewedAt,
@@ -189,11 +192,39 @@ func lowRated(count int32, average float64) bool {
 }
 
 type coachApplicationReq struct {
+	Name         string   `json:"name"`
 	Tier         string   `json:"tier"`
 	Events       []string `json:"events"`
 	BestRecord   string   `json:"best_record"`
 	Achievements string   `json:"achievements"`
 	Years        *int     `json:"years"`
+	SnsUrls      []string `json:"sns_urls"`
+}
+
+// normalizeSnsUrls は、チームや個人の SNS の URL を整える。空行は除き、重複は1つにする。
+// http/https の公開ページ URL だけを通し、それ以外が混ざれば false。
+func normalizeSnsUrls(urls []string) ([]string, bool) {
+	out := make([]string, 0, len(urls))
+	seen := map[string]bool{}
+	for _, raw := range urls {
+		v := strings.TrimSpace(raw)
+		if v == "" {
+			continue
+		}
+		if len(v) > 300 || len(out) >= 3 || seen[v] {
+			if seen[v] {
+				continue
+			}
+			return nil, false
+		}
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
+			return nil, false
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	return out, true
 }
 
 func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) {
@@ -206,9 +237,13 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
 	req.BestRecord = strings.TrimSpace(req.BestRecord)
 	req.Achievements = strings.TrimSpace(req.Achievements)
 	fields := map[string]string{}
+	if e := coachPublicTextError("名前", req.Name, 80); e != "" {
+		fields["name"] = e
+	}
 	if !validCoachTier(req.Tier) {
 		fields["tier"] = "応募する枠を選んでください"
 	}
@@ -219,10 +254,18 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if e := coachPublicTextError("記録", req.BestRecord, 200); e != "" {
 		fields["best_record"] = e
 	}
-	if e := coachPublicTextError("成績", req.Achievements, 500); e != "" {
+	if e := coachPublicTextError("成績や指導経験", req.Achievements, 500); e != "" {
 		fields["achievements"] = e
 	}
-	if req.Years == nil || *req.Years < 0 || *req.Years > 60 {
+	snsUrls, snsOK := normalizeSnsUrls(req.SnsUrls)
+	if !snsOK {
+		fields["sns_urls"] = "SNSのURLは3件までで、https://から始まるURLを入力してください"
+	}
+	if req.Years == nil {
+		years := 0
+		req.Years = &years
+	}
+	if *req.Years < 0 || *req.Years > 60 {
 		fields["years"] = "競技年数は0〜60年で入力してください"
 	}
 	if len(fields) > 0 {
@@ -231,11 +274,13 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	}
 	c, err := s.q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
 		ProfileID:    p.ID,
+		Name:         req.Name,
 		Tier:         req.Tier,
 		Events:       events,
 		BestRecord:   req.BestRecord,
 		Achievements: req.Achievements,
 		Years:        int16(*req.Years),
+		SnsUrls:      snsUrls,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "審査が済んでいるため、応募内容は変えられません")
@@ -361,6 +406,7 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			"best_record":    c.BestRecord,
 			"achievements":   c.Achievements,
 			"years":          c.Years,
+			"sns_urls":       nonNilStrings(c.SnsUrls),
 			"rating_count":   c.RatingCount,
 			"rating_average": c.RatingAverage,
 			// パーソナル指導のプラン。安い順。

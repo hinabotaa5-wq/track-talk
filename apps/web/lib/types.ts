@@ -363,12 +363,14 @@ export type CoachEvent =
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {
+  name?: string;
   service_types: CoachingServiceType[];
   tier: CoachTier;
   events: CoachEvent[];
   best_record: string;
   achievements: string;
   years: number;
+  sns_urls: string[];
   status: CoachStatus;
   applied_at: string;
   reviewed_at: string | null;
@@ -736,6 +738,7 @@ export type PublicCoach = {
   best_record: string;
   achievements: string;
   years: number;
+  sns_urls: string[];
   rating_count: number;
   rating_average: number;
   // パーソナル指導の公開中のプラン。安い順。

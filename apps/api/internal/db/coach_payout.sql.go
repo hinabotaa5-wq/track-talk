@@ -536,7 +536,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type SetCoachPayoutsEnabledParams struct {
@@ -570,6 +570,8 @@ func (q *Queries) SetCoachPayoutsEnabled(ctx context.Context, arg SetCoachPayout
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -579,7 +581,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE stripe_account_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type SetCoachPayoutsEnabledByAccountParams struct {
@@ -614,6 +616,8 @@ func (q *Queries) SetCoachPayoutsEnabledByAccount(ctx context.Context, arg SetCo
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -623,7 +627,7 @@ UPDATE coach_profiles
 SET reduced_fee_until = CASE WHEN $1::boolean THEN now() + interval '1 year' END,
     updated_at = now()
 WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type SetCoachReducedFeeParams struct {
@@ -658,6 +662,8 @@ func (q *Queries) SetCoachReducedFee(ctx context.Context, arg SetCoachReducedFee
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -667,7 +673,7 @@ UPDATE coach_profiles
 SET stripe_account_id = COALESCE(stripe_account_id, $1),
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type SetCoachStripeAccountParams struct {
@@ -702,6 +708,8 @@ func (q *Queries) SetCoachStripeAccount(ctx context.Context, arg SetCoachStripeA
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }

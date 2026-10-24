@@ -70,7 +70,9 @@ func proposeInPerson(t *testing.T, h http.Handler, coach, root string, at time.T
 }
 func TestPublicCoachIncludesInPersonPlanConditions(t *testing.T) {
 	h := setup(t)
-	coach, plan := inPersonPlan(t, h)
+	_, plan := inPersonPlan(t, h)
+	var coachID string
+	queryRowArgs(t, `SELECT coach_id::text FROM coaching_plans WHERE id = $1`, []any{plan}, &coachID)
 	r := doJSON(t, h, "GET", "/v1/coaches", "", nil)
 	if r.Code != http.StatusOK {
 		t.Fatalf("public coaches %d %s", r.Code, r.Body.String())
@@ -93,7 +95,7 @@ func TestPublicCoachIncludesInPersonPlanConditions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range out.Coaches {
-		if c.ID != coach {
+		if c.ID != coachID {
 			continue
 		}
 		for _, p := range c.Plans {

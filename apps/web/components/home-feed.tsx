@@ -103,7 +103,7 @@ export function HomeFeed({
       ) : null}
       {posts.length > 0 ? (
         <MasonryFeed storageKey={path} onEndReached={hasNext && !moreError ? loadMore : undefined} ratios={[...posts.map((post) => post.youtube_shorts || post.instagram_type === "reel" ? 9 / 16 : 4 / 3), ...(hasNext ? [4 / 3] : [])]}>
-          {posts.map((post) => <FeedCard key={post.id} post={post} thumbnailOnly />)}
+          {posts.map((post) => <FeedCard key={post.id} post={post} />)}
           {hasNext ? (
             <button
               key="next-page"

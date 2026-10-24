@@ -138,9 +138,6 @@ export default function ApplyCoachingPlanPage() {
             <p className="text-xs text-slate-300">このコーチの指導を前に受けたことがある人は、お試しには申し込めません。</p>
           ) : null}
         </div>
-        <Link href="/coaches" className="text-xs text-blue-300 underline">
-          コーチ一覧に戻る
-        </Link>
       </section>
 
       {plan.full ? (

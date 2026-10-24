@@ -54,8 +54,7 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       const result = packMosaic(nodes.map((node, index) => {
         const image = node.querySelector<HTMLImageElement>("img");
         const ratio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : hints[index] || 4 / 3;
-        const footer = node.querySelector<HTMLElement>(".feed-card-title")?.getBoundingClientRect().height ?? 0;
-        return { ratio, footer };
+        return { ratio, footer: 0 };
       }), track.clientWidth, available);
       canvas.style.width = `${result.width}px`;
       canvas.style.height = `${result.height}px`;

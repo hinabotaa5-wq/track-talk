@@ -3,7 +3,7 @@ import { CoachList } from "./coach-list";
 
 export const metadata: Metadata = {
   title: "指名コーチ一覧",
-  description: "TrackTalk のオンラインコーチングで見てくれるコーチの一覧です。記録・成績・競技年数を、依頼する前に確かめられます。",
+  description: "TrackTalk のオンラインコーチングで見てくれるコーチの一覧です。記録・成績や指導経験を、依頼する前に確かめられます。",
 };
 
 // 依頼する前に、どんなコーチがいるかを見られる。添削でもパーソナル指導でも同じ一覧を使う。

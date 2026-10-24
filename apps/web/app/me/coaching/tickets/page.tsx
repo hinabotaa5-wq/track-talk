@@ -107,7 +107,7 @@ function TicketsPage() {
       {summary.purchase_block_reason ? <p className="text-sm text-amber-300">{summary.purchase_block_reason} <Link href="/me/coaching" className="underline">利用設定</Link></p> : null}
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
-        <p className="text-xs text-slate-300">1枚あたり{formatYen(p.amount_yen / p.quantity)}</p>
+        {p.quantity > 1 ? <p className="text-xs text-slate-300">1枚あたり{formatYen(p.amount_yen / p.quantity)}</p> : null}
         <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => void buy(p.id)}>購入する</Button>
       </div>)}</div>
       <section className="space-y-2"><h2 className="font-semibold">購入履歴</h2>

@@ -6,9 +6,10 @@ import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
 import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
+import { HeaderCoachLink } from "./header-coach-link";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { useCurrentMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
+import { useCurrentMainTab, headerBackFallback, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
@@ -80,7 +81,7 @@ export function Header() {
   function goBack() {
     const go = () => {
       if (window.history.length > 1) router.back();
-      else router.push("/");
+      else router.replace(headerBackFallback(pathname));
     };
     if (!confirmLeave(go)) go();
   }
@@ -141,6 +142,7 @@ export function Header() {
             {profile?.is_admin && showHeaderAccountActions ? (
               <HeaderAccountPanel key={`admin:${pathname}`} admin signedIn={!!session} />
             ) : null}
+            {showHeaderAccountActions ? <HeaderCoachLink /> : null}
             {pathname === "/" ? <TodayMeetBalloon /> : null}
             {session && showHeaderAccountActions ? (
               <>

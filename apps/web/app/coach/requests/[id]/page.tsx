@@ -121,7 +121,7 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
       <p className="text-xs text-slate-300">
         URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは送れません。直接のやりとりに誘うと利用停止になります。
       </p>
-      <p className="text-xs text-slate-300">返答と一緒に、ニックネーム・担当種目・記録・成績・競技年数が利用者に届きます。</p>
+      <p className="text-xs text-slate-300">返答と一緒に、ニックネーム・担当種目・記録・成績や指導経験が利用者に届きます。</p>
       <Field label="良い点（1つ）" value={good} onChange={setGood} error={errors.good_point} />
       <Field label="直す点（1つ目）" value={fix1} onChange={setFix1} error={errors.fix_points} />
       <Field label="直す点（2つ目、なくてもよい）" value={fix2} onChange={setFix2} />

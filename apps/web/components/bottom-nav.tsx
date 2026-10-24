@@ -71,10 +71,26 @@ function isMeSubPage(pathname: string) {
   return pathname.startsWith("/me/");
 }
 
+// タブから開いた先の画面は共通ヘッダーで戻る。
+function isDetailPage(pathname: string) {
+  return pathname === "/coaches" || pathname === "/coach" ||
+    ["/coaches/", "/coaching/", "/coach/", "/competitions/", "/prefectures/", "/guardian/", "/admin/"].some((prefix) => pathname.startsWith(prefix));
+}
+
+export function headerBackFallback(pathname: string) {
+  if (/^\/coaching\/personal\/plans\/[^/]+$/.test(pathname) || pathname.startsWith("/coaches/")) return "/coaches";
+  if (pathname === "/coach/about") return "/coach/apply";
+  if (pathname.startsWith("/coach/requests/")) return "/coach";
+  if (pathname === "/coach" || pathname.startsWith("/coach/") || pathname.startsWith("/coaching/") || pathname === "/coaches") return "/coaching";
+  if (pathname.startsWith("/competitions/")) return "/competitions";
+  if (pathname.startsWith("/me/")) return "/me";
+  return "/";
+}
+
 // ヘッダーを「戻る」ボタンだけにする画面。ロゴ・大会などのメニュー・通知は出さない。
 // 下のメニューの「マイページ」から開いたログイン画面(next なし)は、ふつうのヘッダーのまま。
 export function hasBackOnlyHeader(pathname: string, search = "") {
-  if (pathname === "/coaches") return true;
+  if (isDetailPage(pathname)) return true;
   if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (isMeSubPage(pathname)) return true;
@@ -91,7 +107,7 @@ export function hidesHeader(pathname: string, search = "", mustSetProfile = fals
 
 // search は "?next=/upload" のような URL のクエリ部分。
 export function showsBackButton(pathname: string, search = "") {
-  if (pathname === "/coaches") return true;
+  if (isDetailPage(pathname)) return true;
   if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   // 投稿の＋などログインが要るページから送られてきたときは、元の画面に戻れるようにする。
   // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。

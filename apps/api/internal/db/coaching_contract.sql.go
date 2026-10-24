@@ -112,7 +112,7 @@ SELECT
      ORDER BY pay.refund_reason IS NOT DISTINCT FROM 'not_started', pay.paid_at DESC LIMIT 1), '')::text AS payment_status,
     COALESCE((SELECT sum(pay.refunded_yen) FROM coaching_payments pay WHERE pay.contract_id = ct.id), 0)::int AS refunded_yen,
     rp.nickname AS requester_nickname,
-    cp.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), cp.nickname, '')::text AS coach_nickname,
     (SELECT count(*) FROM reports r JOIN coaching_messages m ON m.id = r.target_id
      WHERE r.target_type = 'coaching_message' AND m.contract_id = ct.id)::int AS report_count,
     COALESCE((SELECT b.count FROM coaching_blocked_counts b WHERE b.contract_id = ct.id AND b.profile_id = ct.requester_id), 0)::int AS requester_blocked,
@@ -120,6 +120,7 @@ SELECT
 FROM coaching_contracts ct
 JOIN profiles rp ON rp.id = ct.requester_id
 JOIN profiles cp ON cp.id = ct.coach_id
+LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
 ORDER BY ct.created_at DESC
 LIMIT 100
 `
@@ -143,7 +144,7 @@ type AdminListCoachingContractsRow struct {
 	PaymentStatus      string     `json:"payment_status"`
 	RefundedYen        int32      `json:"refunded_yen"`
 	RequesterNickname  *string    `json:"requester_nickname"`
-	CoachNickname      *string    `json:"coach_nickname"`
+	CoachNickname      string     `json:"coach_nickname"`
 	ReportCount        int32      `json:"report_count"`
 	RequesterBlocked   int32      `json:"requester_blocked"`
 	CoachBlocked       int32      `json:"coach_blocked"`
@@ -783,7 +784,7 @@ func (q *Queries) GetCoachingContract(ctx context.Context, id uuid.UUID) (Coachi
 
 const getCoachingContractDetail = `-- name: GetCoachingContractDetail :one
 SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count,
-    cp.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), cp.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     rp.nickname AS requester_nickname
 FROM coaching_contracts ct
@@ -845,7 +846,7 @@ type GetCoachingContractDetailRow struct {
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
 	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  *string    `json:"coach_nickname"`
+	CoachNickname                  string     `json:"coach_nickname"`
 	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
 	RequesterNickname              *string    `json:"requester_nickname"`
 }
@@ -916,7 +917,7 @@ func (q *Queries) GetCoachingContractDetail(ctx context.Context, id uuid.UUID) (
 const getPublicCoachingPlan = `-- name: GetPublicCoachingPlan :one
 SELECT
     pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at, pl.video_reviews, pl.menu_updates, pl.reply_formats, pl.start_on_first_video, pl.service_type, pl.additional_consultation_price_yen, pl.competition_name, pl.competition_date, pl.support_start_date, pl.call_count, pl.call_minutes, pl.venue_area, pl.venue_name, pl.session_count, pl.session_minutes, pl.travel_fee_yen, pl.max_participants,
-    p.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     c.tier AS coach_tier,
     c.events AS coach_events,
@@ -966,7 +967,7 @@ type GetPublicCoachingPlanRow struct {
 	SessionMinutes                 int16      `json:"session_minutes"`
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
-	CoachNickname                  *string    `json:"coach_nickname"`
+	CoachNickname                  string     `json:"coach_nickname"`
 	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
 	CoachTier                      string     `json:"coach_tier"`
 	CoachEvents                    []string   `json:"coach_events"`
@@ -1482,7 +1483,7 @@ func (q *Queries) ListCoachingBlockedAccounts(ctx context.Context) ([]ListCoachi
 }
 
 const listGuardianContracts = `-- name: ListGuardianContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1543,7 +1544,7 @@ type ListGuardianContractsRow struct {
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
 	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  *string    `json:"coach_nickname"`
+	CoachNickname                  string     `json:"coach_nickname"`
 	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
 }
 
@@ -1623,7 +1624,7 @@ func (q *Queries) ListGuardianContracts(ctx context.Context, requesterID uuid.UU
 }
 
 const listMyCoachingContracts = `-- name: ListMyCoachingContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1684,7 +1685,7 @@ type ListMyCoachingContractsRow struct {
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
 	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  *string    `json:"coach_nickname"`
+	CoachNickname                  string     `json:"coach_nickname"`
 	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
 }
 

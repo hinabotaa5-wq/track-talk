@@ -46,6 +46,20 @@ it("決済から戻っただけでは残高を増やさず、サーバー確定�
   expect(mocks.router.replace).toHaveBeenCalledWith("/coaching/new");
 });
 
+it("1枚商品には1枚あたりの金額を出さず、まとめ買いには1枚あたり576円を出す", async () => {
+  mocks.api.mockResolvedValue({
+    ...initial,
+    products: [
+      { id: "single", title: "チケット1枚", quantity: 1, amount_yen: 600 },
+      { id: "five", title: "チケット5枚", quantity: 5, amount_yen: 2880 },
+    ],
+  });
+  await render();
+  expect(container.textContent).toContain("600円");
+  expect(container.textContent).not.toContain("1枚あたり600円");
+  expect(container.textContent).toContain("1枚あたり576円");
+});
+
 it("購入通信の再試行では同じ操作IDを使い、二重購入を防ぐ", async () => {
   let requests = 0;
   mocks.api.mockImplementation(async (_path: string, options?: { method?: string }) => {
