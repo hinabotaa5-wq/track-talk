@@ -79,7 +79,8 @@ export function Header() {
 
   function goBack() {
     const go = () => {
-      if (window.history.length > 1) router.back();
+      if (pathname === "/coach/apply") router.replace("/coach");
+      else if (window.history.length > 1) router.back();
       else router.replace(headerBackFallback(pathname));
     };
     if (!confirmLeave(go)) go();
@@ -138,7 +139,7 @@ export function Header() {
                 );
               })}
             </nav>
-            {pathname === "/" ? <TodayMeetBalloon /> : null}
+            {showHeaderAccountActions ? <TodayMeetBalloon /> : null}
             {session && showHeaderAccountActions ? (
               <>
                 <FeedbackBox />

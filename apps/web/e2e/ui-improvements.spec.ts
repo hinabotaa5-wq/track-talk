@@ -119,13 +119,29 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
 });
 
 test("コーチ画面は3つの小さな入口にまとめ、未ログインなら応募も案内する", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/coaching");
   const choices = page.getByRole("navigation", { name: "コーチングのプランを選ぶ" });
   await expect(choices.locator("a")).toHaveCount(3);
   expect(await choices.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(["/coaching/new", "/coaches", "/coach"]);
+  const boxes = await choices.locator("a").evaluateAll((links) => links.map((link) => {
+    const rect = link.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, right: rect.right };
+  }));
+  expect(boxes[0].bottom).toBeLessThan(boxes[1].top);
+  expect(boxes[1].bottom).toBeLessThan(boxes[2].top);
+  expect(boxes[2].bottom).toBeLessThan(740);
+  expect(boxes.every((box) => box.right <= 320)).toBe(true);
   await choices.locator('a[href="/coach"]').click();
   await expect(page).toHaveURL(/\/login\?next=%2Fcoach$/);
   await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+});
+
+test("今日の大会アイコンをホーム以外の通常ページにも表示する", async ({ page }) => {
+  for (const path of ["/coaching", "/competitions", "/injury"]) {
+    await page.goto(path);
+    await expect(page.getByRole("button", { name: "今日開催中の大会", exact: true })).toBeVisible();
+  }
 });
 
 test("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {

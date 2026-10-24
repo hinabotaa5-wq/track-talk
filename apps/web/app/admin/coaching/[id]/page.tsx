@@ -70,7 +70,7 @@ function OpenContract() {
         </button>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Link href="/admin" className="block text-center text-sm text-blue-300 underline">
-          管理者画面へ
+          アプリ管理へ
         </Link>
       </div>
     );
@@ -131,7 +131,7 @@ function OpenContract() {
         </ul>
       </section>
       <Link href="/admin" className="block text-center text-sm text-blue-300 underline">
-        管理者画面へ
+        アプリ管理へ
       </Link>
     </div>
   );

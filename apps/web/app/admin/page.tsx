@@ -639,7 +639,7 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto min-w-0 max-w-2xl space-y-4 [overflow-wrap:anywhere]">
-      <h1 className="text-2xl font-bold">管理者画面</h1>
+      <h1 className="text-2xl font-bold">アプリ管理</h1>
       <div role="tablist" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((t) => (
           <button
