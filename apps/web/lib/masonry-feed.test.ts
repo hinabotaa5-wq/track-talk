@@ -40,6 +40,12 @@ describe("packMosaic", () => {
       });
     }
   });
+  it("後の投稿が手前に残った空きへ戻って詰まる", () => {
+    const { tiles } = packMosaic([16 / 9, 16 / 9, 9 / 16, 16 / 9].map(item), 358, 540);
+    expect(tiles[2].x).toBeGreaterThan(0);
+    expect(tiles[3].x).toBe(0);
+    expect(tiles[3].y).toBeGreaterThan(tiles[1].y + tiles[1].height);
+  });
   it("同じ投稿順と画面サイズでは配置を毎回変えない", () => {
     const items = [item(9 / 16), item(16 / 9), item(1), item(4 / 3)];
     expect(packMosaic(items, 358, 560)).toEqual(packMosaic(items, 358, 560));
