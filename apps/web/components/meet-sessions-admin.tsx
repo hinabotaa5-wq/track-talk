@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError, apiFetch } from "@/lib/api";
+import { MeetResourceEditor } from "@/components/meet-resource-editor";
+import type { MeetResources } from "@/lib/meet-resources";
 
-type AdminMeet = { meet_key: string; name: string; date_label: string; session_count: number };
+type AdminMeet = { meet_key: string; name: string; date_label: string; session_count: number } & Partial<MeetResources>;
 
 const placeholder = "開始日時,種目,ラウンド,性別\n2026-10-12 10:30,100m,予選,女子\n2026-10-12 11:05,走幅跳,決勝,男子";
 
@@ -86,6 +88,8 @@ export function MeetSessionsAdmin({ token }: { token: string | null }) {
           ))}
         </select>
       </label>
+      {meets.find((meet) => meet.meet_key === meetKey) ? <MeetResourceEditor key={meetKey} meet={meets.find((meet) => meet.meet_key === meetKey)!} token={token} onSaved={load} /> : null}
+      <h3 className="font-semibold">種目ごとの開始時刻</h3>
       <textarea
         value={csv}
         onChange={(e) => setCsv(e.target.value)}

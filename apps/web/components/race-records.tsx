@@ -121,7 +121,7 @@ function RaceRecordForm({
         </label>
         {hasWind ? (
           <label className="block">
-            <span className="mb-1 block text-xs text-slate-300">風(m/s・任意)</span>
+            <span className="mb-1 block text-xs text-slate-300">風(m/s)</span>
             <span className="flex gap-1">
               <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" className="min-w-0 flex-1" />
               <button
@@ -137,11 +137,11 @@ function RaceRecordForm({
         ) : null}
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-300">大会名(任意)</span>
+        <span className="mb-1 block text-xs text-slate-300">大会名</span>
         <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder="例: 県高校総体" />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-300">感想(任意)</span>
+        <span className="mb-1 block text-xs text-slate-300">感想</span>
         <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder="例: 後半で腕振りが小さくなった" />
       </label>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}

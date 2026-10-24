@@ -165,10 +165,13 @@ func nowRunningByMeet(rows []db.ListMeetSessionsRow, now time.Time) map[string][
 }
 
 type adminMeetDTO struct {
-	MeetKey      string `json:"meet_key"`
-	Name         string `json:"name"`
-	DateLabel    string `json:"date_label"`
-	SessionCount int    `json:"session_count"`
+	MeetKey        string `json:"meet_key"`
+	Name           string `json:"name"`
+	DateLabel      string `json:"date_label"`
+	SessionCount   int    `json:"session_count"`
+	OfficialURL    string `json:"official_url"`
+	TimetableURL   string `json:"timetable_url"`
+	YouTubeVideoID string `json:"youtube_video_id"`
 }
 
 // adminListMeetSessions は、タイムテーブルを入れられる大会(これから開催か開催中の対象大会)を返す。
@@ -195,8 +198,14 @@ func (s *Server) adminListMeetSessions(w http.ResponseWriter, r *http.Request) {
 		byKey[c.MeetKey] = int(c.SessionCount)
 	}
 	meets := make([]adminMeetDTO, 0, len(targets))
+	resources, err := s.meetResourceMap(r.Context(), keys)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	for _, t := range targets {
-		meets = append(meets, adminMeetDTO{MeetKey: t.key, Name: t.name, DateLabel: t.dateLabel, SessionCount: byKey[t.key]})
+		links := resourcesForTarget(t, resources[t.key])
+		meets = append(meets, adminMeetDTO{MeetKey: t.key, Name: t.name, DateLabel: t.dateLabel, SessionCount: byKey[t.key], OfficialURL: links.OfficialURL, TimetableURL: links.TimetableURL, YouTubeVideoID: links.YouTubeVideoID})
 	}
 	JSON(w, http.StatusOK, map[string]any{"meets": meets})
 }

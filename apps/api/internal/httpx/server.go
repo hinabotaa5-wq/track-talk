@@ -113,6 +113,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/products/{id}/reviews", s.listProductReviews)
 		r.Get("/menu-contest", s.getMenuContest)
 		r.Get("/meet-threads/today", s.todayMeetThreads)
+		r.Get("/meet-resources", s.listMeetResources)
+		r.Get("/posts/{id}/meet-resources", s.getPostMeetResources)
 		// プッシュ通知はコーチングの知らせと月1回の記録のお知らせに使う。コーチングの提供前でも登録できる。
 		r.Get("/push/public-key", s.pushPublicKey)
 		// 大会の日程と県ページは、検索から来た人がログインなしで読めるようにする。
@@ -204,6 +206,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/practice-ratings/{id}/hide", s.hidePracticeRating)
 			r.Get("/admin/meet-sessions", s.adminListMeetSessions)
 			r.Put("/admin/meet-sessions", s.adminPutMeetSessions)
+			r.Put("/admin/meet-resources", s.adminPutMeetResources)
 			r.Post("/admin/products", s.createProduct)
 			r.Patch("/admin/products/{id}", s.updateProduct)
 			r.Post("/admin/products/{id}/hide", s.hideProduct)

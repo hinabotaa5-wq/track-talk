@@ -13,6 +13,7 @@ import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
 import { regionalCompetitionsPath } from "@/lib/competition-prefecture";
 import { loadDomesticMajors, peekDomesticMajors, undecidedDomesticMeets, type DomesticMeet } from "@/lib/domestic-majors";
 import { fetchTodayMeetThreads, meetThreadForCompetition, meetThreadForMajor } from "@/lib/meet-threads";
+import { fetchMeetResources, type MeetResources } from "@/lib/meet-resources";
 import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
@@ -40,9 +41,11 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   // 開催中の大会の実況スレッド。ホームの「今日開催中」と同じ API なので、開催中の判定もホームとそろう。
   // 取れなければ空のままで、どの大会もふだんどおり公式サイトへ飛ぶ。
   const [meets, setMeets] = useState<MeetThread[]>([]);
+  const [resources, setResources] = useState<MeetResources[]>([]);
 
   useEffect(() => {
     let active = true;
+    fetchMeetResources().then((next) => { if (active) setResources(next); });
     fetchTodayMeetThreads().then((next) => {
       if (active) setMeets(next);
     });
@@ -89,9 +92,9 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
               {item.id === "domestic" ? (
-                <DomesticSchedule initial={initialMajors} meets={meets} />
+                <DomesticSchedule initial={initialMajors} meets={meets} resources={resources} />
               ) : (
-                <InternationalSchedule meets={meets} />
+                <InternationalSchedule meets={meets} resources={resources} />
               )}
             </motion.div>
           ) : null,
@@ -101,7 +104,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   );
 }
 
-function DomesticSchedule({ initial, meets }: { initial: DomesticMajor[] | null; meets: MeetThread[] }) {
+function DomesticSchedule({ initial, meets, resources }: { initial: DomesticMajor[] | null; meets: MeetThread[]; resources: MeetResources[] }) {
   const [majors, setMajors] = useState<DomesticMajor[] | null>(() => peekDomesticMajors() ?? initial);
   const [error, setError] = useState("");
 
@@ -127,14 +130,14 @@ function DomesticSchedule({ initial, meets }: { initial: DomesticMajor[] | null;
     <Schedule
       items={majors}
       itemKey={(major) => `${major.slug}:${major.year}`}
-      renderCard={(major, today) => <DomesticCard major={major} today={today} thread={meetThreadForMajor(meets, major)} />}
+      renderCard={(major, today) => <DomesticCard major={major} today={today} thread={meetThreadForMajor(meets, major)} timetableURL={resources.find((r) => r.major_slug === major.slug && r.major_year === major.year)?.timetable_url} />}
       undecided={undecidedDomesticMeets(majors)}
       emptyBody="今シーズンの国内主要大会はまだ発表されていません。"
     />
   );
 }
 
-function InternationalSchedule({ meets }: { meets: MeetThread[] }) {
+function InternationalSchedule({ meets, resources }: { meets: MeetThread[]; resources: MeetResources[] }) {
   const cached = readCompetitions(INTERNATIONAL, 0);
   const [entry, setEntry] = useState(cached);
 
@@ -154,7 +157,7 @@ function InternationalSchedule({ meets }: { meets: MeetThread[] }) {
     <Schedule
       items={entry.items}
       itemKey={(c) => c.id}
-      renderCard={(c, today) => <InternationalCard competition={c} today={today} thread={meetThreadForCompetition(meets, c)} />}
+      renderCard={(c, today) => <InternationalCard competition={c} today={today} thread={meetThreadForCompetition(meets, c)} timetableURL={resources.find((r) => r.competition_id === c.id)?.timetable_url} />}
       emptyBody="今シーズンの国際大会はまだ取り込まれていません。"
     />
   );
@@ -238,12 +241,14 @@ function StateBadge({ item, today }: { item: Scheduled; today: string }) {
 function ScheduleCard({
   href,
   linkLabel,
+  timetableURL,
   over,
   thread,
   children,
 }: {
   href: string;
   linkLabel: string;
+  timetableURL?: string;
   over: boolean;
   thread?: MeetThread;
   children: ReactNode;
@@ -256,6 +261,7 @@ function ScheduleCard({
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
       ) : children}
+      {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">タイムテーブル</a> : null}
       {thread ? (
         <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
           <span className="min-w-0">
@@ -273,9 +279,9 @@ function ScheduleCard({
   );
 }
 
-function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: string; thread?: MeetThread }) {
+function DomesticCard({ major, today, thread, timetableURL }: { major: DomesticMajor; today: string; thread?: MeetThread; timetableURL?: string }) {
   return (
-    <ScheduleCard href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
+    <ScheduleCard timetableURL={timetableURL} href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {major.schedule_label}
         <StateBadge item={major} today={today} />
@@ -286,10 +292,10 @@ function DomesticCard({ major, today, thread }: { major: DomesticMajor; today: s
   );
 }
 
-function InternationalCard({ competition, today, thread }: { competition: Competition; today: string; thread?: MeetThread }) {
+function InternationalCard({ competition, today, thread, timetableURL }: { competition: Competition; today: string; thread?: MeetThread; timetableURL?: string }) {
   const link = destination(competition, INTERNATIONAL);
   return (
-    <ScheduleCard href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
+    <ScheduleCard timetableURL={timetableURL} href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
       <p className="text-xs text-slate-200">
         {competitionDates(competition.starts_on, competition.ends_on)}
         <StateBadge item={competition} today={today} />
