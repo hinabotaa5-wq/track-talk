@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 function finish(response: NextResponse) {
-  response.cookies.set("tracktalk-next", "", { path: "/", maxAge: 0 });
+  response.cookies.set("tracktalk-next", "", { path: "/", maxAge: 0, sameSite: "lax" });
   return response;
 }
 
@@ -26,9 +26,13 @@ export async function GET(request: NextRequest) {
     return finish(NextResponse.redirect(login));
   }
 
-  const dest = new URL(nextCookiePath(request.cookies.get("tracktalk-next")?.value), origin);
-  if (dest.origin !== origin) {
-    dest.href = new URL("/", origin).href;
+  const dest = new URL("/", origin);
+  const next = new URL(nextCookiePath(request.cookies.get("tracktalk-next")?.value), origin);
+  if (next.origin === origin) {
+    // Cookie からはパス・クエリ・フラグメントだけを使い、リダイレクト先の origin は固定する。
+    dest.pathname = next.pathname;
+    dest.search = next.search;
+    dest.hash = next.hash;
   }
   const success = NextResponse.redirect(dest);
   const supabase = createServerClient(url, key, {
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
       },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          success.cookies.set(name, value, options);
+          success.cookies.set(name, value, { ...options, sameSite: "lax" });
         });
         Object.entries(headers).forEach(([name, value]) => {
           success.headers.set(name, value);

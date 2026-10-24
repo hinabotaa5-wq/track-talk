@@ -2,8 +2,6 @@ package cloudinary
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,8 +14,7 @@ import (
 
 func TestSignOrdersParams(t *testing.T) {
 	got := Sign(map[string]string{"timestamp": "1315060510", "public_id": "sample"}, "abcd")
-	sum := sha1.Sum([]byte("public_id=sample&timestamp=1315060510abcd"))
-	want := hex.EncodeToString(sum[:])
+	want := "0d4fe14b2b4a3f68a97ccc5097c43908b623d24293c296826a9390c14d891509"
 	if got != want {
 		t.Fatalf("got %s want %s", got, want)
 	}
@@ -244,11 +241,11 @@ func TestCoachingUploadIsAuthenticated(t *testing.T) {
 func TestCoachingURLsAreSigned(t *testing.T) {
 	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
 	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
-	// 期待値は Cloudinary の公式 SDK と同じ手順（SHA-1 → URL 用 Base64 の先頭8文字）で別に計算したもの。
-	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--EPOGrjzG--/q_auto,du_30/v1/"+id+".mp4"; got != want {
+	// 期待値は Cloudinary の公式 SDK と同じ手順（SHA-256 → URL 用 Base64 の先頭8文字）で別に計算したもの。
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--OE0d7T-_--/q_auto,du_30/v1/"+id+".mp4"; got != want {
 		t.Fatalf("playback\n got %s\nwant %s", got, want)
 	}
-	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--BA2BgQjp--/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"; got != want {
+	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--AF2cg9FF--/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"; got != want {
 		t.Fatalf("thumbnail\n got %s\nwant %s", got, want)
 	}
 	if c.CoachingPlaybackURL("track-talk/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11") != "" {

@@ -35,9 +35,17 @@ const user = {
 };
 
 const server = createHttpServer((req, res) => {
-  const origin = req.headers.origin ?? "http://localhost:3000";
-  res.setHeader("access-control-allow-origin", origin);
-  res.setHeader("access-control-allow-headers", req.headers["access-control-request-headers"] ?? "*");
+  // ローカルのテスト画面だけを許可し、リクエストの Origin をそのまま返さない。
+  if (req.headers.origin === "http://localhost:3000") {
+    res.setHeader("access-control-allow-origin", "http://localhost:3000");
+  } else if (req.headers.origin === "http://127.0.0.1:3000") {
+    res.setHeader("access-control-allow-origin", "http://127.0.0.1:3000");
+  } else if (req.headers.origin !== undefined) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  res.setHeader("access-control-allow-headers", "authorization,apikey,content-type,x-client-info,x-supabase-api-version");
   res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
   res.setHeader("vary", "Origin");
   if (req.method === "OPTIONS") {

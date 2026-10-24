@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -138,7 +137,9 @@ func Sign(params map[string]string, secret string) string {
 	for _, k := range keys {
 		parts = append(parts, k+"="+params[k])
 	}
-	sum := sha1.Sum([]byte(strings.Join(parts, "&") + secret))
+	// Cloudinary は API 署名に SHA-256 を受け付ける。
+	// https://cloudinary.com/documentation/authentication_signatures
+	sum := sha256.Sum256([]byte(strings.Join(parts, "&") + secret))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -324,8 +325,9 @@ func (c Client) CoachingThumbnailURL(publicID string) string {
 
 // signedVideoURL は非公開の動画を配信する URL を返す。
 // トークン認証の鍵があれば、期限付きのトークン（__cld_token__）を付ける。公式 SDK と同じく、そのときは署名を付けない。
-// 鍵が無ければ署名（s--XXXXXXXX--）を付ける。署名は「変換/public_id.拡張子」に API シークレットを足した SHA-1 を
+// 鍵が無ければ署名（s--XXXXXXXX--）を付ける。署名は「変換/public_id.拡張子」に API シークレットを足した SHA-256 を
 // URL 用の Base64 にした先頭8文字。バージョン（v1）は署名に含めない。
+// https://cloudinary.com/documentation/delivery_url_signatures
 func (c Client) signedVideoURL(transformation, publicID, ext string) string {
 	if c.Cloud == "" || c.Secret == "" || !ValidCoachingPublicID(publicID) {
 		return ""
@@ -339,7 +341,7 @@ func (c Client) signedVideoURL(transformation, publicID, ext string) string {
 		}
 		return base + transformation + "/v1/" + source + "?" + token
 	}
-	sum := sha1.Sum([]byte(transformation + "/" + source + c.Secret))
+	sum := sha256.Sum256([]byte(transformation + "/" + source + c.Secret))
 	signature := "s--" + base64.URLEncoding.EncodeToString(sum[:])[:8] + "--"
 	return base + signature + "/" + transformation + "/v1/" + source
 }

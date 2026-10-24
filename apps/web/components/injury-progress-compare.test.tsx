@@ -23,9 +23,10 @@ const progress: InjuryProgress = {
 };
 
 function row(html: string, label: string) {
-  const match = new RegExp(`<tr><th scope="row"[^>]*>${label}</th>(.*?)</tr>`).exec(html);
+  const match = [...html.matchAll(/<tr><th scope="row"[^>]*>([^<]*)<\/th>(.*?)<\/tr>/g)]
+    .find((match) => match[1] === label);
   if (!match) throw new Error(`row ${label} not found`);
-  return match[1].replace(/<[^>]+>/g, "|");
+  return match[2].replace(/<[^>]+>/g, "|");
 }
 
 describe("InjuryProgressCompareView", () => {

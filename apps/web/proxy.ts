@@ -20,10 +20,11 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet, headers) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          // リクエスト側は名前と値だけを更新する。ブラウザ向けの属性はレスポンス側で設定する。
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set({ name, value }));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
+            response.cookies.set(name, value, { ...options, sameSite: "lax" }),
           );
           Object.entries(headers).forEach(([name, value]) => response.headers.set(name, value));
         },
@@ -40,7 +41,7 @@ export async function proxy(request: NextRequest) {
   if (!url || !key) login.searchParams.set("error", "config");
   else login.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
   const redirect = NextResponse.redirect(login);
-  response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  response.cookies.getAll().forEach((cookie) => redirect.cookies.set({ ...cookie, sameSite: "lax" }));
   redirect.headers.set("Cache-Control", "no-store");
   return redirect;
 }
