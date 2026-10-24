@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
 import { LastTabRestorer } from "@/components/last-tab-restorer";
+import { lastTabStartupScript } from "@/lib/last-tab";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -19,6 +20,7 @@ import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
 import { umamiBeforeSendName, umamiBeforeSendScript } from "@/lib/analytics";
+import { ProductAnalytics } from "@/components/product-analytics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +72,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
+      <head>
+        {/* Next.js の起動を待たず、body の描画前に復元する。 */}
+        <script dangerouslySetInnerHTML={{ __html: lastTabStartupScript }} />
+      </head>
       <body className="isolate flex min-h-full flex-col">
         <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
         {/* Umami より先に読み込ませる。送る URL から保護者のリンクのトークンを外す。 */}
@@ -79,9 +85,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           src="https://cloud.umami.is/script.js"
           data-website-id="0442ad3b-c5a2-45d8-825e-09bb48eded74"
           data-before-send={umamiBeforeSendName}
+          data-domains="tracktalk.jp,www.tracktalk.jp,track-talk.netlify.app"
           strategy="afterInteractive"
         />
         <AuthProvider>
+          <ProductAnalytics />
           <LeaveGuardProvider>
           <ConfirmProvider>
           <ProfileGate />

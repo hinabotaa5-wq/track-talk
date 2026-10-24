@@ -100,3 +100,16 @@ it("保存が制限されたブラウザでも表示を継続する", async () =
   await render("/memo");
   expect(navigation.router.replace).not.toHaveBeenCalled();
 });
+
+it("描画前の復元中は二重に移動せず保存値も維持する", async () => {
+  rememberLastTab("/memo", "");
+  const startupWindow = window as Window & { __tracktalkLastTabRedirect?: boolean };
+  startupWindow.__tracktalkLastTabRedirect = true;
+  try {
+    await render();
+    expect(navigation.router.replace).not.toHaveBeenCalled();
+    expect(readLastTab()).toBe("/memo");
+  } finally {
+    delete startupWindow.__tracktalkLastTabRedirect;
+  }
+});

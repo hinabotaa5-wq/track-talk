@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { appEvents } from "@/lib/practice-events";
 import { profileIncomplete } from "@/lib/profile-gate";
+import { trackEvent } from "@/lib/analytics";
 import { nicknameSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ export default function ProfilePage() {
         token,
         body: JSON.stringify(values),
       });
+      if (firstTime) trackEvent("onboarding_completed");
       await refreshProfile();
       if (firstTime) {
         router.replace("/");

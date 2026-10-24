@@ -467,6 +467,9 @@ export function PostDetail({
       {/* コメントルーム(スレッド)の間は、投稿の動画・いいね・保存などを隠してチャットに集中させる。 */}
       {activeThread ? null : (
       <div className="min-w-0 space-y-6">
+      {post.kind === "meet" && hasFeedTitle(post.title) ? (
+        <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
+      ) : null}
       {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
         <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{post.body}</p>
       ) : null}
@@ -516,13 +519,14 @@ export function PostDetail({
           priority
         />
       ) : null}
-      {post.kind === "practice" || !hasFeedTitle(post.title) ? null : (
+      {post.kind === "practice" || post.kind === "meet" || !hasFeedTitle(post.title) ? null : (
         <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
         <p className="text-xs text-slate-400">元動画: {post.source_title}</p>
       ) : null}
+      {post.kind === "meet" ? null : (
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
         {post.author_name ? <span>{post.author_name}</span> : null}
         {post.author_name && post.author_post_master ? (
@@ -535,6 +539,7 @@ export function PostDetail({
         ) : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>
       </p>
+      )}
       {post.kind === "injury" && post.injury ? (
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
       ) : null}

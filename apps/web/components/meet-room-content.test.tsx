@@ -20,11 +20,13 @@ afterEach(async () => {
   container.remove();
 });
 
-it("公式サイト、タイムテーブル、生配信の順で表示し、自動再生しない", async () => {
+it("会場、生配信、公式サイト、タイムテーブルの順で表示し、自動再生しない", async () => {
   apiFetch.mockResolvedValue({ official_url: "https://example.com/", timetable_url: "https://example.com/time.pdf", youtube_video_id: "abcdefghijk" });
-  await act(async () => root.render(<MeetRoomContent postId="meet" body="大会の実況" />));
-  expect([...container.querySelectorAll("a, iframe")].map((el) => el.tagName)).toEqual(["A", "A", "IFRAME", "A"]);
-  expect(container.querySelectorAll("a")[1].href).toBe("https://example.com/time.pdf");
+  await act(async () => root.render(<MeetRoomContent postId="meet" body="会場: 国立競技場" />));
+  expect(container.firstElementChild?.firstElementChild?.textContent).toBe("会場: 国立競技場");
+  expect([...container.querySelectorAll("a, iframe")].map((el) => el.tagName)).toEqual(["IFRAME", "A", "A", "A"]);
+  expect(container.querySelectorAll("a")[1].href).toBe("https://example.com/");
+  expect(container.querySelectorAll("a")[2].href).toBe("https://example.com/time.pdf");
   const src = new URL(container.querySelector("iframe")!.src);
   expect(src.pathname).toBe("/embed/abcdefghijk");
   expect(src.searchParams.get("autoplay")).toBeNull();

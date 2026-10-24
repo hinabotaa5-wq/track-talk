@@ -11,5 +11,10 @@
   # 現在はコーチ募集のみ。利用者向け画面は準備中の案内にする。
   NEXT_PUBLIC_COACHING_ENABLED = "0"
 
+[context.production.environment]
+  # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。
+  NEXT_PUBLIC_POSTHOG_KEY = "phc_rRHpSCdA2jSgQuTnAUMTGPWbd2No24S4vdU25RMFGwmA"
+  NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

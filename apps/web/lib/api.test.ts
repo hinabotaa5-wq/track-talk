@@ -1,5 +1,27 @@
-import { describe, expect, it } from "vitest";
-import { ApiRequestError, apiErrorText } from "./api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiFetch, ApiRequestError, apiErrorText } from "./api";
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("successful operation tracking", () => {
+  it.each([201, 204])("counts a successful response (%s) once", async (status) => {
+    const track = vi.fn();
+    vi.stubGlobal("window", { location: { hostname: "tracktalk.jp" }, umami: { track } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(status === 204 ? null : '{"id":"123"}', { status })));
+    await apiFetch("/v1/posts", { method: "POST", body: '{"body":"private"}', token: "secret" });
+    expect(track).toHaveBeenCalledExactlyOnceWith("post_created");
+  });
+
+  it("does not count failed HTTP responses or network failures", async () => {
+    const track = vi.fn();
+    vi.stubGlobal("window", { location: { hostname: "tracktalk.jp" }, umami: { track } });
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 422 })).mockRejectedValueOnce(new Error("offline"));
+    vi.stubGlobal("fetch", fetch);
+    await expect(apiFetch("/v1/posts", { method: "POST" })).rejects.toBeInstanceOf(ApiRequestError);
+    await expect(apiFetch("/v1/posts", { method: "POST" })).rejects.toBeInstanceOf(ApiRequestError);
+    expect(track).not.toHaveBeenCalled();
+  });
+});
 
 describe("apiErrorText", () => {
   it("項目ごとの指摘があれば最初の1つを出す", () => {

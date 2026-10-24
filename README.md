@@ -93,6 +93,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `SUPABASE_SERVICE_ROLE_KEY` | 退会時の認証アカウント削除 |
 | `CLOUDINARY_*` | ファイル保存と署名 |
 | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SITE_URL` | ブラウザ向けの公開設定 |
+| `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | 任意の匿名の利用状況計測。未設定なら無効。接続・無料枠の確認は [計測の説明](docs/analytics.md) |
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | 現在は両方 `0`。APIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
 | `COACHING_NEW_ACCEPTANCE_ENABLED` | 現在は `0`。画面を公開する場合も、新しい申込み・購入の受付は別途判断 |
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |

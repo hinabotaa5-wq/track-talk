@@ -10,6 +10,32 @@ const tabParams: Record<string, readonly string[]> = {
   "/injury": ["tab"],
 };
 
+// head で即時実行し、React とホームの読み込みを待たずに前回のタブを開く。
+// 許可するパスとパラメータは通常の保存処理と共有する。
+export const lastTabStartupScript = `(()=>{
+  if(location.pathname!=="/"||location.search||location.hash)return;
+  try{
+    const saved=localStorage.getItem(${JSON.stringify(storageKey)});
+    if(!saved)return;
+    const [path,search=""]=saved.split("?");
+    const tabs=${JSON.stringify(tabParams)};
+    if(!Object.hasOwn(tabs,path))return;
+    const current=new URLSearchParams(search),params=new URLSearchParams();
+    for(const name of tabs[path]){
+      const value=current.get(name);
+      if(value)params.set(name,value);
+    }
+    const query=params.toString(),href=path+(query?"?"+query:"");
+    if(href==="/")return;
+    window.__tracktalkLastTabRedirect=true;
+    location.replace(href);
+  }catch{window.__tracktalkLastTabRedirect=false;}
+})();`;
+
+export function isLastTabStartupRedirecting() {
+  return !!(window as Window & { __tracktalkLastTabRedirect?: boolean }).__tracktalkLastTabRedirect;
+}
+
 export function lastTabHref(pathname: string, search: string) {
   if (!Object.hasOwn(tabParams, pathname)) return null;
   const current = new URLSearchParams(search);

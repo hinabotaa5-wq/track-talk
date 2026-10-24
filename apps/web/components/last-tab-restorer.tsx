@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { readLastTab, rememberLastTab } from "@/lib/last-tab";
+import { isLastTabStartupRedirecting, readLastTab, rememberLastTab } from "@/lib/last-tab";
 
 export function LastTabRestorer() {
   const pathname = usePathname();
@@ -12,6 +12,8 @@ export function LastTabRestorer() {
   const restoring = useRef(false);
 
   useEffect(() => {
+    // head から移動中のホームでは、二重遷移と保存値の上書きを避ける。
+    if (isLastTabStartupRedirecting()) return;
     if (!checked.current) {
       checked.current = true;
       // 起動時だけ復元する。アプリ内のホーム操作や直接開いたリンクを優先する。

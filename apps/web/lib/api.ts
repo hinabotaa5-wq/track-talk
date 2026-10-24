@@ -1,4 +1,5 @@
 import type { ApiError } from "./types";
+import { trackSuccessfulMutation } from "./analytics";
 
 // 開発中のブラウザは /api の書き換えを通す。サーバーで描くときは相対パスを解決できないので、API を直に呼ぶ。
 const API_BASE =
@@ -66,6 +67,7 @@ export async function apiFetch<T>(
     });
   }
   if (res.status === 204) {
+    trackSuccessfulMutation(path, rest.method);
     return undefined as T;
   }
   const text = await res.text();
@@ -83,5 +85,6 @@ export async function apiFetch<T>(
       isApiError(data) ? data : { error: { code: "unknown", message: unknownError } },
     );
   }
+  trackSuccessfulMutation(path, rest.method);
   return data as T;
 }

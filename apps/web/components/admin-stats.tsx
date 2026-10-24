@@ -16,6 +16,18 @@ type WeekRow = {
 };
 
 type AdminStats = {
+  daily_started_at?: string;
+  daily?: {
+    day: string;
+    signups: number;
+    posts: number;
+    comments: number;
+    likes: number;
+    sense_notes: number;
+    race_records: number;
+    product_reviews: number;
+    deletions: number;
+  }[];
   recent_days: number;
   weeks: WeekRow[];
   retention: { week_start: string; signups: number; retained: number }[];
@@ -167,6 +179,17 @@ export function AdminStatsView({ token }: { token: string | null }) {
   const days = stats.recent_days;
   return (
     <div className="space-y-4">
+      {stats.daily_started_at ? (
+        <Section
+          title="日ごとに残す件数"
+          note={`日本時間で直近90日を表示。${new Date(stats.daily_started_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}から保存しています。初日は開始後の分だけ、今日は途中の件数です。新規保存に成功した回数を数え、編集は含めません。いいねの取り消し後の押し直しはもう1回と数えます。削除・退会後も件数は減りません。人数や閲覧数とは別の集計です。`}
+        >
+          <Table
+            head={["日付", "登録", "投稿", "コメント", "いいね", "感覚メモ", "記録", "レビュー", "退会"]}
+            rows={(stats.daily ?? []).map((d) => [d.day, d.signups, d.posts, d.comments, d.likes, d.sense_notes, d.race_records, d.product_reviews, d.deletions])}
+          />
+        </Section>
+      ) : null}
       <Section
         title="週ごとの動き"
         note="週は月曜始まり。「書いた人」は投稿・コメント・いいね・感覚メモ・記録・レビュー・練習の申請・ケガのグループへの参加のどれかをした人数で、読むだけの人は入りません(ページを開いた人数は Umami で見ます)。退会した人のぶんは過去の週からも消えます。"

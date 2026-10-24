@@ -439,6 +439,17 @@ type CompetitionNewsCheck struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+type DailyUsageCollection struct {
+	Singleton bool      `json:"singleton"`
+	StartedAt time.Time `json:"started_at"`
+}
+
+type DailyUsageCount struct {
+	Day    time.Time `json:"day"`
+	Metric string    `json:"metric"`
+	Count  int64     `json:"count"`
+}
+
 type DeletedAccount struct {
 	ID        uuid.UUID `json:"id"`
 	DeletedAt time.Time `json:"deleted_at"`

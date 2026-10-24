@@ -15,7 +15,8 @@ const (
 	// 機能ごとの利用と、問い合わせ・通報の内訳で「直近」とする日数。
 	adminStatsRecentDays = 30
 	// コーチングの需要と供給を見る日数。
-	adminCoachingDays = 90
+	adminCoachingDays   = 90
+	adminDailyStatsDays = 90
 )
 
 // weekStartJST は、t を含む週の月曜 0時(日本時間)。
@@ -61,6 +62,33 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	startedAt, err := s.q.DailyUsageCollectionStart(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	local := now.In(jst.Zone)
+	until := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, jst.Zone)
+	dailySince := until.AddDate(0, 0, -(adminDailyStatsDays - 1))
+	start := startedAt.In(jst.Zone)
+	startDay := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, jst.Zone)
+	if dailySince.Before(startDay) {
+		dailySince = startDay
+	}
+	daily, err := s.q.AdminDailyUsage(ctx, db.AdminDailyUsageParams{Since: dailySince, Until: until})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	dailyRows := make([]map[string]any, 0, len(daily))
+	for _, row := range daily {
+		dailyRows = append(dailyRows, map[string]any{
+			"day": row.Day.Format(time.DateOnly), "signups": row.Signups,
+			"posts": row.Posts, "comments": row.Comments, "likes": row.Likes,
+			"sense_notes": row.SenseNotes, "race_records": row.RaceRecords,
+			"product_reviews": row.ProductReviews, "deletions": row.Deletions,
+		})
+	}
 
 	weekRows := make([]map[string]any, 0, len(weeks))
 	for _, row := range weeks {
@@ -83,12 +111,14 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{
-		"recent_days": adminStatsRecentDays,
-		"weeks":       weekRows,
-		"retention":   retentionRows,
-		"features":    features,
-		"inquiries":   inquiries,
-		"reports":     reports,
+		"recent_days":      adminStatsRecentDays,
+		"weeks":            weekRows,
+		"retention":        retentionRows,
+		"features":         features,
+		"inquiries":        inquiries,
+		"reports":          reports,
+		"daily_started_at": startedAt.Format(time.RFC3339),
+		"daily":            dailyRows,
 	})
 }
 

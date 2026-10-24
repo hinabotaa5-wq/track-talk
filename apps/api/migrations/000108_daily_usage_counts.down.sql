@@ -1,0 +1,11 @@
+DROP TRIGGER count_daily_deletion ON deleted_accounts;
+DROP TRIGGER count_daily_product_review ON product_reviews;
+DROP TRIGGER count_daily_race_record ON race_records;
+DROP TRIGGER count_daily_sense_note ON sense_notes;
+DROP TRIGGER count_daily_like ON post_likes;
+DROP TRIGGER count_daily_comment ON comments;
+DROP TRIGGER count_daily_post ON posts;
+DROP TRIGGER count_daily_signup ON profiles;
+DROP FUNCTION count_daily_usage();
+DROP TABLE daily_usage_collection;
+DROP TABLE daily_usage_counts;

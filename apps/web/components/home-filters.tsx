@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { homeHref, parseHomeSort, type HomeSort } from "@/lib/home-sort";
+import { trackEvent } from "@/lib/analytics";
 
 const chips: { sort: HomeSort; label: string }[] = [
   { sort: "new", label: "新しい" },
@@ -106,6 +107,7 @@ export function HomeFilters() {
             });
             const query = params.toString();
             window.history.pushState(null, "", query ? `/?${query}` : "/");
+            if (params.has("q")) trackEvent("search_submitted");
           }}>
             {sort !== "new" ? <input type="hidden" name="sort" value={sort} /> : null}
             {sort === "review" && sp.get("type") ? <input type="hidden" name="type" value={sp.get("type")!} /> : null}
