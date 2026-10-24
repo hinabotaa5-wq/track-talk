@@ -22,6 +22,7 @@ const accountLinks = [
 ] as const;
 
 const infoLinks = [
+  { href: "/guide", label: "利用ガイド", icon: FileText },
   { href: "/me/contact", label: "お問い合わせ", icon: Mail },
   { href: "/guidelines", label: "ガイドライン", icon: ScrollText },
   { href: "/terms", label: "利用規約", icon: FileText },

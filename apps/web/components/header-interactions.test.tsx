@@ -28,6 +28,7 @@ beforeEach(() => {
   pathname = "/";
   replace.mockReset();
   sessionStorage.clear();
+  localStorage.clear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -80,6 +81,13 @@ describe("ヘッダーの開閉", () => {
   it("マイページでも元の下部タブの選択を保持する", async () => {
     function Selection() { return <span>{useCurrentMainTab("/me")}</span>; }
     sessionStorage.setItem("account-origin", "/injury?tab=data");
+    await act(async () => root.render(<Selection />));
+    expect(container.textContent).toBe("injury");
+  });
+
+  it("ケガタブから開いた投稿の詳細でも選択色を保つ", async () => {
+    localStorage.setItem("tracktalk:last-tab", "/injury?tab=data");
+    function Selection() { return <span>{useCurrentMainTab("/posts/post-1")}</span>; }
     await act(async () => root.render(<Selection />));
     expect(container.textContent).toBe("injury");
   });

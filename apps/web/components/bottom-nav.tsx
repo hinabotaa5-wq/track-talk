@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
+import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
 import { usePathname } from "next/navigation";
 import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
@@ -42,20 +43,33 @@ export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn
 
 export function activeMainTab(pathname: string) {
   if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
-  if (pathname === "/coaching" || pathname === "/coaches" || pathname.startsWith("/coaches/")) return "coaching";
+  if (["/coaching", "/coaches", "/coach", "/guardian", "/me/coaching"].some((base) => pathname === base || pathname.startsWith(`${base}/`))) return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
-  if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
-  if (pathname === "/memo") return "memo";
+  if (pathname.startsWith("/prefectures/")) return "competitions";
+  if (pathname === "/injury" || pathname.startsWith("/injury/") || pathname === "/me/injury") return "injury";
+  if (pathname === "/memo" || pathname.startsWith("/memo/") || pathname === "/me/sense") return "memo";
+  if (pathname === "/menu-contest") return "home";
   if (pathname === "/me") return "me";
   return "";
 }
 
 const noSubscribe = () => () => {};
+function subscribeLastTab(callback: () => void) {
+  window.addEventListener(lastTabChangedEvent, callback);
+  window.addEventListener("storage", callback);
+  return () => { window.removeEventListener(lastTabChangedEvent, callback); window.removeEventListener("storage", callback); };
+}
+const lastTabSnapshot = () => readLastTab() ?? "/";
 export function useCurrentMainTab(pathname: string) {
-  const origin = useSyncExternalStore(noSubscribe, readAccountOrigin, () => "/");
-  return pathname === "/me" || pathname === "/login"
-    ? activeMainTab(origin.split("?")[0]) || "home"
-    : activeMainTab(pathname);
+  const origin = useSyncExternalStore(noSubscribe, () => pathname === "/login" ? new URLSearchParams(window.location.search).get("next") ?? readAccountOrigin() : readAccountOrigin(), () => "/");
+  const last = useSyncExternalStore(subscribeLastTab, lastTabSnapshot, () => "/");
+  const own = activeMainTab(pathname);
+  if (own && own !== "me") return own;
+  if (pathname === "/login" || pathname === "/me" || pathname.startsWith("/me/") || pathname.startsWith("/admin")) {
+    return activeMainTab(origin.split("?")[0]) || activeMainTab(last.split("?")[0]) || "home";
+  }
+  // 投稿などURLだけで所属を判断できない詳細は、最後に開いたタブの色を保つ。
+  return activeMainTab(last.split("?")[0]) || "home";
 }
 
 const injuryGroupPathPattern = /^\/injury\/([^/]+)$/;
@@ -116,7 +130,7 @@ export function showsBackButton(pathname: string, search = "") {
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (pathname === "/upload") return true;
   if (isMeSubPage(pathname)) return true;
-  if (pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
+  if (pathname === "/guide" || pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy") return true;
   if (pathname === "/competitions/major-hosts") return true;
   if (pathname === "/competitions/regional") return true;
   if (pathname === "/menu-contest") return true;

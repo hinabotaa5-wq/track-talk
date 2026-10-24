@@ -76,10 +76,10 @@ it("購入通信の再試行では同じ操作IDを使い、二重購入を防�
   expect(bodies[0].product_id).toBe("single");
 });
 
-it("保護者の同意等で購入できない場合は、理由を表示して購入を止める", async () => {
+it("利用設定の案内を表示せず、購入できない場合は購入を止める", async () => {
   mocks.api.mockResolvedValue({ ...initial, can_purchase: false, purchase_block_reason: "保護者の同意が必要です" });
   await render();
-  expect(container.textContent).toContain("保護者の同意が必要です");
+  expect(container.textContent).not.toContain("利用設定");
   await buy();
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });

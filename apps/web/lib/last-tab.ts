@@ -1,4 +1,5 @@
 const storageKey = "tracktalk:last-tab";
+export const lastTabChangedEvent = "tracktalk:last-tab-changed";
 
 // 一覧のタブだけを保存する。投稿・ログイン・編集画面や検索語には戻さない。
 const tabParams: Record<string, readonly string[]> = {
@@ -36,5 +37,10 @@ export function readLastTab() {
 export function rememberLastTab(pathname: string, search: string) {
   const href = lastTabHref(pathname, search);
   if (!href) return;
-  try { localStorage.setItem(storageKey, href); } catch { /* 保存不可でもタブは使える。 */ }
+  try {
+    if (localStorage.getItem(storageKey) !== href) {
+      localStorage.setItem(storageKey, href);
+      window.dispatchEvent(new Event(lastTabChangedEvent));
+    }
+  } catch { /* 保存不可でもタブは使える。 */ }
 }

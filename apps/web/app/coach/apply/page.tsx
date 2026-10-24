@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// コーチの応募。集めるのは名前・担当種目・記録・成績や指導経験と、任意の SNS だけ。
+// コーチの応募。SNSまたはホームページは最低1件必要。
 // 運営が審査し、結果はこの画面と通知で伝える。
 
 type Draft = {
@@ -36,7 +36,7 @@ const chip = (on: boolean) =>
 
 const statusNotes: Record<CoachApplication["status"], string> = {
   pending: "運営が内容を確認しています。審査中は内容を書き直せます。",
-  approved: "応募が承認されました。コーチ画面で受付を始められます。",
+  approved: coachingEnabled ? "応募が承認されました。コーチ画面で受付を始められます。" : "応募が承認されました。コーチングは準備中です。活動の開始は公開後にご案内します。",
   rejected: "今回は見送りになりました。内容を見直して、もう一度応募できます。",
   suspended: "コーチの活動を停止しています。詳しくはお問い合わせください。",
 };
@@ -107,6 +107,10 @@ export default function CoachApplyPage() {
     setError("");
     try {
       const sns_urls = draft.sns_urls.split("\n").map((v) => v.trim()).filter(Boolean);
+      if (sns_urls.length === 0) {
+        setFieldErrors({ sns_urls: "SNSまたはホームページのURLを1件以上入力してください" });
+        return;
+      }
       const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/applications", {
         method: "POST",
         token,
@@ -241,14 +245,15 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">チームや個人のSNS（任意）</span>
+            <span className="font-semibold">SNS・ホームページ（必須）</span>
             <Textarea
               rows={3}
+              required
               value={draft.sns_urls}
-              placeholder={"例:\nhttps://www.instagram.com/example/\nhttps://x.com/example"}
+              placeholder={"例:\nhttps://www.instagram.com/example/\nhttps://example-club.jp/"}
               onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
             />
-            <span className="block text-xs text-slate-300">1行に1つずつ、最大3件まで貼れます。承認されるとコーチ詳細にリンクとして載ります。</span>
+            <span className="block text-xs text-slate-300">InstagramなどのSNS、または所属するクラブチームのホームページを1件以上入力してください。1行に1つずつ、最大3件まで。公開後はコーチの紹介に表示されます。</span>
             {fieldError("sns_urls")}
           </label>
 
@@ -302,7 +307,7 @@ export default function CoachApplyPage() {
           </div>
           {(application.sns_urls ?? []).length ? (
             <div>
-              <dt className="text-xs text-slate-300">SNS</dt>
+              <dt className="text-xs text-slate-300">SNS・ホームページ</dt>
               <dd className="space-y-1">
                 {application.sns_urls.map((url) => (
                   <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">

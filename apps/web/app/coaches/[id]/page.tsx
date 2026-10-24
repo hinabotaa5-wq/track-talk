@@ -53,7 +53,7 @@ export default function CoachDetailPage() {
               <dd className="whitespace-pre-wrap break-words text-slate-100">{value}</dd>
             </div>)}
             {(coach.sns_urls ?? []).length ? <div>
-              <dt className="text-xs text-slate-300">SNS</dt>
+              <dt className="text-xs text-slate-300">SNS・ホームページ</dt>
               <dd className="space-y-1">
                 {coach.sns_urls.map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline underline-offset-4">{url}</a>)}
               </dd>

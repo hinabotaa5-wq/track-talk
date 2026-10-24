@@ -1,9 +1,15 @@
-name: Enable Coaching Screens
+name: Configure Coaching Availability
 
-# コーチ一覧や既存のコーチング画面を本番で表示するための、明示的な切り替え。
-# 新規の申し込み・購入は COACHING_NEW_ACCEPTANCE_ENABLED を設定するまで受け付けない。
+# 募集のみ／コーチング公開を明示的に切り替える。Web側のフラグも合わせること。
+# この操作では新規の申し込み・購入を常に停止する。受付開始は別途判断する。
 on:
   workflow_dispatch:
+    inputs:
+      enabled:
+        description: コーチング利用を公開する（falseはコーチ募集のみ）
+        type: boolean
+        default: false
+        required: true
 
 concurrency:
   group: configure-coaching
@@ -28,10 +34,12 @@ jobs:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Enable coaching screens
+      - name: Configure coaching availability
+        env:
+          COACHING_SCREEN_FLAG: ${{ inputs.enabled && '1' || '0' }}
         run: |
           gcloud run services update track-talk-api \
             --region "$REGION" \
             --project "$GCP_PROJECT_ID" \
-            --update-env-vars COACHING_ENABLED=1 \
+            --update-env-vars "COACHING_ENABLED=$COACHING_SCREEN_FLAG,COACHING_NEW_ACCEPTANCE_ENABLED=0" \
             --quiet

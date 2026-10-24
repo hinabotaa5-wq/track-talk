@@ -1,6 +1,7 @@
 "use client";
 
 import { CoachConsultationQueue } from "@/components/coaching-consultations";
+import { CoachApplyLink } from "@/components/coach-apply-link";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachEarningsSection } from "@/components/coach-payouts";
@@ -218,10 +219,9 @@ export function CoachDashboard() {
     return (
       <div className="mx-auto max-w-md space-y-4">
         <h1 className="text-2xl font-bold">コーチ画面</h1>
-        <p className="text-sm text-slate-200">承認されたコーチだけが使えます。</p>
-        <Link href={coachApplyPath} className="text-sm text-blue-300 underline">
-          コーチに応募する
-        </Link>
+        <p className="text-sm leading-relaxed text-slate-200">コーチングは準備中です。競技や指導の経験を生かして、選手の次の一歩を支えるコーチを募集しています。</p>
+        <CoachApplyLink />
+        {coach ? <Link href={coachApplyPath} className="block text-sm text-blue-300 underline">応募状況・応募内容を確認する</Link> : null}
       </div>
     );
   }

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Shuffle, UserRound } from "lucide-react";
+import { coachingEnabled } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "コーチング",
-  description: "ランダムで動画添削を依頼するか、コーチを指名して動画添削・大会サポート・対面指導を受けられます。",
+  description: "コーチングは準備中です。現在は陸上競技のコーチを募集しています。",
 };
 
 const choices = [
@@ -30,24 +31,27 @@ const choices = [
 
 export default function CoachingPage() {
   return (
-    <div className="mx-auto max-w-md space-y-6">
-
-      <nav aria-label="コーチングのプランを選ぶ" className="space-y-2">
+    <div className="mx-auto flex min-h-[calc(100svh-10.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-4">
+      {!coachingEnabled ? <div className="space-y-1">
+        <h1 className="text-xl font-bold">コーチングは準備中です</h1>
+        <p className="text-sm text-slate-300">現在はコーチを募集しています。応募は「コーチ専用画面」から。</p>
+      </div> : null}
+      <nav aria-label="コーチングのプランを選ぶ" className="grid flex-1 auto-rows-fr gap-3">
         {choices.map(({ title, description, href, icon: Icon }) => (
-          <Link key={href} href={href} className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 transition hover:border-blue-400/50 hover:bg-blue-500/15 active:scale-[0.98]">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300">
-              <Icon className="size-4" aria-hidden />
+          <Link key={href} href={href} className="group flex min-h-24 min-w-0 items-center gap-4 rounded-2xl border border-white/20 glass bg-white/10 px-5 py-5 transition hover:border-blue-400/50 hover:bg-blue-500/15 active:scale-[0.98]">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
+              <Icon className="size-6" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-bold leading-tight text-white">{title}</h2>
-              <p className="mt-1 text-xs leading-snug text-slate-300">{description}</p>
+              <h2 className="text-base font-bold leading-tight text-white">{title}</h2>
+              <p className="mt-2 text-sm leading-snug text-slate-300">{!coachingEnabled ? href === "/coach" ? "コーチ募集・応募状況の確認" : "準備中・公開までお待ちください" : description}</p>
             </div>
             <ArrowRight className="size-4 shrink-0 text-blue-300" aria-hidden />
           </Link>
         ))}
       </nav>
 
-      <section className="space-y-3">
+      {coachingEnabled ? <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-100">利用中の方</h2>
         <nav aria-label="コーチングの利用状況" className="divide-y divide-white/15 overflow-hidden rounded-xl border border-white/20 bg-white/5">
           {[
@@ -60,7 +64,7 @@ export default function CoachingPage() {
             </Link>
           ))}
         </nav>
-      </section>
+      </section> : null}
     </div>
   );
 }

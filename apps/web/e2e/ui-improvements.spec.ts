@@ -118,7 +118,7 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
 
-test("コーチ画面は3つの小さな入口にまとめ、未ログインなら応募も案内する", async ({ page }) => {
+test("コーチ画面は空き高さを使った3つの入口にまとめ、未ログインなら応募も案内する", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/coaching");
   const choices = page.getByRole("navigation", { name: "コーチングのプランを選ぶ" });
@@ -132,10 +132,23 @@ test("コーチ画面は3つの小さな入口にまとめ、未ログインな�
   expect(boxes[0].bottom).toBeLessThan(boxes[1].top);
   expect(boxes[1].bottom).toBeLessThan(boxes[2].top);
   expect(boxes[2].bottom).toBeLessThan(740);
+  expect(boxes.every((box) => box.bottom - box.top >= 100)).toBe(true);
+  expect(boxes[2].bottom).toBeGreaterThan(600);
   expect(boxes.every((box) => box.right <= 320)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("coaching-recruitment.png") });
   await choices.locator('a[href="/coach"]').click();
   await expect(page).toHaveURL(/\/login\?next=%2Fcoach$/);
   await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+});
+
+test("募集のみの間は直接URLでも準備中を案内し、コーチタブの選択色を保つ", async ({ page }) => {
+  for (const path of ["/coaching/new", "/coaches", "/coaching/personal/plans/example"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: "ただいま準備中です" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "購入する" })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "メイン", exact: true }).getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+  }
 });
 
 test("今日の大会アイコンをホーム以外の通常ページにも表示する", async ({ page }) => {

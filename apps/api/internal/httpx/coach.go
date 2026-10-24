@@ -265,7 +265,9 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	}
 	snsUrls, snsOK := normalizeSnsUrls(req.SnsUrls)
 	if !snsOK {
-		fields["sns_urls"] = "SNSのURLは3件までで、https://から始まるURLを入力してください"
+		fields["sns_urls"] = "SNS・ホームページのURLは3件までで、http://またはhttps://から始まるURLを入力してください"
+	} else if len(snsUrls) == 0 {
+		fields["sns_urls"] = "SNSまたはホームページのURLを1件以上入力してください"
 	}
 	if req.Years == nil {
 		years := 0

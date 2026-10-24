@@ -34,6 +34,7 @@ func coachApplicationBody() map[string]any {
 		"best_record":  "100m 10秒95（2025年）",
 		"achievements": "インターハイ 100m 準決勝",
 		"years":        8,
+		"sns_urls":     []string{"https://example-club.jp/"},
 	}
 }
 
@@ -301,10 +302,19 @@ func TestCoachApplicationSnsUrls(t *testing.T) {
 		t.Fatalf("sns saved %+v", me.Application)
 	}
 
-	// SNS は任意。なしでも応募できる。
+	// SNSまたはホームページは必須。空白だけでも受け付けない。
+	for _, urls := range [][]string{nil, {}, {" ", ""}} {
+		body := coachApplicationBody()
+		body["sns_urls"] = urls
+		rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"sns_urls"`) {
+			t.Fatalf("apply without sns %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	// クラブチームのホームページだけでも応募できる。
 	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, coachApplicationBody())
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"sns_urls":[]`) {
-		t.Fatalf("apply without sns %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("apply with website %d %s", rec.Code, rec.Body.String())
 	}
 }
 

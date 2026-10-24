@@ -6,7 +6,6 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { ticketLedgerLabels, ticketReturnPath, ticketStatusLabels, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
@@ -104,7 +103,6 @@ function TicketsPage() {
         <p className="text-sm text-slate-300">添削のために確保中：{summary.balance.reserved}枚</p>
       </div>
       <p className="text-sm text-slate-200">動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。</p>
-      {summary.purchase_block_reason ? <p className="text-sm text-amber-300">{summary.purchase_block_reason} <Link href="/me/coaching" className="underline">利用設定</Link></p> : null}
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
         {p.quantity > 1 ? <p className="text-xs text-slate-300">1枚あたり{formatYen(p.amount_yen / p.quantity)}</p> : null}

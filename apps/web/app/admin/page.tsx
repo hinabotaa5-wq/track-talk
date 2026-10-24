@@ -519,7 +519,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
             <p className="whitespace-pre-wrap">成績や指導経験: {a.achievements}</p>
             {(a.sns_urls ?? []).length ? (
               <p className="space-y-1">
-                <span className="block">SNS:</span>
+                <span className="block">SNS・ホームページ:</span>
                 {a.sns_urls.map((url) => (
                   <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">
                     {url}

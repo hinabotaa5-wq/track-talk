@@ -12,6 +12,7 @@ export default function CoachAboutPage() {
     <div className="mx-auto max-w-md space-y-7">
       <section className="space-y-3">
         <p className="text-sm font-semibold text-blue-300">TrackTalkのコーチ機能</p>
+        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">現在はコーチ募集のみです。以下は公開後に提供する機能の紹介です。指導の申込み・チケットの購入はまだできません。</p>
         <h1 className="text-2xl font-bold leading-relaxed">あなたの陸上経験を、<br />誰かの次の一歩に。</h1>
         <p className="text-sm leading-relaxed text-slate-200">「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画でのアドバイスから継続的な指導まで、自分が対応できる形で活動できます。</p>
       </section>
@@ -28,7 +29,7 @@ export default function CoachAboutPage() {
           <p className="text-sm leading-relaxed text-slate-200">コーチが指導内容・料金・期間・定員を決めてプランを公開し、利用者はプロフィールや内容を見て申し込みます。申し込みをコーチが承諾した後、必要な支払い・同意を経て指導が始まります。</p>
           <ul className="space-y-3 text-sm text-slate-200">
             <li className="flex gap-2"><Video className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">動画添削</strong>：動画やメッセージを通して、フォームや練習をサポート。</span></li>
-            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">大会サポート</strong>：目標の大会に向けて、準備や調整をサポート。</span></li>
+            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">大会までのサポート</strong>：目標の大会に向けて、準備や調整をサポート。</span></li>
             <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">対面指導</strong>：場所や回数などをプランに明記し、現地で指導。</span></li>
           </ul>
         </article>
@@ -48,9 +49,9 @@ export default function CoachAboutPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold">応募から活動まで</h2>
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-          <li>名前、担当種目、記録、成績や指導経験、顔写真を入力して応募します。SNSのリンクも任意で添えられます。</li>
+          <li>名前、担当種目、記録、成績や指導経験、顔写真と、SNSまたは所属チームのホームページのURLを入力します。URLは1〜3件必須です。</li>
           <li>運営が内容を確認します。審査状況は応募画面で確認できます。</li>
-          <li>承認後、ヘッダーのコーチアイコンから専用画面へ。受付や報酬の受け取り準備、プランの設定を進めます。</li>
+          <li>承認後も公開までは準備中です。「コーチ」タブの「コーチ専用画面」から、承認状況や顔写真を確認できます。活動開始の方法は公開時に案内します。</li>
         </ol>
       </section>
       <Link href="/coach/apply" className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
