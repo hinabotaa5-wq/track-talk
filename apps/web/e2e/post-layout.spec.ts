@@ -28,8 +28,8 @@ test("詳細文を動画より上に通常サイズ・枠なしで表示する",
   const bounds = await description.boundingBox();
   const video = await page.locator("main video").boundingBox();
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(video!.y);
-  const style = await description.evaluate((element) => ({ font: getComputedStyle(element).fontSize, border: getComputedStyle(element).borderTopWidth }));
-  expect(style).toEqual({ font: "16px", border: "0px" });
+  const style = await description.evaluate((element) => ({ font: getComputedStyle(element).fontSize, weight: getComputedStyle(element).fontWeight, border: getComputedStyle(element).borderTopWidth }));
+  expect(style).toEqual({ font: "16px", weight: "600", border: "0px" });
   await page.screenshot({ path: test.info().outputPath("post-detail.png") });
 });
 test("320pxのチャットで長文を小さく折り返し、横にはみ出さない", async ({ page }) => {

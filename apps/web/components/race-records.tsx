@@ -9,6 +9,7 @@ import { EmptyState, ErrorState } from "./empty-state";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { todayInTokyo } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { senseDayLabel } from "@/lib/sense-notes";
 import {
   formatRaceMark,
@@ -241,9 +242,10 @@ function RaceRecordRow({
 }) {
   const [editing, setEditing] = useState(false);
   const lock = useActionLock();
+  const confirmDialog = useConfirm();
 
   async function remove() {
-    if (!confirm("この記録を削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("この記録")))) return;
     if (!lock.acquire()) return;
     try {
       const res = await apiFetch<RaceRecords>(`/v1/me/race-records/${record.id}`, { method: "DELETE", token });

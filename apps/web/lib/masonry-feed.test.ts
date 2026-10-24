@@ -5,11 +5,11 @@ const item = (ratio: number) => ({ ratio, footer: 40 });
 describe("packMosaic", () => {
   it("縦長を小さくし、その下の空きにも横長を組み合わせる", () => {
     const { tiles } = packMosaic([item(9 / 16), item(16 / 9), item(16 / 9), item(16 / 9)], 358, 620);
-    expect(tiles[0].height).toBeLessThanOrEqual(252);
+    expect(tiles[0].height).toBeLessThanOrEqual(322);
     expect(tiles[0].width).toBeLessThan(160);
     expect(tiles[1].x).toBe(0);
     expect(tiles[1].y).toBeGreaterThan(tiles[0].height);
-    expect(tiles[2].y).toBeGreaterThan(tiles[1].y);
+    expect(tiles[2].x).toBeGreaterThan(0);
   });
   it("画面が広ければ2列に制限せず、収まる枚数を配置する", () => {
     const { tiles } = packMosaic(Array.from({ length: 12 }, () => item(16 / 9)), 1000, 540);
@@ -59,5 +59,16 @@ describe("packMosaic", () => {
     const next = full.tiles.find((tile) => tile.x + tile.width > 358)!;
     expect(358 - next.x).toBeGreaterThan(0);
     expect(358 - next.x).toBeLessThan(next.width);
+  });
+  it("文章だけの投稿は写真や横動画より小さく置く", () => {
+    const { tiles } = packMosaic([
+      { ratio: 4 / 3, footer: 0, compact: true },
+      { ratio: 4 / 3, footer: 0 },
+    ], 390, 560);
+    expect(tiles[0].width).toBeLessThan(tiles[1].width);
+  });
+  it("縦動画は従来の小さい上限より大きく置く", () => {
+    const { tiles } = packMosaic([{ ratio: 9 / 16, footer: 0 }], 390, 560);
+    expect(tiles[0].height).toBeGreaterThan(250);
   });
 });

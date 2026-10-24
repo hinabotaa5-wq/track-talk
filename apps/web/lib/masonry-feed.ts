@@ -1,17 +1,18 @@
-export type MosaicItem = { ratio: number; footer: number };
+export type MosaicItem = { ratio: number; footer: number; compact?: boolean };
 export type MosaicTile = { x: number; y: number; width: number; height: number };
 
 // 列やページを作らず、既存のカードの端から次の空きを探す。
 // 投稿順に配置し、後の投稿も手前に残った空きへ詰める。
 export function packMosaic(items: MosaicItem[], viewportWidth: number, height: number, gap = 12) {
   const landscapeWidth = Math.max(176, Math.min(308, viewportWidth * 0.605));
-  const portraitHeight = Math.min(210, height * 0.42);
+  // 縦動画は走りの動きが見やすい大きさにする。文章だけの投稿は少し小さく、写真・動画を優先する。
+  const portraitHeight = Math.min(280, height * 0.56);
   const tiles: MosaicTile[] = [];
 
   for (const item of items) {
     const ratio = Number.isFinite(item.ratio) && item.ratio > 0 ? item.ratio : 4 / 3;
     const footer = Math.max(0, item.footer);
-    const preferredWidth = ratio < 1 ? portraitHeight * ratio + 2 : landscapeWidth;
+    const preferredWidth = ratio < 1 ? portraitHeight * ratio + 2 : landscapeWidth * (item.compact ? 0.78 : 1);
     const width = Math.min(preferredWidth, (height - footer - 2) * ratio + 2);
     const xs = [...new Set([0, ...tiles.map((tile) => tile.x + tile.width + gap)])]
       .sort((a, b) => a - b);

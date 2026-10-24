@@ -1,0 +1,37 @@
+name: Enable Coaching Screens
+
+# コーチ一覧や既存のコーチング画面を本番で表示するための、明示的な切り替え。
+# 新規の申し込み・購入は COACHING_NEW_ACCEPTANCE_ENABLED を設定するまで受け付けない。
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: configure-coaching
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GCP_PROJECT_ID: refined-bolt-493709-a8
+      GCP_WORKLOAD_IDENTITY_PROVIDER: projects/274141774717/locations/global/workloadIdentityPools/github/providers/github
+      GCP_SERVICE_ACCOUNT: github-deploy@refined-bolt-493709-a8.iam.gserviceaccount.com
+      REGION: asia-northeast1
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Enable coaching screens
+        run: |
+          gcloud run services update track-talk-api \
+            --region "$REGION" \
+            --project "$GCP_PROJECT_ID" \
+            --update-env-vars COACHING_ENABLED=1 \
+            --quiet

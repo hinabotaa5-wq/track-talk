@@ -46,7 +46,9 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
       const header = document.querySelector("header");
       if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
-      const viewHeight = window.visualViewport?.height ?? window.innerHeight;
+      // 仮想キーボードは visualViewport だけを縮める。そこで組み直すと、検索中に投稿の順番や形が
+      // 変わってしまうので、投稿一覧はレイアウト画面の高さで固定する。
+      const viewHeight = window.innerHeight;
       // 上下のパディング8pxだけを残し、下のメニュー直前まで使う。
       const available = Math.max(280, viewHeight - (track.getBoundingClientRect().top + window.scrollY) - bottom - 8);
       const anchor = track.scrollLeft > 0 ? nodes.find((node) => node.offsetLeft + node.offsetWidth > track.scrollLeft) : undefined;
@@ -54,7 +56,7 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       const result = packMosaic(nodes.map((node, index) => {
         const image = node.querySelector<HTMLImageElement>("img");
         const ratio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : hints[index] || 4 / 3;
-        return { ratio, footer: 0 };
+        return { ratio, footer: 0, compact: Boolean(node.querySelector(".feed-card-text")) };
       }), track.clientWidth, available);
       canvas.style.width = `${result.width}px`;
       canvas.style.height = `${result.height}px`;
@@ -97,7 +99,6 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
     track.addEventListener("scroll", onScroll, { passive: true });
     canvas.addEventListener("click", savePosition, true);
     window.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("resize", schedule);
     schedule();
     return () => {
       cancelAnimationFrame(frame);
@@ -108,7 +109,6 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       track.removeEventListener("scroll", onScroll);
       canvas.removeEventListener("click", savePosition, true);
       window.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("resize", schedule);
     };
   }, [items.length, ratioKey, onEndReached, storageKey]);
 

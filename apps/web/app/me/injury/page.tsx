@@ -9,6 +9,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
 import { injuryHistoryStageText, injuryRepeatedParts, type InjuryHistoryItem } from "@/lib/injury";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 
 export default function MyInjuryHistoryPage() {
   const { session, token, loading } = useAuth();
@@ -16,6 +17,7 @@ export default function MyInjuryHistoryPage() {
   const [items, setItems] = useState<InjuryHistoryItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/me/injury");
@@ -37,7 +39,7 @@ export default function MyInjuryHistoryPage() {
   }, [token]);
 
   async function remove(id: string) {
-    if (!confirm("この投稿を削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
     setDeletingId(id);
     try {
       await apiFetch(`/v1/posts/${id}`, { method: "DELETE", token });

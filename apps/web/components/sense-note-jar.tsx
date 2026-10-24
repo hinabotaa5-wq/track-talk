@@ -2,15 +2,15 @@ import { senseGrainColor, senseJarLevel, senseJarSize } from "@/lib/sense-notes"
 
 // 感覚がたまっていくビン。1件書くごとに粒が1つ増え、6粒で満杯になって次のビンに移る。
 // dropLatest を付けると、いちばん新しい粒が上から落ちてくる(「動きを減らす」設定の人には動かさない)。
-// 粒は少し大きめにして、senseJarSize 粒でビンがほどよく埋まる並び(下から2つずつ3段)。
-// 詰めすぎず、すき間が目立ちすぎない程度に、大きさと位置を少しずつずらす。粒の数を変えたら、この並びも合わせ直す。
+// senseJarSize 粒でビンの中を埋める並び(下から2つずつ3段)。隣どうしが触れる大きさにして、
+// ビンの中の余白が目立たないようにする。粒の数を変えたら、この並びも合わせ直す。
 const grains = [
-  { cx: 38, cy: 131, r: 18 },
-  { cx: 81, cy: 132, r: 17.5 },
-  { cx: 40, cy: 96, r: 17.5 },
-  { cx: 80, cy: 97, r: 18 },
-  { cx: 39, cy: 62, r: 17.5 },
-  { cx: 80, cy: 63, r: 17 },
+  { cx: 38, cy: 130, r: 21 },
+  { cx: 80, cy: 130, r: 21 },
+  { cx: 38, cy: 89, r: 21 },
+  { cx: 80, cy: 89, r: 21 },
+  { cx: 38, cy: 48, r: 21 },
+  { cx: 80, cy: 48, r: 21 },
 ];
 
 export function SenseNoteJar({ total, dropLatest = false, className = "" }: { total: number; dropLatest?: boolean; className?: string }) {

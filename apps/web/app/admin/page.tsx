@@ -9,6 +9,7 @@ import { MeetSessionsAdmin } from "@/components/meet-sessions-admin";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -419,6 +420,7 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
 
 // コーチの応募の審査。審査中の応募を承認か見送りにする。
 function CoachesAdmin({ token }: { token: string | null }) {
+  const confirmDialog = useConfirm();
   const [status, setStatus] = useState<CoachStatus>("pending");
   const [items, setItems] = useState<AdminCoachApplication[]>([]);
   const [total, setTotal] = useState(0);
@@ -458,7 +460,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
   }
 
   async function removePhoto(a: AdminCoachApplication) {
-    if (!confirm("この顔写真を外しますか？コーチはまた別の写真を登録できます。")) return;
+    if (!(await confirmDialog({ ...deleteConfirmOptions("この顔写真"), body: "コーチはまた別の写真を登録できます。" }))) return;
     try {
       await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/photo`, { method: "DELETE", token });
       setMessage("写真を外しました");

@@ -9,6 +9,7 @@ import { useNow } from "@/components/menu-contest-bar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiRequestError, apiFetch } from "@/lib/api";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { formatDate } from "@/lib/format";
 import {
   formatRemaining,
@@ -50,6 +51,7 @@ function Countdown({ round, now }: { round: MenuContestRound; now: number }) {
 }
 
 function EntryForm({ round, token, onSaved }: { round: MenuContestRound; token: string; onSaved: () => void }) {
+  const confirmDialog = useConfirm();
   const [body, setBody] = useState(round.my_entry?.body ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -72,7 +74,7 @@ function EntryForm({ round, token, onSaved }: { round: MenuContestRound; token: 
   }
 
   async function withdraw() {
-    if (!confirm("応募を取り消しますか？")) return;
+    if (!(await confirmDialog({ ...deleteConfirmOptions("この応募"), title: "応募を取り消しますか？", confirmLabel: "取り消す" }))) return;
     setSaving(true);
     setError("");
     try {

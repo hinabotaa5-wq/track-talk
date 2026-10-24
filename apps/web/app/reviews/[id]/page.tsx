@@ -11,6 +11,7 @@ import { ReviewAttrChips, ReviewAttrsFields, ReviewFilterBar } from "@/component
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiRequestError, apiFetch } from "@/lib/api";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { formatDateTime } from "@/lib/format";
 import { fetchAllPages } from "@/lib/paging";
 import { productKindLabels, ratingText } from "@/lib/product";
@@ -38,6 +39,7 @@ function Stars({ value }: { value: number }) {
 export default function ProductReviewsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { session, token } = useAuth();
+  const confirmDialog = useConfirm();
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [summary, setSummary] = useState<{ review_count: number; avg_rating: number } | null>(null);
@@ -119,7 +121,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   }
 
   async function remove(reviewId: string) {
-    if (!confirm("このレビューを削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("このレビュー")))) return;
     try {
       await apiFetch(`/v1/product-reviews/${reviewId}`, { method: "DELETE", token });
       await load();

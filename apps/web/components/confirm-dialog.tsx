@@ -109,3 +109,13 @@ export function reportConfirmOptions(options: { title?: string; body?: string } 
     confirmLabel: "通報する",
   };
 }
+
+// 削除はブラウザ標準の confirm() を使わず、どの画面でも同じ確認画面を出す。
+// モバイルのアプリ内ブラウザでも操作が途切れず、誤操作も防げる。
+export function deleteConfirmOptions(noun: string): ConfirmOptions {
+  return {
+    title: `${noun}を削除しますか？`,
+    body: "この操作は取り消せません。",
+    confirmLabel: "削除する",
+  };
+}

@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
 import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
-import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
+import { deleteConfirmOptions, reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -166,7 +166,7 @@ export function PostDetail({
   }
 
   async function remove() {
-    if (!confirm("この投稿を削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
@@ -303,7 +303,7 @@ export function PostDetail({
   }
 
   async function deleteComment(cid: string) {
-    if (!confirm("このコメントを削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("このコメント")))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
@@ -468,7 +468,7 @@ export function PostDetail({
       {activeThread ? null : (
       <div className="min-w-0 space-y-6">
       {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
-        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-base leading-relaxed text-slate-200">{post.body}</p>
+        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{post.body}</p>
       ) : null}
       {post.kind === "practice" ? (
         <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
@@ -583,7 +583,7 @@ export function PostDetail({
       )}
       <section className={`min-w-0 space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold">{feedTitle(post.title) || "コメント"}</h2>
+          <h2 className="whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || "コメント"}</h2>
         ) : (
           <h2 className="text-xl font-semibold">コメント</h2>
         )}

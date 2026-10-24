@@ -7,6 +7,7 @@ import { Textarea } from "./ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { todayInTokyo } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
+import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { senseCheer, senseNoteMaxLength, senseNotePlaceholder, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 function SenseNoteFields({ body, onBody }: { body: string; onBody: (v: string) => void }) {
@@ -119,9 +120,10 @@ export function SenseNoteItem({
   onDeleted: (id: string, stats: SenseNoteStats) => void;
 }) {
   const lock = useActionLock();
+  const confirmDialog = useConfirm();
 
   async function remove() {
-    if (!confirm("この感覚メモを削除しますか？")) return;
+    if (!(await confirmDialog(deleteConfirmOptions("この感覚メモ")))) return;
     if (!lock.acquire()) return;
     try {
       const res = await apiFetch<{ stats: SenseNoteStats }>(`/v1/me/sense-notes/${note.id}`, { method: "DELETE", token });

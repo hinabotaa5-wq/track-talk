@@ -144,6 +144,7 @@ it("写真のない文章は本文を一度だけ出し、下のタイトル欄�
   const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, excerpt: "今日の練習の感覚" } }));
   expect(html.match(/今日の練習の感覚/g)).toHaveLength(1);
   expect(html).not.toContain("feed-card-title");
+  expect(html).toContain("feed-card-text");
   expect(html).not.toContain("自分の投稿");
 });
 

@@ -58,6 +58,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // 検索中の仮想キーボードは投稿一覧を縮めずに上から重ねる。
+  interactiveWidget: "overlays-content",
   themeColor: "#16243a",
 };
 
