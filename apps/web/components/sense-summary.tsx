@@ -142,7 +142,7 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
           </Button>
         ) : null}
       </div>
-      {loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったら、ここにまとめを残せます。</p> : null}
+      {loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
       {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
       <div className="space-y-2">
         {summaries.map((summary) => <SummaryEntry key={summary.id} summary={summary} />)}

@@ -79,7 +79,7 @@ func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID uuid.UUID) 
 }
 
 const getCoachReviewRequest = `-- name: GetCoachReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status IN ('in_review', 'returned', 'clarifying')
@@ -106,19 +106,20 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
 
 const getReviewCoach = `-- name: GetReviewCoach :one
-SELECT p.nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
+SELECT COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname, c.photo_public_id, c.tier, c.events, c.best_record, c.achievements, c.years
 FROM coach_profiles c
 JOIN profiles p ON p.id = c.profile_id
 WHERE c.profile_id = $1
 `
 
 type GetReviewCoachRow struct {
-	Nickname      *string  `json:"nickname"`
+	Nickname      string   `json:"nickname"`
 	PhotoPublicID *string  `json:"photo_public_id"`
 	Tier          string   `json:"tier"`
 	Events        []string `json:"events"`
@@ -323,7 +324,7 @@ SET status = 'returned',
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status = 'clarifying'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
 `
 
 type MarkReviewClarifiedParams struct {
@@ -347,6 +348,7 @@ func (q *Queries) MarkReviewClarified(ctx context.Context, arg MarkReviewClarifi
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
@@ -359,7 +361,7 @@ WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
   AND returned_at > now()-interval '7 days'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
 `
 
 type MarkReviewClarifyingParams struct {
@@ -383,6 +385,7 @@ func (q *Queries) MarkReviewClarifying(ctx context.Context, arg MarkReviewClarif
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
@@ -396,7 +399,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'in_review'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
 `
 
 type MarkReviewReturnedParams struct {
@@ -421,6 +424,7 @@ func (q *Queries) MarkReviewReturned(ctx context.Context, arg MarkReviewReturned
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }

@@ -2,11 +2,15 @@
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCurrentMainTab } from "./bottom-nav";
 import { HeaderAccountPanel } from "./header-account-panel";
 import { NotificationBell } from "./notification-bell";
 import { SenseNoteComposer } from "./sense-notes";
 
 const apiFetch = vi.fn();
+let pathname = "/";
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("next/dynamic", () => ({ default: () => () => <p>メニューの内容</p> }));
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token" }) }));
@@ -20,6 +24,9 @@ let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   apiFetch.mockReset();
+  pathname = "/";
+  replace.mockReset();
+  sessionStorage.clear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -59,6 +66,23 @@ describe("ヘッダーの開閉", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     await act(async () => root.render(<HeaderAccountPanel signedIn={false} />));
     expect(container.querySelector("a")?.getAttribute("href")).toBe("/login");
+  });
+
+  it("マイページのアイコンをもう一度押すと元のタブと検索条件に戻る", async () => {
+    sessionStorage.setItem("account-origin", "/injury?tab=data");
+    pathname = "/me";
+    await act(async () => root.render(<HeaderAccountPanel signedIn />));
+    const link = container.querySelector("a")!;
+    expect(link.getAttribute("aria-expanded")).toBe("true");
+    await click(link);
+    expect(replace).toHaveBeenCalledWith("/injury?tab=data");
+  });
+
+  it("マイページでも元の下部タブの選択を保持する", async () => {
+    function Selection() { return <span>{useCurrentMainTab("/me")}</span>; }
+    sessionStorage.setItem("account-origin", "/injury?tab=data");
+    await act(async () => root.render(<Selection />));
+    expect(container.textContent).toBe("injury");
   });
 
   it("未読と既読を表示し、すべて既読で状態と件数が変わる", async () => {

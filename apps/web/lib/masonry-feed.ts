@@ -2,20 +2,19 @@ export type MosaicItem = { ratio: number; footer: number };
 export type MosaicTile = { x: number; y: number; width: number; height: number };
 
 // 列やページを作らず、既存のカードの端から次の空きを探す。
-// 入力順を維持し、後の投稿が先の投稿より左へ戻らないようにする。
+// 投稿順に配置し、後の投稿も手前に残った空きへ詰める。
 export function packMosaic(items: MosaicItem[], viewportWidth: number, height: number, gap = 12) {
   const landscapeWidth = Math.max(176, Math.min(308, viewportWidth * 0.605));
-  const portraitHeight = Math.min(264, height * 0.55);
+  const portraitHeight = Math.min(210, height * 0.42);
   const tiles: MosaicTile[] = [];
-  let lastX = 0;
 
   for (const item of items) {
     const ratio = Number.isFinite(item.ratio) && item.ratio > 0 ? item.ratio : 4 / 3;
     const footer = Math.max(0, item.footer);
     const preferredWidth = ratio < 1 ? portraitHeight * ratio + 2 : landscapeWidth;
     const width = Math.min(preferredWidth, (height - footer - 2) * ratio + 2);
-    const xs = [...new Set([lastX, ...tiles.map((tile) => tile.x + tile.width + gap)])]
-      .filter((x) => x >= lastX).sort((a, b) => a - b);
+    const xs = [...new Set([0, ...tiles.map((tile) => tile.x + tile.width + gap)])]
+      .sort((a, b) => a - b);
     const ys = [...new Set([0, ...tiles.map((tile) => tile.y + tile.height + gap)])].sort((a, b) => a - b);
     let next: MosaicTile | undefined;
     for (const x of xs) {
@@ -40,7 +39,6 @@ export function packMosaic(items: MosaicItem[], viewportWidth: number, height: n
     // 収まらない投稿は右へ続け、画面端で自然に見切れさせる。
     if (!next) next = { x: Math.max(0, ...tiles.map((tile) => tile.x + tile.width + gap)), y: 0, width, height: (width - 2) / ratio + footer + 2 };
     tiles.push(next);
-    lastX = next.x;
   }
   return { tiles, width: Math.max(viewportWidth, ...tiles.map((tile) => tile.x + tile.width)), height };
 }

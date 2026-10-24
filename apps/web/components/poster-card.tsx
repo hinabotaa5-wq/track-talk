@@ -2,7 +2,7 @@
 export function PosterFallback({ title, excerpt }: { title: string; excerpt?: string }) {
   return (
     <div className="flex h-full w-full items-end bg-white/6 p-3.5">
-      <p className={`text-sm leading-snug text-slate-100 ${excerpt ? "line-clamp-6" : "line-clamp-4 font-medium"}`}>{excerpt || title}</p>
+      <p className={`[overflow-wrap:anywhere] text-sm leading-snug text-slate-100 ${excerpt ? "line-clamp-6" : "line-clamp-4 font-medium"}`}>{excerpt || title}</p>
     </div>
   );
 }

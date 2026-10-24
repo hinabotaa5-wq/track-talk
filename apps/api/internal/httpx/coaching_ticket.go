@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const ticketFaceYen int32 = 500
+const ticketFaceYen int32 = 600
 
 type ticketRuleError struct{ code, message string }
 
@@ -284,8 +284,8 @@ func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.P
 	if err := s.ticketEligibility(ctx, q, p); err != nil {
 		return err
 	}
-	price := reviewPrices[rr.Tier]
-	units := price / ticketFaceYen
+	const units int32 = 2
+	price := units * ticketFaceYen
 	lots, err := q.ListTicketLots(ctx, &p.ID)
 	if err != nil {
 		return err

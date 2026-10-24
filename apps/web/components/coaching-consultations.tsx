@@ -77,7 +77,7 @@ function ConsultationDraft({ draft, roomPath, token, funding, price, requiresVid
     } finally { release(); }
   }
   return <div className="space-y-3">
-    <p className="text-sm font-semibold">{funding === "ticket" ? "チケット1枚（500円相当）" : formatYen(price)} / 質問1件と回答1件</p>
+    <p className="text-sm font-semibold">{funding === "ticket" ? `チケット1枚（${formatYen(price)}相当）` : formatYen(price)} / 質問1件と回答1件</p>
     <Textarea aria-label="追加相談の質問" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder="新しく相談したいこと" />
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}

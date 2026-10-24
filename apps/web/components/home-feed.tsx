@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PostsPage } from "@/lib/fetch-posts";
-import { homeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds } from "@/lib/home-feed-cache";
+import { homeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds, readHomeFeedChunks, saveHomeFeedChunks, homeFeedGeneration } from "@/lib/home-feed-cache";
 import { FeedCard } from "@/components/feed-card";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { FeedLoadingFrame } from "@/components/loading-frame";
@@ -24,7 +24,8 @@ export function HomeFeed({
   initial: PostsPage | null;
   kind?: "recruitment";
 }) {
-  const [chunks, setChunks] = useState<PostsPage[] | null>(initial ? [initial] : null);
+  const path = homeFeedPath(kind ?? sort, q, page);
+  const [chunks, setChunks] = useState<PostsPage[] | null>(() => readHomeFeedChunks(path) ?? (initial ? [initial] : null));
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState("");
   const morePending = useRef(false);
@@ -34,7 +35,6 @@ export function HomeFeed({
   const hasNext = meta.page * meta.per_page < meta.total;
   const [error, setError] = useState("");
   const hasInitial = initial !== null;
-  const path = homeFeedPath(kind ?? sort, q, page);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +64,12 @@ export function HomeFeed({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [hasInitial, path, q]);
+
+  useEffect(() => {
+    // 全ページを残し、詳細から戻ったときに後から読み込んだ投稿も復元する。
+    const atGeneration = homeFeedGeneration();
+    return () => { if (chunks) saveHomeFeedChunks(path, chunks, atGeneration); };
+  }, [chunks, path]);
 
   const loadMore = useCallback(async (retry = false) => {
     if (morePending.current || !hasNext || (moreError && !retry)) return;
@@ -96,8 +102,8 @@ export function HomeFeed({
         />
       ) : null}
       {posts.length > 0 ? (
-        <MasonryFeed onEndReached={hasNext && !moreError ? loadMore : undefined} ratios={[...posts.map((post) => post.youtube_shorts || post.instagram_type === "reel" ? 9 / 16 : 4 / 3), ...(hasNext ? [4 / 3] : [])]}>
-          {posts.map((post) => <FeedCard key={post.id} post={post} thumbnailOnly />)}
+        <MasonryFeed storageKey={path} onEndReached={hasNext && !moreError ? loadMore : undefined} ratios={[...posts.map((post) => post.youtube_shorts || post.instagram_type === "reel" ? 9 / 16 : 4 / 3), ...(hasNext ? [4 / 3] : [])]}>
+          {posts.map((post) => <FeedCard key={post.id} post={post} />)}
           {hasNext ? (
             <button
               key="next-page"

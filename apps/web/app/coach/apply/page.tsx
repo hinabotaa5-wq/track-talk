@@ -15,18 +15,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// コーチ（社会人・大学生を含む）の応募。集めるのは担当種目・記録・成績・競技年数だけ。
+// コーチの応募。集めるのは名前・担当種目・記録・成績や指導経験と、任意の SNS だけ。
 // 運営が審査し、結果はこの画面と通知で伝える。
 
 type Draft = {
+  name: string;
   tier: CoachTier;
   events: CoachEvent[];
   best_record: string;
   achievements: string;
-  years: string;
+  sns_urls: string;
 };
 
-const emptyDraft: Draft = { tier: "coach", events: [], best_record: "", achievements: "", years: "" };
+const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: "", achievements: "", sns_urls: "" };
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
@@ -42,11 +43,12 @@ const statusNotes: Record<CoachApplication["status"], string> = {
 
 function draftFrom(a: CoachApplication): Draft {
   return {
-    tier: a.tier,
+    name: a.name ?? "",
+    tier: "coach",
     events: a.events,
     best_record: a.best_record,
     achievements: a.achievements,
-    years: String(a.years),
+    sns_urls: (a.sns_urls ?? []).join("\n"),
   };
 }
 
@@ -104,11 +106,11 @@ export default function CoachApplyPage() {
     setMessage("");
     setError("");
     try {
-      const years = draft.years.trim() === "" ? null : Number(draft.years);
+      const sns_urls = draft.sns_urls.split("\n").map((v) => v.trim()).filter(Boolean);
       const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/applications", {
         method: "POST",
         token,
-        body: JSON.stringify({ ...draft, years }),
+        body: JSON.stringify({ ...draft, sns_urls }),
       });
       setApplication(d.application);
       setDraft(draftFrom(d.application));
@@ -158,8 +160,7 @@ export default function CoachApplyPage() {
             <span className="ml-2 text-xs font-normal text-slate-300">応募日 {formatDateTime(application.applied_at)}</span>
           </p>
           <p className="text-sm text-slate-100">{statusNotes[application.status]}</p>
-          {/* 承認後のコーチ画面と通知の設定は、コーチングを提供するまで 404 なので案内しない。 */}
-          {application.status === "approved" && coachingEnabled ? (
+          {application.status === "approved" ? (
             <Link href="/coach" className="text-sm text-blue-300 underline">
               コーチ画面へ
             </Link>
@@ -177,31 +178,27 @@ export default function CoachApplyPage() {
       ) : null}
 
       {application && (application.status === "pending" || application.status === "approved") ? (
-        <CoachPhotoForm application={application} nickname={profile?.nickname ?? null} token={token} onSaved={setApplication} />
+        <CoachPhotoForm application={application} nickname={application.name || profile?.nickname || null} token={token} onSaved={setApplication} />
       ) : null}
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
       {editable ? (
         <form onSubmit={onSubmit} className="space-y-5">
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">応募する枠</legend>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(coachTierLabels) as CoachTier[]).map((tier) => (
-                <button
-                  key={tier}
-                  type="button"
-                  aria-pressed={draft.tier === tier}
-                  onClick={() => setDraft((d) => ({ ...d, tier }))}
-                  className={chip(draft.tier === tier)}
-                >
-                  {coachTierLabels[tier]}
-                </button>
-              ))}
-            </div>
-            {fieldError("tier")}
-          </fieldset>
-
+          <p className="text-sm text-slate-200">
+            コーチの仕事内容や報酬など、コーチ機能の詳細は
+            <Link href="/coach/about" className="text-blue-300 underline">
+              コーチ機能について
+            </Link>
+            で確認できます。
+          </p>
+          <label className="block space-y-1 text-sm">
+            <span className="font-semibold">名前</span>
+            <Input value={draft.name} maxLength={80} autoComplete="name" required
+              placeholder="コーチとして表示する名前"
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
+            {fieldError("name")}
+          </label>
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">担当種目(複数可)</legend>
             <div className="flex flex-wrap gap-2">
@@ -232,7 +229,7 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">成績</span>
+            <span className="font-semibold">成績や指導経験</span>
             <Textarea
               rows={3}
               value={draft.achievements}
@@ -244,20 +241,15 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">競技年数</span>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={60}
-                className="w-24"
-                value={draft.years}
-                onChange={(e) => setDraft((d) => ({ ...d, years: e.target.value }))}
-              />
-              <span className="text-slate-200">年</span>
-            </div>
-            {fieldError("years")}
+            <span className="font-semibold">チームや個人のSNS（任意）</span>
+            <Textarea
+              rows={3}
+              value={draft.sns_urls}
+              placeholder={"例:\nhttps://www.instagram.com/example/\nhttps://x.com/example"}
+              onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
+            />
+            <span className="block text-xs text-slate-300">1行に1つずつ、最大3件まで貼れます。承認されるとコーチ詳細にリンクとして載ります。</span>
+            {fieldError("sns_urls")}
           </label>
 
           {!application?.photo_url ? (
@@ -273,9 +265,6 @@ export default function CoachApplyPage() {
               <span className="block text-xs text-slate-300">顔がはっきり写った写真にしてください。コーチ一覧に載ります。</span>
             </label>
           ) : null}
-          <p className="text-xs text-slate-300">
-            承認されると、ニックネーム・枠・担当種目・記録・成績・競技年数が、誰でも見られるコーチ一覧に載ります。
-          </p>
           {message ? (
             <div className="flex items-center gap-3 rounded-xl border border-green-400/40 bg-green-500/15 p-4">
               <svg className="size-6 shrink-0 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -292,6 +281,10 @@ export default function CoachApplyPage() {
       ) : application ? (
         <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
           <div>
+            <dt className="text-xs text-slate-300">名前</dt>
+            <dd>{application.name || profile?.nickname || "未登録"}</dd>
+          </div>
+          <div>
             <dt className="text-xs text-slate-300">枠</dt>
             <dd>{coachTierLabels[application.tier]}</dd>
           </div>
@@ -304,13 +297,21 @@ export default function CoachApplyPage() {
             <dd className="whitespace-pre-wrap">{application.best_record}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-300">成績</dt>
+            <dt className="text-xs text-slate-300">成績や指導経験</dt>
             <dd className="whitespace-pre-wrap">{application.achievements}</dd>
           </div>
-          <div>
-            <dt className="text-xs text-slate-300">競技年数</dt>
-            <dd>{application.years}年</dd>
-          </div>
+          {(application.sns_urls ?? []).length ? (
+            <div>
+              <dt className="text-xs text-slate-300">SNS</dt>
+              <dd className="space-y-1">
+                {application.sns_urls.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">
+                    {url}
+                  </a>
+                ))}
+              </dd>
+            </div>
+          ) : null}
         </dl>
       ) : null}
     </div>

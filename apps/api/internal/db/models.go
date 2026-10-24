@@ -70,6 +70,8 @@ type CoachProfile struct {
 	PayoutsEnabled  bool       `json:"payouts_enabled"`
 	ReducedFeeUntil *time.Time `json:"reduced_fee_until"`
 	ServiceTypes    []string   `json:"service_types"`
+	SnsUrls         []string   `json:"sns_urls"`
+	Name            string     `json:"name"`
 }
 
 type CoachingAccessLog struct {
@@ -847,6 +849,7 @@ type ReviewRequest struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	ReturnedAt    *time.Time `json:"returned_at"`
+	Question      string     `json:"question"`
 }
 
 type ReviewResponse struct {

@@ -11,11 +11,13 @@ import (
 )
 
 type coachApplication struct {
+	Name         string   `json:"name"`
 	Tier         string   `json:"tier"`
 	Events       []string `json:"events"`
 	BestRecord   string   `json:"best_record"`
 	Achievements string   `json:"achievements"`
 	Years        int      `json:"years"`
+	SnsUrls      []string `json:"sns_urls"`
 	Status       string   `json:"status"`
 	ReviewedAt   *string  `json:"reviewed_at"`
 }
@@ -26,7 +28,8 @@ type coachMeView struct {
 
 func coachApplicationBody() map[string]any {
 	return map[string]any{
-		"tier":         "senpai",
+		"name":         "テストコーチ",
+		"tier":         "coach",
 		"events":       []string{"110mh", "100m", "100m", "relay"},
 		"best_record":  "100m 10秒95（2025年）",
 		"achievements": "インターハイ 100m 準決勝",
@@ -263,5 +266,108 @@ func TestCoachPhoto(t *testing.T) {
 	}
 	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); strings.Contains(body, second) || !strings.Contains(body, `"photo_url":""`) {
 		t.Fatalf("photo still listed %s", body)
+	}
+}
+
+func TestCoachApplicationSnsUrls(t *testing.T) {
+	h := setup(t)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+
+	// URL でないもの、http/https 以外、4件は受け付けない。
+	for _, urls := range [][]string{
+		{"instagram.com/testcoach"},
+		{"ftp://example.com/testcoach"},
+		{"https://example.com/1", "https://example.com/2", "https://example.com/3", "https://example.com/4"},
+	} {
+		body := coachApplicationBody()
+		body["sns_urls"] = urls
+		rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"sns_urls"`) {
+			t.Fatalf("invalid sns %v: %d %s", urls, rec.Code, rec.Body.String())
+		}
+	}
+
+	// 空行と重複は除いて保存し、自分の応募に返る。
+	body := coachApplicationBody()
+	body["sns_urls"] = []string{" https://www.instagram.com/testcoach/ ", "", "https://www.instagram.com/testcoach/", "https://x.com/testcoach"}
+	rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("apply with sns %d %s", rec.Code, rec.Body.String())
+	}
+	var me coachMeView
+	_ = json.Unmarshal(rec.Body.Bytes(), &me)
+	if me.Application == nil || strings.Join(me.Application.SnsUrls, ",") != "https://www.instagram.com/testcoach/,https://x.com/testcoach" {
+		t.Fatalf("sns saved %+v", me.Application)
+	}
+
+	// SNS は任意。なしでも応募できる。
+	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, coachApplicationBody())
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"sns_urls":[]`) {
+		t.Fatalf("apply without sns %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCoachApplicationNameWithoutYears(t *testing.T) {
+	h := setup(t)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+	body := coachApplicationBody()
+	delete(body, "years")
+	body["name"] = "  山田 太郎  "
+	rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"山田 太郎"`) {
+		t.Fatalf("name without years %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil)
+	if !strings.Contains(rec.Body.String(), `"name":"山田 太郎"`) {
+		t.Fatalf("saved name %s", rec.Body.String())
+	}
+	withCoachPhoto(t, applicant)
+	admin := uuid.New()
+	tadmin := token(t, admin)
+	doJSON(t, h, http.MethodGet, "/v1/me", tadmin, nil)
+	setAdmin(t, admin)
+	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil)
+	if !strings.Contains(rec.Body.String(), `"nickname":"山田 太郎"`) {
+		t.Fatalf("public name %s", rec.Body.String())
+	}
+}
+
+func TestCoachApplicationNameValidation(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	for _, name := range []string{" ", strings.Repeat("あ", 81), "https://example.com"} {
+		body := coachApplicationBody()
+		body["name"] = name
+		rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"name"`) {
+			t.Fatalf("invalid name %d %s", rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestLegacyCoachApplicationPreservesName(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	body := coachApplicationBody()
+	delete(body, "name")
+	rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("legacy application %d %s", rec.Code, rec.Body.String())
+	}
+	body["name"] = "コーチの公開名"
+	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("new application %d %s", rec.Code, rec.Body.String())
+	}
+	delete(body, "name")
+	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"コーチの公開名"`) {
+		t.Fatalf("legacy update preserves name %d %s", rec.Code, rec.Body.String())
 	}
 }

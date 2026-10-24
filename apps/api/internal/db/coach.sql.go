@@ -25,7 +25,7 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -55,6 +55,8 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -87,10 +89,11 @@ SELECT
     c.best_record,
     c.achievements,
     c.years,
+    c.sns_urls,
     c.status,
     c.applied_at,
     c.reviewed_at,
-    p.nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
     r.rating_count,
     r.rating_average
@@ -122,10 +125,11 @@ type ListCoachApplicationsRow struct {
 	BestRecord    string     `json:"best_record"`
 	Achievements  string     `json:"achievements"`
 	Years         int16      `json:"years"`
+	SnsUrls       []string   `json:"sns_urls"`
 	Status        string     `json:"status"`
 	AppliedAt     time.Time  `json:"applied_at"`
 	ReviewedAt    *time.Time `json:"reviewed_at"`
-	Nickname      *string    `json:"nickname"`
+	Nickname      string     `json:"nickname"`
 	PhotoPublicID *string    `json:"photo_public_id"`
 	RatingCount   int32      `json:"rating_count"`
 	RatingAverage float64    `json:"rating_average"`
@@ -147,6 +151,7 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.BestRecord,
 			&i.Achievements,
 			&i.Years,
+			&i.SnsUrls,
 			&i.Status,
 			&i.AppliedAt,
 			&i.ReviewedAt,
@@ -168,13 +173,14 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 const listPublicCoaches = `-- name: ListPublicCoaches :many
 SELECT
     c.profile_id,
-    p.nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
     c.tier,
     c.events,
     c.best_record,
     c.achievements,
     c.years,
+    c.sns_urls,
     c.service_types,
     r.rating_count,
     r.rating_average
@@ -201,13 +207,14 @@ ORDER BY c.tier, c.reviewed_at, c.profile_id
 
 type ListPublicCoachesRow struct {
 	ProfileID     uuid.UUID `json:"profile_id"`
-	Nickname      *string   `json:"nickname"`
+	Nickname      string    `json:"nickname"`
 	PhotoPublicID *string   `json:"photo_public_id"`
 	Tier          string    `json:"tier"`
 	Events        []string  `json:"events"`
 	BestRecord    string    `json:"best_record"`
 	Achievements  string    `json:"achievements"`
 	Years         int16     `json:"years"`
+	SnsUrls       []string  `json:"sns_urls"`
 	ServiceTypes  []string  `json:"service_types"`
 	RatingCount   int32     `json:"rating_count"`
 	RatingAverage float64   `json:"rating_average"`
@@ -232,6 +239,7 @@ func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow
 			&i.BestRecord,
 			&i.Achievements,
 			&i.Years,
+			&i.SnsUrls,
 			&i.ServiceTypes,
 			&i.RatingCount,
 			&i.RatingAverage,
@@ -269,7 +277,7 @@ SET rating_reset_at = now(),
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 // 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
@@ -299,6 +307,8 @@ func (q *Queries) ResetCoachRating(ctx context.Context, profileID uuid.UUID) (Co
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -311,7 +321,7 @@ SET status = $1,
 WHERE profile_id = $2
   AND status = 'pending'
   AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type ReviewCoachApplicationParams struct {
@@ -346,6 +356,8 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -374,20 +386,22 @@ func (q *Queries) SetCoachPhoto(ctx context.Context, arg SetCoachPhotoParams) (*
 }
 
 const submitCoachApplication = `-- name: SubmitCoachApplication :one
-INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
     events = EXCLUDED.events,
     best_record = EXCLUDED.best_record,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
+    sns_urls = EXCLUDED.sns_urls,
+    name = COALESCE(NULLIF(EXCLUDED.name, ''), coach_profiles.name),
     status = 'pending',
     applied_at = now(),
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type SubmitCoachApplicationParams struct {
@@ -397,6 +411,8 @@ type SubmitCoachApplicationParams struct {
 	BestRecord   string    `json:"best_record"`
 	Achievements string    `json:"achievements"`
 	Years        int16     `json:"years"`
+	SnsUrls      []string  `json:"sns_urls"`
+	Name         string    `json:"name"`
 }
 
 // 審査待ちのうちは書き直せる。却下されたら出し直せて、また審査待ちに戻る。
@@ -409,6 +425,8 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		arg.BestRecord,
 		arg.Achievements,
 		arg.Years,
+		arg.SnsUrls,
+		arg.Name,
 	)
 	var i CoachProfile
 	err := row.Scan(
@@ -434,6 +452,8 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }
@@ -442,7 +462,7 @@ const updateCoachServices = `-- name: UpdateCoachServices :one
 UPDATE coach_profiles
 SET service_types = $1::text[], updated_at = now()
 WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
 `
 
 type UpdateCoachServicesParams struct {
@@ -476,6 +496,8 @@ func (q *Queries) UpdateCoachServices(ctx context.Context, arg UpdateCoachServic
 		&i.PayoutsEnabled,
 		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
 	)
 	return i, err
 }

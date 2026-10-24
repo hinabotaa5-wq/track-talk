@@ -5,7 +5,7 @@ vi.mock("./api", () => ({
   apiFetch: () => new Promise((r) => (resolve = r)),
 }));
 
-import { clearHomeFeeds, clearSavedFeeds, isRenderFresh, loadSavedFeed, readFeed, renderSeedTime, savedFeedPath } from "./home-feed-cache";
+import { clearHomeFeeds, clearSavedFeeds, isRenderFresh, loadSavedFeed, readFeed, renderSeedTime, savedFeedPath, readHomeFeedChunks, saveHomeFeedChunks, homeFeedGeneration } from "./home-feed-cache";
 
 describe("saved feed cache", () => {
   it("does not write back a request that started before clearing", async () => {
@@ -34,4 +34,15 @@ describe("home feed rendered a while ago", () => {
     expect(renderSeedTime(now - 2_000, now)).toBe(now);
     expect(renderSeedTime(now - 60_000, now)).toBe(0);
   });
+});
+
+it("詳細から戻るための追加ページを保持し、無効化前の一覧は復活させない", () => {
+  const path = "/v1/posts?sort=new&page=1";
+  const chunks = [{ posts: [], meta: { page: 2, per_page: 12, total: 24 } }];
+  const atGeneration = homeFeedGeneration();
+  saveHomeFeedChunks(path, chunks, atGeneration);
+  expect(readHomeFeedChunks(path)).toEqual(chunks);
+  clearHomeFeeds();
+  saveHomeFeedChunks(path, chunks, atGeneration);
+  expect(readHomeFeedChunks(path)).toBeUndefined();
 });

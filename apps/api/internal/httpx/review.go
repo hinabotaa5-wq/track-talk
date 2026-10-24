@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
@@ -84,6 +85,7 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"tier":          rr.Tier,
 		"event":         rr.Event,
 		"focus":         rr.Focus,
+		"question":      rr.Question,
 		"status":        rr.Status,
 		"due_at":        rr.DueAt,
 		"created_at":    rr.CreatedAt,
@@ -229,6 +231,7 @@ type reviewRequestReq struct {
 	Tier          string   `json:"tier"`
 	Event         string   `json:"event"`
 	Focus         []string `json:"focus"`
+	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
 	// 支払い方法（card か paypay）。Stripe の鍵があるときだけ使う。
 	Method string `json:"method"`
@@ -255,9 +258,22 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !validReviewEvent(req.Event) {
 		fields["event"] = "いまは100mだけ受け付けています"
 	}
-	focus, known := normalizeFocus(req.Focus)
-	if !known || len(focus) == 0 {
-		fields["focus"] = "見てほしい点を1つ以上選んでください"
+	focus := []string{}
+	question := ""
+	if req.Question != nil {
+		question = strings.TrimSpace(*req.Question)
+		if question == "" {
+			fields["question"] = "相談内容を記入してください"
+		}
+		if utf8.RuneCountInString(question) > 1000 {
+			fields["question"] = "1000文字以内で記入してください"
+		}
+	} else {
+		var known bool
+		focus, known = normalizeFocus(req.Focus)
+		if !known || len(focus) == 0 {
+			fields["focus"] = "見てほしい点を1つ以上選んでください"
+		}
 	}
 	if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
@@ -282,7 +298,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if payments {
-			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, reviewPrices[req.Tier])
+			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, reviewPriceYen)
 			if err != nil {
 				MapDBError(w, err)
 				return
@@ -339,6 +355,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Tier:          req.Tier,
 		Event:         req.Event,
 		Focus:         focus,
+		Question:      question,
 		VideoPublicID: req.VideoPublicID,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。

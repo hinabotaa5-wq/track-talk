@@ -2,7 +2,7 @@
 -- 申し込む画面に出すプランとコーチ。公開中で、承認済みで、いまの版の誓約をしたコーチのものだけ。
 SELECT
     pl.*,
-    p.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     c.tier AS coach_tier,
     c.events AS coach_events,
@@ -35,7 +35,7 @@ WHERE id = $1;
 
 -- name: ListMyCoachingContracts :many
 -- 利用者が申し込んだもの。コーチのニックネームと顔写真をつける。
-SELECT ct.*, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.*, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -133,7 +133,7 @@ RETURNING *;
 -- name: GetCoachingContractDetail :one
 -- 申し込みの中身と、両方のニックネーム、コーチの顔写真。
 SELECT ct.*,
-    cp.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), cp.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     rp.nickname AS requester_nickname
 FROM coaching_contracts ct
@@ -144,7 +144,7 @@ WHERE ct.id = $1;
 
 -- name: ListGuardianContracts :many
 -- 保護者のページに出す、子の申し込み（申し込んだとき18歳未満だったもの）。
-SELECT ct.*, p.nickname AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.*, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -201,7 +201,7 @@ SELECT
      ORDER BY pay.refund_reason IS NOT DISTINCT FROM 'not_started', pay.paid_at DESC LIMIT 1), '')::text AS payment_status,
     COALESCE((SELECT sum(pay.refunded_yen) FROM coaching_payments pay WHERE pay.contract_id = ct.id), 0)::int AS refunded_yen,
     rp.nickname AS requester_nickname,
-    cp.nickname AS coach_nickname,
+    COALESCE(NULLIF(c.name, ''), cp.nickname, '')::text AS coach_nickname,
     (SELECT count(*) FROM reports r JOIN coaching_messages m ON m.id = r.target_id
      WHERE r.target_type = 'coaching_message' AND m.contract_id = ct.id)::int AS report_count,
     COALESCE((SELECT b.count FROM coaching_blocked_counts b WHERE b.contract_id = ct.id AND b.profile_id = ct.requester_id), 0)::int AS requester_blocked,
@@ -209,6 +209,7 @@ SELECT
 FROM coaching_contracts ct
 JOIN profiles rp ON rp.id = ct.requester_id
 JOIN profiles cp ON cp.id = ct.coach_id
+LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
 ORDER BY ct.created_at DESC
 LIMIT 100;
 

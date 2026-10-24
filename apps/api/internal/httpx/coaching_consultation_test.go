@@ -80,7 +80,7 @@ func TestConsultationTicketConversationAndFreeConfirmation(t *testing.T) {
 	owner, coach, root := answeredTicketRoom(t, h)
 	path := "/v1/coaching/requests/" + root + "/consultations"
 	c := consultationDraft(t, h, owner, path, uuid.NewString(), "次の大会ではどこを意識しますか")
-	if c.Price != 500 || c.Funding != "ticket" {
+	if c.Price != 600 || c.Funding != "ticket" {
 		t.Fatalf("snapshot %+v", c)
 	}
 	consultationAction(t, h, owner, c.ID, "submit", nil)
@@ -98,7 +98,7 @@ func TestConsultationTicketConversationAndFreeConfirmation(t *testing.T) {
 	}
 	var count, earnings int
 	queryRowArgs(t, `SELECT count(*),sum(amount_yen)::integer FROM coach_earnings WHERE consultation_id=$1`, []any{c.ID}, &count, &earnings)
-	if count != 1 || earnings != 350 {
+	if count != 1 || earnings != 420 {
 		t.Fatalf("earnings %d %d", count, earnings)
 	}
 	consultationAction(t, h, owner, c.ID, "clarify", map[string]any{"body": "接地の練習方法を教えてください"})

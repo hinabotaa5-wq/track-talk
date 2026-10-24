@@ -514,8 +514,17 @@ function CoachesAdmin({ token }: { token: string | null }) {
             ) : null}
             <p>担当種目: {a.events.map((g) => coachEventLabels[g]).join("、")}</p>
             <p className="whitespace-pre-wrap">記録: {a.best_record}</p>
-            <p className="whitespace-pre-wrap">成績: {a.achievements}</p>
-            <p>競技年数: {a.years}年</p>
+            <p className="whitespace-pre-wrap">成績や指導経験: {a.achievements}</p>
+            {(a.sns_urls ?? []).length ? (
+              <p className="space-y-1">
+                <span className="block">SNS:</span>
+                {a.sns_urls.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">
+                    {url}
+                  </a>
+                ))}
+              </p>
+            ) : null}
             {a.status === "approved" ? (
               <p className="text-xs text-slate-200">
                 評価: {a.rating_count > 0 ? `★${a.rating_average.toFixed(1)}（${a.rating_count}件）` : "まだありません"}

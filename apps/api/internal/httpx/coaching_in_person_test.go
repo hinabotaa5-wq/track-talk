@@ -68,6 +68,49 @@ func proposeInPerson(t *testing.T, h http.Handler, coach, root string, at time.T
 	}
 	return out.Session.ID
 }
+func TestPublicCoachIncludesInPersonPlanConditions(t *testing.T) {
+	h := setup(t)
+	_, plan := inPersonPlan(t, h)
+	var coachID string
+	queryRowArgs(t, `SELECT coach_id::text FROM coaching_plans WHERE id = $1`, []any{plan}, &coachID)
+	r := doJSON(t, h, "GET", "/v1/coaches", "", nil)
+	if r.Code != http.StatusOK {
+		t.Fatalf("public coaches %d %s", r.Code, r.Body.String())
+	}
+	var out struct {
+		Coaches []struct {
+			ID    string `json:"id"`
+			Plans []struct {
+				ID              string `json:"id"`
+				VenueArea       string `json:"venue_area"`
+				VenueName       string `json:"venue_name"`
+				SessionCount    int    `json:"session_count"`
+				SessionMinutes  int    `json:"session_minutes"`
+				TravelFeeYen    int    `json:"travel_fee_yen"`
+				MaxParticipants int    `json:"max_participants"`
+			} `json:"plans"`
+		} `json:"coaches"`
+	}
+	if err := json.Unmarshal(r.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range out.Coaches {
+		if c.ID != coachID {
+			continue
+		}
+		for _, p := range c.Plans {
+			if p.ID != plan {
+				continue
+			}
+			if p.VenueArea != "東京都" || p.VenueName != "国立競技場" || p.SessionCount != 2 || p.SessionMinutes != 60 || p.TravelFeeYen != 1000 || p.MaxParticipants != 3 {
+				t.Fatalf("public in-person conditions missing: %+v", p)
+			}
+			return
+		}
+	}
+	t.Fatal("public in-person plan not found")
+}
+
 func TestInPersonPlanSnapshotIncludesTravelFee(t *testing.T) {
 	h := setup(t)
 	coach, plan := inPersonPlan(t, h)

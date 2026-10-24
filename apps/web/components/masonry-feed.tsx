@@ -3,8 +3,12 @@
 import { Children, useEffect, useRef, type ReactNode } from "react";
 import { packMosaic } from "@/lib/masonry-feed";
 
-export function MasonryFeed({ children, ratios, onEndReached }: { children: ReactNode; ratios: number[]; onEndReached?: () => void }) {
+type FeedPosition = { left: number; href?: string; offset: number };
+const positions = new Map<string, FeedPosition>();
+
+export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { children: ReactNode; ratios: number[]; onEndReached?: () => void; storageKey?: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const pendingPosition = useRef<FeedPosition | undefined>(undefined);
   const items = Children.toArray(children);
   const ratioKey = ratios.join(",");
 
@@ -12,6 +16,20 @@ export function MasonryFeed({ children, ratios, onEndReached }: { children: Reac
     const track = trackRef.current;
     const canvas = track?.firstElementChild as HTMLElement | null;
     if (!track || !canvas) return;
+    pendingPosition.current ??= storageKey ? positions.get(storageKey) : undefined;
+    function savePosition(event?: Event) {
+      if (!storageKey || !track || !canvas || pendingPosition.current) return;
+      const nodes = Array.from(canvas.children) as HTMLElement[];
+      const clicked = event?.target instanceof Element ? event.target.closest("a") : null;
+      const anchor = (clicked?.closest(".masonry-feed-tile") as HTMLElement | null)
+        ?? nodes.find((node) => node.offsetLeft + node.offsetWidth > track.scrollLeft);
+      positions.set(storageKey, {
+        left: track.scrollLeft,
+        href: anchor?.querySelector("a")?.getAttribute("href") ?? undefined,
+        offset: (anchor?.offsetLeft ?? 0) - track.scrollLeft,
+      });
+    }
+    function onScroll() { savePosition(); checkEnd(); }
     const hints = ratioKey.split(",").map(Number);
     let frame = 0;
     function checkEnd() {
@@ -36,8 +54,7 @@ export function MasonryFeed({ children, ratios, onEndReached }: { children: Reac
       const result = packMosaic(nodes.map((node, index) => {
         const image = node.querySelector<HTMLImageElement>("img");
         const ratio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : hints[index] || 4 / 3;
-        const footer = node.querySelector<HTMLElement>(".feed-card-title")?.getBoundingClientRect().height ?? 0;
-        return { ratio, footer };
+        return { ratio, footer: 0 };
       }), track.clientWidth, available);
       canvas.style.width = `${result.width}px`;
       canvas.style.height = `${result.height}px`;
@@ -49,7 +66,12 @@ export function MasonryFeed({ children, ratios, onEndReached }: { children: Reac
         node.style.width = `${tile.width}px`;
         node.dataset.position = String(index + 1);
       });
-      if (anchor) track.scrollLeft += anchor.offsetLeft - anchorX;
+      const saved = pendingPosition.current;
+      if (saved) {
+        const target = nodes.find((node) => node.querySelector("a")?.getAttribute("href") === saved.href);
+        track.scrollLeft = target ? target.offsetLeft - saved.offset : saved.left;
+        if (target || !saved.href) pendingPosition.current = undefined;
+      } else if (anchor) track.scrollLeft += anchor.offsetLeft - anchorX;
       checkEnd();
     }
     function schedule() {
@@ -72,7 +94,8 @@ export function MasonryFeed({ children, ratios, onEndReached }: { children: Reac
     canvas.addEventListener("load", schedule, true);
     canvas.addEventListener("error", schedule, true);
     track.addEventListener("wheel", wheel, { passive: false });
-    track.addEventListener("scroll", checkEnd, { passive: true });
+    track.addEventListener("scroll", onScroll, { passive: true });
+    canvas.addEventListener("click", savePosition, true);
     window.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
     schedule();
@@ -82,11 +105,12 @@ export function MasonryFeed({ children, ratios, onEndReached }: { children: Reac
       canvas.removeEventListener("load", schedule, true);
       canvas.removeEventListener("error", schedule, true);
       track.removeEventListener("wheel", wheel);
-      track.removeEventListener("scroll", checkEnd);
+      track.removeEventListener("scroll", onScroll);
+      canvas.removeEventListener("click", savePosition, true);
       window.removeEventListener("resize", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
     };
-  }, [items.length, ratioKey, onEndReached]);
+  }, [items.length, ratioKey, onEndReached, storageKey]);
 
   return <div ref={trackRef} role="region" aria-label="投稿一覧" tabIndex={0} className="masonry-feed-strip rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
     <div className="masonry-feed-canvas">

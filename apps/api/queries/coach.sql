@@ -5,14 +5,16 @@ WHERE profile_id = $1;
 -- name: SubmitCoachApplication :one
 -- 審査待ちのうちは書き直せる。却下されたら出し直せて、また審査待ちに戻る。
 -- 承認済み・停止中は変えられない（行が返らない）。
-INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
     events = EXCLUDED.events,
     best_record = EXCLUDED.best_record,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
+    sns_urls = EXCLUDED.sns_urls,
+    name = COALESCE(NULLIF(EXCLUDED.name, ''), coach_profiles.name),
     status = 'pending',
     applied_at = now(),
     reviewed_at = NULL,
@@ -32,10 +34,11 @@ SELECT
     c.best_record,
     c.achievements,
     c.years,
+    c.sns_urls,
     c.status,
     c.applied_at,
     c.reviewed_at,
-    p.nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
     r.rating_count,
     r.rating_average
@@ -77,13 +80,14 @@ RETURNING *;
 -- 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
 SELECT
     c.profile_id,
-    p.nickname,
+    COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
     c.tier,
     c.events,
     c.best_record,
     c.achievements,
     c.years,
+    c.sns_urls,
     c.service_types,
     r.rating_count,
     r.rating_average

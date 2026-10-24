@@ -84,6 +84,13 @@ export function planIncludes(p: PlanIncludes): { label: string; value: string }[
   if (p.support_start_date && p.competition_date) out.push({ label: "支援日程", value: `${p.support_start_date} 〜 ${p.competition_date}（大会当日まで）` });
   if (p.call_count) out.push({ label: "ビデオ通話", value: `${p.call_count}回・1回${p.call_minutes ?? 30}分` });
   if (p.service_type === "competition_support") out.push({ label: "未提供分の返金", value: "動画回答1組・実施確認済み通話1回を各1単位として按分。終了48時間後に精算" });
+  if (p.service_type === "in_person") {
+    if (p.venue_area) out.push({ label: "地域", value: p.venue_area });
+    if (p.venue_name) out.push({ label: "会場", value: p.venue_name });
+    if (p.session_count) out.push({ label: "対面指導", value: `${p.session_count}回${p.session_minutes ? `・1回${p.session_minutes}分` : ""}` });
+    if (p.travel_fee_yen != null) out.push({ label: "交通費", value: `${formatYen(p.travel_fee_yen)}（基本料金に加算）` });
+    if (p.max_participants) out.push({ label: "募集人数", value: `${p.max_participants}人まで` });
+  }
   if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
   if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
   if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });

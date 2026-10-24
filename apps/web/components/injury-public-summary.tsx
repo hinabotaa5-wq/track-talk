@@ -7,7 +7,7 @@ function Waiting({ min }: { min: number }) {
   return <p className="text-sm text-slate-400">{min}人そろうと表示</p>;
 }
 
-function BarRow({ label, people, total }: { label: string; people: number; total: number }) {
+function BarRow({ label, people, total, hidePeople = false }: { label: string; people: number; total: number; hidePeople?: boolean }) {
   const percent = injuryPercent(people, total);
   return (
     <li className="text-sm">
@@ -15,7 +15,7 @@ function BarRow({ label, people, total }: { label: string; people: number; total
         <span>{label}</span>
         <span className="shrink-0 tabular-nums">
           <span className="font-semibold text-slate-100">{percent}%</span>
-          <span className="ml-1 text-xs text-slate-400">{people}人</span>
+          {hidePeople ? null : <span className="ml-1 text-xs text-slate-400">{people}人</span>}
         </span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-white/10" aria-hidden>
@@ -27,7 +27,7 @@ function BarRow({ label, people, total }: { label: string; people: number; total
 
 // まだ集計が出ていない項目は見出しごと出さない。全部まだのときは、呼ぶ側で1行だけ出す。
 // top を渡すと、多い順に top 件だけ出し、残りは「ほかの回答」を開くと見られる(長い一覧で読みにくくならないように)。
-export function Bars({ title, tally, top }: { title: string; tally: InjuryTally; top?: number }) {
+export function Bars({ title, tally, top, hidePeople = false }: { title: string; tally: InjuryTally; top?: number; hidePeople?: boolean }) {
   if (tally.items.length === 0) return null;
   const items = [...tally.items].sort((a, b) => b.people - a.people);
   const shown = top ? items.slice(0, top) : items;
@@ -36,11 +36,11 @@ export function Bars({ title, tally, top }: { title: string; tally: InjuryTally;
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-bold text-slate-100">{title}</h3>
-        <span className="shrink-0 text-xs text-slate-400">{tally.people}人が回答</span>
+        {hidePeople ? null : <span className="shrink-0 text-xs text-slate-400">{tally.people}人が回答</span>}
       </div>
       <ul className="space-y-1.5">
         {shown.map((item) => (
-          <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} />
+          <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} hidePeople={hidePeople} />
         ))}
       </ul>
       {rest.length > 0 ? (
@@ -48,7 +48,7 @@ export function Bars({ title, tally, top }: { title: string; tally: InjuryTally;
           <summary className="cursor-pointer list-none text-xs text-blue-300 group-open:hidden">ほかの回答を見る({rest.length})</summary>
           <ul className="mt-1.5 space-y-1.5">
             {rest.map((item) => (
-              <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} />
+              <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} hidePeople={hidePeople} />
             ))}
           </ul>
         </details>

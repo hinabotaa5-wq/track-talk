@@ -149,7 +149,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
 		t.Fatalf("tick again %s", rec.Body.String())
 	}
-	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 700 || e.UnpaidYen != 700 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
+	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 840 || e.UnpaidYen != 840 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
 		t.Fatalf("review earnings %+v", e)
 	}
 	if e := coachEarnings(t, h, tc); e.UnpaidYen != 7200 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 90 {
@@ -180,7 +180,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		}
 		got[tr.Get("destination")] = tr.Get("amount")
 	}
-	if got["acct_"+reviewCoach.String()] != "700" || got["acct_"+personalCoach] != "7200" || len(got) != 2 {
+	if got["acct_"+reviewCoach.String()] != "840" || got["acct_"+personalCoach] != "7200" || len(got) != 2 {
 		t.Fatalf("transfers %v", got)
 	}
 	// 済んだものは送り直さない。

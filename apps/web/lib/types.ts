@@ -335,7 +335,7 @@ export type GuardianPublic = CoachingGuardian & {
   default_limit_yen: number;
 };
 
-export type CoachTier = "coach" | "senpai";
+export type CoachTier = "coach";
 export type CoachEvent =
   | "100m"
   | "200m"
@@ -363,12 +363,14 @@ export type CoachEvent =
 export type CoachStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type CoachApplication = {
+  name?: string;
   service_types: CoachingServiceType[];
   tier: CoachTier;
   events: CoachEvent[];
   best_record: string;
   achievements: string;
   years: number;
+  sns_urls: string[];
   status: CoachStatus;
   applied_at: string;
   reviewed_at: string | null;
@@ -637,6 +639,7 @@ export type ReviewRequest = {
   tier: CoachTier;
   event: CoachEvent;
   focus: ReviewFocus[];
+  question?: string;
   status: ReviewStatus;
   due_at: string;
   created_at: string;
@@ -735,6 +738,7 @@ export type PublicCoach = {
   best_record: string;
   achievements: string;
   years: number;
+  sns_urls: string[];
   rating_count: number;
   rating_average: number;
   // パーソナル指導の公開中のプラン。安い順。

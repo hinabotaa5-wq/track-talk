@@ -5,7 +5,7 @@ import { FeedCard } from "./feed-card";
 import type { Post } from "@/lib/types";
 
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children),
+  default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
 }));
 
 const post = {
@@ -120,12 +120,12 @@ it("投稿動画のサムネイルは再生せずに詳細を開く", () => {
   expect(html).toContain("h-auto w-full");
 });
 
-it("YouTubeの縦動画と横動画をそれぞれの比率で埋め込む", () => {
+it("YouTubeは縦横ともサムネイルから詳細を開く", () => {
   for (const shorts of [true, false]) {
     const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "youtube", youtube_video_id: "abcdefghijk", youtube_shorts: shorts } }));
-    expect(html).toContain("https://www.youtube-nocookie.com/embed/abcdefghijk");
-    expect(html).toContain(shorts ? "aspect-[9/16]" : "aspect-video");
-    expect(html).not.toMatch(/<a\b[^>]*><iframe/);
+    expect(html).toContain("https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg");
+    expect(html).toContain(`/posts/${post.id}`);
+    expect(html).not.toContain("<iframe");
   }
 });
 
@@ -133,10 +133,25 @@ it("YouTubeの縦動画と横動画をそれぞれの比率で埋め込む", () 
 it("ホームでは再生プレーヤーではなく元のサムネイルを詳細リンクとして表示する", () => {
   const html = renderToStaticMarkup(createElement(FeedCard, {
     post: { ...post, kind: "video", playback_url: "/samples/vertical.mp4", thumbnail_url: "/samples/vertical.jpg" },
-    thumbnailOnly: true,
   }));
   expect(html).toContain('/samples/vertical.jpg');
   expect(html).toContain(`/posts/${post.id}`);
   expect(html).not.toContain('<video');
   expect(html).not.toContain('<iframe');
+});
+
+it("写真のない文章は本文を一度だけ出し、下のタイトル欄を出さない", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, excerpt: "今日の練習の感覚" } }));
+  expect(html.match(/今日の練習の感覚/g)).toHaveLength(1);
+  expect(html).not.toContain("feed-card-title");
+  expect(html).not.toContain("自分の投稿");
+});
+
+it("画像付き投稿の詳細文は画像の下部に一度だけ重ね、タイトル欄を作らない", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", title: "非表示のタイトル", body: "改行のある詳細文\n後半の説明", thumbnail_url: "/samples/vertical.jpg" } }));
+  expect(html).toContain("feed-card-caption absolute inset-x-0 bottom-0");
+  expect(html).not.toContain("feed-card-title");
+  expect(html).not.toContain("非表示のタイトル");
+  expect(html.match(/改行のある詳細文/g)).toHaveLength(1);
+  expect(html.indexOf("改行のある詳細文")).toBeLessThan(html.indexOf("</a>"));
 });

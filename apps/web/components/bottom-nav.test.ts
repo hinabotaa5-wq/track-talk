@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabs, mainTabHref, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
+import { activeMainTab, headerBackFallback, hasBackOnlyHeader, hidesHeader, mainTabs, mainTabHref, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 
 describe("mainTabHref", () => {
   it("下のメニューは ホーム→大会→メモ→コーチ→ケガ の順", () => {
@@ -74,4 +74,15 @@ describe("showsHeaderAccountActions", () => {
     expect(showsHeaderAccountActions("/posts/new")).toBe(false);
     expect(showsHeaderAccountActions("/menu-contest")).toBe(false);
   });
+});
+
+it("コーチやプランなどの詳細は共通ヘッダーに戻るを表示する", () => {
+  for (const path of ["/coaches", "/coaches/coach-1", "/coach", "/coach/apply", "/coach/about", "/coach/requests/request-1", "/coaching/new", "/coaching/requests/request-1", "/coaching/personal/contract-1", "/coaching/personal/plans/plan-1", "/competitions/major-domestic", "/prefectures/tokyo", "/admin/coaching/contract-1"]) {
+    expect(showsBackButton(path), path).toBe(true);
+    expect(hasBackOnlyHeader(path), path).toBe(true);
+  }
+  for (const path of ["/", "/coaching", "/competitions", "/memo", "/injury"]) expect(showsBackButton(path), path).toBe(false);
+  expect(headerBackFallback("/coaches/coach-1")).toBe("/coaches");
+  expect(headerBackFallback("/coaching/personal/plans/plan-1")).toBe("/coaches");
+  expect(headerBackFallback("/coach/requests/request-1")).toBe("/coach");
 });

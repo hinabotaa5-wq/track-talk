@@ -10,7 +10,7 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 
 const coach: CoachApplication = {
-  tier: "coach", events: ["100m"], best_record: "10秒台", achievements: "全国大会出場", years: 10,
+  tier: "coach", events: ["100m"], best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: [],
   status: "approved", applied_at: "2026-10-23T00:00:00Z", reviewed_at: null,
   on_duty: false, daily_cap: 5, photo_url: "", pledged: true, payouts_ready: true,
   service_types: ["video_review", "competition_support", "in_person"],

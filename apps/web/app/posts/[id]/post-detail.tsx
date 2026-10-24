@@ -259,10 +259,10 @@ export function PostDetail({
         key={c.id}
         type="button"
         onClick={() => openThread(c)}
-        className="flex min-h-28 flex-col rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
+        className="flex min-h-28 min-w-0 flex-col overflow-hidden rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
       >
         <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
-        <span className="line-clamp-4 whitespace-pre-wrap break-words text-sm">{c.body}</span>
+        <span className={`line-clamp-4 whitespace-pre-wrap [overflow-wrap:anywhere] ${c.body.length > 280 ? "text-xs" : "text-sm"}`}>{c.body}</span>
         <span className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-slate-300">
           <span className={thread.replies.length > 0 ? "font-semibold text-blue-200" : ""}>💬 {thread.replies.length}</span>
           <span className="truncate">{formatRelativeTime(c.created_at)}</span>
@@ -354,7 +354,7 @@ export function PostDetail({
         onPointerDown={(e) => e.stopPropagation()}
       >
         <span className="block truncate font-semibold">{replyLabel(c)}</span>
-        <span className="line-clamp-2 break-words opacity-80">{target && !c.reply_to_removed ? target.body : "削除されたコメント"}</span>
+        <span className="line-clamp-2 [overflow-wrap:anywhere] opacity-80">{target && !c.reply_to_removed ? target.body : "削除されたコメント"}</span>
       </button>
     );
   }
@@ -363,7 +363,7 @@ export function PostDetail({
     return (
       <div key={c.id} id={`comment-${c.id}`} className={`flex flex-col ${c.mine ? "items-end" : "items-start"}`}>
         {c.mine ? null : <span className="mb-0.5 ml-3 text-xs font-semibold text-slate-200">{c.author_name ?? "匿名"}</span>}
-        <div className={`flex max-w-[85%] items-end gap-1.5 ${c.mine ? "flex-row-reverse" : ""}`}>
+        <div className={`flex min-w-0 max-w-[95%] items-end gap-1.5 ${c.mine ? "flex-row-reverse" : ""}`}>
           <div
             onPointerDown={(e) => startPress(e, c)}
             onPointerMove={movePress}
@@ -375,12 +375,12 @@ export function PostDetail({
               cancelPress();
               setMenuComment(c);
             }}
-            className={`select-none rounded-3xl px-4 py-2.5 text-sm text-white transition-colors [-webkit-touch-callout:none] ${
+            className={`min-w-0 max-w-full select-none rounded-3xl px-4 py-2.5 text-sm text-white transition-colors [-webkit-touch-callout:none] ${
               c.mine ? "rounded-br-md bg-blue-500/70" : "rounded-bl-md border border-white/20 bg-white/15"
             } ${highlightId === c.id ? "ring-2 ring-blue-300" : ""}`}
           >
             {renderQuote(c)}
-            <p className="whitespace-pre-wrap break-words">{c.body}</p>
+            <p className={`whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed ${c.body.length > 280 ? "text-xs" : "text-sm"}`}>{c.body}</p>
           </div>
           <span className="shrink-0 pb-0.5 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</span>
         </div>
@@ -466,7 +466,10 @@ export function PostDetail({
     >
       {/* コメントルーム(スレッド)の間は、投稿の動画・いいね・保存などを隠してチャットに集中させる。 */}
       {activeThread ? null : (
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
+      {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
+        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-base leading-relaxed text-slate-200">{post.body}</p>
+      ) : null}
       {post.kind === "practice" ? (
         <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
       ) : null}
@@ -491,7 +494,7 @@ export function PostDetail({
         </>
       ) : post.kind === "video" && post.playback_url ? (
         <ZoomableVideo
-          className="mx-auto h-auto max-h-[80dvh] w-auto max-w-full bg-black"
+          className="mx-auto h-auto max-h-[50dvh] w-auto max-w-full bg-black"
           src={post.playback_url}
           poster={post.thumbnail_url}
         />
@@ -507,14 +510,14 @@ export function PostDetail({
         <ZoomableImage
           src={post.thumbnail_url}
           alt={feedTitle(post.title)}
-          sizes="(max-width: 1024px) 100vw, 800px"
-          wrapperClassName="relative w-full overflow-hidden rounded-xl bg-black/25"
-          imageClassName="max-h-[70vh] w-full object-contain h-auto"
+          sizes="(max-width: 640px) 100vw, 560px"
+          wrapperClassName="relative mx-auto w-full max-w-[560px] overflow-hidden rounded-xl bg-black/25"
+          imageClassName="max-h-[50dvh] w-full object-contain h-auto"
           priority
         />
       ) : null}
       {post.kind === "practice" || !hasFeedTitle(post.title) ? null : (
-        <h1 className="text-4xl font-bold [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
+        <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
@@ -532,14 +535,6 @@ export function PostDetail({
         ) : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>
       </p>
-      {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : (post.kind === "recruitment" || post.kind === "practice") && post.body ? (
-        <div>
-          <h2 className="mb-2 text-2xl font-semibold text-slate-100">詳細</h2>
-          <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
-        </div>
-      ) : post.body ? (
-        <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>
-      ) : null}
       {post.kind === "injury" && post.injury ? (
         <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
       ) : null}
@@ -586,9 +581,9 @@ export function PostDetail({
       </div>
       </div>
       )}
-      <section className={`space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
+      <section className={`min-w-0 space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="truncate text-xl font-semibold">{feedTitle(post.title) || "コメント"}</h2>
+          <h2 className="whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold">{feedTitle(post.title) || "コメント"}</h2>
         ) : (
           <h2 className="text-xl font-semibold">コメント</h2>
         )}

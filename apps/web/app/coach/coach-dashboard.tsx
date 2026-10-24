@@ -10,8 +10,9 @@ import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachingEnabled } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
-import { reviewFocusLabels } from "@/lib/review";
+import { reviewQuestionText } from "@/lib/review";
 import type { CoachApplication, CoachingMe, CoachRatingSummary, CoachRequests, CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -34,7 +35,7 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
       <p className="font-semibold text-white">
         {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
       </p>
-      <p className="text-sm text-slate-200">見てほしい点: {request.focus.map((f) => reviewFocusLabels[f]).join("、")}</p>
+      <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
       <p className="text-xs text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
     </div>
   );
@@ -177,13 +178,13 @@ export function CoachDashboard() {
     let cancelled = false;
     Promise.all([
       apiFetch<{ application: CoachApplication | null; rating?: CoachRatingSummary }>("/v1/coach/me", { token }),
-      apiFetch<CoachingMe>("/v1/me/coaching", { token }),
+      coachingEnabled ? apiFetch<CoachingMe>("/v1/me/coaching", { token }) : Promise.resolve(null),
     ])
       .then(([c, me]) => {
         if (cancelled) return;
         setCoach(c.application);
         setRating(c.rating ?? null);
-        setDevices(me.push_devices);
+        setDevices(me?.push_devices ?? 0);
       })
       .catch(() => {
         if (!cancelled) setError("読み込みに失敗しました");
@@ -225,6 +226,16 @@ export function CoachDashboard() {
     );
   }
 
+  if (!coachingEnabled) return (
+    <div className="mx-auto max-w-md space-y-5">
+      <h1 className="text-2xl font-bold">コーチ画面</h1>
+      <p className="text-sm leading-relaxed text-slate-200">コーチの応募は承認されています。現在は受付開始に向けて準備中です。機能の公開後、この画面から依頼への返答やプランの管理ができます。</p>
+      <CoachPhotoForm application={coach} nickname={coach.name || profile?.nickname || null} token={token} onSaved={setCoach} />
+      <Link href="/coach/about" className="block text-sm text-blue-300 underline">コーチ機能について</Link>
+      <Link href="/coach/apply" className="block text-sm text-blue-300 underline">応募内容を確認する</Link>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-1">
@@ -235,7 +246,7 @@ export function CoachDashboard() {
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-        <CoachPhotoForm application={coach} nickname={profile?.nickname ?? null} token={token} onSaved={setCoach} />
+        <CoachPhotoForm application={coach} nickname={coach.name || profile?.nickname || null} token={token} onSaved={setCoach} />
         <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-3">
           <div>
             <p className="text-lg font-bold">{coach.on_duty ? "受付中" : "受付停止中"}</p>

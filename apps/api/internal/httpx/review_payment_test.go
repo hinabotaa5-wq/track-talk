@@ -59,7 +59,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	_, tu := demoRequester(t, h, tadmin)
 
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1000`) {
+	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1200`) {
 		t.Fatalf("estimate %s", rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
@@ -69,7 +69,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	id := paidReview(t, h, tu, "card", "pi_card_1")
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_intent_data[capture_method]") != "manual" ||
-		form.Get("line_items[0][price_data][unit_amount]") != "1000" || form.Get("metadata[kind]") != "review" ||
+		form.Get("line_items[0][price_data][unit_amount]") != "1200" || form.Get("metadata[kind]") != "review" ||
 		form.Get("success_url") != "https://web.test/coaching/requests/"+id+"?paid=1" {
 		t.Fatalf("session %v", form)
 	}
@@ -95,7 +95,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 		t.Fatalf("captured %v", captured)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":1000`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
+	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":1200`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
 		t.Fatalf("detail %s", rec.Body.String())
 	}
 }
@@ -132,7 +132,7 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 		t.Fatalf("canceled %v", canceled)
 	}
 	refunds := f.refundList()
-	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "1000" {
+	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "1200" {
 		t.Fatalf("refunds %v", refunds)
 	}
 	if reviewPaymentStatus(t, card) != "canceled" || reviewPaymentStatus(t, paypay) != "refunded" {
@@ -163,16 +163,17 @@ func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
 	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 1000`)
+	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 3000`)
 	paidReview(t, h, tm, "card", "pi_card_minor")
+	paidReview(t, h, tm, "card", "pi_card_minor_second")
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "monthly_limit") || !strings.Contains(rec.Body.String(), "あと0円") {
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "monthly_limit") || !strings.Contains(rec.Body.String(), "あと600円") {
 		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
 	}
-	body["tier"] = "senpai"
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 3000`)
+	body["tier"] = "coach"
+	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 5000`)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
 		t.Fatalf("within limit %d %s", rec.Code, rec.Body.String())
 	}
@@ -319,7 +320,7 @@ func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
 	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 1000`)
+	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 3000`)
 	codes := make(chan int, 4)
 	for range 4 {
 		body := reviewBodyFor(t, h, tm)
@@ -336,8 +337,8 @@ func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
 	}
 	var open int
 	queryRowArgs(t, `SELECT count(*)::int FROM review_payments WHERE status = 'pending'`, nil, &open)
-	if created != 1 || open != 1 {
-		t.Fatalf("created %d requests with %d checkouts under a 1000 yen limit", created, open)
+	if created != 2 || open != 2 {
+		t.Fatalf("created %d requests with %d checkouts under a 3000 yen limit", created, open)
 	}
 }
 

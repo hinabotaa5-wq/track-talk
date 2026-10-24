@@ -21,7 +21,7 @@ export function MeetRoomContent({ postId, body }: { postId: string; body: string
   const timetable = meetExternalURL(resources?.timetable_url ?? "");
   const videoID = /^[a-zA-Z0-9_-]{11}$/.test(resources?.youtube_video_id ?? "") ? resources!.youtube_video_id : "";
   return <div className="space-y-4">
-    {legacy.text ? <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{legacy.text}</div> : null}
+    {legacy.text ? <div className="whitespace-pre-wrap [overflow-wrap:anywhere] text-base leading-relaxed text-slate-200">{legacy.text}</div> : null}
     <div className="flex flex-col gap-3">
       {official ? <a href={official} target="_blank" rel="noopener noreferrer" className={linkClass}>大会の公式サイト</a> : null}
       {timetable ? <a href={timetable} target="_blank" rel="noopener noreferrer" className={linkClass}>タイムテーブル</a> : null}

@@ -10,6 +10,13 @@ const prefetchSorts: FeedSort[] = ["popular", "new", "recruitment"];
 type Entry = { data: PostsPage; at: number };
 
 const cache = new Map<string, Entry>();
+const chunksCache = new Map<string, PostsPage[]>();
+export function readHomeFeedChunks(path: string) { return chunksCache.get(path); }
+export function homeFeedGeneration() { return generation; }
+export function saveHomeFeedChunks(path: string, chunks: PostsPage[], atGeneration: number) {
+  if (atGeneration === generation) chunksCache.set(path, chunks);
+}
+
 const inflight = new Map<string, Promise<PostsPage>>();
 // 消したあとに、消す前に始めた読み込みが書き戻さないようにする世代の番号(ログアウト後に前の人の保存一覧が残らないように)。
 let generation = 0;
@@ -68,6 +75,7 @@ export function renderSeedTime(renderedAt: number, now = Date.now()) {
 export function clearHomeFeeds() {
   generation++;
   homeClearedAt = Date.now();
+  chunksCache.clear();
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/posts")) {
       cache.delete(key);
