@@ -8,6 +8,8 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # コーチ画面は公開し、新規の申込み・購入の受け付けは API 側で別に切り替える。
+  NEXT_PUBLIC_COACHING_ENABLED = "1"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

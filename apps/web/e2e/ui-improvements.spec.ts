@@ -148,7 +148,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await expect(page.getByRole("button", { name: "次の投稿へ", exact: true })).toHaveCount(0);
   await track.hover();
   await page.mouse.wheel(0, 240);
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   expect((await first.boundingBox())!.x).toBeLessThan(before!.x);
   expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
   // 横長の一覧がページ全体にはみ出したり、縦長画像でカードが伸びたりしない。

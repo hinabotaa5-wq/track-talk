@@ -105,7 +105,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   const hasThumbnail = Boolean(thumbnail || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
     <Link href={href} aria-label={description ? undefined : "投稿の詳細を開く"}
-      className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}${post.kind === "text" ? " feed-card-text" : ""}`}>
+      className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}${post.kind === "text" && !hasThumbnail ? " feed-card-text" : ""}`}>
       <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${thumbnail || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
