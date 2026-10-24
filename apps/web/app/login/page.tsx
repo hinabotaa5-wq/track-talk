@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { coachApplyPath } from "@/lib/coach-recruit";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import type { z } from "zod";
@@ -69,6 +70,11 @@ export default function LoginPage() {
       </form>
       {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
       <GoogleSignInButton nextPath={safeNextPath(next)} />
+      {safeNextPath(next) === "/coach" ? (
+        <Link href={coachApplyPath} className="block rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition hover:bg-white/15 active:scale-[0.98]">
+          コーチに応募する
+        </Link>
+      ) : null}
       <p className="text-sm">
         アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">登録</Link>
       </p>

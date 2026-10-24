@@ -6,6 +6,23 @@ import { packMosaic } from "@/lib/masonry-feed";
 type FeedPosition = { left: number; href?: string; offset: number };
 const positions = new Map<string, FeedPosition>();
 
+function readNumber(key: string) {
+  try {
+    const value = Number(sessionStorage.getItem(key));
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveNumber(key: string, value: number) {
+  try {
+    sessionStorage.setItem(key, String(value));
+  } catch {
+    // プライベートブラウズなど、保存できない環境ではその表示中だけ固定する。
+  }
+}
+
 export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { children: ReactNode; ratios: number[]; onEndReached?: () => void; storageKey?: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pendingPosition = useRef<FeedPosition | undefined>(undefined);
@@ -32,6 +49,8 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
     function onScroll() { savePosition(); checkEnd(); }
     const hints = ratioKey.split(",").map(Number);
     let frame = 0;
+    let fixedAvailable: number | undefined;
+    let measuredWidth = 0;
     function checkEnd() {
       if (!track || !onEndReached) return;
       const remaining = track.scrollWidth - track.scrollLeft - track.clientWidth;
@@ -46,16 +65,25 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
       const header = document.querySelector("header");
       if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
-      // 仮想キーボードは visualViewport だけを縮める。そこで組み直すと、検索中に投稿の順番や形が
-      // 変わってしまうので、投稿一覧はレイアウト画面の高さで固定する。
-      const viewHeight = window.innerHeight;
-      // 上下のパディング8pxだけを残し、下のメニュー直前まで使う。
-      const available = Math.max(280, viewHeight - (track.getBoundingClientRect().top + window.scrollY) - bottom - 8);
+      // キーボードや引っ張って更新するときの viewport の一時的な変化で、投稿の大きさや順番を
+      // 組み直さない。幅が変わったときだけ、表示幅に合わせて新しく計算する。
+      const width = Math.round(track.clientWidth);
+      if (!fixedAvailable || Math.abs(width - measuredWidth) > 1) {
+        const savedAvailable = storageKey ? readNumber(`masonry-height:${storageKey}:${width}`) : undefined;
+        fixedAvailable = savedAvailable ?? Math.max(280, window.innerHeight - (track.getBoundingClientRect().top + window.scrollY) - bottom - 8);
+        measuredWidth = width;
+        if (storageKey) saveNumber(`masonry-height:${storageKey}:${width}`, fixedAvailable);
+      }
+      const available = fixedAvailable;
       const anchor = track.scrollLeft > 0 ? nodes.find((node) => node.offsetLeft + node.offsetWidth > track.scrollLeft) : undefined;
       const anchorX = anchor?.offsetLeft ?? 0;
       const result = packMosaic(nodes.map((node, index) => {
         const image = node.querySelector<HTMLImageElement>("img");
-        const ratio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : hints[index] || 4 / 3;
+        const src = image?.currentSrc || image?.src;
+        const imageKey = src ? `masonry-ratio:${src}` : undefined;
+        const naturalRatio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : undefined;
+        const ratio = (naturalRatio ?? (imageKey ? readNumber(imageKey) : undefined) ?? hints[index]) || 4 / 3;
+        if (naturalRatio && imageKey) saveNumber(imageKey, naturalRatio);
         return { ratio, footer: 0, compact: Boolean(node.querySelector(".feed-card-text")) };
       }), track.clientWidth, available);
       canvas.style.width = `${result.width}px`;
@@ -91,11 +119,18 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       event.preventDefault();
       track.scrollLeft = Math.max(0, Math.min(max, track.scrollLeft + delta));
     }
+    function keyDown(event: KeyboardEvent) {
+      if (!track || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+      event.preventDefault();
+      const delta = Math.max(120, track.clientWidth * 0.72) * (event.key === "ArrowRight" ? 1 : -1);
+      track.scrollLeft = Math.max(0, Math.min(track.scrollWidth - track.clientWidth, track.scrollLeft + delta));
+    }
     const observer = new ResizeObserver(schedule);
     observer.observe(track);
     canvas.addEventListener("load", schedule, true);
     canvas.addEventListener("error", schedule, true);
     track.addEventListener("wheel", wheel, { passive: false });
+    track.addEventListener("keydown", keyDown);
     track.addEventListener("scroll", onScroll, { passive: true });
     canvas.addEventListener("click", savePosition, true);
     window.addEventListener("resize", schedule);
@@ -106,6 +141,7 @@ export function MasonryFeed({ children, ratios, onEndReached, storageKey }: { ch
       canvas.removeEventListener("load", schedule, true);
       canvas.removeEventListener("error", schedule, true);
       track.removeEventListener("wheel", wheel);
+      track.removeEventListener("keydown", keyDown);
       track.removeEventListener("scroll", onScroll);
       canvas.removeEventListener("click", savePosition, true);
       window.removeEventListener("resize", schedule);

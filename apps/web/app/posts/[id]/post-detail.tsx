@@ -468,7 +468,7 @@ export function PostDetail({
       {activeThread ? null : (
       <div className="min-w-0 space-y-6">
       {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
-        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{post.body}</p>
+        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{post.body}</p>
       ) : null}
       {post.kind === "practice" ? (
         <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
@@ -583,7 +583,7 @@ export function PostDetail({
       )}
       <section className={`min-w-0 space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="whitespace-pre-wrap [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || "コメント"}</h2>
+          <h2 className="mx-auto max-w-prose whitespace-pre-wrap text-center [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || "コメント"}</h2>
         ) : (
           <h2 className="text-xl font-semibold">コメント</h2>
         )}

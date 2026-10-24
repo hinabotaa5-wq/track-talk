@@ -42,7 +42,7 @@ function MenuLink({ href, label, icon: Icon }: { href: string; label: string; ic
 }
 
 export default function MePage() {
-  const { session, token, loading } = useAuth();
+  const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const logoutLock = useActionLock();
   const [installed, setInstalled] = useState(true);
@@ -80,6 +80,7 @@ export default function MePage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-xl font-bold text-slate-100">マイページ</h1>
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
+        {profile?.is_admin ? <MenuLink href="/admin" label="管理者画面" icon={Shield} /> : null}
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}

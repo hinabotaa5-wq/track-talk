@@ -638,9 +638,9 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="mx-auto min-w-0 max-w-2xl space-y-4 [overflow-wrap:anywhere]">
       <h1 className="text-2xl font-bold">管理者画面</h1>
-      <div role="tablist" className="flex flex-wrap gap-2">
+      <div role="tablist" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -648,7 +648,7 @@ export default function AdminPage() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${
+            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${
               tab === t.id ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
             }`}
           >

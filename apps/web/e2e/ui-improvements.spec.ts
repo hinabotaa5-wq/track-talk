@@ -118,6 +118,16 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
 
+test("コーチ画面は3つの小さな入口にまとめ、未ログインなら応募も案内する", async ({ page }) => {
+  await page.goto("/coaching");
+  const choices = page.getByRole("navigation", { name: "コーチングのプランを選ぶ" });
+  await expect(choices.locator("a")).toHaveCount(3);
+  expect(await choices.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(["/coaching/new", "/coaches", "/coach"]);
+  await choices.locator('a[href="/coach"]').click();
+  await expect(page).toHaveURL(/\/login\?next=%2Fcoach$/);
+  await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+});
+
 test("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -139,6 +149,8 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track).toBeVisible();
   await expect(track.getByRole("link")).toHaveCount(6);
+  await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await expect.poll(() => track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   const first = track.getByRole("link").first();
   const second = track.getByRole("link").nth(1);
   const before = await first.boundingBox();
@@ -149,6 +161,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await track.hover();
   await page.mouse.wheel(0, 240);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await expect(track.getByRole("link")).toHaveCount(12);
   expect((await first.boundingBox())!.x).toBeLessThan(before!.x);
   expect(await page.evaluate(() => window.scrollY)).toBe(originalY);
   // 横長の一覧がページ全体にはみ出したり、縦長画像でカードが伸びたりしない。
@@ -158,7 +171,6 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await page.keyboard.press("ArrowRight");
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(beforeKey);
   await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; el.dispatchEvent(new Event("scroll")); });
-  await expect(track.getByRole("link")).toHaveCount(12);
   await expect(page).not.toHaveURL(/page=2/);
   await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-1");
   await expect(track.getByRole("button", { name: "続きを読み込む" })).toHaveCount(0);
@@ -228,6 +240,34 @@ test("サムネイルの縦横比と異なる高さを保ち、右側の投稿�
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   expect((await first.boundingBox())!.x).toBeLessThan(before);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("フィードを更新しても投稿の大きさと配置を保つ", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.setFixedTime(Date.now() + 120_000);
+  await page.route("**/api/v1/posts?**", (route) => route.fulfill({ json: {
+    posts: Array.from({ length: 6 }, (_, index) => ({
+      id: `fixed-${index}`, title: `固定投稿${index}`, body: "更新後も形を保つ", kind: "video",
+      playback_url: `/samples/${index % 2 ? "vertical" : "horizontal"}.mp4`, thumbnail_url: `/samples/${index % 2 ? "vertical" : "horizontal"}.jpg`,
+      mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
+      created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
+    })), meta: { page: 1, per_page: 20, total: 6 },
+  } }));
+  const layout = () => page.getByRole("region", { name: "投稿一覧", exact: true }).locator(".masonry-feed-tile").evaluateAll((tiles) => tiles.map((tile) => {
+    const rect = tile.getBoundingClientRect();
+    return [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)];
+  }));
+  await page.goto("/");
+  const track = page.getByRole("region", { name: "投稿一覧", exact: true });
+  await expect(track.locator("img")).toHaveCount(6);
+  await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
+  const before = await layout();
+  await page.reload();
+  await expect(track.locator("img")).toHaveCount(6);
+  await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
+  expect(await layout()).toEqual(before);
 });
 
 test("空きに組み合わせても新しい順・人気順と固定タブを保つ", async ({ page }) => {

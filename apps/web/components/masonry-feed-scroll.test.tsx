@@ -55,3 +55,18 @@ it("詳細を開いて一覧を作り直しても横位置を復元する", asyn
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   expect((container.querySelector('[role="region"]') as HTMLDivElement).scrollLeft).toBe(400);
 });
+
+it("同じフィードの高さを保存し、更新後もカードの形を保つ", async () => {
+  sessionStorage.clear();
+  const content = <MasonryFeed storageKey="fixed-layout" ratios={[1]}><a href="/fixed">投稿</a></MasonryFeed>;
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  const height = container.querySelector<HTMLElement>(".masonry-feed-canvas")!.style.height;
+  const width = container.querySelector<HTMLElement>(".masonry-feed-tile")!.style.width;
+  await act(async () => root.render(null));
+  vi.stubGlobal("innerHeight", 400);
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  expect(container.querySelector<HTMLElement>(".masonry-feed-canvas")!.style.height).toBe(height);
+  expect(container.querySelector<HTMLElement>(".masonry-feed-tile")!.style.width).toBe(width);
+});

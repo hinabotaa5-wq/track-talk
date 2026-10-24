@@ -134,7 +134,7 @@ export function NotificationBell() {
           if (willOpen) load(true);
           setOpen(willOpen);
         }}
-        className="relative inline-flex size-11 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 active:scale-[0.98]"
+        className={`relative inline-flex size-11 items-center justify-center rounded-full transition active:scale-[0.98] ${open ? "bg-white/20 text-white" : "text-slate-300 hover:bg-white/16"}`}
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (

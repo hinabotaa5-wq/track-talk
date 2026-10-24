@@ -77,6 +77,9 @@ describe("showsHeaderAccountActions", () => {
 });
 
 it("コーチやプランなどの詳細は共通ヘッダーに戻るを表示する", () => {
+  expect(showsBackButton("/admin")).toBe(true);
+  expect(hasBackOnlyHeader("/admin")).toBe(true);
+  expect(headerBackFallback("/admin")).toBe("/me");
   for (const path of ["/coaches", "/coaches/coach-1", "/coach", "/coach/apply", "/coach/about", "/coach/requests/request-1", "/coaching/new", "/coaching/requests/request-1", "/coaching/personal/contract-1", "/coaching/personal/plans/plan-1", "/competitions/major-domestic", "/prefectures/tokyo", "/admin/coaching/contract-1"]) {
     expect(showsBackButton(path), path).toBe(true);
     expect(hasBackOnlyHeader(path), path).toBe(true);

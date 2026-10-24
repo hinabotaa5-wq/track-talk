@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCurrentMainTab } from "./bottom-nav";
 import { HeaderAccountPanel } from "./header-account-panel";
+import { FeedbackBox } from "./feedback-box";
 import { NotificationBell } from "./notification-bell";
 import { SenseNoteComposer } from "./sense-notes";
 
@@ -43,22 +44,6 @@ async function click(el: Element | null) {
 }
 
 describe("ヘッダーの開閉", () => {
-  for (const admin of [true]) {
-    it(`${admin ? "管理" : "マイページ"}を同じアイコンで開閉し、Escapeでも閉じる`, async () => {
-      await act(async () => root.render(<HeaderAccountPanel admin={admin} signedIn />));
-      const button = container.querySelector("button");
-      expect(button?.getAttribute("aria-expanded")).toBe("false");
-      await click(button);
-      expect(button?.getAttribute("aria-expanded")).toBe("true");
-      expect(document.querySelector('[role="dialog"]')?.textContent).toContain("メニューの内容");
-      await click(button);
-      expect(document.querySelector('[role="dialog"]')).toBeNull();
-      await click(button);
-      await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
-      expect(button?.getAttribute("aria-expanded")).toBe("false");
-    });
-  }
-
   it("マイページは独立したページへ移動する", async () => {
     await act(async () => root.render(<HeaderAccountPanel signedIn />));
     expect(container.querySelector('a[aria-label="マイページ"]')?.getAttribute("href")).toBe("/me");
@@ -78,6 +63,20 @@ describe("ヘッダーの開閉", () => {
     expect(replace).toHaveBeenCalledWith("/injury?tab=data");
   });
 
+  it("マイページを開いている間はアイコンを選択状態にする", async () => {
+    pathname = "/me";
+    await act(async () => root.render(<HeaderAccountPanel signedIn />));
+    expect(container.querySelector("a")?.className).toContain("bg-white/20");
+  });
+
+  it("ご意見を開いている間はアイコンを選択状態にする", async () => {
+    await act(async () => root.render(<FeedbackBox />));
+    const button = container.querySelector("button");
+    expect(button?.className).not.toContain("bg-white/20");
+    await click(button);
+    expect(button?.className).toContain("bg-white/20");
+  });
+
   it("マイページでも元の下部タブの選択を保持する", async () => {
     function Selection() { return <span>{useCurrentMainTab("/me")}</span>; }
     sessionStorage.setItem("account-origin", "/injury?tab=data");
@@ -94,6 +93,7 @@ describe("ヘッダーの開閉", () => {
     const bell = container.querySelector("button");
     expect(bell?.getAttribute("aria-label")).toContain("未読1件");
     await click(bell);
+    expect(bell?.className).toContain("bg-white/20");
     const rows = [...document.querySelectorAll("li")];
     expect(rows[0].textContent).toContain("未読");
     expect(rows[1].textContent).toContain("既読");

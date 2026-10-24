@@ -73,11 +73,13 @@ function isMeSubPage(pathname: string) {
 
 // タブから開いた先の画面は共通ヘッダーで戻る。
 function isDetailPage(pathname: string) {
-  return pathname === "/coaches" || pathname === "/coach" ||
+  return pathname === "/coaches" || pathname === "/coach" || pathname === "/admin" ||
     ["/coaches/", "/coaching/", "/coach/", "/competitions/", "/prefectures/", "/guardian/", "/admin/"].some((prefix) => pathname.startsWith(prefix));
 }
 
 export function headerBackFallback(pathname: string) {
+  if (pathname === "/admin") return "/me";
+  if (pathname.startsWith("/admin/")) return "/admin";
   if (/^\/coaching\/personal\/plans\/[^/]+$/.test(pathname) || pathname.startsWith("/coaches/")) return "/coaches";
   if (pathname === "/coach/about") return "/coach/apply";
   if (pathname.startsWith("/coach/requests/")) return "/coach";

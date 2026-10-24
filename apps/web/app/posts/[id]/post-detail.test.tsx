@@ -14,13 +14,14 @@ function render(current = post, comments: Comment[] = []) {
   container.innerHTML = renderToStaticMarkup(createElement(PostDetail, { id: current.id, initial: { post: current, comments } }));
   return container;
 }
-it.each(["video", "youtube", "instagram"] as const)("%s の詳細文を動画より上に普通のサイズで表示し枠を付けない", (kind) => {
+it.each(["video", "youtube", "instagram"] as const)("%s の詳細文を動画より上に大きく太字で表示し枠を付けない", (kind) => {
   room = "";
   const container = render({ ...post, kind, youtube_video_id: "abcdefghijk", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e" });
   const description = container.querySelector(".post-description")!;
   const media = container.querySelector("video, iframe")!;
   expect(description.textContent).toBe(post.body);
-  expect(description.classList.contains("text-base")).toBe(true);
+  expect(description.classList.contains("text-lg")).toBe(true);
+  expect(description.classList.contains("font-bold")).toBe(true);
   expect(description.className).not.toMatch(/border|rounded|glass|bg-/);
   expect(description.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

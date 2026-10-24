@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({ json });
   });
 });
-test("詳細文を動画より上に通常サイズ・枠なしで表示する", async ({ page }) => {
+test("詳細文を動画より上に大きく太字で表示し、枠を付けない", async ({ page }) => {
   await page.goto(`/posts/${post.id}`);
   const description = page.locator(".post-description");
   await expect(description).toHaveText(post.body, { timeout: 15000 });
@@ -29,13 +29,15 @@ test("詳細文を動画より上に通常サイズ・枠なしで表示する",
   const video = await page.locator("main video").boundingBox();
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(video!.y);
   const style = await description.evaluate((element) => ({ font: getComputedStyle(element).fontSize, weight: getComputedStyle(element).fontWeight, border: getComputedStyle(element).borderTopWidth }));
-  expect(style).toEqual({ font: "16px", weight: "600", border: "0px" });
+  expect(style).toEqual({ font: "18px", weight: "700", border: "0px" });
   await page.screenshot({ path: test.info().outputPath("post-detail.png") });
 });
 test("320pxのチャットで長文を小さく折り返し、横にはみ出さない", async ({ page }) => {
   await page.goto(`/posts/${post.id}?room=long-comment`);
   const bubble = page.locator("#comment-long-comment p");
   await expect(bubble).toHaveText(longBody);
+  const threadTitle = page.locator("main h2").first();
+  expect(await threadTitle.evaluate((element) => getComputedStyle(element).textAlign)).toBe("center");
   const dimensions = await bubble.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth, font: getComputedStyle(element).fontSize, right: element.getBoundingClientRect().right }));
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
   expect(dimensions.right).toBeLessThanOrEqual(320);

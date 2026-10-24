@@ -6,7 +6,6 @@ import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
 import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
-import { HeaderCoachLink } from "./header-coach-link";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
 import { useCurrentMainTab, headerBackFallback, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
@@ -139,10 +138,6 @@ export function Header() {
                 );
               })}
             </nav>
-            {profile?.is_admin && showHeaderAccountActions ? (
-              <HeaderAccountPanel key={`admin:${pathname}`} admin signedIn={!!session} />
-            ) : null}
-            {showHeaderAccountActions ? <HeaderCoachLink /> : null}
             {pathname === "/" ? <TodayMeetBalloon /> : null}
             {session && showHeaderAccountActions ? (
               <>
