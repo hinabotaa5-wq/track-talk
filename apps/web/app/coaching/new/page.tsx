@@ -2,23 +2,23 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
+import { ArrowRight } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText } from "@/lib/api";
-import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachEventLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
   maxReviewSeconds,
   reviewEvents,
-  reviewFocusLabels,
-  reviewFocusOptions,
   reviewPayMethodLabels,
   tooLong,
   videoDuration,
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import type { CoachEvent, CoachingMe, CoachTier, ReviewEstimate, ReviewFocus, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingMe, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,9 +40,9 @@ export default function NewReviewRequestPage() {
   const router = useRouter();
   const [me, setMe] = useState<CoachingMe | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [tier, setTier] = useState<CoachTier>("coach");
+  const tier = "coach";
   const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
-  const [focus, setFocus] = useState<ReviewFocus[]>([]);
+  const [question, setQuestion] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
@@ -106,10 +106,6 @@ export default function NewReviewRequestPage() {
     };
   }, [token, tier, event, me?.demo]);
 
-  function toggleFocus(value: ReviewFocus) {
-    setFocus((current) => (current.includes(value) ? current.filter((f) => f !== value) : [...current, value]));
-  }
-
   async function onPickFile(picked: File | null) {
     setError("");
     setFile(picked);
@@ -122,8 +118,8 @@ export default function NewReviewRequestPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (focus.length === 0) {
-      setError("見てほしい点を1つ以上選んでください");
+    if (!question.trim()) {
+      setError("相談内容を記入してください");
       return;
     }
     if (!file) {
@@ -134,7 +130,7 @@ export default function NewReviewRequestPage() {
       setError("100MB以内の動画にしてください");
       return;
     }
-    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < (tier === "coach" ? 2 : 1)) {
+    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 2) {
       setError("チケットが不足しています。先に購入してから動画を選んでください。");
       return;
     }
@@ -150,7 +146,7 @@ export default function NewReviewRequestPage() {
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
-        body: JSON.stringify({ tier, event, focus, video_public_id: payload.public_id, method }),
+        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id, method }),
       });
       if (created.checkout_url) {
         window.location.href = created.checkout_url;
@@ -180,6 +176,9 @@ export default function NewReviewRequestPage() {
           </p>
         )}
         <h1 className="text-2xl font-bold">フォーム添削を頼む</h1>
+        <Link href="/coaches" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
+          コーチ一覧<ArrowRight className="size-4 text-blue-300" aria-hidden />
+        </Link>
       </div>
 
       {!me.demo ? (
@@ -201,20 +200,6 @@ export default function NewReviewRequestPage() {
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">誰に見てもらうか</legend>
-            <Link href="/coaches" className="text-xs text-blue-300 underline">
-              コーチ一覧を見る
-            </Link>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(coachTierLabels) as CoachTier[]).map((t) => (
-                <button key={t} type="button" aria-pressed={tier === t} onClick={() => setTier(t)} className={chip(tier === t)}>
-                  {coachTierLabels[t]}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">種目</legend>
             <div className="flex flex-wrap gap-2">
               {reviewEvents.map((value) => (
@@ -226,27 +211,18 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
           </fieldset>
 
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">見てほしい点(複数可)</legend>
-            <div className="flex flex-wrap gap-2">
-              {reviewFocusOptions.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={focus.includes(value)}
-                  onClick={() => toggleFocus(value)}
-                  className={chip(focus.includes(value))}
-                >
-                  {reviewFocusLabels[value]}
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <label className="block space-y-2 text-sm">
+            <span className="font-semibold">相談内容</span>
+            <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} maxLength={1000} required disabled={pending} placeholder="例：後半にスピードが落ちます。動画を見て、改善点や練習方法を教えてください。" />
+            <span className="block text-xs text-slate-300">{question.length}/1000文字</span>
+          </label>
 
           {ticketSummary ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
             <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
-            <p className="text-xs text-slate-300">この添削は{tier === "coach" ? 2 : 1}枚です。先に購入してから動画を選んでください。</p>
-            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="text-blue-300 underline">チケットを購入・確認する</Link>
+            <p className="text-xs text-slate-300">この添削は2枚です。先に購入してから動画を選んでください。</p>
+            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
+              チケットを購入・確認する<ArrowRight className="size-4 text-blue-300" aria-hidden />
+            </Link>
           </div> : null}
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">動画({maxReviewSeconds}秒まで)</span>
@@ -257,9 +233,6 @@ export default function NewReviewRequestPage() {
               onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
               disabled={pending}
             />
-            <span className="block text-xs text-slate-300">
-              ユニフォームの学校名やゼッケンなど、個人がわかるものが写らないようにしてください。動画はコーチだけが見られます。
-            </span>
           </label>
 
           {upload ? (
@@ -278,9 +251,9 @@ export default function NewReviewRequestPage() {
           ) : null}
           {estimate?.payments || (ticketSummary?.balance.available ?? 0) > 0 ? (
             <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate?.price_yen ?? (tier === "coach" ? 1000 : 500))}）</legend>
+              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate?.price_yen ?? 1200)}）</legend>
               <div className="flex flex-wrap gap-2">
-                {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（{tier === "coach" ? 2 : 1}枚）</button> : null}
+                {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
                 {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}
@@ -297,7 +270,7 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
           <Button type="submit" className="w-full" disabled={pending || !file}>
-            {pending ? "送っています" : method === "tickets" ? `チケット${tier === "coach" ? 2 : 1}枚を確保して送る` : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
+            {pending ? "送っています" : method === "tickets" ? "チケット2枚を確保して送る" : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
           </Button>
         </form>
       )}

@@ -1,9 +1,9 @@
-import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewPayMethod, ReviewStatus } from "./types";
+import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewPayMethod, ReviewRequest, ReviewStatus } from "./types";
 
 // 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す（API の reviewEvents と合わせる）。
 export const reviewEvents: CoachEvent[] = ["100m"];
 
-// 見てほしい点。並びは画面に出す順。自由記述は置かない（連絡先の受け渡しを防ぐため）。
+// 以前の依頼で選ばれた項目の表示名。
 export const reviewFocusLabels: Record<ReviewFocus, string> = {
   start: "スタート",
   acceleration: "加速",
@@ -15,7 +15,9 @@ export const reviewFocusLabels: Record<ReviewFocus, string> = {
   other: "その他",
 };
 
-export const reviewFocusOptions = Object.keys(reviewFocusLabels) as ReviewFocus[];
+export function reviewQuestionText(request: Pick<ReviewRequest, "question" | "focus">) {
+  return request.question || request.focus.map((focus) => reviewFocusLabels[focus]).join("、");
+}
 
 export const reviewStatusLabels: Record<ReviewStatus, string> = {
   awaiting_payment: "お支払い待ち",

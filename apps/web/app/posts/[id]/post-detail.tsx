@@ -491,7 +491,7 @@ export function PostDetail({
         </>
       ) : post.kind === "video" && post.playback_url ? (
         <ZoomableVideo
-          className="mx-auto h-auto max-h-[80dvh] w-auto max-w-full bg-black"
+          className="mx-auto h-auto max-h-[50dvh] w-auto max-w-full bg-black"
           src={post.playback_url}
           poster={post.thumbnail_url}
         />
@@ -507,9 +507,9 @@ export function PostDetail({
         <ZoomableImage
           src={post.thumbnail_url}
           alt={feedTitle(post.title)}
-          sizes="(max-width: 1024px) 100vw, 800px"
-          wrapperClassName="relative w-full overflow-hidden rounded-xl bg-black/25"
-          imageClassName="max-h-[70vh] w-full object-contain h-auto"
+          sizes="(max-width: 640px) 100vw, 560px"
+          wrapperClassName="relative mx-auto w-full max-w-[560px] overflow-hidden rounded-xl bg-black/25"
+          imageClassName="max-h-[50dvh] w-full object-contain h-auto"
           priority
         />
       ) : null}

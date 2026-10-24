@@ -335,7 +335,7 @@ export type GuardianPublic = CoachingGuardian & {
   default_limit_yen: number;
 };
 
-export type CoachTier = "coach" | "senpai";
+export type CoachTier = "coach";
 export type CoachEvent =
   | "100m"
   | "200m"
@@ -637,6 +637,7 @@ export type ReviewRequest = {
   tier: CoachTier;
   event: CoachEvent;
   focus: ReviewFocus[];
+  question?: string;
   status: ReviewStatus;
   due_at: string;
   created_at: string;

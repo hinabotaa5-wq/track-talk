@@ -167,7 +167,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 		if rr.Status != "returned" || rs.HiddenAt != nil {
 			return 0, 0, false, &ticketRuleError{"consultation_unavailable", "添削の返却・補足回答を待ってから相談できます"}
 		}
-		return 500, reviewSharePercent, false, nil
+		return ticketFaceYen, reviewSharePercent, false, nil
 	}
 	c := room.contract
 	if c.MessagesPurgedAt != nil || c.Status == "refunded" || c.Status == "suspended" {

@@ -303,7 +303,7 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{
 		"due_at": due, "coaches_on_duty": onDuty,
 		// payments が false のあいだは支払いなしのデモ版。
-		"payments": s.stripe.Configured(), "price_yen": reviewPrices[tier],
+		"payments": s.stripe.Configured(), "price_yen": reviewPriceYen,
 	})
 }
 
@@ -315,6 +315,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"tier":       rr.Tier,
 		"event":      rr.Event,
 		"focus":      rr.Focus,
+		"question":   rr.Question,
 		"status":     rr.Status,
 		"due_at":     rr.DueAt,
 		"created_at": rr.CreatedAt,

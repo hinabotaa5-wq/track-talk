@@ -730,7 +730,7 @@ func (q *Queries) LockTicketReservation(ctx context.Context, id uuid.UUID) (Coac
 }
 
 const lockTicketReview = `-- name: LockTicketReview :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests WHERE id = $1 FOR UPDATE
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketReview(ctx context.Context, id uuid.UUID) (ReviewRequest, error) {
@@ -749,6 +749,7 @@ func (q *Queries) LockTicketReview(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }

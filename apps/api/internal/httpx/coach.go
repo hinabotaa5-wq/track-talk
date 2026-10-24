@@ -25,7 +25,7 @@ var coachEvents = func() []string {
 }()
 
 func validCoachTier(tier string) bool {
-	return tier == "coach" || tier == "senpai"
+	return tier == "coach"
 }
 
 func validCoachStatus(status string) bool {
@@ -343,6 +343,7 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
 			StartOnFirstVideo: p.StartOnFirstVideo,
 			CompetitionName:   p.CompetitionName, CompetitionDate: p.CompetitionDate, SupportStartDate: p.SupportStartDate, CallCount: p.CallCount, CallMinutes: p.CallMinutes,
+			VenueArea: p.VenueArea, VenueName: p.VenueName, SessionCount: p.SessionCount, SessionMinutes: p.SessionMinutes, TravelFeeYen: p.TravelFeeYen, MaxParticipants: p.MaxParticipants,
 			ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 		})
 		plan["full"] = p.ActiveCount >= int32(p.Capacity)

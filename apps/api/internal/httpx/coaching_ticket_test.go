@@ -59,7 +59,7 @@ func payTicketPurchase(t *testing.T, h http.Handler, id string, amount int) {
 func buyFiveTickets(t *testing.T, h http.Handler, tok string) string {
 	t.Helper()
 	id := startTicketPurchase(t, h, tok, "five", uuid.NewString(), "/coaching/new")
-	payTicketPurchase(t, h, id, 2400)
+	payTicketPurchase(t, h, id, 2880)
 	return id
 }
 func ticketReview(t *testing.T, h http.Handler, tok string) string {
@@ -116,8 +116,8 @@ func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
 	if rec.Code != 500 || ticketSummary(t, h, tu).Balance.Available != 0 {
 		t.Fatalf("incorrect amount credited: %d", rec.Code)
 	}
-	payTicketPurchase(t, h, id, 2400)
-	payTicketPurchase(t, h, id, 2400)
+	payTicketPurchase(t, h, id, 2880)
+	payTicketPurchase(t, h, id, 2880)
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 5 {
 		t.Fatalf("credit %d", got)
 	}
@@ -164,7 +164,7 @@ func TestTicketsReservedConsumedAndReleasedWithFixedEarnings(t *testing.T) {
 	}
 	var gross, earnings int
 	queryRowArgs(t, `SELECT gross_yen,amount_yen FROM coach_earnings WHERE review_request_id=$1 AND coach_id=$2`, []any{id, coach}, &gross, &earnings)
-	if gross != 1000 || earnings != 700 {
+	if gross != 1200 || earnings != 840 {
 		t.Fatalf("discount affected earnings %d %d", gross, earnings)
 	}
 	if len(f.captured) != 0 || len(f.refunds) != 0 {
@@ -257,7 +257,7 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
 	}
 	state := ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 1440 || len(f.refunds) != 1 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 1728 || len(f.refunds) != 1 {
 		t.Fatalf("refund %+v remote %v", state, f.refunds)
 	}
 	// 外部返金後にローカル確定だけ失敗した状態を再現する。操作IDで検索し、2回目の返金を作らない。
@@ -267,7 +267,7 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if len(f.refunds) != 1 || state.Purchases[0].RefundedYen != 1440 {
+	if len(f.refunds) != 1 || state.Purchases[0].RefundedYen != 1728 {
 		t.Fatalf("duplicate refund %+v remote %v", state, f.refunds)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 422 {
@@ -285,18 +285,18 @@ func TestTicketGuardianConsentLimitsAndNoDoubleChargeOnUse(t *testing.T) {
 		t.Fatalf("missing consent %d %s", rec.Code, rec.Body.String())
 	}
 	gt := issueGuardianLink(t, h, tu, guardianEmail())
-	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/consent", "", map[string]any{"guardian_name": "保護者", "relationship": "mother", "agree": true, "monthly_limit_yen": 3000}); rec.Code != 200 {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/consent", "", map[string]any{"guardian_name": "保護者", "relationship": "mother", "agree": true, "monthly_limit_yen": 5000}); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	buyFiveTickets(t, h, tu)
-	// 2400円購入済み。追加の2400円購入は不可、500円は可。
+	// 2880円購入済み。追加の2880円購入は不可、600円は可。
 	body["request_key"] = uuid.NewString()
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tu, body); rec.Code != 422 || !strings.Contains(rec.Body.String(), "monthly_limit") {
 		t.Fatalf("monthly cap %d %s", rec.Code, rec.Body.String())
 	}
 	single := startTicketPurchase(t, h, tu, "single", uuid.NewString(), "/coaching/new")
-	payTicketPurchase(t, h, single, 500)
-	ticketReview(t, h, tu) // 2900円購入済みでも使用時に1000円を二重計上しない。
+	payTicketPurchase(t, h, single, 600)
+	ticketReview(t, h, tu) // 3480円購入済みでも使用時に1200円を二重計上しない。
 	execSQLArgs(t, `UPDATE guardian_consents SET status='revoked' WHERE minor_id=$1`, minor)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, func() map[string]any { b := reviewBodyFor(t, h, tu); b["method"] = "tickets"; return b }()); rec.Code != 422 {
 		t.Fatalf("revoked use %d", rec.Code)
@@ -315,7 +315,7 @@ func TestTicketRefundExcludesReservedAndCanRefundAfterRelease(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state := ticketSummary(t, h, tu)
-	if state.Balance.Reserved != 2 || state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 1440 {
+	if state.Balance.Reserved != 2 || state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 1728 {
 		t.Fatalf("reserved refund %+v", state)
 	}
 	execSQLArgs(t, `UPDATE review_requests SET due_at=now()-interval '1 minute' WHERE id=$1`, review)
@@ -326,7 +326,7 @@ func TestTicketRefundExcludesReservedAndCanRefundAfterRelease(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2400 || state.Purchases[0].Status != "refunded" || len(f.refunds) != 2 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2880 || state.Purchases[0].Status != "refunded" || len(f.refunds) != 2 {
 		t.Fatalf("full refund %+v", state)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -344,7 +344,7 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, map[string]any{"confirm": "退会する"}); rec.Code != 200 {
 		t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 	}
-	payTicketPurchase(t, h, purchase, 500)
+	payTicketPurchase(t, h, purchase, 600)
 	if rec := tick(t, h, "tick-secret"); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
@@ -353,7 +353,7 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 	if status != "refunded" || len(f.refunds) != 1 {
 		t.Fatalf("orphan payment %s %v", status, f.refunds)
 	}
-	payTicketPurchase(t, h, purchase, 500)
+	payTicketPurchase(t, h, purchase, 600)
 	if len(f.refunds) != 1 {
 		t.Fatal("duplicate orphan refund")
 	}
@@ -392,7 +392,7 @@ func TestTicketPendingRefundFailureRestoresBalance(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2400 || len(f.refunds) != 2 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2880 || len(f.refunds) != 2 {
 		t.Fatalf("retry refund %+v", state)
 	}
 	assertTicketAccounting(t, h, admin)

@@ -8,7 +8,7 @@ import { ReviewCoachCard, ReviewResponseView } from "@/components/review-respons
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { helpfulLabels, reviewFocusLabels, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
+import { helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
 import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -275,8 +275,8 @@ function ReviewRequestView() {
           <dd>{coachEventLabels[request.event]}</dd>
         </div>
         <div>
-          <dt className="text-xs text-slate-300">見てほしい点</dt>
-          <dd>{request.focus.map((f) => reviewFocusLabels[f]).join("、")}</dd>
+          <dt className="text-xs text-slate-300">相談内容</dt>
+          <dd className="whitespace-pre-wrap break-words">{reviewQuestionText(request)}</dd>
         </div>
       </dl>
 

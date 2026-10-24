@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
+import { readAccountOrigin } from "@/lib/account-origin";
 import { usePathname } from "next/navigation";
 import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
@@ -40,12 +42,20 @@ export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn
 
 export function activeMainTab(pathname: string) {
   if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
-  if (pathname === "/coaching") return "coaching";
+  if (pathname === "/coaching" || pathname === "/coaches" || pathname.startsWith("/coaches/")) return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/")) return "injury";
   if (pathname === "/memo") return "memo";
   if (pathname === "/me") return "me";
   return "";
+}
+
+const noSubscribe = () => () => {};
+export function useCurrentMainTab(pathname: string) {
+  const origin = useSyncExternalStore(noSubscribe, readAccountOrigin, () => "/");
+  return pathname === "/me" || pathname === "/login"
+    ? activeMainTab(origin.split("?")[0]) || "home"
+    : activeMainTab(pathname);
 }
 
 const injuryGroupPathPattern = /^\/injury\/([^/]+)$/;
@@ -64,6 +74,7 @@ function isMeSubPage(pathname: string) {
 // ヘッダーを「戻る」ボタンだけにする画面。ロゴ・大会などのメニュー・通知は出さない。
 // 下のメニューの「マイページ」から開いたログイン画面(next なし)は、ふつうのヘッダーのまま。
 export function hasBackOnlyHeader(pathname: string, search = "") {
+  if (pathname === "/coaches") return true;
   if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (isMeSubPage(pathname)) return true;
@@ -80,6 +91,7 @@ export function hidesHeader(pathname: string, search = "", mustSetProfile = fals
 
 // search は "?next=/upload" のような URL のクエリ部分。
 export function showsBackButton(pathname: string, search = "") {
+  if (pathname === "/coaches") return true;
   if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   // 投稿の＋などログインが要るページから送られてきたときは、元の画面に戻れるようにする。
   // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。
@@ -124,9 +136,8 @@ export function BottomNav() {
   const pathname = usePathname();
   const { session } = useAuth();
   const guardedClick = useGuardedLinkClick();
+  const current = useCurrentMainTab(pathname);
   if (hidesBottomNav(pathname)) return null;
-
-  const current = activeMainTab(pathname);
 
   return (
     <>

@@ -103,15 +103,13 @@ function TicketsPage() {
         <p className="text-xl font-bold">利用できるチケット：{summary.balance.available}枚</p>
         <p className="text-sm text-slate-300">添削のために確保中：{summary.balance.reserved}枚</p>
       </div>
-      <p className="text-sm text-slate-200">コーチの動画添削は2枚、社会人・大学生の動画添削は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。</p>
-      <p className="text-xs text-slate-300">有効期限はありません。未使用分の返金はお問い合わせからご相談ください。依頼のために確保中の分は返金対象に含みません。</p>
+      <p className="text-sm text-slate-200">動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。</p>
       {summary.purchase_block_reason ? <p className="text-sm text-amber-300">{summary.purchase_block_reason} <Link href="/me/coaching" className="underline">利用設定</Link></p> : null}
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
         <p className="text-xs text-slate-300">1枚あたり{formatYen(p.amount_yen / p.quantity)}</p>
         <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => void buy(p.id)}>購入する</Button>
       </div>)}</div>
-      <Link href={returnPath === "/me/coaching/tickets" ? "/coaching/new" : returnPath} className="block text-sm text-blue-300 underline">相談の画面に戻る</Link>
       <section className="space-y-2"><h2 className="font-semibold">購入履歴</h2>
         {(summary.purchases ?? []).length === 0 ? <p className="text-sm text-slate-300">まだ購入はありません</p> : null}
         <ul className="space-y-2">{(summary.purchases ?? []).map((p) => <li key={p.id} className="rounded-lg border border-white/15 p-3 text-sm">

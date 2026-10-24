@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
-import { reviewFocusLabels } from "@/lib/review";
+import { reviewQuestionText } from "@/lib/review";
 import type { CoachApplication, CoachingMe, CoachRatingSummary, CoachRequests, CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -34,7 +34,7 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
       <p className="font-semibold text-white">
         {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
       </p>
-      <p className="text-sm text-slate-200">見てほしい点: {request.focus.map((f) => reviewFocusLabels[f]).join("、")}</p>
+      <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
       <p className="text-xs text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
     </div>
   );

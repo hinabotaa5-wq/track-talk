@@ -847,6 +847,7 @@ type ReviewRequest struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	ReturnedAt    *time.Time `json:"returned_at"`
+	Question      string     `json:"question"`
 }
 
 type ReviewResponse struct {

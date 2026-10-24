@@ -30,7 +30,7 @@ function Details({ group }: { group: InjuryPublicGroup }) {
   return (
     <div className="space-y-4">
       {questionsOf(group).map((q) => (
-        <Bars key={q.short} title={q.title} tally={q.tally} top={3} />
+        <Bars key={q.short} title={q.title} tally={q.tally} top={3} hidePeople />
       ))}
     </div>
   );
@@ -41,24 +41,23 @@ function hasData(group: InjuryPublicGroup) {
 }
 
 // 全体のデータ。質問ごとの上位3つを出す。
-function OverallCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
+function OverallCard({ group }: { group: InjuryPublicGroup }) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-lg font-bold">{group.body_part_label}</h2>
-        <span className="text-sm text-slate-300">{group.members}人</span>
       </div>
       {hasData(group) ? (
         <Details group={group} />
       ) : (
-        <p className="text-sm text-slate-400">{min}人そろうと表示</p>
+        <p className="text-sm text-slate-400">データが集まると表示します</p>
       )}
     </section>
   );
 }
 
 // ケガごとのデータ。並べると長くなるので、閉じた状態で要点だけ見せ、開くと詳しく見られる。
-function GroupCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
+function GroupCard({ group }: { group: InjuryPublicGroup }) {
   const ready = hasData(group);
   const first = topItem(group.pre_changes) ?? topItem(group.activities);
   return (
@@ -67,11 +66,10 @@ function GroupCard({ group, min }: { group: InjuryPublicGroup; min: number }) {
         <span className="min-w-0">
           <span className="block font-bold">{group.body_part_label}</span>
           <span className="mt-0.5 block text-xs text-slate-300">
-            {ready ? (first ? `多かったのは「${first.label}」` : "データを見る") : `${min}人そろうと表示`}
+            {ready ? (first ? `多かったのは「${first.label}」` : "データを見る") : `$データが集まると表示します`}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1 text-sm text-slate-300">
-          {group.members}人
           <ChevronDown className="size-4 transition group-open:rotate-180" aria-hidden />
         </span>
       </summary>
@@ -103,7 +101,7 @@ export function DataView() {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <p className="text-sm text-slate-200">ケガをした人の経験を、まだケガをしていない人の予防に</p>
+        <p className="text-sm text-slate-200">みんなの経験を自分のケガ対策に活かそう！</p>
       </div>
 
       {failed ? (
@@ -114,12 +112,12 @@ export function DataView() {
         <EmptyState title="まだデータがありません" body="共有のグループに参加する人が増えると、ここに集計が出ます。" />
       ) : (
         <>
-          <OverallCard group={data.overall} min={data.min_people} />
+          <OverallCard group={data.overall} />
           <h2 className="pt-2 text-base font-bold">ケガごとのデータ</h2>
           <ul className="grid items-start gap-3 sm:grid-cols-2">
             {data.groups.map((group) => (
               <li key={group.body_part}>
-                <GroupCard group={group} min={data.min_people} />
+                <GroupCard group={group} />
               </li>
             ))}
           </ul>

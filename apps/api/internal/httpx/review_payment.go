@@ -20,8 +20,8 @@ import (
 // カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
 // PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する。
 
-// reviewPrices は、1本の値段（円）。online-coaching/design-review.md の送る画面の案のとおり。
-var reviewPrices = map[string]int32{"coach": 1000, "senpai": 500}
+// ランダム添削はチケット2枚分の共通料金。
+const reviewPriceYen int32 = 2 * ticketFaceYen
 
 // 保護者が月の上限を選ぶ前の上限（design-review.md「18歳未満の支払い」）。
 const defaultMinorMonthlyLimit = 3000
@@ -70,13 +70,10 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
-	price := reviewPrices[rr.Tier]
+	price := reviewPriceYen
 	id := uuid.New()
 	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
 	name := "フォーム添削（コーチ）"
-	if rr.Tier == "senpai" {
-		name = "フォーム添削（社会人・大学生・上司）"
-	}
 	params := stripe.CheckoutParams{
 		Name:           name,
 		AmountYen:      int(price),
@@ -175,7 +172,7 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	if err == nil && (consent.Status == "declined" || consent.Status == "revoked") {
 		return "", "guardian_declined", "保護者の同意がないため、フォーム添削は使えません", nil
 	}
-	msg, err = s.minorMonthlyBlock(ctx, q, p.ID, rr.ID, reviewPrices[rr.Tier])
+	msg, err = s.minorMonthlyBlock(ctx, q, p.ID, rr.ID, reviewPriceYen)
 	if err != nil {
 		return "", "", "", err
 	}

@@ -40,3 +40,18 @@ it("最初の投稿だけで画面が埋まらない場合は、続きを補う"
   await render(next);
   expect(next).toHaveBeenCalledTimes(1);
 });
+
+it("詳細を開いて一覧を作り直しても横位置を復元する", async () => {
+  vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) { return Number.parseFloat(this.style.left) || 0; });
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) { return Number.parseFloat(this.style.width) || 0; });
+  const content = <MasonryFeed storageKey="restore-test" ratios={[1, 1, 1, 1, 1, 1]}>{Array.from({ length: 6 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  const track = container.querySelector('[role="region"]') as HTMLDivElement;
+  track.scrollLeft = 400;
+  track.dispatchEvent(new Event("scroll"));
+  await act(async () => root.render(null));
+  await act(async () => root.render(content));
+  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+  expect((container.querySelector('[role="region"]') as HTMLDivElement).scrollLeft).toBe(400);
+});

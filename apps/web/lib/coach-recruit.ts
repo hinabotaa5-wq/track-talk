@@ -5,7 +5,6 @@ export const coachApplyPath = "/coach/apply";
 
 export const coachTierLabels: Record<CoachTier, string> = {
   coach: "コーチ",
-  senpai: "社会人・大学生",
 };
 
 // 担当種目。並びは画面に出す順。

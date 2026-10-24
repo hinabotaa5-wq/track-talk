@@ -3,7 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { HomeFeed } from "./home-feed";
-import { loadHomeFeed } from "@/lib/home-feed-cache";
+import { loadHomeFeed, readHomeFeedChunks } from "@/lib/home-feed-cache";
 import type { PostsPage } from "@/lib/fetch-posts";
 import type { Post } from "@/lib/types";
 
@@ -12,6 +12,9 @@ vi.mock("@/lib/home-feed-cache", () => ({
   isFeedFresh: () => true,
   loadHomeFeed: vi.fn(),
   prefetchHomeFeeds: vi.fn(),
+  readHomeFeedChunks: vi.fn(),
+  saveHomeFeedChunks: vi.fn(),
+  homeFeedGeneration: () => 0,
 }));
 vi.mock("./feed-card", () => ({ FeedCard: ({ post }: { post: Post }) => <a href={`/posts/${post.id}`}>{post.title}</a> }));
 vi.mock("./masonry-feed", () => ({ MasonryFeed: ({ children, onEndReached }: { children: ReactNode; onEndReached?: () => void }) => <div><button data-end onClick={() => onEndReached?.()}>末尾付近へ</button>{children}</div> }));
@@ -66,4 +69,14 @@ it("並び替え後に前の追加取得が届いても、新しい一覧へ混�
   await act(async () => root.render(<HomeFeed key="popular" sort="popular" q="" page={1} initial={chunk(1, ["popular"])} />));
   await act(async () => finish(chunk(2, ["old-response"])));
   expect(ids()).toEqual(["popular"]);
+});
+
+it("詳細から戻ったときは追加ページを復元し、その続きから読み込む", async () => {
+  vi.mocked(readHomeFeedChunks).mockReturnValueOnce([chunk(1, ["a"]), chunk(2, ["b"])]);
+  request.mockResolvedValueOnce(chunk(3, ["c"]));
+  await act(async () => root.render(<HomeFeed sort="new" q="" page={1} initial={chunk(1, ["a"])} />));
+  expect(ids()).toEqual(["a", "b"]);
+  await act(async () => end());
+  expect(request).toHaveBeenCalledWith(expect.stringContaining("page=3"));
+  expect(ids()).toEqual(["a", "b", "c"]);
 });

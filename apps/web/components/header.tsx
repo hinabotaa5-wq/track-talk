@@ -8,7 +8,7 @@ import { FeedbackBox } from "./feedback-box";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
-import { activeMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
+import { useCurrentMainTab, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
@@ -85,7 +85,7 @@ export function Header() {
     if (!confirmLeave(go)) go();
   }
 
-  const current = activeMainTab(pathname);
+  const current = useCurrentMainTab(pathname);
 
   // ヘッダーを出さない画面でも、iPhone の上の切り欠きに中身が重ならないよう余白だけ残す。
   if (hidesHeader(pathname, search, profileIncomplete(profile))) return <div aria-hidden style={{ paddingTop: "env(safe-area-inset-top)" }} />;

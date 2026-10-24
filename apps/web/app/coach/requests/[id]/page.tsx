@@ -15,7 +15,7 @@ import {
   clarifyReasonLabels,
   maxResponseChars,
   maxReviewSeconds,
-  reviewFocusLabels,
+  reviewQuestionText,
   tooLong,
   videoDuration,
 } from "@/lib/review";
@@ -221,7 +221,7 @@ export default function CoachReviewRequestPage() {
         <h1 className="text-2xl font-bold">
           {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
         </h1>
-        <p className="text-sm text-slate-200">見てほしい点: {request.focus.map((f) => reviewFocusLabels[f]).join("、")}</p>
+        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
         {request.status === "in_review" ? (
           <p className="text-sm text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
         ) : null}

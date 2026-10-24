@@ -652,12 +652,12 @@ export function TrialBadge() {
   );
 }
 
-// PublicPlanList は、コーチ一覧のカードに出すプラン。
+// PublicPlanList は、コーチ詳細に出す公開中の指名プラン。
 export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
   if (plans.length === 0) return null;
   return (
     <div className="space-y-1.5 border-t border-white/15 pt-2">
-      <p className="text-xs text-slate-300">パーソナル指導</p>
+      <p className="text-xs text-slate-300">公開中のプラン</p>
       <ul className="space-y-2">
         {sortTrialFirst(plans).map((p) => (
           <li key={p.id} className={`rounded-lg p-2 ${p.kind === "trial" ? "border border-blue-400/40 bg-blue-500/10" : "bg-white/5"}`}>

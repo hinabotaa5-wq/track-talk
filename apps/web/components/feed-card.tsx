@@ -132,10 +132,10 @@ export function FeedCard({ post, returnTo, thumbnailOnly = false }: { post: Post
         ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
           <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={cardTitle || title || "Instagram"} />
         ) : (
-          <PosterFallback title={title} excerpt={post.excerpt} />
+          <PosterFallback title={title} excerpt={post.excerpt || post.body} />
         )}
       </div>
-      {hasFeedTitle(cardTitle) && !(post.kind === "text" && post.thumbnail_url) ? <CardTitle title={cardTitle} /> : null}
+      {hasFeedTitle(cardTitle) && post.kind !== "text" ? <CardTitle title={cardTitle} /> : null}
     </Link>
   );
 }

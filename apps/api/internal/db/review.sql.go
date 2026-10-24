@@ -20,7 +20,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'offered'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
 `
 
 type AcceptReviewRequestParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewReque
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
@@ -183,9 +184,9 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 }
 
 const createReviewRequest = `-- name: CreateReviewRequest :one
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
 `
 
 type CreateReviewRequestParams struct {
@@ -197,6 +198,7 @@ type CreateReviewRequestParams struct {
 	VideoPublicID string    `json:"video_public_id"`
 	DueAt         time.Time `json:"due_at"`
 	Status        string    `json:"status"`
+	Question      string    `json:"question"`
 }
 
 // status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
@@ -210,6 +212,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		arg.VideoPublicID,
 		arg.DueAt,
 		arg.Status,
+		arg.Question,
 	)
 	var i ReviewRequest
 	err := row.Scan(
@@ -225,6 +228,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
@@ -329,7 +333,7 @@ func (q *Queries) ExpireStaleReviewOffers(ctx context.Context) ([]uuid.UUID, err
 }
 
 const getReviewRequest = `-- name: GetReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
 WHERE id = $1
 `
 
@@ -349,12 +353,13 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }
 
 const listCoachOpenOffers = `-- name: ListCoachOpenOffers :many
-SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at
+SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question
 FROM review_offers o
 JOIN review_requests r ON r.id = o.request_id
 WHERE o.coach_id = $1
@@ -393,6 +398,7 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 			&i.ReviewRequest.CreatedAt,
 			&i.ReviewRequest.UpdatedAt,
 			&i.ReviewRequest.ReturnedAt,
+			&i.ReviewRequest.Question,
 		); err != nil {
 			return nil, err
 		}
@@ -405,7 +411,7 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 }
 
 const listCoachReviewing = `-- name: ListCoachReviewing :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
 WHERE coach_id = $1::uuid
   AND status IN ('in_review', 'clarifying')
 ORDER BY due_at
@@ -433,6 +439,7 @@ func (q *Queries) ListCoachReviewing(ctx context.Context, coachID uuid.UUID) ([]
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ReturnedAt,
+			&i.Question,
 		); err != nil {
 			return nil, err
 		}
@@ -485,7 +492,7 @@ func (q *Queries) ListDemoCodes(ctx context.Context) ([]ListDemoCodesRow, error)
 }
 
 const listMyReviewRequests = `-- name: ListMyReviewRequests :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
 WHERE requester_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -519,6 +526,7 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ReturnedAt,
+			&i.Question,
 		); err != nil {
 			return nil, err
 		}
@@ -587,7 +595,7 @@ func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOff
 }
 
 const lockQueuedReviewRequest = `-- name: LockQueuedReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
 WHERE id = $1
   AND status = 'queued'
   AND due_at > now()
@@ -610,6 +618,7 @@ func (q *Queries) LockQueuedReviewRequest(ctx context.Context, id uuid.UUID) (Re
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReturnedAt,
+		&i.Question,
 	)
 	return i, err
 }

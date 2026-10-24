@@ -78,7 +78,7 @@ func TestCoachingUpgradePreservesLegacyData(t *testing.T) {
  ('00000000-0000-0000-0000-000000000001','旧コーチ'),
  ('00000000-0000-0000-0000-000000000002','旧利用者');
  INSERT INTO coach_profiles(profile_id,tier,events,best_record,achievements,years,pledged_at,pledge_version)
- VALUES ('00000000-0000-0000-0000-000000000001','coach',ARRAY['100m'],'10秒','実績',10,now(),1);
+ VALUES ('00000000-0000-0000-0000-000000000001','senpai',ARRAY['100m'],'10秒','実績',10,now(),1);
  INSERT INTO coaching_plans(id,coach_id,kind,title,description,duration_days,price_yen,capacity,video_reviews,reply_formats)
  VALUES ('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','period','旧プラン','旧説明',30,8000,5,3,ARRAY['text','video']);
  INSERT INTO coaching_contracts(id,plan_id,coach_id,requester_id,plan_kind,plan_title,duration_days,price_yen,event,goal,current_record,message,minor,status,respond_by,starts_at,ends_at,video_reviews,reply_formats,payment_required)
@@ -88,7 +88,7 @@ func TestCoachingUpgradePreservesLegacyData(t *testing.T) {
  INSERT INTO coaching_payments(id,contract_id,payer,amount_yen,checkout_session_id,checkout_url,session_expires_at,payment_intent_id,status,paid_at)
  VALUES ('00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000004','requester',7000,'cs_legacy','https://example.test',now(),'pi_legacy','paid',now());
  INSERT INTO review_requests(id,requester_id,tier,event,focus,video_public_id,due_at)
- VALUES ('00000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000002','coach','100m',ARRAY['start'],'legacy-video',now()+interval '2 days');
+ VALUES ('00000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000002','senpai','100m',ARRAY['start'],'legacy-video',now()+interval '2 days');
  INSERT INTO review_payments(id,request_id,payer_id,method,amount_yen,checkout_session_id,checkout_url,session_expires_at,payment_intent_id,status)
  VALUES ('00000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000002','card',1000,'cs_legacy_review','https://example.test',now(),'pi_legacy_review','authorized');
  `)
@@ -124,6 +124,9 @@ func TestCoachingUpgradePreservesLegacyData(t *testing.T) {
 			t.Fatal(err)
 		}
 		for key, want := range before[table] {
+			if key == "tier" {
+				want = "coach"
+			}
 			if !reflect.DeepEqual(after[key], want) {
 				t.Errorf("%s.%s changed: %v -> %v", table, key, want, after[key])
 			}

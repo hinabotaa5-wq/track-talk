@@ -43,8 +43,8 @@ WHERE requester_id = $1;
 
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: ListMyReviewRequests :many

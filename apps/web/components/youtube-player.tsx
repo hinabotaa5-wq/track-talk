@@ -8,8 +8,8 @@ export function YouTubePlayer({ videoId, title, shorts }: { videoId: string; tit
     <iframe
       className={
         shorts
-          ? "mx-auto aspect-[9/16] max-h-[70vh] w-full max-w-[39.375vh] rounded-xl bg-black shadow-sm"
-          : "aspect-video w-full rounded-xl bg-black shadow-sm"
+          ? "mx-auto aspect-[9/16] max-h-[50dvh] w-full max-w-[28.125dvh] rounded-xl bg-black shadow-sm"
+          : "mx-auto aspect-video w-full max-w-[560px] rounded-xl bg-black shadow-sm"
       }
       src={`${youtubeOrigin}/embed/${videoId}?playsinline=1&rel=0&cc_load_policy=0`}
       title={title}

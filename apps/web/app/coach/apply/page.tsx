@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// コーチ（社会人・大学生を含む）の応募。集めるのは担当種目・記録・成績・競技年数だけ。
+// コーチの応募。集めるのは担当種目・記録・成績・競技年数だけ。
 // 運営が審査し、結果はこの画面と通知で伝える。
 
 type Draft = {
@@ -42,7 +42,7 @@ const statusNotes: Record<CoachApplication["status"], string> = {
 
 function draftFrom(a: CoachApplication): Draft {
   return {
-    tier: a.tier,
+    tier: "coach",
     events: a.events,
     best_record: a.best_record,
     achievements: a.achievements,
@@ -184,24 +184,6 @@ export default function CoachApplyPage() {
 
       {editable ? (
         <form onSubmit={onSubmit} className="space-y-5">
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">応募する枠</legend>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(coachTierLabels) as CoachTier[]).map((tier) => (
-                <button
-                  key={tier}
-                  type="button"
-                  aria-pressed={draft.tier === tier}
-                  onClick={() => setDraft((d) => ({ ...d, tier }))}
-                  className={chip(draft.tier === tier)}
-                >
-                  {coachTierLabels[tier]}
-                </button>
-              ))}
-            </div>
-            {fieldError("tier")}
-          </fieldset>
-
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">担当種目(複数可)</legend>
             <div className="flex flex-wrap gap-2">

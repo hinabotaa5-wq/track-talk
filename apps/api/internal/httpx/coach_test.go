@@ -26,7 +26,7 @@ type coachMeView struct {
 
 func coachApplicationBody() map[string]any {
 	return map[string]any{
-		"tier":         "senpai",
+		"tier":         "coach",
 		"events":       []string{"110mh", "100m", "100m", "relay"},
 		"best_record":  "100m 10秒95（2025年）",
 		"achievements": "インターハイ 100m 準決勝",
