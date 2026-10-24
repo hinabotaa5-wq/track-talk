@@ -165,7 +165,9 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track).toBeVisible();
-  await expect(track.getByRole("link")).toHaveCount(6);
+  // 画面の空き具合によっては、最初の操作より前に2ページ目まで補う。
+  await expect(track.locator('a[href="/posts/horizontal-1"]')).toBeVisible();
+  await expect.poll(async () => Number(await track.locator(".masonry-feed-canvas").getAttribute("data-count"))).toBeGreaterThanOrEqual(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   await expect.poll(() => track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   const first = track.getByRole("link").first();
