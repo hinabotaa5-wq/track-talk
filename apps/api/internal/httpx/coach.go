@@ -237,7 +237,6 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	// 古い画面は名前を送らない。明示された名前だけ検証し、未送信なら従来の表示名を維持する。
 	name := ""
 	if req.Name != nil {
 		name = strings.TrimSpace(*req.Name)
@@ -245,10 +244,8 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	req.BestRecord = strings.TrimSpace(req.BestRecord)
 	req.Achievements = strings.TrimSpace(req.Achievements)
 	fields := map[string]string{}
-	if req.Name != nil {
-		if e := coachPublicTextError("名前", name, 80); e != "" {
-			fields["name"] = e
-		}
+	if e := coachPublicTextError("名前", name, 80); e != "" {
+		fields["name"] = e
 	}
 	if !validCoachTier(req.Tier) {
 		fields["tier"] = "応募する枠を選んでください"

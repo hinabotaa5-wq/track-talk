@@ -361,14 +361,14 @@ func TestCoachApplicationNameValidation(t *testing.T) {
 	}
 }
 
-func TestLegacyCoachApplicationPreservesName(t *testing.T) {
+func TestCoachApplicationRequiresNameOnCreateAndUpdate(t *testing.T) {
 	h := setup(t)
 	ta := token(t, uuid.New())
 	body := coachApplicationBody()
 	delete(body, "name")
 	rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy application %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"name"`) {
+		t.Fatalf("missing name on create %d %s", rec.Code, rec.Body.String())
 	}
 	body["name"] = "コーチの公開名"
 	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
@@ -377,7 +377,7 @@ func TestLegacyCoachApplicationPreservesName(t *testing.T) {
 	}
 	delete(body, "name")
 	rec = doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"コーチの公開名"`) {
-		t.Fatalf("legacy update preserves name %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"name"`) {
+		t.Fatalf("missing name on update %d %s", rec.Code, rec.Body.String())
 	}
 }

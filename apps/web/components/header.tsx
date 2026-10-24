@@ -80,6 +80,7 @@ export function Header() {
   function goBack() {
     const go = () => {
       if (pathname === "/coach/apply") router.replace("/coach");
+      else if (pathname === "/coach/about") router.replace("/coach/apply");
       else if (window.history.length > 1) router.back();
       else router.replace(headerBackFallback(pathname));
     };

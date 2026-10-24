@@ -9,11 +9,6 @@ const meet = {
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => {
-    // 自動で出る大会の案内を閉じ、各アイコンの操作を確かめる。
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-    sessionStorage.setItem("today-meet-balloon:closed", today);
-  });
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
@@ -27,6 +22,22 @@ test.beforeEach(async ({ page }) => {
     else if (path.endsWith("/posts")) body = { posts: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } };
     await route.fulfill({ json: body });
   });
+});
+
+test("今日の大会は自動で開かず、タップした時だけ表示する", async ({ page }) => {
+  await page.goto("/");
+  const trophy = page.getByRole("button", { name: "今日開催中の大会", exact: true });
+  const dialog = page.getByRole("dialog", { name: "今日開催中の大会", exact: true });
+  await expect(trophy).toBeVisible();
+  await expect(trophy).toHaveAttribute("aria-expanded", "false");
+  await expect(dialog).toHaveCount(0);
+  await trophy.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "閉じる" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
+  await expect(trophy).toBeVisible();
+  await expect(dialog).toHaveCount(0);
 });
 
 test("ホームの大会をヘッダーに集約し、未ログインのマイページはログインへ移動する", async ({ page }) => {

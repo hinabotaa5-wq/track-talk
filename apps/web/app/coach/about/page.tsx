@@ -54,7 +54,7 @@ export default function CoachAboutPage() {
           <li>承認後も公開までは準備中です。「コーチ」タブの「コーチ専用画面」から、承認状況や顔写真を確認できます。活動開始の方法は公開時に案内します。</li>
         </ol>
       </section>
-      <Link href="/coach/apply" className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
+      <Link href="/coach/apply" replace className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
         応募画面へ進む<ArrowRight className="size-4" aria-hidden />
       </Link>
     </div>

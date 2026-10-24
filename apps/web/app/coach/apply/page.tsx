@@ -107,8 +107,15 @@ export default function CoachApplyPage() {
     setError("");
     try {
       const sns_urls = draft.sns_urls.split("\n").map((v) => v.trim()).filter(Boolean);
-      if (sns_urls.length === 0) {
-        setFieldErrors({ sns_urls: "SNSまたはホームページのURLを1件以上入力してください" });
+      const missing: Record<string, string> = {};
+      if (!draft.name.trim()) missing.name = "名前を入力してください";
+      if (draft.events.length === 0) missing.events = "担当種目を1つ以上選んでください";
+      if (!draft.best_record.trim()) missing.best_record = "記録を入力してください";
+      if (!draft.achievements.trim()) missing.achievements = "成績や指導経験を入力してください";
+      if (sns_urls.length === 0) missing.sns_urls = "SNSまたはホームページのURLを1件以上入力してください";
+      if (!photo && !application?.photo_url) missing.photo = "顔写真を選んでください";
+      if (Object.keys(missing).length > 0) {
+        setFieldErrors(missing);
         return;
       }
       const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/applications", {
@@ -191,7 +198,7 @@ export default function CoachApplyPage() {
         <form onSubmit={onSubmit} className="space-y-5">
           <p className="text-sm text-slate-200">
             コーチの仕事内容や報酬など、コーチ機能の詳細は
-            <Link href="/coach/about" className="text-blue-300 underline">
+            <Link href="/coach/about" replace className="text-blue-300 underline">
               コーチ機能について
             </Link>
             で確認できます。
@@ -199,7 +206,6 @@ export default function CoachApplyPage() {
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">名前</span>
             <Input value={draft.name} maxLength={80} autoComplete="name" required
-              placeholder="コーチとして表示する名前"
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
             {fieldError("name")}
           </label>
@@ -225,6 +231,7 @@ export default function CoachApplyPage() {
             <span className="font-semibold">記録</span>
             <Input
               value={draft.best_record}
+              required
               maxLength={200}
               placeholder="例: 100m 10秒95(2025年)"
               onChange={(e) => setDraft((d) => ({ ...d, best_record: e.target.value }))}
@@ -237,6 +244,7 @@ export default function CoachApplyPage() {
             <Textarea
               rows={3}
               value={draft.achievements}
+              required
               maxLength={500}
               placeholder="例: インターハイ 100m 準決勝"
               onChange={(e) => setDraft((d) => ({ ...d, achievements: e.target.value }))}
@@ -245,7 +253,7 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">SNS・ホームページ（必須）</span>
+            <span className="font-semibold">SNS・ホームページ</span>
             <Textarea
               rows={3}
               required
@@ -259,15 +267,17 @@ export default function CoachApplyPage() {
 
           {!application?.photo_url ? (
             <label className="block space-y-1 text-sm">
-              <span className="font-semibold">顔写真（必須）</span>
+              <span className="font-semibold">顔写真</span>
               <input
                 className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
                 type="file"
+                required
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                 onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
                 disabled={pending}
               />
               <span className="block text-xs text-slate-300">顔がはっきり写った写真にしてください。コーチ一覧に載ります。</span>
+              {fieldError("photo")}
             </label>
           ) : null}
           {message ? (

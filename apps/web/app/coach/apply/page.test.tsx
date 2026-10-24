@@ -7,7 +7,7 @@ const apiFetch = vi.fn();
 const session = {};
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ session, profile: { nickname: "普段の名前" }, token: "test", loading: false }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
-vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, replace, ...props }: { href: string; children: ReactNode; replace?: boolean }) => <a href={href} data-replace={replace} {...props}>{children}</a> }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("@/components/coach-photo", () => ({ CoachPhotoForm: () => null, uploadCoachPhoto: vi.fn() }));
 const application = { name: "コーチの名前", tier: "coach", events: ["100m"], best_record: "10秒95", achievements: "全国大会", sns_urls: ["https://example-club.jp/"], status: "pending", applied_at: "2026-10-24T00:00:00Z", photo_url: "photo", years: 8 };
@@ -23,15 +23,32 @@ it("名前を保存し、年数と公開説明文を外して専用の機能紹�
   apiFetch.mockResolvedValue({ application });
   await act(async () => root.render(<CoachApplyPage />));
   expect(container.querySelector<HTMLInputElement>('input[autocomplete="name"]')?.value).toBe("コーチの名前");
+  expect(container.querySelector('input[autocomplete="name"]')?.hasAttribute("placeholder")).toBe(false);
+  expect(container.textContent).not.toContain("（必須）");
+  expect(container.querySelectorAll('input[required], textarea[required]')).toHaveLength(4);
   expect(container.querySelector('input[type="number"]')).toBeNull();
   expect(container.textContent).not.toContain("競技年数");
   expect(container.textContent).not.toContain("承認されると、ニックネーム");
   expect(container.textContent).toContain("成績や指導経験");
-  expect(container.querySelector('a[href="/coach/about"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/coach/about"]')?.getAttribute("data-replace")).toBe("true");
   await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   const submitted = apiFetch.mock.calls.find(([, options]) => options?.method === "POST");
   expect(JSON.parse(submitted![1].body)).toMatchObject({ name: "コーチの名前", sns_urls: ["https://example-club.jp/"] });
   expect(JSON.parse(submitted![1].body)).not.toHaveProperty("years");
+});
+
+it.each([
+  ["name", " ", "名前を入力してください"],
+  ["events", [], "担当種目を1つ以上選んでください"],
+  ["best_record", " ", "記録を入力してください"],
+  ["achievements", " ", "成績や指導経験を入力してください"],
+  ["photo_url", "", "顔写真を選んでください"],
+])("%sが未入力なら応募を送らない", async (field, value, message) => {
+  apiFetch.mockResolvedValue({ application: { ...application, [field as string]: value } });
+  await act(async () => root.render(<CoachApplyPage />));
+  await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(container.textContent).toContain(message);
+  expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
 it("SNSやホームページが空なら応募を送らず、入力を案内する", async () => {

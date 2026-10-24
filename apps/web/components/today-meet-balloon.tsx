@@ -6,27 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "./auth-provider";
 import { AnchoredPanel } from "./anchored-panel";
 import { fetchTodayMeetThreads } from "@/lib/meet-threads";
-import { todayInTokyo } from "@/lib/format";
 import type { MeetThread } from "@/lib/types";
-
-// 閉じた日を覚えておく。アプリを開き直す(タブやホーム画面アプリを起動し直す)とまた出る。
-const closedKey = "today-meet-balloon:closed";
-
-function closedToday(today: string) {
-  try {
-    return window.sessionStorage.getItem(closedKey) === today;
-  } catch {
-    return false;
-  }
-}
-
-function rememberClosed(today: string) {
-  try {
-    window.sessionStorage.setItem(closedKey, today);
-  } catch {
-    // 保存できなくても、閉じること自体はできる。
-  }
-}
 
 export function TodayMeetBalloon() {
   const { token } = useAuth();
@@ -41,7 +21,6 @@ export function TodayMeetBalloon() {
     fetchTodayMeetThreads(token).then((next) => {
       if (!active) return;
       setMeets(next);
-      if (next.length > 0 && !closedToday(todayInTokyo())) setOpen(true);
     });
     return () => {
       active = false;
@@ -49,7 +28,6 @@ export function TodayMeetBalloon() {
   }, [token]);
 
   const close = useCallback(() => {
-    rememberClosed(todayInTokyo());
     setOpen(false);
   }, []);
 
