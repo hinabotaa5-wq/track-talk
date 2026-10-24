@@ -37,7 +37,7 @@ describe("auth callback redirect", () => {
 
   it("preserves a same-site path, query and fragment", async () => {
     const response = await callback(encodeURIComponent("/competitions?prefecture=13#results"));
-    expect(response.headers.get("location")).toBe("https://tracktalk.example/competitions?prefecture=13#results");
+    expect(response.headers.get("location")).toBe("/competitions?prefecture=13#results");
     expect(response.cookies.get("tracktalk-next")?.maxAge).toBe(0);
     expect(response.cookies.get("tracktalk-next")?.sameSite).toBe("lax");
     expect(response.cookies.get("session")).toMatchObject({ value: "token", sameSite: "lax", secure: true, path: "/" });
@@ -56,23 +56,51 @@ describe("auth callback redirect", () => {
     "/login",
   ])("falls back to the site root for %s", async (path) => {
     const response = await callback(path);
-    expect(response.headers.get("location")).toBe("https://tracktalk.example/");
+    expect(response.headers.get("location")).toBe("/");
   });
 
-  it("keeps the origin when normalization leaves two leading slashes in the path", async () => {
+  it("falls back to root when normalization leaves two leading slashes in the path", async () => {
     const response = await callback("/a/..//evil.example/phishing");
-    const destination = new URL(response.headers.get("location")!);
+    const destination = new URL(response.headers.get("location")!, "https://tracktalk.example");
     expect(destination.origin).toBe("https://tracktalk.example");
-    expect(destination.pathname).toBe("//evil.example/phishing");
+    expect(destination.pathname).toBe("/");
   });
 
   it("returns to login if the code exchange fails", async () => {
     exchangeCodeForSession.mockResolvedValue({ error: new Error("invalid code") });
     const response = await callback("/me");
-    const destination = new URL(response.headers.get("location")!);
+    const destination = new URL(response.headers.get("location")!, "https://tracktalk.example");
     expect(destination.origin).toBe("https://tracktalk.example");
     expect(destination.pathname).toBe("/login");
     expect(response.cookies.get("tracktalk-next")?.maxAge).toBe(0);
     expect(response.cookies.get("tracktalk-next")?.sameSite).toBe("lax");
   });
+
+  it.each(["success", "missing code", "exchange failure", "missing config"])(
+    "keeps the browser host when Netlify uses an internal request URL: %s",
+    async (scenario) => {
+      if (scenario === "exchange failure") {
+        exchangeCodeForSession.mockResolvedValue({ error: new Error("invalid code") });
+      }
+      if (scenario === "missing config") vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
+      const query = scenario === "missing code" ? "" : "?code=test-code";
+      const request = new NextRequest(`https://main--track-talk.netlify.app/auth/callback${query}`, {
+        headers: { "x-forwarded-host": "evil.example", host: "evil.example" },
+      });
+      request.cookies.set({ name: "tracktalk-next", value: encodeURIComponent("/me?tab=posts#recent") });
+      const response = await GET(request);
+      const location = response.headers.get("location")!;
+      expect(response.status).toBe(307);
+      expect(location.startsWith("/")).toBe(true);
+      expect(location.startsWith("//")).toBe(false);
+      // 同じレスポンスをどちらの公開ホストで受けても、そのホストから移動しない。
+      for (const origin of ["https://track-talk.netlify.app", "https://tracktalk.jp"]) {
+        const destination = new URL(location, `${origin}/auth/callback`);
+        expect(destination.origin).toBe(origin);
+        expect(destination.pathname).toBe(scenario === "success" ? "/me" : "/login");
+      }
+      if (scenario === "success") expect(location).toBe("/me?tab=posts#recent");
+      expect(response.cookies.get("tracktalk-next")?.maxAge).toBe(0);
+    },
+  );
 });

@@ -8,6 +8,15 @@ function finish(response: NextResponse) {
   return response;
 }
 
+function redirectWithinSite(destination: URL) {
+  // Netlify 内部のホスト名を Location に出さず、ブラウザが開いているサイト内で移動する。
+  // 正規化でパスが // 始まりになった場合も、外部ホストとして解釈されないよう拒む。
+  const location = destination.pathname.startsWith("//")
+    ? "/"
+    : `${destination.pathname}${destination.search}${destination.hash}`;
+  return new NextResponse(null, { status: 307, headers: { Location: location } });
+}
+
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const login = new URL("/login", origin);
@@ -16,14 +25,14 @@ export async function GET(request: NextRequest) {
 
   if (!url || !key) {
     login.searchParams.set("error", "config");
-    return finish(NextResponse.redirect(login));
+    return finish(redirectWithinSite(login));
   }
 
   const failed = callbackParamsError(request.nextUrl.searchParams);
   const code = request.nextUrl.searchParams.get("code");
   if (failed || !code) {
     login.searchParams.set("error", failed ?? "google");
-    return finish(NextResponse.redirect(login));
+    return finish(redirectWithinSite(login));
   }
 
   const dest = new URL("/", origin);
@@ -34,7 +43,7 @@ export async function GET(request: NextRequest) {
     dest.search = next.search;
     dest.hash = next.hash;
   }
-  const success = NextResponse.redirect(dest);
+  const success = redirectWithinSite(dest);
   const supabase = createServerClient(url, key, {
     ...(process.env.SUPABASE_COOKIE_NAME
       ? { cookieOptions: { name: process.env.SUPABASE_COOKIE_NAME } }
@@ -57,7 +66,7 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     login.searchParams.set("error", callbackExchangeError);
-    return finish(NextResponse.redirect(login));
+    return finish(redirectWithinSite(login));
   }
   return finish(success);
 }
