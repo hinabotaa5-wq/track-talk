@@ -31,7 +31,7 @@ describe("auth callback redirect", () => {
 
   async function callback(path?: string) {
     const request = new NextRequest("https://tracktalk.example/auth/callback?code=test-code");
-    if (path !== undefined) request.cookies.set("tracktalk-next", path);
+    if (path !== undefined) request.cookies.set({ name: "tracktalk-next", value: path });
     return GET(request);
   }
 
