@@ -192,7 +192,7 @@ func lowRated(count int32, average float64) bool {
 }
 
 type coachApplicationReq struct {
-	Name         string   `json:"name"`
+	Name         *string  `json:"name"`
 	Tier         string   `json:"tier"`
 	Events       []string `json:"events"`
 	BestRecord   string   `json:"best_record"`
@@ -237,12 +237,18 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	req.Name = strings.TrimSpace(req.Name)
+	// 古い画面は名前を送らない。明示された名前だけ検証し、未送信なら従来の表示名を維持する。
+	name := ""
+	if req.Name != nil {
+		name = strings.TrimSpace(*req.Name)
+	}
 	req.BestRecord = strings.TrimSpace(req.BestRecord)
 	req.Achievements = strings.TrimSpace(req.Achievements)
 	fields := map[string]string{}
-	if e := coachPublicTextError("名前", req.Name, 80); e != "" {
-		fields["name"] = e
+	if req.Name != nil {
+		if e := coachPublicTextError("名前", name, 80); e != "" {
+			fields["name"] = e
+		}
 	}
 	if !validCoachTier(req.Tier) {
 		fields["tier"] = "応募する枠を選んでください"
@@ -274,7 +280,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	}
 	c, err := s.q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
 		ProfileID:    p.ID,
-		Name:         req.Name,
+		Name:         name,
 		Tier:         req.Tier,
 		Events:       events,
 		BestRecord:   req.BestRecord,
