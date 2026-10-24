@@ -6,6 +6,7 @@ import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { feedTitle, hasFeedTitle } from "@/components/feed-card";
 import { MeetThreadNowRunning } from "@/components/meet-now-running";
+import { MeetRoomContent } from "@/components/meet-room-content";
 import { DetailLoadingFrame } from "@/components/loading-frame";
 import { PracticeReputationSummary, practiceAttendanceLine } from "@/components/practice-reputation";
 import { prefectureName } from "@/lib/prefectures";
@@ -531,7 +532,7 @@ export function PostDetail({
         ) : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>
       </p>
-      {(post.kind === "recruitment" || post.kind === "practice") && post.body ? (
+      {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : (post.kind === "recruitment" || post.kind === "practice") && post.body ? (
         <div>
           <h2 className="mb-2 text-2xl font-semibold text-slate-100">詳細</h2>
           <div className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border border-white/20 glass bg-white/10 p-4 text-lg leading-8 text-slate-200">{post.body}</div>

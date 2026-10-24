@@ -10,6 +10,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type CloudinaryRetirement struct {
+	PublicID  string    `json:"public_id"`
+	RetiredAt time.Time `json:"retired_at"`
+}
+
 type CloudinaryUpload struct {
 	PublicID  string    `json:"public_id"`
 	OwnerID   uuid.UUID `json:"owner_id"`
@@ -546,6 +551,14 @@ type MajorHost struct {
 	ImageUrl      string    `json:"image_url"`
 	PageUrl       string    `json:"page_url"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type MeetResource struct {
+	MeetKey        string    `json:"meet_key"`
+	OfficialUrl    string    `json:"official_url"`
+	TimetableUrl   string    `json:"timetable_url"`
+	YoutubeVideoID string    `json:"youtube_video_id"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type MeetSession struct {
