@@ -12,6 +12,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	voice "github.com/hinata/track-talk/apps/api/internal/livekit"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
@@ -19,6 +20,7 @@ import (
 )
 
 type Server struct {
+	voice     *voice.Service
 	cfg       config.Config
 	pool      *pgxpool.Pool
 	q         *db.Queries
@@ -73,6 +75,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			Endpoint: cfg.GeminiEndpoint,
 		},
 	}
+	if cfg.MeetVoiceEnabled || cfg.LiveKitAPIKey != "" {
+		voiceCfg := cfg
+		voiceCfg.MeetVoiceEnabled = true
+		s.voice, _ = voice.New(voiceCfg)
+	}
 	if cfg.PushHTTP != nil {
 		s.push.HTTP = cfg.PushHTTP
 	}
@@ -89,6 +96,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	}))
 	r.Use(s.limit.Middleware)
 	r.Get("/health", s.health)
+	r.Post("/v1/livekit/webhook", s.meetVoiceWebhook)
+	r.Post("/internal/voice/tick", s.meetVoiceTick)
 	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
 	// コーチングを提供していない間は、tick も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
@@ -125,6 +134,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(v))
+			r.Get("/posts/{id}/voice", s.getMeetVoice)
+			r.Post("/posts/{id}/voice/heartbeat", s.heartbeatMeetVoice)
+			r.Get("/admin/voice", s.adminMeetVoice)
+			r.Put("/admin/voice", s.adminConfigureMeetVoice)
+			r.Post("/admin/voice/connections/{connectionID}", s.adminModerateMeetVoice)
+			r.Post("/admin/voice/bans/{id}/remove", s.adminUnbanMeetVoice)
+			r.Post("/posts/{id}/voice/join", s.joinMeetVoice)
+			r.Post("/posts/{id}/voice/leave", s.leaveMeetVoice)
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Patch("/me/badge", s.updateBadge)

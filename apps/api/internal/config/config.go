@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +13,14 @@ import (
 )
 
 type Config struct {
+	MeetVoiceTickSecret string
+	// MeetVoiceEnabled は段階公開用。LiveKit の秘密情報は API にだけ設定する。
+	MeetVoiceEnabled bool
+	LiveKitURL       string
+	LiveKitAPIKey    string
+	LiveKitAPISecret string
+	// LiveKitAPIBase はテスト用の管理API接続先。環境変数からは読まない。
+	LiveKitAPIBase         string
 	Addr                   string
 	DatabaseURL            string
 	SupabaseURL            string
@@ -91,6 +100,11 @@ func Load() (Config, error) {
 	_ = godotenv.Load("../../.env")
 
 	cfg := Config{
+		MeetVoiceEnabled:           enabled(os.Getenv("MEET_VOICE_ENABLED")),
+		MeetVoiceTickSecret:        os.Getenv("MEET_VOICE_TICK_SECRET"),
+		LiveKitURL:                 strings.TrimSpace(os.Getenv("LIVEKIT_URL")),
+		LiveKitAPIKey:              strings.TrimSpace(os.Getenv("LIVEKIT_API_KEY")),
+		LiveKitAPISecret:           strings.TrimSpace(os.Getenv("LIVEKIT_API_SECRET")),
 		Addr:                       env("API_ADDR", ":8080"),
 		DatabaseURL:                os.Getenv("DATABASE_URL"),
 		SupabaseURL:                os.Getenv("SUPABASE_URL"),
@@ -157,7 +171,30 @@ func Load() (Config, error) {
 	if err := cfg.ValidateStripe(); err != nil {
 		return Config{}, err
 	}
+	if err := cfg.ValidateMeetVoice(); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
+}
+
+// ValidateMeetVoice は有効化した通話の設定漏れを起動時に検出する。値はエラーに含めない。
+func (c Config) ValidateMeetVoice() error {
+	if !c.MeetVoiceEnabled {
+		return nil
+	}
+	u, err := url.Parse(c.LiveKitURL)
+	if err != nil || u.Scheme != "wss" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+		return fmt.Errorf("LIVEKIT_URL must be a wss:// server URL without credentials, path, query or fragment")
+	}
+	if strings.TrimSpace(c.LiveKitAPIKey) == "" || strings.TrimSpace(c.LiveKitAPISecret) == "" {
+		return fmt.Errorf("LIVEKIT_API_KEY and LIVEKIT_API_SECRET are required when MEET_VOICE_ENABLED is set")
+	}
+	// Strict token revocation is a Cloud feature. A self-hosted server could
+	// accept RemoveParticipant while leaving old bearer tokens usable.
+	if !strings.HasSuffix(strings.ToLower(u.Hostname()), ".livekit.cloud") {
+		return fmt.Errorf("LIVEKIT_URL must use a LiveKit Cloud server (*.livekit.cloud)")
+	}
+	return nil
 }
 
 // StripeMode は、秘密鍵の種類。鍵が無ければ空(支払いなしのデモ版)、テスト用の鍵なら "test"、本番の鍵なら "live"。

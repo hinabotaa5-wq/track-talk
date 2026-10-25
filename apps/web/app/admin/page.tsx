@@ -1,5 +1,7 @@
 "use client";
 
+import { MeetVoiceAdmin, VoiceReportReview } from "@/components/meet-voice-admin";
+
 import { AdminStatsView } from "@/components/admin-stats";
 import { AnnouncementsAdmin } from "@/components/announcements-admin";
 import { CoachAvatar } from "@/components/coach-photo";
@@ -53,6 +55,7 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
   coaching_message: "パーソナル指導のやりとり",
   coaching_consultation: "追加相談",
   practice_rating: "練習の評価のひとこと",
+ voice_participant: "音声通話の参加者",
 };
 
 const perPage = 20;
@@ -98,7 +101,7 @@ function InjuryNoteActions({ report, token }: { report: AdminReport; token: stri
   );
 }
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats" | "announce";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats" | "announce" | "voice";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   // ページごとに持つ。トークンの更新で同じページを読み直しても、行が二重に足されない。
@@ -621,7 +624,7 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats" || tab === "announce";
+  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats" || tab === "announce" || tab === "voice";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: reports.total },
@@ -637,6 +640,7 @@ export default function AdminPage() {
     { id: "meets", label: "タイムテーブル", total: -1 },
     { id: "stats", label: "利用状況", total: -1 },
     { id: "announce", label: "お知らせ", total: -1 },
+    { id: "voice", label: "音声通話", total: -1 },
   ];
 
   return (
@@ -667,6 +671,7 @@ export default function AdminPage() {
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
       {tab === "stats" ? <AdminStatsView token={token} /> : null}
       {tab === "announce" ? <AnnouncementsAdmin token={token} /> : null}
+      {tab === "voice" ? <MeetVoiceAdmin token={token} /> : null}
       {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
       {custom ? null : tab === "reports" ? (
         <ul className="space-y-3">
@@ -689,7 +694,7 @@ export default function AdminPage() {
               <p className="text-xs text-slate-300">
                 通報者: {r.by_guardian ? `保護者（${r.reporter_nickname ?? "名前なし"}さんの）` : (r.reporter_nickname ?? "名前なし")}
               </p>
-              {r.target_type === "coaching_consultation" ? <Link href={`/admin/coaching/consultations/${r.target_id}?report=${r.id}`} className="text-sm text-blue-300 underline">記録を残して追加相談を開く</Link> : r.target_type === "coaching_message" ? (
+              {r.target_type === "voice_participant" ? <VoiceReportReview connectionId={r.target_id} reportId={r.id} token={token} initialStatus={r.status} /> : r.target_type === "coaching_consultation" ? <Link href={`/admin/coaching/consultations/${r.target_id}?report=${r.id}`} className="text-sm text-blue-300 underline">記録を残して追加相談を開く</Link> : r.target_type === "coaching_message" ? (
                 <CoachingReportActions report={r} token={token} />
               ) : !r.target_body ? null : hideTargets[r.target_type] ? (
                 <InjuryNoteActions report={r} token={token} />

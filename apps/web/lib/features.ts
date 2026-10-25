@@ -10,3 +10,5 @@ export const coachingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_ENAB
 // 感覚メモを保存順に6個ずつまとめるふりかえり(AI)。感覚メモを Gemini に送る(プライバシーポリシーの委託先に書いてある)。
 // API 側の SENSE_SUMMARY_ENABLED と揃えること。
 export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUMMARY_ENABLED);
+
+export const meetVoiceEnabled = flagEnabled(process.env.NEXT_PUBLIC_MEET_VOICE_ENABLED);

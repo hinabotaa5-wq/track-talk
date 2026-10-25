@@ -192,3 +192,18 @@ export function raceChartPoints(records: RaceRecord[], kind: RaceMarkKind, box: 
     return { record, x: xs.get(record.id)!, y: box.top + (kind === "time" ? ratio : 1 - ratio) * (box.height - box.top - box.bottom) };
   });
 }
+
+// 単位の異なる種目は初回=100で比較する。タイム短縮・距離や得点の増加が上になる。
+export function raceOverviewSeries(records: RaceRecord[], box: RaceChartBox = raceChartBox) {
+  const ordered = sortRaceRecords(records);
+  const xs = raceChartX(ordered, box);
+  const groups = new Map<string, RaceRecord[]>();
+  for (const record of ordered) groups.set(record.event, [...(groups.get(record.event) ?? []), record]);
+  const series = sortRaceEvents([...groups].map(([event, rows]) => ({ event, event_label: rows[0].event_label, kind: raceMarkKind(event), wind: false, count: rows.length }))).map((event, index) => {
+    const rows = groups.get(event.event)!;
+    const baseline = rows[0].mark;
+    return { ...event, color: `hsl(${(index * 137.5 + 195) % 360} 85% 72%)`, points: rows.map((record) => ({ record, index: 100 + (event.kind === "time" ? baseline - record.mark : record.mark - baseline) / baseline * 100 })) };
+  });
+  const domain = raceChartDomain([100, ...series.flatMap((s) => s.points.map((p) => p.index))], true);
+  return { domain, series: series.map((s) => ({ ...s, points: s.points.map((p) => ({ ...p, x: xs.get(p.record.id)!, y: box.top + (domain.high - p.index) / (domain.high - domain.low) * (box.height - box.top - box.bottom) })) })) };
+}

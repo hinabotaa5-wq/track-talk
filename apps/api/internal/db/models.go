@@ -603,6 +603,82 @@ type MeetThread struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type MeetVoiceAction struct {
+	ID           uuid.UUID  `json:"id"`
+	ActorID      *uuid.UUID `json:"actor_id"`
+	ConnectionID *uuid.UUID `json:"connection_id"`
+	TargetUserID *uuid.UUID `json:"target_user_id"`
+	PostID       *uuid.UUID `json:"post_id"`
+	Action       string     `json:"action"`
+	Success      bool       `json:"success"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+type MeetVoiceBan struct {
+	PostID    uuid.UUID  `json:"post_id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	Reason    string     `json:"reason"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type MeetVoiceParticipant struct {
+	ID         uuid.UUID  `json:"id"`
+	UserID     *uuid.UUID `json:"user_id"`
+	PostID     uuid.UUID  `json:"post_id"`
+	RoomSid    string     `json:"room_sid"`
+	PublicName string     `json:"public_name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	EndedAt    *time.Time `json:"ended_at"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+}
+
+type MeetVoiceRateLimit struct {
+	UserID      uuid.UUID `json:"user_id"`
+	WindowStart time.Time `json:"window_start"`
+	Attempts    int32     `json:"attempts"`
+}
+
+type MeetVoiceReservation struct {
+	UserID         uuid.UUID  `json:"user_id"`
+	ID             uuid.UUID  `json:"id"`
+	PostID         uuid.UUID  `json:"post_id"`
+	TokenExpiresAt time.Time  `json:"token_expires_at"`
+	State          string     `json:"state"`
+	ParticipantSid string     `json:"participant_sid"`
+	LastEventAt    *time.Time `json:"last_event_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastSeenAt     time.Time  `json:"last_seen_at"`
+	ConfirmedAt    time.Time  `json:"confirmed_at"`
+	SoloSince      *time.Time `json:"solo_since"`
+}
+
+type MeetVoiceSession struct {
+	RoomSid     string     `json:"room_sid"`
+	PostID      uuid.UUID  `json:"post_id"`
+	RoomName    string     `json:"room_name"`
+	StartedAt   time.Time  `json:"started_at"`
+	EndedAt     *time.Time `json:"ended_at"`
+	LastEventAt time.Time  `json:"last_event_at"`
+}
+
+type MeetVoiceSetting struct {
+	Singleton           bool        `json:"singleton"`
+	Paused              bool        `json:"paused"`
+	LastTickAt          *time.Time  `json:"last_tick_at"`
+	RestrictToPosts     bool        `json:"restrict_to_posts"`
+	AllowedPostIds      []uuid.UUID `json:"allowed_post_ids"`
+	MonthlyMinutesLimit int32       `json:"monthly_minutes_limit"`
+}
+
+type MeetVoiceWebhookEvent struct {
+	ID         uuid.UUID `json:"id"`
+	Event      string    `json:"event"`
+	RoomSid    string    `json:"room_sid"`
+	CreatedAt  time.Time `json:"created_at"`
+	ReceivedAt time.Time `json:"received_at"`
+}
+
 type MenuContestEntry struct {
 	ID         uuid.UUID `json:"id"`
 	RoundStart time.Time `json:"round_start"`

@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { meetVoiceEnabled } from "@/lib/features";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
@@ -29,6 +31,8 @@ import { YouTubePlayer } from "@/components/youtube-player";
 import { LikeButton, ReportButton, SaveButton } from "@/components/action-button";
 import { InjuryTypicalRecovery } from "@/components/injury-typical-recovery";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
+
+const MeetVoicePanel = dynamic(() => import("@/components/meet-voice-panel").then((m) => m.MeetVoicePanel), { ssr: false });
 
 export function PostDetail({
   id,
@@ -523,6 +527,7 @@ export function PostDetail({
         <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
+      {post.kind === "meet" && meetVoiceEnabled ? <MeetVoicePanel key={`voice-${post.id}`} postId={post.id} /> : null}
       {post.source_title ? (
         <p className="text-xs text-slate-400">元動画: {post.source_title}</p>
       ) : null}
