@@ -25,11 +25,25 @@ func TestVideoURLs(t *testing.T) {
 	id := "track-talk/11111111-1111-4111-8111-111111111111"
 	thumb := c.ThumbnailURL(id)
 	play := c.PlaybackURL(id)
-	if !strings.Contains(thumb, "/demo/video/upload/so_auto,c_limit,w_800,f_jpg/track-talk/") || !strings.HasSuffix(thumb, ".jpg") {
+	if !strings.Contains(thumb, "/demo/video/upload/so_auto,c_limit,w_800,q_auto,f_jpg/track-talk/") || !strings.HasSuffix(thumb, ".jpg") {
 		t.Fatal(thumb)
 	}
 	if !strings.Contains(play, "/demo/video/upload/c_limit,w_1280,h_1280,q_auto/track-talk/") || !strings.HasSuffix(play, ".mp4") {
 		t.Fatal(play)
+	}
+}
+
+func TestCardURLs(t *testing.T) {
+	c := Client{Cloud: "demo"}
+	id := "track-talk/11111111-1111-4111-8111-111111111111"
+	if got := c.CardImageURL(id); !strings.Contains(got, "/demo/image/upload/c_limit,w_600,q_auto,f_auto/track-talk/") {
+		t.Fatal(got)
+	}
+	if got := c.CardThumbnailURL(id); !strings.Contains(got, "/demo/video/upload/so_auto,c_limit,w_600,q_auto,f_jpg/track-talk/") || !strings.HasSuffix(got, ".jpg") {
+		t.Fatal(got)
+	}
+	if (Client{}).CardImageURL(id) != "" || c.CardThumbnailURL("") != "" {
+		t.Fatal("空の設定では URL を作らない")
 	}
 }
 

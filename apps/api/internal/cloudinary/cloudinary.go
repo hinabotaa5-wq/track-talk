@@ -287,7 +287,16 @@ func (c Client) ThumbnailURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_800,f_jpg/" + deliveryPath(publicID) + ".jpg"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_800,q_auto,f_jpg/" + deliveryPath(publicID) + ".jpg"
+}
+
+// CardThumbnailURL は一覧カード用の小さな動画サムネイル URL を返す。
+// カードは幅200px前後なので、高解像度の端末でも粗く見えない幅にとどめる。
+func (c Client) CardThumbnailURL(publicID string) string {
+	if c.Cloud == "" || publicID == "" {
+		return ""
+	}
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_" + cardWidth + ",q_auto,f_jpg/" + deliveryPath(publicID) + ".jpg"
 }
 
 func (c Client) PlaybackURL(publicID string) string {
@@ -302,6 +311,17 @@ func (c Client) ImageURL(publicID string) string {
 		return ""
 	}
 	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_1600,q_auto,f_auto/" + deliveryPath(publicID)
+}
+
+// cardWidth は一覧カードに配信する画像の幅。
+const cardWidth = "600"
+
+// CardImageURL は一覧カード用の小さな画像 URL を返す。詳細画面は ImageURL を使う。
+func (c Client) CardImageURL(publicID string) string {
+	if c.Cloud == "" || publicID == "" {
+		return ""
+	}
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/image/upload/c_limit,w_" + cardWidth + ",q_auto,f_auto/" + deliveryPath(publicID)
 }
 
 // AvatarURL は顔写真を正方形に切り抜いた URL を返す。顔が真ん中に来るように切る。
