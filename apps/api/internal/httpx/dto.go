@@ -19,10 +19,12 @@ type postDTO struct {
 	Title string    `json:"title"`
 	Body  string    `json:"body,omitempty"`
 	// Excerpt は一覧カードに出す詳細の冒頭。一覧では本文を返さないので、カードに詳細を出す投稿に付ける。
-	Excerpt        string  `json:"excerpt,omitempty"`
-	AuthorName     *string `json:"author_name,omitempty"`
-	PostMaster     bool    `json:"author_post_master,omitempty"`
-	authorID       uuid.UUID
+	Excerpt    string  `json:"excerpt,omitempty"`
+	AuthorName *string `json:"author_name,omitempty"`
+	PostMaster bool    `json:"author_post_master,omitempty"`
+	authorID   uuid.UUID
+	// list は一覧用の項目か。一覧では小さな画像を配る。
+	list           bool
 	Mine           bool            `json:"mine"`
 	LikeCount      int32           `json:"like_count"`
 	CommentCount   int32           `json:"comment_count"`
@@ -148,6 +150,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 		LikedByMe:    liked,
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
+		list:         list,
 	}
 	applyKind(&p, row.Kind, row.YoutubeVideoID, row.YoutubeThumbnailUrl, row.CloudinaryPublicID)
 	p.YouTubeShorts = row.YoutubeShorts

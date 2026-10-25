@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RaceRecordsPanel } from "./race-records";
+import { RaceRecordRow, RaceRecordsPanel } from "./race-records";
 import type { RaceRecord, RaceRecords } from "@/lib/race-records";
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ apiFetch, apiErrorText: () => "保存できませんでした" }));
@@ -20,12 +20,15 @@ async function render() { await act(async () => root.render(<RaceRecordsPanel to
 async function fill(input: HTMLInputElement, value: string) {
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value); input.dispatchEvent(new Event("input",{bubbles:true})); });
 }
-it("記録会はラウンド欄を開かずに保存でき、必要なときだけ自由に追記できる", async () => {
+it("ラウンド欄は大会名の下に常に出し、空欄でも保存でき、必要なときだけ自由に追記できる", async () => {
   await render();
   const form = container.querySelector("form")!;
-  const details = form.querySelector("details")!;
+  expect(form.querySelector("details")).toBeNull();
+  expect(form.textContent).not.toContain("記録会などは空欄のまま");
   const round = form.querySelector<HTMLInputElement>("input[list]")!;
-  expect(details.open).toBe(false); expect(round.required).toBe(false);
+  const meet = form.querySelector<HTMLInputElement>('input[placeholder="例: 県高校総体"]')!;
+  expect(meet.compareDocumentPosition(round) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(round.required).toBe(false);
   await fill(form.querySelector<HTMLInputElement>('input[placeholder^="例: 10.85"]')!, "11.12");
   await act(async () => form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
   let saved = apiFetch.mock.calls.find(([,options]) => options.method === "POST");
@@ -36,21 +39,38 @@ it("記録会はラウンド欄を開かずに保存でき、必要なときだ�
   saved = apiFetch.mock.calls.filter(([,options]) => options.method === "POST").at(-1);
   expect(JSON.parse(saved![1].body)).toMatchObject({round:"第2レース",mark:1110});
 });
-it("全種目を選ぶと単位を混ぜずに比較し、一覧には種目とラウンドを表示する", async () => {
+it("全種目を選ぶと各種目のグラフを縦に並べ、記録カードの一覧は出さない", async () => {
   await render();
+  expect(container.querySelector('[aria-label="記録を直す"]')).toBeNull();
+  expect(container.textContent).not.toContain("小さな変化を大きく見せない");
   const all = [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("全種目"))!;
   await act(async () => all.click());
   expect(all.getAttribute("aria-pressed")).toBe("true");
-  expect(container.querySelector('svg[aria-label^="全種目"]')).not.toBeNull();
-  expect(container.textContent).toContain("最初の記録を100");
-  expect(container.textContent).toContain("6.00m");
-  expect(container.textContent).toContain("決勝");
-  expect(container.querySelectorAll("ul li")).toHaveLength(3);
+  expect([...container.querySelectorAll("svg[aria-label]")].map((svg) => svg.getAttribute("aria-label"))).toEqual(["100m記録の推移のグラフ", "走幅跳記録の推移のグラフ"]);
+  expect(container.textContent).toContain("6.00");
+  expect(container.querySelector("ul")).toBeNull();
 });
-it("編集フォームは既存のラウンドを保持する", async () => {
+it("グラフに日付は出さず、点を押すとその記録の日付を表示する", async () => {
   await render();
+  const svg = container.querySelector("svg[aria-label]")!;
+  expect(svg.textContent).not.toContain("5月3日");
+  const point = svg.querySelector<SVGGElement>('[role="button"]')!;
+  await act(async () => point.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(svg.textContent).toContain("5月3日");
+  await act(async () => point.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(svg.textContent).not.toContain("5月3日");
+});
+it("未来の日付は「〇〇以下に設定してください」と案内する", async () => {
+  await render();
+  const date = container.querySelector<HTMLInputElement>('input[type="date"]')!;
+  Object.defineProperty(date, "validity", { configurable: true, get: () => ({ rangeOverflow: true }) });
+  await act(async () => date.dispatchEvent(new Event("invalid", { cancelable: true })));
+  expect(date.validationMessage).toMatch(/^\d{4}\/\d{2}\/\d{2}以下に設定してください$/);
+});
+it("カレンダーの詳細から開く編集フォームは既存のラウンドを保持する", async () => {
+  await act(async () => root.render(<RaceRecordRow record={data.records[1]} kind="time" token="test" onChanged={() => {}} />));
   await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="記録を直す"]')!.click());
-  const form = container.querySelectorAll("form")[1];
+  const form = container.querySelector("form")!;
   const round = form.querySelector<HTMLInputElement>("input[list]")!;
   expect(round.value).toBe("決勝");
   await act(async () => form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));

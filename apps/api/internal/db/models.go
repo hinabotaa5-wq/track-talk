@@ -10,6 +10,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type Announcement struct {
+	ID             uuid.UUID  `json:"id"`
+	SenderID       *uuid.UUID `json:"sender_id"`
+	Title          string     `json:"title"`
+	Body           string     `json:"body"`
+	Url            string     `json:"url"`
+	CreatedAt      time.Time  `json:"created_at"`
+	InAppCount     int32      `json:"in_app_count"`
+	FinishedAt     *time.Time `json:"finished_at"`
+	PushRecipients int32      `json:"push_recipients"`
+	CanceledAt     *time.Time `json:"canceled_at"`
+}
+
 type CloudinaryRetirement struct {
 	PublicID  string    `json:"public_id"`
 	RetiredAt time.Time `json:"retired_at"`
@@ -709,6 +722,7 @@ type Notification struct {
 	Title           *string    `json:"title"`
 	Body            *string    `json:"body"`
 	Url             *string    `json:"url"`
+	AnnouncementID  *uuid.UUID `json:"announcement_id"`
 }
 
 type NotificationSetting struct {

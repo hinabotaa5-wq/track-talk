@@ -11,6 +11,8 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
 import { LastTabRestorer } from "@/components/last-tab-restorer";
 import { lastTabStartupScript } from "@/lib/last-tab";
+import { pendingLinkStartupScript } from "@/lib/pending-link-startup";
+import { PendingLinkReset } from "@/components/pending-link-reset";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -75,6 +77,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         {/* Next.js の起動を待たず、body の描画前に復元する。 */}
         <script dangerouslySetInnerHTML={{ __html: lastTabStartupScript }} />
+        <script dangerouslySetInnerHTML={{ __html: pendingLinkStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
         <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
@@ -95,6 +98,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ProfileGate />
           <Suspense fallback={null}>
             <LastTabRestorer />
+          </Suspense>
+          <Suspense fallback={null}>
+            <PendingLinkReset />
           </Suspense>
           <AmbientBackground />
           <CompetitionPrefetch />

@@ -22,7 +22,8 @@ export default async function CompetitionsPage({
   if (target) redirect(target);
 
   // 国内主要大会の一覧をサーバーで描いておき、検索エンジンが中身を読めるようにする。取れなければ画面側で取り直す。
-  const majors = await apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors", { signal: AbortSignal.timeout(3000) })
+  // 一覧はめったに変わらないので24時間取り置き、タブを開くたびに API の起動を待たない。画面側では最新を読み直す。
+  const majors = await apiFetch<{ majors: DomesticMajor[] }>("/v1/domestic-majors", { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } })
     .then((data) => data.majors ?? [])
     .catch(() => null);
 

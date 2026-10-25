@@ -83,7 +83,12 @@ WHERE p.deleted_at IS NULL
       )
     )
   )
-ORDER BY p.created_at DESC
+  -- cursor_id があれば、前のページの最後の投稿より後ろだけを読む(OFFSETを使わない)。
+  AND (
+    sqlc.narg('cursor_id')::uuid IS NULL
+    OR (p.created_at, p.id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid)
+  )
+ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
 
 -- name: ListPostsPopular :many
@@ -172,7 +177,11 @@ WHERE p.deleted_at IS NULL
       )
     )
   )
-ORDER BY p.like_count DESC, p.created_at DESC
+  AND (
+    sqlc.narg('cursor_id')::uuid IS NULL
+    OR (p.like_count, p.created_at, p.id) < (sqlc.narg('cursor_likes')::int, sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid)
+  )
+ORDER BY p.like_count DESC, p.created_at DESC, p.id DESC
 LIMIT sqlc.arg('limit_n') OFFSET sqlc.arg('offset_n');
 
 -- name: CountPosts :one

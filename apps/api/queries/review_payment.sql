@@ -93,14 +93,6 @@ WHERE r.status = 'awaiting_payment'
   AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured'))
 RETURNING r.id;
 
--- name: SumMonthlyReviewPayments :one
--- 18歳未満の月の上限に使う、その人の今月（日本時間）の支払い。開いたままの支払い画面も数える。
-SELECT COALESCE(sum(amount_yen), 0)::int FROM review_payments
-WHERE payer_id = sqlc.arg(payer_id)
-  AND request_id IS DISTINCT FROM sqlc.arg(exclude_request_id)::uuid
-  AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-  AND (status IN ('authorized', 'captured') OR (status = 'pending' AND session_expires_at > now()));
-
 -- name: GetLatestReviewPayment :one
 -- 画面に出す支払い。支払い画面を開いただけのものは出さない。
 SELECT * FROM review_payments

@@ -6,41 +6,20 @@ import { useAuth } from "@/components/auth-provider";
 import { FeedCard } from "@/components/feed-card";
 import { FeedGrid } from "@/components/feed-grid";
 import { ViewSwitch } from "@/components/view-switch";
-import { apiFetch } from "@/lib/api";
-import { fetchAllPages } from "@/lib/paging";
-import type { Meta, Post } from "@/lib/types";
+import { LoadMore } from "@/components/load-more";
+import { useCursorPosts } from "@/lib/use-cursor-posts";
 
 export default function MyPostsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [postsError, setPostsError] = useState("");
   const [sort, setSort] = useState<"popular" | "new">("popular");
+  // 最初の1ページだけ読み、続きは末尾に近づいたら足す。
+  const feed = useCursorPosts(`/v1/me/posts?sort=${sort}`, token);
+  const posts = feed.posts ?? [];
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/me/posts");
   }, [loading, session, router]);
-
-  useEffect(() => {
-    if (!token) return;
-    let active = true;
-    // API は1ページ20件（最大50件）で切るので、最後のページまで集める。
-    fetchAllPages(async (page) => {
-      const d = await apiFetch<{ posts: Post[]; meta: Meta }>(`/v1/me/posts?sort=${sort}&page=${page}&per_page=50`, { token });
-      return { items: d.posts ?? [], total: d.meta.total };
-    })
-      .then((d) => {
-        if (!active) return;
-        setPosts(d.items);
-        setPostsError("");
-      })
-      .catch(() => {
-        if (active) setPostsError("投稿の取得に失敗しました");
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, sort]);
 
   if (loading || !session) {
     return <p className="text-sm text-slate-200">読み込み中...</p>;
@@ -59,8 +38,10 @@ export default function MyPostsPage() {
         current={sort}
         onSelect={setSort}
       />
-      {postsError ? (
-        <p className="text-sm text-red-400">{postsError}</p>
+      {feed.error ? (
+        <p className="text-sm text-red-400">{feed.error}</p>
+      ) : feed.posts === null ? (
+        <p className="text-sm text-slate-200">読み込み中...</p>
       ) : posts.length === 0 ? (
         <p className="text-sm text-slate-200">まだ投稿がありません</p>
       ) : (
@@ -70,6 +51,7 @@ export default function MyPostsPage() {
           ))}
         </FeedGrid>
       )}
+      {feed.hasMore ? <LoadMore onLoad={() => void feed.loadMore()} loading={feed.loadingMore} error={feed.moreError} expired={feed.expired} /> : null}
     </div>
   );
 }

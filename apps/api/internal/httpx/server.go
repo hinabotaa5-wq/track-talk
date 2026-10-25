@@ -246,6 +246,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/stats", s.adminStats)
 			r.Get("/admin/stats/coaching", s.adminCoachingStats)
 			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
+			r.Get("/admin/announcements", s.adminListAnnouncements)
+			r.Get("/admin/announcements/recipients", s.adminAnnouncementRecipients)
+			r.Post("/admin/announcements/test", s.adminTestAnnouncement)
+			r.Post("/admin/announcements", s.adminSendAnnouncement)
+			r.Post("/admin/announcements/{id}/cancel", s.adminCancelAnnouncement)
 		})
 
 		// オンラインコーチング（年齢・保護者の同意・プッシュ通知・添削動画・パーソナル指導・
@@ -400,11 +405,19 @@ func (s *Server) present(p postDTO) postDTO {
 			p.PlaybackURL = s.cfg.LocalMediaBaseURL + "/" + name + ".mp4"
 			return p
 		}
-		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
+		if p.list {
+			p.ThumbnailURL = s.cloud.CardThumbnailURL(p.VideoPublicID)
+		} else {
+			p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
+		}
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}
 	if (p.Kind == "text" || p.Kind == "recruitment" || p.Kind == "instagram") && p.ImagePublicID != "" {
-		p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
+		if p.list {
+			p.ThumbnailURL = s.cloud.CardImageURL(p.ImagePublicID)
+		} else {
+			p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
+		}
 	}
 	return p
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { MainTabLink } from "./main-tab-link";
+import { MainTabLink, PendingIcon } from "./main-tab-link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
@@ -25,13 +25,13 @@ const MemoIcon = createLucideIcon("memo", [
 export const mainTabs = [
   { id: "home", href: "/", label: "ホーム", icon: Home },
   { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "memo", href: "/memo", label: "メモ", icon: MemoIcon },
   { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
+  { id: "memo", href: "/memo", label: "メモ", icon: MemoIcon },
   { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
 ] as const;
 
 // マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
-export const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
+const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
 
 export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
   const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);
@@ -194,7 +194,9 @@ export function BottomNav() {
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  <PendingIcon className="size-5" label={`${tab.label}を開いています`}>
+                    <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  </PendingIcon>
                   <span>{tab.label}</span>
                 </MainTabLink>
               </li>

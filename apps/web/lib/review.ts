@@ -4,7 +4,7 @@ import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewPayMe
 export const reviewEvents: CoachEvent[] = ["100m"];
 
 // 以前の依頼で選ばれた項目の表示名。
-export const reviewFocusLabels: Record<ReviewFocus, string> = {
+const reviewFocusLabels: Record<ReviewFocus, string> = {
   start: "スタート",
   acceleration: "加速",
   "top-speed": "トップスピード",

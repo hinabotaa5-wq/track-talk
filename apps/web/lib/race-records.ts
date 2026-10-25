@@ -130,7 +130,7 @@ export type RaceChartPoint = { record: RaceRecord; x: number; y: number };
 
 export type RaceChartBox = { width: number; height: number; left: number; right: number; top: number; bottom: number };
 
-export const raceChartBox: RaceChartBox = { width: 320, height: 180, left: 48, right: 12, top: 14, bottom: 26 };
+export const raceChartBox: RaceChartBox = { width: 320, height: 180, left: 48, right: 12, top: 14, bottom: 12 };
 
 function dayNumber(day: string) {
   const [y, m, d] = day.split("-").map(Number);

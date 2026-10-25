@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, jstToday, togglePreChange,
-  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangeStepError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts } from "./injury";
+  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangeStepError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts, injuryPartFigures, injuryPartFigure, injuryGroupsByRegion, defaultInjuryRegion, type InjuryGroupMember } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -237,5 +237,40 @@ describe("injury hindsight", () => {
   it("keeps 'don't know' apart from the other choices", () => {
     expect(toggleHindsight(["warmup"], "none")).toEqual(["none"]);
     expect(toggleHindsight(["none"], "gear")).toEqual(["gear"]);
+  });
+
+  it("puts every injury group on the body illustration", () => {
+    expect(Object.keys(injuryPartFigures).sort()).toEqual(injuryBodyParts.map((item) => item.value).sort());
+    expect(injuryPartFigure("hamstring-strain")).toMatchObject({ region: "thigh", side: "back" });
+    expect(injuryPartFigure("neck")).toEqual({ region: "bone", side: "front", spots: [] });
+  });
+
+  it("groups injury groups by body region and totals the members", () => {
+    const groups = [
+      { body_part: "quad-strain", body_part_label: "太もも前の肉離れ", members: 3 },
+      { body_part: "shoulder", body_part_label: "肩の痛み", members: 2 },
+      { body_part: "hamstring-strain", body_part_label: "ハムストリングの肉離れ", members: 5 },
+      { body_part: "other", body_part_label: "その他", members: 1 },
+    ];
+    const regions = injuryGroupsByRegion(groups);
+    expect(regions.map((region) => [region.value, region.members])).toEqual([
+      ["upper", 2],
+      ["thigh", 8],
+      ["knee", 0],
+      ["lower-leg", 0],
+      ["bone", 1],
+    ]);
+    expect(regions[1].groups.map((group) => group.body_part)).toEqual(["hamstring-strain", "quad-strain"]);
+  });
+
+  it("opens on my own group's region, or else the busiest one", () => {
+    const me: InjuryGroupMember = { stage: "rehab", stage_label: "リハビリ中", injured_on: "2026-10-01", injured_on_exact: true, pre_changes: [] };
+    const groups = [
+      { body_part: "shin-splints", body_part_label: "シンスプリント", members: 9 },
+      { body_part: "elbow", body_part_label: "肘の痛み", members: 1 },
+    ];
+    expect(defaultInjuryRegion(groups)).toBe("knee");
+    expect(defaultInjuryRegion([groups[0], { ...groups[1], me }])).toBe("upper");
+    expect(defaultInjuryRegion([])).toBe("upper");
   });
 });

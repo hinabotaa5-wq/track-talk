@@ -13,8 +13,8 @@ import { InjuryRoadmap } from "@/components/injury-roadmap";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { fetchAllPages } from "@/lib/paging";
-import type { PostsPage } from "@/lib/fetch-posts";
+import { LoadMore } from "@/components/load-more";
+import { useCursorPosts } from "@/lib/use-cursor-posts";
 import {
   canPostInStage,
   injuryBodyPartLabel,
@@ -31,7 +31,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const { session, token, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
-  const [posts, setPosts] = useState<{ stage: string; page: PostsPage } | null>(null);
   const router = useRouter();
   const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
   const [leaveError, setLeaveError] = useState("");
@@ -70,23 +69,8 @@ export function GroupView({ part, members, summary }: { part: string; members: n
 
   const joined = load.kind === "joined";
   const myStage = joined ? load.group.me.stage : null;
-  useEffect(() => {
-    if (!joined || !token || !selected) return;
-    const controller = new AbortController();
-    // 21件目以降もグループの中から辿れるよう、最後のページまで集める。
-    fetchAllPages(async (pageNo) => {
-      const page = await apiFetch<PostsPage>(`/v1/injury/groups/${part}/posts?page=${pageNo}&per_page=50&stage=${selected}`, {
-        token,
-        signal: controller.signal,
-      });
-      return { items: page.posts ?? [], total: page.meta.total };
-    })
-      .then((all) => setPosts({ stage: selected, page: { posts: all.items, meta: { page: 1, per_page: all.items.length, total: all.total } } }))
-      .catch(() => {
-        if (!controller.signal.aborted) setPosts({ stage: selected, page: { posts: [], meta: { page: 1, per_page: 20, total: 0 } } });
-      });
-    return () => controller.abort();
-  }, [joined, part, token, selected, myStage]);
+  // 最初の1ページだけ読み、続きは末尾に近づいたら足す。自分の段階が変わったら読み直す。
+  const feed = useCursorPosts(joined && selected ? `/v1/injury/groups/${part}/posts?stage=${selected}` : null, token, myStage);
 
   async function leaveGroup() {
     setLeaving("busy");
@@ -144,7 +128,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           onJoined={() => {
             setLoad({ kind: "loading" });
             setSelected(null);
-            setPosts(null);
             setJoining(false);
             void fetchGroup();
           }}
@@ -161,7 +144,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const mine = group.me.stage;
   const own = canPostInStage(selected, mine);
   const selectedLabel = injuryStages.find((item) => item.value === selected)?.label ?? "";
-  const current = posts?.stage === selected ? posts.page : null;
+  const current = feed.posts;
 
   return (
     <div className="space-y-4">
@@ -187,15 +170,16 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       <h2 className="pt-2 text-base font-bold">{selectedLabel}の投稿</h2>
       {current === null ? (
         <FeedLoadingFrame />
-      ) : current.posts.length === 0 ? (
+      ) : current.length === 0 ? (
         <EmptyState title="まだ投稿がありません" body={own ? "最初の一言を書いてみましょう。" : "この段階の投稿は、まだありません。"} />
       ) : (
         <FeedGrid>
-          {current.posts.map((post) => (
+          {current.map((post) => (
             <FeedCard key={post.id} post={post} />
           ))}
         </FeedGrid>
       )}
+      {feed.hasMore ? <LoadMore onLoad={() => void feed.loadMore()} loading={feed.loadingMore} error={feed.moreError} expired={feed.expired} /> : null}
 
       {summary ? (
         <section className="space-y-3 border-t border-white/15 pt-4" aria-label="みんなのデータ">

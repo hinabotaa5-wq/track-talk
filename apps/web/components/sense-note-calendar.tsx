@@ -48,7 +48,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
 
   return (
     <section aria-label={title} className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <h2 className="text-base font-bold">{title}</h2>
+      {shared ? null : <h2 className="text-base font-bold">{title}</h2>}
       <div className="flex items-center justify-between">
         <Button variant="secondary" aria-label="前の月" onClick={() => moveMonth(-1)}><ChevronLeft className="size-5" aria-hidden /></Button>
         <h3 aria-live="polite" className="font-semibold tabular-nums">{year}年{monthNumber}月</h3>
@@ -75,15 +75,14 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
               className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border text-sm tabular-nums transition focus-visible:outline-2 focus-visible:outline-sky-300 ${selectedDay === day ? "border-sky-300 bg-sky-400/25 text-white" : hasContent ? "border-sky-300/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/20" : "border-transparent text-slate-400"} ${day === today ? "ring-1 ring-inset ring-white/40" : ""}`}
             >
               <span>{number}</span>
-              <span className="flex gap-1" aria-hidden>
-                <span className={`size-1.5 rounded-full ${written ? "bg-sky-300" : "bg-transparent"}`} />
-                {shared ? <span className={`size-1.5 rounded-full ${hasRecord ? "bg-amber-300" : "bg-transparent"}`} /> : null}
+              <span className="flex h-1.5 items-center justify-center gap-1" aria-hidden>
+                {written ? <span className="size-1.5 rounded-full bg-sky-300" /> : null}
+                {shared && hasRecord ? <span className="size-1.5 rounded-full bg-amber-300" /> : null}
               </span>
             </button>
           );
         })}
       </div>
-      <p className="flex items-center gap-2 text-xs text-slate-300"><span aria-hidden className="size-1.5 rounded-full bg-sky-300" />書いた日をタップすると詳細が開きます</p>
       {shared ? <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300"><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-amber-300" />大会記録</span></p> : null}
       {recordsLoading ? <p role="status" className="text-sm text-slate-300">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">大会記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
       {loading ? <p role="status" className="text-sm text-slate-300">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !recordsLoading && !recordsFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・大会記録はありません。" : "この月の感覚メモはありません。"}</p> : null}

@@ -20,7 +20,6 @@ import {
   raceChartBox,
   raceChartPoints,
   raceChartDomain,
-  raceOverviewSeries,
   sortRaceRecords,
   raceRoundSuggestions,
   raceRecordRoundMaxLength,
@@ -31,6 +30,7 @@ import {
   raceRecordMeetNameMaxLength,
   raceRecordMemoMaxLength,
   sortRaceEvents,
+  type RaceChartBox,
   type RaceMarkKind,
   type RaceRecord,
   type RaceRecords,
@@ -113,7 +113,14 @@ function RaceRecordForm({
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="mb-1 block text-xs text-slate-300">日付</span>
-          <Input type="date" value={day} max={todayInTokyo()} onChange={(e) => setDay(e.target.value)} required />
+          <Input
+            type="date"
+            value={day}
+            max={todayInTokyo()}
+            onChange={(e) => { e.currentTarget.setCustomValidity(""); setDay(e.target.value); }}
+            onInvalid={(e) => { if (e.currentTarget.validity.rangeOverflow) e.currentTarget.setCustomValidity(`${todayInTokyo().replaceAll("-", "/")}以下に設定してください`); }}
+            required
+          />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs text-slate-300">種目</span>
@@ -150,15 +157,11 @@ function RaceRecordForm({
         <span className="mb-1 block text-xs text-slate-300">大会名</span>
         <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder="例: 県高校総体" />
       </label>
-      <details open={record?.round ? true : undefined} className="rounded-lg border border-white/15 p-3">
-        <summary className="cursor-pointer text-sm text-slate-200">予選・準決勝・決勝などを記入（任意）</summary>
-        <label className="mt-3 block">
-          <span className="mb-1 block text-xs text-slate-300">ラウンド（任意）</span>
-          <Input value={round} onChange={(e) => setRound(e.target.value)} list={roundListId} maxLength={raceRecordRoundMaxLength} placeholder="例: 予選 / 準決勝 / 決勝" />
-          <datalist id={roundListId}>{raceRoundSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
-        </label>
-        <p className="mt-2 text-xs text-slate-300">記録会などは空欄のまま保存できます。同じ日・種目でも、1本ずつ記録を残せます。</p>
-      </details>
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-300">ラウンド（任意）</span>
+        <Input value={round} onChange={(e) => setRound(e.target.value)} list={roundListId} maxLength={raceRecordRoundMaxLength} placeholder="例: 予選 / 準決勝 / 決勝" />
+        <datalist id={roundListId}>{raceRoundSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+      </label>
       <label className="block">
         <span className="mb-1 block text-xs text-slate-300">感想</span>
         <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder="例: 後半で腕振りが小さくなった" />
@@ -185,47 +188,61 @@ function RaceRecordForm({
 }
 
 // 1つの種目の推移。よい記録ほど上。自己ベストは色を変え、追い風参考は白抜きにする。
-function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceMarkKind }) {
-  const points = raceChartPoints(records, kind);
+// 日付は軸に出さず、点を押したときだけ表示する。
+function RaceRecordChart({ records, kind, label, box = raceChartBox }: { records: RaceRecord[]; kind: RaceMarkKind; label?: string; box?: RaceChartBox }) {
+  const [active, setActive] = useState<string | null>(null);
+  const points = raceChartPoints(records, kind, box);
   if (points.length === 0) return null;
-  const box = raceChartBox;
-  const ordered = sortRaceRecords(records);
-  const marks = ordered.map((record) => record.mark);
+  const marks = records.map((record) => record.mark);
   const { low, high } = raceChartDomain(marks);
   const topMark = kind === "time" ? low : high;
   const bottomMark = kind === "time" ? high : low;
-  const first = ordered[0].raced_on;
-  const last = ordered[ordered.length - 1].raced_on;
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const picked = points.find((p) => p.record.id === active);
+  const toggle = (id: string) => setActive((current) => (current === id ? null : id));
 
   return (
     <figure className="space-y-1">
-      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label="記録の推移のグラフ">
+      {label ? <h3 className="text-sm font-semibold">{label}</h3> : null}
+      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label={`${label ?? ""}記録の推移のグラフ`}>
         <line x1={box.left} x2={box.width - box.right} y1={box.top} y2={box.top} className="stroke-white/15" />
         <line x1={box.left} x2={box.width - box.right} y1={box.height - box.bottom} y2={box.height - box.bottom} className="stroke-white/25" />
         <line x1={box.left} x2={box.width - box.right} y1={(box.top + box.height - box.bottom) / 2} y2={(box.top + box.height - box.bottom) / 2} className="stroke-white/10" strokeDasharray="3 3" />
         {[topMark, (low + high) / 2, bottomMark].map((mark, i) => <text key={i} x={box.left - 6} y={box.top + i / 2 * (box.height - box.top - box.bottom) + 4} textAnchor="end" className="fill-slate-300 text-xs">{formatRaceMark(Math.round(mark), kind)}</text>)}
-        <text x={box.left} y={box.height - 8} className="fill-slate-400 text-xs">
-          {senseDayLabel(first)}
-        </text>
-        {first !== last ? (
-          <text x={box.width - box.right} y={box.height - 8} textAnchor="end" className="fill-slate-400 text-xs">
-            {senseDayLabel(last)}
-          </text>
-        ) : null}
         <path d={path} fill="none" className="stroke-sky-300/70" strokeWidth={1.5} strokeLinejoin="round" />
         {points.map((p) => (
-          <circle
+          <g
             key={p.record.id}
-            cx={p.x}
-            cy={p.y}
-            r={p.record.is_pb ? 5 : 3.5}
-            strokeWidth={1.5}
-            className={p.record.wind_aided ? "fill-slate-950 stroke-slate-200" : p.record.is_pb ? "fill-amber-300 stroke-amber-100" : "fill-sky-300 stroke-sky-100"}
+            role="button"
+            tabIndex={0}
+            aria-label={`${senseDayLabel(p.record.raced_on)} ${formatRaceMark(p.record.mark, kind)}`}
+            aria-pressed={active === p.record.id}
+            onClick={() => toggle(p.record.id)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(p.record.id); } }}
+            className="cursor-pointer outline-none"
           >
-            <title>{`${p.record.raced_on} ${p.record.meet_name} ${p.record.round ?? ""} ${formatRaceMark(p.record.mark, kind)}`}</title>
-          </circle>
+            <circle cx={p.x} cy={p.y} r={12} fill="transparent" />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={p.record.is_pb ? 5 : 3.5}
+              strokeWidth={active === p.record.id ? 2.5 : 1.5}
+              className={p.record.wind_aided ? "fill-slate-950 stroke-slate-200" : p.record.is_pb ? "fill-amber-300 stroke-amber-100" : "fill-sky-300 stroke-sky-100"}
+            />
+          </g>
         ))}
+        {picked ? (
+          <text
+            x={picked.x}
+            y={picked.y < box.top + 18 ? picked.y + 20 : picked.y - 10}
+            textAnchor={picked.x < box.left + 40 ? "start" : picked.x > box.width - box.right - 40 ? "end" : "middle"}
+            className="pointer-events-none fill-white stroke-slate-950 text-xs font-semibold"
+            strokeWidth={3}
+            paintOrder="stroke"
+          >
+            {senseDayLabel(picked.record.raced_on)}
+          </text>
+        ) : null}
       </svg>
       <figcaption className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-300">
         <span className="flex items-center gap-1">
@@ -243,32 +260,17 @@ function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceM
   );
 }
 
-function RaceOverviewChart({ records }: { records: RaceRecord[] }) {
-  const { domain, series } = raceOverviewSeries(records);
-  const box = raceChartBox;
-  const sorted = sortRaceRecords(records);
-  const first = sorted[0]?.raced_on, last = sorted.at(-1)?.raced_on;
-  const y = (value: number) => box.top + (domain.high - value) / (domain.high - domain.low) * (box.height - box.top - box.bottom);
-  return <figure className="space-y-3">
-    <h3 className="text-sm font-semibold">全種目の伸びを比較</h3>
-    <p className="text-xs leading-relaxed text-slate-300">各種目の最初の記録を100とし、タイムの短縮率・距離や得点の増加率を重ねています。上に行くほど初回よりよい記録です。種目間の実力や公式の得点を比較するものではありません。</p>
-    <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label="全種目の初回の記録を100とした伸び率のグラフ">
-      {[domain.high, 100, domain.low].map((value, i) => <g key={i}>
-        <line x1={box.left} x2={box.width - box.right} y1={y(value)} y2={y(value)} className={value === 100 ? "stroke-white/40" : "stroke-white/15"} strokeDasharray={value === 100 ? "4 3" : undefined} />
-        <text x={box.left - 6} y={y(value) + 4} textAnchor="end" className="fill-slate-300 text-xs">{value.toFixed(1)}</text>
-      </g>)}
-      {series.map((item) => <g key={item.event}>
-        <path d={item.points.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")} fill="none" stroke={item.color} strokeWidth={1.5} />
-        {item.points.map((p) => <circle key={p.record.id} cx={p.x} cy={p.y} r={p.record.is_pb ? 4 : 3} fill={p.record.wind_aided ? "#020617" : item.color} stroke={item.color} strokeWidth={1.5}>
-          <title>{`${p.record.raced_on} ${item.event_label} ${p.record.round ?? ""} ${formatRaceMark(p.record.mark, item.kind)} / ${p.index.toFixed(1)}${p.record.wind_aided ? "（追い風参考）" : ""}`}</title>
-        </circle>)}
-      </g>)}
-      {first ? <text x={box.left} y={box.height - 8} className="fill-slate-400 text-xs">{senseDayLabel(first)}</text> : null}
-      {last && first !== last ? <text x={box.width - box.right} y={box.height - 8} textAnchor="end" className="fill-slate-400 text-xs">{senseDayLabel(last)}</text> : null}
-    </svg>
-    <figcaption className="flex flex-wrap gap-x-3 gap-y-2 text-xs">{series.map((item) => <span key={item.event} className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4" style={{ backgroundColor: item.color }} aria-hidden />{item.event_label}</span>)}</figcaption>
-    {records.some((r) => r.wind_aided) ? <p className="text-xs text-slate-300">白抜きの点は追い風参考です。</p> : null}
-  </figure>;
+// 全種目は、各種目のグラフを小さくして縦に重ねる。
+const smallChartBox: RaceChartBox = { ...raceChartBox, height: 110 };
+
+function RaceEventCharts({ records, events }: { records: RaceRecord[]; events: RaceRecords["events"] }) {
+  return (
+    <div className="space-y-4">
+      {events.map((item) => (
+        <RaceRecordChart key={item.event} records={records.filter((record) => record.event === item.event)} kind={item.kind} label={item.event_label} box={smallChartBox} />
+      ))}
+    </div>
+  );
 }
 
 export function RaceRecordRow({
@@ -380,7 +382,7 @@ function PBStatsCard({ token }: { token: string | null }) {
 
 const noRecords: RaceRecords = { events: [], records: [] };
 
-// 記録のタブ。書く欄、種目の切り替え、グラフ、記録の一覧(新しい順)。
+// 記録のタブ。書く欄、種目の切り替え、グラフ。1件ずつの記録はカレンダーの詳細で見て、直す・消す。
 export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, selectedDay }: {
   token: string | null;
   data?: RaceRecords | null;
@@ -447,16 +449,8 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
             ))}
           </div>
           <div className="rounded-2xl border border-white/20 glass bg-white/10 p-3">
-            {overview ? <RaceOverviewChart records={records} /> : <RaceRecordChart records={records} kind={current.kind} />}
-            {!overview ? <p className="mt-2 text-xs text-slate-400">小さな変化を大きく見せないよう、縦軸に余裕を持たせています。同日の記録はラウンド順に並びます。</p> : null}
+            {overview ? <RaceEventCharts records={records} events={events} /> : <RaceRecordChart key={current.event} records={records} kind={current.kind} />}
           </div>
-          <ul className="space-y-2">
-            {[...records].reverse().map((record) => (
-              <li key={record.id}>
-                <RaceRecordRow record={record} kind={raceMarkKind(record.event)} token={token} onChanged={onSaved} />
-              </li>
-            ))}
-          </ul>
         </section>
       )}
     </div>
