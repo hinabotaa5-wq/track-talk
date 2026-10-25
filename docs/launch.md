@@ -20,7 +20,6 @@
 - `CORS_ORIGINS` は画面の本番 URL
 - ヘルスチェック: `/health`
 - 予算（既定は月100円）を超えると API が止まる。再開は手作業
-- VM に移す場合の手順は [Oracle Cloud で動かす手順](oracle-deploy.md)
 
 ## Stripe（コーチングの支払い・送金）
 

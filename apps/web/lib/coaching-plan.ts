@@ -23,7 +23,7 @@ export function serviceReady(service: CoachingServiceType | null | undefined): b
   return true;
 }
 
-export function serviceLabel(service: CoachingServiceType | null | undefined): string {
+function serviceLabel(service: CoachingServiceType | null | undefined): string {
   return service ? coachingServiceLabels[service] : "従来のサポートプラン";
 }
 

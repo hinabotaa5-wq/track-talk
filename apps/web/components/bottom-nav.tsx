@@ -31,7 +31,7 @@ export const mainTabs = [
 ] as const;
 
 // マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
-export const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
+const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
 
 export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
   const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);

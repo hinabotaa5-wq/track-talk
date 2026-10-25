@@ -83,8 +83,8 @@ read -rs "NEW_DATABASE_URL?新のプーラー URL: "; echo; D="$(mktemp -d)/tt-m
 | `public` の dump / restore | 14 秒 / 17 秒、51 テーブルの行数が一致、マイグレーションの版も一致 |
 | `auth.users` / `auth.identities` | 4 → 4 / 6 → 6、パスワードログインを確認 |
 
-- [`deploy/db-migration/rehearse.sh`](../deploy/db-migration/rehearse.sh): `public` を dump して restore し、行数とマイグレーションの版を旧と突き合わせる。旧 DB は読むだけで、新 DB の `public` にテーブルがあると止まる
-- [`deploy/db-migration/rehearse-auth.sh`](../deploy/db-migration/rehearse-auth.sh): `auth.users` と `auth.identities` のデータだけを流す。`sessions`・`refresh_tokens` などの使い捨てのテーブルは移さない。新プロジェクトの JWT 鍵は旧と別物なので、利用者は一度ログインし直しになる
+- `rehearse.sh`(移行後に削除): `public` を dump して restore し、行数とマイグレーションの版を旧と突き合わせる。旧 DB は読むだけで、新 DB の `public` にテーブルがあると止まる
+- `rehearse-auth.sh`(移行後に削除): `auth.users` と `auth.identities` のデータだけを流す。`sessions`・`refresh_tokens` などの使い捨てのテーブルは移さない。新プロジェクトの JWT 鍵は旧と別物なので、利用者は一度ログインし直しになる
 - `pg_dump` は、サーバーと同じ（または新しい）メジャーバージョンが要る。サーバーが 17 のとき、手元が 16 だと `server version mismatch` で止まる。`brew install postgresql@17` のあと、`PATH` の先頭に `/opt/homebrew/opt/postgresql@17/bin` を足す
 - 接続文字列は `read -rs` で変数に入れ、**同じコマンドの中で**使う（別のコマンドに分けると、環境変数が引き継がれない場合がある）
 - dump にはパスワードのハッシュとメールアドレスが入る。終わったら、保存先のディレクトリごと消す
