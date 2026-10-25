@@ -46,6 +46,12 @@ describe("packMosaic", () => {
     expect(tiles[3].x).toBe(0);
     expect(tiles[3].y).toBeGreaterThan(tiles[1].y + tiles[1].height);
   });
+  it("12件ごとの区切りでも、次の投稿が前の区切りの空きへ詰まる", () => {
+    const items = Array.from({ length: 24 }, (_, index) => item([9 / 16, 16 / 9, 1, 4 / 3, 0.3][index % 5]));
+    const { tiles } = packMosaic(items, 390, 560);
+    const firstRight = Math.max(...tiles.slice(0, 12).map((tile) => tile.x + tile.width));
+    expect(tiles[12].x).toBeLessThan(firstRight);
+  });
   it("同じ投稿順と画面サイズでは配置を毎回変えない", () => {
     const items = [item(9 / 16), item(16 / 9), item(1), item(4 / 3)];
     expect(packMosaic(items, 358, 560)).toEqual(packMosaic(items, 358, 560));
