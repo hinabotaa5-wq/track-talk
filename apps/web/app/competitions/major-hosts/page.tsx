@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 };
 
 // 一覧をサーバーで描いておき、検索エンジンが中身を読めるようにする。取れなければ画面側で取り直す。
-// 開催地の一覧はめったに変わらないので1時間取り置き、開くたびに API の起動を待たない。
+// 開催地の一覧はめったに変わらないので24時間取り置き、開くたびに API の起動を待たない。
 export default async function Page() {
-  const hosts = await apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts", { signal: AbortSignal.timeout(3000), next: { revalidate: 3600 } })
+  const hosts = await apiFetch<{ hosts: MajorHost[] }>("/v1/major-hosts", { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } })
     .then((data) => data.hosts ?? [])
     .catch(() => null);
   return <MajorHostsPanel initialHosts={hosts} />;
