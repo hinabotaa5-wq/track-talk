@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { HomeFeed } from "@/components/home-feed";
-import { ReviewHome } from "@/components/review-home";
+import { FeedLoadingFrame } from "@/components/loading-frame";
 import type { PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, isRenderFresh, readFeed, renderSeedTime, seedFeed } from "@/lib/home-feed-cache";
 import { parseHomeSort, parseProductKind } from "@/lib/home-sort";
 import { parseReviewFilters, reviewFiltersQuery } from "@/lib/review-filters";
+
+// レビューとそのアニメーションは、レビューを開くときだけ読み込む。
+const ReviewHome = dynamic(() => import("@/components/review-home").then((mod) => mod.ReviewHome), {
+  loading: () => <FeedLoadingFrame horizontal />,
+});
 
 // 絞り込みのチップは history.pushState で URL を変えるので、タブはサーバーの props ではなく URL から読み、
 // サーバーとやりとりせずに切り替える。

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 export function PostFab() {
   return (
     <Link
+      prefetch={false}
       href="/upload"
       aria-label="投稿する"
       className="fixed left-4 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] z-30 flex size-14 items-center justify-center rounded-full bg-white text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-[0.98] md:left-8 md:bottom-8"

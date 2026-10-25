@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Trophy, X } from "lucide-react";
+import { MessageCircle, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "./auth-provider";
@@ -63,16 +63,8 @@ export function TodayMeetBalloon() {
         rightShiftRem={6}
         className="w-80 max-w-[calc(100vw-2rem)] mt-2 rounded-2xl border border-amber-200/60 bg-amber-50 text-slate-900 shadow-xl"
       >
-        <div role="dialog" aria-label="今日開催中の大会" className="relative p-4">
-          <button
-            type="button"
-            onClick={close}
-            aria-label="閉じる"
-            className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-amber-100 active:scale-[0.98]"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-          <p className="pr-6 text-sm font-bold leading-relaxed">今日は以下の大会が開催されてるよ！</p>
+        <div role="dialog" aria-label="今日開催中の大会" className="p-4">
+          <p className="text-sm font-bold leading-relaxed">今日は以下の大会が開催されてるよ！</p>
           <ul className="mt-3 space-y-2">
             {meets.map((meet) => (
               <li key={meet.meet_key}>

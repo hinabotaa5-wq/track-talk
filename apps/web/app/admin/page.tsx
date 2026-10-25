@@ -634,13 +634,13 @@ export default function AdminPage() {
     ...(coachingEnabled ? ([{ id: "payouts", label: "送金", total: -1 }] as { id: Tab; label: string; total: number }[]) : []),
     { id: "menu", label: "エグ練", total: -1 },
     { id: "meets", label: "タイムテーブル", total: -1 },
-    { id: "stats", label: "数字", total: -1 },
+    { id: "stats", label: "利用状況", total: -1 },
   ];
 
   return (
     <div className="mx-auto min-w-0 max-w-2xl space-y-4 [overflow-wrap:anywhere]">
       <h1 className="text-2xl font-bold">アプリ管理</h1>
-      <div role="tablist" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div role="tablist" aria-label="管理項目" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -648,7 +648,7 @@ export default function AdminPage() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${
+            className={`min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.98] ${
               tab === t.id ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
             }`}
           >

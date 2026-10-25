@@ -53,6 +53,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     const info = post.practice;
     return (
       <Link
+        prefetch={false}
         href={href}
         className={cardClass}
       >
@@ -75,7 +76,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   if (post.kind === "injury") {
     const info = post.injury;
     return (
-      <Link href={href} className={cardClass}>
+      <Link prefetch={false} href={href} className={cardClass}>
         <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-rose-400/10 p-3.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {info ? (
@@ -104,7 +105,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   }
   const hasThumbnail = Boolean(thumbnail || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
-    <Link href={href} aria-label={description ? undefined : "投稿の詳細を開く"}
+    <Link prefetch={false} href={href} aria-label={description ? undefined : "投稿の詳細を開く"}
       className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}${post.kind === "text" && !hasThumbnail ? " feed-card-text" : ""}`}>
       <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${thumbnail || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (

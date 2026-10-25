@@ -133,7 +133,7 @@ jobs:
           done
           curl -sf http://127.0.0.1:8080/health
           curl -sf -o /dev/null -X POST http://127.0.0.1:54321/auth/v1/token
-          npx playwright test e2e/home.spec.ts e2e/login-post.spec.ts e2e/ui-improvements.spec.ts e2e/post-layout.spec.ts e2e/home-feed-performance.spec.ts e2e/last-tab-startup.spec.ts
+          npx playwright test e2e/home.spec.ts e2e/login-post.spec.ts e2e/ui-improvements.spec.ts e2e/post-layout.spec.ts e2e/home-feed-performance.spec.ts e2e/last-tab-startup.spec.ts e2e/startup-responsive.spec.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:

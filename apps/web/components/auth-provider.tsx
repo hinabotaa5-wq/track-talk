@@ -1,8 +1,7 @@
 "use client";
 
-import { createClient } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { clearCompetitions } from "@/lib/competition-list";
@@ -28,10 +27,11 @@ const AuthContext = createContext<AuthState>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = useMemo(() => createClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(Boolean(supabase));
+  const [loading, setLoading] = useState(Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  ));
 
   // 読み込みが重なったら(ログアウト直後に前のトークンの応答が遅れて届くなど)、最後に始めたものの結果だけを使う。
   const profileSeq = useRef(0);
@@ -50,30 +50,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!supabase) {
-      return;
-    }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      loadProfile(data.session?.access_token ?? null).finally(() => setLoading(false));
-    });
-    const { data } = supabase.auth.onAuthStateChange((_e, next) => {
-      setSession(next);
-      if (!next) {
-        clearCompetitions();
-        clearMajorHosts();
-        clearDomesticMajors();
-        clearSavedFeeds();
-        try {
-          clearPersonalStorage(window.localStorage);
-        } catch {
-          // 保存領域が使えない端末では、消すものもない。
-        }
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    const invalidateProfile = () => { profileSeq.current++; };
+    // 認証 SDK のダウンロードを、タブや検索の操作準備の前提にしない。
+    void import("@/lib/supabase").then(({ createClient }) => {
+      if (!active) return;
+      const supabase = createClient();
+      if (!supabase) {
+        setLoading(false);
+        return;
       }
-      loadProfile(next?.access_token ?? null);
+      // INITIAL_SESSION もここで受け取る。getSession と重ねてプロフィールを二重取得しない。
+      const { data } = supabase.auth.onAuthStateChange((_e, next) => {
+        if (!active) return;
+        setSession(next);
+        if (!next) {
+          clearCompetitions();
+          clearMajorHosts();
+          clearDomesticMajors();
+          clearSavedFeeds();
+          try {
+            clearPersonalStorage(window.localStorage);
+          } catch {
+            // 保存領域が使えない端末では、消すものもない。
+          }
+        }
+        void loadProfile(next?.access_token ?? null).finally(() => {
+          if (active) setLoading(false);
+        });
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+    }).catch(() => {
+      if (active) setLoading(false);
     });
-    return () => data.subscription.unsubscribe();
-  }, [supabase]);
+    return () => {
+      active = false;
+      invalidateProfile();
+      unsubscribe?.();
+    };
+  }, []);
 
   return (
     <AuthContext.Provider

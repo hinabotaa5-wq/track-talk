@@ -1,5 +1,6 @@
 import type { CaptureResult, PostHog, PostHogConfig } from "posthog-js";
 import type { AnalyticsEvent } from "./analytics";
+import { afterStartup } from "./after-startup";
 
 const events = new Set([
   "$pageview", "onboarding_completed", "post_created", "post_liked",
@@ -74,7 +75,8 @@ function getClient(): Promise<PostHog | null> {
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim().replace(/\/+$/, "");
   // ホストも明示する。未設定なら通信もブラウザへの保存もしない。
   if (!key || !host || !["https://us.i.posthog.com", "https://eu.i.posthog.com"].includes(host)) return Promise.resolve(null);
-  client ??= import("posthog-js/no-external")
+  client ??= new Promise<void>((resolve) => { afterStartup(resolve); })
+    .then(() => import("posthog-js/no-external"))
     .then(({ default: posthog }) => posthog.init(key, posthogConfig(host)))
     .catch(() => null);
   return client;

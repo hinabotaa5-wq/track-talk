@@ -62,6 +62,7 @@ export function MenuContestBar() {
 
   return (
     <Link
+      prefetch={false}
       href="/menu-contest"
       className="mx-auto flex max-w-5xl items-center gap-2 px-4 pb-2 text-sm transition active:scale-[0.98]"
     >

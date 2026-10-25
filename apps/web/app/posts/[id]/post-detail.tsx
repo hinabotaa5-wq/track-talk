@@ -468,7 +468,7 @@ export function PostDetail({
       {activeThread ? null : (
       <div className="min-w-0 space-y-6">
       {post.kind === "meet" && hasFeedTitle(post.title) ? (
-        <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
+        <h1 className="text-2xl font-bold leading-snug [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       ) : null}
       {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
         <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{post.body}</p>

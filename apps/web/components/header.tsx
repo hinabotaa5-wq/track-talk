@@ -111,7 +111,7 @@ export function Header() {
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
+            <Link prefetch={false} href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
               <TrackLogo />
             </Link>
           )}
@@ -124,6 +124,7 @@ export function Header() {
                 const active = current === tab.id;
                 return (
                   <Link
+                    prefetch={false}
                     key={tab.id}
                     href={mainTabHref(tab.id, !!session)}
                     onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}

@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsPage, posthogConfig, sanitizePosthogEvent } from "./posthog";
 
+const startup = vi.hoisted(() => ({ tasks: [] as (() => void)[] }));
+vi.mock("./after-startup", () => ({ afterStartup: (callback: () => void) => { startup.tasks.push(callback); return () => {}; } }));
+
 const sdk = vi.hoisted(() => ({ init: vi.fn(), capture: vi.fn() }));
 vi.mock("posthog-js/no-external", () => ({ default: sdk }));
 
 beforeEach(() => {
   vi.resetModules();
+  startup.tasks = [];
   sdk.init.mockReset().mockReturnValue(sdk);
   sdk.capture.mockReset();
   vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_public");
@@ -72,6 +76,9 @@ describe("optional PostHog startup", () => {
     const { capturePosthog } = await import("./posthog");
     capturePosthog("$pageview", "/register");
     capturePosthog("onboarding_completed", "/me/profile");
+    expect(sdk.init).not.toHaveBeenCalled();
+    expect(startup.tasks).toHaveLength(1);
+    startup.tasks[0]();
     await vi.waitFor(() => expect(sdk.capture).toHaveBeenCalledTimes(2));
     expect(sdk.init).toHaveBeenCalledTimes(1);
     expect(sdk.capture).toHaveBeenNthCalledWith(1, "$pageview", { $pathname: "/register" });
@@ -91,6 +98,7 @@ describe("optional PostHog startup", () => {
     vi.stubGlobal("window", { location: { hostname: "track-talk.netlify.app", pathname: "/" } });
     const { capturePosthog } = await import("./posthog");
     capturePosthog("search_submitted");
+    startup.tasks[0]();
     await vi.waitFor(() => expect(sdk.capture).toHaveBeenCalledExactlyOnceWith("search_submitted", { $pathname: "/" }));
   });
 
@@ -98,6 +106,7 @@ describe("optional PostHog startup", () => {
     sdk.init.mockImplementationOnce(() => { throw new Error("blocked"); });
     const { capturePosthog } = await import("./posthog");
     expect(() => capturePosthog("post_created")).not.toThrow();
+    startup.tasks[0]();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sdk.capture).not.toHaveBeenCalled();
   });

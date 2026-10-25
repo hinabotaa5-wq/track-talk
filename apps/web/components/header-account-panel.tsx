@@ -11,6 +11,7 @@ export function HeaderAccountPanel({ signedIn }: { signedIn: boolean }) {
   const active = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/admin" || pathname.startsWith("/admin/");
   return (
     <Link
+      prefetch={false}
       href={signedIn ? "/me" : "/login"}
       aria-label="マイページ"
       aria-expanded={pathname === "/me"}

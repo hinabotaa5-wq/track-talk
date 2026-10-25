@@ -31,9 +31,9 @@ type AdminStats = {
   recent_days: number;
   weeks: WeekRow[];
   retention: { week_start: string; signups: number; retained: number }[];
-  features: { feature: string; recent: number; recent_users: number; total: number }[];
-  inquiries: { source: string; category: string; recent: number; total: number }[];
-  reports: { target_type: string; reason: string; recent: number; open: number; total: number }[];
+  features: { feature: string; recent: number; recent_users: number; total: number }[] | null;
+  inquiries: { source: string; category: string; recent: number; total: number }[] | null;
+  reports: { target_type: string; reason: string; recent: number; open: number; total: number }[] | null;
 };
 
 type CoachingStats = {
@@ -59,18 +59,9 @@ type CoachingStats = {
 };
 
 const featureLabels: Record<string, string> = {
-  "post:text": "投稿(文章)",
-  "post:youtube": "投稿(YouTube)",
-  "post:instagram": "投稿(Instagram)",
-  "post:video": "投稿(動画)",
-  "post:recruitment": "クラブチームの募集",
-  "post:practice": "練習相手募集",
-  "post:injury": "ケガの投稿",
   comment: "コメント",
-  like: "いいね",
   save: "保存",
   sense_note: "感覚メモ",
-  race_record: "競技会の記録",
   product_review: "シューズのレビュー",
   practice_application: "練習への参加申請",
   injury_group: "ケガのグループに参加",
@@ -179,45 +170,49 @@ export function AdminStatsView({ token }: { token: string | null }) {
   const days = stats.recent_days;
   return (
     <div className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-lg font-bold">アプリ内の利用状況</h2>
+        <p className="text-sm text-slate-300">アカウント単位の利用人数・継続率と、Umamiに送っていない機能の利用・運営状況を表示します。閲覧数・訪問者数・投稿・いいね・競技会の記録の件数はUmamiで確認できます。</p>
+      </div>
       {stats.daily_started_at ? (
         <Section
           title="日ごとに残す件数"
-          note={`日本時間で直近90日を表示。${new Date(stats.daily_started_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}から保存しています。初日は開始後の分だけ、今日は途中の件数です。新規保存に成功した回数を数え、編集は含めません。いいねの取り消し後の押し直しはもう1回と数えます。削除・退会後も件数は減りません。人数や閲覧数とは別の集計です。`}
+          note={`日本時間で直近90日を表示。${new Date(stats.daily_started_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}から保存しています。初日は開始後の分だけ、今日は途中の件数です。新規保存に成功した回数を数え、編集は含めません。削除・退会後も件数は減りません。`}
         >
           <Table
-            head={["日付", "登録", "投稿", "コメント", "いいね", "感覚メモ", "記録", "レビュー", "退会"]}
-            rows={(stats.daily ?? []).map((d) => [d.day, d.signups, d.posts, d.comments, d.likes, d.sense_notes, d.race_records, d.product_reviews, d.deletions])}
+            head={["日付", "コメント", "感覚メモ", "レビュー", "退会"]}
+            rows={(stats.daily ?? []).map((d) => [d.day, d.comments, d.sense_notes, d.product_reviews, d.deletions])}
           />
         </Section>
       ) : null}
       <Section
         title="週ごとの動き"
-        note="週は月曜始まり。「書いた人」は投稿・コメント・いいね・感覚メモ・記録・レビュー・練習の申請・ケガのグループへの参加のどれかをした人数で、読むだけの人は入りません(ページを開いた人数は Umami で見ます)。退会した人のぶんは過去の週からも消えます。"
+        note="週は日本時間の月曜始まり。「書いた人数」は投稿・コメント・いいね・感覚メモ・記録・レビュー・練習の申請・ケガのグループへの参加のどれかをしたアカウント数です。同じアカウントは1人として数えます。読むだけの人は含みません。退会した人のぶんは過去の週からも消えます。"
       >
         <Table
-          head={["週", "登録", "書いた人", "投稿", "感覚メモ", "記録", "退会"]}
-          rows={stats.weeks.map((w) => [weekLabel(w.week_start), w.signups, w.active_users, w.posts, w.sense_notes, w.race_records, w.deletions])}
+          head={["週", "書いた人数", "感覚メモ", "退会"]}
+          rows={stats.weeks.map((w) => [weekLabel(w.week_start), w.active_users, w.sense_notes, w.deletions])}
         />
       </Section>
 
-      <Section title="続けて使っている人" note="登録した週ごとに、登録から29〜35日目(5週目)にも書き込みをした人の割合。5週目が終わった週だけ出します。">
+      <Section title="続けて使っている人" note="登録した週ごとに、登録から29〜35日目(5週目)にも書き込みをしたアカウントの割合。同じアカウントの利用を端末をまたいで集計します。5週目が終わった週だけ出します。">
         <Table
           head={["登録した週", "登録", "5週目も書いた", "割合"]}
           rows={stats.retention.map((r) => [weekLabel(r.week_start), r.signups, r.retained, percent(r.retained, r.signups)])}
         />
       </Section>
 
-      <Section title="機能ごとの利用" note={`直近${days}日の件数と使った人数、これまでの件数。`}>
+      <Section title="機能ごとの利用" note={`Umamiに送っていない機能の、直近${days}日の件数・利用アカウント数と、現在残っている全期間の件数。削除や取り消しで件数は減ります。`}>
         <Table
-          head={["機能", `${days}日の件数`, `${days}日の人数`, "これまで"]}
-          rows={stats.features.map((f) => [featureLabels[f.feature] ?? f.feature, f.recent, f.recent_users, f.total])}
+          head={["機能", `${days}日の件数`, `${days}日の人数`, "全期間の件数"]}
+          rows={(stats.features ?? []).filter((f) => Object.hasOwn(featureLabels, f.feature)).map((f) => [featureLabels[f.feature], f.recent, f.recent_users, f.total])}
         />
       </Section>
 
       <Section title="問い合わせの内訳" note={`直近${days}日とこれまでの件数。`}>
         <Table
           head={["窓口", "種類", `${days}日`, "これまで"]}
-          rows={stats.inquiries.map((q) => [
+          rows={(stats.inquiries ?? []).map((q) => [
             sourceLabels[q.source] ?? q.source,
             inquiryCategoryLabels[q.category as keyof typeof inquiryCategoryLabels] ?? q.category,
             q.recent,
@@ -229,7 +224,7 @@ export function AdminStatsView({ token }: { token: string | null }) {
       <Section title="通報の内訳" note={`直近${days}日、未対応、これまでの件数。`}>
         <Table
           head={["対象", "理由", `${days}日`, "未対応", "これまで"]}
-          rows={stats.reports.map((r) => [targetLabels[r.target_type] ?? r.target_type, reasonLabels[r.reason] ?? r.reason, r.recent, r.open, r.total])}
+          rows={(stats.reports ?? []).map((r) => [targetLabels[r.target_type] ?? r.target_type, reasonLabels[r.reason] ?? r.reason, r.recent, r.open, r.total])}
         />
       </Section>
 

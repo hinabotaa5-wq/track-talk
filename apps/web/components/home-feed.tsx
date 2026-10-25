@@ -9,6 +9,7 @@ import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { ApiRequestError } from "@/lib/api";
 import type { Meta, Post } from "@/lib/types";
+import { afterStartup } from "@/lib/after-startup";
 
 const loadError = "投稿の取得に失敗しました。APIの起動を確認してください。";
 
@@ -53,6 +54,11 @@ export function HomeFeed({
   useEffect(() => {
     let active = true;
     alive.current = true;
+    let cancelPrefetch: (() => void) | undefined;
+    function prefetch() {
+      cancelPrefetch?.();
+      cancelPrefetch = afterStartup(() => prefetchHomeFeeds(q));
+    }
     function refresh(retry: boolean) {
       // データがなければ API が起きるまで読み直し続ける。古いデータがあれば、目立たないように更新する。
       loadHomeFeed(path, retry)
@@ -60,14 +66,14 @@ export function HomeFeed({
           if (!active) return;
           setChunks((current) => data.meta.has_more !== undefined ? [data] : [data, ...(current?.slice(1) ?? [])]);
           setError("");
-          prefetchHomeFeeds(q);
+          prefetch();
         })
         .catch(() => {
           if (active && !hasInitial) setError(loadError);
         });
     }
     if ((chunksRef.current?.length ?? 0) <= 1 && !(hasInitial && isFeedFresh(path))) refresh(!hasInitial);
-    else prefetchHomeFeeds(q);
+    else prefetch();
     function onVisible() {
       if (document.visibilityState === "visible" && (chunksRef.current?.length ?? 0) <= 1 && !isFeedFresh(path)) refresh(false);
     }
@@ -75,6 +81,7 @@ export function HomeFeed({
     return () => {
       active = false;
       alive.current = false;
+      cancelPrefetch?.();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [hasInitial, path, q]);
