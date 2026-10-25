@@ -21,6 +21,7 @@ const categoryLabels: Record<NotificationCategory, { title: string; detail: stri
   review: { title: "フォーム添削", detail: "返答、補足、期限切れ、「役に立ちましたか」" },
   coaching: { title: "パーソナル指導・コーチ", detail: "申し込み、承諾、開始、終了、メッセージ、コーチの応募の結果" },
   monthly: { title: "月1回の記録のお知らせ", detail: "毎月1日に、大会の記録を残すお知らせ" },
+  announcement: { title: "運営からのお知らせ", detail: "新しい機能が使えるようになったときなど、運営から全員へのお知らせ" },
 };
 
 function Switch({ checked, label, disabled, onChange }: { checked: boolean; label: string; disabled: boolean; onChange: (next: boolean) => void }) {

@@ -16,13 +16,14 @@ import (
 
 // 通知の種類。マイページの通知タブで、種類ごとにベル(アプリ内)とプッシュを切り替えられる。
 const (
-	notifyComment     = "comment"     // 自分の投稿へのコメント、自分のコメントへの返信
-	notifyPractice    = "practice"    // 練習の参加申請・承認・解散後の評価
-	notifyRecruitment = "recruitment" // 新しい練習の募集
-	notifyInjury      = "injury"      // ケガの投稿の経過報告
-	notifyReview      = "review"      // フォーム添削の返答・補足・期限切れなど
-	notifyCoaching    = "coaching"    // パーソナル指導のやりとり、コーチの応募の結果
-	notifyMonthly     = "monthly"     // 月1回の大会の記録のお知らせ
+	notifyComment      = "comment"      // 自分の投稿へのコメント、自分のコメントへの返信
+	notifyPractice     = "practice"     // 練習の参加申請・承認・解散後の評価
+	notifyRecruitment  = "recruitment"  // 新しい練習の募集
+	notifyInjury       = "injury"       // ケガの投稿の経過報告
+	notifyReview       = "review"       // フォーム添削の返答・補足・期限切れなど
+	notifyCoaching     = "coaching"     // パーソナル指導のやりとり、コーチの応募の結果
+	notifyMonthly      = "monthly"      // 月1回の大会の記録のお知らせ
+	notifyAnnouncement = "announcement" // 運営からのお知らせ(管理者画面から全員へ送る)
 	// notifyImportant は切り替えられない知らせ。お金(支払い・返金・送金)、保護者の同意、運営の対応、
 	// 運営への通報、受付中のコーチへの添削の打診。届かないと本人が損をするか、運営が対応できない。
 	notifyImportant = "important"
@@ -44,6 +45,7 @@ var notificationCategories = []notificationCategory{
 	{Key: notifyReview, InAppDefault: true, PushDefault: true},
 	{Key: notifyCoaching, InAppDefault: true, PushDefault: true},
 	{Key: notifyMonthly, InAppDefault: true, PushDefault: true},
+	{Key: notifyAnnouncement, InAppDefault: true, PushDefault: true},
 }
 
 func findNotificationCategory(key string) (notificationCategory, bool) {
