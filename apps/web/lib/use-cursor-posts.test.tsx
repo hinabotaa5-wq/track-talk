@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -10,11 +10,13 @@ vi.mock("@/lib/api", async (importOriginal) => ({ ...(await importOriginal<typeo
 const request = vi.mocked(apiFetch);
 const page = (ids: string[], next = "") => ({ posts: ids.map((id) => ({ id, title: id, kind: "text" }) as Post), meta: { page: 1, per_page: 24, total: 0, has_more: !!next, next_cursor: next } });
 
-let feed: ReturnType<typeof useCursorPosts>;
+const latest: { current?: ReturnType<typeof useCursorPosts> } = {};
 function Probe({ base }: { base: string | null }) {
-  feed = useCursorPosts(base, "token");
+  const feed = useCursorPosts(base, "token");
+  useEffect(() => { latest.current = feed; });
   return null;
 }
+const feedOf = () => latest.current!;
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
@@ -34,27 +36,27 @@ it("最初の1ページだけ読み、続きは重ならないように足して
   request.mockResolvedValueOnce(page(["1", "2"], "c1")).mockResolvedValueOnce(page(["2", "3"]));
   await act(async () => root.render(<Probe base="/v1/me/posts?sort=new" />));
   expect(request).toHaveBeenCalledTimes(1);
-  expect(feed.posts?.map((post) => post.id)).toEqual(["1", "2"]);
-  expect(feed.hasMore).toBe(true);
-  await act(async () => { await feed.loadMore(); });
+  expect(feedOf().posts?.map((post) => post.id)).toEqual(["1", "2"]);
+  expect(feedOf().hasMore).toBe(true);
+  await act(async () => { await feedOf().loadMore(); });
   expect(request).toHaveBeenLastCalledWith("/v1/me/posts?sort=new&pagination=cursor&per_page=24&cursor=c1", { token: "token" });
-  expect(feed.posts?.map((post) => post.id)).toEqual(["1", "2", "3"]);
-  expect(feed.hasMore).toBe(false);
-  await act(async () => { await feed.loadMore(); });
+  expect(feedOf().posts?.map((post) => post.id)).toEqual(["1", "2", "3"]);
+  expect(feedOf().hasMore).toBe(false);
+  await act(async () => { await feedOf().loadMore(); });
   expect(request).toHaveBeenCalledTimes(2);
 });
 
 it("期限切れのカーソルは読み直しを促す", async () => {
   request.mockResolvedValueOnce(page(["1"], "old")).mockRejectedValueOnce(new ApiRequestError(400, { error: { code: "invalid_cursor", message: "x" } } as never));
   await act(async () => root.render(<Probe base="/v1/me/posts" />));
-  await act(async () => { await feed.loadMore(); });
-  expect(feed.expired).toBe(true);
-  expect(feed.moreError).not.toBe("");
-  expect(feed.posts?.map((post) => post.id)).toEqual(["1"]);
+  await act(async () => { await feedOf().loadMore(); });
+  expect(feedOf().expired).toBe(true);
+  expect(feedOf().moreError).not.toBe("");
+  expect(feedOf().posts?.map((post) => post.id)).toEqual(["1"]);
 });
 
 it("読み込む一覧が決まるまでは取りにいかない", async () => {
   await act(async () => root.render(<Probe base={null} />));
   expect(request).not.toHaveBeenCalled();
-  expect(feed.posts).toBeNull();
+  expect(feedOf().posts).toBeNull();
 });
