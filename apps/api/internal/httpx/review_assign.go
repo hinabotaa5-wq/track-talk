@@ -329,7 +329,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 
 // listCoachRequests は、コーチに届いている打診と、引き受けて添削中の依頼。
 func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
@@ -359,21 +359,12 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
-		return
-	}
-	coach, err := s.q.GetCoachProfile(r.Context(), p.ID)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && coach.Status != "approved") {
-		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけが引き受けられます")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
 		return
 	}
 	tx, err := s.pool.Begin(r.Context())
@@ -417,7 +408,7 @@ func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}

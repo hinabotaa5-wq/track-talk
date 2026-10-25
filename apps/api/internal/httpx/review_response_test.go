@@ -298,16 +298,27 @@ func TestReviewAuthorization(t *testing.T) {
 	id := acceptedReview(t, h, tadmin, tc, tu)
 	// These routes must reject unauthenticated callers before inspecting request data.
 	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, "/v1/coach/requests"},
 		{http.MethodGet, "/v1/coach/requests/" + id},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/response"},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification"},
 		{http.MethodPost, "/v1/coach/offers/" + id + "/accept"},
+		{http.MethodPost, "/v1/coach/offers/" + id + "/decline"},
 	} {
 		if rec := doJSON(t, h, route.method, route.path, "", nil); rec.Code != http.StatusUnauthorized {
 			t.Fatalf("unauthenticated %s: %d", route.path, rec.Code)
 		}
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tu, responseBody()); rec.Code != http.StatusConflict {
+	for _, unauthorized := range []string{tother, tu} {
+		want := http.StatusNotFound
+		if unauthorized == tu {
+			want = http.StatusForbidden
+		}
+		if rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+id, unauthorized, nil); rec.Code != want {
+			t.Fatalf("unauthorized request read %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tu, responseBody()); rec.Code != http.StatusForbidden {
 		t.Fatalf("requester submits response %d", rec.Code)
 	}
 
@@ -320,12 +331,74 @@ func TestReviewAuthorization(t *testing.T) {
 	// IDを知っていても、担当外のコーチと依頼者本人は補足を返せない。
 	for _, unauthorized := range []string{tother, tu} {
 		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", unauthorized, map[string]any{"clarification": "担当外からの補足"})
-		if rec.Code != http.StatusConflict {
+		want := http.StatusConflict
+		if unauthorized == tu {
+			want = http.StatusForbidden
+		}
+		if rec.Code != want {
 			t.Fatalf("unauthorized clarification %d %s", rec.Code, rec.Body.String())
 		}
 	}
 
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "1台ずつ歩いて越えます"}); rec.Code != http.StatusOK {
 		t.Fatalf("coach clarification %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// Approval must be checked on every request, even when an assignment still
+// belongs to the caller and their authentication token remains valid.
+func TestReviewRevokedCoachAuthorization(t *testing.T) {
+	for _, operation := range []string{"list_offer", "list_review", "read", "response", "clarification", "decline"} {
+		t.Run(operation, func(t *testing.T) {
+			fakeCoachingCloudinary(t)
+			h := setup(t)
+			tadmin := adminToken(t, h)
+			coach, tc := onDutyCoach(t, h, tadmin)
+			_, tu := demoRequester(t, h, tadmin)
+			rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+			}
+			offers := coachRequests(t, h, tc).Offers
+			if len(offers) != 1 {
+				t.Fatalf("offers %+v", offers)
+			}
+			offer := offers[0]
+			id := offer.Request.ID
+			if operation != "list_offer" && operation != "decline" {
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offer.ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+					t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+				}
+			}
+			if operation == "clarification" {
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
+					t.Fatalf("response %d %s", rec.Code, rec.Body.String())
+				}
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"}); rec.Code != http.StatusOK {
+					t.Fatalf("clarify %d %s", rec.Code, rec.Body.String())
+				}
+			}
+			execSQLArgs(t, `UPDATE coach_profiles SET status = 'suspended', on_duty = false WHERE profile_id = $1`, coach)
+			before := reviewStatus(t, h, tu, id)
+			method, path := http.MethodGet, "/v1/coach/requests"
+			var body any
+			switch operation {
+			case "read":
+				path += "/" + id
+			case "response":
+				method, path, body = http.MethodPost, "/v1/coaching/requests/"+id+"/response", responseBody()
+			case "clarification":
+				method, path, body = http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", map[string]any{"clarification": "停止済みコーチからの補足"}
+			case "decline":
+				method, path = http.MethodPost, "/v1/coach/offers/"+offer.ID+"/decline"
+			}
+			rec = doJSON(t, h, method, path, tc, body)
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("suspended coach: got %d, want 403", rec.Code)
+			}
+			if after := reviewStatus(t, h, tu, id); after != before {
+				t.Errorf("suspended coach changed request: %s -> %s", before, after)
+			}
+		})
 	}
 }

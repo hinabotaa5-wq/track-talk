@@ -78,6 +78,56 @@ func tick(t *testing.T, h http.Handler, secret string) *httptest.ResponseRecorde
 	return rec
 }
 
+func TestReviewOfferAuthorization(t *testing.T) {
+	for _, action := range []string{"accept", "decline"} {
+		t.Run(action, func(t *testing.T) {
+			fakeCoachingCloudinary(t)
+			h := setup(t)
+			tadmin := adminToken(t, h)
+			_, tc := onDutyCoach(t, h, tadmin)
+			_, tother := onDutyCoach(t, h, tadmin)
+			_, tu := demoRequester(t, h, tadmin)
+			rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+			}
+			offers := coachRequests(t, h, tc).Offers
+			if len(offers) != 1 {
+				t.Fatalf("offers %+v", offers)
+			}
+			offer := offers[0]
+			path := "/v1/coach/offers/" + offer.ID + "/" + action
+			requesterStatus := http.StatusForbidden
+			for _, caller := range []struct {
+				name, token string
+				status      int
+			}{
+				{"anonymous", "", http.StatusUnauthorized},
+				{"invalid token", "invalid", http.StatusUnauthorized},
+				{"other coach", tother, http.StatusNotFound},
+				{"requester", tu, requesterStatus},
+			} {
+				rec := doJSON(t, h, http.MethodPost, path, caller.token, nil)
+				if rec.Code != caller.status {
+					t.Fatalf("%s: %d %s", caller.name, rec.Code, rec.Body.String())
+				}
+				// A rejected attempt must not answer, requeue, or reassign the offer.
+				remaining := coachRequests(t, h, tc).Offers
+				if len(remaining) != 1 || remaining[0].ID != offer.ID || remaining[0].Request.Status != "offered" {
+					t.Fatalf("%s changed the offer: %+v", caller.name, remaining)
+				}
+			}
+			want := http.StatusOK
+			if action == "decline" {
+				want = http.StatusNoContent
+			}
+			if rec := doJSON(t, h, http.MethodPost, path, tc, nil); rec.Code != want {
+				t.Fatalf("owner: %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestReviewOfferFlow(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setupConfig(t, func(cfg *config.Config) { cfg.CoachingTickSecret = "tick-secret" })
