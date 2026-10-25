@@ -33,7 +33,8 @@ test("今日の大会は自動で開かず、タップした時だけ表示す�
   await expect(dialog).toHaveCount(0);
   await trophy.click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "閉じる" }).click();
+  await expect(dialog.getByRole("button", { name: "閉じる" })).toHaveCount(0);
+  await page.mouse.click(8, 8);
   await expect(dialog).toHaveCount(0);
   await page.reload();
   await expect(trophy).toBeVisible();

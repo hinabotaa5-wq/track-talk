@@ -24,6 +24,7 @@ export function saveHomeFeedChunks(path: string, chunks: PostsPage[], atGenerati
 const inflight = new Map<string, Promise<PostsPage>>();
 // 消したあとに、消す前に始めた読み込みが書き戻さないようにする世代の番号(ログアウト後に前の人の保存一覧が残らないように)。
 let generation = 0;
+let savedGeneration = 0;
 // 投稿の作成・編集・削除でフィードを消した時刻。これより前にサーバーが描いた画面の一覧は古い。
 let homeClearedAt = 0;
 
@@ -101,7 +102,7 @@ export function clearHomeFeeds() {
 }
 
 export function clearSavedFeeds() {
-  generation++;
+  savedGeneration++;
   for (const key of [...cache.keys(), ...inflight.keys()]) {
     if (key.startsWith("/v1/me/")) {
       cache.delete(key);
@@ -111,11 +112,12 @@ export function clearSavedFeeds() {
 }
 
 function start(path: string, request: () => Promise<{ posts?: PostsPage["posts"] | null; meta: PostsPage["meta"] }>) {
-  const startedAt = generation;
+  const currentGeneration = () => path.startsWith("/v1/me/") ? savedGeneration : generation;
+  const startedAt = currentGeneration();
   const pending: Promise<PostsPage> = request()
     .then((data) => {
       const page = { posts: data.posts ?? [], meta: data.meta, request_path: path };
-      if (startedAt === generation) seedFeed(path, page);
+      if (startedAt === currentGeneration()) seedFeed(path, page);
       return page;
     })
     .finally(() => {

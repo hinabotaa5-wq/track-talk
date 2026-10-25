@@ -94,3 +94,19 @@ it("古い世代の保存処理で新しい一覧を消さない", () => {
   saveHomeFeedChunks(path, chunks, oldGeneration);
   expect(readHomeFeedChunks(path)).toEqual(chunks);
 });
+
+
+it("認証初期化で保存一覧を消してもホームの取得と復元を無効化しない", async () => {
+  const { loadHomeFeed } = await import("./home-feed-cache");
+  clearHomeFeeds();
+  const path = "/v1/posts?saved-clear-race";
+  const pending = loadHomeFeed(path);
+  const homeGeneration = homeFeedGeneration();
+  clearSavedFeeds();
+  const data = { posts: [], meta: { page: 1, per_page: 12, total: 0 } };
+  resolve(data);
+  await pending;
+  expect(readFeed(path)).toMatchObject(data);
+  saveHomeFeedChunks(path, [data], homeGeneration);
+  expect(readHomeFeedChunks(path)).toEqual([data]);
+});

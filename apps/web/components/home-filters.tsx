@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
@@ -59,7 +59,10 @@ function KeywordInput({ initial }: { initial: string }) {
   );
 }
 
+const subscribeToHydration = () => () => {};
+
 export function HomeFilters() {
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   // チップは history.pushState でタブを切り替える。HomeView は URL を見て、サーバーとやりとりせずに切り替える。
   const sp = useSearchParams();
   const sort = parseHomeSort(sp.get("sort"));
@@ -126,6 +129,7 @@ export function HomeFilters() {
             ref={searchButtonRef}
             type="button"
             aria-label="キーワード検索を開く"
+            disabled={!hydrated}
             aria-expanded={false}
             onClick={() => setSearchOpen(true)}
             className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 glass bg-white/10 text-slate-300 transition hover:bg-white/16 active:scale-[0.98]"
