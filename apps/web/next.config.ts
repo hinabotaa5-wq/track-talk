@@ -90,6 +90,19 @@ const nextConfig: NextConfig = {
           { key: "Netlify-Vary", value: "query=view|month|prefecture" },
         ],
       },
+      // 投稿の詳細も、サーバーはログインなしで読める中身だけを描く(いいね状態などは画面側が開いたあとに読み直す)。
+      // 毎回描くとオハイオの関数から東京の API へ2本往復してから画面が開くので、端で短くキャッシュする。
+      // 消された・非表示にされた投稿を長く出し続けないよう、ホームより短くする。作成画面(/posts/new など)は ID の形で外す。
+      {
+        source: "/posts/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+        headers: [
+          {
+            key: "Netlify-CDN-Cache-Control",
+            value: "public, durable, max-age=60, stale-while-revalidate=300",
+          },
+          { key: "Netlify-Vary", value: "query=from|room" },
+        ],
+      },
       {
         source: "/competitions/major-hosts",
         headers: [{ key: "Netlify-CDN-Cache-Control", value: "public, durable, max-age=300, stale-while-revalidate=3600" }],

@@ -36,6 +36,17 @@ html {
   }
 }
 
+/* アプリを開いた直後(React が動く前)に押したリンクは、アイコンをクルクルに替える。印は起動スクリプトが付ける。 */
+[data-boot-pending] .pending-link-idle {
+  display: none;
+}
+[data-boot-pending] .pending-link-boot {
+  display: block;
+}
+[data-boot-pending] .card-pending {
+  display: flex;
+}
+
 /* ダブルタップのズーム待ちをなくして、タップにすぐ反応させる。 */
 a,
 button,

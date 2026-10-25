@@ -6,6 +6,7 @@ import type { Post } from "@/lib/types";
 
 vi.mock("next/link", () => ({
   default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
+  useLinkStatus: () => ({ pending: false }),
 }));
 
 const post = {
@@ -25,6 +26,12 @@ describe("FeedCard", () => {
   it("keeps a return path when opened from my page", () => {
     const html = renderToStaticMarkup(createElement(FeedCard, { post, returnTo: "me" }));
     expect(html).toContain('href="/posts/4020b4de-956e-4819-97e6-90cb82f83fc0?from=me"');
+  });
+
+  it("shows a spinner on the card while the post opens", () => {
+    const html = renderToStaticMarkup(createElement(FeedCard, { post }));
+    expect(html).toContain("data-pending-link");
+    expect(html).toContain("card-pending");
   });
 
   it("opens the post directly from other feeds", () => {
