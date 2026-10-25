@@ -10,13 +10,13 @@ export const metadata: Metadata = {
 
 const choices = [
   {
-    title: "ランダムプラン",
+    title: "動画添削プラン",
     description: "おまかせで動画添削",
     href: "/coaching/new",
     icon: Shuffle,
   },
   {
-    title: "指名プラン",
+    title: "サポートプラン",
     description: "コーチとプランを選ぶ",
     href: "/coaches",
     icon: UserRound,
@@ -57,7 +57,7 @@ export default function CoachingPage() {
           {[
             ["/me/coaching/tickets", "チケットの残高・購入"],
             ["/me/coaching/requests", "依頼した動画添削"],
-            ["/me/coaching/personal", "申し込んだ指名プラン"],
+            ["/me/coaching/personal", "申し込んだサポートプラン"],
           ].map(([href, label]) => (
             <Link key={href} href={href} className="flex min-h-12 items-center justify-between gap-3 px-4 text-sm text-slate-200 transition hover:bg-white/10">
               {label}<ArrowRight className="size-4 text-slate-400" aria-hidden />

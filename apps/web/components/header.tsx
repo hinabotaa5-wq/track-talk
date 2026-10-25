@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { MainTabLink } from "./main-tab-link";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
@@ -123,8 +124,7 @@ export function Header() {
                 const Icon = tab.icon;
                 const active = current === tab.id;
                 return (
-                  <Link
-                    prefetch={false}
+                  <MainTabLink
                     key={tab.id}
                     href={mainTabHref(tab.id, !!session)}
                     onClick={(event) => guardedClick(event, mainTabHref(tab.id, !!session))}
@@ -136,8 +136,8 @@ export function Header() {
                     }`}
                   >
                     <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                    {tab.label}
-                  </Link>
+                    <span>{tab.label}</span>
+                  </MainTabLink>
                 );
               })}
             </nav>

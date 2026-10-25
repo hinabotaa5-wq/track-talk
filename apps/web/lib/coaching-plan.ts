@@ -24,7 +24,7 @@ export function serviceReady(service: CoachingServiceType | null | undefined): b
 }
 
 export function serviceLabel(service: CoachingServiceType | null | undefined): string {
-  return service ? coachingServiceLabels[service] : "従来の指名プラン";
+  return service ? coachingServiceLabels[service] : "従来のサポートプラン";
 }
 
 export const planKindLabels: Record<CoachingPlanKind, string> = {

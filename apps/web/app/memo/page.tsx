@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { EmptyState, ErrorState } from "@/components/empty-state";
+import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
-import { SenseNoteComposer, SenseNoteItem, SenseNoteStatsRow } from "@/components/sense-notes";
+import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
 import { SenseSummaryCard } from "@/components/sense-summary";
-import { Button } from "@/components/ui/button";
+import { SenseNoteCalendar } from "@/components/sense-note-calendar";
+import { todayInTokyo } from "@/lib/format";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { senseSummaryEnabled } from "@/lib/features";
-import { groupSenseNotesByDay, senseDayLabel, sortSenseNotes, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
+import { sortSenseNotes, type SenseNote, type SenseNoteStats } from "@/lib/sense-notes";
 
 type Page = { notes: SenseNote[]; next_cursor: string | null; stats: SenseNoteStats };
 
@@ -26,7 +27,8 @@ export default function MySenseNotesPage() {
   const [stats, setStats] = useState<SenseNoteStats | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [historyFailed, setHistoryFailed] = useState(false);
+  const [month, setMonth] = useState(() => todayInTokyo().slice(0, 7));
   const [dropped, setDropped] = useState(false);
   // 感覚メモと、競技会の記録(グラフ)を切り替える。
   const [tab, setTab] = useState<"sense" | "records">("sense");
@@ -61,23 +63,26 @@ export default function MySenseNotesPage() {
     return () => controller.abort();
   }, [token]);
 
-  async function loadMore() {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const d = await apiFetch<Page>(`/v1/me/sense-notes?cursor=${encodeURIComponent(cursor)}`, { token });
-      setNotes((list) => [...(list ?? []), ...(d.notes ?? [])]);
-      setCursor(d.next_cursor);
-    } catch {
-      alert("読み込めませんでした");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  // 月初より古いメモに届くまでページを読み、月内のマークが欠けないようにする。
+  useEffect(() => {
+    const oldest = notes?.[notes.length - 1]?.day;
+    if (!token || !cursor || !oldest || oldest < `${month}-01` || historyFailed) return;
+    const controller = new AbortController();
+    apiFetch<Page>(`/v1/me/sense-notes?cursor=${encodeURIComponent(cursor)}`, { token, signal: controller.signal })
+      .then((d) => {
+        setNotes((list) => sortSenseNotes([...new Map([...(list ?? []), ...(d.notes ?? [])].map((note) => [note.id, note])).values()]));
+        setCursor(d.next_cursor);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setHistoryFailed(true);
+      });
+    return () => controller.abort();
+  }, [token, cursor, notes, month, historyFailed]);
 
   if (loading) return <p className="text-sm text-slate-200">読み込み中...</p>;
   const shownNotes = guest ? [] : notes;
   const shownStats = guest ? guestStats : stats;
+  const needsOlderNotes = Boolean(cursor && shownNotes?.length && shownNotes[shownNotes.length - 1].day >= `${month}-01`);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -132,39 +137,20 @@ export default function MySenseNotesPage() {
 
             {senseSummaryEnabled && !guest ? <SenseSummaryCard key={token} token={token} total={shownStats.total} /> : null}
 
-            {shownNotes.length === 0 ? (
-              <EmptyState title="まだ感覚メモがありません" body="今日の練習で「うまくいった」「なんか違った」と感じたことを、ひとことから書いてみよう。" />
-            ) : (
-              <div className="space-y-5">
-                {groupSenseNotesByDay(shownNotes).map((group) => (
-                  <section key={group.day} className="space-y-2">
-                    <h2 className="text-sm font-semibold text-slate-200">{senseDayLabel(group.day)}</h2>
-                    <ul className="space-y-2">
-                      {group.notes.map((note) => (
-                        <li key={note.id}>
-                          <SenseNoteItem
-                            note={note}
-                            token={token}
-                            onDeleted={(id, next) => {
-                              setNotes((list) => list?.filter((n) => n.id !== id) ?? list);
-                              setStats(next);
-                              setDropped(false);
-                            }}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-                {cursor ? (
-                  <div className="flex justify-center">
-                    <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-                      {loadingMore ? "読み込み中..." : "もっと見る"}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            )}
+            <SenseNoteCalendar
+              notes={shownNotes}
+              token={token}
+              month={month}
+              onMonthChange={setMonth}
+              loading={needsOlderNotes && !historyFailed}
+              failed={needsOlderNotes && historyFailed}
+              onRetry={() => setHistoryFailed(false)}
+              onDeleted={(id, next) => {
+                setNotes((list) => list?.filter((n) => n.id !== id) ?? list);
+                setStats(next);
+                setDropped(false);
+              }}
+            />
           </>
         )}
       </div>

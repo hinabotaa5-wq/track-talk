@@ -370,7 +370,7 @@ function PlanForm({
       <fieldset className="space-y-1.5">
         <legend className="text-sm text-slate-200">サービス</legend>
         <div className="flex flex-wrap gap-2">
-          {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来の指名プラン（分類を選んで移行できます）</span> : null}
+          {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来のサポートプラン（分類を選んで移行できます）</span> : null}
           {services.map((service) => (
             <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
               onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
@@ -652,7 +652,7 @@ export function TrialBadge() {
   );
 }
 
-// PublicPlanList は、コーチ詳細に出す公開中の指名プラン。
+// PublicPlanList は、コーチ詳細に出す公開中のサポートプラン。
 export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
   if (plans.length === 0) return null;
   return (

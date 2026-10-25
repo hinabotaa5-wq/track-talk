@@ -63,7 +63,7 @@ it("既存プランの非公開操作で、設定済みの分類と追加相談�
 
 it("分類を推測せず既存プランとして表示し、新規作成時は分類を求める", async () => {
   await render([legacyPlan]);
-  expect(container.textContent).toContain("従来の指名プラン");
+  expect(container.textContent).toContain("従来のサポートプラン");
   await click("プランを追加する");
   await click("保存する");
   expect(container.textContent).toContain("サービスを選んでください");

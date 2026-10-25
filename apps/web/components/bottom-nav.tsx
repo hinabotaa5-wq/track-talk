@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { MainTabLink } from "./main-tab-link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
@@ -186,8 +186,7 @@ export function BottomNav() {
             const href = mainTabHref(tab.id, !!session);
             return (
               <li key={tab.id}>
-                <Link
-                  prefetch={false}
+                <MainTabLink
                   href={href}
                   onClick={(event) => guardedClick(event, href)}
                   className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-transform duration-150 active:scale-[0.98] ${
@@ -196,8 +195,8 @@ export function BottomNav() {
                   aria-current={active ? "page" : undefined}
                 >
                   <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                  {tab.label}
-                </Link>
+                  <span>{tab.label}</span>
+                </MainTabLink>
               </li>
             );
           })}

@@ -36,7 +36,7 @@ function LimitChoices({
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm text-slate-300">購入・お支払いの月の上限（毎月1日にリセットされます）</legend>
-      <p className="text-xs text-slate-300">チケット購入・フォーム添削・指名プランのお支払いを合算します。購入済みチケットの使用時は二重に数えません。</p>
+      <p className="text-xs text-slate-300">チケット購入・フォーム添削・サポートプランのお支払いを合算します。購入済みチケットの使用時は二重に数えません。</p>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => (
           <label

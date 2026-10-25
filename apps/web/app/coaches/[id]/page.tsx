@@ -61,7 +61,7 @@ export default function CoachDetailPage() {
           </dl>
         </section>
         <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
-          <h2 id="coach-plans" className="text-lg font-bold">指名プラン</h2>
+          <h2 id="coach-plans" className="text-lg font-bold">サポートプラン</h2>
           <CoachServicePlans key={coach.id} services={coach.service_types ?? []} plans={coach.plans ?? []} />
         </section>
       </>}

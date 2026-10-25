@@ -12,7 +12,7 @@ export default function CoachesPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">指名コーチ一覧</h1>
-        <p className="text-sm text-slate-200">コーチを選ぶと、詳しいプロフィールと指名プランを確認できます。</p>
+        <p className="text-sm text-slate-200">コーチを選ぶと、詳しいプロフィールとサポートプランを確認できます。</p>
       </div>
       <CoachList />
     </div>

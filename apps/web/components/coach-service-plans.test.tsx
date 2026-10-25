@@ -39,7 +39,7 @@ it("別の種類へ切り替えると選択したプランだけを表示する"
 it("公開プランがないサービスは無効にし、分類のない既存プランは残す", async () => {
   await render([{ ...plan, service_type: null }], ["video_review"]);
   expect([...container.querySelectorAll("button")].every((button) => button.disabled)).toBe(true);
-  expect(container.textContent).toContain("従来の指名プラン");
+  expect(container.textContent).toContain("従来のサポートプラン");
   expect(container.textContent).toContain(plan.title);
 });
 it("満員でも内容は確認でき、申し込みはできない", async () => {

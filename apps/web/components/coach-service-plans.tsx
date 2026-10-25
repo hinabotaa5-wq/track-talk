@@ -49,8 +49,8 @@ export function CoachServicePlans({ services, plans }: { services: CoachingServi
           <PublicPlanList plans={publicPlans.filter((plan) => plan.service_type === active)} />
         </section> : null}
       </div>
-      {legacy.length ? <section className="space-y-2" aria-label="従来の指名プラン">
-        <h3 className="text-sm font-semibold">従来の指名プラン</h3>
+      {legacy.length ? <section className="space-y-2" aria-label="従来のサポートプラン">
+        <h3 className="text-sm font-semibold">従来のサポートプラン</h3>
         <PublicPlanList plans={legacy} />
       </section> : null}
     </div>

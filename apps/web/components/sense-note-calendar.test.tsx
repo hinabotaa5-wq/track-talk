@@ -1,0 +1,68 @@
+/** @vitest-environment jsdom */
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { SenseNoteCalendar } from "./sense-note-calendar";
+import type { SenseNote } from "@/lib/sense-notes";
+vi.mock("./sense-notes", () => ({ SenseNoteItem: ({ note }: { note: SenseNote }) => <div>{note.body}</div> }));
+let root: Root;
+let container: HTMLDivElement;
+const note: SenseNote = { id: "note", body: "リズムよく走れた", day: "2026-10-25", event: null, event_label: null, created_at: "2026-10-25T03:00:00Z", updated_at: "2026-10-25T03:00:00Z" };
+const onMonthChange = vi.fn();
+const onRetry = vi.fn();
+beforeEach(() => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-25T03:00:00Z"));
+  vi.clearAllMocks();
+  container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+});
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
+async function render(notes = [note], month = "2026-10", loading = false, failed = false) {
+  await act(async () => root.render(<SenseNoteCalendar notes={notes} token="token" month={month} onMonthChange={onMonthChange} loading={loading} failed={failed} onRetry={onRetry} onDeleted={() => {}} />));
+}
+async function click(label: string) {
+  const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+  await act(async () => button.click());
+}
+it("書いた日にマークが付き、タップすると詳細を開いて閉じられる", async () => {
+  await render();
+  expect(container.textContent).not.toContain(note.body);
+  const written = container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月25日、感覚メモあり"]')!;
+  expect(written.disabled).toBe(false);
+  expect(written.querySelector(".bg-sky-300")).not.toBeNull();
+  expect(container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月24日、感覚メモなし"]')!.disabled).toBe(true);
+  await click("2026年10月25日、感覚メモあり");
+  expect(container.textContent).toContain(note.body);
+  await click("詳細を閉じる");
+  expect(container.textContent).not.toContain(note.body);
+});
+it("月の境界を越えて移動し、未来の月への移動はできない", async () => {
+  await render();
+  expect(container.querySelector<HTMLButtonElement>('button[aria-label="次の月"]')!.disabled).toBe(true);
+  await render([], "2026-01");
+  await click("前の月");
+  expect(onMonthChange).toHaveBeenLastCalledWith("2025-12");
+  await render([], "2025-12");
+  await click("次の月");
+  expect(onMonthChange).toHaveBeenLastCalledWith("2026-01");
+});
+it("うるう年の月末を表示し、メモの追加・削除にマークが追従する", async () => {
+  const leapNote = { ...note, day: "2024-02-29" };
+  await render([], "2024-02");
+  expect(container.textContent).toContain("この月の感覚メモはありません");
+  expect(container.querySelector('button[aria-label="2024年2月30日、感覚メモなし"]')).toBeNull();
+  await render([leapNote], "2024-02");
+  await click("2024年2月29日、感覚メモあり");
+  expect(container.textContent).toContain(note.body);
+  await render([], "2024-02");
+  expect(container.textContent).not.toContain(note.body);
+  expect(container.querySelector('button[aria-label="2024年2月29日、感覚メモあり"]')).toBeNull();
+});
+it("未取得の月は読み込み中を表示し、失敗した場合は再読み込みできる", async () => {
+  await render([], "2026-10", true);
+  expect(container.textContent).toContain("この月のメモを読み込み中");
+  expect(container.textContent).not.toContain("この月の感覚メモはありません");
+  await render([], "2026-10", false, true);
+  await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "再読み込み")!.click());
+  expect(onRetry).toHaveBeenCalledOnce();
+});

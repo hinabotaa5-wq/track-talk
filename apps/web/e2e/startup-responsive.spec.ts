@@ -26,3 +26,26 @@ test("起動直後の通信が終わらなくても検索とホームの切替�
     await page.unrouteAll({ behavior: "ignoreErrors" });
   }
 });
+
+test("下部バーは初回の画面取得待ちを表示し、待っている間も別のタブへ移れる", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let release: (() => void) | undefined;
+  await page.route("**/competitions?*", async (route) => {
+    if (!route.request().headers().rsc) return route.continue();
+    await new Promise<void>((resolve) => { release = resolve; });
+    await route.abort().catch(() => {});
+  });
+  try {
+    await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
+    const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
+    const competitions = nav.getByRole("link", { name: "大会", exact: true });
+    await competitions.click();
+    await expect(competitions.locator('[aria-busy="true"]')).toBeVisible();
+    await nav.getByRole("link", { name: "コーチ", exact: true }).click();
+    await expect(page).toHaveURL(/\/coaching$/);
+    await expect(nav.getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");
+  } finally {
+    release?.();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
