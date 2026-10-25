@@ -48,7 +48,7 @@ function packBlock(items: MosaicItem[], viewportWidth: number, height: number, g
 
 // 既存の詰め方を12件ごとにまとめ、過去の全カードを探索しない。
 // 次のブロックは前のブロックの右端付近のカードだけを見て、その間の空きから詰める。
-export const mosaicBlockSize = 12;
+const mosaicBlockSize = 12;
 type Block = { key: string; tiles: MosaicTile[] };
 export function createMosaicPacker() {
   let blocks: Block[] = [];
