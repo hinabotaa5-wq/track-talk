@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -77,5 +78,23 @@ func TestNormalizeRaceRecord(t *testing.T) {
 		if c.field != "" && fields[c.field] == "" {
 			t.Fatalf("%s: want error on %s, got %v", c.name, c.field, fields)
 		}
+	}
+}
+
+func TestRaceRoundIsOptionalFreeText(t *testing.T) {
+	today := time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC)
+	for _, round := range []string{"", "予選", "準決勝", "決勝", "記録会", "第2レース"} {
+		params, fields := normalizeRaceRecord(raceRecordReq{RacedOn: "2026-10-25", Event: "100m", Mark: 1100, Round: round}, today)
+		if len(fields) != 0 || params.Round != round {
+			t.Fatalf("round=%q fields=%v", round, fields)
+		}
+		got := buildRaceRecords([]db.ListRaceRecordsRow{{ID: uuid.New(), Event: "100m", RacedOn: today, Mark: 1100, Round: params.Round}})
+		if got.Records[0].Round != round {
+			t.Fatalf("round lost: %+v", got)
+		}
+	}
+	_, fields := normalizeRaceRecord(raceRecordReq{RacedOn: "2026-10-25", Event: "100m", Mark: 1100, Round: strings.Repeat("あ", 21)}, today)
+	if fields["round"] == "" {
+		t.Fatal("long round accepted")
 	}
 }

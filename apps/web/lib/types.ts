@@ -52,7 +52,7 @@ export type Post = {
   author_name?: string;
   author_post_master?: boolean;
   body?: string;
-  // 一覧のカードに出す本文の冒頭(写真のない文章の投稿だけ)。
+  // 一覧カードに出す詳細の冒頭。写真付きの文章や動画URLの投稿にも使う。
   excerpt?: string;
   mine: boolean;
   like_count: number;

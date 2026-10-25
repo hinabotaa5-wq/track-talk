@@ -32,7 +32,9 @@ WITH legal AS (
         CASE WHEN event = ANY($3::text[]) THEN -mark ELSE mark END AS score,
         min(CASE WHEN event = ANY($3::text[]) THEN -mark ELSE mark END) OVER (
             PARTITION BY author_id, event
-            ORDER BY raced_on, created_at, id
+            ORDER BY raced_on, meet_name,
+                CASE round WHEN '予備予選' THEN 1 WHEN '予選' THEN 2 WHEN '準々決勝' THEN 3 WHEN '準決勝' THEN 4 WHEN '決勝' THEN 5 WHEN 'タイムレース決勝' THEN 5 ELSE 0 END,
+                created_at, id
             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
         ) AS prev_best
     FROM race_records
@@ -83,9 +85,9 @@ func (q *Queries) CountRecentPBAuthors(ctx context.Context, arg CountRecentPBAut
 }
 
 const createRaceRecord = `-- name: CreateRaceRecord :one
-INSERT INTO race_records (id, author_id, raced_on, event, mark, wind, memo, meet_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
+INSERT INTO race_records (id, author_id, raced_on, event, mark, wind, memo, meet_name, round)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, raced_on, event, mark, wind, memo, meet_name, round, created_at, updated_at
 `
 
 type CreateRaceRecordParams struct {
@@ -97,6 +99,7 @@ type CreateRaceRecordParams struct {
 	Wind     *int16    `json:"wind"`
 	Memo     string    `json:"memo"`
 	MeetName string    `json:"meet_name"`
+	Round    string    `json:"round"`
 }
 
 type CreateRaceRecordRow struct {
@@ -107,6 +110,7 @@ type CreateRaceRecordRow struct {
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
 	MeetName  string    `json:"meet_name"`
+	Round     string    `json:"round"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -121,6 +125,7 @@ func (q *Queries) CreateRaceRecord(ctx context.Context, arg CreateRaceRecordPara
 		arg.Wind,
 		arg.Memo,
 		arg.MeetName,
+		arg.Round,
 	)
 	var i CreateRaceRecordRow
 	err := row.Scan(
@@ -131,6 +136,7 @@ func (q *Queries) CreateRaceRecord(ctx context.Context, arg CreateRaceRecordPara
 		&i.Wind,
 		&i.Memo,
 		&i.MeetName,
+		&i.Round,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -157,10 +163,12 @@ func (q *Queries) DeleteRaceRecord(ctx context.Context, arg DeleteRaceRecordPara
 }
 
 const listRaceRecords = `-- name: ListRaceRecords :many
-SELECT id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
+SELECT id, raced_on, event, mark, wind, memo, meet_name, round, created_at, updated_at
 FROM race_records
 WHERE author_id = $1
-ORDER BY event, raced_on, created_at, id
+ORDER BY event, raced_on, meet_name,
+    CASE round WHEN '予備予選' THEN 1 WHEN '予選' THEN 2 WHEN '準々決勝' THEN 3 WHEN '準決勝' THEN 4 WHEN '決勝' THEN 5 WHEN 'タイムレース決勝' THEN 5 ELSE 0 END,
+    created_at, id
 `
 
 type ListRaceRecordsRow struct {
@@ -171,6 +179,7 @@ type ListRaceRecordsRow struct {
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
 	MeetName  string    `json:"meet_name"`
+	Round     string    `json:"round"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -193,6 +202,7 @@ func (q *Queries) ListRaceRecords(ctx context.Context, authorID uuid.UUID) ([]Li
 			&i.Wind,
 			&i.Memo,
 			&i.MeetName,
+			&i.Round,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -224,10 +234,11 @@ SET raced_on = $1,
     wind = $4,
     memo = $5,
     meet_name = $6,
+    round = $7,
     updated_at = now()
-WHERE id = $7
-  AND author_id = $8
-RETURNING id, raced_on, event, mark, wind, memo, meet_name, created_at, updated_at
+WHERE id = $8
+  AND author_id = $9
+RETURNING id, raced_on, event, mark, wind, memo, meet_name, round, created_at, updated_at
 `
 
 type UpdateRaceRecordParams struct {
@@ -237,6 +248,7 @@ type UpdateRaceRecordParams struct {
 	Wind     *int16    `json:"wind"`
 	Memo     string    `json:"memo"`
 	MeetName string    `json:"meet_name"`
+	Round    string    `json:"round"`
 	ID       uuid.UUID `json:"id"`
 	AuthorID uuid.UUID `json:"author_id"`
 }
@@ -249,6 +261,7 @@ type UpdateRaceRecordRow struct {
 	Wind      *int16    `json:"wind"`
 	Memo      string    `json:"memo"`
 	MeetName  string    `json:"meet_name"`
+	Round     string    `json:"round"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -261,6 +274,7 @@ func (q *Queries) UpdateRaceRecord(ctx context.Context, arg UpdateRaceRecordPara
 		arg.Wind,
 		arg.Memo,
 		arg.MeetName,
+		arg.Round,
 		arg.ID,
 		arg.AuthorID,
 	)
@@ -273,6 +287,7 @@ func (q *Queries) UpdateRaceRecord(ctx context.Context, arg UpdateRaceRecordPara
 		&i.Wind,
 		&i.Memo,
 		&i.MeetName,
+		&i.Round,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

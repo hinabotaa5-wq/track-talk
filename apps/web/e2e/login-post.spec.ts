@@ -16,7 +16,7 @@ test("login then publish a text post", async ({ page }) => {
   await expect(page).toHaveURL("/", { timeout: 20_000 });
 
   await page.goto("/posts/new");
-  await expect(page.getByRole("heading", { name: "文章" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "文章・写真" })).toBeVisible({ timeout: 20_000 });
 
   const body = `朝練の話 ${Date.now()}\n今日のスタートを共有します`;
   await page.getByLabel("詳細").fill(body);

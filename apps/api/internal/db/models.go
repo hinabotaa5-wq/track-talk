@@ -769,6 +769,7 @@ type RaceRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	MeetName  string    `json:"meet_name"`
+	Round     string    `json:"round"`
 }
 
 type RecruitmentDetail struct {

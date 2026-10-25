@@ -285,3 +285,47 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 		t.Fatalf("A offers after reset %+v", offers)
 	}
 }
+
+// Keep authorization probes separate from the long happy-path flow so rate limits
+// cannot mask either the authorization checks or the legitimate coach operations.
+func TestReviewAuthorization(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setupConfig(t, nil)
+	tadmin := adminToken(t, h)
+	_, tc := onDutyCoach(t, h, tadmin)
+	_, tother := onDutyCoach(t, h, tadmin)
+	_, tu := demoRequester(t, h, tadmin)
+	id := acceptedReview(t, h, tadmin, tc, tu)
+	// These routes must reject unauthenticated callers before inspecting request data.
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, "/v1/coach/requests/" + id},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/response"},
+		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification"},
+		{http.MethodPost, "/v1/coach/offers/" + id + "/accept"},
+	} {
+		if rec := doJSON(t, h, route.method, route.path, "", nil); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("unauthenticated %s: %d", route.path, rec.Code)
+		}
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tu, responseBody()); rec.Code != http.StatusConflict {
+		t.Fatalf("requester submits response %d", rec.Code)
+	}
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
+		t.Fatalf("coach response %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"}); rec.Code != http.StatusOK {
+		t.Fatalf("request clarification %d", rec.Code)
+	}
+	// IDを知っていても、担当外のコーチと依頼者本人は補足を返せない。
+	for _, unauthorized := range []string{tother, tu} {
+		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", unauthorized, map[string]any{"clarification": "担当外からの補足"})
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("unauthorized clarification %d %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "1台ずつ歩いて越えます"}); rec.Code != http.StatusOK {
+		t.Fatalf("coach clarification %d %s", rec.Code, rec.Body.String())
+	}
+}

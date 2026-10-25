@@ -157,7 +157,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	}
 	if !list {
 		p.Body = row.Body
-	} else if (row.Kind == "text" && p.ImagePublicID == "") || row.Kind == "video" || row.Kind == "youtube" || row.Kind == "instagram" {
+	} else if row.Kind == "text" || row.Kind == "video" || row.Kind == "youtube" || row.Kind == "instagram" {
 		p.Excerpt = postExcerpt(row.Body)
 	}
 	return p

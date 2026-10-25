@@ -76,6 +76,7 @@ type raceRecordReq struct {
 	Memo    string `json:"memo"`
 	// MeetName は記録を出した大会の名前。任意。
 	MeetName string `json:"meet_name"`
+	Round    string `json:"round"`
 }
 
 type raceRecordDTO struct {
@@ -91,6 +92,7 @@ type raceRecordDTO struct {
 	IsPB      bool      `json:"is_pb"`
 	Memo      string    `json:"memo"`
 	MeetName  string    `json:"meet_name"`
+	Round     string    `json:"round"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -157,6 +159,11 @@ func normalizeRaceRecord(req raceRecordReq, today time.Time) (db.CreateRaceRecor
 	if len([]rune(meetName)) > maxRaceMeetName {
 		fields["meet_name"] = "大会名は60文字以内で書いてください"
 	}
+	round := strings.Join(strings.Fields(req.Round), " ")
+	if len([]rune(round)) > 20 {
+		fields["round"] = "ラウンドは20文字以内で書いてください"
+	}
+	out.Round = round
 	out.MeetName = meetName
 	return out, fields
 }
@@ -185,6 +192,7 @@ func buildRaceRecords(rows []db.ListRaceRecordsRow) raceRecordsDTO {
 			WindAided:  row.Wind != nil && *row.Wind > maxLegalWind,
 			Memo:       row.Memo,
 			MeetName:   row.MeetName,
+			Round:      row.Round,
 			CreatedAt:  row.CreatedAt,
 		}
 		if !item.WindAided {
@@ -290,6 +298,7 @@ func (s *Server) updateRaceRecord(w http.ResponseWriter, r *http.Request) {
 		Wind:     params.Wind,
 		Memo:     params.Memo,
 		MeetName: params.MeetName,
+		Round:    params.Round,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

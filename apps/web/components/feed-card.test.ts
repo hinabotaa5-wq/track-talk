@@ -148,9 +148,11 @@ it("写真のない文章は本文を一度だけ出し、下のタイトル欄�
   expect(html).not.toContain("自分の投稿");
 });
 
-it("画像付き投稿の詳細文は画像の下部に一度だけ重ね、タイトル欄を作らない", () => {
-  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", title: "非表示のタイトル", body: "改行のある詳細文\n後半の説明", thumbnail_url: "/samples/vertical.jpg" } }));
+it.each(["text", "video"] as const)("%s：画像付き投稿の詳細文は画像の下部に一度だけ重ね、タイトル欄を作らない", (kind) => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind, title: "非表示のタイトル", excerpt: "改行のある詳細文\n後半の説明", thumbnail_url: "/samples/vertical.jpg" } }));
   expect(html).toContain("feed-card-caption absolute inset-x-0 bottom-0");
+  expect(html).toContain("backdrop-filter:blur(8px)");
+  expect(html).toContain("-webkit-backdrop-filter:blur(8px)");
   expect(html).not.toContain("feed-card-title");
   expect(html).not.toContain("非表示のタイトル");
   expect(html.match(/改行のある詳細文/g)).toHaveLength(1);

@@ -68,7 +68,7 @@ export default function VideoUrlPostPage() {
         return;
       }
       clearHomeFeeds();
-      router.push("/");
+      router.push("/?sort=new");
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : "保存に失敗しました"));
       setStatus("");
@@ -78,6 +78,7 @@ export default function VideoUrlPostPage() {
 
   return (
     <ComposerPage title="動画URL">
+      <p className="text-sm text-slate-300">同じ動画・投稿のスレッドがある場合は、そのスレッドを開きます。新しいスレッドを作成した場合はホームに戻ります。</p>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium">
           URL
@@ -118,7 +119,7 @@ export default function VideoUrlPostPage() {
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting || !kind}>
-          {submitting ? "開いています" : "このスレッドを開く"}
+          {submitting ? "送っています" : "投稿する"}
         </Button>
       </form>
     </ComposerPage>

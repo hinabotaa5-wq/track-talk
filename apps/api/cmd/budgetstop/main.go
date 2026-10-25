@@ -14,16 +14,19 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/MicahParks/keyfunc/v3"
 )
 
 const internalOnly = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
 type stopper struct {
 	// projects/<PROJECT>/locations/<REGION>/services/<SERVICE>
-	service string
-	runAPI  string
-	token   func(context.Context) (string, error)
-	client  *http.Client
+	service   string
+	authorize func(*http.Request) error
+	runAPI    string
+	token     func(context.Context) (string, error)
+	client    *http.Client
 }
 
 type pushRequest struct {
@@ -43,12 +46,23 @@ func main() {
 		slog.Error("config", "err", "TARGET_SERVICE is required")
 		os.Exit(1)
 	}
+	audience, email := os.Getenv("PUSH_AUDIENCE"), os.Getenv("PUSH_SERVICE_ACCOUNT")
+	if audience == "" || email == "" {
+		slog.Error("config", "err", "PUSH_AUDIENCE and PUSH_SERVICE_ACCOUNT are required")
+		os.Exit(1)
+	}
+	keys, err := keyfunc.NewDefault([]string{"https://www.googleapis.com/oauth2/v3/certs"})
+	if err != nil {
+		slog.Error("push verification keys", "err", err)
+		os.Exit(1)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	s := stopper{
-		service: service,
-		runAPI:  "https://run.googleapis.com/v2/",
-		token:   metadataToken(client),
-		client:  client,
+		service:   service,
+		authorize: pushAuthorizer(audience, email, keys.Keyfunc),
+		runAPI:    "https://run.googleapis.com/v2/",
+		token:     metadataToken(client),
+		client:    client,
 	}
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -67,6 +81,12 @@ func (s stopper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// Validate the Google-signed Pub/Sub identity before parsing or acting on a notice.
+	if s.authorize == nil || s.authorize(r) != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var push pushRequest
 	if err := json.NewDecoder(r.Body).Decode(&push); err != nil {
 		// 形式が違う通知は再送しても直らないので 2xx で受け取って捨てる。

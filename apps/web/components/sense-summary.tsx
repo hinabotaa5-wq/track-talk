@@ -138,10 +138,11 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
           <span className="text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
         ) : (
           <Button variant="secondary" className="px-3 py-1 text-xs" onClick={create} disabled={busy}>
-            {busy ? "まとめています..." : "6個の感覚をまとめる"}
+            {busy ? "まとめています..." : `${minNotes}個の感覚をまとめる`}
           </Button>
         ) : null}
       </div>
+      {loaded && shortBy === 0 ? <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p> : null}
       {loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
       {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
       <div className="space-y-2">

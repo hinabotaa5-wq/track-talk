@@ -7,7 +7,7 @@ import type { SenseNote } from "@/lib/sense-notes";
 const apiFetch = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ session: {}, token: "token", loading: false }) }));
-vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...args) }));
+vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => args[0] === "/v1/me/race-records" ? Promise.resolve({ records: [], events: [] }) : apiFetch(...args) }));
 vi.mock("@/lib/features", () => ({ senseSummaryEnabled: false }));
 vi.mock("./race-records", () => ({ RaceRecordsPanel: () => null }));
 vi.mock("./sense-note-jar", () => ({ SenseNoteJar: () => null }));
@@ -30,11 +30,11 @@ it("31日ある月の最初の30件だけで止まらず、前月へ移動する
     .mockResolvedValueOnce(page([note("2026-09-01"), note("2026-08-31")], "august"));
   await act(async () => root.render(<MySenseNotesPage />));
   expect(apiFetch).toHaveBeenCalledTimes(2);
-  await click("2026年10月1日、感覚メモあり");
+  await click("2026年10月1日、感覚メモあり、記録なし");
   expect(container.textContent).toContain("メモ2026-10-01");
   await click("前の月");
   expect(apiFetch).toHaveBeenCalledTimes(3);
-  await click("2026年9月1日、感覚メモあり");
+  await click("2026年9月1日、感覚メモあり、記録なし");
   expect(container.textContent).toContain("メモ2026-09-01");
 });
 it("過去メモの取得失敗を表示し、再読み込みで不足分を取得する", async () => {
@@ -44,7 +44,7 @@ it("過去メモの取得失敗を表示し、再読み込みで不足分を取�
   await act(async () => root.render(<MySenseNotesPage />));
   expect(container.textContent).toContain("過去のメモを読み込めませんでした");
   await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "再読み込み")!.click());
-  await click("2026年10月1日、感覚メモあり");
+  await click("2026年10月1日、感覚メモあり、記録なし");
   expect(container.textContent).toContain("メモ2026-10-01");
   expect(container.textContent).not.toContain("過去のメモを読み込めませんでした");
 });

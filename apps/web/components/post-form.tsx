@@ -65,14 +65,16 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
           return;
         }
         setStatus("アップロードの準備をしています…");
-        const sending = await shrinkImage(photo);
+        const [sending, signed] = await Promise.all([
+          shrinkImage(photo),
+          apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token }),
+        ]);
         if (sending.size > maxPhotoBytes) {
           setError("10MB以内の写真にしてください");
           setStatus("");
           release();
           return;
         }
-        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         setStatus("");
         setUploadPhase("upload");
         setUpload({ loaded: 0, total: sending.size, percent: 0 });
