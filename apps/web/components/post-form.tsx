@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { postSchema, urlPostSchema } from "@/lib/validators";
+import { postSchema } from "@/lib/validators";
 import type { z } from "zod";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -32,7 +32,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   const [photo, setPhoto] = useState<File | null>(null);
   const { pending, acquire, release } = useActionLock();
   const form = useForm<Values>({
-    resolver: zodResolver(initial?.kind === "youtube" || initial?.kind === "instagram" ? urlPostSchema : postSchema),
+    resolver: zodResolver(postSchema),
     defaultValues: {
       body: initial?.body ?? "",
     },

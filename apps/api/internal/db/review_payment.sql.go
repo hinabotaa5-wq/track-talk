@@ -445,27 +445,6 @@ func (q *Queries) StartPaidReviewRequest(ctx context.Context, id uuid.UUID) (Rev
 	return i, err
 }
 
-const sumMonthlyReviewPayments = `-- name: SumMonthlyReviewPayments :one
-SELECT COALESCE(sum(amount_yen), 0)::int FROM review_payments
-WHERE payer_id = $1
-  AND request_id IS DISTINCT FROM $2::uuid
-  AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-  AND (status IN ('authorized', 'captured') OR (status = 'pending' AND session_expires_at > now()))
-`
-
-type SumMonthlyReviewPaymentsParams struct {
-	PayerID          *uuid.UUID `json:"payer_id"`
-	ExcludeRequestID uuid.UUID  `json:"exclude_request_id"`
-}
-
-// 18歳未満の月の上限に使う、その人の今月（日本時間）の支払い。開いたままの支払い画面も数える。
-func (q *Queries) SumMonthlyReviewPayments(ctx context.Context, arg SumMonthlyReviewPaymentsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, sumMonthlyReviewPayments, arg.PayerID, arg.ExcludeRequestID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const touchReviewPayment = `-- name: TouchReviewPayment :exec
 UPDATE review_payments SET updated_at = now() WHERE id = $1
 `

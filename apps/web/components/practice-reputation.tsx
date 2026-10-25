@@ -17,7 +17,7 @@ export function practiceAttendanceLine(attendance?: PracticeAttendance) {
   return `参加率 ${percent}%（${attendance.total}回中 ドタキャン${attendance.no_show}回）`;
 }
 
-export function practiceReputationLine(reputation?: PracticeReputation) {
+function practiceReputationLine(reputation?: PracticeReputation) {
   if (!reputation) return "";
   if (reputation.good + reputation.ok + reputation.bad === 0) return "まだ評価がありません";
   return `良い ${reputation.good} / 普通 ${reputation.ok} / 悪い ${reputation.bad}`;
