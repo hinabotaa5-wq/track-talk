@@ -417,6 +417,76 @@ export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
   return [...groups].sort((a, b) => (order.get(a.body_part) ?? 0) - (order.get(b.body_part) ?? 0));
 }
 
+// 共有タブで体のイラストからケガを探すときの、まとまり。体の上から順に並べる。
+export const injuryRegions = [
+  { value: "upper", label: "上半身" },
+  { value: "thigh", label: "太もも" },
+  { value: "knee", label: "ひざ・すね" },
+  { value: "lower-leg", label: "ふくらはぎ・足首" },
+  { value: "bone", label: "骨・その他" },
+] as const;
+
+export type InjuryRegion = (typeof injuryRegions)[number]["value"];
+export type InjuryFigureSide = "front" | "back";
+
+type InjuryBodyPartCode = (typeof injuryBodyParts)[number]["value"];
+
+// 人型のイラスト(viewBox 0 0 60 120)のどこを光らせるか。座標は図の上での位置で、左右は気にしない。
+// 疲労骨折は場所がばらばらなので点を3つ置き、その他は点の代わりに「?」を出す。
+export const injuryPartFigures: Record<
+  InjuryBodyPartCode,
+  { region: InjuryRegion; side: InjuryFigureSide; spots: readonly (readonly [number, number])[] }
+> = {
+  shoulder: { region: "upper", side: "front", spots: [[19, 22]] },
+  elbow: { region: "upper", side: "front", spots: [[12, 42]] },
+  "lower-back": { region: "upper", side: "back", spots: [[30, 52]] },
+  "hamstring-strain": { region: "thigh", side: "back", spots: [[25, 70]] },
+  "quad-strain": { region: "thigh", side: "front", spots: [[25, 68]] },
+  "jumpers-knee": { region: "knee", side: "front", spots: [[25, 84]] },
+  "shin-splints": { region: "knee", side: "front", spots: [[25, 96]] },
+  "calf-strain": { region: "lower-leg", side: "back", spots: [[25, 94]] },
+  "achilles-tendinitis": { region: "lower-leg", side: "back", spots: [[25, 108]] },
+  sprain: { region: "lower-leg", side: "front", spots: [[25, 113]] },
+  "stress-fracture": { region: "bone", side: "front", spots: [[25, 100], [21, 116], [30, 54]] },
+  other: { region: "bone", side: "front", spots: [] },
+};
+
+// 一覧にないコードが来たときは「骨・その他」に入れて、点は出さない。
+export function injuryPartFigure(code: string) {
+  return injuryPartFigures[code as InjuryBodyPartCode] ?? { region: "bone" as const, side: "front" as const, spots: [] };
+}
+
+// 体のイラストの上に置く、まとまりごとのタップする丸。骨・その他は場所がないので丸を置かない。
+export const injuryRegionSpots: { region: InjuryRegion; side: InjuryFigureSide; x: number; y: number }[] = [
+  { region: "upper", side: "front", x: 17, y: 24 },
+  { region: "thigh", side: "front", x: 25, y: 68 },
+  { region: "knee", side: "front", x: 35, y: 90 },
+  { region: "lower-leg", side: "front", x: 25, y: 112 },
+  { region: "upper", side: "back", x: 30, y: 50 },
+  { region: "thigh", side: "back", x: 35, y: 70 },
+  { region: "lower-leg", side: "back", x: 25, y: 98 },
+];
+
+// グループをまとまりごとに分け、まとまりの人数の合計も出す。並びは injuryBodyParts の順。
+export function injuryGroupsByRegion(groups: InjuryGroupSummary[]) {
+  const sorted = sortInjuryGroups(groups);
+  return injuryRegions.map((region) => {
+    const items = sorted.filter((group) => injuryPartFigure(group.body_part).region === region.value);
+    return { ...region, groups: items, members: items.reduce((sum, group) => sum + group.members, 0) };
+  });
+}
+
+// 最初に開くまとまり。参加中のグループがあればそこ、なければいちばん人が多いところ。
+export function defaultInjuryRegion(groups: InjuryGroupSummary[]): InjuryRegion {
+  const mine = sortInjuryGroups(groups).find((group) => group.me);
+  if (mine) return injuryPartFigure(mine.body_part).region;
+  const busiest = injuryGroupsByRegion(groups).reduce<{ value: InjuryRegion; members: number } | null>(
+    (best, region) => (region.members > (best?.members ?? 0) ? region : best),
+    null,
+  );
+  return busiest?.value ?? injuryRegions[0].value;
+}
+
 // ロードマップ上の自分の段階だけ投稿できる。ほかの段階は読むだけ。
 export function canPostInStage(selected: string, mine: string) {
   return selected === mine;
