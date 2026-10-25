@@ -17,13 +17,15 @@ function contentSecurityPolicy() {
     ...origin(process.env.NEXT_PUBLIC_SUPABASE_URL),
     "https://*.supabase.co",
     "wss://*.supabase.co",
+    "wss://*.livekit.cloud",
+    "https://*.livekit.cloud",
     "https://api.cloudinary.com",
     "https://res.cloudinary.com",
     "https://cloud.umami.is",
     "https://gateway.umami.is",
     ...origin(process.env.NEXT_PUBLIC_POSTHOG_HOST),
   ];
-  const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is"];
+  const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is", "https://www.youtube.com", "https://s.ytimg.com"];
   if (process.env.NODE_ENV !== "production") script.push("'unsafe-eval'");
   const directives = [
     "default-src 'self'",
@@ -43,6 +45,7 @@ function contentSecurityPolicy() {
 }
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NODE_ENV === "development" && process.env.TRACKTALK_VOICE_E2E === "1" ? ".next-voice-e2e" : ".next",
   async rewrites() {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
     if (process.env.NODE_ENV === "production") return [];

@@ -98,6 +98,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `COACHING_NEW_ACCEPTANCE_ENABLED` | 現在は `0`。画面を公開する場合も、新しい申込み・購入の受付は別途判断 |
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |
 | `VAPID_*` | 端末へのプッシュ通知 |
+| `MEET_VOICE_ENABLED` / `NEXT_PUBLIC_MEET_VOICE_ENABLED` / `LIVEKIT_*` / `MEET_VOICE_TICK_SECRET` | 実装済み・既定無効の実況ルーム音声通話。公開範囲・月間概算上限は管理画面で設定。[開発と公開前確認](docs/meet-voice-development.md) |
 | `SENSE_SUMMARY_ENABLED` / `NEXT_PUBLIC_SENSE_SUMMARY_ENABLED` | 感覚メモのAI振り返りの公開設定 |
 | `GEMINI_API_KEY` | 大会データの抽出・提供中のメモ振り返り |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | 提供中のメール送信 |

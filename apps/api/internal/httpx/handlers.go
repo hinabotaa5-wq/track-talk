@@ -1163,6 +1163,25 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	if req.TargetType == "voice_participant" {
+		member, err := s.q.GetMeetVoiceParticipant(r.Context(), tid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if _, ok := s.getReadablePost(w, r, member.PostID); !ok {
+			return
+		}
+		allowed, err := s.q.VoiceReportAllowed(r.Context(), db.VoiceReportAllowedParams{TargetID: tid, UserID: p.ID, PostID: member.PostID})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if !allowed {
+			Error(w, 403, "forbidden", "同じ音声通話の参加者だけが通報できます")
+			return
+		}
+	}
 	if req.TargetType == "coaching_consultation" {
 		s.reportConsultation(w, r, p.ID, tid, req.Reason, req.Detail, false)
 		return

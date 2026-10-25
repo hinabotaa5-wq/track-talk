@@ -14,13 +14,13 @@ function TabContent({ children }: { children: ReactNode }) {
 }
 
 // 起動時の通信を優先し、空き時間か操作の気配があった時点でタブを準備する。
-export function MainTabLink({ children, ...props }: Omit<ComponentProps<typeof Link>, "prefetch">) {
+export function MainTabLink({ children, prefetch = null, ...props }: ComponentProps<typeof Link>) {
   const [ready, setReady] = useState(false);
   useEffect(() => afterStartup(() => setReady(true)), []);
   return (
     <Link
       {...props}
-      prefetch={ready ? null : false}
+      prefetch={ready ? prefetch : false}
       onPointerEnter={(event) => { setReady(true); props.onPointerEnter?.(event); }}
       onPointerDown={(event) => { setReady(true); props.onPointerDown?.(event); }}
       onFocus={(event) => { setReady(true); props.onFocus?.(event); }}

@@ -37,6 +37,7 @@ test("下部バーは初回の画面取得待ちを表示し、待っている�
   });
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
     const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
     const competitions = nav.getByRole("link", { name: "大会", exact: true });
     await competitions.click();
@@ -46,6 +47,30 @@ test("下部バーは初回の画面取得待ちを表示し、待っている�
     await expect(nav.getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");
   } finally {
     release?.();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
+
+test("投稿画面の通信が遅くても、押した直後に待機表示が出る", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pending: (() => void)[] = [];
+  await page.route("**/upload?*", async (route) => {
+    if (!route.request().headers().rsc) return route.continue();
+    await new Promise<void>((resolve) => pending.push(resolve));
+    await route.abort().catch(() => {});
+  });
+  try {
+    await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
+    const post = page.getByRole("link", { name: "投稿する", exact: true });
+    await post.click();
+    await expect(post.getByRole("status")).toHaveText("投稿画面を開いています");
+    await expect(post.locator('[aria-busy="true"]')).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
+    await nav.getByRole("link", { name: "コーチ", exact: true }).click();
+    await expect(page).toHaveURL(/\/coaching$/);
+  } finally {
+    for (const resolve of pending) resolve();
     await page.unrouteAll({ behavior: "ignoreErrors" });
   }
 });

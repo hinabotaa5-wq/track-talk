@@ -81,9 +81,13 @@ gcloud run deploy "$STOPPER" \
   --service-account "$(sa budget-stop)" \
   --set-env-vars "TARGET_SERVICE=projects/$PROJECT_ID/locations/$REGION/services/$API" \
   --cpu 1 --memory 128Mi --min-instances 0 --max-instances 1 \
-  --no-allow-unauthenticated --quiet
+  --invoker-iam-check --no-allow-unauthenticated --quiet
 fi
 STOPPER_URL=$(gcloud run services describe "$STOPPER" --region "$REGION" --format='value(status.url)')
+# Apply authentication even when the service already exists.
+gcloud run services update "$STOPPER" --region "$REGION" --invoker-iam-check \
+  --update-env-vars "PUSH_AUDIENCE=$STOPPER_URL,PUSH_SERVICE_ACCOUNT=$(sa budget-stop)" --quiet
+
 # budget-stop が API の設定を変えられるようにする。
 gcloud run services add-iam-policy-binding "$API" --region "$REGION" \
   --member "serviceAccount:$(sa budget-stop)" --role roles/run.developer --quiet >/dev/null

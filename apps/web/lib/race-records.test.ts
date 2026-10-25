@@ -7,6 +7,9 @@ import {
   toggleRaceWindSign,
   raceChartBox,
   raceChartPoints,
+  raceChartDomain,
+  raceOverviewSeries,
+  sortRaceRecords,
   raceEventHasWind,
   raceMarkInput,
   raceMarkKind,
@@ -94,13 +97,13 @@ describe("race records", () => {
     expect(track[0].x).toBe(box.left);
     expect(track[2].x).toBe(box.width - box.right);
     // 速い(小さい)ほど上。
-    expect(track[1].y).toBe(box.top);
-    expect(track[0].y).toBe(bottom);
+    expect(track[1].y).toBeGreaterThan(box.top);
+    expect(track[0].y).toBeLessThan(bottom);
     expect(track[2].y).toBeCloseTo((box.top + bottom) / 2);
 
     const field = raceChartPoints([record("2026-05-01", 650), record("2026-06-01", 705)], "distance");
-    expect(field[1].y).toBe(box.top);
-    expect(field[0].y).toBe(bottom);
+    expect(field[1].y).toBeGreaterThan(box.top);
+    expect(field[0].y).toBeLessThan(bottom);
   });
 
   it("centres a single record", () => {
@@ -110,4 +113,31 @@ describe("race records", () => {
     expect(only.y).toBe(box.top + (box.height - box.top - box.bottom) / 2);
     expect(raceChartPoints([], "time")).toEqual([]);
   });
+});
+
+it("小さなタイム差をグラフいっぱいに拡大しない", () => {
+  const records = [record("2026-05-01", 1100), record("2026-06-01", 1101)];
+  const points = raceChartPoints(records, "time");
+  expect(Math.abs(points[0].y - points[1].y)).toBeLessThan(1);
+  const domain = raceChartDomain(records.map((r) => r.mark));
+  expect(domain.high - domain.low).toBeGreaterThanOrEqual(220);
+});
+it("同日に逆順に入力しても予選から決勝へ別の位置で並ぶ", () => {
+  const rows = [record("2026-05-01", 1080, { id: "final", round: "決勝" }), record("2026-05-01", 1100, { id: "heat", round: "予選" }), record("2026-05-01", 1090, { id: "semi", round: "準決勝" })];
+  const points = raceChartPoints(rows, "time");
+  expect(points.map((p) => p.record.id)).toEqual(["heat", "semi", "final"]);
+  expect(points[0].x).toBeLessThan(points[1].x);
+  expect(points[1].x).toBeLessThan(points[2].x);
+  expect(sortRaceRecords(rows).map((r) => r.round)).toEqual(["予選", "準決勝", "決勝"]);
+});
+it("全種目は共通の軸で初回100からの短縮率・増加率を比べる", () => {
+  const overview = raceOverviewSeries([
+    record("2026-05-01", 1000, { id: "t1" }), record("2026-06-01", 900, { id: "t2" }),
+    record("2026-05-01", 500, { id: "d1", event: "long-jump", event_label: "走幅跳" }), record("2026-06-01", 550, { id: "d2", event: "long-jump", event_label: "走幅跳" }),
+    record("2026-05-01", 5000, { id: "p1", event: "decathlon", event_label: "十種競技" }), record("2026-06-01", 4500, { id: "p2", event: "decathlon", event_label: "十種競技" }),
+  ]);
+  expect(overview.series.map((s) => s.points.map((p) => p.index))).toEqual([[100, 110], [100, 110], [100, 90]]);
+  expect(overview.series[0].points[1].y).toBe(overview.series[1].points[1].y);
+  expect(overview.series[0].points[1].y).toBeLessThan(overview.series[2].points[1].y);
+  expect(raceOverviewSeries([]).series).toEqual([]);
 });

@@ -53,10 +53,11 @@ func newRunAPI(t *testing.T, api *runAPI) *httptest.Server {
 
 func newStopper(srv *httptest.Server) stopper {
 	return stopper{
-		service: target,
-		runAPI:  srv.URL + "/v2/",
-		token:   func(context.Context) (string, error) { return "tok", nil },
-		client:  srv.Client(),
+		service:   target,
+		authorize: func(*http.Request) error { return nil },
+		runAPI:    srv.URL + "/v2/",
+		token:     func(context.Context) (string, error) { return "tok", nil },
+		client:    srv.Client(),
 	}
 }
 
@@ -121,5 +122,21 @@ func TestMalformedNoticeIsDropped(t *testing.T) {
 	}
 	if api.calls != 0 {
 		t.Fatalf("cloud run api called %d times", api.calls)
+	}
+}
+
+func TestUnauthenticatedNoticeCannotStopService(t *testing.T) {
+	for _, configured := range []bool{false, true} {
+		api := &runAPI{}
+		s := newStopper(newRunAPI(t, api))
+		s.authorize = nil
+		if configured {
+			s.authorize = func(*http.Request) error { return errors.New("invalid identity") }
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", pushBody(t, 100, 100)))
+		if rec.Code != http.StatusUnauthorized || api.calls != 0 {
+			t.Fatalf("status=%d cloud run calls=%d", rec.Code, api.calls)
+		}
 	}
 }

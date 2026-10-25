@@ -9,6 +9,7 @@ import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
 import { SenseSummaryCard } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
+import type { RaceRecords } from "@/lib/race-records";
 import { todayInTokyo } from "@/lib/format";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
@@ -26,9 +27,14 @@ export default function MySenseNotesPage() {
   const [notes, setNotes] = useState<SenseNote[] | null>(null);
   const [stats, setStats] = useState<SenseNoteStats | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [notesRetry, setNotesRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [historyFailed, setHistoryFailed] = useState(false);
   const [month, setMonth] = useState(() => todayInTokyo().slice(0, 7));
+  const [raceData, setRaceData] = useState<RaceRecords | null>(null);
+  const [raceFailed, setRaceFailed] = useState(false);
+  const [raceRetry, setRaceRetry] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dropped, setDropped] = useState(false);
   // 感覚メモと、競技会の記録(グラフ)を切り替える。
   const [tab, setTab] = useState<"sense" | "records">("sense");
@@ -53,6 +59,8 @@ export default function MySenseNotesPage() {
     const controller = new AbortController();
     apiFetch<Page>("/v1/me/sense-notes", { token, signal: controller.signal })
       .then((d) => {
+        if (controller.signal.aborted) return;
+        setFailed(false);
         setNotes(d.notes ?? []);
         setStats(d.stats);
         setCursor(d.next_cursor);
@@ -61,7 +69,16 @@ export default function MySenseNotesPage() {
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [token]);
+  }, [token, notesRetry]);
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    apiFetch<RaceRecords>("/v1/me/race-records", { token, signal: controller.signal })
+      .then((next) => { if (!controller.signal.aborted) { setRaceData(next); setRaceFailed(false); } })
+      .catch(() => { if (!controller.signal.aborted) setRaceFailed(true); });
+    return () => controller.abort();
+  }, [token, raceRetry]);
 
   // 月初より古いメモに届くまでページを読み、月内のマークが欠けないようにする。
   useEffect(() => {
@@ -110,7 +127,8 @@ export default function MySenseNotesPage() {
           </p>
         ) : null}
         {tab === "records" ? (
-          <RaceRecordsPanel token={guest ? null : token} />
+          raceFailed ? <ErrorState message="記録の取得に失敗しました。下のカレンダーから再読み込みできます。" /> :
+          <RaceRecordsPanel token={guest ? null : token} data={raceData} onRecordsChanged={setRaceData} selectedDay={selectedDay} />
         ) : failed ? (
           <ErrorState message="感覚メモの取得に失敗しました。APIの起動を確認してください。" />
         ) : shownNotes === null || shownStats === null ? (
@@ -137,22 +155,30 @@ export default function MySenseNotesPage() {
 
             {senseSummaryEnabled && !guest ? <SenseSummaryCard key={token} token={token} total={shownStats.total} /> : null}
 
+          </>
+        )}
             <SenseNoteCalendar
-              notes={shownNotes}
+              notes={shownNotes ?? []}
               token={token}
+              records={guest ? [] : raceData?.records ?? []}
+              selectedDay={selectedDay}
+              onDayChange={setSelectedDay}
+              onRecordsChanged={setRaceData}
+              recordsLoading={!guest && !raceData && !raceFailed}
+              recordsFailed={!guest && raceFailed}
+              onRecordsRetry={() => { setRaceFailed(false); setRaceRetry((value) => value + 1); }}
               month={month}
               onMonthChange={setMonth}
-              loading={needsOlderNotes && !historyFailed}
-              failed={needsOlderNotes && historyFailed}
-              onRetry={() => setHistoryFailed(false)}
+              loading={!guest && !failed && (shownNotes === null || (needsOlderNotes && !historyFailed))}
+              failed={failed || (needsOlderNotes && historyFailed)}
+              onRetry={() => { setHistoryFailed(false); if (failed) { setFailed(false); setNotesRetry((value) => value + 1); } }}
               onDeleted={(id, next) => {
                 setNotes((list) => list?.filter((n) => n.id !== id) ?? list);
                 setStats(next);
                 setDropped(false);
               }}
             />
-          </>
-        )}
+
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ type raceRecordsResp struct {
 		IsPB      bool   `json:"is_pb"`
 		Memo      string `json:"memo"`
 		MeetName  string `json:"meet_name"`
+		Round     string `json:"round"`
 	} `json:"records"`
 }
 
@@ -132,5 +133,36 @@ func TestRaceRecordLimitHoldsUnderConcurrency(t *testing.T) {
 	queryRowArgs(t, `SELECT count(*) FROM race_records WHERE author_id = $1`, []any{id}, &n)
 	if n != 1000 {
 		t.Fatalf("records %d", n)
+	}
+}
+
+func TestRaceRecordRoundsAndOrdinaryMeets(t *testing.T) {
+	h := setup(t)
+	me := token(t, uuid.New())
+	for _, round := range []string{"決勝", "予選", "準決勝", ""} {
+		rec := doJSON(t, h, http.MethodPost, "/v1/me/race-records", me, map[string]any{"raced_on": "2026-05-03", "event": "100m", "mark": 1100, "meet_name": "記録会", "round": round})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create round=%q: %d %s", round, rec.Code, rec.Body.String())
+		}
+	}
+	got := decodeRaceRecords(t, doJSON(t, h, http.MethodGet, "/v1/me/race-records", me, nil).Body.Bytes())
+	want := []string{"", "予選", "準決勝", "決勝"}
+	if len(got.Records) != len(want) {
+		t.Fatalf("lost rounds: %+v", got)
+	}
+	for i, r := range got.Records {
+		if r.Round != want[i] {
+			t.Fatalf("order: %+v", got)
+		}
+	}
+	rec := doJSON(t, h, http.MethodPatch, "/v1/me/race-records/"+got.Records[0].ID, me, map[string]any{"raced_on": "2026-05-03", "event": "100m", "mark": 1100, "round": "第2レース"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("edit: %d %s", rec.Code, rec.Body.String())
+	}
+	updated := decodeRaceRecords(t, rec.Body.Bytes())
+	for _, r := range updated.Records {
+		if r.ID == got.Records[0].ID && r.Round != "第2レース" {
+			t.Fatalf("edit lost: %+v", r)
+		}
 	}
 }

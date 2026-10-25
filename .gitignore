@@ -27,3 +27,6 @@ CLAUDE.local.md
 
 # Cloud Run の環境変数（deploy/cloud-run/env.example.yaml をコピーしたもの）
 deploy/cloud-run/env.yaml
+
+# Isolated voice UI browser tests
+apps/web/.next-voice-e2e/

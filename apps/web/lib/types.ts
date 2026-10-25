@@ -52,7 +52,7 @@ export type Post = {
   author_name?: string;
   author_post_master?: boolean;
   body?: string;
-  // 一覧のカードに出す本文の冒頭(写真のない文章の投稿だけ)。
+  // 一覧カードに出す詳細の冒頭。写真付きの文章や動画URLの投稿にも使う。
   excerpt?: string;
   mine: boolean;
   like_count: number;
@@ -90,6 +90,22 @@ export type MeetThread = {
   major_slug: string;
   major_year: number;
   competition_id: string;
+};
+
+// 参加券はメモリでのみ扱い、URL・ログ・永続ストレージに保存しない。
+export type MeetVoiceStatus = {
+  enabled: boolean;
+  participants: number;
+  capacity: number;
+  full: boolean;
+};
+
+export type MeetVoiceJoin = {
+  url: string;
+  token: string;
+  room: string;
+  expires_in: number;
+  connection_id: string;
 };
 
 export type Injury = {
@@ -239,7 +255,7 @@ export type AdminInquiry = Inquiry & {
 
 export type AdminReport = {
   id: string;
-  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message" | "coaching_consultation" | "practice_rating";
+  target_type: "post" | "comment" | "injury_note" | "review_response" | "coaching_message" | "coaching_consultation" | "practice_rating" | "voice_participant";
   target_id: string;
   reason: "spam" | "harassment" | "misinfo" | "other";
   detail: string;
@@ -456,7 +472,7 @@ export type PlanIncludes = {
   session_minutes?: number;
   travel_fee_yen?: number;
   max_participants?: number;
-  // 未設定は以前からある指名プラン。
+  // 未設定は以前からあるサポートプラン。
   service_type?: CoachingServiceType | null;
   additional_consultation_price_yen?: number | null;
   video_reviews: number | null;

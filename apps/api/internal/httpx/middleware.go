@@ -155,8 +155,8 @@ func NewRateLimiter() *RateLimiter {
 
 func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Stripe の Webhook は Stripe のサーバーからまとめて届くので数えない（署名で確かめる）。
-		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.URL.Path == "/webhooks/stripe" {
+		// サービスの Webhook はまとめて届くので数えない（各ハンドラで署名を確かめる）。
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || (r.URL.Path == "/webhooks/stripe" || r.URL.Path == "/v1/livekit/webhook") {
 			next.ServeHTTP(w, r)
 			return
 		}
