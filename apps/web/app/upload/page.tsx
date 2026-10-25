@@ -5,6 +5,7 @@ import { MainTabLink } from "@/components/main-tab-link";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { UploadOpening } from "./upload-opening";
 
 export default function UploadPage() {
   const { session, loading } = useAuth();
@@ -14,7 +15,7 @@ export default function UploadPage() {
     if (!loading && !session) router.replace("/login?next=/upload");
   }, [loading, session, router]);
 
-  if (!session) return <p className="text-sm text-slate-200">読み込み中…</p>;
+  if (!session) return <UploadOpening />;
 
   // ホームの「＋」から開く詳細画面。下のメニューは出さないので、その分まで5つの入口で埋める。
   // dvh だと、iPhone の Safari で画面を開いた直後に下のツールバーが出てきた分だけ高さが縮み、

@@ -4,11 +4,12 @@ import { formatDate } from "@/lib/format";
 import { PosterFallback } from "@/components/poster-card";
 import { InstagramThumb } from "@/components/instagram-thumb";
 import { isInstagramShortcode } from "@/lib/instagram";
+import { CardPending } from "@/components/card-pending";
 
 export const feedGridClass = "columns-2 gap-3";
 
 const cardClass =
-  "group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
+  "group relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-white/20 glass bg-white/10 shadow-md backdrop-blur-xs transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-white/40 hover:shadow-blue-950/30 active:scale-[0.98]";
 
 // 空の見出しを投稿詳細に表示しない。
 export function hasFeedTitle(title: string) {
@@ -55,6 +56,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
       <Link
         prefetch={false}
         href={href}
+        data-pending-link=""
         className={cardClass}
       >
         <div className="flex aspect-[4/3] flex-col justify-center gap-2 bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
@@ -70,13 +72,14 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
             <p className="line-clamp-3 break-words text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
           )}
         </div>
+        <CardPending />
       </Link>
     );
   }
   if (post.kind === "injury") {
     const info = post.injury;
     return (
-      <Link prefetch={false} href={href} className={cardClass}>
+      <Link prefetch={false} href={href} data-pending-link="" className={cardClass}>
         <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-rose-400/10 p-3.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {info ? (
@@ -100,12 +103,13 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
             <span className="font-semibold text-rose-300">わかる {post.like_count}</span>
           </div>
         </div>
+        <CardPending />
       </Link>
     );
   }
   const hasThumbnail = Boolean(thumbnail || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
-    <Link prefetch={false} href={href} aria-label={description ? undefined : "投稿の詳細を開く"}
+    <Link prefetch={false} href={href} data-pending-link="" aria-label={description ? undefined : "投稿の詳細を開く"}
       className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}${post.kind === "text" && !hasThumbnail ? " feed-card-text" : ""}`}>
       <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${thumbnail || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
@@ -127,6 +131,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         )}
         {hasThumbnail && description ? <CardCaption text={description} /> : null}
       </div>
+      <CardPending />
     </Link>
   );
 }
