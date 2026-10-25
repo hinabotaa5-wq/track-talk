@@ -43,7 +43,7 @@ func TestNotificationSettingsDefaultsAndUpdate(t *testing.T) {
 	tok := token(t, uuid.New())
 
 	got := notificationSettings(t, h, tok)
-	if len(got) != 7 {
+	if len(got) != 8 {
 		t.Fatalf("categories %+v", got)
 	}
 	for key, s := range got {

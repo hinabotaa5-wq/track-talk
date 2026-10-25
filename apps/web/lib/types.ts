@@ -216,7 +216,7 @@ export type AppNotification = {
 };
 
 // 通知の種類ごとの受け取り設定。in_app はベルの一覧、push は通知をオンにした端末。
-export type NotificationCategory = "comment" | "practice" | "recruitment" | "injury" | "review" | "coaching" | "monthly";
+export type NotificationCategory = "comment" | "practice" | "recruitment" | "injury" | "review" | "coaching" | "monthly" | "announcement";
 
 export type NotificationSetting = {
   category: NotificationCategory;

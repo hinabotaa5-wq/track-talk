@@ -229,6 +229,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/stats", s.adminStats)
 			r.Get("/admin/stats/coaching", s.adminCoachingStats)
 			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
+			r.Get("/admin/announcements", s.adminListAnnouncements)
+			r.Get("/admin/announcements/recipients", s.adminAnnouncementRecipients)
+			r.Post("/admin/announcements/test", s.adminTestAnnouncement)
+			r.Post("/admin/announcements", s.adminSendAnnouncement)
+			r.Post("/admin/announcements/{id}/cancel", s.adminCancelAnnouncement)
 		})
 
 		// オンラインコーチング（年齢・保護者の同意・プッシュ通知・添削動画・パーソナル指導・
