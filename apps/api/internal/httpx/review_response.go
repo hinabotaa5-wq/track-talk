@@ -129,7 +129,7 @@ func (s *Server) notifyReview(ctx context.Context, to, requestID uuid.UUID, kind
 
 // getCoachReviewRequest は、引き受けたコーチに依頼と自分の返答を見せる。
 func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
@@ -160,7 +160,7 @@ type reviewResponseReq struct {
 
 // submitReviewResponse は、引き受けたコーチが返答を送る。返却目安を過ぎたら送れない。
 func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
@@ -363,7 +363,7 @@ type clarificationReq struct {
 
 // submitClarification は、コーチが補足を1回だけ返す。
 func (s *Server) submitClarification(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
+	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
