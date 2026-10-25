@@ -133,6 +133,10 @@ func TestReviewOfferFlow(t *testing.T) {
 		t.Fatalf("B accepts A's offer %d", rec.Code)
 	}
 
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offersA.Offers[0].ID+"/decline", tb, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("B declines A's offer %d", rec.Code)
+	}
+
 	// A が見送ると B に回る。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offersA.Offers[0].ID+"/decline", ta, nil); rec.Code != http.StatusNoContent {
 		t.Fatalf("decline %d %s", rec.Code, rec.Body.String())

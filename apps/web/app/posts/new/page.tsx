@@ -5,7 +5,7 @@ import { PostForm } from "@/components/post-form";
 
 export default function NewPostPage() {
   return (
-    <ComposerPage title="文章">
+    <ComposerPage title="文章・写真">
       <PostForm />
     </ComposerPage>
   );

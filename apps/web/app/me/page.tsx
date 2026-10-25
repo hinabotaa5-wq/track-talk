@@ -14,7 +14,7 @@ const accountLinks = [
   { href: "/me/posts", label: "自分の投稿", icon: LayoutGrid },
   { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
   { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
-  { href: "/me/profile", label: "ニックネームの変更", icon: UserRoundPen },
+  { href: "/me/profile", label: "ニックネームと種目の変更", icon: UserRoundPen },
   { href: "/me/email", label: "メールアドレスの変更", icon: AtSign },
   { href: "/me/password", label: "パスワードの変更", icon: KeyRound },
   { href: "/me/badge", label: "バッジ", icon: Award },

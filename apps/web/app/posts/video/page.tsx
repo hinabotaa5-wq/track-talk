@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { ComposerPage } from "@/components/composer-page";
+import { SubmittingProgress } from "@/components/submitting-progress";
 import { UploadProgress } from "@/components/upload-progress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -106,7 +107,7 @@ export default function OwnVideoPage() {
         </label>
         {upload ? (
           <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
-        ) : null}
+        ) : submitting ? <SubmittingProgress /> : null}
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting || !file}>

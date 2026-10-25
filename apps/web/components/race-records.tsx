@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -19,6 +19,11 @@ import {
   toggleRaceWindSign,
   raceChartBox,
   raceChartPoints,
+  raceChartDomain,
+  raceOverviewSeries,
+  sortRaceRecords,
+  raceRoundSuggestions,
+  raceRecordRoundMaxLength,
   raceEventHasWind,
   raceMarkInput,
   raceMarkKind,
@@ -41,20 +46,24 @@ function RaceRecordForm({
   token,
   record,
   defaultEvent,
+  defaultDay,
   onSaved,
   onCancel,
 }: {
   token: string | null;
   record?: RaceRecord;
   defaultEvent: string;
+  defaultDay?: string;
   onSaved: (records: RaceRecords, event: string) => void;
   onCancel?: () => void;
 }) {
-  const [day, setDay] = useState(record?.raced_on ?? todayInTokyo());
+  const [day, setDay] = useState(record?.raced_on ?? defaultDay ?? todayInTokyo());
   const [event, setEvent] = useState(record?.event ?? defaultEvent);
   const kind = raceMarkKind(event);
   const [mark, setMark] = useState(record ? raceMarkInput(record.mark, kind) : "");
   const [wind, setWind] = useState(record?.wind != null ? formatRaceWind(record.wind).replace("±", "") : "");
+  const roundListId = useId();
+  const [round, setRound] = useState(record?.round ?? "");
   const [meetName, setMeetName] = useState(record?.meet_name ?? "");
   const [memo, setMemo] = useState(record?.memo ?? "");
   const [error, setError] = useState("");
@@ -83,12 +92,12 @@ function RaceRecordForm({
       const res = await apiFetch<RaceRecords>(record ? `/v1/me/race-records/${record.id}` : "/v1/me/race-records", {
         method: record ? "PATCH" : "POST",
         token,
-        body: JSON.stringify({ raced_on: day, event, mark: parsedMark, wind: parsedWind ?? null, memo: memo.trim(), meet_name: meetName.trim() }),
+        body: JSON.stringify({ raced_on: day, event, mark: parsedMark, wind: parsedWind ?? null, memo: memo.trim(), meet_name: meetName.trim(), round: round.trim() }),
       });
       if (!record) {
         setMark("");
         setWind("");
-        setMeetName("");
+        setRound("");
         setMemo("");
       }
       onSaved(res, event);
@@ -141,6 +150,15 @@ function RaceRecordForm({
         <span className="mb-1 block text-xs text-slate-300">大会名</span>
         <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder="例: 県高校総体" />
       </label>
+      <details open={record?.round ? true : undefined} className="rounded-lg border border-white/15 p-3">
+        <summary className="cursor-pointer text-sm text-slate-200">予選・準決勝・決勝などを記入（任意）</summary>
+        <label className="mt-3 block">
+          <span className="mb-1 block text-xs text-slate-300">ラウンド（任意）</span>
+          <Input value={round} onChange={(e) => setRound(e.target.value)} list={roundListId} maxLength={raceRecordRoundMaxLength} placeholder="例: 予選 / 準決勝 / 決勝" />
+          <datalist id={roundListId}>{raceRoundSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <p className="mt-2 text-xs text-slate-300">記録会などは空欄のまま保存できます。同じ日・種目でも、1本ずつ記録を残せます。</p>
+      </details>
       <label className="block">
         <span className="mb-1 block text-xs text-slate-300">感想</span>
         <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder="例: 後半で腕振りが小さくなった" />
@@ -171,11 +189,13 @@ function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceM
   const points = raceChartPoints(records, kind);
   if (points.length === 0) return null;
   const box = raceChartBox;
-  const marks = records.map((record) => record.mark);
-  const best = kind === "time" ? Math.min(...marks) : Math.max(...marks);
-  const worst = kind === "time" ? Math.max(...marks) : Math.min(...marks);
-  const first = records[0].raced_on;
-  const last = records[records.length - 1].raced_on;
+  const ordered = sortRaceRecords(records);
+  const marks = ordered.map((record) => record.mark);
+  const { low, high } = raceChartDomain(marks);
+  const topMark = kind === "time" ? low : high;
+  const bottomMark = kind === "time" ? high : low;
+  const first = ordered[0].raced_on;
+  const last = ordered[ordered.length - 1].raced_on;
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 
   return (
@@ -183,14 +203,8 @@ function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceM
       <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label="記録の推移のグラフ">
         <line x1={box.left} x2={box.width - box.right} y1={box.top} y2={box.top} className="stroke-white/15" />
         <line x1={box.left} x2={box.width - box.right} y1={box.height - box.bottom} y2={box.height - box.bottom} className="stroke-white/25" />
-        <text x={box.left - 6} y={(best === worst ? points[0].y : box.top) + 4} textAnchor="end" className="fill-slate-300 text-xs">
-          {formatRaceMark(best, kind)}
-        </text>
-        {best !== worst ? (
-          <text x={box.left - 6} y={box.height - box.bottom} textAnchor="end" className="fill-slate-400 text-xs">
-            {formatRaceMark(worst, kind)}
-          </text>
-        ) : null}
+        <line x1={box.left} x2={box.width - box.right} y1={(box.top + box.height - box.bottom) / 2} y2={(box.top + box.height - box.bottom) / 2} className="stroke-white/10" strokeDasharray="3 3" />
+        {[topMark, (low + high) / 2, bottomMark].map((mark, i) => <text key={i} x={box.left - 6} y={box.top + i / 2 * (box.height - box.top - box.bottom) + 4} textAnchor="end" className="fill-slate-300 text-xs">{formatRaceMark(Math.round(mark), kind)}</text>)}
         <text x={box.left} y={box.height - 8} className="fill-slate-400 text-xs">
           {senseDayLabel(first)}
         </text>
@@ -209,7 +223,7 @@ function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceM
             strokeWidth={1.5}
             className={p.record.wind_aided ? "fill-slate-950 stroke-slate-200" : p.record.is_pb ? "fill-amber-300 stroke-amber-100" : "fill-sky-300 stroke-sky-100"}
           >
-            <title>{`${p.record.raced_on} ${formatRaceMark(p.record.mark, kind)}`}</title>
+            <title>{`${p.record.raced_on} ${p.record.meet_name} ${p.record.round ?? ""} ${formatRaceMark(p.record.mark, kind)}`}</title>
           </circle>
         ))}
       </svg>
@@ -229,7 +243,35 @@ function RaceRecordChart({ records, kind }: { records: RaceRecord[]; kind: RaceM
   );
 }
 
-function RaceRecordRow({
+function RaceOverviewChart({ records }: { records: RaceRecord[] }) {
+  const { domain, series } = raceOverviewSeries(records);
+  const box = raceChartBox;
+  const sorted = sortRaceRecords(records);
+  const first = sorted[0]?.raced_on, last = sorted.at(-1)?.raced_on;
+  const y = (value: number) => box.top + (domain.high - value) / (domain.high - domain.low) * (box.height - box.top - box.bottom);
+  return <figure className="space-y-3">
+    <h3 className="text-sm font-semibold">全種目の伸びを比較</h3>
+    <p className="text-xs leading-relaxed text-slate-300">各種目の最初の記録を100とし、タイムの短縮率・距離や得点の増加率を重ねています。上に行くほど初回よりよい記録です。種目間の実力や公式の得点を比較するものではありません。</p>
+    <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label="全種目の初回の記録を100とした伸び率のグラフ">
+      {[domain.high, 100, domain.low].map((value, i) => <g key={i}>
+        <line x1={box.left} x2={box.width - box.right} y1={y(value)} y2={y(value)} className={value === 100 ? "stroke-white/40" : "stroke-white/15"} strokeDasharray={value === 100 ? "4 3" : undefined} />
+        <text x={box.left - 6} y={y(value) + 4} textAnchor="end" className="fill-slate-300 text-xs">{value.toFixed(1)}</text>
+      </g>)}
+      {series.map((item) => <g key={item.event}>
+        <path d={item.points.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")} fill="none" stroke={item.color} strokeWidth={1.5} />
+        {item.points.map((p) => <circle key={p.record.id} cx={p.x} cy={p.y} r={p.record.is_pb ? 4 : 3} fill={p.record.wind_aided ? "#020617" : item.color} stroke={item.color} strokeWidth={1.5}>
+          <title>{`${p.record.raced_on} ${item.event_label} ${p.record.round ?? ""} ${formatRaceMark(p.record.mark, item.kind)} / ${p.index.toFixed(1)}${p.record.wind_aided ? "（追い風参考）" : ""}`}</title>
+        </circle>)}
+      </g>)}
+      {first ? <text x={box.left} y={box.height - 8} className="fill-slate-400 text-xs">{senseDayLabel(first)}</text> : null}
+      {last && first !== last ? <text x={box.width - box.right} y={box.height - 8} textAnchor="end" className="fill-slate-400 text-xs">{senseDayLabel(last)}</text> : null}
+    </svg>
+    <figcaption className="flex flex-wrap gap-x-3 gap-y-2 text-xs">{series.map((item) => <span key={item.event} className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4" style={{ backgroundColor: item.color }} aria-hidden />{item.event_label}</span>)}</figcaption>
+    {records.some((r) => r.wind_aided) ? <p className="text-xs text-slate-300">白抜きの点は追い風参考です。</p> : null}
+  </figure>;
+}
+
+export function RaceRecordRow({
   record,
   kind,
   token,
@@ -280,8 +322,10 @@ function RaceRecordRow({
         <p className="text-xs text-slate-300">
           {senseDayLabel(record.raced_on)}
           {record.meet_name ? ` ・ ${record.meet_name}` : ""}
+          {record.round ? ` ・ ${record.round}` : ""}
         </p>
         <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-xs text-sky-200">{record.event_label}</span>
           <span className="text-lg font-bold tabular-nums text-slate-100">{formatRaceMark(record.mark, kind)}</span>
           {record.wind !== null ? <span className="text-xs tabular-nums text-slate-300">風 {formatRaceWind(record.wind)}</span> : null}
           {record.is_pb ? <span className="rounded-full bg-amber-300/20 px-2 py-0.5 text-xs font-semibold text-amber-200">自己ベスト</span> : null}
@@ -337,13 +381,18 @@ function PBStatsCard({ token }: { token: string | null }) {
 const noRecords: RaceRecords = { events: [], records: [] };
 
 // 記録のタブ。書く欄、種目の切り替え、グラフ、記録の一覧(新しい順)。
-export function RaceRecordsPanel({ token }: { token: string | null }) {
+export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, selectedDay }: {
+  token: string | null;
+  data?: RaceRecords | null;
+  onRecordsChanged?: (records: RaceRecords) => void;
+  selectedDay?: string | null;
+}) {
   const [data, setData] = useState<RaceRecords | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string>("");
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || externalData !== undefined) return;
     const controller = new AbortController();
     apiFetch<RaceRecords>("/v1/me/race-records", { token, signal: controller.signal })
       .then(setData)
@@ -351,42 +400,45 @@ export function RaceRecordsPanel({ token }: { token: string | null }) {
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [token]);
+  }, [token, externalData]);
 
   if (failed) return <ErrorState message="記録の取得に失敗しました。APIの起動を確認してください。" />;
   // ログインしていない人には、空の記録の画面を見せる(書こうとするとログインへ案内する)。
-  const shown = token ? data : noRecords;
+  const shown = token ? (externalData === undefined ? data : externalData) : noRecords;
   if (!shown) return <p className="text-sm text-slate-200">読み込み中...</p>;
 
   const events = sortRaceEvents(shown.events);
   const current = events.find((item) => item.event === selected) ?? events[0];
-  const records = current ? shown.records.filter((record) => record.event === current.event) : [];
+  const overview = selected === "all";
+  const records = sortRaceRecords(overview ? shown.records : current ? shown.records.filter((record) => record.event === current.event) : []);
 
   function onSaved(next: RaceRecords, event: string) {
     setData(next);
-    setSelected(event);
+    onRecordsChanged?.(next);
+    setSelected((previous) => previous === "all" ? "all" : event);
   }
 
   return (
     <div className="space-y-4">
       <PBStatsCard token={token} />
       <section className="rounded-2xl border border-white/20 glass bg-white/10 p-4">
-        <RaceRecordForm token={token} defaultEvent={current?.event ?? raceRecordEvents[0].value} onSaved={onSaved} />
+        <RaceRecordForm key={selectedDay ?? "today"} defaultDay={selectedDay ?? undefined} token={token} defaultEvent={current?.event ?? raceRecordEvents[0].value} onSaved={onSaved} />
       </section>
 
       {!current ? (
         <EmptyState title="まだ記録がありません" body="競技会の記録を残すと、種目ごとの推移がグラフになります。" />
       ) : (
         <section className="space-y-3">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label="グラフの種目">
+            <button type="button" onClick={() => setSelected("all")} aria-pressed={overview} className={`shrink-0 rounded-full border px-3 py-1 text-sm ${overview ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"}`}>全種目<span className="ml-1 text-xs">{shown.records.length}</span></button>
             {events.map((item) => (
               <button
                 key={item.event}
                 type="button"
                 onClick={() => setSelected(item.event)}
-                aria-pressed={item.event === current.event}
+                aria-pressed={!overview && item.event === current.event}
                 className={`shrink-0 rounded-full border px-3 py-1 text-sm ${
-                  item.event === current.event ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"
+                  !overview && item.event === current.event ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"
                 }`}
               >
                 {item.event_label}
@@ -395,12 +447,13 @@ export function RaceRecordsPanel({ token }: { token: string | null }) {
             ))}
           </div>
           <div className="rounded-2xl border border-white/20 glass bg-white/10 p-3">
-            <RaceRecordChart records={records} kind={current.kind} />
+            {overview ? <RaceOverviewChart records={records} /> : <RaceRecordChart records={records} kind={current.kind} />}
+            {!overview ? <p className="mt-2 text-xs text-slate-400">小さな変化を大きく見せないよう、縦軸に余裕を持たせています。同日の記録はラウンド順に並びます。</p> : null}
           </div>
           <ul className="space-y-2">
             {[...records].reverse().map((record) => (
               <li key={record.id}>
-                <RaceRecordRow record={record} kind={current.kind} token={token} onChanged={onSaved} />
+                <RaceRecordRow record={record} kind={raceMarkKind(record.event)} token={token} onChanged={onSaved} />
               </li>
             ))}
           </ul>

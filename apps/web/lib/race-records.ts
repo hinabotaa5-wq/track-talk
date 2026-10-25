@@ -18,12 +18,16 @@ export type RaceRecord = {
   memo: string;
   // 記録を出した大会の名前。書かなければ空。
   meet_name: string;
+  round?: string;
   created_at: string;
 };
 
 export type RaceEvent = { event: string; event_label: string; kind: RaceMarkKind; wind: boolean; count: number };
 
 export type RaceRecords = { events: RaceEvent[]; records: RaceRecord[] };
+
+export const raceRecordRoundMaxLength = 20;
+export const raceRoundSuggestions = ["予選", "準決勝", "決勝", "準々決勝", "タイムレース決勝"] as const;
 
 export const raceRecordMemoMaxLength = 300;
 export const raceRecordMeetNameMaxLength = 60;
@@ -133,23 +137,73 @@ function dayNumber(day: string) {
   return Date.UTC(y, m - 1, d) / 86_400_000;
 }
 
-// グラフの点の位置。横は日付、縦は記録で、よい記録ほど上に来る(トラックは縦軸を反転する)。
-// records は1つの種目の、古い順。
+// 同日の記録は大会・ラウンド順に並べ、入力した順が逆でも決勝を最後にする。
+const roundOrder: Record<string, number> = { "予備予選": 1, "予選": 2, "準々決勝": 3, "準決勝": 4, "決勝": 5, "タイムレース決勝": 5 };
+export function sortRaceRecords(records: RaceRecord[]) {
+  return [...records].sort((a, b) => a.raced_on.localeCompare(b.raced_on)
+    || a.meet_name.localeCompare(b.meet_name)
+    || (roundOrder[a.round ?? ""] ?? 0) - (roundOrder[b.round ?? ""] ?? 0)
+    || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+}
+
+// 小さな変化でグラフ全体を上下しないよう、記録の20%以上の幅と上下の余白を取る。
+export function raceChartDomain(marks: number[], allowNegative = false) {
+  if (!marks.length) return { low: 90, high: 110 };
+  const min = Math.min(...marks), max = Math.max(...marks);
+  const middle = (min + max) / 2;
+  const span = Math.max((max - min) * 2, middle * 0.2, 2);
+  const low = allowNegative ? middle - span / 2 : Math.max(0, middle - span / 2);
+  return { low, high: low + span };
+}
+
+// 日付の間隔を基準にしつつ、同日の記録には最大12pxずつ横幅を確保する。
+function raceChartX(records: RaceRecord[], box: RaceChartBox) {
+  const sorted = sortRaceRecords(records);
+  const byDay = new Map<string, RaceRecord[]>();
+  for (const record of sorted) {
+    const group = byDay.get(record.raced_on) ?? [];
+    group.push(record);
+    byDay.set(record.raced_on, group);
+  }
+  const days = [...byDay.keys()];
+  const first = dayNumber(days[0] ?? "1970-01-01");
+  const span = dayNumber(days.at(-1) ?? "1970-01-01") - first;
+  const width = box.width - box.left - box.right;
+  const extras = sorted.length - days.length;
+  const gap = Math.min(12, width / Math.max(1, extras * 2));
+  const dateWidth = width - extras * gap;
+  const positions = new Map<string, number>();
+  let preceding = 0;
+  for (const [day, group] of byDay) {
+    group.forEach((record, i) => positions.set(record.id, box.left + (span
+      ? (dayNumber(day) - first) / span * dateWidth + (preceding + i) * gap
+      : sorted.length > 1 ? i / (sorted.length - 1) * width : width / 2)));
+    preceding += group.length - 1;
+  }
+  return positions;
+}
+
 export function raceChartPoints(records: RaceRecord[], kind: RaceMarkKind, box: RaceChartBox = raceChartBox): RaceChartPoint[] {
-  if (records.length === 0) return [];
-  const innerWidth = box.width - box.left - box.right;
-  const innerHeight = box.height - box.top - box.bottom;
-  const days = records.map((record) => dayNumber(record.raced_on));
-  const firstDay = Math.min(...days);
-  const daySpan = Math.max(...days) - firstDay;
-  const marks = records.map((record) => record.mark);
-  const low = Math.min(...marks);
-  const markSpan = Math.max(...marks) - low;
-  return records.map((record, index) => {
-    const x = daySpan === 0 ? box.left + innerWidth / 2 : box.left + ((days[index] - firstDay) / daySpan) * innerWidth;
-    const ratio = markSpan === 0 ? 0.5 : (record.mark - low) / markSpan;
-    // ratio は記録の大きさ。トラックは小さいほど上、フィールドと混成は大きいほど上。
-    const fromTop = kind === "time" ? ratio : 1 - ratio;
-    return { record, x, y: box.top + fromTop * innerHeight };
+  const sorted = sortRaceRecords(records);
+  const xs = raceChartX(sorted, box);
+  const { low, high } = raceChartDomain(sorted.map((r) => r.mark));
+  return sorted.map((record) => {
+    const ratio = (record.mark - low) / (high - low);
+    return { record, x: xs.get(record.id)!, y: box.top + (kind === "time" ? ratio : 1 - ratio) * (box.height - box.top - box.bottom) };
   });
+}
+
+// 単位の異なる種目は初回=100で比較する。タイム短縮・距離や得点の増加が上になる。
+export function raceOverviewSeries(records: RaceRecord[], box: RaceChartBox = raceChartBox) {
+  const ordered = sortRaceRecords(records);
+  const xs = raceChartX(ordered, box);
+  const groups = new Map<string, RaceRecord[]>();
+  for (const record of ordered) groups.set(record.event, [...(groups.get(record.event) ?? []), record]);
+  const series = sortRaceEvents([...groups].map(([event, rows]) => ({ event, event_label: rows[0].event_label, kind: raceMarkKind(event), wind: false, count: rows.length }))).map((event, index) => {
+    const rows = groups.get(event.event)!;
+    const baseline = rows[0].mark;
+    return { ...event, color: `hsl(${(index * 137.5 + 195) % 360} 85% 72%)`, points: rows.map((record) => ({ record, index: 100 + (event.kind === "time" ? baseline - record.mark : record.mark - baseline) / baseline * 100 })) };
+  });
+  const domain = raceChartDomain([100, ...series.flatMap((s) => s.points.map((p) => p.index))], true);
+  return { domain, series: series.map((s) => ({ ...s, points: s.points.map((p) => ({ ...p, x: xs.get(p.record.id)!, y: box.top + (domain.high - p.index) / (domain.high - domain.low) * (box.height - box.top - box.bottom) })) })) };
 }

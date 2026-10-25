@@ -70,7 +70,13 @@ test("320pxのチャットで長文を小さく折り返し、横にはみ出さ
   expect(Number.parseFloat(dimensions.font)).toBeLessThan(16);
   await page.screenshot({ path: test.info().outputPath("chat.png") });
 });
-test("画像の下部に詳細文を重ね、タイトル用の別枠を作らない", async ({ page }) => {
+for (const kind of ["text", "video"] as const) {
+test(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠を作らない`, async ({ page }) => {
+  // 一覧APIと同じく本文を含めず、写真付き文章もexcerptから描く。
+  await page.route("**/api/v1/posts?*", (route) => route.fulfill({ json: {
+    posts: [{ ...post, kind, body: undefined, excerpt: post.body }],
+    meta: { page: 1, total: 1, total_pages: 1 },
+  } }));
   await page.goto("/");
   await page.getByRole("link", { name: "人気", exact: true }).click();
   const card = page.locator(`a[href="/posts/${post.id}"]`);
@@ -87,3 +93,5 @@ test("画像の下部に詳細文を重ね、タイトル用の別枠を作ら�
   expect(placement.blur).toBe("blur(8px)");
   await page.screenshot({ path: test.info().outputPath("feed.png") });
 });
+
+}

@@ -3,7 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SenseNoteCalendar } from "./sense-note-calendar";
+import type { RaceRecord } from "@/lib/race-records";
 import type { SenseNote } from "@/lib/sense-notes";
+vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => vi.fn(), deleteConfirmOptions: vi.fn() }));
 vi.mock("./sense-notes", () => ({ SenseNoteItem: ({ note }: { note: SenseNote }) => <div>{note.body}</div> }));
 let root: Root;
 let container: HTMLDivElement;
@@ -65,4 +67,20 @@ it("未取得の月は読み込み中を表示し、失敗した場合は再読�
   await render([], "2026-10", false, true);
   await act(async () => [...container.querySelectorAll("button")].find((button) => button.textContent === "再読み込み")!.click());
   expect(onRetry).toHaveBeenCalledOnce();
+});
+
+it("記録だけの日とメモ・記録の両方がある日を開ける", async () => {
+  const record: RaceRecord = {id:"race", raced_on:"2026-10-24", event:"100m", event_label:"100m", mark:1100,wind:null,wind_aided:false,is_pb:true,memo:"最後まで走れた",meet_name:"記録会",round:"",created_at:"2026-10-24T00:00:00Z"};
+  const props = {notes:[note],records:[record], token:"token", month:"2026-10",onMonthChange,loading:false,failed:false,onRetry,onDeleted:()=>{}};
+  await act(async () => root.render(<SenseNoteCalendar {...props} />));
+  await click("2026年10月24日、感覚メモなし、記録あり");
+  expect(container.textContent).toContain("最後まで走れた");
+  expect(container.textContent).toContain("11.00");
+  await act(async () => root.render(<SenseNoteCalendar {...props} records={[{...record,raced_on:note.day}]} />));
+  await click("2026年10月25日、感覚メモあり、記録あり");
+  expect(container.textContent).toContain(note.body);
+  expect(container.textContent).toContain("最後まで走れた");
+  await act(async () => root.render(<SenseNoteCalendar {...props} records={[]} />));
+  expect(container.textContent).not.toContain("最後まで走れた");
+  expect(container.textContent).toContain(note.body);
 });
