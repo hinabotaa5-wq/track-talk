@@ -955,8 +955,13 @@ WHERE p.deleted_at IS NULL
       )
     )
   )
-ORDER BY p.created_at DESC
-LIMIT $8 OFFSET $7
+  -- cursor_id があれば、前のページの最後の投稿より後ろだけを読む(OFFSETを使わない)。
+  AND (
+    $7::uuid IS NULL
+    OR (p.created_at, p.id) < ($8::timestamptz, $7::uuid)
+  )
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $10 OFFSET $9
 `
 
 type ListPostsNewParams struct {
@@ -966,6 +971,8 @@ type ListPostsNewParams struct {
 	Kind            *string    `json:"kind"`
 	Keyword         *string    `json:"keyword"`
 	PrefectureCodes []string   `json:"prefecture_codes"`
+	CursorID        *uuid.UUID `json:"cursor_id"`
+	CursorTime      *time.Time `json:"cursor_time"`
 	OffsetN         int32      `json:"offset_n"`
 	LimitN          int32      `json:"limit_n"`
 }
@@ -997,6 +1004,8 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 		arg.Kind,
 		arg.Keyword,
 		arg.PrefectureCodes,
+		arg.CursorID,
+		arg.CursorTime,
 		arg.OffsetN,
 		arg.LimitN,
 	)
@@ -1121,8 +1130,12 @@ WHERE p.deleted_at IS NULL
       )
     )
   )
-ORDER BY p.like_count DESC, p.created_at DESC
-LIMIT $9 OFFSET $8
+  AND (
+    $8::uuid IS NULL
+    OR (p.like_count, p.created_at, p.id) < ($9::int, $10::timestamptz, $8::uuid)
+  )
+ORDER BY p.like_count DESC, p.created_at DESC, p.id DESC
+LIMIT $12 OFFSET $11
 `
 
 type ListPostsPopularParams struct {
@@ -1133,6 +1146,9 @@ type ListPostsPopularParams struct {
 	Kind            *string    `json:"kind"`
 	Keyword         *string    `json:"keyword"`
 	PrefectureCodes []string   `json:"prefecture_codes"`
+	CursorID        *uuid.UUID `json:"cursor_id"`
+	CursorLikes     *int32     `json:"cursor_likes"`
+	CursorTime      *time.Time `json:"cursor_time"`
 	OffsetN         int32      `json:"offset_n"`
 	LimitN          int32      `json:"limit_n"`
 }
@@ -1165,6 +1181,9 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 		arg.Kind,
 		arg.Keyword,
 		arg.PrefectureCodes,
+		arg.CursorID,
+		arg.CursorLikes,
+		arg.CursorTime,
 		arg.OffsetN,
 		arg.LimitN,
 	)

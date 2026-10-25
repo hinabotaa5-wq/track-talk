@@ -145,3 +145,88 @@ func TestHomeFeedCursorRecruitmentAndEmpty(t *testing.T) {
 		t.Fatalf("empty %s", rec.Body.String())
 	}
 }
+
+// 自分の投稿もカーソルで続きを読める。同じ時刻やいいね数の投稿も、重複も抜けもなく辿れる。
+func TestMyPostsCursor(t *testing.T) {
+	for _, sort := range []string{"new", "popular"} {
+		t.Run(sort, func(t *testing.T) {
+			h := setup(t)
+			ctx := context.Background()
+			pool, err := pgxpool.New(ctx, testDSN(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer pool.Close()
+			author, other := uuid.New(), uuid.New()
+			for _, id := range []uuid.UUID{author, other} {
+				if _, err := pool.Exec(ctx, `INSERT INTO profiles(id,nickname) VALUES($1,'mine')`, id); err != nil {
+					t.Fatal(err)
+				}
+			}
+			stamp := time.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)
+			for i := 1; i <= 23; i++ {
+				// 半分は同じ時刻・同じいいね数にして、並びの同点を作る。
+				at, likes := stamp, 3
+				if i%2 == 0 {
+					at, likes = stamp.Add(-time.Duration(i)*time.Minute), i
+				}
+				if _, err := pool.Exec(ctx, `INSERT INTO posts(id,author_id,title,body,kind,created_at,like_count) VALUES($1,$2,'自分','本文','text',$3,$4)`, uuid.New(), author, at, likes); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := pool.Exec(ctx, `INSERT INTO posts(id,author_id,title,body,kind) VALUES($1,$2,'他人','本文','text')`, uuid.New(), other); err != nil {
+				t.Fatal(err)
+			}
+			tok := token(t, author)
+			base := "/v1/me/posts?pagination=cursor&per_page=10&sort=" + sort
+			read := func(path string) homeFeedResponse {
+				t.Helper()
+				rec := doJSON(t, h, http.MethodGet, path, tok, nil)
+				if rec.Code != 200 {
+					t.Fatalf("read %d %s", rec.Code, rec.Body.String())
+				}
+				var result homeFeedResponse
+				if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+					t.Fatal(err)
+				}
+				return result
+			}
+			seen := map[string]bool{}
+			result := read(base)
+			first := result.Meta.Next
+			for page := 1; ; page++ {
+				for _, post := range result.Posts {
+					if seen[post.ID] {
+						t.Fatalf("duplicate %s", post.ID)
+					}
+					seen[post.ID] = true
+				}
+				if !result.Meta.HasMore {
+					break
+				}
+				if page > 3 {
+					t.Fatal("never terminates")
+				}
+				result = read(base + "&cursor=" + url.QueryEscape(result.Meta.Next))
+			}
+			if len(seen) != 23 {
+				t.Fatalf("got %d posts", len(seen))
+			}
+			// 公開ホームや別の並び順のカーソルは使えない。
+			otherSort := map[string]string{"new": "popular", "popular": "new"}[sort]
+			for _, path := range []string{
+				"/v1/me/posts?pagination=cursor&per_page=10&sort=" + otherSort + "&cursor=" + url.QueryEscape(first),
+				"/v1/posts?pagination=cursor&per_page=10&sort=" + sort + "&cursor=" + url.QueryEscape(first),
+			} {
+				if rec := doJSON(t, h, http.MethodGet, path, tok, nil); rec.Code != 400 {
+					t.Fatalf("foreign cursor %s: %d %s", path, rec.Code, rec.Body.String())
+				}
+			}
+			// ページ番号での取得は総件数を返し続ける。
+			legacy := read("/v1/me/posts?sort=" + sort + "&page=1&per_page=10")
+			if legacy.Meta.Total != 23 {
+				t.Fatalf("legacy %+v", legacy.Meta)
+			}
+		})
+	}
+}

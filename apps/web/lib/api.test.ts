@@ -23,6 +23,18 @@ describe("successful operation tracking", () => {
   });
 });
 
+describe("cache", () => {
+  it("ふだんは取り置かず、revalidate を渡したときだけ取り置きを使う", async () => {
+    const fetch = vi.fn().mockImplementation(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await apiFetch("/v1/domestic-majors");
+    await apiFetch("/v1/domestic-majors", { next: { revalidate: 600 } });
+    expect(fetch.mock.calls[0][1].cache).toBe("no-store");
+    expect(fetch.mock.calls[1][1].cache).toBeUndefined();
+    expect(fetch.mock.calls[1][1].next).toEqual({ revalidate: 600 });
+  });
+});
+
 describe("apiErrorText", () => {
   it("項目ごとの指摘があれば最初の1つを出す", () => {
     const err = new ApiRequestError(422, {

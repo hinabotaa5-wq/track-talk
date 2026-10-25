@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -230,20 +231,46 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			stage = &v
 		}
 	}
-	count, err := s.q.CountPosts(r.Context(), db.CountPostsParams{
-		AuthorID:        author,
-		Kind:            kind,
-		Part:            part,
-		Stage:           stage,
-		PopularWindow:   boolPtr(popular && author == nil),
-		Keyword:         keyword,
-		PrefectureCodes: codes,
-	})
-	if err != nil {
-		MapDBError(w, err)
-		return
+	// pagination=cursor なら、前のページの最後の投稿から続きを読む。件数を数えず、1件多く読んで続きを判定する。
+	byCursor := r.URL.Query().Get("pagination") == "cursor"
+	var cursor homeCursor
+	var cursorID *uuid.UUID
+	var cursorTime *time.Time
+	var cursorLikes *int32
+	limit := per
+	var count int64
+	if byCursor {
+		scope := listCursorScope(sort, author, kind, part, stage, strings.TrimSpace(r.URL.Query().Get("q")))
+		cursor = homeCursor{Version: 1, Scope: scope, AsOf: time.Now().UTC()}
+		if raw := r.URL.Query().Get("cursor"); raw != "" {
+			var ok bool
+			cursor, ok = decodeHomeCursor(raw, scope, time.Now())
+			if !ok {
+				Error(w, http.StatusBadRequest, "invalid_cursor", "一覧を更新して、もう一度お試しください")
+				return
+			}
+			cursorID, cursorTime, cursorLikes = &cursor.ID, &cursor.Time, &cursor.Likes
+		}
+		offset, limit = 0, per+1
+	} else {
+		var err error
+		count, err = s.q.CountPosts(r.Context(), db.CountPostsParams{
+			AuthorID:        author,
+			Kind:            kind,
+			Part:            part,
+			Stage:           stage,
+			PopularWindow:   boolPtr(popular && author == nil),
+			Keyword:         keyword,
+			PrefectureCodes: codes,
+		})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 	var items []postDTO
+	var last db.ListPostsNewRow
+	hasMore := false
 	if popular {
 		rows, err := s.q.ListPostsPopular(r.Context(), db.ListPostsPopularParams{
 			AuthorID:        author,
@@ -253,12 +280,19 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			PopularWindow:   boolPtr(author == nil),
 			Keyword:         keyword,
 			PrefectureCodes: codes,
-			LimitN:          per,
+			CursorID:        cursorID,
+			CursorTime:      cursorTime,
+			CursorLikes:     cursorLikes,
+			LimitN:          limit,
 			OffsetN:         offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
 			return
+		}
+		if hasMore = byCursor && len(rows) > int(per); hasMore {
+			rows = rows[:per]
+			last = db.ListPostsNewRow(rows[len(rows)-1])
 		}
 		ids := idsFromPopular(rows)
 		liked := s.likedSet(r.Context(), ids)
@@ -277,12 +311,18 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			Stage:           stage,
 			Keyword:         keyword,
 			PrefectureCodes: codes,
-			LimitN:          per,
+			CursorID:        cursorID,
+			CursorTime:      cursorTime,
+			LimitN:          limit,
 			OffsetN:         offset,
 		})
 		if err != nil {
 			MapDBError(w, err)
 			return
+		}
+		if hasMore = byCursor && len(rows) > int(per); hasMore {
+			rows = rows[:per]
+			last = rows[len(rows)-1]
 		}
 		ids := idsFromNew(rows)
 		liked := s.likedSet(r.Context(), ids)
@@ -306,7 +346,31 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 		MapDBError(w, err)
 		return
 	}
+	if byCursor {
+		next := ""
+		if hasMore {
+			cursor.Time, cursor.ID, cursor.Likes = last.CreatedAt, last.ID, last.LikeCount
+			next = encodeHomeCursor(cursor)
+		}
+		JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": map[string]any{"page": page, "per_page": per, "total": 0, "has_more": hasMore, "next_cursor": next}})
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{"posts": items, "meta": meta{Page: int(page), PerPage: int(per), Total: count}})
+}
+
+// listCursorScope は、絞り込みの条件ごとにカーソルを分ける。別の一覧のカーソルは使えない。
+func listCursorScope(sort string, author *uuid.UUID, kind, part, stage *string, q string) string {
+	value := func(v *string) string {
+		if v == nil {
+			return ""
+		}
+		return *v
+	}
+	who := ""
+	if author != nil {
+		who = author.String()
+	}
+	return homeCursorScope("list:"+sort, who+"\x00"+value(kind)+"\x00"+value(part)+"\x00"+value(stage), q)
 }
 
 func idsFromNew(rows []db.ListPostsNewRow) []uuid.UUID {

@@ -383,11 +383,19 @@ func (s *Server) present(p postDTO) postDTO {
 			p.PlaybackURL = s.cfg.LocalMediaBaseURL + "/" + name + ".mp4"
 			return p
 		}
-		p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
+		if p.list {
+			p.ThumbnailURL = s.cloud.CardThumbnailURL(p.VideoPublicID)
+		} else {
+			p.ThumbnailURL = s.cloud.ThumbnailURL(p.VideoPublicID)
+		}
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}
 	if (p.Kind == "text" || p.Kind == "recruitment" || p.Kind == "instagram") && p.ImagePublicID != "" {
-		p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
+		if p.list {
+			p.ThumbnailURL = s.cloud.CardImageURL(p.ImagePublicID)
+		} else {
+			p.ThumbnailURL = s.cloud.ImageURL(p.ImagePublicID)
+		}
 	}
 	return p
 }
