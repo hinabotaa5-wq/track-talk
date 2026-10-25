@@ -59,7 +59,8 @@ export async function apiFetch<T>(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
-      cache: "no-store",
+      // ふだんは毎回取りにいく。サーバーで描く公開の一覧だけ、next.revalidate を渡して取り置きを使える。
+      ...(rest.next?.revalidate !== undefined ? {} : { cache: "no-store" as const }),
     });
   } catch {
     throw new ApiRequestError(0, {
