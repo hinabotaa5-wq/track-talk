@@ -7,7 +7,7 @@ import {
 } from "@/components/app-icon-mark";
 
 // ヘッダーのロゴ(トラックの3レーン)をアプリアイコンにする。
-// 明るい空色→青のグラデーションに右上から光を当て、白いレーンを外側ほど濃く重ねて奥行きを出す。
+// 濃い空色→青のグラデーションに右上から光を当て、白いレーンを外側ほど濃く重ねて奥行きを出す。
 // 色と形は components/app-icon-mark.tsx と揃える。
 export function renderAppIcon(size: number) {
   return new ImageResponse(
