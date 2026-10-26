@@ -90,6 +90,7 @@ export default function LoginPage() {
           パスワードを忘れた
         </Link>
       </p>
+      <p className="text-sm"><Link href="/contact" className="text-blue-300 underline">ログインできないときのお問い合わせ</Link></p>
     </div>
   );
 }

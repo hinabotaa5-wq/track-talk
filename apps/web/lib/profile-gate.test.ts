@@ -19,6 +19,7 @@ describe("mustCompleteProfile", () => {
     expect(mustCompleteProfile("/injury/data", empty)).toBe(true);
     expect(mustCompleteProfile("/me/profile", empty)).toBe(false);
     expect(mustCompleteProfile("/terms", empty)).toBe(false);
+    expect(mustCompleteProfile("/contact", empty)).toBe(false);
     expect(mustCompleteProfile("/reset-password/update", empty)).toBe(false);
   });
 

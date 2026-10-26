@@ -115,7 +115,7 @@ function MfaVerify() {
       </form>
       <p className="text-sm text-slate-300">
         認証アプリを使えなくなったときは、
-        <Link href="/me/contact" className="inline-block text-blue-400 transition active:scale-[0.98]">お問い合わせ</Link>
+        <Link href="/contact" className="inline-block text-blue-400 transition active:scale-[0.98]">お問い合わせ</Link>
         から運営に連絡してください。
       </p>
       <button type="button" onClick={signOut} className="text-sm text-slate-400 underline transition active:scale-[0.98]">

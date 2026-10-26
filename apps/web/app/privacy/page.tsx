@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Article } from "@/components/legal-prose";
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default function PrivacyPage() {
       <Article n={1} title="運営者と連絡先">
         <p>運営者の名称は TrackTalk 運営です。個人が運営しています。</p>
         <p>
-          住所は、保有個人データの開示などの請求を受けたときに、遅滞なく通知します。連絡と苦情は、ログイン後のマイページ「お問い合わせ」で受け付けます。
+          住所は、保有個人データの開示などの請求を受けたときに、遅滞なく通知します。連絡と苦情は、<Link href="/contact" className="text-blue-300 underline">運営のメール窓口</Link>、またはログイン後のマイページ「お問い合わせ」で受け付けます。
         </p>
       </Article>
 

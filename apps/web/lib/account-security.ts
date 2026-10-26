@@ -6,7 +6,7 @@ export type AssuranceLevel = string | null | undefined;
 export type MfaGateState = "none" | "verify" | "setup";
 
 // 二段階認証の確認がなくても開ける画面。ログインし直す・規約を読むなどはできるようにする。
-const openPrefixes = ["/login", "/register", "/auth", "/terms", "/privacy", "/guidelines"];
+const openPrefixes = ["/login", "/register", "/auth", "/terms", "/privacy", "/contact", "/guidelines"];
 
 // 管理者・コーチは、二段階認証を設定するまで、これらの画面を開けない(API も拒む)。
 const staffPrefixes = ["/admin", "/coach"];
