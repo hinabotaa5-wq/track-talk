@@ -264,7 +264,8 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 	for i, page := range pages {
 		u := pageURLs[i]
 		if i > 0 {
-			time.Sleep(5 * time.Second)
+			// Tier 0 の Flash は5回/分。県内の複数ページ間にも県のあいだと同じ余裕を残す。
+			time.Sleep(15 * time.Second)
 		}
 		drafts, err := client.Extract(ctx, page)
 		if err != nil {

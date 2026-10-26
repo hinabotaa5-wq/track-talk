@@ -21,18 +21,23 @@ func (s *Server) reserveSenseSummaryAttempt(ctx context.Context) (bool, error) {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('sense-summary-budget', 0))`); err != nil {
 		return false, err
 	}
-	var now time.Time
-	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
+	var now, providerStart time.Time
+	if err := tx.QueryRow(ctx, `WITH t AS (SELECT clock_timestamp() AS at)
+SELECT at, date_trunc('day', at AT TIME ZONE 'America/Los_Angeles') AT TIME ZONE 'America/Los_Angeles' FROM t`).Scan(&now, &providerStart); err != nil {
 		return false, err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM sense_summary_attempts WHERE attempted_at <= $1`, now.Add(-24*time.Hour)); err != nil {
+	retainedSince := now.Add(-24 * time.Hour)
+	if providerStart.Before(retainedSince) {
+		retainedSince = providerStart
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM sense_summary_attempts WHERE attempted_at < $1`, retainedSince); err != nil {
 		return false, err
 	}
-	var dayCount, minuteCount int64
-	if err := tx.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE attempted_at > $1) FROM sense_summary_attempts`, now.Add(-time.Minute)).Scan(&dayCount, &minuteCount); err != nil {
+	var dayCount, minuteCount, providerDayCount int64
+	if err := tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE attempted_at > $1), count(*) FILTER (WHERE attempted_at > $2), count(*) FILTER (WHERE attempted_at >= $3) FROM sense_summary_attempts`, now.Add(-24*time.Hour), now.Add(-time.Minute), providerStart).Scan(&dayCount, &minuteCount, &providerDayCount); err != nil {
 		return false, err
 	}
-	if (daily > 0 && dayCount >= int64(daily)) || (minute > 0 && minuteCount >= int64(minute)) {
+	if (daily > 0 && (dayCount >= int64(daily) || providerDayCount >= int64(daily))) || (minute > 0 && minuteCount >= int64(minute)) {
 		return false, nil
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO sense_summary_attempts (attempted_at) VALUES ($1)`, now); err != nil {

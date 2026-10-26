@@ -13,8 +13,8 @@ import (
 
 // 無料枠との比較（2026-10-27: Flash-Lite は500回/日・15回/分）に余裕を残す。
 const (
-	DefaultSenseSummaryDailyLimit  = 200
-	DefaultSenseSummaryMinuteLimit = 5
+	DefaultSenseSummaryDailyLimit  = 400
+	DefaultSenseSummaryMinuteLimit = 10
 )
 
 type Config struct {
@@ -82,10 +82,10 @@ type Config struct {
 	// GeminiSummaryModel は、感覚メモのまとめに使う Gemini のモデル。空なら httpx の既定(軽いモデル)。
 	// 無料枠の1日の回数はモデルごとなので、大会の取り込みと別のモデルにすると回数を分け合わずに済む。
 	GeminiSummaryModel string
-	// SenseSummaryDailyLimit は、全員で直近24時間に試行できる要約の数。未設定は200、明示的な0は上限なし。
+	// SenseSummaryDailyLimit は、全員で直近24時間に試行できる要約の数。未設定は400、明示的な0は上限なし。
 	// 成否を問わず呼び出し直前にDBで予約する。日付のリセット時刻の違いや同時リクエストでも超えない。
 	SenseSummaryDailyLimit int
-	// SenseSummaryMinuteLimit は、全員で直近1分に試行できる数。未設定は5、明示的な0は上限なし。
+	// SenseSummaryMinuteLimit は、全員で直近1分に試行できる数。未設定は10、明示的な0は上限なし。
 	SenseSummaryMinuteLimit int
 	// LocalMediaBaseURL はローカルプレビューの動画配信先。本番では設定しない。
 	LocalMediaBaseURL string

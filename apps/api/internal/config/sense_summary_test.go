@@ -12,7 +12,7 @@ func TestSenseSummaryLimits(t *testing.T) {
 		wantDaily, wantMinute int
 		wantErr               bool
 	}{
-		{"unset", "", "", 200, 5, false},
+		{"unset", "", "", 400, 10, false},
 		{"explicit", "400", "8", 400, 8, false},
 		{"zero explicitly disables", "0", "0", 0, 0, false},
 		{"negative daily", "-1", "5", 0, 0, true},
