@@ -136,7 +136,7 @@ it("感覚メモの日付は日本時間の今日に固定し、保存日はAPI�
   vi.setSystemTime(new Date("2026-10-22T16:00:00Z")); // 日本時間は10月23日
   const onCreated = vi.fn();
   apiFetch.mockResolvedValue({ note: { id: "new" }, stats: { total: 1, days: 1, streak: 1, today: 1 } });
-  await act(async () => root.render(createElement(SenseNoteComposer, { token: "test-token", writtenToday: false, onCreated })));
+  await act(async () => root.render(createElement(SenseNoteComposer, { token: "test-token", writtenToday: false, streak: 0, onCreated })));
   expect(container.querySelector("time")?.dateTime).toBe("2026-10-23");
   expect(container.querySelector("input")).toBeNull();
   expect(container.textContent).not.toContain("日本時間の今日の日付で保存します");
@@ -150,4 +150,10 @@ it("感覚メモの日付は日本時間の今日に固定し、保存日はAPI�
   await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(apiFetch).toHaveBeenCalledWith("/v1/me/sense-notes", expect.objectContaining({ body: JSON.stringify({ body: "リズムよく走れた" }) }));
   expect(onCreated).toHaveBeenCalledOnce();
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("1日続けて書けてる。また明日も書こう！");
+});
+
+it("保存済みの画面でも連続日数の一文だけを表示する", async () => {
+  await act(async () => root.render(<SenseNoteComposer token="test-token" writtenToday streak={6} onCreated={vi.fn()} />));
+  expect(container.textContent).toBe("6日続けて書けてる。また明日も書こう！");
 });
