@@ -36,22 +36,9 @@ export function senseJarLevel(total: number) {
   return { filled: Math.floor(safe / senseJarSize), current: safe % senseJarSize };
 }
 
-// 書いたあとに出すねぎらい。stats は書いたあとの値。
-export function senseCheer(stats: SenseNoteStats) {
-  const { filled, current } = senseJarLevel(stats.total);
-  if (stats.total > 0 && current === 0) {
-    return { title: "今日も頑張ったね", body: `器が感覚でいっぱいになった。${filled}杯目、おめでとう。` };
-  }
-  if (stats.total === 1) {
-    return { title: "今日も頑張ったね", body: "はじめての感覚がたまった。体が覚えたことを、少しずつ残していこう。" };
-  }
-  if (stats.today > 1) {
-    return { title: "今日も頑張ったね", body: `今日の感覚、${stats.today}つ目。気づきが多い日だったね。` };
-  }
-  if (stats.streak >= 2) {
-    return { title: "今日も頑張ったね", body: `${stats.streak}日続けて書けてる。感覚が${stats.total}個たまったよ。` };
-  }
-  return { title: "今日も頑張ったね", body: `感覚が${stats.total}個たまったよ。また明日の体の声も聞かせてね。` };
+// 保存直後と、今日のメモを保存済みの画面で同じ一文を表示する。
+export function senseCheer(stats: Pick<SenseNoteStats, "streak">) {
+  return `${stats.streak}日続けて書けてる。また明日も書こう！`;
 }
 
 // 日付の新しい順(同じ日は保存の新しい順)に並べる。日付を選んで書けるので、書いた順とは限らない。

@@ -4,13 +4,14 @@ import { senseGrainColor, senseJarLevel, senseJarSize } from "@/lib/sense-notes"
 // dropLatest を付けると、いちばん新しい粒が上から落ちてくる(「動きを減らす」設定の人には動かさない)。
 // senseJarSize 粒でビンの中を埋める並び(下から2つずつ3段)。隣どうしが触れる大きさにして、
 // ビンの中の余白が目立たないようにする。粒の数を変えたら、この並びも合わせ直す。
+// 直径42の粒を3段積める高さ128の胴に収め、上段を切らない。
 const grains = [
-  { cx: 38, cy: 130, r: 21 },
-  { cx: 80, cy: 130, r: 21 },
-  { cx: 38, cy: 89, r: 21 },
-  { cx: 80, cy: 89, r: 21 },
-  { cx: 38, cy: 48, r: 21 },
-  { cx: 80, cy: 48, r: 21 },
+  { cx: 39, cy: 150, r: 21 },
+  { cx: 81, cy: 150, r: 21 },
+  { cx: 39, cy: 108, r: 21 },
+  { cx: 81, cy: 108, r: 21 },
+  { cx: 39, cy: 66, r: 21 },
+  { cx: 81, cy: 66, r: 21 },
 ];
 
 export function SenseNoteJar({ total, dropLatest = false, className = "" }: { total: number; dropLatest?: boolean; className?: string }) {
@@ -18,10 +19,10 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
   // 満杯になった直後は、空のビンではなく満杯のビンを見せる。
   const shown = total > 0 && current === 0 ? senseJarSize : current;
   const jarIndex = total > 0 && current === 0 ? filled : filled + 1;
-  const fillTop = shown === 0 ? 146 : Math.max(44, Math.min(...grains.slice(0, shown).map((g) => g.cy - g.r)) + 6);
+  const fillTop = shown === 0 ? 168 : shown === senseJarSize ? 44 : Math.max(44, Math.min(...grains.slice(0, shown).map((g) => g.cy - g.r)) + 6);
   return (
     <div className={`relative shrink-0 ${className}`}>
-      <svg viewBox="0 0 120 160" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
+      <svg viewBox="0 0 120 184" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
         <defs>
           <linearGradient id="sense-jar-glass" x1="0" x2="1">
             <stop offset="0" stopColor="rgb(255 255 255 / 0.22)" />
@@ -33,19 +34,19 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
             <stop offset="1" stopColor="rgb(125 211 252 / 0.28)" />
           </linearGradient>
           <clipPath id="sense-jar-inside">
-            <path d="M22 44 Q14 50 14 64 V138 Q14 150 28 150 H92 Q106 150 106 138 V64 Q106 50 98 44 Z" />
+            <path d="M22 44 Q14 50 14 64 V160 Q14 172 28 172 H92 Q106 172 106 160 V64 Q106 50 98 44 Z" />
           </clipPath>
         </defs>
         <rect x="34" y="16" width="52" height="14" rx="5" fill="rgb(253 230 138 / 0.85)" />
         <rect x="38" y="28" width="44" height="12" rx="3" fill="rgb(255 255 255 / 0.18)" />
         <path
-          d="M22 44 Q14 50 14 64 V138 Q14 150 28 150 H92 Q106 150 106 138 V64 Q106 50 98 44 Z"
+          d="M22 44 Q14 50 14 64 V160 Q14 172 28 172 H92 Q106 172 106 160 V64 Q106 50 98 44 Z"
           fill="url(#sense-jar-glass)"
           stroke="rgb(255 255 255 / 0.55)"
           strokeWidth="2.5"
         />
         <g clipPath="url(#sense-jar-inside)">
-          <rect x="0" y={fillTop} width="120" height={160 - fillTop} fill="url(#sense-jar-glow)" className="transition-all duration-700" />
+          <rect x="0" y={fillTop} width="120" height={184 - fillTop} fill="url(#sense-jar-glow)" className="transition-all duration-700" />
           {Array.from({ length: shown }, (_, i) => {
             const { cx, cy, r } = grains[i % grains.length];
             const latest = dropLatest && i === shown - 1;
@@ -63,7 +64,7 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
             );
           })}
         </g>
-        <path d="M24 60 Q22 90 24 128" stroke="rgb(255 255 255 / 0.45)" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <path d="M24 60 Q22 108 24 150" stroke="rgb(255 255 255 / 0.45)" strokeWidth="3" strokeLinecap="round" fill="none" />
       </svg>
       {filled > 0 ? (
         <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-xs font-bold text-slate-900 shadow">

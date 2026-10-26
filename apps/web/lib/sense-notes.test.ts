@@ -27,13 +27,13 @@ describe("sense notes", () => {
     expect(senseSummaryMinNotes).toBe(senseJarSize);
   });
 
-  it("always opens the cheer with 今日も頑張ったね", () => {
-    const first = senseCheer({ total: 1, days: 1, streak: 1, today: 1 });
-    expect(first.title).toBe("今日も頑張ったね");
-    expect(first.body).toContain("はじめて");
-    expect(senseCheer({ total: 5, days: 3, streak: 3, today: 1 }).body).toContain("3日続けて");
-    expect(senseCheer({ total: 5, days: 3, streak: 1, today: 2 }).body).toContain("2つ目");
-    expect(senseCheer({ total: 6, days: 6, streak: 6, today: 1 }).body).toContain("1杯目");
+  it.each([
+    { total: 1, days: 1, streak: 1, today: 1 },
+    { total: 5, days: 3, streak: 3, today: 1 },
+    { total: 5, days: 3, streak: 1, today: 2 },
+    { total: 6, days: 6, streak: 6, today: 1 },
+  ])("shows only the streak encouragement for $total notes", (stats) => {
+    expect(senseCheer(stats)).toBe(`${stats.streak}日続けて書けてる。また明日も書こう！`);
   });
 
   it("groups notes by day keeping the order", () => {
