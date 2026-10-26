@@ -248,9 +248,7 @@ function RaceRecordChart({ records, kind, label, box = raceChartBox, showLegend 
             x={picked.x}
             y={picked.y < box.top + 18 ? picked.y + 20 : picked.y - 10}
             textAnchor={picked.x < box.left + 40 ? "start" : picked.x > box.width - box.right - 40 ? "end" : "middle"}
-            className="pointer-events-none fill-white stroke-slate-950 text-xs font-semibold"
-            strokeWidth={3}
-            paintOrder="stroke"
+            className="pointer-events-none fill-white text-xs font-semibold"
           >
             {chartDay(picked.record.raced_on)}
           </text>

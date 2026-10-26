@@ -97,15 +97,15 @@ export default function MePage() {
         {infoLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
-        <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass}>
-          <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
-          <span className="flex-1">ログアウト</span>
-        </button>
         <Link href="/me/delete" className={menuRowClass}>
           <UserX className="size-4 shrink-0 text-slate-300" aria-hidden />
           <span className="flex-1">退会する</span>
           <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
         </Link>
+        <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass}>
+          <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
+          <span className="flex-1">ログアウト</span>
+        </button>
       </nav>
       {logoutError ? <p role="alert" className="text-sm text-red-400">{logoutError}</p> : null}
     </div>
