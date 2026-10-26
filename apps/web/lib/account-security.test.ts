@@ -8,7 +8,7 @@ describe("mfaGateState", () => {
   });
 
   it("ログイン・登録・規約の画面は止めない", () => {
-    for (const pathname of ["/login", "/register", "/auth/callback", "/terms", "/privacy", "/guidelines"]) {
+    for (const pathname of ["/login", "/register", "/auth/callback", "/terms", "/privacy", "/contact", "/guidelines"]) {
       expect(mfaGateState({ pathname, currentLevel: "aal1", nextLevel: "aal2", mfaRequired: true })).toBe("none");
     }
   });

@@ -6,7 +6,7 @@ export function profileIncomplete(profile: Pick<Profile, "nickname" | "event"> |
 }
 
 // ニックネームと種目を決める前でも開ける画面。ここ以外は、決める画面に送り返す。
-const openPrefixes = ["/me/profile", "/login", "/register", "/reset-password", "/auth", "/terms", "/privacy", "/guidelines", "/guardian"];
+const openPrefixes = ["/me/profile", "/login", "/register", "/reset-password", "/auth", "/terms", "/privacy", "/contact", "/guidelines", "/guardian"];
 
 export function mustCompleteProfile(pathname: string, profile: Pick<Profile, "nickname" | "event"> | null) {
   if (!profileIncomplete(profile)) return false;
