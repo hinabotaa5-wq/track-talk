@@ -11,7 +11,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// 無料枠との比較（2026-10-27: Flash-Lite は500回/日・10回/分）に余裕を残す。
+// 無料枠との比較（2026-10-27: Flash-Lite は500回/日・15回/分）に余裕を残す。
 const (
 	DefaultSenseSummaryDailyLimit  = 200
 	DefaultSenseSummaryMinuteLimit = 5
