@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { MainTabLink } from "./main-tab-link";
-import { appIconBackground, appIconColors, TrackLanesMark } from "./app-icon-mark";
+import { appIconColors, TrackLanesMark } from "./app-icon-mark";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
@@ -23,18 +23,10 @@ function useLocationSearch() {
   return useSyncExternalStore(noSubscribe, () => window.location.search, () => "");
 }
 
-// アプリアイコン(components/app-icon-mark.tsx)と同じ空色のタイルに白い3レーン。
-// 濃紺の帯の上でも埋もれないよう、白線だけでなく背景ごとアイコンの形で出す。
+// アプリアイコン(components/app-icon-mark.tsx)の背景を除いた、白い3レーンだけのマーク。
+// 512×512 の座標のうちレーンのある範囲(線の太さを含む)だけを切り出して表示する。
 function TrackMark() {
-  return (
-    <span
-      className="flex size-8 shrink-0 overflow-hidden rounded-[9px] shadow-sm shadow-black/30 ring-1 ring-white/20"
-      style={{ backgroundImage: appIconBackground }}
-      aria-hidden
-    >
-      <TrackLanesMark className="size-full" />
-    </span>
-  );
+  return <TrackLanesMark viewBox="115 125 280 270" className="h-7 w-[29px] shrink-0" />;
 }
 
 function TrackLogo() {
