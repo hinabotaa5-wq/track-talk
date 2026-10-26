@@ -63,6 +63,9 @@ func (m planMenu) text() string {
 	return b.String()
 }
 
+// contractCoachForbidden は、承認を取り消されたコーチが担当の申し込みを開こうとしたときの文言。
+const contractCoachForbidden = "承認されたコーチだけが申し込みのやりとりを操作できます"
+
 // contractParty は、ログインしている人がこの申し込みの本人かコーチかを確かめる。違えば 404。
 func (s *Server) contractParty(w http.ResponseWriter, r *http.Request) (db.Profile, db.CoachingContract, string, bool) {
 	me, ok := s.requireProfile(w, r)
@@ -85,7 +88,7 @@ func (s *Server) contractParty(w http.ResponseWriter, r *http.Request) (db.Profi
 	role := "requester"
 	if ct.CoachID == me.ID {
 		role = "coach"
-		if !s.requireStaffMFA(w, r) {
+		if !s.requireCurrentCoach(w, r, me.ID, contractCoachForbidden) {
 			return db.Profile{}, db.CoachingContract{}, "", false
 		}
 	}

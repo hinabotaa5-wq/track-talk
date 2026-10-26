@@ -348,6 +348,9 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if row.CoachID == me.ID && !s.requireCurrentCoach(w, r, me.ID, contractCoachForbidden) {
+		return
+	}
 	c := s.contractJSON(db.CoachingContract{
 		ID: row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
