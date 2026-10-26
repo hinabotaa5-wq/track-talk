@@ -404,7 +404,7 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
     return () => controller.abort();
   }, [token, externalData]);
 
-  if (failed) return <ErrorState message="記録の取得に失敗しました。APIの起動を確認してください。" />;
+  if (failed) return <ErrorState message="記録の取得に失敗しました。時間をおいて、もう一度開いてください。" />;
   // ログインしていない人には、空の記録の画面を見せる(書こうとするとログインへ案内する)。
   const shown = token ? (externalData === undefined ? data : externalData) : noRecords;
   if (!shown) return <p className="text-sm text-slate-200">読み込み中...</p>;

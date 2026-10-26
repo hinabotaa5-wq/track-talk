@@ -109,7 +109,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   }
 
   if (load.kind === "failed") {
-    return intro(<ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />);
+    return intro(<ErrorState message="グループの取得に失敗しました。時間をおいて、もう一度開いてください。" />);
   }
 
   if (load.kind === "not-joined") {

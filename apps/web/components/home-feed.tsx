@@ -11,7 +11,7 @@ import { ApiRequestError } from "@/lib/api";
 import type { Meta, Post } from "@/lib/types";
 import { afterStartup } from "@/lib/after-startup";
 
-const loadError = "投稿の取得に失敗しました。APIの起動を確認してください。";
+const loadError = "投稿の取得に失敗しました。時間をおいて、もう一度開いてください。";
 
 export function HomeFeed({
   sort,
