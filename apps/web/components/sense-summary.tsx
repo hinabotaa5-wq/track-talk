@@ -148,34 +148,40 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
   return { summaries: loaded ? summaries : [], cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry: () => setReload((value) => value + 1) };
 }
 
-// 移動先が決まるまで、作成ボタンと履歴は元の欄に保つ。
-export function SenseSummaryCard({ state }: { state: ReturnType<typeof useSenseSummaries> }) {
+// 瓶の横では作成状況とボタンだけを表示し、まとめの本文はカレンダーで読む。
+export function SenseSummaryCard({ state, compact = false }: { state: ReturnType<typeof useSenseSummaries>; compact?: boolean }) {
   const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className="space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4" aria-label="まとめた感覚">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label="まとめた感覚">
+      <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />
           まとめた感覚
         </h2>
         {loaded ? shortBy > 0 ? (
-          <span className="text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
+          <span className="block text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
         ) : (
           <Button variant="secondary" className="px-3 py-1 text-xs" onClick={create} disabled={busy}>
             {busy ? "まとめています..." : `${minNotes}個の感覚をまとめる`}
           </Button>
         ) : null}
       </div>
-      {loaded && shortBy === 0 ? <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p> : null}
-      {loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
+      {!compact ? <SenseSummaryNotice state={state} /> : null}
+      {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
       {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
-      <div className="space-y-2">
+      {!compact ? <div className="space-y-2">
         {summaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} />)}
-      </div>
-      {cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "読み込み中..." : "過去のまとめをもっと見る"}</Button> : null}
+      </div> : null}
+      {!compact && cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "読み込み中..." : "過去のまとめをもっと見る"}</Button> : null}
       {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
       {!loaded && error ? <Button variant="secondary" onClick={retry}>もう一度読み込む</Button> : null}
     </section>
   );
+}
+
+// 送信の説明は瓶の横の細い欄に詰めず、作成できるときにその下で全文を示す。
+export function SenseSummaryNotice({ state }: { state: ReturnType<typeof useSenseSummaries> }) {
+  if (!state.loaded || state.pendingNotes < state.minNotes) return null;
+  return <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{state.minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p>;
 }

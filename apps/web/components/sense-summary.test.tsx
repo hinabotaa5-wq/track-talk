@@ -21,9 +21,9 @@ beforeEach(() => {
   apiFetch.mockReset();
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-function SummaryHarness({ total = 12, month }: { total?: number; month?: string }) {
+function SummaryHarness({ total = 12, month, compact = false }: { total?: number; month?: string; compact?: boolean }) {
   const state = useSenseSummaries("test", total, month);
-  return <SenseSummaryCard state={state} />;
+  return <SenseSummaryCard state={state} compact={compact} />;
 }
 async function render() {
   await act(async () => root.render(<SummaryHarness />));
@@ -103,4 +103,17 @@ it("過去月に移ると作成順で古い履歴まで読み、日付を戻し�
   // to_day が過去でも、作成日が表示月内なら次ページを確認する。
   expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("cursor=next-page"), expect.anything());
   expect(container.querySelectorAll("details")).toHaveLength(2);
+});
+
+it("瓶の横では作成状況とボタンを表示し、まとめ本文はカレンダーに任せる", async () => {
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (options?.method === "POST") return { summary: saved, pending_notes: 0 };
+    if (path.endsWith("/summaries")) return { summaries: [saved], next_cursor: null };
+    return { pending_notes: 6, min_notes: 6 };
+  });
+  await act(async () => root.render(<SummaryHarness compact />));
+  expect(container.querySelector("details")).toBeNull();
+  await click("6個の感覚をまとめる");
+  expect(container.textContent).toContain("あと6個でまとめられます");
+  expect(container.textContent).not.toContain(saved.summary.overview);
 });

@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
-import { SenseSummaryCard, useSenseSummaries } from "@/components/sense-summary";
+import { SenseSummaryCard, SenseSummaryNotice, useSenseSummaries } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
 import type { RaceRecords } from "@/lib/race-records";
 import { todayInTokyo } from "@/lib/format";
@@ -139,10 +139,12 @@ export default function MySenseNotesPage() {
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
               <div className="flex items-center gap-4">
                 <SenseNoteJar total={shownStats.total} dropLatest={dropped} className="h-32 w-24" />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 space-y-3">
+                  {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} compact /> : null}
                   <SenseNoteStatsRow stats={shownStats} />
                 </div>
               </div>
+              {senseSummaryEnabled && !guest ? <SenseSummaryNotice state={summaryState} /> : null}
               <SenseNoteComposer
                 token={token}
                 writtenToday={shownStats.today > 0}
@@ -153,9 +155,6 @@ export default function MySenseNotesPage() {
                 }}
               />
             </section>
-
-            {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} /> : null}
-
           </>
         )}
             <SenseNoteCalendar
