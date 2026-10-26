@@ -22,7 +22,7 @@ const (
 	// パーソナル指導の手数料（%）。
 	personalFeePercent = 20
 	// 1回に送金する最低額（円）。送金のたびに Stripe の費用（月200円と入金ごとの250円+0.25%）がかかるので、
-	// 届かない分は翌月以降に繰り越す。
+	// 届かない分は翌月に繰り越す。繰り越しは1回までで、翌月は届かなくても送る。
 	minPayoutYen = 3000
 )
 
@@ -171,7 +171,7 @@ type payoutRunResult struct {
 }
 
 // runCoachPayouts は、前の月までの報酬をコーチごとにまとめ、まだ送っていない送金を Stripe で送る。
-// 合計が minPayoutYen に届かないコーチの分は、送金にまとめずに残しておく。
+// 合計が minPayoutYen に届かないコーチの分は、1回だけ送金にまとめずに残しておく。
 func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	var out payoutRunResult
 	// 送金する前に、記録し損ねた報酬を拾う。

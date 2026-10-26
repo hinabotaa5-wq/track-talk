@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 
 // コーチへの報酬。コーチの画面の「報酬」と、運営の「送金」。
 // 支払いは TrackTalk が受け取り、月に1回、前の月までの報酬をまとめて Stripe でコーチのアカウントへ送金する。
-// 合計が最低送金額に届かない分は翌月以降に繰り越す。
+// 合計が最低送金額に届かない分は1回だけ翌月に繰り越す。
 
 const payoutStatusLabels: Record<CoachPayoutStatus, string> = {
   pending: "送金待ち",
@@ -94,7 +94,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
         </div>
       </div>
       <p className="text-xs text-slate-300">
-        取り分は、フォーム添削が代金の{data.review_share}%、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは、届くまで翌月以降に繰り越します。銀行口座への入金は毎月15日ごろです。
+        取り分は、フォーム添削が代金の{data.review_share}%、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは翌月に繰り越し、翌月は届かなくても送金します（繰り越しは1回まで）。銀行口座への入金は毎月15日ごろです。
       </p>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">
@@ -168,7 +168,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
       >
         前の月までの報酬を送金する
       </button>
-      <p className="text-xs text-slate-300">毎月1日から14日のあいだに押してください。コーチの銀行口座への入金は毎月15日です。前の月までの分が3,000円に届かないコーチは翌月以降に繰り越します（承認済みでなくなったコーチには、届かなくても残りを送ります）。</p>
+      <p className="text-xs text-slate-300">毎月1日から14日のあいだに押してください。コーチの銀行口座への入金は毎月15日です。前の月までの分が3,000円に届かないコーチは翌月に1回だけ繰り越します（繰り越した翌月と、承認済みでなくなったコーチには、届かなくても送ります）。</p>
       {message ? <p className="text-sm text-slate-100">{message}</p> : null}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">コーチ</h2>

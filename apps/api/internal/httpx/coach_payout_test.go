@@ -11,6 +11,9 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
+// lastMonthJST は、日本時間の前の月の2日。
+const lastMonthJST = `(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month' + interval '1 day') AT TIME ZONE 'Asia/Tokyo'`
+
 type earningsView struct {
 	Payments       bool `json:"payments"`
 	StripeLinked   bool `json:"stripe_linked"`
@@ -158,7 +161,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	}
 
 	// 前の月の分になったら送る。3,000円に届かない添削の840円は繰り越す。
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at = created_at - interval '40 days'`)
+	execSQLArgs(t, `UPDATE coach_earnings SET created_at = `+lastMonthJST)
 	f.failNextTransfers(1)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":0,"failed":1`) {
@@ -331,5 +334,35 @@ func TestFullRefundAfterEndRemovesEarning(t *testing.T) {
 	execSQLArgs(t, `UPDATE coach_earnings e SET payout_id = p.id FROM coach_payouts p WHERE p.coach_id = e.coach_id AND e.contract_id = $1`, other)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/contracts/"+other+"/refund", tadmin, map[string]any{"kind": "full"}); rec.Code != http.StatusConflict {
 		t.Fatalf("refund after payout %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 3,000円に届かない報酬の繰り越しは1回まで。前の前の月の分が残っていれば、届かなくても送る。
+func TestCoachPayoutCarriesOverOnce(t *testing.T) {
+	h, f := setupStripe(t)
+	tadmin := adminToken(t, h)
+	coach, _ := onDutyCoach(t, h, tadmin)
+	earn := func(when string) {
+		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+			VALUES (gen_random_uuid(), $1, 'review', 1200, 70, 840, `+when+`)`, coach)
+	}
+	run := func() string {
+		rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("run %d %s", rec.Code, rec.Body.String())
+		}
+		return rec.Body.String()
+	}
+	earn(lastMonthJST)
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
+		t.Fatalf("carry over %s", out)
+	}
+	// 前の月に繰り越した分（ここでは前の前の月の報酬）が残っていれば、合計が届かなくても送る。
+	earn(lastMonthJST + ` - interval '1 month'`)
+	if out := run(); !strings.Contains(out, `"created":1,"paid":1`) {
+		t.Fatalf("pay after one carry over %s", out)
+	}
+	if got := f.transferList(); len(got) != 1 || got[0].Get("amount") != "1680" {
+		t.Fatalf("transfers %v", got)
 	}
 }

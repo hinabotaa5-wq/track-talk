@@ -63,8 +63,9 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 
 -- name: ListPayableCoachEarnings :many
 -- 今月（日本時間）より前の、まだ送金していない報酬。受け取りの準備ができたコーチの分だけ。
--- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月以降に繰り越す。
--- 活動を終えた（承認済みでなくなった）コーチには、届かなくても残りを送る。
+-- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
+-- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
+-- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
 SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen)::int AS amount_yen
 FROM coach_earnings e
 JOIN coach_profiles cp ON cp.profile_id = e.coach_id
@@ -72,7 +73,8 @@ WHERE e.payout_id IS NULL
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
 GROUP BY e.coach_id, cp.status
-HAVING sum(e.amount_yen) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved';
+HAVING sum(e.amount_yen) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved'
+    OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo';
 
 -- name: UpsertCoachPayout :one
 -- 前の月の分の送金。同じ月の送金がまだ済んでいなければ、そこに足す。
