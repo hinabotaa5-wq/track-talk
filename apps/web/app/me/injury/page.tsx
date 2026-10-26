@@ -113,7 +113,7 @@ export default function MyInjuryHistoryPage() {
       </div>
 
       {failed ? (
-        <ErrorState message="履歴の取得に失敗しました。APIの起動を確認してください。" />
+        <ErrorState message="履歴の取得に失敗しました。時間をおいて、もう一度開いてください。" />
       ) : items === null ? (
         <p className="text-sm text-slate-200">読み込み中...</p>
       ) : items.length === 0 ? (

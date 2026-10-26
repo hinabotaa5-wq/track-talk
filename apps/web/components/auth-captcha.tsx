@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // 登録・ログイン・パスワード再設定の自動操作対策(Cloudflare Turnstile)。
 // サイトキーが無い間は何も出さず、トークンも送らない。Supabase 側で CAPTCHA を有効にするときに、
 // NEXT_PUBLIC_TURNSTILE_SITE_KEY を入れて画面を出してから、Supabase の設定を切り替える。
-export const captchaSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+const captchaSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 type Turnstile = {
   render: (el: HTMLElement, options: Record<string, unknown>) => string;
@@ -59,7 +59,7 @@ export function useCaptcha() {
   };
 }
 
-export function AuthCaptcha({ onToken, resetKey }: { onToken: (token: string) => void; resetKey: number }) {
+function AuthCaptcha({ onToken, resetKey }: { onToken: (token: string) => void; resetKey: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const tokenRef = useRef(onToken);

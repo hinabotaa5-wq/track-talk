@@ -42,7 +42,7 @@ export function InjuryView() {
       <InjuryMeCards token={token} />
 
       {failed ? (
-        <ErrorState message="グループの取得に失敗しました。APIの起動を確認してください。" />
+        <ErrorState message="グループの取得に失敗しました。時間をおいて、もう一度開いてください。" />
       ) : groups === null ? (
         <div role="status" aria-busy="true" className="space-y-3">
           <p className="sr-only">グループを読み込んでいます</p>

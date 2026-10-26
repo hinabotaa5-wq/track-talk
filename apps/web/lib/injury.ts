@@ -418,7 +418,7 @@ export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
 }
 
 // 共有タブで体のイラストからケガを探すときの、まとまり。体の上から順に並べる。
-export const injuryRegions = [
+const injuryRegions = [
   { value: "upper", label: "上半身" },
   { value: "thigh", label: "太もも" },
   { value: "knee", label: "ひざ・すね" },

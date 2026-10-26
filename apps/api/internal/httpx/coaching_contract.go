@@ -201,7 +201,9 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		}
 		if plan.ServiceType != nil && *plan.ServiceType == "in_person" {
 			ct, err = q.SnapshotInPersonContract(r.Context(), ct.ID)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		if plan.ServiceType != nil && *plan.ServiceType == "competition_support" {
 			ct, err = q.SnapshotSupportContract(r.Context(), ct.ID)
@@ -346,6 +348,9 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	if row.CoachID == me.ID && !s.requireCurrentCoach(w, r, me.ID, contractCoachForbidden) {
 		return
 	}
 	c := s.contractJSON(db.CoachingContract{
