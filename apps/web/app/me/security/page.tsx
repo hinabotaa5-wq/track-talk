@@ -2,8 +2,8 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
+import { MfaEnrollSteps } from "@/components/mfa-enroll-steps";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { isTotpCode, mfaErrorMessage, normalizeTotpCode } from "@/lib/account-security";
 import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase";
@@ -161,19 +161,7 @@ export default function SecurityPage() {
             ))}
           </>
         ) : enrolling ? (
-          <form onSubmit={finishEnroll} className="space-y-3">
-            <p className="text-sm text-slate-200">1. 認証アプリで、このコードを読み取ってください。</p>
-            {/* eslint-disable-next-line @next/next/no-img-element -- Supabase が返す SVG の data URL をそのまま出す */}
-            <img src={enrolling.qr} alt="二段階認証の QR コード" className="mx-auto size-48 rounded-md bg-white p-2" />
-            <p className="text-xs text-slate-300">
-              読み取れないときは、このキーを手で入れてください: <span className="break-all font-mono text-slate-100">{enrolling.secret}</span>
-            </p>
-            <p className="text-sm text-slate-200">2. 認証アプリに出た6桁のコードを入れてください。</p>
-            <Input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
-            <Button type="submit" className="w-full" disabled={pending}>
-              設定する
-            </Button>
-          </form>
+          <MfaEnrollSteps qr={enrolling.qr} secret={enrolling.secret} code={code} onCode={setCode} pending={pending} onSubmit={finishEnroll} />
         ) : (
           <>
             <p className="text-sm text-slate-300">まだ設定していません。</p>
