@@ -67,7 +67,7 @@ export function MfaEnrollSteps({
     <form onSubmit={onSubmit} className="space-y-5">
       <Step n={1} title="認証アプリを用意する">
         <p className="text-xs text-slate-300">
-          Google Authenticator(無料)を、App Store か Google Play から入れてください。すでに入れている人は次へ進みます。
+          iPhone は、最初から入っている「パスワード」アプリで足ります。新しく入れる必要はありません。Android などは、Google Authenticator(無料)を Google Play から入れてください。すでに認証アプリを使っている人は次へ進みます。
         </p>
       </Step>
 
@@ -85,7 +85,10 @@ export function MfaEnrollSteps({
             </Button>
             <p className="break-all rounded-md bg-black/20 p-2 font-mono text-xs text-slate-100">{secret}</p>
             <p className="text-xs text-slate-300">
-              アプリを開いて「＋」→「セットアップキーを入力」を選び、アカウント名に「TrackTalk」、キーに貼り付けて追加します。
+              iPhone:「パスワード」アプリで TrackTalk の項目(なければ「＋」で作る。Web サイトは track-talk.netlify.app)を開き、「確認コードを設定」→「セットアップキーを入力」でキーを貼り付けます。
+            </p>
+            <p className="text-xs text-slate-300">
+              Google Authenticator など: アプリの「＋」→「セットアップキーを入力」で、アカウント名に「TrackTalk」、キーに貼り付けます。
             </p>
           </>
         )}

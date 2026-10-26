@@ -61,12 +61,18 @@ export default function SecurityPage() {
     setError("");
     setMessage("");
     try {
-      // 途中でやめた登録が残っていると新しく作れないので、確認の済んでいないものは消してから始める。
-      const { data: all } = await supabase.auth.mfa.listFactors();
-      for (const f of all?.all ?? []) {
-        if (f.status === "unverified") await supabase.auth.mfa.unenroll({ factorId: f.id });
+      // 途中でやめた登録(確認前の設定)は消さずに残す。消すと「二段階認証を解除しました」のメールが飛ぶ。
+      // 名前は設定ごとに変える(同じ名前だと作れない)。
+      const enroll = () => supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `TrackTalk ${crypto.randomUUID().slice(0, 8)}` });
+      let { data, error: err } = await enroll();
+      if (err?.code === "too_many_enrolled_mfa_factors") {
+        // 途中でやめた登録がたまって上限に達したときだけ、確認前のものを片づけてやり直す。
+        const { data: all } = await supabase.auth.mfa.listFactors();
+        for (const f of all?.all ?? []) {
+          if (f.status === "unverified") await supabase.auth.mfa.unenroll({ factorId: f.id });
+        }
+        ({ data, error: err } = await enroll());
       }
-      const { data, error: err } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `TrackTalk ${new Date().toLocaleDateString("ja-JP")}` });
       if (err || !data) {
         setError(mfaErrorMessage(err ?? {}));
         return;
