@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
-import { SenseSummaryCard } from "@/components/sense-summary";
+import { SenseSummaryCard, useSenseSummaries } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
 import type { RaceRecords } from "@/lib/race-records";
 import { todayInTokyo } from "@/lib/format";
@@ -41,6 +41,7 @@ export default function MySenseNotesPage() {
 
   // ログインしていなくても中身は見られる。書こうとしたり、ボタンを押したりしたらログインへ案内する。
   const guest = !loading && !session;
+  const summaryState = useSenseSummaries(senseSummaryEnabled && session ? token : null, stats?.total ?? 0, month);
   function toLogin(event: SyntheticEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -153,12 +154,16 @@ export default function MySenseNotesPage() {
               />
             </section>
 
-            {senseSummaryEnabled && !guest ? <SenseSummaryCard key={token} token={token} total={shownStats.total} /> : null}
+            {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} /> : null}
 
           </>
         )}
             <SenseNoteCalendar
               notes={shownNotes ?? []}
+              summaries={summaryState.summaries}
+              summariesLoading={senseSummaryEnabled && !guest && (!summaryState.loaded || summaryState.loadingMore) && !summaryState.error}
+              summariesFailed={senseSummaryEnabled && !guest && Boolean(summaryState.error)}
+              onSummariesRetry={summaryState.retry}
               token={token}
               records={guest ? [] : raceData?.records ?? []}
               selectedDay={selectedDay}
