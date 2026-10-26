@@ -201,7 +201,9 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		}
 		if plan.ServiceType != nil && *plan.ServiceType == "in_person" {
 			ct, err = q.SnapshotInPersonContract(r.Context(), ct.ID)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		if plan.ServiceType != nil && *plan.ServiceType == "competition_support" {
 			ct, err = q.SnapshotSupportContract(r.Context(), ct.ID)

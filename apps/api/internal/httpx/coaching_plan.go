@@ -277,7 +277,9 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fields := req.supportFields(db.CoachingPlan{}, req.Published == nil || *req.Published)
-	for k, v := range req.inPersonFields(db.CoachingPlan{}, req.Published == nil || *req.Published) { fields[k]=v }
+	for k, v := range req.inPersonFields(db.CoachingPlan{}, req.Published == nil || *req.Published) {
+		fields[k] = v
+	}
 	for k, v := range req.validate(0) {
 		fields[k] = v
 	}
@@ -338,9 +340,13 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, ok = s.saveSupportPlan(w, r, q, req, p)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	p, ok = s.saveInPersonPlan(w, r, q, req, p)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
@@ -397,7 +403,9 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		published = *req.Published
 	}
 	fields := req.supportFields(current, published)
-	for k, v := range req.inPersonFields(current, published) { fields[k]=v }
+	for k, v := range req.inPersonFields(current, published) {
+		fields[k] = v
+	}
 	for k, v := range req.validate(int(current.PriceYen)) {
 		fields[k] = v
 	}
@@ -440,9 +448,13 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, ok = s.saveSupportPlan(w, r, q, req, p)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	p, ok = s.saveInPersonPlan(w, r, q, req, p)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
