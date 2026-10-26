@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorText, apiFetch } from "@/lib/api";
+import { mainTabs } from "@/components/bottom-nav";
 import { formatDateTime } from "@/lib/format";
 
 type Announcement = {
@@ -156,10 +157,18 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
           <span>本文({body.trim().length}/{bodyMax})</span>
           <Textarea rows={3} value={body} maxLength={bodyMax} disabled={pending !== null} onChange={(e) => setBody(e.target.value)} />
         </label>
-        <label className={label}>
-          <span>タップしたときに開くページ(/ から始まるサイト内のパス)</span>
-          <Input value={url} maxLength={200} disabled={pending !== null} onChange={(e) => setURL(e.target.value)} placeholder="/coaches" />
-        </label>
+        <fieldset disabled={pending !== null} className="space-y-2">
+          <legend className="text-sm text-slate-200">タップしたときに開くページ</legend>
+          <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="お知らせをタップしたときに開くページ">
+            {mainTabs.map(({ href, label, icon: Icon }) => (
+              <label key={href} className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border p-2 text-xs ${url === href ? "border-blue-400 bg-blue-500/20 text-blue-200" : "border-white/20 text-slate-200"}`}>
+                <input className="sr-only peer" type="radio" name="announcement-destination" value={href} checked={url === href} onChange={() => setURL(href)} />
+                <Icon className="size-5 peer-focus-visible:outline peer-focus-visible:outline-2" aria-hidden />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {pending ? null : (
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" disabled={!filled || busy !== ""} onClick={() => void sendTest()}>
@@ -178,7 +187,7 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
             <div className="rounded-lg border border-white/20 bg-slate-900/80 p-3">
               <p className="text-sm font-semibold text-white">{pending.title}</p>
               <p className="whitespace-pre-wrap text-sm text-slate-200">{pending.body}</p>
-              <p className="mt-1 text-xs text-slate-400">タップで開く: {pending.url}</p>
+              <p className="mt-1 text-xs text-slate-400">タップで開く: {mainTabs.find((tab) => tab.href === pending.url)?.label ?? pending.url}</p>
             </div>
             <p className="text-sm text-slate-100">
               ベル: <strong>{pending.recipients.in_app}人</strong> ／ プッシュ: <strong>{pending.recipients.push}人</strong>

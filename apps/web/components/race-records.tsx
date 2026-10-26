@@ -189,7 +189,19 @@ function RaceRecordForm({
 
 // 1つの種目の推移。よい記録ほど上。自己ベストは色を変え、追い風参考は白抜きにする。
 // 日付は軸に出さず、点を押したときだけ表示する。
-function RaceRecordChart({ records, kind, label, box = raceChartBox }: { records: RaceRecord[]; kind: RaceMarkKind; label?: string; box?: RaceChartBox }) {
+function chartDay(day: string) {
+  const [, month, date] = day.split("-");
+  return `${Number(month)}/${Number(date)}`;
+}
+
+function RaceChartLegend({ records }: { records: RaceRecord[] }) {
+  return <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-300">
+    <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full bg-amber-300" aria-hidden />自己ベスト更新</span>
+    {records.some((record) => record.wind_aided) ? <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full border border-slate-200" aria-hidden />追い風参考</span> : null}
+  </div>;
+}
+
+function RaceRecordChart({ records, kind, label, box = raceChartBox, showLegend = true }: { records: RaceRecord[]; kind: RaceMarkKind; label?: string; box?: RaceChartBox; showLegend?: boolean }) {
   const [active, setActive] = useState<string | null>(null);
   const points = raceChartPoints(records, kind, box);
   if (points.length === 0) return null;
@@ -215,7 +227,7 @@ function RaceRecordChart({ records, kind, label, box = raceChartBox }: { records
             key={p.record.id}
             role="button"
             tabIndex={0}
-            aria-label={`${senseDayLabel(p.record.raced_on)} ${formatRaceMark(p.record.mark, kind)}`}
+            aria-label={`${chartDay(p.record.raced_on)} ${formatRaceMark(p.record.mark, kind)}`}
             aria-pressed={active === p.record.id}
             onClick={() => toggle(p.record.id)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(p.record.id); } }}
@@ -240,22 +252,11 @@ function RaceRecordChart({ records, kind, label, box = raceChartBox }: { records
             strokeWidth={3}
             paintOrder="stroke"
           >
-            {senseDayLabel(picked.record.raced_on)}
+            {chartDay(picked.record.raced_on)}
           </text>
         ) : null}
       </svg>
-      <figcaption className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-300">
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-full bg-amber-300" aria-hidden />
-          自己ベスト更新
-        </span>
-        {records.some((record) => record.wind_aided) ? (
-          <span className="flex items-center gap-1">
-            <span className="inline-block size-2.5 rounded-full border border-slate-200" aria-hidden />
-            追い風参考
-          </span>
-        ) : null}
-      </figcaption>
+      {showLegend ? <figcaption><RaceChartLegend records={records} /></figcaption> : null}
     </figure>
   );
 }
@@ -267,8 +268,9 @@ function RaceEventCharts({ records, events }: { records: RaceRecord[]; events: R
   return (
     <div className="space-y-4">
       {events.map((item) => (
-        <RaceRecordChart key={item.event} records={records.filter((record) => record.event === item.event)} kind={item.kind} label={item.event_label} box={smallChartBox} />
+        <RaceRecordChart key={item.event} records={records.filter((record) => record.event === item.event)} kind={item.kind} label={item.event_label} box={smallChartBox} showLegend={false} />
       ))}
+      <RaceChartLegend records={records} />
     </div>
   );
 }

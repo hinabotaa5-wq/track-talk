@@ -1,20 +1,32 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { LoadMore } from "@/components/load-more";
 import { InjuryProgressCompare } from "@/components/injury-progress-compare";
+import type { Meta } from "@/lib/types";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
-import { injuryHistoryStageText, injuryRepeatedParts, type InjuryHistoryItem } from "@/lib/injury";
+import { injuryHistoryStageText, type InjuryHistoryItem } from "@/lib/injury";
 import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 
 export default function MyInjuryHistoryPage() {
-  const { session, token, loading } = useAuth();
+  const { session, token, sessionLoading: loading } = useAuth();
   const router = useRouter();
-  const [items, setItems] = useState<InjuryHistoryItem[] | null>(null);
+  const [rawItems, setItems] = useState<InjuryHistoryItem[] | null>(null);
+  const [owner, setOwner] = useState<string | null>(null);
+  const items = owner === token ? rawItems : null;
+  const generation = useRef(0);
+  const [repeated, setRepeated] = useState<{ label: string; count: number }[]>([]);
+  const [next, setNext] = useState("");
+  const [moreError, setMoreError] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const requestPending = useRef(false);
+  const [reload, setReload] = useState(0);
   const [failed, setFailed] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirmDialog = useConfirm();
@@ -26,17 +38,51 @@ export default function MyInjuryHistoryPage() {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    apiFetch<{ items: InjuryHistoryItem[] }>("/v1/me/injury-history", { token })
+    const effectGeneration = ++generation.current;
+    apiFetch<{ items: InjuryHistoryItem[]; repeated: { label: string; count: number }[]; meta: Meta }>("/v1/me/injury-history?pagination=cursor&per_page=24", { token })
       .then((d) => {
-        if (active) setItems(d.items ?? []);
+        if (!active) return;
+        setFailed(false);
+        setOwner(token);
+        setItems(d.items ?? []);
+        setRepeated(d.repeated ?? []);
+        setNext(d.meta?.has_more ? d.meta.next_cursor ?? "" : "");
+        setExpired(false);
+        setMoreError("");
       })
       .catch(() => {
         if (active) setFailed(true);
       });
     return () => {
       active = false;
+      generation.current = effectGeneration + 1;
     };
-  }, [token]);
+  }, [token, reload]);
+
+  async function loadMore() {
+    if (!next || requestPending.current) return;
+    requestPending.current = true;
+    setLoadingMore(true);
+    const cursor = next;
+    const requestGeneration = generation.current;
+    try {
+      const d = await apiFetch<{ items: InjuryHistoryItem[]; meta: Meta }>(`/v1/me/injury-history?pagination=cursor&per_page=24&cursor=${encodeURIComponent(cursor)}`, { token });
+      if (requestGeneration !== generation.current) return;
+      setItems((current) => {
+        const seen = new Set(current?.map((item) => item.id));
+        return [...(current ?? []), ...d.items.filter((item) => !seen.has(item.id))];
+      });
+      setNext(d.meta.has_more ? d.meta.next_cursor ?? "" : "");
+      setMoreError("");
+    } catch (error) {
+      if (requestGeneration !== generation.current) return;
+      setMoreError("続きを読み込めませんでした");
+      setExpired(error instanceof ApiRequestError && error.code === "invalid_cursor");
+    } finally {
+      requestPending.current = false;
+      setLoadingMore(false);
+    }
+  }
 
   async function remove(id: string) {
     if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
@@ -52,11 +98,10 @@ export default function MyInjuryHistoryPage() {
     clearSavedFeeds();
     setItems((current) => current?.filter((item) => item.id !== id) ?? current);
     setDeletingId(null);
+    setReload((value) => value + 1);
   }
 
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
-
-  const repeated = items ? injuryRepeatedParts(items) : [];
 
   return (
     <div className="space-y-4">
@@ -114,6 +159,7 @@ export default function MyInjuryHistoryPage() {
               </li>
             ))}
           </ul>
+          {next ? <LoadMore onLoad={() => void loadMore()} loading={loadingMore} error={moreError} expired={expired} /> : null}
           {token ? <InjuryProgressCompare token={token} /> : null}
         </>
       )}

@@ -64,3 +64,13 @@ describe("unsubscribePushOnThisDevice", () => {
     await expect(unsubscribePushOnThisDevice(null)).resolves.toBeUndefined();
   });
 });
+
+it("通知サービスが応答しなくてもログアウトの前処理は2秒で終わる", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("navigator", { serviceWorker: { getRegistration: () => new Promise(() => {}) } });
+  try {
+    const cleanup = unsubscribePushOnThisDevice("tok");
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(cleanup).resolves.toBeUndefined();
+  } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});

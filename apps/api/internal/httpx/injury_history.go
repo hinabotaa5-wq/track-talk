@@ -68,6 +68,10 @@ func (s *Server) myInjuryHistory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if r.URL.Query().Get("pagination") == "cursor" {
+		s.injuryHistoryPage(w, r, me.ID)
+		return
+	}
 	posts, err := s.q.ListMyInjuryPosts(r.Context(), me.ID)
 	if err != nil {
 		MapDBError(w, err)

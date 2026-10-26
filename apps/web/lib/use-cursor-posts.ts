@@ -12,7 +12,7 @@ export function cursorPostsPath(base: string, cursor?: string) {
   return `${base}${sep}pagination=cursor&per_page=${perPage}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
 }
 
-type State = { base: string; posts: Post[]; next: string; error: string; expired: boolean };
+type State = { base: string; token: string; posts: Post[]; next: string; error: string; expired: boolean };
 
 // useCursorPosts は、一覧を最初の1ページだけ読み、続きは loadMore で1ページずつ足す。
 // 投稿が増えても、開いたときに全件を取りにいかない。base が null の間は読まない。
@@ -21,15 +21,17 @@ export function useCursorPosts(base: string | null, token: string | null | undef
   const [state, setState] = useState<State | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const pending = useRef(false);
-  const current = base !== null && state?.base === base ? state : null;
+  const current = base !== null && state?.base === base && state.token === token ? state : null;
 
   useEffect(() => {
     if (base === null || !token) return;
     const controller = new AbortController();
     apiFetch<{ posts: Post[]; meta: Meta }>(cursorPostsPath(base), { token, signal: controller.signal })
-      .then((data) => setState({ base, posts: data.posts ?? [], next: data.meta.has_more ? data.meta.next_cursor ?? "" : "", error: "", expired: false }))
+      .then((data) => {
+        if (!controller.signal.aborted) setState({ base, token, posts: data.posts ?? [], next: data.meta.has_more ? data.meta.next_cursor ?? "" : "", error: "", expired: false });
+      })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ base, posts: [], next: "", error: "投稿の取得に失敗しました", expired: false });
+        if (!controller.signal.aborted) setState({ base, token, posts: [], next: "", error: "投稿の取得に失敗しました", expired: false });
       });
     return () => controller.abort();
   }, [base, token, reloadKey]);
@@ -42,7 +44,7 @@ export function useCursorPosts(base: string | null, token: string | null | undef
     try {
       const data = await apiFetch<{ posts: Post[]; meta: Meta }>(cursorPostsPath(from, next), { token });
       setState((value) => {
-        if (!value || value.base !== from || value.next !== next) return value;
+        if (!value || value.base !== from || value.token !== token || value.next !== next) return value;
         // 読み込み中に削除や並び替えで重なった投稿は足さない。
         const seen = new Set(value.posts.map((post) => post.id));
         const added = (data.posts ?? []).filter((post) => !seen.has(post.id));
@@ -50,7 +52,7 @@ export function useCursorPosts(base: string | null, token: string | null | undef
       });
     } catch (error) {
       const expired = error instanceof ApiRequestError && error.code === "invalid_cursor";
-      setState((value) => value && value.base === from ? { ...value, error: "続きの読み込みに失敗しました", expired } : value);
+      setState((value) => value && value.base === from && value.token === token ? { ...value, error: "続きの読み込みに失敗しました", expired } : value);
     } finally {
       pending.current = false;
       setLoadingMore(false);

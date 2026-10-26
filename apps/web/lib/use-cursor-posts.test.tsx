@@ -11,8 +11,8 @@ const request = vi.mocked(apiFetch);
 const page = (ids: string[], next = "") => ({ posts: ids.map((id) => ({ id, title: id, kind: "text" }) as Post), meta: { page: 1, per_page: 24, total: 0, has_more: !!next, next_cursor: next } });
 
 const latest: { current?: ReturnType<typeof useCursorPosts> } = {};
-function Probe({ base }: { base: string | null }) {
-  const feed = useCursorPosts(base, "token");
+function Probe({ base, token = "token" }: { base: string | null; token?: string }) {
+  const feed = useCursorPosts(base, token);
   useEffect(() => { latest.current = feed; });
   return null;
 }
@@ -58,5 +58,14 @@ it("期限切れのカーソルは読み直しを促す", async () => {
 it("読み込む一覧が決まるまでは取りにいかない", async () => {
   await act(async () => root.render(<Probe base={null} />));
   expect(request).not.toHaveBeenCalled();
+  expect(feedOf().posts).toBeNull();
+});
+
+it("アカウントが変わると前の人の一覧を表示しない", async () => {
+  request.mockResolvedValueOnce(page(["private-user-a"]));
+  await act(async () => root.render(<Probe base="/v1/me/saves" token="a" />));
+  expect(feedOf().posts?.[0].id).toBe("private-user-a");
+  request.mockReturnValueOnce(new Promise(() => {}));
+  await act(async () => root.render(<Probe base="/v1/me/saves" token="b" />));
   expect(feedOf().posts).toBeNull();
 });

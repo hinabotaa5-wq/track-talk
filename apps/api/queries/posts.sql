@@ -10,6 +10,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -103,6 +104,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -281,6 +283,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -309,9 +312,9 @@ WHERE p.id = $1
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id,
-    instagram_type, instagram_shortcode, source_title
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at;
+    instagram_type, instagram_shortcode, x_post_id, source_title
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, x_post_id, source_title, like_count, comment_count, created_at, updated_at;
 
 -- name: UpdatePost :one
 UPDATE posts
@@ -354,6 +357,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -541,6 +545,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -600,6 +605,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -646,4 +652,79 @@ WHERE p.deleted_at IS NULL AND p.hidden_at IS NULL
     )
   )
 ORDER BY p.like_count DESC, p.created_at DESC, p.id DESC
+LIMIT sqlc.arg('limit_n');
+
+-- name: FindXPostID :one
+SELECT id FROM posts WHERE x_post_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL;
+
+-- name: ListSavedPostsCursor :many
+SELECT
+    s.created_at AS saved_at,
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.x_post_id,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+WHERE s.user_id = sqlc.arg('user_id')
+  AND s.created_at <= sqlc.arg('as_of')
+  AND (sqlc.narg('cursor_id')::uuid IS NULL OR (s.created_at, p.id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  -- ケガの投稿は、いまそのグループに参加している間だけ出す(抜けたら読めない)。保存は残すので、入り直すとまた出る。
+  AND (
+    p.kind <> 'injury'
+    OR p.author_id = sqlc.arg('user_id')
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      JOIN injury_group_members m ON m.body_part = i.body_part AND m.user_id = sqlc.arg('user_id')
+      WHERE i.post_id = p.id
+    )
+  )
+  AND (
+    sqlc.narg('keyword')::text IS NULL
+    OR p.title ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || sqlc.narg('keyword') || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality(sqlc.arg('prefecture_codes')::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY(sqlc.arg('prefecture_codes')::text[])
+      )
+    )
+  )
+ORDER BY s.created_at DESC, p.id DESC
 LIMIT sqlc.arg('limit_n');

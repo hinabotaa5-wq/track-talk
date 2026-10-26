@@ -35,6 +35,7 @@ type postDTO struct {
 	YouTubeVideoID string          `json:"youtube_video_id,omitempty"`
 	YouTubeShorts  bool            `json:"youtube_shorts,omitempty"`
 	InstagramType  string          `json:"instagram_type,omitempty"`
+	XPostID        string          `json:"x_post_id,omitempty"`
 	InstagramCode  string          `json:"instagram_shortcode,omitempty"`
 	VideoPublicID  string          `json:"video_public_id,omitempty"`
 	ImagePublicID  string          `json:"image_public_id,omitempty"`
@@ -121,7 +122,7 @@ func applyKind(p *postDTO, kind string, youtubeID, thumbnail, publicID *string) 
 	if publicID != nil && kind == "video" {
 		p.VideoPublicID = *publicID
 	}
-	if publicID != nil && (kind == "text" || kind == "instagram") {
+	if publicID != nil && (kind == "text" || kind == "instagram" || kind == "x") {
 		p.ImagePublicID = *publicID
 	}
 	if kind == "youtube" && thumbnail != nil && YouTubeThumbnailURL(*thumbnail) == "" {
@@ -153,6 +154,9 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 		list:         list,
 	}
 	applyKind(&p, row.Kind, row.YoutubeVideoID, row.YoutubeThumbnailUrl, row.CloudinaryPublicID)
+	if row.XPostID != nil {
+		p.XPostID = *row.XPostID
+	}
 	p.YouTubeShorts = row.YoutubeShorts
 	applyInstagram(&p, row.InstagramType, row.InstagramShortcode)
 	if row.SourceTitle != nil && *row.SourceTitle != "" {
@@ -160,7 +164,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	}
 	if !list {
 		p.Body = row.Body
-	} else if row.Kind == "text" || row.Kind == "video" || row.Kind == "youtube" || row.Kind == "instagram" {
+	} else if row.Kind == "text" || row.Kind == "video" || row.Kind == "youtube" || row.Kind == "instagram" || row.Kind == "x" {
 		p.Excerpt = postExcerpt(row.Body)
 	}
 	return p
@@ -189,6 +193,7 @@ func postFromGet(row db.GetPostRow, liked bool) postDTO {
 		YoutubeShorts:       row.YoutubeShorts,
 		InstagramType:       row.InstagramType,
 		InstagramShortcode:  row.InstagramShortcode,
+		XPostID:             row.XPostID,
 		CloudinaryPublicID:  row.CloudinaryPublicID,
 		SourceTitle:         row.SourceTitle,
 		LikeCount:           row.LikeCount,

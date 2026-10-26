@@ -116,6 +116,8 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>クラブ</KindBadge>
           </span>
+        ) : post.kind === "x" ? (
+          <span className="absolute top-2.5 left-2.5 z-10"><KindBadge>X</KindBadge></span>
         ) : post.kind === "instagram" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
             <KindBadge>Instagram</KindBadge>

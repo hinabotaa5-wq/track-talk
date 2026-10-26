@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 import {
@@ -142,7 +142,7 @@ export function InstallGuide() {
   if (platform === null || standalone) return null;
 
   const steps = stepsFor(platform);
-  const showBanner = platform !== "other" && !dismissed && !open;
+  const showBanner = platform !== "other" && !dismissed && !open && pathname !== "/me/install";
   const navHidden = hidesBottomNav(pathname);
 
   return (
@@ -212,22 +212,7 @@ export function InstallGuide() {
                     このままアプリとして追加する
                   </Button>
                 ) : null}
-                <ol className="mt-5 space-y-5">
-                  {steps.map((step, index) => (
-                    <li key={step.title}>
-                      <div className="mb-2 flex items-start gap-2.5">
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-white">{step.title}</p>
-                          <p className="mt-0.5 text-xs text-slate-300">{step.body}</p>
-                        </div>
-                      </div>
-                      {step.art}
-                    </li>
-                  ))}
-                </ol>
+                <InstallStepList steps={steps} />
               </>
             )}
 
@@ -239,4 +224,37 @@ export function InstallGuide() {
       ) : null}
     </>
   );
+}
+
+function InstallStepList({ steps }: { steps: Step[] }) {
+  return (
+    <ol className="mt-5 space-y-5">
+      {steps.map((step, index) => (
+        <li key={step.title}>
+          <div className="mb-2 flex items-start gap-2.5">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              {index + 1}
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-white">{step.title}</p>
+              <p className="mt-0.5 text-xs text-slate-300">{step.body}</p>
+            </div>
+          </div>
+          {step.art}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const subscribeInstallPage = () => () => {};
+
+export function InstallInstructions() {
+  const platform = useSyncExternalStore(subscribeInstallPage,
+    () => isStandalone() ? "installed" : detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints),
+    () => null);
+  if (!platform) return <p className="text-sm text-slate-300">追加方法を読み込んでいます…</p>;
+  if (platform === "installed") return <p className="text-sm text-slate-200">ホーム画面に追加済みです。次回もホーム画面のアイコンから開けます。</p>;
+  if (platform === "other") return <p className="text-sm text-slate-200">スマホのブラウザ(iPhone は Safari、Android は Chrome)でこのページを開くと、ホーム画面に追加できます。</p>;
+  return <InstallStepList steps={stepsFor(platform)} />;
 }

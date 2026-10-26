@@ -62,3 +62,18 @@ it("人数を見て「送信」と入力するまで、全員には送れない"
   expect(payload.id).toMatch(/^[0-9a-f-]{36}$/);
   expect(container.textContent).toContain("ベル 120人、プッシュ 44人に送りました");
 });
+
+it("下部バーと同じ5つのアイコンから通知の移動先を選べる", async () => {
+  await act(async () => root.render(<AnnouncementsAdmin token="t" />));
+  const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+  expect([...radios].map((input) => input.value)).toEqual(["/", "/competitions", "/coaching", "/memo", "/injury"]);
+  expect(container.textContent).not.toContain("サイト内のパス");
+  await act(async () => {
+    type(container.querySelector("input")!, "お知らせ");
+    type(container.querySelector("textarea")!, "詳細です");
+    radios[2].click();
+  });
+  await act(async () => button("自分にだけ試し送信").click());
+  const request = fetch.mock.calls.find(([path]) => path === "/v1/admin/announcements/test")!;
+  expect(JSON.parse(request[1].body as string).url).toBe("/coaching");
+});
