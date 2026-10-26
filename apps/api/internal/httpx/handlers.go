@@ -89,6 +89,9 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (db.Profil
 		Error(w, http.StatusForbidden, "forbidden", "権限がありません")
 		return db.Profile{}, false
 	}
+	if !s.requireStaffMFA(w, r) {
+		return db.Profile{}, false
+	}
 	return p, true
 }
 
@@ -112,7 +115,15 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	JSON(w, http.StatusOK, profileJSON(p))
+	mfaRequired, err := s.staffMFARequired(r, p)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	body := profileJSON(p)
+	// 管理者・承認済みコーチで、いまのログインに二段階認証が足りないとき true。
+	body["mfa_required"] = mfaRequired
+	JSON(w, http.StatusOK, body)
 }
 
 type profileReq struct {

@@ -267,6 +267,8 @@ export type Profile = {
   event?: string | null;
   post_master_badge_public?: boolean;
   is_admin?: boolean;
+  // 管理者・承認済みコーチで、いまのログインに二段階認証が足りないとき true。
+  mfa_required?: boolean;
   created_at: string;
   updated_at?: string;
 };

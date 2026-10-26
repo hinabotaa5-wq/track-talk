@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
+  <title>メールアドレスを変更しました</title>
+</head>
+<body style="margin:0;padding:0;background-color:#16243a;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">TrackTalk のログイン用メールアドレスが変更されました。</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#16243a" style="background-color:#16243a;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#1f3150" style="max-width:480px;background-color:#1f3150;border:1px solid #3a4d6e;border-radius:16px;">
+          <tr>
+            <td style="padding:32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;">
+              <p style="margin:0 0 28px;font-size:22px;font-weight:900;color:#ffffff;">Track<span style="font-weight:700;color:#93c5fd;">Talk</span></p>
+              <h1 style="margin:0 0 12px;font-size:22px;line-height:1.4;font-weight:700;color:#f4f7fb;">メールアドレスを変更しました</h1>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#cbd5e1;">TrackTalk アカウントのログイン用メールアドレスが {{ .OldEmail }} から {{ .Email }} に変更されました。</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#cbd5e1;">ご自身で変更した場合は、このメールに対応する必要はありません。</p>
+              <p style="margin:0 0 0;font-size:15px;line-height:1.7;color:#fca5a5;">心当たりがない場合は、アカウントが第三者に使われているおそれがあります。すぐにアプリの「お問い合わせ」から運営にお知らせください。</p>
+              <p style="margin:28px 0 0;font-size:13px;line-height:1.6;color:#94a3b8;">このメールは送信専用です。<br><a href="{{ .SiteURL }}" style="color:#94a3b8;text-decoration:none;">{{ .SiteURL }}</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

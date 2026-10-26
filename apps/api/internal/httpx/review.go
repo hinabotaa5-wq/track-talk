@@ -120,6 +120,9 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if !s.requireStaffMFA(w, r) {
+		return
+	}
 	onDuty := current.OnDuty
 	if req.OnDuty != nil {
 		onDuty = *req.OnDuty

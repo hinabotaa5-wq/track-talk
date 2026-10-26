@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { ProfileGate } from "@/components/profile-gate";
+import { AccountMfaGate } from "@/components/account-mfa-gate";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
@@ -106,7 +107,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-            {children}
+            <AccountMfaGate>{children}</AccountMfaGate>
           </main>
           <BottomNav />
           <ScrollTopOnTabChange />

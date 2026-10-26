@@ -101,6 +101,8 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `SENSE_SUMMARY_ENABLED` / `NEXT_PUBLIC_SENSE_SUMMARY_ENABLED` | 感覚メモのAI振り返りの公開設定 |
 | `GEMINI_API_KEY` | 大会データの抽出・提供中のメモ振り返り |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | 提供中のメール送信 |
+| `STAFF_MFA_REQUIRED` | `1` で管理者・承認済みコーチの API に二段階認証を求める。全員が `/me/security` で設定してから立てる |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 登録・ログイン・パスワード再設定の自動操作対策(Cloudflare Turnstile)。先にこれを入れて Web を出し直し、そのあと Supabase の CAPTCHA を有効にする |
 
 本番Webの募集のみ設定は `netlify.toml` の `NEXT_PUBLIC_COACHING_ENABLED = "0"`。APIは「Configure Coaching Availability」ワークフローを `enabled=false` で実行して閉じます。画面のフラグだけでAPIを保護しないでください。再公開時は説明・規約・プライバシーポリシー、決済・返金・未成年者の同意を確認し、両側の設定を合わせます。
 

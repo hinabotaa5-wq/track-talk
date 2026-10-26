@@ -92,6 +92,9 @@ func (s *Server) approvedCoach(w http.ResponseWriter, r *http.Request) (db.Coach
 		MapDBError(w, err)
 		return db.CoachProfile{}, false
 	}
+	if !s.requireStaffMFA(w, r) {
+		return db.CoachProfile{}, false
+	}
 	return c, true
 }
 

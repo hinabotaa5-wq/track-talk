@@ -8,6 +8,7 @@ import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -31,6 +32,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(draft.agreed);
   const { pending, acquire, release } = useActionLock();
+  const captcha = useCaptcha();
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: draft.email, password: draft.password },
@@ -53,6 +55,10 @@ export default function RegisterPage() {
       setError("Supabase の公開設定がありません。");
       return;
     }
+    if (!captcha.ready) {
+      setError("「人間であることの確認」が終わるまでお待ちください。");
+      return;
+    }
     if (!acquire()) return;
     setError("");
     rememberNextPath("/me/profile?onboarding=1", 86400);
@@ -60,9 +66,13 @@ export default function RegisterPage() {
       .signUp({
         email: values.email,
         password: values.password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback`, captchaToken: captcha.captchaToken },
       })
-      .finally(release);
+      .finally(() => {
+        // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。
+        captcha.reset();
+        release();
+      });
     if (err) {
       setError(authErrorMessage(err));
       return;
@@ -111,7 +121,8 @@ export default function RegisterPage() {
             に同意する
           </span>
         </label>
-        <Button type="submit" className="w-full" disabled={pending || !agreed}>
+        {captcha.widget}
+        <Button type="submit" className="w-full" disabled={pending || !agreed || !captcha.ready}>
           登録
         </Button>
       </form>

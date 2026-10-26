@@ -23,6 +23,7 @@ const messages: Record<string, string> = {
   captcha_failed: "確認に失敗しました。もう一度試してください。",
   request_timeout: "処理がタイムアウトしました。もう一度試してください。",
   hook_timeout: "処理がタイムアウトしました。もう一度試してください。",
+  insufficient_aal: "先に二段階認証のコードを入れてください。",
   same_password: "いまのパスワードとは別のパスワードにしてください。",
 };
 
