@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { HomeFilters } from "@/components/home-filters";
-import { PostFab } from "@/components/post-fab";
+import { HomePostFab } from "@/components/post-fab";
 
 // 絞り込みは layout に置き、loading.tsx がフィードだけを差し替えるあいだも表示したままにする。
 // (home) のルートグループで、その loading.tsx がほかのすべてのルートにかからないようにする。
@@ -14,7 +14,9 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
         </Suspense>
       </div>
       <div className="space-y-4 px-4 md:px-0">{children}</div>
-      <PostFab />
+      <Suspense>
+        <HomePostFab />
+      </Suspense>
     </div>
   );
 }

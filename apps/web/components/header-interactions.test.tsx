@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCurrentMainTab } from "./bottom-nav";
@@ -12,7 +12,13 @@ const apiFetch = vi.fn();
 let pathname = "/";
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace }) }));
-vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
+const linkStatus = vi.hoisted(() => ({ pending: false }));
+vi.mock("next/link", () => ({
+  default: ({ href, children, className, onClick, ...props }: ComponentProps<"a"> & { href: string }) => (
+    <a href={href} className={className} onClick={onClick} aria-label={props["aria-label"]} aria-expanded={props["aria-expanded"]}>{children}</a>
+  ),
+  useLinkStatus: () => linkStatus,
+}));
 vi.mock("next/dynamic", () => ({ default: () => () => <p>メニューの内容</p> }));
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token" }) }));
 vi.mock("@/lib/api", () => ({
@@ -27,6 +33,7 @@ beforeEach(() => {
   apiFetch.mockReset();
   pathname = "/";
   replace.mockReset();
+  linkStatus.pending = false;
   sessionStorage.clear();
   localStorage.clear();
   container = document.createElement("div");
@@ -62,6 +69,16 @@ describe("ヘッダーの開閉", () => {
     expect(link.getAttribute("aria-expanded")).toBe("true");
     await click(link);
     expect(replace).toHaveBeenCalledWith("/injury?tab=data");
+  });
+
+  it("マイページへの移動に時間がかかるあいだはクルクルを出す", async () => {
+    vi.useFakeTimers();
+    linkStatus.pending = true;
+    await act(async () => root.render(<HeaderAccountPanel signedIn />));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("マイページを開いています");
+    expect(container.querySelector("svg.animate-spin")).not.toBeNull();
   });
 
   it("マイページを開いている間はアイコンを選択状態にする", async () => {
