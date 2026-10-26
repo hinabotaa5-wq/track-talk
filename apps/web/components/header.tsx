@@ -26,7 +26,7 @@ function useLocationSearch() {
 // アプリアイコン(components/app-icon-mark.tsx)の背景を除いた3レーンのマーク。
 // アイコンでは半透明の白に空色が透けて内側ほど水色に見えるが、濃紺の上では灰色になるので、
 // 透けた後の見え方の色を直接塗る(外側→内側)。
-const headerLaneColors = ["#ffffff", "#c4ecff", appIconColors.from] as const;
+const headerLaneColors = ["#ffffff", "#a8e4ff", appIconColors.from] as const;
 
 // 512×512 の座標のうちレーンのある範囲(線の太さを含む)だけを切り出して表示する。
 function TrackMark() {

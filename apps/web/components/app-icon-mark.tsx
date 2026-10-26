@@ -1,16 +1,17 @@
 import type { SVGProps } from "react";
 
-// アプリアイコンの色。背景は上の明るい空色から下の青へのグラデーションに、右上から白い光を重ねる。
+// アプリアイコンの色。背景は上の濃い空色から下の青へのグラデーションに、右上から白い光を重ねる。
+// ホーム画面で薄く見えないよう、彩度を高めにし、光は控えめにしている。
 // レーンは白で、外側ほど濃く、内側ほど透ける。
 export const appIconColors = {
-  from: "#7fdcff",
-  to: "#2d7dff",
+  from: "#2ec5ff",
+  to: "#0a5cff",
   lane: "#ffffff",
 } as const;
 
 // 背景を CSS で描くときの値(AppIconMark と lib/app-icon.tsx で共通)。
 export const appIconBackground = [
-  "radial-gradient(circle at 80% 5%, rgba(255,255,255,0.4), rgba(255,255,255,0) 60%)",
+  "radial-gradient(circle at 80% 5%, rgba(255,255,255,0.22), rgba(255,255,255,0) 60%)",
   `linear-gradient(150deg, ${appIconColors.from}, ${appIconColors.to})`,
 ].join(", ");
 
@@ -18,8 +19,8 @@ export const appIconBackground = [
 // maskable でも欠けないよう、中央の安全領域(直径 80% の円)に収めてある。
 export const appIconLanes = [
   { d: "M380 140H260A130 130 0 0 0 130 270V380", opacity: 1 },
-  { d: "M380 190H260A80 80 0 0 0 180 270V380", opacity: 0.75 },
-  { d: "M380 240H260A30 30 0 0 0 230 270V380", opacity: 0.5 },
+  { d: "M380 190H260A80 80 0 0 0 180 270V380", opacity: 0.8 },
+  { d: "M380 240H260A30 30 0 0 0 230 270V380", opacity: 0.6 },
 ] as const;
 
 export const appIconLaneWidth = 30;
