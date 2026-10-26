@@ -18,8 +18,8 @@ import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-u
 
 const maxCoverBytes = 10 * 1024 * 1024;
 
-const urlError = "YouTubeの動画か、Instagramの投稿・リールのURLを貼ってください";
-const kindLabel = { youtube: "YouTube", instagram: "Instagram" } as const;
+const urlError = "YouTubeの動画、Instagramの投稿・リール、Xの投稿のURLを貼ってください";
+const kindLabel = { youtube: "YouTube", instagram: "Instagram", x: "X" } as const;
 
 export default function VideoUrlPostPage() {
   const { session, token } = useAuth();
@@ -47,7 +47,7 @@ export default function VideoUrlPostPage() {
     setError("");
     try {
       let imagePublicId: string | undefined;
-      if (kind === "instagram" && cover) {
+      if ((kind === "instagram" || kind === "x") && cover) {
         setStatus("送信しています…");
         const sending = await shrinkImage(cover);
         if (sending.size > maxCoverBytes) throw new Error("10MB以内の画像にしてください");
@@ -78,7 +78,6 @@ export default function VideoUrlPostPage() {
 
   return (
     <ComposerPage title="動画URL">
-      <p className="text-sm text-slate-300">同じ動画・投稿のスレッドがある場合は、そのスレッドを開きます。新しいスレッドを作成した場合はホームに戻ります。</p>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium">
           URL
@@ -86,7 +85,7 @@ export default function VideoUrlPostPage() {
             className="mt-1"
             type="url"
             inputMode="url"
-            placeholder="YouTube か Instagram の URL"
+            placeholder="YouTube・Instagram・X の URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
@@ -96,11 +95,11 @@ export default function VideoUrlPostPage() {
         ) : (
           <p className="text-sm text-red-400">{urlError}</p>
         )}
-        {kind === "instagram" ? (
+        {kind === "instagram" || kind === "x" ? (
           <label className="block text-sm font-medium">
             サムネの画像（任意）
             <span className="mt-0.5 block text-xs font-normal text-slate-300">
-              Instagramのサムネはこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。
+              {kindLabel[kind]}のサムネはこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。
             </span>
             <input
               className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"

@@ -8,9 +8,10 @@ import { markLinkPending, useIsLinkPending } from "@/lib/pending-link";
 
 const PendingContext = createContext(false);
 
-function TabContent({ id, children }: { id: string; children: ReactNode }) {
+function TabContent({ id, children, startup }: { id: string; children: ReactNode; startup: boolean }) {
   const { pending: linkPending } = useLinkStatus();
-  const pending = useIsLinkPending(id) || linkPending;
+  const markedPending = useIsLinkPending(id);
+  const pending = startup && (markedPending || linkPending);
   return (
     <PendingContext.Provider value={pending}>
       {/* クルクルに替わるアイコン(svg)は点滅させない。animation が重なると回らなくなる。 */}
@@ -42,10 +43,11 @@ export function PendingIcon({ children, className, label }: { children: ReactNod
 }
 
 // 起動時の通信を優先し、空き時間か操作の気配があった時点でタブを準備する。
-export function MainTabLink({ children, prefetch = null, ...props }: ComponentProps<typeof Link>) {
+export function MainTabLink({ children, prefetch = null, startupOnly = false, ...props }: ComponentProps<typeof Link> & { startupOnly?: boolean }) {
   const id = useId();
   const [ready, setReady] = useState(false);
-  useEffect(() => afterStartup(() => setReady(true)), []);
+  const [startup, setStartup] = useState(true);
+  useEffect(() => afterStartup(() => { setReady(true); setStartup(false); }), []);
   return (
     <Link
       {...props}
@@ -56,7 +58,7 @@ export function MainTabLink({ children, prefetch = null, ...props }: ComponentPr
       onPointerDown={(event) => { setReady(true); props.onPointerDown?.(event); }}
       onFocus={(event) => { setReady(true); props.onFocus?.(event); }}
     >
-      <TabContent id={id}>{children}</TabContent>
+      <TabContent id={id} startup={!startupOnly || startup}>{children}</TabContent>
     </Link>
   );
 }

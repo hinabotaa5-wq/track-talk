@@ -14,6 +14,7 @@ type AuthState = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  sessionLoading: boolean;
   token: string | null;
   refreshProfile: () => Promise<void>;
 };
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthState>({
   session: null,
   profile: null,
   loading: true,
+  sessionLoading: true,
   token: null,
   refreshProfile: async () => {},
 });
@@ -32,6 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   ));
+
+  const [sessionLoading, setSessionLoading] = useState(loading);
 
   // 読み込みが重なったら(ログアウト直後に前のトークンの応答が遅れて届くなど)、最後に始めたものの結果だけを使う。
   const profileSeq = useRef(0);
@@ -59,12 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       if (!supabase) {
         setLoading(false);
+        setSessionLoading(false);
         return;
       }
       // INITIAL_SESSION もここで受け取る。getSession と重ねてプロフィールを二重取得しない。
       const { data } = supabase.auth.onAuthStateChange((_e, next) => {
         if (!active) return;
         setSession(next);
+        setSessionLoading(false);
         if (!next) {
           clearCompetitions();
           clearMajorHosts();
@@ -77,12 +83,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
         void loadProfile(next?.access_token ?? null).finally(() => {
-          if (active) setLoading(false);
+          if (active) {
+          setLoading(false);
+          setSessionLoading(false);
+        }
         });
       });
       unsubscribe = () => data.subscription.unsubscribe();
     }).catch(() => {
-      if (active) setLoading(false);
+      if (active) {
+          setLoading(false);
+          setSessionLoading(false);
+        }
     });
     return () => {
       active = false;
@@ -97,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         profile,
         loading,
+        sessionLoading,
         token: session?.access_token ?? null,
         refreshProfile: () => loadProfile(session?.access_token ?? null),
       }}

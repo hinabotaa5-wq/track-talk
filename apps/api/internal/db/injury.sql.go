@@ -146,6 +146,38 @@ func (q *Queries) CountInjuryUpdates(ctx context.Context, postID uuid.UUID) (int
 	return count, err
 }
 
+const countMyRepeatedInjuries = `-- name: CountMyRepeatedInjuries :many
+SELECT i.body_part, count(*)::bigint AS count
+FROM posts p JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1 AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+GROUP BY i.body_part HAVING count(*) >= 2
+`
+
+type CountMyRepeatedInjuriesRow struct {
+	BodyPart string `json:"body_part"`
+	Count    int64  `json:"count"`
+}
+
+func (q *Queries) CountMyRepeatedInjuries(ctx context.Context, authorID uuid.UUID) ([]CountMyRepeatedInjuriesRow, error) {
+	rows, err := q.db.Query(ctx, countMyRepeatedInjuries, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountMyRepeatedInjuriesRow
+	for rows.Next() {
+		var i CountMyRepeatedInjuriesRow
+		if err := rows.Scan(&i.BodyPart, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createInjuryUpdate = `-- name: CreateInjuryUpdate :one
 INSERT INTO injury_updates (id, post_id, stage, body)
 VALUES ($1, $2, $3, $4)
@@ -525,6 +557,45 @@ func (q *Queries) ListInjuryGroupStageChanges(ctx context.Context, bodyPart stri
 	return items, nil
 }
 
+const listInjuryPageReports = `-- name: ListInjuryPageReports :many
+SELECT u.post_id, u.stage, min(u.created_at)::timestamptz AS first_at
+FROM injury_updates u JOIN posts p ON p.id = u.post_id
+WHERE p.author_id = $1 AND p.id = ANY($2::uuid[])
+  AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+GROUP BY u.post_id, u.stage
+`
+
+type ListInjuryPageReportsParams struct {
+	AuthorID uuid.UUID   `json:"author_id"`
+	PostIds  []uuid.UUID `json:"post_ids"`
+}
+
+type ListInjuryPageReportsRow struct {
+	PostID  uuid.UUID `json:"post_id"`
+	Stage   string    `json:"stage"`
+	FirstAt time.Time `json:"first_at"`
+}
+
+func (q *Queries) ListInjuryPageReports(ctx context.Context, arg ListInjuryPageReportsParams) ([]ListInjuryPageReportsRow, error) {
+	rows, err := q.db.Query(ctx, listInjuryPageReports, arg.AuthorID, arg.PostIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInjuryPageReportsRow
+	for rows.Next() {
+		var i ListInjuryPageReportsRow
+		if err := rows.Scan(&i.PostID, &i.Stage, &i.FirstAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInjuryUpdates = `-- name: ListInjuryUpdates :many
 SELECT id, post_id, stage, body, created_at
 FROM injury_updates
@@ -695,6 +766,61 @@ func (q *Queries) ListMyInjuryPosts(ctx context.Context, authorID uuid.UUID) ([]
 	var items []ListMyInjuryPostsRow
 	for rows.Next() {
 		var i ListMyInjuryPostsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CreatedAt,
+			&i.BodyPart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyInjuryPostsPage = `-- name: ListMyInjuryPostsPage :many
+SELECT p.id, p.title, p.created_at, i.body_part
+FROM posts p JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1 AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.created_at <= $2
+  AND ($3::uuid IS NULL OR (p.created_at, p.id) < ($4::timestamptz, $3::uuid))
+ORDER BY p.created_at DESC, p.id DESC LIMIT $5
+`
+
+type ListMyInjuryPostsPageParams struct {
+	AuthorID   uuid.UUID  `json:"author_id"`
+	AsOf       time.Time  `json:"as_of"`
+	CursorID   *uuid.UUID `json:"cursor_id"`
+	CursorTime *time.Time `json:"cursor_time"`
+	LimitN     int32      `json:"limit_n"`
+}
+
+type ListMyInjuryPostsPageRow struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+	BodyPart  string    `json:"body_part"`
+}
+
+func (q *Queries) ListMyInjuryPostsPage(ctx context.Context, arg ListMyInjuryPostsPageParams) ([]ListMyInjuryPostsPageRow, error) {
+	rows, err := q.db.Query(ctx, listMyInjuryPostsPage,
+		arg.AuthorID,
+		arg.AsOf,
+		arg.CursorID,
+		arg.CursorTime,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyInjuryPostsPageRow
+	for rows.Next() {
+		var i ListMyInjuryPostsPageRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,

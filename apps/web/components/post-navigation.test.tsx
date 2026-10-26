@@ -2,6 +2,7 @@
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { MainTabLink, PendingIcon } from "./main-tab-link";
 import { PostFab } from "./post-fab";
 import { ComposerPage } from "./composer-page";
 import UploadPage from "@/app/upload/page";
@@ -60,4 +61,13 @@ it("認証の確認中はログインへ飛ばさず、未ログイン確定後�
   expect(state.replace).toHaveBeenCalledWith("/login?next=%2Fposts%2Fnew");
   await act(async () => root.render(<UploadPage />));
   expect(state.replace).toHaveBeenLastCalledWith("/login?next=/upload");
+});
+
+it("下部バーは起動中だけ回し、準備後は遷移中も元のアイコンを保つ", async () => {
+  state.pending = true;
+  await act(async () => root.render(<MainTabLink startupOnly href="/memo"><PendingIcon className="size-5" label="開いています"><span>メモのアイコン</span></PendingIcon></MainTabLink>));
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("開いています");
+  await act(async () => state.ready?.());
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(container.textContent).toContain("メモのアイコン");
 });

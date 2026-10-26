@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { ZoomableVideo } from "@/components/zoomable-video";
+import { XPostLink } from "@/components/x-post-link";
 import { InstagramEmbed } from "@/components/instagram-embed";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -509,6 +510,11 @@ export function PostDetail({
         />
       ) : post.kind === "instagram" && post.instagram_type && post.instagram_shortcode ? (
         <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title) || "投稿"} />
+      ) : post.kind === "x" && post.x_post_id ? (
+        <div className="space-y-3">
+          {post.thumbnail_url ? <ZoomableImage src={post.thumbnail_url} alt="" sizes="(max-width: 640px) 100vw, 560px" /> : null}
+          <XPostLink id={post.x_post_id} />
+        </div>
       ) : post.thumbnail_url ? (
         <ZoomableImage
           src={post.thumbnail_url}

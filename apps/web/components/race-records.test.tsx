@@ -53,12 +53,12 @@ it("全種目を選ぶと各種目のグラフを縦に並べ、記録カード�
 it("グラフに日付は出さず、点を押すとその記録の日付を表示する", async () => {
   await render();
   const svg = container.querySelector("svg[aria-label]")!;
-  expect(svg.textContent).not.toContain("5月3日");
+  expect(svg.textContent).not.toContain("5/3");
   const point = svg.querySelector<SVGGElement>('[role="button"]')!;
   await act(async () => point.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-  expect(svg.textContent).toContain("5月3日");
+  expect(svg.textContent).toContain("5/3");
   await act(async () => point.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-  expect(svg.textContent).not.toContain("5月3日");
+  expect(svg.textContent).not.toContain("5/3");
 });
 it("未来の日付は「〇〇以下に設定してください」と案内する", async () => {
   await render();
@@ -76,4 +76,15 @@ it("カレンダーの詳細から開く編集フォームは既存のラウン�
   await act(async () => form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
   const saved = apiFetch.mock.calls.find(([,options]) => options.method === "PATCH");
   expect(JSON.parse(saved![1].body).round).toBe("決勝");
+});
+
+it("全種目の凡例を下に一箇所だけ表示する", async () => {
+  await act(async () => root.render(<RaceRecordsPanel token="test" data={{ ...data, records: data.records.map((record) => ({ ...record, wind_aided: true })) }} />));
+  const all = [...container.querySelectorAll("button")].find((button) => button.textContent?.startsWith("全種目"))!;
+  await act(async () => all.click());
+  expect(container.textContent?.match(/自己ベスト更新/g)).toHaveLength(1);
+  expect(container.textContent?.match(/追い風参考/g)).toHaveLength(1);
+  const graphs = container.querySelectorAll("figure");
+  expect(graphs).toHaveLength(2);
+  expect(graphs[1].compareDocumentPosition([...container.querySelectorAll("span")].find((el) => el.textContent === "自己ベスト更新")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

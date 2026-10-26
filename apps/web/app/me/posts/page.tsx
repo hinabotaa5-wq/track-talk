@@ -10,7 +10,7 @@ import { LoadMore } from "@/components/load-more";
 import { useCursorPosts } from "@/lib/use-cursor-posts";
 
 export default function MyPostsPage() {
-  const { session, token, loading } = useAuth();
+  const { session, token, sessionLoading: loading } = useAuth();
   const router = useRouter();
   const [sort, setSort] = useState<"popular" | "new">("popular");
   // 最初の1ページだけ読み、続きは末尾に近づいたら足す。

@@ -167,6 +167,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)
+			r.Post("/posts/x", s.citeXPost)
 			r.Post("/uploads/video", s.signVideoUpload)
 			r.Post("/uploads/image", s.signImageUpload)
 			r.Patch("/posts/{id}", s.updatePost)
@@ -395,7 +396,7 @@ func (s *Server) present(p postDTO) postDTO {
 		}
 		p.PlaybackURL = s.cloud.PlaybackURL(p.VideoPublicID)
 	}
-	if (p.Kind == "text" || p.Kind == "recruitment" || p.Kind == "instagram") && p.ImagePublicID != "" {
+	if (p.Kind == "text" || p.Kind == "recruitment" || p.Kind == "instagram" || p.Kind == "x") && p.ImagePublicID != "" {
 		if p.list {
 			p.ThumbnailURL = s.cloud.CardImageURL(p.ImagePublicID)
 		} else {

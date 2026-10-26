@@ -793,6 +793,10 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("pagination") == "cursor" {
+		s.listSavedPostsCursor(w, r)
+		return
+	}
 	p, ok := s.requireProfile(w, r)
 	if !ok {
 		return

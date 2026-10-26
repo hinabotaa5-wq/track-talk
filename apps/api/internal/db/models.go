@@ -676,6 +676,7 @@ type Post struct {
 	InstagramShortcode  *string    `json:"instagram_shortcode"`
 	SourceTitle         *string    `json:"source_title"`
 	YoutubeShorts       bool       `json:"youtube_shorts"`
+	XPostID             *string    `json:"x_post_id"`
 }
 
 type PostLike struct {

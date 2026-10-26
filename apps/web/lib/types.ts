@@ -59,13 +59,14 @@ export type Post = {
   comment_count: number;
   liked_by_me: boolean;
   saved_by_me: boolean;
-  kind: "text" | "youtube" | "instagram" | "video" | "recruitment" | "practice" | "injury" | "meet";
+  kind: "text" | "youtube" | "instagram" | "x" | "video" | "recruitment" | "practice" | "injury" | "meet";
   thumbnail_url?: string;
   youtube_shorts?: boolean;
   youtube_video_id?: string;
   source_title?: string;
   instagram_type?: "p" | "reel";
   instagram_shortcode?: string;
+  x_post_id?: string;
   video_public_id?: string;
   image_public_id?: string;
   playback_url?: string;

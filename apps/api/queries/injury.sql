@@ -272,3 +272,24 @@ SET hidden_at = now()
 WHERE note_id = $1
   AND note IS NOT NULL
   AND hidden_at IS NULL;
+
+-- name: ListMyInjuryPostsPage :many
+SELECT p.id, p.title, p.created_at, i.body_part
+FROM posts p JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = sqlc.arg('author_id') AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+  AND p.created_at <= sqlc.arg('as_of')
+  AND (sqlc.narg('cursor_id')::uuid IS NULL OR (p.created_at, p.id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY p.created_at DESC, p.id DESC LIMIT sqlc.arg('limit_n');
+
+-- name: ListInjuryPageReports :many
+SELECT u.post_id, u.stage, min(u.created_at)::timestamptz AS first_at
+FROM injury_updates u JOIN posts p ON p.id = u.post_id
+WHERE p.author_id = sqlc.arg('author_id') AND p.id = ANY(sqlc.arg('post_ids')::uuid[])
+  AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+GROUP BY u.post_id, u.stage;
+
+-- name: CountMyRepeatedInjuries :many
+SELECT i.body_part, count(*)::bigint AS count
+FROM posts p JOIN injury_details i ON i.post_id = p.id
+WHERE p.author_id = $1 AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+GROUP BY i.body_part HAVING count(*) >= 2;

@@ -17,19 +17,33 @@ export function clearPersonalStorage(storage: Pick<Storage, "length" | "key" | "
 // この端末の通知の購読を外す。API に知らせないと、ログアウトしたあとも前の人あての通知(保護者の同意や
 // 添削の依頼など)がこの端末に届き続ける。token が無い(退会したあと)ときは、ブラウザ側だけ外す。
 export async function unsubscribePushOnThisDevice(token: string | null) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      removePushSubscription(token),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, 2000); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function removePushSubscription(token: string | null) {
   if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
   try {
     const registration = await navigator.serviceWorker.getRegistration();
     const subscription = await registration?.pushManager.getSubscription();
     if (!subscription) return;
+    const unsubscribe = subscription.unsubscribe().catch(() => undefined);
     if (token) {
       await apiFetch<void>("/v1/me/push-subscriptions", {
         method: "DELETE",
         token,
+        signal: AbortSignal.timeout(1500),
         body: JSON.stringify({ endpoint: subscription.endpoint }),
       }).catch(() => undefined);
     }
-    await subscription.unsubscribe();
+    await unsubscribe;
   } catch {
     // 通知を外せなくてもログアウトは止めない。
   }

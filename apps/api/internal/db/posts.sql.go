@@ -177,9 +177,9 @@ const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id,
-    instagram_type, instagram_shortcode, source_title
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, source_title, like_count, comment_count, created_at, updated_at
+    instagram_type, instagram_shortcode, x_post_id, source_title
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, x_post_id, source_title, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
@@ -194,6 +194,7 @@ type CreatePostParams struct {
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	SourceTitle         *string   `json:"source_title"`
 }
 
@@ -209,6 +210,7 @@ type CreatePostRow struct {
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
 	CommentCount        int32     `json:"comment_count"`
@@ -229,6 +231,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.CloudinaryPublicID,
 		arg.InstagramType,
 		arg.InstagramShortcode,
+		arg.XPostID,
 		arg.SourceTitle,
 	)
 	var i CreatePostRow
@@ -244,6 +247,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.CloudinaryPublicID,
 		&i.InstagramType,
 		&i.InstagramShortcode,
+		&i.XPostID,
 		&i.SourceTitle,
 		&i.LikeCount,
 		&i.CommentCount,
@@ -322,6 +326,17 @@ func (q *Queries) FindInstagramPostID(ctx context.Context, instagramShortcode *s
 	return id, err
 }
 
+const findXPostID = `-- name: FindXPostID :one
+SELECT id FROM posts WHERE x_post_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL
+`
+
+func (q *Queries) FindXPostID(ctx context.Context, xPostID *string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findXPostID, xPostID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const findYouTubePostID = `-- name: FindYouTubePostID :one
 SELECT id
 FROM posts
@@ -349,6 +364,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -385,6 +401,7 @@ type GetPostRow struct {
 	YoutubeShorts        bool      `json:"youtube_shorts"`
 	InstagramType        *string   `json:"instagram_type"`
 	InstagramShortcode   *string   `json:"instagram_shortcode"`
+	XPostID              *string   `json:"x_post_id"`
 	CloudinaryPublicID   *string   `json:"cloudinary_public_id"`
 	SourceTitle          *string   `json:"source_title"`
 	LikeCount            int32     `json:"like_count"`
@@ -409,6 +426,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.YoutubeShorts,
 		&i.InstagramType,
 		&i.InstagramShortcode,
+		&i.XPostID,
 		&i.CloudinaryPublicID,
 		&i.SourceTitle,
 		&i.LikeCount,
@@ -541,6 +559,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -610,6 +629,7 @@ type ListHomePostsNewRow struct {
 	YoutubeShorts       bool      `json:"youtube_shorts"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
@@ -646,6 +666,7 @@ func (q *Queries) ListHomePostsNew(ctx context.Context, arg ListHomePostsNewPara
 			&i.YoutubeShorts,
 			&i.InstagramType,
 			&i.InstagramShortcode,
+			&i.XPostID,
 			&i.CloudinaryPublicID,
 			&i.SourceTitle,
 			&i.LikeCount,
@@ -675,6 +696,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -746,6 +768,7 @@ type ListHomePostsPopularRow struct {
 	YoutubeShorts       bool      `json:"youtube_shorts"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
@@ -783,6 +806,7 @@ func (q *Queries) ListHomePostsPopular(ctx context.Context, arg ListHomePostsPop
 			&i.YoutubeShorts,
 			&i.InstagramType,
 			&i.InstagramShortcode,
+			&i.XPostID,
 			&i.CloudinaryPublicID,
 			&i.SourceTitle,
 			&i.LikeCount,
@@ -882,6 +906,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -988,6 +1013,7 @@ type ListPostsNewRow struct {
 	YoutubeShorts       bool      `json:"youtube_shorts"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
@@ -1027,6 +1053,7 @@ func (q *Queries) ListPostsNew(ctx context.Context, arg ListPostsNewParams) ([]L
 			&i.YoutubeShorts,
 			&i.InstagramType,
 			&i.InstagramShortcode,
+			&i.XPostID,
 			&i.CloudinaryPublicID,
 			&i.SourceTitle,
 			&i.LikeCount,
@@ -1056,6 +1083,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -1164,6 +1192,7 @@ type ListPostsPopularRow struct {
 	YoutubeShorts       bool      `json:"youtube_shorts"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
@@ -1205,6 +1234,7 @@ func (q *Queries) ListPostsPopular(ctx context.Context, arg ListPostsPopularPara
 			&i.YoutubeShorts,
 			&i.InstagramType,
 			&i.InstagramShortcode,
+			&i.XPostID,
 			&i.CloudinaryPublicID,
 			&i.SourceTitle,
 			&i.LikeCount,
@@ -1266,6 +1296,7 @@ SELECT
     p.youtube_shorts,
     p.instagram_type,
     p.instagram_shortcode,
+    p.x_post_id,
     p.cloudinary_public_id,
     p.source_title,
     p.like_count,
@@ -1342,6 +1373,7 @@ type ListSavedPostsRow struct {
 	YoutubeShorts       bool      `json:"youtube_shorts"`
 	InstagramType       *string   `json:"instagram_type"`
 	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
 	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
 	SourceTitle         *string   `json:"source_title"`
 	LikeCount           int32     `json:"like_count"`
@@ -1376,6 +1408,158 @@ func (q *Queries) ListSavedPosts(ctx context.Context, arg ListSavedPostsParams) 
 			&i.YoutubeShorts,
 			&i.InstagramType,
 			&i.InstagramShortcode,
+			&i.XPostID,
+			&i.CloudinaryPublicID,
+			&i.SourceTitle,
+			&i.LikeCount,
+			&i.CommentCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSavedPostsCursor = `-- name: ListSavedPostsCursor :many
+SELECT
+    s.created_at AS saved_at,
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.x_post_id,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at
+FROM post_saves s
+JOIN posts p ON p.id = s.post_id
+WHERE s.user_id = $1
+  AND s.created_at <= $2
+  AND ($3::uuid IS NULL OR (s.created_at, p.id) < ($4::timestamptz, $3::uuid))
+  AND p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  -- ケガの投稿は、いまそのグループに参加している間だけ出す(抜けたら読めない)。保存は残すので、入り直すとまた出る。
+  AND (
+    p.kind <> 'injury'
+    OR p.author_id = $1
+    OR EXISTS (
+      SELECT 1 FROM injury_details i
+      JOIN injury_group_members m ON m.body_part = i.body_part AND m.user_id = $1
+      WHERE i.post_id = p.id
+    )
+  )
+  AND (
+    $5::text IS NULL
+    OR p.title ILIKE '%' || $5 || '%' ESCAPE '\'
+    OR p.body ILIKE '%' || $5 || '%' ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM recruitment_details d
+      WHERE d.post_id = p.id
+        AND (
+          d.venue ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.schedule ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.gender_ratio ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.average_age ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR d.recruit_age ILIKE '%' || $5 || '%' ESCAPE '\'
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM practice_details pd
+      WHERE pd.post_id = p.id
+        AND (
+          pd.venue ILIKE '%' || $5 || '%' ESCAPE '\'
+          OR pd.event_other ILIKE '%' || $5 || '%' ESCAPE '\'
+        )
+    )
+    OR (
+      cardinality($6::text[]) > 0
+      AND EXISTS (
+        SELECT 1 FROM recruitment_prefectures rp
+        WHERE rp.post_id = p.id
+          AND rp.prefecture = ANY($6::text[])
+      )
+    )
+  )
+ORDER BY s.created_at DESC, p.id DESC
+LIMIT $7
+`
+
+type ListSavedPostsCursorParams struct {
+	UserID          uuid.UUID  `json:"user_id"`
+	AsOf            time.Time  `json:"as_of"`
+	CursorID        *uuid.UUID `json:"cursor_id"`
+	CursorTime      *time.Time `json:"cursor_time"`
+	Keyword         *string    `json:"keyword"`
+	PrefectureCodes []string   `json:"prefecture_codes"`
+	LimitN          int32      `json:"limit_n"`
+}
+
+type ListSavedPostsCursorRow struct {
+	SavedAt             time.Time `json:"saved_at"`
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	YoutubeShorts       bool      `json:"youtube_shorts"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListSavedPostsCursor(ctx context.Context, arg ListSavedPostsCursorParams) ([]ListSavedPostsCursorRow, error) {
+	rows, err := q.db.Query(ctx, listSavedPostsCursor,
+		arg.UserID,
+		arg.AsOf,
+		arg.CursorID,
+		arg.CursorTime,
+		arg.Keyword,
+		arg.PrefectureCodes,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSavedPostsCursorRow
+	for rows.Next() {
+		var i ListSavedPostsCursorRow
+		if err := rows.Scan(
+			&i.SavedAt,
+			&i.ID,
+			&i.AuthorID,
+			&i.Title,
+			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.YoutubeShorts,
+			&i.InstagramType,
+			&i.InstagramShortcode,
+			&i.XPostID,
 			&i.CloudinaryPublicID,
 			&i.SourceTitle,
 			&i.LikeCount,
