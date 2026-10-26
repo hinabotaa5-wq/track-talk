@@ -79,7 +79,7 @@ export function SenseNoteComposer({
       <div role="status" className="sense-cheer space-y-3 rounded-xl border border-sky-300/40 bg-sky-950/40 p-4 text-center">
         <p className="text-lg font-bold text-sky-100">{cheer.title}</p>
         <p className="text-sm text-sky-100/90">{cheer.body}</p>
-        <p className="text-xs text-sky-100/80">また明日、その日の感覚を書こう。</p>
+        <p className="text-xs text-sky-100/80">また明日書こう！</p>
       </div>
     );
   }
@@ -87,7 +87,7 @@ export function SenseNoteComposer({
   if (writtenToday) {
     return (
       <p className="rounded-xl border border-white/15 bg-white/8 p-3 text-center text-sm text-slate-200">
-        今日の感覚はためました。また明日、その日の感覚を書こう。
+        今日の感覚はためました。また明日書こう！
       </p>
     );
   }
