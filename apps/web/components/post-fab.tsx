@@ -1,6 +1,8 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { parseHomeSort } from "@/lib/home-sort";
 import { MainTabLink, PendingIcon } from "./main-tab-link";
 
 // 投稿はタブではなく、ホームの左下のボタンから始める。ログインしていなければ proxy がログインへ送る。
@@ -18,4 +20,11 @@ export function PostFab() {
       </PendingIcon>
     </MainTabLink>
   );
+}
+
+// レビューのタブでは投稿ボタンを出さない。
+export function HomePostFab() {
+  const sp = useSearchParams();
+  if (parseHomeSort(sp.get("sort")) === "review") return null;
+  return <PostFab />;
 }

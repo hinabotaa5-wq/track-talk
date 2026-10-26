@@ -61,6 +61,36 @@ function KeywordInput({ initial }: { initial: string }) {
 
 const subscribeToHydration = () => () => {};
 
+// 縦に流れる一覧(募集・レビュー)では、下へ読み進めるあいだタブを上に引っ込め、上へ戻すと出す。
+function useHideOnScrollDown(enabled: boolean) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    let last = window.scrollY;
+    let frame = 0;
+    function update() {
+      const y = window.scrollY;
+      const delta = y - last;
+      // 一番上の近くでは常に出す。指の小さな揺れでは切り替えない。
+      if (y < 80) setHidden(false);
+      else if (delta > 8) setHidden(true);
+      else if (delta < -8) setHidden(false);
+      if (y < 80 || Math.abs(delta) > 8) last = y;
+    }
+    function onScroll() {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      setHidden(false);
+    };
+  }, [enabled]);
+  return [hidden, setHidden] as const;
+}
+
 export function HomeFilters() {
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   // チップは history.pushState でタブを切り替える。HomeView は URL を見て、サーバーとやりとりせずに切り替える。
@@ -71,6 +101,8 @@ export function HomeFilters() {
   // 検索URLへの戻る操作でも入力欄を開く。キーワードを消すだけなら入力を続けられる。
   const [searchRequested, setSearchOpen] = useState(false);
   const searchOpen = searchRequested || Boolean(q);
+  const [scrolledAway, setScrolledAway] = useHideOnScrollDown(sort === "recruitment" || sort === "review");
+  const hidden = scrolledAway && !searchOpen;
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const restoreSearchFocus = useRef(false);
   useEffect(() => {
@@ -93,7 +125,11 @@ export function HomeFilters() {
   }
 
   return (
-    <div className="px-4 py-3 md:mb-4 md:px-0">
+    <div
+      data-hidden={hidden || undefined}
+      onFocusCapture={() => setScrolledAway(false)}
+      className={`px-4 py-3 md:mb-4 md:px-0 motion-safe:transition-[translate,opacity] motion-safe:duration-200 ${hidden ? "pointer-events-none -translate-y-full opacity-0" : ""}`}
+    >
       {searchOpen ? (
         <div className="flex items-center gap-2" onKeyDown={(event) => {
           if (event.key === "Escape") {

@@ -3,7 +3,7 @@ import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MainTabLink, PendingIcon } from "./main-tab-link";
-import { PostFab } from "./post-fab";
+import { HomePostFab, PostFab } from "./post-fab";
 import { ComposerPage } from "./composer-page";
 import UploadPage from "@/app/upload/page";
 
@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   session: {} as object | null, loading: false, pending: false,
   ready: null as (() => void) | null, prefetch: undefined as unknown,
   replace: vi.fn(),
+  search: "",
 }));
 vi.mock("next/link", () => ({
   default: ({ prefetch, children, ...props }: ComponentProps<"a"> & { prefetch?: unknown }) => {
@@ -21,13 +22,17 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/lib/after-startup", () => ({ afterStartup: (callback: () => void) => { state.ready = callback; return () => {}; } }));
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ session: state.session, loading: state.loading }) }));
-vi.mock("next/navigation", () => ({ usePathname: () => "/posts/new", useRouter: () => ({ replace: state.replace }) }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/posts/new",
+  useRouter: () => ({ replace: state.replace }),
+  useSearchParams: () => new URLSearchParams(state.search),
+}));
 vi.mock("./leave-guard", () => ({ LeaveGuardArea: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  state.session = {}; state.loading = false; state.pending = false; state.ready = null; state.replace.mockReset();
+  state.session = {}; state.loading = false; state.pending = false; state.ready = null; state.replace.mockReset(); state.search = "";
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -88,4 +93,15 @@ it("下部バーは0.2秒待った場合だけ回し、移動が終われば戻�
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.textContent).toContain("メモのアイコン");
   } finally { vi.useRealTimers(); }
+});
+
+it("レビューのタブでは投稿ボタンを出さない", async () => {
+  await act(async () => root.render(<HomePostFab />));
+  expect(container.querySelector('a[aria-label="投稿する"]')).not.toBeNull();
+  state.search = "sort=recruitment";
+  await act(async () => root.render(<HomePostFab key="recruitment" />));
+  expect(container.querySelector('a[aria-label="投稿する"]')).not.toBeNull();
+  state.search = "sort=review";
+  await act(async () => root.render(<HomePostFab key="review" />));
+  expect(container.querySelector('a[aria-label="投稿する"]')).toBeNull();
 });
