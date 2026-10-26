@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { MainTabLink } from "./main-tab-link";
-import { appIconColors, TrackLanesMark } from "./app-icon-mark";
+import { appIconColors, appIconLaneWidth, appIconLanes } from "./app-icon-mark";
 import { ChevronLeft } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
@@ -23,10 +23,22 @@ function useLocationSearch() {
   return useSyncExternalStore(noSubscribe, () => window.location.search, () => "");
 }
 
-// アプリアイコン(components/app-icon-mark.tsx)の背景を除いた、白い3レーンだけのマーク。
+// アプリアイコン(components/app-icon-mark.tsx)の背景を除いた3レーンのマーク。
+// アイコンでは半透明の白に空色が透けて内側ほど水色に見えるが、濃紺の上では灰色になるので、
+// 透けた後の見え方の色を直接塗る(外側→内側)。
+const headerLaneColors = ["#ffffff", "#c4ecff", appIconColors.from] as const;
+
 // 512×512 の座標のうちレーンのある範囲(線の太さを含む)だけを切り出して表示する。
 function TrackMark() {
-  return <TrackLanesMark viewBox="115 125 280 270" className="h-7 w-[29px] shrink-0" />;
+  return (
+    <svg viewBox="115 125 280 270" className="h-7 w-[29px] shrink-0" aria-hidden="true">
+      <g fill="none" strokeWidth={appIconLaneWidth} strokeLinecap="round">
+        {appIconLanes.map((lane, i) => (
+          <path key={lane.d} d={lane.d} stroke={headerLaneColors[i]} />
+        ))}
+      </g>
+    </svg>
+  );
 }
 
 function TrackLogo() {
