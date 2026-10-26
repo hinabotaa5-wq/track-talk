@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "TrackTalk のプライバシーポリシー",
 };
 
-const privacyUpdated = "2026年10月25日";
+const privacyUpdated = "2026年10月26日";
 
 export default function PrivacyPage() {
   return (
@@ -103,6 +103,7 @@ export default function PrivacyPage() {
           <li>Meta: 利用者が指定した Instagram 投稿の埋め込み表示</li>
           <li>Umami: 画面を開いた人数と回数、機能の利用回数の計測</li>
           <li>PostHog: 有効にした場合の、匿名の識別子による機能の利用、画面の移動と再訪の計測</li>
+          <li>Cloudflare（Turnstile）: 有効にした場合の、登録・ログイン・パスワードの再設定と変更での自動操作の確認。確認のために、端末とブラウザの情報、IPアドレスが Cloudflare に送られます</li>
           <li>Google、Mozilla、Apple、Microsoft: 通知をオンにした端末への通知の配信。端末のブラウザに応じて、そのブラウザの通知サービスを使います</li>
           <li>Stripe: オンラインコーチングの支払いの処理と、コーチへの報酬の送金。提供を始めるまで使いません</li>
           <li>Google（Gemini API）: 感覚メモのふりかえりの作成。利用者が「6個の感覚をまとめる」を押したときだけ、まだまとめていない感覚メモを保存した順に6個選び、本文と種目、日付と曜日を送ります。元の6個の感覚もまとめと一緒に保存するため、感覚メモを個別に削除した後も、まとめには作成時の内容が残ります。ニックネームやメールアドレスなど、あなたを特定する情報は送りません。運営者は Gemini API を無料の利用枠で使っているため、送った内容は Google の規約に基づき、Google の製品や機械学習の技術の改善に使われ、Google の担当者が読むことがあります</li>
