@@ -3,6 +3,7 @@
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { isRecentRecoverySession } from "@/lib/password-recovery";
 import { newPasswordSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -13,6 +14,7 @@ import { useEffect, useState } from "react";
 import type { z } from "zod";
 
 // リセット用メールのリンクから開く画面。リンクの code でログインした状態になるので、新しいパスワードを設定する。
+// ふつうのログインのまま開いても設定させない(いまのパスワードの確認なしに変えられてしまうため)。ログイン中の変更はマイページで行う。
 export default function UpdatePasswordPage() {
   // Supabase の設定がない環境では、リンクを確かめられない。
   const [ready, setReady] = useState<"checking" | "ok" | "expired">(() =>
@@ -30,12 +32,14 @@ export default function UpdatePasswordPage() {
     const supabase = createClient();
     if (!supabase) return;
     let alive = true;
-    // URL の code はクライアントが読み込み時にセッションへ交換する。交換が済むと PASSWORD_RECOVERY か SIGNED_IN が届く。
+    // URL の code はクライアントが読み込み時にセッションへ交換する。再設定リンクなら PASSWORD_RECOVERY が届き、
+    // トークンの amr にも再設定リンクでのログインが残る。どちらもないふつうのログインは期限切れと同じ扱いにする。
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (alive && session && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION")) setReady("ok");
+      if (!alive || !session) return;
+      if (event === "PASSWORD_RECOVERY" || isRecentRecoverySession(session.access_token)) setReady("ok");
     });
     void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (alive) setReady(session ? "ok" : "expired");
+      if (alive) setReady((current) => (current === "ok" || isRecentRecoverySession(session?.access_token) ? "ok" : "expired"));
     });
     return () => {
       alive = false;
@@ -67,6 +71,7 @@ export default function UpdatePasswordPage() {
         <p className="text-sm">
           リンクの有効期限が切れたか、リセットを申し込んだのとは別のブラウザで開いています。
           <Link href="/reset-password" className="underline">もう一度メールを送ってください</Link>
+          ログイン中に変えるときは、<Link href="/me/password" className="underline">マイページのパスワードの変更</Link>から変えられます。
         </p>
       ) : (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
