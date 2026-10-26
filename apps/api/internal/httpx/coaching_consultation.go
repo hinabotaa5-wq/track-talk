@@ -100,6 +100,9 @@ func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) 
 		return room, "requester", true
 	}
 	if room.coach != nil && *room.coach == p.ID {
+		if !s.requireStaffMFA(w, r) {
+			return room, "", false
+		}
 		return room, "coach", true
 	}
 	Error(w, 404, "not_found", "見つかりませんでした")
@@ -134,6 +137,9 @@ func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.C
 		return c, "requester", true
 	}
 	if c.CoachID != nil && *c.CoachID == p.ID && c.Status != "draft" && c.Status != "awaiting_payment" {
+		if !s.requireStaffMFA(w, r) {
+			return c, "", false
+		}
 		return c, "coach", true
 	}
 	Error(w, 404, "not_found", "見つかりませんでした")

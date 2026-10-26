@@ -85,6 +85,9 @@ func (s *Server) contractParty(w http.ResponseWriter, r *http.Request) (db.Profi
 	role := "requester"
 	if ct.CoachID == me.ID {
 		role = "coach"
+		if !s.requireStaffMFA(w, r) {
+			return db.Profile{}, db.CoachingContract{}, "", false
+		}
 	}
 	return me, ct, role, true
 }

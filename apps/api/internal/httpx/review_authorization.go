@@ -24,5 +24,8 @@ func (s *Server) requireApprovedReviewCoach(w http.ResponseWriter, r *http.Reque
 		MapDBError(w, err)
 		return db.Profile{}, false
 	}
+	if !s.requireStaffMFA(w, r) {
+		return db.Profile{}, false
+	}
 	return p, true
 }

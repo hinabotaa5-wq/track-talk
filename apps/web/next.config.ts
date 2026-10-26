@@ -22,8 +22,10 @@ function contentSecurityPolicy() {
     "https://cloud.umami.is",
     "https://gateway.umami.is",
     ...origin(process.env.NEXT_PUBLIC_POSTHOG_HOST),
+    // 登録・ログインの自動操作対策(Cloudflare Turnstile)
+    "https://challenges.cloudflare.com",
   ];
-  const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is"];
+  const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is", "https://challenges.cloudflare.com"];
   if (process.env.NODE_ENV !== "production") script.push("'unsafe-eval'");
   const directives = [
     "default-src 'self'",
@@ -36,7 +38,7 @@ function contentSecurityPolicy() {
     "img-src 'self' data: blob: https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://upload.wikimedia.org https://thumb.wikimedia.org https://www.instagram.com https://*.cdninstagram.com https://*.fbcdn.net",
     "media-src 'self' blob: https://res.cloudinary.com",
     "font-src 'self'",
-    "frame-src https://www.youtube-nocookie.com https://www.instagram.com",
+    "frame-src https://www.youtube-nocookie.com https://www.instagram.com https://challenges.cloudflare.com",
     `connect-src ${connect.join(" ")}`,
   ];
   return directives.join("; ");

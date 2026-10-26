@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { rememberNextPath } from "@/lib/safe-next";
+import { confirmCurrentPassword } from "@/lib/confirm-password";
 import { createClient } from "@/lib/supabase";
+import { useCaptcha } from "./auth-captcha";
 import { useActionLock } from "@/lib/use-action-lock";
 import { changeEmailSchema, changePasswordSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,18 +30,11 @@ function ForgotPasswordLink() {
   );
 }
 
-// 変える前に、いまのパスワードで本人かどうかを確かめる。
-async function confirmCurrentPassword(email: string, password: string) {
-  const supabase = createClient();
-  if (!supabase) return "Supabase の公開設定がありません。";
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  return error ? authErrorMessage(error) : "";
-}
-
 export function EmailSection({ email }: { email: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  const captcha = useCaptcha();
   const form = useForm<z.infer<typeof changeEmailSchema>>({
     resolver: zodResolver(changeEmailSchema),
     defaultValues: { email: "", current: "" },
@@ -47,7 +42,7 @@ export function EmailSection({ email }: { email: string }) {
 
   async function onSubmit(values: z.infer<typeof changeEmailSchema>) {
     const supabase = createClient();
-    if (!supabase || !acquire()) return;
+    if (!supabase || !captcha.ready || !acquire()) return;
     setError("");
     setMessage("");
     try {
@@ -55,7 +50,8 @@ export function EmailSection({ email }: { email: string }) {
         setError("いまのメールアドレスと同じです。");
         return;
       }
-      const wrong = await confirmCurrentPassword(email, values.current);
+      // 変える前に、いまのパスワードで本人かどうかを確かめる。
+      const wrong = await confirmCurrentPassword(email, values.current, captcha.captchaToken);
       if (wrong) {
         setError(wrong);
         return;
@@ -69,6 +65,8 @@ export function EmailSection({ email }: { email: string }) {
       form.reset();
       setMessage("確認メールを送りました。メール内のリンクを開くと、メールアドレスが変わります。届かないときは迷惑メールを確認してください。");
     } finally {
+      // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。
+      captcha.reset();
       release();
     }
   }
@@ -82,9 +80,10 @@ export function EmailSection({ email }: { email: string }) {
         <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
         <ForgotPasswordLink />
+        {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
           変更する
         </Button>
       </form>
@@ -96,6 +95,7 @@ export function PasswordSection({ email }: { email: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  const captcha = useCaptcha();
   const form = useForm<z.infer<typeof changePasswordSchema>>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: { current: "", password: "", confirm: "" },
@@ -103,11 +103,12 @@ export function PasswordSection({ email }: { email: string }) {
 
   async function onSubmit(values: z.infer<typeof changePasswordSchema>) {
     const supabase = createClient();
-    if (!supabase || !acquire()) return;
+    if (!supabase || !captcha.ready || !acquire()) return;
     setError("");
     setMessage("");
     try {
-      const wrong = await confirmCurrentPassword(email, values.current);
+      // 変える前に、いまのパスワードで本人かどうかを確かめる。
+      const wrong = await confirmCurrentPassword(email, values.current, captcha.captchaToken);
       if (wrong) {
         setError(wrong);
         return;
@@ -120,6 +121,8 @@ export function PasswordSection({ email }: { email: string }) {
       form.reset();
       setMessage("パスワードを変更しました。");
     } finally {
+      // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。
+      captcha.reset();
       release();
     }
   }
@@ -134,9 +137,10 @@ export function PasswordSection({ email }: { email: string }) {
         {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
         <Input type="password" autoComplete="new-password" placeholder="もう一度" {...form.register("confirm")} />
         {form.formState.errors.confirm ? <p className="text-sm text-red-400">{form.formState.errors.confirm.message}</p> : null}
+        {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
           変更する
         </Button>
       </form>

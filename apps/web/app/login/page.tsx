@@ -9,6 +9,7 @@ import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CoachApplyLink } from "@/components/coach-apply-link";
@@ -31,6 +32,7 @@ function nextParam() {
 export default function LoginPage() {
   const [submitError, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  const captcha = useCaptcha();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
   const next = useSyncExternalStore(subscribeToNothing, nextParam, () => null);
   const error = submitError || (code ? (callbackErrorMessages[code] ?? "") : "");
@@ -46,10 +48,16 @@ export default function LoginPage() {
       setError("Supabase の公開設定がありません。");
       return;
     }
+    if (!captcha.ready) {
+      setError("「人間であることの確認」が終わるまでお待ちください。");
+      return;
+    }
     if (!acquire()) return;
-    const { error: err } = await supabase.auth.signInWithPassword(values);
+    const { error: err } = await supabase.auth.signInWithPassword({ ...values, options: { captchaToken: captcha.captchaToken } });
     if (err) {
       setError(authErrorMessage(err));
+      // 確認のトークンは1回しか使えないので、取り直してからもう一度試せるようにする。
+      captcha.reset();
       release();
       return;
     }
@@ -63,8 +71,9 @@ export default function LoginPage() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
+        {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
           ログイン
         </Button>
       </form>
