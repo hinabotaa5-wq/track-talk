@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
-import { SenseSummaryCard } from "@/components/sense-summary";
+import { SenseSummaryCard, SenseSummaryNotice, useSenseSummaries } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
 import type { RaceRecords } from "@/lib/race-records";
 import { todayInTokyo } from "@/lib/format";
@@ -41,6 +41,7 @@ export default function MySenseNotesPage() {
 
   // ログインしていなくても中身は見られる。書こうとしたり、ボタンを押したりしたらログインへ案内する。
   const guest = !loading && !session;
+  const summaryState = useSenseSummaries(senseSummaryEnabled && session ? token : null, stats?.total ?? 0, month);
   function toLogin(event: SyntheticEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -138,10 +139,12 @@ export default function MySenseNotesPage() {
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
               <div className="flex items-center gap-4">
                 <SenseNoteJar total={shownStats.total} dropLatest={dropped} className="h-32 w-24" />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 space-y-3">
+                  {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} compact /> : null}
                   <SenseNoteStatsRow stats={shownStats} />
                 </div>
               </div>
+              {senseSummaryEnabled && !guest ? <SenseSummaryNotice state={summaryState} /> : null}
               <SenseNoteComposer
                 token={token}
                 writtenToday={shownStats.today > 0}
@@ -152,13 +155,14 @@ export default function MySenseNotesPage() {
                 }}
               />
             </section>
-
-            {senseSummaryEnabled && !guest ? <SenseSummaryCard key={token} token={token} total={shownStats.total} /> : null}
-
           </>
         )}
             <SenseNoteCalendar
               notes={shownNotes ?? []}
+              summaries={summaryState.summaries}
+              summariesLoading={senseSummaryEnabled && !guest && (!summaryState.loaded || summaryState.loadingMore) && !summaryState.error}
+              summariesFailed={senseSummaryEnabled && !guest && Boolean(summaryState.error)}
+              onSummariesRetry={summaryState.retry}
               token={token}
               records={guest ? [] : raceData?.records ?? []}
               selectedDay={selectedDay}

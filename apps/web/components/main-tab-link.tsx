@@ -8,10 +8,17 @@ import { markLinkPending, useIsLinkPending } from "@/lib/pending-link";
 
 const PendingContext = createContext(false);
 
-function TabContent({ id, children, startup }: { id: string; children: ReactNode; startup: boolean }) {
+function TabContent({ id, children, delay }: { id: string; children: ReactNode; delay: number }) {
   const { pending: linkPending } = useLinkStatus();
   const markedPending = useIsLinkPending(id);
-  const pending = startup && (markedPending || linkPending);
+  const waiting = markedPending || linkPending;
+  const [delayed, setDelayed] = useState(false);
+  useEffect(() => {
+    if (!waiting || delay === 0) return;
+    const timer = setTimeout(() => setDelayed(true), delay);
+    return () => { clearTimeout(timer); setDelayed(false); };
+  }, [waiting, delay]);
+  const pending = waiting && (delay === 0 || delayed);
   return (
     <PendingContext.Provider value={pending}>
       {/* クルクルに替わるアイコン(svg)は点滅させない。animation が重なると回らなくなる。 */}
@@ -22,7 +29,7 @@ function TabContent({ id, children, startup }: { id: string; children: ReactNode
   );
 }
 
-// リンクのアイコン。次の画面が開くまではクルクルに替える。
+// リンクのアイコン。指定した待ち時間を超えた移動中だけクルクルに替える。
 // React が動く前のタップは、起動スクリプトが付ける data-boot-pending を CSS で見て替える。
 export function PendingIcon({ children, className, label }: { children: ReactNode; className: string; label: string }) {
   const pending = useContext(PendingContext);
@@ -43,22 +50,22 @@ export function PendingIcon({ children, className, label }: { children: ReactNod
 }
 
 // 起動時の通信を優先し、空き時間か操作の気配があった時点でタブを準備する。
-export function MainTabLink({ children, prefetch = null, startupOnly = false, ...props }: ComponentProps<typeof Link> & { startupOnly?: boolean }) {
+export function MainTabLink({ children, prefetch = null, pendingDelay = 0, ...props }: ComponentProps<typeof Link> & { pendingDelay?: number }) {
   const id = useId();
   const [ready, setReady] = useState(false);
-  const [startup, setStartup] = useState(true);
-  useEffect(() => afterStartup(() => { setReady(true); setStartup(false); }), []);
+  useEffect(() => afterStartup(() => setReady(true)), []);
   return (
     <Link
       {...props}
       data-pending-link=""
+      data-pending-delay={pendingDelay || undefined}
       prefetch={ready ? prefetch : false}
       onNavigate={(event) => { props.onNavigate?.(event); markLinkPending(id, typeof props.href === "string" ? props.href : props.href.pathname ?? ""); }}
       onPointerEnter={(event) => { setReady(true); props.onPointerEnter?.(event); }}
       onPointerDown={(event) => { setReady(true); props.onPointerDown?.(event); }}
       onFocus={(event) => { setReady(true); props.onFocus?.(event); }}
     >
-      <TabContent id={id} startup={!startupOnly || startup}>{children}</TabContent>
+      <TabContent id={id} delay={pendingDelay}>{children}</TabContent>
     </Link>
   );
 }

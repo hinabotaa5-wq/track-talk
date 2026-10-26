@@ -1,5 +1,8 @@
+/** @vitest-environment jsdom */
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { InjuryGroupSummary } from "@/lib/injury";
 import { InjuryGroupPicker } from "./injury-view";
 
@@ -30,4 +33,36 @@ describe("InjuryGroupPicker", () => {
     expect(html).toMatch(/>6<\/text>/);
     expect(html).toContain("グループに入る");
   });
+});
+
+it("人型や場所ボタンを選ぶとグループ一覧へ移り、初期表示ではスクロールしない", async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const scroll = vi.fn();
+  const matchMedia = vi.fn().mockReturnValue({ matches: false });
+  let frame: FrameRequestCallback | undefined;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frame = callback; return 1; });
+  vi.stubGlobal("matchMedia", matchMedia);
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { value: scroll, configurable: true });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<InjuryGroupPicker groups={groups} />));
+    expect(scroll).not.toHaveBeenCalled();
+    const region = [...container.querySelectorAll("button")].find((button) => button.textContent === "ひざ・すね")!;
+    await act(async () => region.click());
+    frame?.(0);
+    expect(container.textContent).toContain("シンスプリント");
+    expect(scroll).toHaveBeenLastCalledWith({ behavior: "smooth", block: "start" });
+    matchMedia.mockReturnValue({ matches: true });
+    await act(async () => region.click());
+    frame?.(0);
+    expect(scroll).toHaveBeenLastCalledWith({ behavior: "instant", block: "start" });
+    expect(scroll).toHaveBeenCalledTimes(2);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
 });

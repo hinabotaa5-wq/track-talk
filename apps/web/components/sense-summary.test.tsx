@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SenseSummary } from "@/lib/sense-notes";
-import { SenseSummaryCard } from "./sense-summary";
+import { SenseSummaryCard, useSenseSummaries } from "./sense-summary";
 
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
@@ -21,8 +21,12 @@ beforeEach(() => {
   apiFetch.mockReset();
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+function SummaryHarness({ total = 12, month, compact = false }: { total?: number; month?: string; compact?: boolean }) {
+  const state = useSenseSummaries("test", total, month);
+  return <SenseSummaryCard state={state} compact={compact} />;
+}
 async function render() {
-  await act(async () => root.render(<SenseSummaryCard token="test" total={12} />));
+  await act(async () => root.render(<SummaryHarness />));
 }
 async function click(label: string) {
   const button = [...container.querySelectorAll("button")].find((el) => el.textContent === label);
@@ -79,10 +83,37 @@ it("作成前に始まった再読み込みが遅れても、新しいまとめ�
     if (path.endsWith("/summaries")) return oldHistory;
     return { pending_notes: 7, min_notes: 6 };
   });
-  await act(async () => root.render(<SenseSummaryCard token="test" total={13} />));
+  await act(async () => root.render(<SummaryHarness total={13} />));
   await click("6個の感覚をまとめる");
   await act(async () => resolveHistory({ summaries: [saved], next_cursor: null }));
   expect(container.querySelectorAll("details")).toHaveLength(2);
   expect(container.querySelector("details")?.textContent).toContain("新しいまとめ");
   expect(container.textContent).toContain("あと5個");
+});
+
+it("過去月に移ると作成順で古い履歴まで読み、日付を戻して書いたまとめも取りこぼさない", async () => {
+  const backdated = { ...saved, id: "backdated", to_day: "2026-08-20", created_at: "2026-10-05T00:00:00Z" };
+  const older = { ...saved, id: "older", to_day: "2026-09-15", created_at: "2026-09-15T00:00:00Z" };
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path.includes("cursor=")) return { summaries: [older], next_cursor: null };
+    if (path.endsWith("/summaries")) return { summaries: [backdated], next_cursor: "next-page" };
+    return { pending_notes: 0, min_notes: 6 };
+  });
+  await act(async () => root.render(<SummaryHarness month="2026-10" />));
+  // to_day が過去でも、作成日が表示月内なら次ページを確認する。
+  expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("cursor=next-page"), expect.anything());
+  expect(container.querySelectorAll("details")).toHaveLength(2);
+});
+
+it("瓶の横では作成状況とボタンを表示し、まとめ本文はカレンダーに任せる", async () => {
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (options?.method === "POST") return { summary: saved, pending_notes: 0 };
+    if (path.endsWith("/summaries")) return { summaries: [saved], next_cursor: null };
+    return { pending_notes: 6, min_notes: 6 };
+  });
+  await act(async () => root.render(<SummaryHarness compact />));
+  expect(container.querySelector("details")).toBeNull();
+  await click("6個の感覚をまとめる");
+  expect(container.textContent).toContain("あと6個でまとめられます");
+  expect(container.textContent).not.toContain(saved.summary.overview);
 });

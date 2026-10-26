@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
+import { todayInTokyo } from "@/lib/format";
 import { senseDayLabel, senseSummaryMinNotes, senseSummaryRangeLabel, type SenseSummary, type SenseSummaryResponse, type SenseSummaryHistory } from "@/lib/sense-notes";
 
 function SummaryList({ title, items }: { title: string; items: string[] }) {
@@ -21,9 +22,9 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function SummaryEntry({ summary }: { summary: SenseSummary }) {
+export function SenseSummaryEntry({ summary, open = false }: { summary: SenseSummary; open?: boolean }) {
   return (
-    <details className="group rounded-xl border border-white/15 bg-white/5">
+    <details open={open || undefined} className="group rounded-xl border border-white/15 bg-white/5">
       <summary className="flex cursor-pointer list-none items-start gap-3 p-4 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1 space-y-1">
           <span className="block text-xs text-slate-300">{senseSummaryRangeLabel(summary)} · {summary.note_count}個の感覚</span>
@@ -56,17 +57,20 @@ function SummaryEntry({ summary }: { summary: SenseSummary }) {
   );
 }
 
-// 作成ボタンと過去のまとめ。元の感覚は作成時の内容で保存されている。
-export function SenseSummaryCard({ token, total }: { token: string | null; total: number }) {
+// 作成と履歴の状態を共有し、感覚・記録のどちらのカレンダーにも反映する。
+export function useSenseSummaries(token: string | null, total: number, calendarMonth?: string) {
   const [summaries, setSummaries] = useState<SenseSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [pendingNotes, setPendingNotes] = useState(0);
   const [minNotes, setMinNotes] = useState(senseSummaryMinNotes);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedToken, setLoadedToken] = useState<string | null>(null);
+  const loaded = token !== null && loadedToken === token;
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const version = useRef(0);
+  const moreRequest = useRef(false);
+  const invalidate = useCallback(() => { version.current++; }, []);
   const { pending: busy, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -83,18 +87,20 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
       setSummaries(history.summaries);
       setCursor(history.next_cursor);
       setError("");
-      setLoaded(true);
+      setLoadedToken(token);
     }).catch(() => {
       if (!controller.signal.aborted && requestedVersion === version.current) setError("まとめを読み込めませんでした");
     });
-    return () => controller.abort();
-  }, [token, total, reload]);
+    return () => { controller.abort(); invalidate(); };
+  }, [token, total, reload, invalidate]);
 
   async function create() {
-    if (!acquire()) return;
+    if (!token || !acquire()) return;
+    const requestedVersion = version.current;
     setError("");
     try {
       const d = await apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { method: "POST", token });
+      if (requestedVersion !== version.current) return;
       // 作成前に始まった読み込みで、新しいまとめを上書きしない。
       version.current++;
       if (d.summary) {
@@ -103,14 +109,16 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
       }
       setPendingNotes(d.pending_notes ?? 0);
     } catch (e) {
+      if (requestedVersion !== version.current) return;
       setError(e instanceof ApiRequestError ? e.message : "まとめを作れませんでした");
     } finally {
       release();
     }
   }
 
-  async function loadMore() {
-    if (!cursor || loadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (!token || !cursor || moreRequest.current) return;
+    moreRequest.current = true;
     const requestedVersion = version.current;
     setLoadingMore(true);
     setError("");
@@ -122,35 +130,58 @@ export function SenseSummaryCard({ token, total }: { token: string | null; total
     } catch {
       if (requestedVersion === version.current) setError("過去のまとめを読み込めませんでした。もう一度お試しください");
     } finally {
+      moreRequest.current = false;
       setLoadingMore(false);
     }
-  }
+  }, [token, cursor]);
 
+  // 履歴は作成順。対象月より前に作られたまとめまで読むと、過去月の点も欠けない。
+  // 元のメモを過去の日付で保存できるため、to_day では読み込みの終点を判断しない。
+  useEffect(() => {
+    const oldest = summaries[summaries.length - 1];
+    if (!loaded || !calendarMonth || !cursor || !oldest || error || loadingMore) return;
+    if (todayInTokyo(new Date(oldest.created_at)) < `${calendarMonth}-01`) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadMore();
+  }, [loaded, calendarMonth, cursor, summaries, error, loadingMore, loadMore]);
+
+  return { summaries: loaded ? summaries : [], cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry: () => setReload((value) => value + 1) };
+}
+
+// 瓶の横では作成状況とボタンだけを表示し、まとめの本文はカレンダーで読む。
+export function SenseSummaryCard({ state, compact = false }: { state: ReturnType<typeof useSenseSummaries>; compact?: boolean }) {
+  const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className="space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4" aria-label="まとめた感覚">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label="まとめた感覚">
+      <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />
           まとめた感覚
         </h2>
         {loaded ? shortBy > 0 ? (
-          <span className="text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
+          <span className="block text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
         ) : (
           <Button variant="secondary" className="px-3 py-1 text-xs" onClick={create} disabled={busy}>
             {busy ? "まとめています..." : `${minNotes}個の感覚をまとめる`}
           </Button>
         ) : null}
       </div>
-      {loaded && shortBy === 0 ? <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p> : null}
-      {loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
+      {!compact ? <SenseSummaryNotice state={state} /> : null}
+      {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
       {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
-      <div className="space-y-2">
-        {summaries.map((summary) => <SummaryEntry key={summary.id} summary={summary} />)}
-      </div>
-      {cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "読み込み中..." : "過去のまとめをもっと見る"}</Button> : null}
+      {!compact ? <div className="space-y-2">
+        {summaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} />)}
+      </div> : null}
+      {!compact && cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "読み込み中..." : "過去のまとめをもっと見る"}</Button> : null}
       {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
-      {!loaded && error ? <Button variant="secondary" onClick={() => setReload((value) => value + 1)}>もう一度読み込む</Button> : null}
+      {!loaded && error ? <Button variant="secondary" onClick={retry}>もう一度読み込む</Button> : null}
     </section>
   );
+}
+
+// 送信の説明は瓶の横の細い欄に詰めず、作成できるときにその下で全文を示す。
+export function SenseSummaryNotice({ state }: { state: ReturnType<typeof useSenseSummaries> }) {
+  if (!state.loaded || state.pendingNotes < state.minNotes) return null;
+  return <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{state.minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p>;
 }

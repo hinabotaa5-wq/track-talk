@@ -34,7 +34,13 @@ it("書いた日にマークが付き、タップすると詳細を開いて閉�
   expect(written.querySelector(".bg-sky-300")).not.toBeNull();
   expect(container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月24日、感覚メモなし"]')!.disabled).toBe(true);
   await click("2026年10月25日、感覚メモあり");
-  expect(container.textContent).toContain(note.body);
+  expect(container.querySelector('[role="dialog"]')?.textContent).toContain(note.body);
+  const close = container.querySelector<HTMLButtonElement>('button[aria-label="詳細を閉じる"]')!;
+  expect(document.activeElement).toBe(close);
+  await act(async () => close.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(written);
+  await click("2026年10月25日、感覚メモあり");
   await click("詳細を閉じる");
   expect(container.textContent).not.toContain(note.body);
 });
@@ -83,4 +89,24 @@ it("記録だけの日とメモ・記録の両方がある日を開ける", asyn
   await act(async () => root.render(<SenseNoteCalendar {...props} records={[]} />));
   expect(container.textContent).not.toContain("最後まで走れた");
   expect(container.textContent).toContain(note.body);
+});
+
+it("元のメモを削除した後も、まとめだけの日をカレンダーから開ける", async () => {
+  const summary = {
+    id: "summary", from_day: "2026-10-01", to_day: "2026-10-06", note_count: 6,
+    summary: { overview: "接地が安定した", good: ["リズムがよい"], concerns: [], next: ["腕振り"] },
+    notes: [note], created_at: "2026-10-07T00:00:00Z",
+  };
+  await act(async () => root.render(<SenseNoteCalendar notes={[]} summaries={[summary]} token="token" month="2026-10" onMonthChange={onMonthChange} loading={false} failed={false} onRetry={onRetry} onDeleted={() => {}} />));
+  const day = container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月6日、感覚メモなし、まとめた感覚あり"]')!;
+  expect(day.disabled).toBe(false);
+  expect(day.querySelector(".bg-violet-300")).not.toBeNull();
+  expect(container.textContent).not.toContain("この月の感覚メモはありません");
+  await act(async () => day.click());
+  const dialog = container.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain("接地が安定した");
+  expect(dialog.textContent).toContain(note.body);
+  expect(dialog.querySelector("details")!.open).toBe(true);
+  await act(async () => dialog.parentElement!.click());
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
 });

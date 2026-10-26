@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearLinkPending, markLinkPending, useIsLinkPending } from "./pending-link";
 import { pendingLinkStartupScript } from "./pending-link-startup";
 
@@ -59,4 +59,25 @@ describe("タップしたリンクのクルクル", () => {
     click(memo);
     expect(memo.hasAttribute("data-boot-pending")).toBe(false);
   });
+});
+
+it("起動前の下部リンクも0.2秒待ち、ページを離れたらタイマーを止める", () => {
+  vi.useFakeTimers();
+  (window as Window & { __tracktalkHydrated?: boolean }).__tracktalkHydrated = false;
+  new Function(pendingLinkStartupScript)();
+  document.body.innerHTML = '<a data-pending-link data-pending-delay="200" href="/memo">メモ</a>';
+  const link = document.querySelector("a")!;
+  const click = () => link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  try {
+    click();
+    vi.advanceTimersByTime(199);
+    expect(link.hasAttribute("data-boot-pending")).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(link.hasAttribute("data-boot-pending")).toBe(true);
+    clearLinkPending();
+    click();
+    window.dispatchEvent(new Event("pagehide"));
+    vi.advanceTimersByTime(200);
+    expect(link.hasAttribute("data-boot-pending")).toBe(false);
+  } finally { vi.useRealTimers(); }
 });

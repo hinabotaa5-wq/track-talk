@@ -27,7 +27,7 @@ test("起動直後の通信が終わらなくても検索とホームの切替�
   }
 });
 
-test("起動準備後の下部バーはクルクルに替わらず、通信待ちでも別のタブへ移れる", async ({ page }) => {
+test("下部バーは移動が0.2秒以上かかる場合だけ回し、待っている間も別のタブへ移れる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let release: (() => void) | undefined;
   await page.route("**/competitions?*", async (route) => {
@@ -40,11 +40,10 @@ test("起動準備後の下部バーはクルクルに替わらず、通信待�
     await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
     const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
     const competitions = nav.getByRole("link", { name: "大会", exact: true });
-    // 起動直後だけの表示期間が過ぎた後のタップを検証する。
+    // 起動準備が終わった後でも、遅い移動だけを表示する。
     await page.waitForTimeout(4000);
     await competitions.click();
-    await expect(competitions.locator('[aria-busy="true"]')).toHaveCount(0);
-    await expect(competitions.locator(".pending-link-idle svg")).toBeVisible();
+    await expect(competitions.getByRole("status")).toHaveText("大会を開いています");
     await nav.getByRole("link", { name: "コーチ", exact: true }).click();
     await expect(page).toHaveURL(/\/coaching$/);
     await expect(nav.getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");

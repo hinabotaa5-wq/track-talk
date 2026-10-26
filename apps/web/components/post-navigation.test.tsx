@@ -63,11 +63,29 @@ it("認証の確認中はログインへ飛ばさず、未ログイン確定後�
   expect(state.replace).toHaveBeenLastCalledWith("/login?next=/upload");
 });
 
-it("下部バーは起動中だけ回し、準備後は遷移中も元のアイコンを保つ", async () => {
-  state.pending = true;
-  await act(async () => root.render(<MainTabLink startupOnly href="/memo"><PendingIcon className="size-5" label="開いています"><span>メモのアイコン</span></PendingIcon></MainTabLink>));
-  expect(container.querySelector('[role="status"]')?.textContent).toBe("開いています");
-  await act(async () => state.ready?.());
-  expect(container.querySelector('[role="status"]')).toBeNull();
-  expect(container.textContent).toContain("メモのアイコン");
+it("下部バーは0.2秒待った場合だけ回し、移動が終われば戻す", async () => {
+  vi.useFakeTimers();
+  const view = () => <MainTabLink pendingDelay={200} href="/memo"><PendingIcon className="size-5" label="開いています"><span>メモのアイコン</span></PendingIcon></MainTabLink>;
+  try {
+    state.pending = true;
+    await act(async () => root.render(view()));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    await act(async () => vi.advanceTimersByTime(199));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("開いています");
+    await act(async () => state.ready?.());
+    expect(container.querySelector('[role="status"]')).not.toBeNull();
+    state.pending = false;
+    await act(async () => root.render(view()));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    state.pending = true;
+    await act(async () => root.render(view()));
+    await act(async () => vi.advanceTimersByTime(100));
+    state.pending = false;
+    await act(async () => root.render(view()));
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain("メモのアイコン");
+  } finally { vi.useRealTimers(); }
 });
