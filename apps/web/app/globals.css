@@ -9,6 +9,13 @@ html {
   color-scheme: dark;
 }
 
+/* iPhone で上端を越えて引っ張ると、ヘッダーごと下にずれて、上に後ろの空色の模様がのぞく。
+   ヘッダーの外側は塗れない(iOS は画面の上端より外の中身を描かない)ので、引っ張り自体を止める。 */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -34,19 +41,6 @@ html {
     backdrop-filter: none;
     background-color: rgb(24 40 64 / 0.94);
   }
-}
-
-/* iPhone で上端を越えて引っ張ると、ヘッダーごと下にずれて上に後ろの模様がのぞく。
-   ヘッダーの上に同じ色の帯を伸ばして、ステータスバーまでヘッダー色でつなぐ。 */
-.header-overscroll-fill::before {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  height: 100vh;
-  background: #16243a;
-  pointer-events: none;
 }
 
 /* アプリを開いた直後(React が動く前)に押したリンクは、アイコンをクルクルに替える。印は起動スクリプトが付ける。 */
