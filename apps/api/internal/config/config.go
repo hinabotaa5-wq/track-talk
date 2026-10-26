@@ -11,6 +11,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// 無料枠との比較（2026-10-27: Flash-Lite は500回/日・10回/分）に余裕を残す。
+const (
+	DefaultSenseSummaryDailyLimit  = 200
+	DefaultSenseSummaryMinuteLimit = 5
+)
+
 type Config struct {
 	Addr                   string
 	DatabaseURL            string
@@ -76,9 +82,11 @@ type Config struct {
 	// GeminiSummaryModel は、感覚メモのまとめに使う Gemini のモデル。空なら httpx の既定(軽いモデル)。
 	// 無料枠の1日の回数はモデルごとなので、大会の取り込みと別のモデルにすると回数を分け合わずに済む。
 	GeminiSummaryModel string
-	// SenseSummaryDailyLimit は、全員で1日(日本時間)に作れるまとめの数。0 なら上限なし。
-	// 無料枠のあいだは、AI Studio に出ている1日の回数より少なくしておくと、超えたぶんは「混み合っています」になる。
+	// SenseSummaryDailyLimit は、全員で直近24時間に試行できる要約の数。未設定は200、明示的な0は上限なし。
+	// 成否を問わず呼び出し直前にDBで予約する。日付のリセット時刻の違いや同時リクエストでも超えない。
 	SenseSummaryDailyLimit int
+	// SenseSummaryMinuteLimit は、全員で直近1分に試行できる数。未設定は5、明示的な0は上限なし。
+	SenseSummaryMinuteLimit int
 	// LocalMediaBaseURL はローカルプレビューの動画配信先。本番では設定しない。
 	LocalMediaBaseURL string
 	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
@@ -135,13 +143,20 @@ func Load() (Config, error) {
 		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
 		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
 		GeminiSummaryModel:         strings.TrimSpace(os.Getenv("GEMINI_SUMMARY_MODEL")),
+		SenseSummaryDailyLimit:     DefaultSenseSummaryDailyLimit,
+		SenseSummaryMinuteLimit:    DefaultSenseSummaryMinuteLimit,
 	}
-	if raw := strings.TrimSpace(os.Getenv("SENSE_SUMMARY_DAILY_LIMIT")); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 0 {
-			return Config{}, fmt.Errorf("SENSE_SUMMARY_DAILY_LIMIT は0以上の整数にしてください: %q", raw)
+	for name, target := range map[string]*int{
+		"SENSE_SUMMARY_DAILY_LIMIT":  &cfg.SenseSummaryDailyLimit,
+		"SENSE_SUMMARY_MINUTE_LIMIT": &cfg.SenseSummaryMinuteLimit,
+	} {
+		if raw := strings.TrimSpace(os.Getenv(name)); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 0 {
+				return Config{}, fmt.Errorf("%s は0以上の整数にしてください: %q", name, raw)
+			}
+			*target = n
 		}
-		cfg.SenseSummaryDailyLimit = n
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

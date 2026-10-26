@@ -20,9 +20,11 @@ var ErrRateLimited = errors.New("gemini rate limit")
 var generateEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
 type Client struct {
-	Key   string
-	Model string
-	HTTP  *http.Client
+	// MaxOutputTokens は省略時にはモデルの既定値。要約だけ小さく制限する。
+	MaxOutputTokens int
+	Key             string
+	Model           string
+	HTTP            *http.Client
 	// Endpoint はテストで Gemini の代わりのサーバーに向けるためのもの。空なら本物の Gemini。
 	Endpoint string
 }
@@ -62,15 +64,15 @@ func (c Client) generate(ctx context.Context, parts []map[string]any) (string, e
 	if httpClient == nil {
 		httpClient = geminiClient
 	}
+	generationConfig := map[string]any{"temperature": 0, "responseMimeType": "application/json", "thinkingConfig": map[string]string{"thinkingLevel": "low"}}
+	if c.MaxOutputTokens > 0 {
+		generationConfig["maxOutputTokens"] = c.MaxOutputTokens
+	}
 	body, err := json.Marshal(map[string]any{
 		"contents": []map[string]any{
 			{"role": "user", "parts": parts},
 		},
-		"generationConfig": map[string]any{
-			"temperature":      0,
-			"responseMimeType": "application/json",
-			"thinkingConfig":   map[string]string{"thinkingLevel": "low"},
-		},
+		"generationConfig": generationConfig,
 	})
 	if err != nil {
 		return "", err

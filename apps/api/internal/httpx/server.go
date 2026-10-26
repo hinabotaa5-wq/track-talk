@@ -68,9 +68,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			DevLog: cfg.MailDevLog,
 		},
 		gemini: competitions.Client{
-			Key:      cfg.GeminiAPIKey,
-			Model:    senseSummaryModel(cfg.GeminiSummaryModel),
-			Endpoint: cfg.GeminiEndpoint,
+			MaxOutputTokens: 2048,
+			Key:             cfg.GeminiAPIKey,
+			Model:           senseSummaryModel(cfg.GeminiSummaryModel),
+			Endpoint:        cfg.GeminiEndpoint,
 		},
 	}
 	if cfg.PushHTTP != nil {
