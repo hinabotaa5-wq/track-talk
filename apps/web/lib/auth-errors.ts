@@ -25,6 +25,9 @@ const messages: Record<string, string> = {
   hook_timeout: "処理がタイムアウトしました。もう一度試してください。",
   insufficient_aal: "先に二段階認証のコードを入れてください。",
   same_password: "いまのパスワードとは別のパスワードにしてください。",
+  current_password_required: "いまのパスワードを入力してください。",
+  current_password_invalid: "いまのパスワードが違います。",
+  reauthentication_needed: "安全のため、一度ログアウトしてログインし直してから変更してください。",
 };
 
 const fallback = "処理に失敗しました。もう一度試してください。";

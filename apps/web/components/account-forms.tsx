@@ -113,7 +113,8 @@ export function PasswordSection({ email }: { email: string }) {
         setError(wrong);
         return;
       }
-      const { error: err } = await supabase.auth.updateUser({ password: values.password });
+      // Supabase の「Require current password when updating」が有効なときは、サーバーもいまのパスワードを確かめる。
+      const { error: err } = await supabase.auth.updateUser({ password: values.password, current_password: values.current });
       if (err) {
         setError(authErrorMessage(err));
         return;

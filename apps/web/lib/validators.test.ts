@@ -137,6 +137,12 @@ describe("validators", () => {
     expect(authErrorMessage({ message: "User already registered" })).toBe(
       "このメールアドレスはすでに登録されています。",
     );
+    expect(authErrorMessage({ code: "current_password_invalid", message: "Current password required when setting new password." })).toBe(
+      "いまのパスワードが違います。",
+    );
+    expect(authErrorMessage({ code: "reauthentication_needed", message: "Password update requires reauthentication" })).toBe(
+      "安全のため、一度ログアウトしてログインし直してから変更してください。",
+    );
     expect(cloudinaryErrorMessage("File size too large. Got 20. Maximum is 10.")).toBe(
       "ファイルサイズが大きすぎます",
     );
