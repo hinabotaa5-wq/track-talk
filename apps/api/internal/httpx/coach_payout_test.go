@@ -68,7 +68,8 @@ func TestCoachOnboardingGatesDutyAndContracts(t *testing.T) {
 			t.Fatalf("onboarding %d %s", rec.Code, rec.Body.String())
 		}
 	}
-	if len(f.accounts) != 1 || f.accounts[0].Get("type") != "express" || f.accounts[0].Get("country") != "JP" {
+	if len(f.accounts) != 1 || f.accounts[0].Get("type") != "express" || f.accounts[0].Get("country") != "JP" ||
+		f.accounts[0].Get("settings[payouts][schedule][interval]") != "monthly" || f.accounts[0].Get("settings[payouts][schedule][monthly_anchor]") != "15" {
 		t.Fatalf("accounts %v", f.accounts)
 	}
 	if e := coachEarnings(t, h, tc); !e.Payments || !e.StripeLinked || e.PayoutsEnabled {
@@ -126,16 +127,10 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
 	}
 
-	// パーソナル指導: 初年10%のコーチの8,000円の期間が終わった。
+	// パーソナル指導: 8,000円の期間が終わった。手数料は20%。
 	tu, tc, contractID := adultAccepted(t, h)
 	var personalCoach string
 	queryRowArgs(t, `SELECT coach_id FROM coaching_contracts WHERE id = $1`, []any{contractID}, &personalCoach)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+personalCoach+"/reduced-fee", tc, map[string]any{"enabled": true}); rec.Code != http.StatusForbidden {
-		t.Fatalf("non-admin reduced fee %d", rec.Code)
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+personalCoach+"/reduced-fee", tadmin, map[string]any{"enabled": true}); rec.Code != http.StatusOK {
-		t.Fatalf("reduced fee %d %s", rec.Code, rec.Body.String())
-	}
 	checkout(t, h, tu, contractID)
 	paidSession(t, h, sessionIDFor(t, contractID), "pi_personal_earn", 8000)
 	if contractStatus(t, contractID) != "active" {
@@ -152,7 +147,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 840 || e.UnpaidYen != 840 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
 		t.Fatalf("review earnings %+v", e)
 	}
-	if e := coachEarnings(t, h, tc); e.UnpaidYen != 7200 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 90 {
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 6400 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 80 {
 		t.Fatalf("personal earnings %+v", e)
 	}
 
@@ -162,15 +157,21 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		t.Fatalf("run this month %d %s", rec.Code, rec.Body.String())
 	}
 
-	// 前の月の分になったら送る。1回目は Stripe が断り、次に押したときにやり直す。
+	// 前の月の分になったら送る。3,000円に届かない添削の840円は繰り越す。
 	execSQLArgs(t, `UPDATE coach_earnings SET created_at = created_at - interval '40 days'`)
-	f.failNextTransfers(2)
+	f.failNextTransfers(1)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":2`) || !strings.Contains(rec.Body.String(), `"failed":2`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":0,"failed":1`) {
 		t.Fatalf("run failed %d %s", rec.Code, rec.Body.String())
 	}
+	if e := coachEarnings(t, h, trc); e.UnpaidYen != 840 || len(e.Payouts) != 0 || e.Earnings[0].Paid {
+		t.Fatalf("carried over %+v", e)
+	}
+	// 1回目は Stripe が断り、次に押したときにやり直す。繰り越した分が3,000円に届いたら一緒に送る。
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+		SELECT gen_random_uuid(), coach_id, source, gross_yen, share_percent, amount_yen, created_at FROM coach_earnings, generate_series(1, 3) WHERE coach_id = $1`, reviewCoach)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":0`) || !strings.Contains(rec.Body.String(), `"paid":2`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1`) || !strings.Contains(rec.Body.String(), `"paid":2`) {
 		t.Fatalf("run retry %d %s", rec.Code, rec.Body.String())
 	}
 	got := map[string]string{}
@@ -180,7 +181,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		}
 		got[tr.Get("destination")] = tr.Get("amount")
 	}
-	if got["acct_"+reviewCoach.String()] != "840" || got["acct_"+personalCoach] != "7200" || len(got) != 2 {
+	if got["acct_"+reviewCoach.String()] != "3360" || got["acct_"+personalCoach] != "6400" || len(got) != 2 {
 		t.Fatalf("transfers %v", got)
 	}
 	// 済んだものは送り直さない。
@@ -194,7 +195,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"created":0,"paid":2,"failed":0`) || len(f.transferList()) != 2 {
 		t.Fatalf("run after lost update %s %d", rec.Body.String(), len(f.transferList()))
 	}
-	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 7200 || !e.Earnings[0].Paid {
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 6400 || !e.Earnings[0].Paid {
 		t.Fatalf("after payout %+v", e)
 	}
 

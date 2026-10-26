@@ -207,11 +207,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 	default:
 		return 0, 0, false, &ticketRuleError{"consultation_unavailable", "指導開始後または終了後に相談できます"}
 	}
-	share := int16(100 - personalFeePercent)
-	if cp.ReducedFeeUntil != nil && cp.ReducedFeeUntil.After(time.Now()) {
-		share = int16(100 - personalReducedFeePercent)
-	}
-	return *c.AdditionalConsultationPriceYen, share, requiresVideo, nil
+	return *c.AdditionalConsultationPriceYen, 100 - personalFeePercent, requiresVideo, nil
 }
 func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 	out := map[string]any{"id": c.ID, "request_key": c.RequestKey, "status": c.Status, "funding": c.Funding, "price_yen": c.PriceYen, "payment_state": c.PaymentState,

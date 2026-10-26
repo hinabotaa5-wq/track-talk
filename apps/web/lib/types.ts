@@ -414,9 +414,9 @@ export type CoachEarnings = {
   payments: boolean;
   stripe_linked: boolean;
   payouts_enabled: boolean;
-  reduced_fee_until: string | null;
   review_share: number;
   personal_fee: number;
+  min_payout_yen: number;
   this_month_yen: number;
   unpaid_yen: number;
   payouts: CoachPayout[];
@@ -428,7 +428,6 @@ export type AdminPayoutCoach = {
   tier: CoachTier;
   stripe_linked: boolean;
   payouts_enabled: boolean;
-  reduced_fee_until: string | null;
   unpaid_yen: number;
 };
 export type AdminCoachPayout = CoachPayout & {

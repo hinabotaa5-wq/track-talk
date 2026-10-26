@@ -225,7 +225,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/coaching/contracts/{id}", s.adminOpenCoachingContract)
 			r.Post("/admin/coaching/contracts/{id}/suspend", s.adminSuspendCoachingContract)
 			r.Post("/admin/coaching/contracts/{id}/resume", s.adminResumeCoachingContract)
-			r.Post("/admin/coaching/coaches/{id}/reduced-fee", s.adminSetReducedFee)
 			r.Get("/admin/menu-contest", s.adminMenuContest)
 			r.Get("/admin/stats", s.adminStats)
 			r.Get("/admin/stats/coaching", s.adminCoachingStats)

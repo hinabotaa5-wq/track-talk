@@ -66,7 +66,7 @@ func (q *Queries) AdminListCoachPayouts(ctx context.Context) ([]AdminListCoachPa
 
 const adminListPayoutCoaches = `-- name: AdminListPayoutCoaches :many
 SELECT cp.profile_id, p.nickname, cp.tier, (cp.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
-       cp.payouts_enabled, cp.reduced_fee_until,
+       cp.payouts_enabled,
        COALESCE((SELECT sum(e.amount_yen) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL), 0)::int AS unpaid_yen
 FROM coach_profiles cp
 JOIN profiles p ON p.id = cp.profile_id
@@ -76,13 +76,12 @@ LIMIT 200
 `
 
 type AdminListPayoutCoachesRow struct {
-	ProfileID       uuid.UUID  `json:"profile_id"`
-	Nickname        *string    `json:"nickname"`
-	Tier            string     `json:"tier"`
-	StripeLinked    bool       `json:"stripe_linked"`
-	PayoutsEnabled  bool       `json:"payouts_enabled"`
-	ReducedFeeUntil *time.Time `json:"reduced_fee_until"`
-	UnpaidYen       int32      `json:"unpaid_yen"`
+	ProfileID      uuid.UUID `json:"profile_id"`
+	Nickname       *string   `json:"nickname"`
+	Tier           string    `json:"tier"`
+	StripeLinked   bool      `json:"stripe_linked"`
+	PayoutsEnabled bool      `json:"payouts_enabled"`
+	UnpaidYen      int32     `json:"unpaid_yen"`
 }
 
 // 運営の送金の画面に出す、承認済みのコーチ。
@@ -101,7 +100,6 @@ func (q *Queries) AdminListPayoutCoaches(ctx context.Context) ([]AdminListPayout
 			&i.Tier,
 			&i.StripeLinked,
 			&i.PayoutsEnabled,
-			&i.ReducedFeeUntil,
 			&i.UnpaidYen,
 		); err != nil {
 			return nil, err
@@ -207,11 +205,9 @@ FROM (
     SELECT DISTINCT ON (ct.id)
         ct.id AS contract_id, ct.coach_id,
         pay.amount_yen - pay.refunded_yen AS gross,
-        CASE WHEN cp.reduced_fee_until IS NOT NULL AND cp.reduced_fee_until > ct.starts_at
-             THEN 100 - $1::int ELSE 100 - $2::int END AS share
+        100 - $1::int AS share
     FROM coaching_contracts ct
     JOIN coaching_payments pay ON pay.contract_id = ct.id
-    LEFT JOIN coach_profiles cp ON cp.profile_id = ct.coach_id
     WHERE ct.status IN ('ended', 'refunded') AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
       AND pay.status IN ('paid', 'partially_refunded')
       AND pay.refund_reason IS DISTINCT FROM 'not_started'
@@ -224,16 +220,10 @@ ON CONFLICT DO NOTHING
 RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id
 `
 
-type InsertPersonalEarningsParams struct {
-	ReducedFeePercent int32 `json:"reduced_fee_percent"`
-	FeePercent        int32 `json:"fee_percent"`
-}
-
 // 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
-// 手数料は20%、初年10%のコーチは、その期間中に始まった指導が10%。
 // 取り分が0円になる行（1円だけ残った返金など）は記録しない。amount_yen > 0 の制約で全体が失敗するため。
-func (q *Queries) InsertPersonalEarnings(ctx context.Context, arg InsertPersonalEarningsParams) ([]CoachEarning, error) {
-	rows, err := q.db.Query(ctx, insertPersonalEarnings, arg.ReducedFeePercent, arg.FeePercent)
+func (q *Queries) InsertPersonalEarnings(ctx context.Context, feePercent int32) ([]CoachEarning, error) {
+	rows, err := q.db.Query(ctx, insertPersonalEarnings, feePercent)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +344,8 @@ JOIN coach_profiles cp ON cp.profile_id = e.coach_id
 WHERE e.payout_id IS NULL
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
-GROUP BY e.coach_id
+GROUP BY e.coach_id, cp.status
+HAVING sum(e.amount_yen) >= $1::int OR cp.status <> 'approved'
 `
 
 type ListPayableCoachEarningsRow struct {
@@ -363,8 +354,10 @@ type ListPayableCoachEarningsRow struct {
 }
 
 // 今月（日本時間）より前の、まだ送金していない報酬。受け取りの準備ができたコーチの分だけ。
-func (q *Queries) ListPayableCoachEarnings(ctx context.Context) ([]ListPayableCoachEarningsRow, error) {
-	rows, err := q.db.Query(ctx, listPayableCoachEarnings)
+// 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月以降に繰り越す。
+// 活動を終えた（承認済みでなくなった）コーチには、届かなくても残りを送る。
+func (q *Queries) ListPayableCoachEarnings(ctx context.Context, minYen int32) ([]ListPayableCoachEarningsRow, error) {
+	rows, err := q.db.Query(ctx, listPayableCoachEarnings, minYen)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +529,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
 `
 
 type SetCoachPayoutsEnabledParams struct {
@@ -568,7 +561,6 @@ func (q *Queries) SetCoachPayoutsEnabled(ctx context.Context, arg SetCoachPayout
 		&i.PledgeVersion,
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
-		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
@@ -581,7 +573,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE stripe_account_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
 `
 
 type SetCoachPayoutsEnabledByAccountParams struct {
@@ -614,53 +606,6 @@ func (q *Queries) SetCoachPayoutsEnabledByAccount(ctx context.Context, arg SetCo
 		&i.PledgeVersion,
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
-		&i.ReducedFeeUntil,
-		&i.ServiceTypes,
-		&i.SnsUrls,
-		&i.Name,
-	)
-	return i, err
-}
-
-const setCoachReducedFee = `-- name: SetCoachReducedFee :one
-UPDATE coach_profiles
-SET reduced_fee_until = CASE WHEN $1::boolean THEN now() + interval '1 year' END,
-    updated_at = now()
-WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
-`
-
-type SetCoachReducedFeeParams struct {
-	Enabled   bool      `json:"enabled"`
-	ProfileID uuid.UUID `json:"profile_id"`
-}
-
-// 運営が「初年10%」を付けたり外したりする。付けた時から1年。
-func (q *Queries) SetCoachReducedFee(ctx context.Context, arg SetCoachReducedFeeParams) (CoachProfile, error) {
-	row := q.db.QueryRow(ctx, setCoachReducedFee, arg.Enabled, arg.ProfileID)
-	var i CoachProfile
-	err := row.Scan(
-		&i.ProfileID,
-		&i.Tier,
-		&i.Events,
-		&i.BestRecord,
-		&i.Achievements,
-		&i.Years,
-		&i.Status,
-		&i.AppliedAt,
-		&i.ReviewedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.OnDuty,
-		&i.DailyCap,
-		&i.LastOfferedAt,
-		&i.RatingResetAt,
-		&i.PhotoPublicID,
-		&i.PledgedAt,
-		&i.PledgeVersion,
-		&i.StripeAccountID,
-		&i.PayoutsEnabled,
-		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
@@ -673,7 +618,7 @@ UPDATE coach_profiles
 SET stripe_account_id = COALESCE(stripe_account_id, $1),
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, reduced_fee_until, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
 `
 
 type SetCoachStripeAccountParams struct {
@@ -706,7 +651,6 @@ func (q *Queries) SetCoachStripeAccount(ctx context.Context, arg SetCoachStripeA
 		&i.PledgeVersion,
 		&i.StripeAccountID,
 		&i.PayoutsEnabled,
-		&i.ReducedFeeUntil,
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,

@@ -335,12 +335,18 @@ type Account struct {
 	DetailsSubmitted bool   `json:"details_submitted"`
 }
 
+// PayoutMonthlyAnchor は、コーチのアカウントから銀行口座へ入金する日。運営は毎月この日より前に送金する。
+const PayoutMonthlyAnchor = 15
+
 // CreateAccount は、コーチの受け取り用のアカウントを作る。本人確認と口座の登録は Stripe の画面で行う。
+// 入金ごとに Stripe の費用がかかるので、銀行口座への入金は月1回にする。
 func (c Client) CreateAccount(ctx context.Context, metadata map[string]string, idempotencyKey string) (Account, error) {
 	form := url.Values{}
 	form.Set("type", "express")
 	form.Set("country", "JP")
 	form.Set("capabilities[transfers][requested]", "true")
+	form.Set("settings[payouts][schedule][interval]", "monthly")
+	form.Set("settings[payouts][schedule][monthly_anchor]", strconv.Itoa(PayoutMonthlyAnchor))
 	for k, v := range metadata {
 		form.Set("metadata["+k+"]", v)
 	}
