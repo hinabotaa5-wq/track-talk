@@ -17,6 +17,8 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 
 ## 2. 二段階認証(認証アプリ)
 
+**公開は保留中。** Supabase のパスキーが正式に出てから公開する方針で、マイページの入口(`/me/security` へのリンク)は隠してある。画面と API は入っていて、URL を直に開けば設定できるが、`STAFF_MFA_REQUIRED` は立てない。公開するときは、`apps/web/app/me/page.tsx` の `accountLinks` に「二段階認証」のリンクを戻す。
+
 - 利用者は マイページ → 二段階認証(`/me/security`)で設定・解除する。設定した人は、ログインのたびに6桁のコードを求められる(パスワードでも Google でも)。
 - `STAFF_MFA_REQUIRED=1` の API は、管理者と承認済みコーチの操作を、二段階認証を済ませたログイン(JWT の `aal` が `aal2`)でしか受け付けない(403 `mfa_required`)。画面は `/v1/me` の `mfa_required` を見て、管理・コーチの画面の前に設定・確認を求める。
 - ふつうの利用者は、二段階認証を設定していても API 側では求めない(画面で止める)。
