@@ -99,6 +99,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |
 | `VAPID_*` | 端末へのプッシュ通知 |
 | `SENSE_SUMMARY_ENABLED` / `NEXT_PUBLIC_SENSE_SUMMARY_ENABLED` | 感覚メモのAI振り返りの公開設定 |
+| `SENSE_SUMMARY_DAILY_LIMIT` / `SENSE_SUMMARY_MINUTE_LIMIT` | 要約APIの全員合計の試行上限。既定は直近24時間400回・直近1分10回（失敗も含む）。[設定と根拠](docs/sense-summary-limits.md) |
 | `GEMINI_API_KEY` | 大会データの抽出・提供中のメモ振り返り |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | 提供中のメール送信 |
 | `REMINDER_SECRET` / `STORAGE_CLEANUP_SECRET` | 月1回のお知らせ・保存期限の毎日の整理を Cloud Scheduler から呼ぶときの秘密の値。`deploy/cloud-run/monthly-reminder.sh`・`storage-cleanup.sh` が作って入れる。空なら呼べない(404) |

@@ -65,3 +65,30 @@ func TestParseDraftsAcceptsEmptyMeetsObject(t *testing.T) {
 		t.Fatalf("array: %v %v", drafts, err)
 	}
 }
+
+func TestGenerateJSONOutputCapIsOptIn(t *testing.T) {
+	var received []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			GenerationConfig map[string]any `json:"generationConfig"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		received = append(received, body.GenerationConfig)
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`))
+	}))
+	defer server.Close()
+	for _, limit := range []int{0, 2048} {
+		client := Client{Key: "test", Endpoint: server.URL, MaxOutputTokens: limit}
+		if _, err := client.GenerateJSON(context.Background(), "synthetic"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := received[0]["maxOutputTokens"]; ok {
+		t.Fatal("competition default was capped")
+	}
+	if received[1]["maxOutputTokens"] != float64(2048) {
+		t.Fatalf("config=%v", received[1])
+	}
+}
