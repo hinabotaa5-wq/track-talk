@@ -70,7 +70,7 @@ export default function UpdatePasswordPage() {
       ) : ready === "expired" ? (
         <p className="text-sm">
           リンクの有効期限が切れたか、リセットを申し込んだのとは別のブラウザで開いています。
-          <Link href="/reset-password" className="underline">もう一度メールを送ってください</Link>
+          <Link href="/reset-password" className="underline">もう一度メールを送ってください</Link>。
           ログイン中に変えるときは、<Link href="/me/password" className="underline">マイページのパスワードの変更</Link>から変えられます。
         </p>
       ) : (
