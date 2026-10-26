@@ -19,9 +19,11 @@ import (
 const (
 	// 添削の代金のうちコーチの取り分（%）。
 	reviewSharePercent = 70
-	// パーソナル指導の手数料（%）。最初の数人のコーチは初年10%。
-	personalFeePercent        = 20
-	personalReducedFeePercent = 10
+	// パーソナル指導の手数料（%）。
+	personalFeePercent = 20
+	// 1回に送金する最低額（円）。送金のたびに Stripe の費用（月200円と入金ごとの250円+0.25%）がかかるので、
+	// 届かない分は翌月に繰り越す。繰り越しは1回までで、翌月は届かなくても送る。
+	minPayoutYen = 3000
 )
 
 // payoutsReady は、コーチが報酬を受け取れる状態か。Stripe の鍵がないデモ版では、いつでも受け取れる扱いにする。
@@ -130,16 +132,16 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 	}
 	JSON(w, http.StatusOK, map[string]any{
 		// payments が false のあいだは支払いなしのデモ版。
-		"payments":          s.stripe.Configured(),
-		"stripe_linked":     coach.StripeAccountID != nil,
-		"payouts_enabled":   coach.PayoutsEnabled,
-		"reduced_fee_until": coach.ReducedFeeUntil,
-		"review_share":      reviewSharePercent,
-		"personal_fee":      personalFeePercent,
-		"this_month_yen":    summary.ThisMonthYen,
-		"unpaid_yen":        summary.UnpaidYen,
-		"payouts":           outPayouts,
-		"earnings":          outEarnings,
+		"payments":        s.stripe.Configured(),
+		"stripe_linked":   coach.StripeAccountID != nil,
+		"payouts_enabled": coach.PayoutsEnabled,
+		"review_share":    reviewSharePercent,
+		"personal_fee":    personalFeePercent,
+		"min_payout_yen":  minPayoutYen,
+		"this_month_yen":  summary.ThisMonthYen,
+		"unpaid_yen":      summary.UnpaidYen,
+		"payouts":         outPayouts,
+		"earnings":        outEarnings,
 	})
 }
 
@@ -154,9 +156,7 @@ func recordCoachEarningsWith(ctx context.Context, q *db.Queries) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	personal, err := q.InsertPersonalEarnings(ctx, db.InsertPersonalEarningsParams{
-		FeePercent: personalFeePercent, ReducedFeePercent: personalReducedFeePercent,
-	})
+	personal, err := q.InsertPersonalEarnings(ctx, personalFeePercent)
 	if err != nil {
 		return len(reviews), err
 	}
@@ -171,6 +171,7 @@ type payoutRunResult struct {
 }
 
 // runCoachPayouts は、前の月までの報酬をコーチごとにまとめ、まだ送っていない送金を Stripe で送る。
+// 合計が minPayoutYen に届かないコーチの分は、1回だけ送金にまとめずに残しておく。
 func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	var out payoutRunResult
 	// 送金する前に、記録し損ねた報酬を拾う。
@@ -181,7 +182,7 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 		if err := q.LockCoachPayouts(ctx); err != nil {
 			return err
 		}
-		rows, err := q.ListPayableCoachEarnings(ctx)
+		rows, err := q.ListPayableCoachEarnings(ctx, minPayoutYen)
 		if err != nil {
 			return err
 		}
@@ -312,28 +313,4 @@ func (s *Server) adminRunCoachPayouts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, out)
-}
-
-// adminSetReducedFee は、運営がコーチに「初年10%」を付ける（外す）。付けた時から1年のあいだに始まったパーソナル指導が10%。
-func (s *Server) adminSetReducedFee(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	var req struct {
-		Enabled bool `json:"enabled"`
-	}
-	if err := DecodeJSON(r, &req); err != nil {
-		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return
-	}
-	c, err := s.q.SetCoachReducedFee(r.Context(), db.SetCoachReducedFeeParams{Enabled: req.Enabled, ProfileID: id})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, map[string]any{"reduced_fee_until": c.ReducedFeeUntil})
 }

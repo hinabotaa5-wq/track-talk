@@ -1,13 +1,14 @@
 "use client";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatYen } from "@/lib/format";
 import type { AdminCoachPayout, AdminPayoutCoach, CoachEarnings, CoachPayoutStatus } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useState } from "react";
 
 // コーチへの報酬。コーチの画面の「報酬」と、運営の「送金」。
 // 支払いは TrackTalk が受け取り、月に1回、前の月までの報酬をまとめて Stripe でコーチのアカウントへ送金する。
+// 合計が最低送金額に届かない分は1回だけ翌月に繰り越す。
 
 const payoutStatusLabels: Record<CoachPayoutStatus, string> = {
   pending: "送金待ち",
@@ -24,7 +25,6 @@ function monthLabel(month: string): string {
 export function CoachEarningsSection({ token, onReady }: { token: string | null; onReady: () => void }) {
   const [data, setData] = useState<CoachEarnings | null>(null);
   const [error, setError] = useState("");
-  const [now] = useState(() => Date.now());
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -59,7 +59,6 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
   if (!data) return error ? <p className="text-sm text-red-400">{error}</p> : null;
   if (!data.payments) return null;
 
-  const reduced = data.reduced_fee_until && new Date(data.reduced_fee_until).getTime() > now;
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <h2 className="font-bold">報酬</h2>
@@ -95,9 +94,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
         </div>
       </div>
       <p className="text-xs text-slate-300">
-        取り分は、フォーム添削が代金の{data.review_share}%、パーソナル指導が手数料{reduced ? 10 : data.personal_fee}%を引いた分
-        {reduced ? `（初年10%、${formatDateTime(data.reduced_fee_until!)}までに始まった指導）` : ""}
-        です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。
+        取り分は、フォーム添削が代金の{data.review_share}%、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは翌月に繰り越し、翌月は届かなくても送金します（繰り越しは1回まで）。銀行口座への入金は毎月15日ごろです。
       </p>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">
@@ -115,13 +112,12 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
   );
 }
 
-// PayoutsAdmin は、運営の「送金」。月に1回押して前の月までの報酬を送り、コーチに「初年10%」を付ける。
+// PayoutsAdmin は、運営の「送金」。月に1回押して前の月までの報酬を送る。
 export function PayoutsAdmin({ token }: { token: string | null }) {
   const [payments, setPayments] = useState(true);
   const [coaches, setCoaches] = useState<AdminPayoutCoach[]>([]);
   const [payouts, setPayouts] = useState<AdminCoachPayout[]>([]);
   const [message, setMessage] = useState("");
-  const [now] = useState(() => Date.now());
   const { pending, acquire, release } = useActionLock();
 
   const load = useCallback(async () => {
@@ -161,26 +157,6 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
     }
   }
 
-  async function toggleFee(c: AdminPayoutCoach, enabled: boolean) {
-    const ask = enabled
-      ? `${c.nickname ?? "このコーチ"}さんに「初年10%」を付けますか？今から1年のあいだに始まったパーソナル指導の手数料が10%になります。`
-      : `${c.nickname ?? "このコーチ"}さんの「初年10%」を外しますか？`;
-    if (!confirm(ask)) return;
-    if (!acquire()) return;
-    try {
-      await apiFetch(`/v1/admin/coaching/coaches/${c.profile_id}/reduced-fee`, {
-        method: "POST",
-        token,
-        body: JSON.stringify({ enabled }),
-      });
-      await load();
-    } catch (err) {
-      setMessage(err instanceof ApiRequestError ? err.message : "変えられませんでした");
-    } finally {
-      release();
-    }
-  }
-
   return (
     <div className="space-y-4">
       {!payments ? <p className="text-sm text-slate-200">いまは支払いのないデモ版なので、送金はありません。</p> : null}
@@ -192,25 +168,19 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
       >
         前の月までの報酬を送金する
       </button>
+      <p className="text-xs text-slate-300">毎月1日から14日のあいだに押してください。コーチの銀行口座への入金は毎月15日です。前の月までの分が3,000円に届かないコーチは翌月に1回だけ繰り越します（繰り越した翌月と、承認済みでなくなったコーチには、届かなくても送ります）。</p>
       {message ? <p className="text-sm text-slate-100">{message}</p> : null}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">コーチ</h2>
         <ul className="space-y-2">
-          {coaches.map((c) => {
-            const reduced = c.reduced_fee_until && new Date(c.reduced_fee_until).getTime() > now;
-            return (
-              <li key={c.profile_id} className="space-y-1 rounded-xl border border-white/20 bg-white/10 p-3 text-sm">
-                <p className="font-semibold text-white">{c.nickname ?? "名前なし"}</p>
-                <p className="text-xs text-slate-300">
-                  口座: {c.payouts_enabled ? "登録済み" : c.stripe_linked ? "登録の途中" : "未登録"} · まだ送金していない分: {formatYen(c.unpaid_yen)}
-                </p>
-                <label className="flex items-center gap-2 text-xs text-slate-200">
-                  <input type="checkbox" checked={Boolean(reduced)} disabled={pending} onChange={(e) => void toggleFee(c, e.target.checked)} />
-                  初年10%{reduced ? `（${formatDateTime(c.reduced_fee_until!)}まで）` : ""}
-                </label>
-              </li>
-            );
-          })}
+          {coaches.map((c) => (
+            <li key={c.profile_id} className="space-y-1 rounded-xl border border-white/20 bg-white/10 p-3 text-sm">
+              <p className="font-semibold text-white">{c.nickname ?? "名前なし"}</p>
+              <p className="text-xs text-slate-300">
+                口座: {c.payouts_enabled ? "登録済み" : c.stripe_linked ? "登録の途中" : "未登録"} · まだ送金していない分: {formatYen(c.unpaid_yen)}
+              </p>
+            </li>
+          ))}
         </ul>
       </section>
       <section className="space-y-2">

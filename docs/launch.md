@@ -29,6 +29,8 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 - ダッシュボードで本番に切り替え、本番用の鍵を作る（サンドボックスの鍵・Webhook の鍵は本番では使えない）。秘密鍵は `STRIPE_SECRET_KEY`（`sk_live_...`、または必要な権限だけの制限付きキー `rk_live_...`）
 - 支払い方法（カード・Apple Pay・Google Pay・PayPay）は、ダッシュボードの「支払い方法」で有効にしたものが支払い画面に出る。PayPay は審査が要る場合がある
 - Connect を有効にする（コーチへの送金。コーチは Express アカウントで、国は日本）
+  - コーチの銀行口座への入金は、アカウントを作るときに月1回・毎月15日に設定する。運営は毎月1〜14日に「送金」を押す
+  - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
   - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`。署名の鍵を `STRIPE_WEBHOOK_SECRET` に入れる
   - 接続アカウント用: `account.updated`。署名の鍵（別の値）を `STRIPE_CONNECT_WEBHOOK_SECRET` に入れる

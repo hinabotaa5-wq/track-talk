@@ -81,7 +81,6 @@ type CoachProfile struct {
 	PledgeVersion   *int16     `json:"pledge_version"`
 	StripeAccountID *string    `json:"stripe_account_id"`
 	PayoutsEnabled  bool       `json:"payouts_enabled"`
-	ReducedFeeUntil *time.Time `json:"reduced_fee_until"`
 	ServiceTypes    []string   `json:"service_types"`
 	SnsUrls         []string   `json:"sns_urls"`
 	Name            string     `json:"name"`

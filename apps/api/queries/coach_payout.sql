@@ -21,14 +21,6 @@ SET payouts_enabled = sqlc.arg(payouts_enabled),
 WHERE stripe_account_id = sqlc.arg(stripe_account_id)
 RETURNING *;
 
--- name: SetCoachReducedFee :one
--- 運営が「初年10%」を付けたり外したりする。付けた時から1年。
-UPDATE coach_profiles
-SET reduced_fee_until = CASE WHEN sqlc.arg(enabled)::boolean THEN now() + interval '1 year' END,
-    updated_at = now()
-WHERE profile_id = sqlc.arg(profile_id) AND status = 'approved'
-RETURNING *;
-
 -- name: InsertReviewEarnings :many
 -- 返却して代金が確定した添削の、コーチの取り分を記録する。
 INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen)
@@ -44,18 +36,15 @@ RETURNING *;
 
 -- name: InsertPersonalEarnings :many
 -- 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
--- 手数料は20%、初年10%のコーチは、その期間中に始まった指導が10%。
 INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen)
 SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100
 FROM (
     SELECT DISTINCT ON (ct.id)
         ct.id AS contract_id, ct.coach_id,
         pay.amount_yen - pay.refunded_yen AS gross,
-        CASE WHEN cp.reduced_fee_until IS NOT NULL AND cp.reduced_fee_until > ct.starts_at
-             THEN 100 - sqlc.arg(reduced_fee_percent)::int ELSE 100 - sqlc.arg(fee_percent)::int END AS share
+        100 - sqlc.arg(fee_percent)::int AS share
     FROM coaching_contracts ct
     JOIN coaching_payments pay ON pay.contract_id = ct.id
-    LEFT JOIN coach_profiles cp ON cp.profile_id = ct.coach_id
     WHERE ct.status IN ('ended', 'refunded') AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
       AND pay.status IN ('paid', 'partially_refunded')
       AND pay.refund_reason IS DISTINCT FROM 'not_started'
@@ -74,13 +63,18 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 
 -- name: ListPayableCoachEarnings :many
 -- 今月（日本時間）より前の、まだ送金していない報酬。受け取りの準備ができたコーチの分だけ。
+-- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
+-- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
+-- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
 SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen)::int AS amount_yen
 FROM coach_earnings e
 JOIN coach_profiles cp ON cp.profile_id = e.coach_id
 WHERE e.payout_id IS NULL
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
-GROUP BY e.coach_id;
+GROUP BY e.coach_id, cp.status
+HAVING sum(e.amount_yen) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved'
+    OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo';
 
 -- name: UpsertCoachPayout :one
 -- 前の月の分の送金。同じ月の送金がまだ済んでいなければ、そこに足す。
@@ -144,7 +138,7 @@ WHERE coach_id = $1;
 -- name: AdminListPayoutCoaches :many
 -- 運営の送金の画面に出す、承認済みのコーチ。
 SELECT cp.profile_id, p.nickname, cp.tier, (cp.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
-       cp.payouts_enabled, cp.reduced_fee_until,
+       cp.payouts_enabled,
        COALESCE((SELECT sum(e.amount_yen) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL), 0)::int AS unpaid_yen
 FROM coach_profiles cp
 JOIN profiles p ON p.id = cp.profile_id
