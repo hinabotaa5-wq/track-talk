@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
+import { ServiceConsentText } from "@/components/service-consent-text";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { safeNextPath } from "@/lib/safe-next";
@@ -10,7 +11,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-// 海外の事業者に預けることへの同意を、今いる利用者から1回だけもらう画面。
+// 登録画面を通らずに入った人も、規約などと海外への提供を1回で同意する画面。
 // 同意しない人は使い続けられないので、退会の画面へ案内する。
 function ConsentForm() {
   const { session, token, profile, loading, refreshProfile } = useAuth();
@@ -41,11 +42,10 @@ function ConsentForm() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">海外の事業者に預けることへの同意</h1>
+      <h1 className="text-2xl font-bold">利用にあたっての同意</h1>
       <p className="text-sm leading-7 text-slate-300">
-        TrackTalk は、あなたの個人情報（アカウント、投稿、感覚メモ、ケガの記録など）を、米国の事業者のサーバーに預けて動いています。個人情報保護法にもとづき、続けて使う前に、次の説明を読んで同意してください。同意は1回だけで、次からは聞きません。
+        TrackTalk を利用する前に、利用規約・コミュニティガイドライン・プライバシーポリシーと、海外の事業者に個人情報を預けることについて確認してください。
       </p>
-      <OverseasConsentNotice />
       <label className="flex cursor-pointer items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -53,14 +53,14 @@ function ConsentForm() {
           checked={checked}
           onChange={(e) => setChecked(e.target.checked)}
         />
-        <span>
-          上の説明と
-          <Link href="/privacy" className="text-blue-300 underline">
-            プライバシーポリシー
-          </Link>
-          第7条を読み、個人情報を米国などの海外の事業者に預けることに同意します。
-        </span>
+        <ServiceConsentText />
       </label>
+      <details className="rounded-lg border border-slate-700 px-3 py-2">
+        <summary className="cursor-pointer text-sm text-slate-200">海外の事業者に預けることについて</summary>
+        <div className="pt-2">
+          <OverseasConsentNotice />
+        </div>
+      </details>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="button" className="w-full" disabled={!checked || pending || !session} onClick={onConsent}>
         同意して続ける
