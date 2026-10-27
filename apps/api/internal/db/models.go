@@ -919,3 +919,18 @@ type SenseNoteSummaryClaim struct {
 	AuthorID  uuid.UUID `json:"author_id"`
 	ClaimedAt time.Time `json:"claimed_at"`
 }
+
+type SenseSummaryAttempt struct {
+	ID          int64     `json:"id"`
+	AttemptedAt time.Time `json:"attempted_at"`
+}
+
+type TargetMeet struct {
+	ProfileID uuid.UUID  `json:"profile_id"`
+	Source    string     `json:"source"`
+	Ref       string     `json:"ref"`
+	Name      string     `json:"name"`
+	StartsOn  time.Time  `json:"starts_on"`
+	EndsOn    *time.Time `json:"ends_on"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}

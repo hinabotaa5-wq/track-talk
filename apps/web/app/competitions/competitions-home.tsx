@@ -18,6 +18,7 @@ import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
 import { useNow } from "@/lib/use-now";
+import { TargetMeetButton } from "@/components/target-meet-button";
 import type { Competition, DomesticMajor, MeetThread } from "@/lib/types";
 import { competitionDates, destination } from "./regional/regional-view";
 
@@ -244,6 +245,7 @@ function ScheduleCard({
   timetableURL,
   over,
   thread,
+  action,
   children,
 }: {
   href: string;
@@ -251,16 +253,18 @@ function ScheduleCard({
   timetableURL?: string;
   over: boolean;
   thread?: MeetThread;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className={`${cardBase} ${thread ? "border-amber-300/60" : ""} ${over ? "opacity-80" : ""}`}>
+    <div className={`${cardBase} relative ${thread ? "border-amber-300/60" : ""} ${over ? "opacity-80" : ""}`}>
+      {action}
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="block transition hover:text-blue-300 active:scale-[0.98]">
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`block transition hover:text-blue-300 active:scale-[0.98] ${action ? "pr-10" : ""}`}>
           {children}
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
-      ) : children}
+      ) : <div className={action ? "pr-10" : ""}>{children}</div>}
       {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">タイムテーブル</a> : null}
       {thread ? (
         <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
@@ -281,7 +285,14 @@ function ScheduleCard({
 
 function DomesticCard({ major, today, thread, timetableURL }: { major: DomesticMajor; today: string; thread?: MeetThread; timetableURL?: string }) {
   return (
-    <ScheduleCard timetableURL={timetableURL} href={major.site_url} linkLabel={major.site_url ? "公式サイト" : ""} over={isOver(major, today)} thread={thread}>
+    <ScheduleCard
+      timetableURL={timetableURL}
+      href={major.site_url}
+      linkLabel={major.site_url ? "公式サイト" : ""}
+      over={isOver(major, today)}
+      thread={thread}
+      action={isOver(major, today) ? null : <TargetMeetButton className="absolute right-3 top-3" source="major" meetRef={`${major.slug}:${major.year}`} name={major.name} />}
+    >
       <p className="text-xs text-slate-200">
         {major.schedule_label}
         <StateBadge item={major} today={today} />

@@ -5,7 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { CompetitionFilters } from "@/components/competition-filters";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
-import { formatDate } from "@/lib/format";
+import { TargetMeetButton } from "@/components/target-meet-button";
+import { formatDate, todayInTokyo } from "@/lib/format";
+import { isOver } from "@/lib/season-schedule";
+import { useNow } from "@/lib/use-now";
 import { competitionCacheKey, loadCompetitions, readCompetitions } from "@/lib/competition-list";
 import { regionalPrefecture, saveCompetitionPrefecture } from "@/lib/competition-prefecture";
 import { INTERNATIONAL, associationListLabel, currentMonthInTokyo, monthNumber } from "@/lib/prefectures";
@@ -43,6 +46,9 @@ export function RegionalCompetitionsView() {
   const shownItems = ready ? items : (cached?.items ?? []);
   const shownError = ready ? error : (cached?.error ?? "");
   const loading = !ready && !cached;
+  // 終わった大会にはセットさせない。「今日」は表示のあとに決める(CDN のキャッシュに前日の判定を残さない)。
+  const now = useNow();
+  const today = now === null ? "0000-01-01" : todayInTokyo(new Date(now));
 
   useEffect(() => {
     if (prefecture) saveCompetitionPrefecture(prefecture);
@@ -77,18 +83,15 @@ export function RegionalCompetitionsView() {
           {shownItems.map((c) => {
             const link = destination(c, prefecture);
             return (
-              <a
-                key={c.id}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16 active:scale-[0.98]"
-              >
-                <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
-                <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
-                {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
-                <p className="text-sm text-blue-400">{link.label}</p>
-              </a>
+              <div key={c.id} className="relative rounded-xl border border-white/20 glass bg-white/10 p-4 transition hover:border-blue-700/70 hover:bg-white/16">
+                <a href={link.href} target="_blank" rel="noopener noreferrer" className="block pr-10 active:scale-[0.98]">
+                  <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
+                  <h2 className="text-lg font-semibold text-slate-100">{c.name}</h2>
+                  {c.location ? <p className="mt-1 text-sm text-slate-200">{c.location}</p> : null}
+                  <p className="text-sm text-blue-400">{link.label}</p>
+                </a>
+                {isOver(c, today) ? null : <TargetMeetButton className="absolute right-3 top-3" source="competition" meetRef={c.id} name={c.name} />}
+              </div>
             );
           })}
         </div>
