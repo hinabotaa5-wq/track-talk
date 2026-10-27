@@ -2,7 +2,7 @@ import { runInNewContext } from "node:vm";
 import { expect, it, vi } from "vitest";
 import { lastTabHref, lastTabStartupScript } from "./last-tab";
 
-function start(saved: string | null, url = "/", blocked = false) {
+function start(saved: string | null, url = "/", blocked = false, requestAnimationFrame?: (callback: () => void) => void) {
   const parsed = new URL(url, "https://tracktalk.jp");
   const replace = vi.fn();
   const window = { __tracktalkLastTabRedirect: false };
@@ -12,7 +12,7 @@ function start(saved: string | null, url = "/", blocked = false) {
   });
   runInNewContext(lastTabStartupScript, {
     location: { pathname: parsed.pathname, search: parsed.search, hash: parsed.hash, replace },
-    localStorage: { getItem }, window, URLSearchParams,
+    localStorage: { getItem }, window, URLSearchParams, requestAnimationFrame,
   });
   return { replace, window, getItem };
 }
@@ -24,6 +24,17 @@ it.each([
   const result = start(`${path}?${search}`);
   expect(result.replace).toHaveBeenCalledExactlyOnceWith(lastTabHref(path, search));
   expect(result.window.__tracktalkLastTabRedirect).toBe(true);
+});
+
+it("起動ロゴを一度描画してから復元し、その間も二重遷移を防ぐ", () => {
+  const frames: Array<() => void> = [];
+  const result = start("/memo", "/", false, (callback) => { frames.push(callback); });
+  expect(result.window.__tracktalkLastTabRedirect).toBe(true);
+  expect(result.replace).not.toHaveBeenCalled();
+  frames.shift()!();
+  expect(result.replace).not.toHaveBeenCalled();
+  frames.shift()!();
+  expect(result.replace).toHaveBeenCalledExactlyOnceWith("/memo");
 });
 
 it.each([null, "/", "https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("初回・ホーム・不正な保存値では移動しない: %s", (saved) => {

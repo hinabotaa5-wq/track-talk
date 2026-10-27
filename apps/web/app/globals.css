@@ -16,6 +16,11 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* 起動用JSが届かなかった場合もロゴで画面を隠し続けない。 */
+@keyframes startup-splash-release {
+  to { visibility: hidden; }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

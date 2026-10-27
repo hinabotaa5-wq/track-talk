@@ -12,7 +12,7 @@ export function LastTabRestorer() {
   const restoring = useRef(false);
 
   useEffect(() => {
-    // head から移動中のホームでは、二重遷移と保存値の上書きを避ける。
+    // 起動スクリプトで移動中のホームでは、二重遷移と保存値の上書きを避ける。
     if (isLastTabStartupRedirecting()) return;
     if (!checked.current) {
       checked.current = true;
