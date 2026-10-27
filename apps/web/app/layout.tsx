@@ -25,6 +25,9 @@ import { JsonLd } from "@/components/json-ld";
 import { umamiBeforeSendName, umamiBeforeSendScript } from "@/lib/analytics";
 import { ProductAnalytics } from "@/components/product-analytics";
 
+import { StartupSplash } from "@/components/startup-splash";
+import { startupImages } from "@/lib/startup-images";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -51,6 +54,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "TrackTalk",
+    startupImage: startupImages,
     // black-translucent だと iOS 26 のホーム画面アプリで、画面の下がステータスバーの高さ分だけ
     // 描かれずに空き、下に固定したバーも浮く(WebKit bug 301108)。ステータスバーは iOS に描かせる。
     statusBarStyle: "default",
@@ -76,8 +80,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
       <head>
-        {/* Next.js の起動を待たず、body の描画前に復元する。 */}
-        <script dangerouslySetInnerHTML={{ __html: lastTabStartupScript }} />
         <script dangerouslySetInnerHTML={{ __html: pendingLinkStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
@@ -93,6 +95,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           strategy="lazyOnload"
         />
         <AuthProvider>
+          <StartupSplash />
+          {/* ロゴを描画してから復元する。Reactの起動は待たない。 */}
+          <script dangerouslySetInnerHTML={{ __html: lastTabStartupScript }} />
           <ProductAnalytics />
           <LeaveGuardProvider>
           <ConfirmProvider>

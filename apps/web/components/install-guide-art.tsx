@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { appIconColors, TrackLanesMark } from "./app-icon-mark";
+import { TrackLanesMark } from "./app-icon-mark";
 
 // 手順ごとの説明イラスト。iOS / Android の実画面は OS のバージョンで変わるため、
 // 要点だけを描いた簡易版にしている。実画面の画像に替える場合はここを差し替える。
@@ -94,18 +94,7 @@ export function IosConfirmArt() {
       <rect x="182" y="17" width="28" height="18" rx="9" fill="#2563eb" />
       <text x="196" y="30" textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff">追加</text>
       <Pulse cx={196} cy={26} r={17} />
-      <defs>
-        <linearGradient id="install-icon-bg" x1="0" y1="0" x2="0.6" y2="1">
-          <stop offset="0" stopColor={appIconColors.from} />
-          <stop offset="1" stopColor={appIconColors.to} />
-        </linearGradient>
-        <radialGradient id="install-icon-light" cx="0.8" cy="0.05" r="0.6">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.4" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect x="34" y="50" width="44" height="44" rx="10" fill="url(#install-icon-bg)" />
-      <rect x="34" y="50" width="44" height="44" rx="10" fill="url(#install-icon-light)" stroke="#ffffff" strokeOpacity="0.15" />
+      <rect x="34" y="50" width="44" height="44" rx="10" fill="#ffffff" />
       <TrackLanesMark x="34" y="50" width="44" height="44" />
       <text x="90" y="68" fontSize="12" fontWeight="700" fill="#e2e8f0">TrackTalk</text>
       <text x="90" y="84" fontSize="9" fill="#94a3b8">tracktalk のアドレス</text>
