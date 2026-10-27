@@ -34,7 +34,7 @@ updates:
     directories: ["/apps/api", "/apps/web"]
     schedule:
       interval: monthly
-    # Node は Netlify と同じ版にそろえて、上げるときは手で上げる。
+    # Node のメジャーは、Netlify のビルドの版とあわせて手で上げる。
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
