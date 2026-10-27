@@ -113,6 +113,7 @@ describe("injury group join", () => {
       pre_changes: ["more-volume"],
       hindsight: ["rest-early"],
       stage: "rehab",
+      health_consent: true,
     });
     expect(injuryJoinPayload("other", { ...answers, diagnosis: " 疲労骨折 " })).toMatchObject({ diagnosis: "疲労骨折" });
   });

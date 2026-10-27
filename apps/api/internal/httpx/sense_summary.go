@@ -12,14 +12,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/hinata/track-talk/apps/api/internal/competitions"
+	"github.com/hinata/track-talk/apps/api/internal/claude"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
 // 感覚メモのふりかえり。本人が頼んだときだけ、未要約の感覚を保存順に6個ずつ
-// Gemini に送ってまとめる。まとめと元の感覚は本人だけが読む。
+// Claude(Anthropic)に送ってまとめる。まとめと元の感覚は本人だけが読む。
 const (
 	// senseSummaryMinNotes は、まとめを作るのに要る、前のまとめのあとに書いた感覚メモの数。画面のビン1杯の数
 	// （web の senseJarSize）と同じにして、ビンが満杯になったらまとめられるようにする。
@@ -27,23 +27,27 @@ const (
 	// 1つのまとめには、保存順に6個の感覚を使う。
 	maxSenseSummaryNotes = senseSummaryMinNotes
 	// 1日(日本時間)に作れるまとめの数。日付をさかのぼって書けば6個はすぐにたまるので、上限が無いと1人で
-	// Gemini を何度でも呼べてしまう(無料枠の1日の回数は、大会の取り込みと同じ鍵で分け合っている)。
+	// Claude を何度でも呼べて、料金がかさんでしまう。
 	maxSenseSummariesPerDay = 3
 	maxSenseSummaryItems    = 3
 	maxSenseSummaryOverview = 300
 	maxSenseSummaryItem     = 100
 	senseSummaryTimeout     = 60 * time.Second
-	// defaultSenseSummaryModel は、まとめに使う既定のモデル。短い文をまとめるだけなので軽いモデルで足り、
-	// 料金も安い。無料枠の1日の回数はモデルごとなので、大会の取り込み(competitions.Model)と回数を分け合わない。
-	defaultSenseSummaryModel = "gemini-3.5-flash-lite"
+	// senseSummaryMaxTokens は、返事(考える分を含む)の上限。まとめは数百トークンで収まる。
+	senseSummaryMaxTokens = 4096
 )
 
-// senseSummaryModel は、GEMINI_SUMMARY_MODEL が空なら既定のモデルを返す。
-func senseSummaryModel(configured string) string {
-	if configured != "" {
-		return configured
-	}
-	return defaultSenseSummaryModel
+// senseSummarySchema は、Claude に返させる JSON の形。senseSummaryContent と同じ。
+var senseSummarySchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"overview": map[string]any{"type": "string"},
+		"good":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"concerns": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"next":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+	},
+	"required":             []string{"overview", "good", "concerns", "next"},
+	"additionalProperties": false,
 }
 
 type senseSummaryContent struct {
@@ -178,14 +182,14 @@ func (s *Server) getSenseSummary(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
-// createSenseSummary は、前のまとめのあとに書いた感覚メモを Gemini でまとめて残す。
+// createSenseSummary は、前のまとめのあとに書いた感覚メモを Claude でまとめて残す。
 func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
 		return
 	}
-	if s.cfg.GeminiAPIKey == "" {
-		slog.Error("sense summary: GEMINI_API_KEY が入っていません")
+	if s.cfg.AnthropicAPIKey == "" {
+		slog.Error("sense summary: ANTHROPIC_API_KEY が入っていません")
 		Error(w, http.StatusServiceUnavailable, "summary_unavailable", "いまはまとめを作れません。しばらくしてからお試しください")
 		return
 	}
@@ -253,16 +257,16 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), senseSummaryTimeout)
 	defer cancel()
-	raw, err := s.gemini.GenerateJSON(ctx, senseSummaryPrompt(notes))
+	raw, err := s.ai.GenerateJSON(ctx, senseSummaryPrompt(notes), senseSummarySchema)
 	var content senseSummaryContent
 	if err == nil {
 		content, err = parseSenseSummary(raw)
 	}
 	if err != nil {
-		// 本番で失敗の理由を追えるよう、Gemini の返事(先頭だけ)ごとエラーとして残す。
+		// 本番で失敗の理由を追えるよう、エラーを残す。
 		slog.Error("sense summary", "err", err, "notes", len(notes))
-		// 無料枠の回数(大会の取り込みと同じ鍵で分け合っている)を使い切ったときは、時間をおけば作れることを伝える。
-		if errors.Is(err, competitions.ErrRateLimited) {
+		// 回数の上限や混雑で断られたときは、時間をおけば作れることを伝える。
+		if errors.Is(err, claude.ErrRateLimited) {
 			Error(w, http.StatusServiceUnavailable, "summary_busy", "AI が混み合っていて、いまはまとめを作れません。時間をおいてもう一度お試しください")
 			return
 		}
@@ -340,7 +344,7 @@ func parseSenseSummary(raw string) (senseSummaryContent, error) {
 	raw = strings.TrimSuffix(raw, "```")
 	raw = strings.TrimSpace(raw)
 	var out senseSummaryContent
-	// 形を決めずに JSON を頼むと、Gemini は [{...}] のように配列で包んで返すことがある。そのときは1つ目を使う。
+	// 以前の Gemini は [{...}] のように配列で包んで返すことがあった。形を決めた今も、念のため1つ目を使う。
 	if strings.HasPrefix(raw, "[") {
 		var list []senseSummaryContent
 		if err := json.Unmarshal([]byte(raw), &list); err != nil {

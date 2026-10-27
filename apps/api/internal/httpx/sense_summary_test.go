@@ -36,35 +36,47 @@ type senseSummaryResponse struct {
 	} `json:"summary"`
 }
 
-// fakeGemini は、Gemini の代わりに reply を返し、届いたプロンプトを残す。
-type fakeGemini struct {
+// fakeClaude は、Claude の代わりに reply を返し、届いたプロンプトとモデルを残す。
+type fakeClaude struct {
 	mu    sync.Mutex
 	reply string
-	// status が 0 でなければ、その HTTP ステータスで返す(無料枠の上限の 429 など)。
+	// status が 0 でなければ、その HTTP ステータスで返す(回数の上限の 429 など)。
 	status  int
 	prompts []string
+	models  []string
 }
 
-func (f *fakeGemini) serve(t *testing.T) string {
+func (f *fakeClaude) serve(t *testing.T) string {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
 		raw, _ := io.ReadAll(r.Body)
 		var body struct {
-			Contents []struct {
-				Parts []struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content []struct {
 					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
+				} `json:"content"`
+			} `json:"messages"`
 		}
 		_ = json.Unmarshal(raw, &body)
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		f.prompts = append(f.prompts, body.Contents[0].Parts[0].Text)
+		f.prompts = append(f.prompts, body.Messages[0].Content[0].Text)
+		f.models = append(f.models, body.Model)
+		w.Header().Set("Content-Type", "application/json")
 		if f.status != 0 {
 			w.WriteHeader(f.status)
-			_, _ = w.Write([]byte(`{"error":{"status":"RESOURCE_EXHAUSTED"}}`))
+			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"rate_limit_error","message":"rate limited"}}`))
 			return
 		}
-		payload, _ := json.Marshal(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]string{"text": f.reply}}}}}})
+		payload, _ := json.Marshal(map[string]any{
+			"id": "msg_test", "type": "message", "role": "assistant", "model": body.Model,
+			"content":     []any{map[string]string{"type": "text", "text": f.reply}},
+			"stop_reason": "end_turn",
+			"usage":       map[string]int{"input_tokens": 1, "output_tokens": 1},
+		})
 		_, _ = w.Write(payload)
 	}))
 	t.Cleanup(server.Close)
@@ -138,12 +150,12 @@ func TestSenseSummaryHistoryIsHiddenUntilLaunch(t *testing.T) {
 }
 
 func TestSenseSummaryNeedsSixNotes(t *testing.T) {
-	gemini := &fakeGemini{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
-	url := gemini.serve(t)
+	ai := &fakeClaude{reply: `{"overview":"接地の感覚がつかめてきた1週間でした。","good":["地面を真下に押せた"],"concerns":["右のハムに張りがある"],"next":["腕振りを小さく速く"]}`}
+	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = url
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = url
 	})
 	me := token(t, uuid.New())
 	other := token(t, uuid.New())
@@ -157,8 +169,8 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", me, nil); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("no notes = %d", rec.Code)
 	}
-	if len(gemini.prompts) != 0 {
-		t.Fatal("gemini was called without notes")
+	if len(ai.prompts) != 0 {
+		t.Fatal("claude was called without notes")
 	}
 
 	// 6個たまるまでは、まとめられない。あと何個かは、取得で分かる。
@@ -172,8 +184,8 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "あと1個") {
 		t.Fatalf("5 notes = %d %s", rec.Code, rec.Body.String())
 	}
-	if len(gemini.prompts) != 0 {
-		t.Fatal("gemini was called with too few notes")
+	if len(ai.prompts) != 0 {
+		t.Fatal("claude was called with too few notes")
 	}
 	writeSenseNotes(t, h, other, 0, 6)
 	execSQLArgs(t, `INSERT INTO sense_notes (id, author_id, body, day) VALUES (gen_random_uuid(), $1, '6個目', $2::date)`,
@@ -190,7 +202,7 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 	if got.Summary.FromDay > got.Summary.ToDay {
 		t.Fatalf("range = %s..%s", got.Summary.FromDay, got.Summary.ToDay)
 	}
-	prompt := gemini.prompts[0]
+	prompt := ai.prompts[0]
 	if !strings.Contains(prompt, "[100m] 接地で地面を押せた") || !strings.Contains(prompt, "[種目なし] 右のハムが張る") || strings.Count(prompt, "[種目なし]") != 5 {
 		t.Fatalf("prompt = %s", prompt)
 	}
@@ -230,18 +242,18 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 		t.Fatalf("second summary right after the first = %d %s", rec.Code, rec.Body.String())
 	}
 	// 他の人は別に数える。壊れた答えは 502 で、まとめを作ったことにならない。
-	gemini.reply = "not json"
+	ai.reply = "not json"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusBadGateway {
 		t.Fatalf("broken reply = %d", rec.Code)
 	}
-	// 無料枠の上限に当たったときは 503 で、時間をおけば作れることを伝える。まとめを作ったことにはならない。
-	gemini.status = http.StatusTooManyRequests
+	// 回数の上限に当たったときは 503 で、時間をおけば作れることを伝える。まとめを作ったことにはならない。
+	ai.status = http.StatusTooManyRequests
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "summary_busy") {
 		t.Fatalf("rate limited = %d %s", rec.Code, rec.Body.String())
 	}
-	gemini.status = 0
+	ai.status = 0
 	// 配列で包まれた答えでも作れる。
-	gemini.reply = `[{"overview":"ok","good":[],"concerns":[],"next":[]}]`
+	ai.reply = `[{"overview":"ok","good":[],"concerns":[],"next":[]}]`
 	if rec := doJSON(t, h, http.MethodPost, "/v1/me/sense-notes/summary", other, nil); rec.Code != http.StatusCreated {
 		t.Fatalf("other summary after failure = %d", rec.Code)
 	}
@@ -249,12 +261,12 @@ func TestSenseSummaryNeedsSixNotes(t *testing.T) {
 
 // 同時に頼まれても、まとめは1回しか作らず、AI も1回しか呼ばない。
 func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	ai := &fakeClaude{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
 	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = url
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = url
 	})
 	me := token(t, uuid.New())
 	writeSenseNotes(t, h, me, 0, 6)
@@ -285,12 +297,12 @@ func TestSenseSummaryIsMadeOnceUnderConcurrency(t *testing.T) {
 
 // 古いメモでも、6個たまっていればまとめられる。
 func TestSenseSummaryCountsOldNotes(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	ai := &fakeClaude{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
 	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = url
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = url
 	})
 	id := uuid.New()
 	me := token(t, id)
@@ -318,14 +330,14 @@ func TestSenseSummaryCountsOldNotes(t *testing.T) {
 }
 
 // まとめは1日に3回まで。日付をさかのぼって書けば6個はすぐにたまるので、上限が無いと1人で
-// Gemini を何度でも呼べて、無料枠(大会の取り込みと同じ鍵)を使い切ってしまう。
+// Claude を何度でも呼べて、料金がかさんでしまう。
 func TestSenseSummaryDailyLimit(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	ai := &fakeClaude{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
 	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = url
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = url
 	})
 	me := token(t, uuid.New())
 	for i := 0; i < 3; i++ {
@@ -343,26 +355,19 @@ func TestSenseSummaryDailyLimit(t *testing.T) {
 	calls := len(ai.prompts)
 	ai.mu.Unlock()
 	if calls != 3 {
-		t.Fatalf("gemini calls = %d, want 3", calls)
+		t.Fatalf("claude calls = %d, want 3", calls)
 	}
 }
 
 // 全員の1日の上限(SENSE_SUMMARY_DAILY_LIMIT)を超えたら、AI を呼ばずに「混み合っています」を返す。
-// まとめには、大会の取り込みと別の軽いモデルを使う。
+// まとめには、軽くて安い Haiku を使う。
 func TestSenseSummaryGlobalDailyLimit(t *testing.T) {
-	var mu sync.Mutex
-	var paths []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		paths = append(paths, r.URL.Path)
-		mu.Unlock()
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"overview\":\"ok\"}"}]}}]}`))
-	}))
-	t.Cleanup(server.Close)
+	ai := &fakeClaude{reply: `{"overview":"ok","good":[],"concerns":[],"next":[]}`}
+	url := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = server.URL + "/models/%s"
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = url
 		c.SenseSummaryDailyLimit = 2
 	})
 	for i := 0; i < 2; i++ {
@@ -378,24 +383,24 @@ func TestSenseSummaryGlobalDailyLimit(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "summary_busy") {
 		t.Fatalf("over the global limit = %d %s", rec.Code, rec.Body.String())
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if len(paths) != 2 {
-		t.Fatalf("gemini calls = %d, want 2", len(paths))
+	ai.mu.Lock()
+	defer ai.mu.Unlock()
+	if len(ai.models) != 2 {
+		t.Fatalf("claude calls = %d, want 2", len(ai.models))
 	}
-	if paths[0] != "/models/gemini-3.5-flash-lite" {
-		t.Fatalf("model path = %s", paths[0])
+	if ai.models[0] != "claude-haiku-5-5" {
+		t.Fatalf("model = %s", ai.models[0])
 	}
 }
 
 // 同時刻のメモも6個ずつ重複せずに使い、元の感覚は削除後もまとめから読める。
 func TestSenseSummaryHistoryKeepsSixSourceNotes(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"リズムをつかめました","good":[],"concerns":[],"next":[]}`}
+	ai := &fakeClaude{reply: `{"overview":"リズムをつかめました","good":[],"concerns":[],"next":[]}`}
 	endpoint := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = endpoint
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = endpoint
 	})
 	me, other := token(t, uuid.New()), token(t, uuid.New())
 	writeSenseNotes(t, h, me, 0, 13)

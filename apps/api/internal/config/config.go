@@ -72,25 +72,25 @@ type Config struct {
 	// MailDevLog が true なら、メールを送らずに本文を API のログに出す。手元で試すためのもので、本番では立てない。
 	MailDevLog bool
 	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
-	// 感覚メモを Gemini に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
+	// 感覚メモを Claude(Anthropic)に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
 	SenseSummaryEnabled bool
 	// StaffMFARequired が true なら、管理者と承認済みコーチの API は二段階認証(aal2)を済ませたログインでしか使えない。
 	// 管理者・コーチが二段階認証を設定し終えるまで、本番では立てない。
 	StaffMFARequired bool
-	// Gemini の API キー。感覚メモのまとめに使う（大会の取り込みと同じキー）。空ならまとめは作れない。
-	GeminiAPIKey string
-	// GeminiSummaryModel は、感覚メモのまとめに使う Gemini のモデル。空なら httpx の既定(軽いモデル)。
-	// 無料枠の1日の回数はモデルごとなので、大会の取り込みと別のモデルにすると回数を分け合わずに済む。
-	GeminiSummaryModel string
+	// Anthropic の API キー。感覚メモのまとめに使う。空ならまとめは作れない。
+	AnthropicAPIKey string
+	// SenseSummaryModel は、感覚メモのまとめに使う Claude のモデル。空なら claude.DefaultModel(Haiku)。
+	SenseSummaryModel string
 	// SenseSummaryDailyLimit は、全員で直近24時間に試行できる要約の数。未設定は400、明示的な0は上限なし。
+	// 有料の API なので、使われすぎて料金が膨らまないための上限。
 	// 成否を問わず呼び出し直前にDBで予約する。日付のリセット時刻の違いや同時リクエストでも超えない。
 	SenseSummaryDailyLimit int
 	// SenseSummaryMinuteLimit は、全員で直近1分に試行できる数。未設定は10、明示的な0は上限なし。
 	SenseSummaryMinuteLimit int
 	// LocalMediaBaseURL はローカルプレビューの動画配信先。本番では設定しない。
 	LocalMediaBaseURL string
-	// GeminiEndpoint はテストで Gemini の代わりのサーバーに向けるためのもの。
-	GeminiEndpoint string
+	// AnthropicEndpoint はテストで Claude の代わりのサーバーに向けるためのもの。
+	AnthropicEndpoint string
 	// PushHTTP はテストで Web Push の送信先を差し替えるためのもの。nil なら既定のクライアント。
 	PushHTTP *http.Client
 	// Clock はテストで現在時刻を差し替えるためのもの。nil なら time.Now。
@@ -140,9 +140,9 @@ func Load() (Config, error) {
 		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
 		StaffMFARequired:           enabled(os.Getenv("STAFF_MFA_REQUIRED")),
 		LocalMediaBaseURL:          strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),
-		GeminiAPIKey:               os.Getenv("GEMINI_API_KEY"),
-		GeminiEndpoint:             os.Getenv("GEMINI_ENDPOINT"),
-		GeminiSummaryModel:         strings.TrimSpace(os.Getenv("GEMINI_SUMMARY_MODEL")),
+		AnthropicAPIKey:            os.Getenv("ANTHROPIC_API_KEY"),
+		AnthropicEndpoint:          os.Getenv("ANTHROPIC_ENDPOINT"),
+		SenseSummaryModel:          strings.TrimSpace(os.Getenv("SENSE_SUMMARY_MODEL")),
 		SenseSummaryDailyLimit:     DefaultSenseSummaryDailyLimit,
 		SenseSummaryMinuteLimit:    DefaultSenseSummaryMinuteLimit,
 	}

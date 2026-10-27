@@ -9,7 +9,7 @@ func TestNormalizeInjuryJoinDate(t *testing.T) {
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	req := injuryJoinReq{
 		Severity: "mild", SawDoctor: new(bool), Place: "grass", Activity: "jog",
-		PreChanges: []string{"fatigue", "fatigue"}, Stage: "resting",
+		PreChanges: []string{"fatigue", "fatigue"}, Stage: "resting", HealthConsent: true,
 	}
 	// 今日までの日を選べる。月だけ・先の日・10年より前は選べない。
 	for day, ok := range map[string]bool{
@@ -60,7 +60,7 @@ func TestNormalizeInjuryJoinDateUsesJST(t *testing.T) {
 	now := time.Date(2026, 10, 31, 20, 0, 0, 0, time.UTC) // 日本時間 11月1日 05:00
 	req := injuryJoinReq{
 		Severity: "mild", SawDoctor: new(bool), Place: "grass", Activity: "jog",
-		PreChanges: []string{"fatigue"}, Stage: "resting", InjuredOn: "2026-11-01",
+		PreChanges: []string{"fatigue"}, Stage: "resting", InjuredOn: "2026-11-01", HealthConsent: true,
 	}
 	if _, fields := normalizeInjuryJoin("shin-splints", req, now); len(fields) != 0 {
 		t.Fatalf("fields %v", fields)
