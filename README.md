@@ -52,7 +52,7 @@
 | 場所 | 役割 |
 | --- | --- |
 | `apps/web` | Next.js 16、React 19、TypeScript、Tailwind CSS 4の画面 |
-| `apps/api` | Go 1.25、chi、pgx、sqlcの業務APIと認可 |
+| `apps/api` | Go 1.27.3、chi、pgx、sqlcの業務APIと認可 |
 | `apps/api/migrations` | PostgreSQLのスキーマ変更。API起動時に適用 |
 | `apps/api/queries` | sqlc用SQL。変更後に `make sqlc` で再生成 |
 | `deploy` / `.github/workflows` | Cloud Run・Netlifyへの手動公開と定期処理 |
@@ -62,7 +62,7 @@
 
 ## ローカル起動
 
-必要なもの: Node.js 22、Go 1.25、Docker。SQLの再生成にはsqlcが必要です。
+必要なもの: Node.js 22、Go 1.27.3、Docker。SQLの再生成にはsqlcが必要です。
 
 ```bash
 cp .env.example .env
