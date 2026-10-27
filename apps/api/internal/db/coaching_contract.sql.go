@@ -29,7 +29,7 @@ WHERE ct.id = $2
   AND (ct.competition_date IS NULL OR (ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
   AND pl.id = ct.plan_id
   AND (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity
-RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count
+RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates
 `
 
 type AcceptCoachingContractParams struct {
@@ -98,6 +98,7 @@ func (q *Queries) AcceptCoachingContract(ctx context.Context, arg AcceptCoaching
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -199,7 +200,7 @@ UPDATE coaching_contracts
 SET status = 'cancelled',
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND status = 'applied'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type CancelCoachingContractParams struct {
@@ -263,6 +264,7 @@ func (q *Queries) CancelCoachingContract(ctx context.Context, arg CancelCoaching
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -292,33 +294,34 @@ const createCoachingContract = `-- name: CreateCoachingContract :one
 INSERT INTO coaching_contracts (
     id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen,
     event, goal, current_record, message, minor, respond_by,
-    video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, plan_description, additional_consultation_price_yen
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+    video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, plan_description, additional_consultation_price_yen, preferred_dates
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type CreateCoachingContractParams struct {
-	ID                             uuid.UUID `json:"id"`
-	PlanID                         uuid.UUID `json:"plan_id"`
-	CoachID                        uuid.UUID `json:"coach_id"`
-	RequesterID                    uuid.UUID `json:"requester_id"`
-	PlanKind                       string    `json:"plan_kind"`
-	PlanTitle                      string    `json:"plan_title"`
-	DurationDays                   int16     `json:"duration_days"`
-	PriceYen                       int32     `json:"price_yen"`
-	Event                          string    `json:"event"`
-	Goal                           string    `json:"goal"`
-	CurrentRecord                  string    `json:"current_record"`
-	Message                        string    `json:"message"`
-	Minor                          bool      `json:"minor"`
-	RespondBy                      time.Time `json:"respond_by"`
-	VideoReviews                   *int16    `json:"video_reviews"`
-	MenuUpdates                    *string   `json:"menu_updates"`
-	ReplyFormats                   []string  `json:"reply_formats"`
-	StartOnFirstVideo              bool      `json:"start_on_first_video"`
-	ServiceType                    *string   `json:"service_type"`
-	PlanDescription                *string   `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32    `json:"additional_consultation_price_yen"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
 }
 
 func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoachingContractParams) (CoachingContract, error) {
@@ -344,6 +347,7 @@ func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoaching
 		arg.ServiceType,
 		arg.PlanDescription,
 		arg.AdditionalConsultationPriceYen,
+		arg.PreferredDates,
 	)
 	var i CoachingContract
 	err := row.Scan(
@@ -398,6 +402,7 @@ func (q *Queries) CreateCoachingContract(ctx context.Context, arg CreateCoaching
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -408,7 +413,7 @@ SET status = 'declined',
     responded_at = now(),
     updated_at = now()
 WHERE id = $1 AND coach_id = $2 AND status = 'applied'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type DeclineCoachingContractParams struct {
@@ -471,6 +476,7 @@ func (q *Queries) DeclineCoachingContract(ctx context.Context, arg DeclineCoachi
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -480,7 +486,7 @@ UPDATE coaching_contracts
 SET status = 'ended',
     updated_at = now()
 WHERE (status='active' OR (status='suspended' AND fulfillment_version=1)) AND ends_at<=now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 // 期間が終わったものを閉じる。
@@ -545,6 +551,7 @@ func (q *Queries) EndCoachingContracts(ctx context.Context) ([]CoachingContract,
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 		); err != nil {
 			return nil, err
 		}
@@ -561,7 +568,7 @@ UPDATE coaching_contracts
 SET status = 'expired',
     updated_at = now()
 WHERE status = 'applied' AND respond_by <= now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 // 48時間返事がなかった申し込みを閉じる。
@@ -626,6 +633,7 @@ func (q *Queries) ExpireCoachingApplications(ctx context.Context) ([]CoachingCon
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 		); err != nil {
 			return nil, err
 		}
@@ -642,7 +650,7 @@ UPDATE coaching_contracts
 SET status = 'expired',
     updated_at = now()
 WHERE status = 'accepted' AND start_by <= now()
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 // 承諾から72時間のうちに保護者の同意（支払いがあるときは支払い）がなかったものを閉じる。
@@ -707,6 +715,7 @@ func (q *Queries) ExpireCoachingStarts(ctx context.Context) ([]CoachingContract,
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 		); err != nil {
 			return nil, err
 		}
@@ -719,7 +728,7 @@ func (q *Queries) ExpireCoachingStarts(ctx context.Context) ([]CoachingContract,
 }
 
 const getCoachingContract = `-- name: GetCoachingContract :one
-SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count FROM coaching_contracts
+SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates FROM coaching_contracts
 WHERE id = $1
 `
 
@@ -778,12 +787,13 @@ func (q *Queries) GetCoachingContract(ctx context.Context, id uuid.UUID) (Coachi
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
 
 const getCoachingContractDetail = `-- name: GetCoachingContractDetail :one
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count,
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates,
     COALESCE(NULLIF(c.name, ''), cp.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     rp.nickname AS requester_nickname
@@ -795,60 +805,61 @@ WHERE ct.id = $1
 `
 
 type GetCoachingContractDetailRow struct {
-	ID                             uuid.UUID  `json:"id"`
-	PlanID                         uuid.UUID  `json:"plan_id"`
-	CoachID                        uuid.UUID  `json:"coach_id"`
-	RequesterID                    uuid.UUID  `json:"requester_id"`
-	PlanKind                       string     `json:"plan_kind"`
-	PlanTitle                      string     `json:"plan_title"`
-	DurationDays                   int16      `json:"duration_days"`
-	PriceYen                       int32      `json:"price_yen"`
-	Event                          string     `json:"event"`
-	Goal                           string     `json:"goal"`
-	CurrentRecord                  string     `json:"current_record"`
-	Message                        string     `json:"message"`
-	Minor                          bool       `json:"minor"`
-	Status                         string     `json:"status"`
-	RespondBy                      time.Time  `json:"respond_by"`
-	RespondedAt                    *time.Time `json:"responded_at"`
-	StartsAt                       *time.Time `json:"starts_at"`
-	EndsAt                         *time.Time `json:"ends_at"`
-	CreatedAt                      time.Time  `json:"created_at"`
-	UpdatedAt                      time.Time  `json:"updated_at"`
-	StartBy                        *time.Time `json:"start_by"`
-	SuspendedAt                    *time.Time `json:"suspended_at"`
-	PaymentRequired                bool       `json:"payment_required"`
-	MessagesPurgedAt               *time.Time `json:"messages_purged_at"`
-	VideoReviews                   *int16     `json:"video_reviews"`
-	MenuUpdates                    *string    `json:"menu_updates"`
-	ReplyFormats                   []string   `json:"reply_formats"`
-	StartOnFirstVideo              bool       `json:"start_on_first_video"`
-	ClockStartedAt                 *time.Time `json:"clock_started_at"`
-	ServiceType                    *string    `json:"service_type"`
-	PlanDescription                *string    `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32     `json:"additional_consultation_price_yen"`
-	CompetitionName                *string    `json:"competition_name"`
-	CompetitionDate                *time.Time `json:"competition_date"`
-	SupportStartDate               *time.Time `json:"support_start_date"`
-	CallCount                      int16      `json:"call_count"`
-	CallMinutes                    int16      `json:"call_minutes"`
-	FulfillmentVersion             int16      `json:"fulfillment_version"`
-	FulfillmentState               string     `json:"fulfillment_state"`
-	SupportRefundAmountYen         *int32     `json:"support_refund_amount_yen"`
-	SupportRefundAttemptID         *uuid.UUID `json:"support_refund_attempt_id"`
-	SupportRefundReason            *string    `json:"support_refund_reason"`
-	DeliveredVideoCount            int32      `json:"delivered_video_count"`
-	DeliveredCallCount             int32      `json:"delivered_call_count"`
-	VenueArea                      *string    `json:"venue_area"`
-	VenueName                      *string    `json:"venue_name"`
-	SessionCount                   int16      `json:"session_count"`
-	SessionMinutes                 int16      `json:"session_minutes"`
-	TravelFeeYen                   int32      `json:"travel_fee_yen"`
-	MaxParticipants                int16      `json:"max_participants"`
-	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  string     `json:"coach_nickname"`
-	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
-	RequesterNickname              *string    `json:"requester_nickname"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	Status                         string      `json:"status"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	RespondedAt                    *time.Time  `json:"responded_at"`
+	StartsAt                       *time.Time  `json:"starts_at"`
+	EndsAt                         *time.Time  `json:"ends_at"`
+	CreatedAt                      time.Time   `json:"created_at"`
+	UpdatedAt                      time.Time   `json:"updated_at"`
+	StartBy                        *time.Time  `json:"start_by"`
+	SuspendedAt                    *time.Time  `json:"suspended_at"`
+	PaymentRequired                bool        `json:"payment_required"`
+	MessagesPurgedAt               *time.Time  `json:"messages_purged_at"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ClockStartedAt                 *time.Time  `json:"clock_started_at"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	CompetitionName                *string     `json:"competition_name"`
+	CompetitionDate                *time.Time  `json:"competition_date"`
+	SupportStartDate               *time.Time  `json:"support_start_date"`
+	CallCount                      int16       `json:"call_count"`
+	CallMinutes                    int16       `json:"call_minutes"`
+	FulfillmentVersion             int16       `json:"fulfillment_version"`
+	FulfillmentState               string      `json:"fulfillment_state"`
+	SupportRefundAmountYen         *int32      `json:"support_refund_amount_yen"`
+	SupportRefundAttemptID         *uuid.UUID  `json:"support_refund_attempt_id"`
+	SupportRefundReason            *string     `json:"support_refund_reason"`
+	DeliveredVideoCount            int32       `json:"delivered_video_count"`
+	DeliveredCallCount             int32       `json:"delivered_call_count"`
+	VenueArea                      *string     `json:"venue_area"`
+	VenueName                      *string     `json:"venue_name"`
+	SessionCount                   int16       `json:"session_count"`
+	SessionMinutes                 int16       `json:"session_minutes"`
+	TravelFeeYen                   int32       `json:"travel_fee_yen"`
+	MaxParticipants                int16       `json:"max_participants"`
+	DeliveredSessionCount          int32       `json:"delivered_session_count"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
+	CoachNickname                  string      `json:"coach_nickname"`
+	CoachPhotoPublicID             *string     `json:"coach_photo_public_id"`
+	RequesterNickname              *string     `json:"requester_nickname"`
 }
 
 // 申し込みの中身と、両方のニックネーム、コーチの顔写真。
@@ -907,6 +918,7 @@ func (q *Queries) GetCoachingContractDetail(ctx context.Context, id uuid.UUID) (
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 		&i.CoachNickname,
 		&i.CoachPhotoPublicID,
 		&i.RequesterNickname,
@@ -1022,7 +1034,7 @@ SET status = 'guardian_declined',
     start_by = NULL,
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND minor AND status = 'accepted'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type GuardianDeclineCoachingContractParams struct {
@@ -1085,6 +1097,7 @@ func (q *Queries) GuardianDeclineCoachingContract(ctx context.Context, arg Guard
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -1097,7 +1110,7 @@ SET status = 'active',
     start_by = NULL,
     updated_at = now()
 WHERE id = $1 AND requester_id = $2 AND minor AND NOT payment_required AND status = 'accepted' AND start_by > now() AND (competition_date IS NULL OR (competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type GuardianStartCoachingContractParams struct {
@@ -1161,6 +1174,7 @@ func (q *Queries) GuardianStartCoachingContract(ctx context.Context, arg Guardia
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -1254,12 +1268,12 @@ func (q *Queries) ListAdminProfileIDs(ctx context.Context) ([]uuid.UUID, error) 
 }
 
 const listCoachContracts = `-- name: ListCoachContracts :many
-(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, p.nickname AS requester_nickname
+(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, p.nickname AS requester_nickname
  FROM coaching_contracts ct
  JOIN profiles p ON p.id = ct.requester_id
  WHERE ct.coach_id = $1 AND ct.status IN ('applied', 'accepted', 'active', 'suspended'))
 UNION ALL
-(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, p.nickname AS requester_nickname
+(SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, p.nickname AS requester_nickname
  FROM coaching_contracts ct
  JOIN profiles p ON p.id = ct.requester_id
  WHERE ct.coach_id = $1 AND ct.status NOT IN ('applied', 'accepted', 'active', 'suspended')
@@ -1269,58 +1283,59 @@ ORDER BY created_at DESC
 `
 
 type ListCoachContractsRow struct {
-	ID                             uuid.UUID  `json:"id"`
-	PlanID                         uuid.UUID  `json:"plan_id"`
-	CoachID                        uuid.UUID  `json:"coach_id"`
-	RequesterID                    uuid.UUID  `json:"requester_id"`
-	PlanKind                       string     `json:"plan_kind"`
-	PlanTitle                      string     `json:"plan_title"`
-	DurationDays                   int16      `json:"duration_days"`
-	PriceYen                       int32      `json:"price_yen"`
-	Event                          string     `json:"event"`
-	Goal                           string     `json:"goal"`
-	CurrentRecord                  string     `json:"current_record"`
-	Message                        string     `json:"message"`
-	Minor                          bool       `json:"minor"`
-	Status                         string     `json:"status"`
-	RespondBy                      time.Time  `json:"respond_by"`
-	RespondedAt                    *time.Time `json:"responded_at"`
-	StartsAt                       *time.Time `json:"starts_at"`
-	EndsAt                         *time.Time `json:"ends_at"`
-	CreatedAt                      time.Time  `json:"created_at"`
-	UpdatedAt                      time.Time  `json:"updated_at"`
-	StartBy                        *time.Time `json:"start_by"`
-	SuspendedAt                    *time.Time `json:"suspended_at"`
-	PaymentRequired                bool       `json:"payment_required"`
-	MessagesPurgedAt               *time.Time `json:"messages_purged_at"`
-	VideoReviews                   *int16     `json:"video_reviews"`
-	MenuUpdates                    *string    `json:"menu_updates"`
-	ReplyFormats                   []string   `json:"reply_formats"`
-	StartOnFirstVideo              bool       `json:"start_on_first_video"`
-	ClockStartedAt                 *time.Time `json:"clock_started_at"`
-	ServiceType                    *string    `json:"service_type"`
-	PlanDescription                *string    `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32     `json:"additional_consultation_price_yen"`
-	CompetitionName                *string    `json:"competition_name"`
-	CompetitionDate                *time.Time `json:"competition_date"`
-	SupportStartDate               *time.Time `json:"support_start_date"`
-	CallCount                      int16      `json:"call_count"`
-	CallMinutes                    int16      `json:"call_minutes"`
-	FulfillmentVersion             int16      `json:"fulfillment_version"`
-	FulfillmentState               string     `json:"fulfillment_state"`
-	SupportRefundAmountYen         *int32     `json:"support_refund_amount_yen"`
-	SupportRefundAttemptID         *uuid.UUID `json:"support_refund_attempt_id"`
-	SupportRefundReason            *string    `json:"support_refund_reason"`
-	DeliveredVideoCount            int32      `json:"delivered_video_count"`
-	DeliveredCallCount             int32      `json:"delivered_call_count"`
-	VenueArea                      *string    `json:"venue_area"`
-	VenueName                      *string    `json:"venue_name"`
-	SessionCount                   int16      `json:"session_count"`
-	SessionMinutes                 int16      `json:"session_minutes"`
-	TravelFeeYen                   int32      `json:"travel_fee_yen"`
-	MaxParticipants                int16      `json:"max_participants"`
-	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	RequesterNickname              *string    `json:"requester_nickname"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	Status                         string      `json:"status"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	RespondedAt                    *time.Time  `json:"responded_at"`
+	StartsAt                       *time.Time  `json:"starts_at"`
+	EndsAt                         *time.Time  `json:"ends_at"`
+	CreatedAt                      time.Time   `json:"created_at"`
+	UpdatedAt                      time.Time   `json:"updated_at"`
+	StartBy                        *time.Time  `json:"start_by"`
+	SuspendedAt                    *time.Time  `json:"suspended_at"`
+	PaymentRequired                bool        `json:"payment_required"`
+	MessagesPurgedAt               *time.Time  `json:"messages_purged_at"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ClockStartedAt                 *time.Time  `json:"clock_started_at"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	CompetitionName                *string     `json:"competition_name"`
+	CompetitionDate                *time.Time  `json:"competition_date"`
+	SupportStartDate               *time.Time  `json:"support_start_date"`
+	CallCount                      int16       `json:"call_count"`
+	CallMinutes                    int16       `json:"call_minutes"`
+	FulfillmentVersion             int16       `json:"fulfillment_version"`
+	FulfillmentState               string      `json:"fulfillment_state"`
+	SupportRefundAmountYen         *int32      `json:"support_refund_amount_yen"`
+	SupportRefundAttemptID         *uuid.UUID  `json:"support_refund_attempt_id"`
+	SupportRefundReason            *string     `json:"support_refund_reason"`
+	DeliveredVideoCount            int32       `json:"delivered_video_count"`
+	DeliveredCallCount             int32       `json:"delivered_call_count"`
+	VenueArea                      *string     `json:"venue_area"`
+	VenueName                      *string     `json:"venue_name"`
+	SessionCount                   int16       `json:"session_count"`
+	SessionMinutes                 int16       `json:"session_minutes"`
+	TravelFeeYen                   int32       `json:"travel_fee_yen"`
+	MaxParticipants                int16       `json:"max_participants"`
+	DeliveredSessionCount          int32       `json:"delivered_session_count"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
+	RequesterNickname              *string     `json:"requester_nickname"`
 }
 
 // コーチに届いた申し込み。利用者はニックネームだけ見せる。終わったものは新しい順に30件まで。
@@ -1385,6 +1400,7 @@ func (q *Queries) ListCoachContracts(ctx context.Context, coachID uuid.UUID) ([]
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 			&i.RequesterNickname,
 		); err != nil {
 			return nil, err
@@ -1483,7 +1499,7 @@ func (q *Queries) ListCoachingBlockedAccounts(ctx context.Context) ([]ListCoachi
 }
 
 const listGuardianContracts = `-- name: ListGuardianContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1493,59 +1509,60 @@ LIMIT 50
 `
 
 type ListGuardianContractsRow struct {
-	ID                             uuid.UUID  `json:"id"`
-	PlanID                         uuid.UUID  `json:"plan_id"`
-	CoachID                        uuid.UUID  `json:"coach_id"`
-	RequesterID                    uuid.UUID  `json:"requester_id"`
-	PlanKind                       string     `json:"plan_kind"`
-	PlanTitle                      string     `json:"plan_title"`
-	DurationDays                   int16      `json:"duration_days"`
-	PriceYen                       int32      `json:"price_yen"`
-	Event                          string     `json:"event"`
-	Goal                           string     `json:"goal"`
-	CurrentRecord                  string     `json:"current_record"`
-	Message                        string     `json:"message"`
-	Minor                          bool       `json:"minor"`
-	Status                         string     `json:"status"`
-	RespondBy                      time.Time  `json:"respond_by"`
-	RespondedAt                    *time.Time `json:"responded_at"`
-	StartsAt                       *time.Time `json:"starts_at"`
-	EndsAt                         *time.Time `json:"ends_at"`
-	CreatedAt                      time.Time  `json:"created_at"`
-	UpdatedAt                      time.Time  `json:"updated_at"`
-	StartBy                        *time.Time `json:"start_by"`
-	SuspendedAt                    *time.Time `json:"suspended_at"`
-	PaymentRequired                bool       `json:"payment_required"`
-	MessagesPurgedAt               *time.Time `json:"messages_purged_at"`
-	VideoReviews                   *int16     `json:"video_reviews"`
-	MenuUpdates                    *string    `json:"menu_updates"`
-	ReplyFormats                   []string   `json:"reply_formats"`
-	StartOnFirstVideo              bool       `json:"start_on_first_video"`
-	ClockStartedAt                 *time.Time `json:"clock_started_at"`
-	ServiceType                    *string    `json:"service_type"`
-	PlanDescription                *string    `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32     `json:"additional_consultation_price_yen"`
-	CompetitionName                *string    `json:"competition_name"`
-	CompetitionDate                *time.Time `json:"competition_date"`
-	SupportStartDate               *time.Time `json:"support_start_date"`
-	CallCount                      int16      `json:"call_count"`
-	CallMinutes                    int16      `json:"call_minutes"`
-	FulfillmentVersion             int16      `json:"fulfillment_version"`
-	FulfillmentState               string     `json:"fulfillment_state"`
-	SupportRefundAmountYen         *int32     `json:"support_refund_amount_yen"`
-	SupportRefundAttemptID         *uuid.UUID `json:"support_refund_attempt_id"`
-	SupportRefundReason            *string    `json:"support_refund_reason"`
-	DeliveredVideoCount            int32      `json:"delivered_video_count"`
-	DeliveredCallCount             int32      `json:"delivered_call_count"`
-	VenueArea                      *string    `json:"venue_area"`
-	VenueName                      *string    `json:"venue_name"`
-	SessionCount                   int16      `json:"session_count"`
-	SessionMinutes                 int16      `json:"session_minutes"`
-	TravelFeeYen                   int32      `json:"travel_fee_yen"`
-	MaxParticipants                int16      `json:"max_participants"`
-	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  string     `json:"coach_nickname"`
-	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	Status                         string      `json:"status"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	RespondedAt                    *time.Time  `json:"responded_at"`
+	StartsAt                       *time.Time  `json:"starts_at"`
+	EndsAt                         *time.Time  `json:"ends_at"`
+	CreatedAt                      time.Time   `json:"created_at"`
+	UpdatedAt                      time.Time   `json:"updated_at"`
+	StartBy                        *time.Time  `json:"start_by"`
+	SuspendedAt                    *time.Time  `json:"suspended_at"`
+	PaymentRequired                bool        `json:"payment_required"`
+	MessagesPurgedAt               *time.Time  `json:"messages_purged_at"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ClockStartedAt                 *time.Time  `json:"clock_started_at"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	CompetitionName                *string     `json:"competition_name"`
+	CompetitionDate                *time.Time  `json:"competition_date"`
+	SupportStartDate               *time.Time  `json:"support_start_date"`
+	CallCount                      int16       `json:"call_count"`
+	CallMinutes                    int16       `json:"call_minutes"`
+	FulfillmentVersion             int16       `json:"fulfillment_version"`
+	FulfillmentState               string      `json:"fulfillment_state"`
+	SupportRefundAmountYen         *int32      `json:"support_refund_amount_yen"`
+	SupportRefundAttemptID         *uuid.UUID  `json:"support_refund_attempt_id"`
+	SupportRefundReason            *string     `json:"support_refund_reason"`
+	DeliveredVideoCount            int32       `json:"delivered_video_count"`
+	DeliveredCallCount             int32       `json:"delivered_call_count"`
+	VenueArea                      *string     `json:"venue_area"`
+	VenueName                      *string     `json:"venue_name"`
+	SessionCount                   int16       `json:"session_count"`
+	SessionMinutes                 int16       `json:"session_minutes"`
+	TravelFeeYen                   int32       `json:"travel_fee_yen"`
+	MaxParticipants                int16       `json:"max_participants"`
+	DeliveredSessionCount          int32       `json:"delivered_session_count"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
+	CoachNickname                  string      `json:"coach_nickname"`
+	CoachPhotoPublicID             *string     `json:"coach_photo_public_id"`
 }
 
 // 保護者のページに出す、子の申し込み（申し込んだとき18歳未満だったもの）。
@@ -1610,6 +1627,7 @@ func (q *Queries) ListGuardianContracts(ctx context.Context, requesterID uuid.UU
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 			&i.CoachNickname,
 			&i.CoachPhotoPublicID,
 		); err != nil {
@@ -1624,7 +1642,7 @@ func (q *Queries) ListGuardianContracts(ctx context.Context, requesterID uuid.UU
 }
 
 const listMyCoachingContracts = `-- name: ListMyCoachingContracts :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
 FROM coaching_contracts ct
 JOIN profiles p ON p.id = ct.coach_id
 LEFT JOIN coach_profiles c ON c.profile_id = ct.coach_id
@@ -1634,59 +1652,60 @@ LIMIT 100
 `
 
 type ListMyCoachingContractsRow struct {
-	ID                             uuid.UUID  `json:"id"`
-	PlanID                         uuid.UUID  `json:"plan_id"`
-	CoachID                        uuid.UUID  `json:"coach_id"`
-	RequesterID                    uuid.UUID  `json:"requester_id"`
-	PlanKind                       string     `json:"plan_kind"`
-	PlanTitle                      string     `json:"plan_title"`
-	DurationDays                   int16      `json:"duration_days"`
-	PriceYen                       int32      `json:"price_yen"`
-	Event                          string     `json:"event"`
-	Goal                           string     `json:"goal"`
-	CurrentRecord                  string     `json:"current_record"`
-	Message                        string     `json:"message"`
-	Minor                          bool       `json:"minor"`
-	Status                         string     `json:"status"`
-	RespondBy                      time.Time  `json:"respond_by"`
-	RespondedAt                    *time.Time `json:"responded_at"`
-	StartsAt                       *time.Time `json:"starts_at"`
-	EndsAt                         *time.Time `json:"ends_at"`
-	CreatedAt                      time.Time  `json:"created_at"`
-	UpdatedAt                      time.Time  `json:"updated_at"`
-	StartBy                        *time.Time `json:"start_by"`
-	SuspendedAt                    *time.Time `json:"suspended_at"`
-	PaymentRequired                bool       `json:"payment_required"`
-	MessagesPurgedAt               *time.Time `json:"messages_purged_at"`
-	VideoReviews                   *int16     `json:"video_reviews"`
-	MenuUpdates                    *string    `json:"menu_updates"`
-	ReplyFormats                   []string   `json:"reply_formats"`
-	StartOnFirstVideo              bool       `json:"start_on_first_video"`
-	ClockStartedAt                 *time.Time `json:"clock_started_at"`
-	ServiceType                    *string    `json:"service_type"`
-	PlanDescription                *string    `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32     `json:"additional_consultation_price_yen"`
-	CompetitionName                *string    `json:"competition_name"`
-	CompetitionDate                *time.Time `json:"competition_date"`
-	SupportStartDate               *time.Time `json:"support_start_date"`
-	CallCount                      int16      `json:"call_count"`
-	CallMinutes                    int16      `json:"call_minutes"`
-	FulfillmentVersion             int16      `json:"fulfillment_version"`
-	FulfillmentState               string     `json:"fulfillment_state"`
-	SupportRefundAmountYen         *int32     `json:"support_refund_amount_yen"`
-	SupportRefundAttemptID         *uuid.UUID `json:"support_refund_attempt_id"`
-	SupportRefundReason            *string    `json:"support_refund_reason"`
-	DeliveredVideoCount            int32      `json:"delivered_video_count"`
-	DeliveredCallCount             int32      `json:"delivered_call_count"`
-	VenueArea                      *string    `json:"venue_area"`
-	VenueName                      *string    `json:"venue_name"`
-	SessionCount                   int16      `json:"session_count"`
-	SessionMinutes                 int16      `json:"session_minutes"`
-	TravelFeeYen                   int32      `json:"travel_fee_yen"`
-	MaxParticipants                int16      `json:"max_participants"`
-	DeliveredSessionCount          int32      `json:"delivered_session_count"`
-	CoachNickname                  string     `json:"coach_nickname"`
-	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	Status                         string      `json:"status"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	RespondedAt                    *time.Time  `json:"responded_at"`
+	StartsAt                       *time.Time  `json:"starts_at"`
+	EndsAt                         *time.Time  `json:"ends_at"`
+	CreatedAt                      time.Time   `json:"created_at"`
+	UpdatedAt                      time.Time   `json:"updated_at"`
+	StartBy                        *time.Time  `json:"start_by"`
+	SuspendedAt                    *time.Time  `json:"suspended_at"`
+	PaymentRequired                bool        `json:"payment_required"`
+	MessagesPurgedAt               *time.Time  `json:"messages_purged_at"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ClockStartedAt                 *time.Time  `json:"clock_started_at"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	CompetitionName                *string     `json:"competition_name"`
+	CompetitionDate                *time.Time  `json:"competition_date"`
+	SupportStartDate               *time.Time  `json:"support_start_date"`
+	CallCount                      int16       `json:"call_count"`
+	CallMinutes                    int16       `json:"call_minutes"`
+	FulfillmentVersion             int16       `json:"fulfillment_version"`
+	FulfillmentState               string      `json:"fulfillment_state"`
+	SupportRefundAmountYen         *int32      `json:"support_refund_amount_yen"`
+	SupportRefundAttemptID         *uuid.UUID  `json:"support_refund_attempt_id"`
+	SupportRefundReason            *string     `json:"support_refund_reason"`
+	DeliveredVideoCount            int32       `json:"delivered_video_count"`
+	DeliveredCallCount             int32       `json:"delivered_call_count"`
+	VenueArea                      *string     `json:"venue_area"`
+	VenueName                      *string     `json:"venue_name"`
+	SessionCount                   int16       `json:"session_count"`
+	SessionMinutes                 int16       `json:"session_minutes"`
+	TravelFeeYen                   int32       `json:"travel_fee_yen"`
+	MaxParticipants                int16       `json:"max_participants"`
+	DeliveredSessionCount          int32       `json:"delivered_session_count"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
+	CoachNickname                  string      `json:"coach_nickname"`
+	CoachPhotoPublicID             *string     `json:"coach_photo_public_id"`
 }
 
 // 利用者が申し込んだもの。コーチのニックネームと顔写真をつける。
@@ -1751,6 +1770,7 @@ func (q *Queries) ListMyCoachingContracts(ctx context.Context, requesterID uuid.
 			&i.TravelFeeYen,
 			&i.MaxParticipants,
 			&i.DeliveredSessionCount,
+			&i.PreferredDates,
 			&i.CoachNickname,
 			&i.CoachPhotoPublicID,
 		); err != nil {
@@ -1785,7 +1805,7 @@ SET status = 'active',
     suspended_at = NULL,
     updated_at = now()
 WHERE id = $1 AND status = 'suspended'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 // 止めていた時間の分だけ終了日を延ばして再開する。
@@ -1844,6 +1864,7 @@ func (q *Queries) ResumeCoachingContract(ctx context.Context, id uuid.UUID) (Coa
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -1873,7 +1894,7 @@ SET status = 'suspended',
     suspended_at = now(),
     updated_at = now()
 WHERE id = $1 AND status = 'active'
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 // 通報などで運営がやりとりを止める。期間は止めている間も進まないよう、再開のときに延ばす。
@@ -1932,6 +1953,7 @@ func (q *Queries) SuspendCoachingContract(ctx context.Context, id uuid.UUID) (Co
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }

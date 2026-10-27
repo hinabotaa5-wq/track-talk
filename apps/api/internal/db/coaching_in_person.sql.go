@@ -363,7 +363,7 @@ func (q *Queries) SaveInPersonPlan(ctx context.Context, arg SaveInPersonPlanPara
 
 const snapshotInPersonContract = `-- name: SnapshotInPersonContract :one
 UPDATE coaching_contracts ct SET venue_area=pl.venue_area,venue_name=pl.venue_name,session_count=pl.session_count,session_minutes=pl.session_minutes,travel_fee_yen=pl.travel_fee_yen,max_participants=pl.max_participants,price_yen=pl.price_yen+pl.travel_fee_yen,fulfillment_version=2
-FROM coaching_plans pl WHERE ct.id=$1 AND pl.id=ct.plan_id AND ct.service_type='in_person' RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count
+FROM coaching_plans pl WHERE ct.id=$1 AND pl.id=ct.plan_id AND ct.service_type='in_person' RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates
 `
 
 func (q *Queries) SnapshotInPersonContract(ctx context.Context, id uuid.UUID) (CoachingContract, error) {
@@ -421,6 +421,7 @@ func (q *Queries) SnapshotInPersonContract(ctx context.Context, id uuid.UUID) (C
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }

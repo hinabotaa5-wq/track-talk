@@ -34,6 +34,14 @@ type CloudinaryUpload struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type CoachAvailability struct {
+	CoachID   uuid.UUID `json:"coach_id"`
+	Day       time.Time `json:"day"`
+	Status    string    `json:"status"`
+	Note      string    `json:"note"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type CoachEarning struct {
 	ID              uuid.UUID  `json:"id"`
 	CoachID         *uuid.UUID `json:"coach_id"`
@@ -173,57 +181,58 @@ type CoachingConsultationRefund struct {
 }
 
 type CoachingContract struct {
-	ID                             uuid.UUID  `json:"id"`
-	PlanID                         uuid.UUID  `json:"plan_id"`
-	CoachID                        uuid.UUID  `json:"coach_id"`
-	RequesterID                    uuid.UUID  `json:"requester_id"`
-	PlanKind                       string     `json:"plan_kind"`
-	PlanTitle                      string     `json:"plan_title"`
-	DurationDays                   int16      `json:"duration_days"`
-	PriceYen                       int32      `json:"price_yen"`
-	Event                          string     `json:"event"`
-	Goal                           string     `json:"goal"`
-	CurrentRecord                  string     `json:"current_record"`
-	Message                        string     `json:"message"`
-	Minor                          bool       `json:"minor"`
-	Status                         string     `json:"status"`
-	RespondBy                      time.Time  `json:"respond_by"`
-	RespondedAt                    *time.Time `json:"responded_at"`
-	StartsAt                       *time.Time `json:"starts_at"`
-	EndsAt                         *time.Time `json:"ends_at"`
-	CreatedAt                      time.Time  `json:"created_at"`
-	UpdatedAt                      time.Time  `json:"updated_at"`
-	StartBy                        *time.Time `json:"start_by"`
-	SuspendedAt                    *time.Time `json:"suspended_at"`
-	PaymentRequired                bool       `json:"payment_required"`
-	MessagesPurgedAt               *time.Time `json:"messages_purged_at"`
-	VideoReviews                   *int16     `json:"video_reviews"`
-	MenuUpdates                    *string    `json:"menu_updates"`
-	ReplyFormats                   []string   `json:"reply_formats"`
-	StartOnFirstVideo              bool       `json:"start_on_first_video"`
-	ClockStartedAt                 *time.Time `json:"clock_started_at"`
-	ServiceType                    *string    `json:"service_type"`
-	PlanDescription                *string    `json:"plan_description"`
-	AdditionalConsultationPriceYen *int32     `json:"additional_consultation_price_yen"`
-	CompetitionName                *string    `json:"competition_name"`
-	CompetitionDate                *time.Time `json:"competition_date"`
-	SupportStartDate               *time.Time `json:"support_start_date"`
-	CallCount                      int16      `json:"call_count"`
-	CallMinutes                    int16      `json:"call_minutes"`
-	FulfillmentVersion             int16      `json:"fulfillment_version"`
-	FulfillmentState               string     `json:"fulfillment_state"`
-	SupportRefundAmountYen         *int32     `json:"support_refund_amount_yen"`
-	SupportRefundAttemptID         *uuid.UUID `json:"support_refund_attempt_id"`
-	SupportRefundReason            *string    `json:"support_refund_reason"`
-	DeliveredVideoCount            int32      `json:"delivered_video_count"`
-	DeliveredCallCount             int32      `json:"delivered_call_count"`
-	VenueArea                      *string    `json:"venue_area"`
-	VenueName                      *string    `json:"venue_name"`
-	SessionCount                   int16      `json:"session_count"`
-	SessionMinutes                 int16      `json:"session_minutes"`
-	TravelFeeYen                   int32      `json:"travel_fee_yen"`
-	MaxParticipants                int16      `json:"max_participants"`
-	DeliveredSessionCount          int32      `json:"delivered_session_count"`
+	ID                             uuid.UUID   `json:"id"`
+	PlanID                         uuid.UUID   `json:"plan_id"`
+	CoachID                        uuid.UUID   `json:"coach_id"`
+	RequesterID                    uuid.UUID   `json:"requester_id"`
+	PlanKind                       string      `json:"plan_kind"`
+	PlanTitle                      string      `json:"plan_title"`
+	DurationDays                   int16       `json:"duration_days"`
+	PriceYen                       int32       `json:"price_yen"`
+	Event                          string      `json:"event"`
+	Goal                           string      `json:"goal"`
+	CurrentRecord                  string      `json:"current_record"`
+	Message                        string      `json:"message"`
+	Minor                          bool        `json:"minor"`
+	Status                         string      `json:"status"`
+	RespondBy                      time.Time   `json:"respond_by"`
+	RespondedAt                    *time.Time  `json:"responded_at"`
+	StartsAt                       *time.Time  `json:"starts_at"`
+	EndsAt                         *time.Time  `json:"ends_at"`
+	CreatedAt                      time.Time   `json:"created_at"`
+	UpdatedAt                      time.Time   `json:"updated_at"`
+	StartBy                        *time.Time  `json:"start_by"`
+	SuspendedAt                    *time.Time  `json:"suspended_at"`
+	PaymentRequired                bool        `json:"payment_required"`
+	MessagesPurgedAt               *time.Time  `json:"messages_purged_at"`
+	VideoReviews                   *int16      `json:"video_reviews"`
+	MenuUpdates                    *string     `json:"menu_updates"`
+	ReplyFormats                   []string    `json:"reply_formats"`
+	StartOnFirstVideo              bool        `json:"start_on_first_video"`
+	ClockStartedAt                 *time.Time  `json:"clock_started_at"`
+	ServiceType                    *string     `json:"service_type"`
+	PlanDescription                *string     `json:"plan_description"`
+	AdditionalConsultationPriceYen *int32      `json:"additional_consultation_price_yen"`
+	CompetitionName                *string     `json:"competition_name"`
+	CompetitionDate                *time.Time  `json:"competition_date"`
+	SupportStartDate               *time.Time  `json:"support_start_date"`
+	CallCount                      int16       `json:"call_count"`
+	CallMinutes                    int16       `json:"call_minutes"`
+	FulfillmentVersion             int16       `json:"fulfillment_version"`
+	FulfillmentState               string      `json:"fulfillment_state"`
+	SupportRefundAmountYen         *int32      `json:"support_refund_amount_yen"`
+	SupportRefundAttemptID         *uuid.UUID  `json:"support_refund_attempt_id"`
+	SupportRefundReason            *string     `json:"support_refund_reason"`
+	DeliveredVideoCount            int32       `json:"delivered_video_count"`
+	DeliveredCallCount             int32       `json:"delivered_call_count"`
+	VenueArea                      *string     `json:"venue_area"`
+	VenueName                      *string     `json:"venue_name"`
+	SessionCount                   int16       `json:"session_count"`
+	SessionMinutes                 int16       `json:"session_minutes"`
+	TravelFeeYen                   int32       `json:"travel_fee_yen"`
+	MaxParticipants                int16       `json:"max_participants"`
+	DeliveredSessionCount          int32       `json:"delivered_session_count"`
+	PreferredDates                 []time.Time `json:"preferred_dates"`
 }
 
 type CoachingContractConsent struct {

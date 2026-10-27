@@ -254,6 +254,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
 			r.Get("/coaches", s.listCoaches)
+			r.Get("/coaches/{id}/availability", s.getPublicCoachAvailability)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
 			r.Get("/guardian/{token}", s.getGuardian)
@@ -336,6 +337,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Patch("/coach/me/services", s.updateCoachServices)
 				r.Get("/coach/me/earnings", s.coachEarnings)
 				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
+				r.Get("/coach/me/availability", s.getMyCoachAvailability)
+				r.Put("/coach/me/availability", s.saveCoachAvailability)
 				r.Get("/coach/me/plans", s.listMyCoachingPlans)
 				r.Post("/coach/me/plans", s.createCoachingPlan)
 				r.Patch("/coach/me/plans/{id}", s.updateCoachingPlan)

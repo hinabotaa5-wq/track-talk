@@ -333,7 +333,7 @@ func (q *Queries) MarkSupportSettled(ctx context.Context, id uuid.UUID) error {
 const prepareSupportRefund = `-- name: PrepareSupportRefund :one
 UPDATE coaching_contracts SET fulfillment_state='refund_pending',support_refund_amount_yen=$2,support_refund_attempt_id=$3,
  support_refund_reason=$4,status='refunded',ends_at=LEAST(COALESCE(ends_at,now()),now()),updated_at=now()
-WHERE id=$1 RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count
+WHERE id=$1 RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates
 `
 
 type PrepareSupportRefundParams struct {
@@ -403,6 +403,7 @@ func (q *Queries) PrepareSupportRefund(ctx context.Context, arg PrepareSupportRe
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
@@ -489,7 +490,7 @@ func (q *Queries) SetMessageReviewSubmission(ctx context.Context, arg SetMessage
 const snapshotSupportContract = `-- name: SnapshotSupportContract :one
 UPDATE coaching_contracts ct SET competition_name=pl.competition_name,competition_date=pl.competition_date,
  support_start_date=pl.support_start_date,call_count=pl.call_count,call_minutes=pl.call_minutes,fulfillment_version=1
-FROM coaching_plans pl WHERE ct.id=$1 AND pl.id=ct.plan_id AND ct.service_type='competition_support' RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count
+FROM coaching_plans pl WHERE ct.id=$1 AND pl.id=ct.plan_id AND ct.service_type='competition_support' RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates
 `
 
 func (q *Queries) SnapshotSupportContract(ctx context.Context, id uuid.UUID) (CoachingContract, error) {
@@ -547,6 +548,7 @@ func (q *Queries) SnapshotSupportContract(ctx context.Context, id uuid.UUID) (Co
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
 		&i.DeliveredSessionCount,
+		&i.PreferredDates,
 	)
 	return i, err
 }
