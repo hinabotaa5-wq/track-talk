@@ -1,5 +1,5 @@
 // layout(サーバー)から読むので、React のフックを使う pending-link.ts とは分ける。
-// React が動き出す前も、リンクの待ち時間を超えた場合だけクルクルを出す。
+// React が動き出す前も、リンクの待ち時間を超えた場合だけ読み込み表示を出す。
 // その間のリンクはブラウザがそのまま開くので、押されたリンクに印を付けて CSS で切り替える。
 export const pendingLinkStartupScript = `(()=>{
   let timer;

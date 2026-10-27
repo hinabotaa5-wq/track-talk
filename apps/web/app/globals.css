@@ -60,15 +60,80 @@ body {
   }
 }
 
-/* アプリを開いた直後(React が動く前)に押したリンクは、アイコンをクルクルに替える。印は起動スクリプトが付ける。 */
-[data-boot-pending] .pending-link-idle {
-  display: none;
-}
-[data-boot-pending] .pending-link-boot {
-  display: block;
-}
+/* アプリを開いた直後(React が動く前)に押したリンクにも読み込み表示を出す。印は起動スクリプトが付ける。 */
 [data-boot-pending] .card-pending {
   display: flex;
+}
+body:has(a[data-screen-loader][data-boot-pending]) .screen-loader {
+  display: flex;
+}
+
+/* タブを開くあいだの読み込み表示(screen-loader.tsx)。ヘッダー(z-40)と下のバー(z-30)の下に敷き、中身だけを覆う。
+   すぐ開ける移動でちらつかないよう、0.2秒待ってからふわっと出す。 */
+.screen-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.875rem;
+  /* ヘッダーと下のバーを除いた中身の真ん中に来るよう、上下の高さ分ずらす。 */
+  padding-top: calc(3.8125rem + env(safe-area-inset-top));
+  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  background-color: rgb(22 36 58 / 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: screen-loader-in 240ms ease-out 200ms both;
+}
+@media (min-width: 48rem) {
+  .screen-loader {
+    padding-bottom: 0;
+  }
+}
+@keyframes screen-loader-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.screen-loader-track {
+  width: 9.5rem;
+  height: auto;
+  overflow: visible;
+}
+.screen-loader-lane {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.14);
+  stroke-width: 10;
+}
+.screen-loader-line {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.25);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+/* 空色の光がトラックを周回する。直線で加速し、カーブで少しゆるむように緩急をつける。 */
+.screen-loader-runner {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 46 354;
+  filter: drop-shadow(0 0 4px #38bdf8);
+  animation: screen-loader-lap 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+@keyframes screen-loader-lap {
+  to { stroke-dashoffset: -400; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-loader {
+    animation-delay: 200ms;
+    animation-duration: 1ms;
+  }
+  .screen-loader-runner {
+    animation-duration: 4s;
+    animation-timing-function: linear;
+  }
 }
 
 /* ダブルタップのズーム待ちをなくして、タップにすぐ反応させる。 */

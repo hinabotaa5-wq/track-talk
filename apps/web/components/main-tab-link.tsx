@@ -1,13 +1,12 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { LoaderCircle } from "lucide-react";
-import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useId, useState, type ComponentProps, type ReactNode } from "react";
 import { afterStartup } from "@/lib/after-startup";
 import { markLinkPending, useIsLinkPending } from "@/lib/pending-link";
 
-const PendingContext = createContext(false);
-
+// 開いている途中のリンクは、指定した待ち時間を超えたら文字とアイコンを薄い空色にする。
+// 読み込み中のアニメーションはアイコンではなく画面に出す(ScreenLoader)。
 function TabContent({ id, children, delay }: { id: string; children: ReactNode; delay: number }) {
   const { pending: linkPending } = useLinkStatus();
   const markedPending = useIsLinkPending(id);
@@ -20,32 +19,9 @@ function TabContent({ id, children, delay }: { id: string; children: ReactNode; 
   }, [waiting, delay]);
   const pending = waiting && (delay === 0 || delayed);
   return (
-    <PendingContext.Provider value={pending}>
-      {/* クルクルに替わるアイコン(svg)は点滅させない。animation が重なると回らなくなる。 */}
-      <span aria-busy={pending || undefined} className={`contents ${pending ? "[&>*:not(svg)]:animate-pulse [&>*]:text-blue-300" : ""}`}>
-        {children}
-      </span>
-    </PendingContext.Provider>
-  );
-}
-
-// リンクのアイコン。指定した待ち時間を超えた移動中だけクルクルに替える。
-// React が動く前のタップは、起動スクリプトが付ける data-boot-pending を CSS で見て替える。
-export function PendingIcon({ children, className, label }: { children: ReactNode; className: string; label: string }) {
-  const pending = useContext(PendingContext);
-  if (pending) {
-    return (
-      <>
-        <LoaderCircle className={`${className} animate-spin`} aria-hidden />
-        <span role="status" className="sr-only">{label}</span>
-      </>
-    );
-  }
-  return (
-    <>
-      <span className="pending-link-idle contents">{children}</span>
-      <LoaderCircle className={`pending-link-boot hidden ${className} animate-spin`} aria-hidden />
-    </>
+    <span aria-busy={pending || undefined} className={`contents ${pending ? "[&>*]:text-blue-300" : ""}`}>
+      {children}
+    </span>
   );
 }
 
@@ -58,6 +34,7 @@ export function MainTabLink({ children, prefetch = null, pendingDelay = 0, ...pr
     <Link
       {...props}
       data-pending-link=""
+      data-screen-loader=""
       data-pending-delay={pendingDelay || undefined}
       prefetch={ready ? prefetch : false}
       onNavigate={(event) => { props.onNavigate?.(event); markLinkPending(id, typeof props.href === "string" ? props.href : props.href.pathname ?? ""); }}
