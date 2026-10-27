@@ -11,7 +11,7 @@ on:
       - "**.md"
       - "docs/**"
 
-# リポジトリは読むだけ。GITHUB_TOKEN に書き込みの権限を持たせない。
+# リポジトリは読むだけ。GITHUB_TOKEN に書き込みの権限を持たせない(Dependabot の自動マージのジョブだけ例外)。
 permissions:
   contents: read
 
@@ -142,3 +142,23 @@ jobs:
         with:
           name: login-post-e2e
           path: apps/web/test-results
+
+  # Dependabot の更新 PR は、上のテストがすべて通ったら自動でマージする。
+  # 大きな変更が入りうるメジャー更新(1.x → 2.x など)だけは人が見る。マージしても本番には自動で出ない。
+  dependabot-merge:
+    needs: [api, web, e2e]
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Merge
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --squash "$PR_URL"
