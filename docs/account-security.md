@@ -33,6 +33,8 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 
 登録・ログイン・パスワード再設定・メールアドレス/パスワードの変更で、Turnstile の確認を出し、トークンを Supabase に渡す。
 
+2026-10-27 に本番で有効化済み(ウィジェットのホスト名は `track-talk.netlify.app`、公開用の鍵は `netlify.toml`、秘密の鍵は Supabase だけ)。独自ドメインに移るときは、先に Cloudflare のウィジェットにそのホスト名を足す。
+
 本番で有効にする順番(逆にすると、全員がログインできなくなる):
 
 1. Cloudflare で Turnstile のウィジェットを作り、ホスト名に本番のドメインを入れる。
