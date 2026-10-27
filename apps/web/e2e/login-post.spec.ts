@@ -8,8 +8,11 @@ test("login then publish a text post", async ({ page }) => {
   await page.getByPlaceholder("メール").fill("runner@example.com");
   await page.getByPlaceholder("パスワード").fill("password1");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
-  // 登録画面を通らずにログインした人は、海外の事業者に預けることへの同意から始まる。
-  await expect(page.getByRole("heading", { name: "海外の事業者に預けることへの同意" })).toBeVisible({ timeout: 20_000 });
+  // 登録画面を通らずにログインした人も、規約などと海外への提供に1回で同意する。
+  await expect(page.getByRole("heading", { name: "利用にあたっての同意" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
+  await expect(page.getByRole("checkbox")).toHaveAccessibleName("利用規約・コミュニティガイドライン・プライバシーポリシー、および個人情報を海外の事業者に預けること（同ポリシー第7条）に同意する");
+  await expect(page.getByRole("button", { name: "同意して続ける" })).toBeDisabled();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "同意して続ける" }).click();
   // はじめてのログインは、ニックネームと種目を決めるまで先に進めない。

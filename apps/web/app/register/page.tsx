@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
+import { ServiceConsentText } from "@/components/service-consent-text";
 import { rememberOverseasConsent } from "@/lib/overseas-consent";
 import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
@@ -109,20 +110,7 @@ export default function RegisterPage() {
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
           />
-          <span>
-            <Link href="/terms" className="inline-block text-blue-400 transition active:scale-[0.98]">
-              利用規約
-            </Link>
-            ・
-            <Link href="/guidelines" className="inline-block text-blue-400 transition active:scale-[0.98]">
-              コミュニティガイドライン
-            </Link>
-            ・
-            <Link href="/privacy" className="inline-block text-blue-400 transition active:scale-[0.98]">
-              プライバシーポリシー
-            </Link>
-            に同意し、個人情報を米国などの海外の事業者に預けること（プライバシーポリシー第7条）にも同意する
-          </span>
+          <ServiceConsentText />
         </label>
         <details className="rounded-lg border border-slate-700 px-3 py-2">
           <summary className="cursor-pointer text-sm text-slate-200">海外の事業者に預けることについて</summary>
