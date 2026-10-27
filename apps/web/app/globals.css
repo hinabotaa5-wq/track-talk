@@ -96,43 +96,64 @@ body:has(a[data-screen-loader][data-boot-pending]) .screen-loader {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.screen-loader-track {
-  width: 9.5rem;
+.screen-loader-watch {
+  width: 5.5rem;
   height: auto;
   overflow: visible;
 }
-.screen-loader-lane {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.14);
-  stroke-width: 10;
+.screen-loader-crown {
+  fill: rgb(255 255 255 / 0.4);
 }
-.screen-loader-line {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.25);
-  stroke-width: 1;
-  stroke-dasharray: 3 4;
+.screen-loader-face {
+  fill: rgb(255 255 255 / 0.06);
+  stroke: rgb(255 255 255 / 0.4);
+  stroke-width: 3;
 }
-/* 空色の光がトラックを周回する。直線で加速し、カーブで少しゆるむように緩急をつける。 */
-.screen-loader-runner {
+.screen-loader-tick {
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.screen-loader-pin {
+  fill: #f4f7fb;
+}
+/* 針が1周するあいだに、空色の輪が12時の位置から一周分たまる。 */
+.screen-loader-arc,
+.screen-loader-hand {
+  transform-origin: 43px 54px;
+  animation-duration: 2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.screen-loader-arc {
   fill: none;
   stroke: #38bdf8;
-  stroke-width: 6;
+  stroke-width: 4;
   stroke-linecap: round;
-  stroke-dasharray: 46 354;
-  filter: drop-shadow(0 0 4px #38bdf8);
-  animation: screen-loader-lap 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  transform: rotate(-90deg);
+  animation-name: screen-loader-fill;
 }
-@keyframes screen-loader-lap {
-  to { stroke-dashoffset: -400; }
+.screen-loader-hand {
+  stroke: #f4f7fb;
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation-name: screen-loader-sweep;
+}
+@keyframes screen-loader-fill {
+  from { stroke-dasharray: 0 100; }
+  to { stroke-dasharray: 100 0; }
+}
+@keyframes screen-loader-sweep {
+  to { transform: rotate(360deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .screen-loader {
     animation-delay: 200ms;
     animation-duration: 1ms;
   }
-  .screen-loader-runner {
+  .screen-loader-arc,
+  .screen-loader-hand {
     animation-duration: 4s;
-    animation-timing-function: linear;
   }
 }
 
