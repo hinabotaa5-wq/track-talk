@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeleteAccountPage from "./page";
 
-const { state, signInWithPassword, apiFetch, signOut } = vi.hoisted(() => ({
+const { state, signInWithPassword, apiFetch, signOut, replace } = vi.hoisted(() => ({
   state: {
     session: {
       user: { email: "runner@example.com", app_metadata: { provider: "email" } },
@@ -18,10 +18,11 @@ const { state, signInWithPassword, apiFetch, signOut } = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   apiFetch: vi.fn(),
   signOut: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ replace, refresh: vi.fn() }),
 }));
 
 vi.mock("@/components/auth-provider", () => ({
@@ -76,6 +77,7 @@ describe("DeleteAccountPage", () => {
     signInWithPassword.mockReset();
     apiFetch.mockReset();
     signOut.mockReset();
+    replace.mockReset();
     document.cookie = "tracktalk-next=; Path=/; Max-Age=0";
   });
 
@@ -96,6 +98,8 @@ describe("DeleteAccountPage", () => {
     });
     expect(signInWithPassword).not.toHaveBeenCalled();
     expect(apiFetch).toHaveBeenCalledWith("/v1/me", expect.objectContaining({ token: "old-token" }));
+    expect(signOut).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith("/goodbye");
     await view.unmount();
   });
 });

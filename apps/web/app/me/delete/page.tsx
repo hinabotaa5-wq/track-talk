@@ -25,7 +25,7 @@ export default function DeleteAccountPage() {
     if (!loading && !session && !leaving.current) router.replace("/login");
   }, [loading, session, router]);
 
-  async function leave() {
+  async function leave(done: string) {
     leaving.current = true;
     // 退会で消えた投稿が、ホームの一覧に残らないようにする。
     clearHomeFeeds();
@@ -33,7 +33,7 @@ export default function DeleteAccountPage() {
     await unsubscribePushOnThisDevice(null);
     const supabase = createClient();
     await supabase?.auth.signOut();
-    router.replace("/");
+    router.replace(done);
     router.refresh();
   }
 
@@ -51,7 +51,7 @@ export default function DeleteAccountPage() {
         setAuthLeft(true);
         return;
       }
-      await leave();
+      await leave("/goodbye");
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.fields?.confirm || err.message);
@@ -73,7 +73,7 @@ export default function DeleteAccountPage() {
         <p className="text-sm text-slate-300">
           投稿・コメントなどのデータは削除しました。ログイン用アカウントは削除できなかったため、同じメールアドレスで再びログインできることがあります。
         </p>
-        <Button type="button" className="w-full" onClick={() => void leave()}>
+        <Button type="button" className="w-full" onClick={() => void leave("/")}>
           ログアウトしてホームへ
         </Button>
       </div>
