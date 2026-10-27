@@ -143,14 +143,16 @@ jobs:
           name: login-post-e2e
           path: apps/web/test-results
 
-  # Dependabot の更新 PR は、上のテストがすべて通ったら自動でマージする。
-  # 大きな変更が入りうるメジャー更新(1.x → 2.x など)だけは人が見る。マージしても本番には自動で出ない。
+  # Dependabot の更新 PR は、上のテストがすべて通ったら自動でマージし、変わった側(API か Web)だけを本番に出す。
+  # 大きな変更が入りうるメジャー更新(1.x → 2.x など)だけは人が見る。
+  # Web の本番デプロイは1回ごとに Netlify のクレジットを使うので、更新は dependabot.yml で月1回にまとめている。
   dependabot-merge:
     needs: [api, web, e2e]
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -162,3 +164,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --squash "$PR_URL"
+      # GitHub Actions の部品だけの更新は、本番の中身が変わらないので出さない。
+      - name: Deploy API
+        if: steps.meta.outputs.update-type != 'version-update:semver-major' && (steps.meta.outputs.package-ecosystem == 'go_modules' || (steps.meta.outputs.package-ecosystem == 'docker' && contains(steps.meta.outputs.directory, 'apps/api')))
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-api.yml --ref main --repo "$GITHUB_REPOSITORY"
+      - name: Deploy Web
+        if: steps.meta.outputs.update-type != 'version-update:semver-major' && steps.meta.outputs.package-ecosystem == 'npm_and_yarn'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-web.yml --ref main --repo "$GITHUB_REPOSITORY"
