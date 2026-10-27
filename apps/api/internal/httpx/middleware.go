@@ -137,6 +137,8 @@ func bearer(r *http.Request) string {
 }
 
 type RateLimiter struct {
+	// auth は、書き込みを人ごとに数えるためにトークンを読む。nil なら全部 IP で数える。
+	auth      *auth.Verifier
 	mu        sync.Mutex
 	writes    map[string][]time.Time
 	reports   map[string][]time.Time
@@ -145,8 +147,9 @@ type RateLimiter struct {
 	lastSweep time.Time
 }
 
-func NewRateLimiter() *RateLimiter {
+func NewRateLimiter(v *auth.Verifier) *RateLimiter {
 	return &RateLimiter{
+		auth:      v,
 		writes:    map[string][]time.Time{},
 		reports:   map[string][]time.Time{},
 		inquiries: map[string][]time.Time{},
@@ -182,16 +185,34 @@ func (l *RateLimiter) Middleware(next http.Handler) http.Handler {
 			}
 			l.inquiries[ip] = append(l.inquiries[ip], now)
 		}
-		l.writes[ip] = prune(l.writes[ip], now.Add(-time.Minute))
-		if len(l.writes[ip]) >= 30 {
+		// 同じ Wi-Fi や携帯回線の部員は IP を分け合うので、ログイン中は人ごとに数える。
+		key := l.writeKey(r, ip)
+		l.writes[key] = prune(l.writes[key], now.Add(-time.Minute))
+		if len(l.writes[key]) >= 30 {
 			l.mu.Unlock()
 			Error(w, http.StatusTooManyRequests, "rate_limited", "リクエストが多すぎます")
 			return
 		}
-		l.writes[ip] = append(l.writes[ip], now)
+		l.writes[key] = append(l.writes[key], now)
 		l.mu.Unlock()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// writeKey は、書き込みの回数を数える単位を返す。正しいトークンがあれば利用者、なければ IP。
+func (l *RateLimiter) writeKey(r *http.Request, ip string) string {
+	if l.auth == nil {
+		return ip
+	}
+	raw := bearer(r)
+	if raw == "" {
+		return ip
+	}
+	identity, err := l.auth.ParseIdentity(raw)
+	if err != nil {
+		return ip
+	}
+	return "user:" + identity.UserID.String()
 }
 
 // sweep は10分ごとに、窓の外の記録しか残っていない IP の行を消す。消さないと、送信元を変えながら
