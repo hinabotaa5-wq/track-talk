@@ -6,7 +6,7 @@ import (
 )
 
 func TestRateLimiterSweepDropsIdleIPs(t *testing.T) {
-	l := NewRateLimiter()
+	l := NewRateLimiter(nil)
 	now := time.Now()
 	l.writes["198.51.100.1"] = []time.Time{now.Add(-2 * time.Minute)}
 	l.writes["198.51.100.2"] = []time.Time{now.Add(-10 * time.Second)}

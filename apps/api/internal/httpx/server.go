@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/claude"
@@ -42,7 +43,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			BaseURL: cfg.SupabaseURL,
 			APIKey:  cfg.SupabaseServiceRoleKey,
 		},
-		limit: NewRateLimiter(),
+		limit: NewRateLimiter(v),
 		cloud: cloudinary.Client{
 			Cloud:        cfg.CloudName,
 			Key:          cfg.CloudAPIKey,
@@ -81,6 +82,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.Use(SecurityHeaders)
 	r.Use(Recover)
 	r.Use(RequestLog)
+	// JSON を gzip で縮めて、Cloud Run から外への通信量を減らす。トークンはヘッダーで送り Cookie を使わないので、
+	// 圧縮の長さから中身を当てる攻撃（BREACH）の前提は成り立たない。
+	r.Use(middleware.Compress(5, "application/json"))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
