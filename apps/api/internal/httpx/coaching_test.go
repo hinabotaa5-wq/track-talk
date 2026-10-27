@@ -79,6 +79,9 @@ func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 		{http.MethodPost, "/v1/guardian/abc/messages/" + id + "/report", ""},
 		// 公開のコーチ一覧とプラン
 		{http.MethodGet, "/v1/coaches", ""},
+		{http.MethodGet, "/v1/coaches/" + id + "/availability", ""},
+		{http.MethodGet, "/v1/coach/me/availability", ta},
+		{http.MethodPut, "/v1/coach/me/availability", ta},
 		{http.MethodGet, "/v1/coaching/plans/" + id, ""},
 		// パーソナル指導（利用者側）
 		{http.MethodPost, "/v1/coaching/contracts", ta},

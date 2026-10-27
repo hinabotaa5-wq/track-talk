@@ -30,7 +30,7 @@ export default function CoachAboutPage() {
           <ul className="space-y-3 text-sm text-slate-200">
             <li className="flex gap-2"><Video className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">動画添削</strong>：動画やメッセージを通して、フォームや練習をサポート。</span></li>
             <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">大会までのサポート</strong>：目標の大会に向けて、準備や調整をサポート。</span></li>
-            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">対面指導</strong>：場所や回数などをプランに明記し、現地で指導。</span></li>
+            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">対面指導</strong>：場所や回数などをプランに明記し、現地で指導します。空き日カレンダーから希望日を受け取り、メッセージで相談して日時を提案・確定します。</span></li>
           </ul>
         </article>
       </section>

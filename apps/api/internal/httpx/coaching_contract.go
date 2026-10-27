@@ -79,11 +79,12 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 type coachingContractReq struct {
-	PlanID        uuid.UUID `json:"plan_id"`
-	Event         string    `json:"event"`
-	Goal          string    `json:"goal"`
-	CurrentRecord string    `json:"current_record"`
-	Message       string    `json:"message"`
+	PreferredDates []string  `json:"preferred_dates"`
+	PlanID         uuid.UUID `json:"plan_id"`
+	Event          string    `json:"event"`
+	Goal           string    `json:"goal"`
+	CurrentRecord  string    `json:"current_record"`
+	Message        string    `json:"message"`
 	contractConsentReq
 }
 
@@ -118,6 +119,20 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	req.CurrentRecord = strings.TrimSpace(req.CurrentRecord)
 	req.Message = strings.TrimSpace(req.Message)
 	fields := req.fields()
+	preferredDates := make([]time.Time, 0, len(req.PreferredDates))
+	today := availabilityToday(time.Now())
+	seenDates := map[string]bool{}
+	if len(req.PreferredDates) > 3 || (len(req.PreferredDates) > 0 && (plan.ServiceType == nil || (*plan.ServiceType != "in_person" && *plan.ServiceType != "competition_support"))) {
+		fields["preferred_dates"] = "希望日は対面指導・大会サポートで3つまで選べます"
+	}
+	for _, value := range req.PreferredDates {
+		day, valid := availabilityDate(value, today)
+		if !valid || seenDates[value] {
+			fields["preferred_dates"] = "今日から21日以内の日を重複せず選んでください"
+		}
+		seenDates[value] = true
+		preferredDates = append(preferredDates, day)
+	}
 	if !slices.Contains(plan.CoachEvents, req.Event) {
 		fields["event"] = "このコーチが見る種目から選んでください"
 	}
@@ -173,7 +188,24 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			return err
 		}
+		if len(preferredDates) > 0 {
+			if plan.ServiceType == nil || (*plan.ServiceType != "in_person" && *plan.ServiceType != "competition_support") {
+				return errPreferredDates
+			}
+			rows, err := q.ListCoachAvailability(r.Context(), db.ListCoachAvailabilityParams{CoachID: plan.CoachID, Today: availabilityToday(time.Now())})
+			if err != nil {
+				return err
+			}
+			for _, day := range preferredDates {
+				if !slices.ContainsFunc(rows, func(row db.CoachAvailability) bool {
+					return row.Day.Equal(day) && (row.Status == "available" || row.Status == "consult")
+				}) {
+					return errPreferredDates
+				}
+			}
+		}
 		ct, err = q.CreateCoachingContract(r.Context(), db.CreateCoachingContractParams{
+			PreferredDates:                 preferredDates,
 			ID:                             uuid.New(),
 			PlanID:                         plan.ID,
 			CoachID:                        plan.CoachID,
@@ -215,6 +247,10 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 			ContractID: ct.ID, Party: "requester", ProfileID: &me.ID, Version: contractConsentVersion,
 		})
 	})
+	if errors.Is(err, errPreferredDates) {
+		FieldError(w, map[string]string{"preferred_dates": "空き状況が変わりました。○か△の日を選び直してください"})
+		return
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		Error(w, http.StatusConflict, "conflict", "このコーチには、返事待ちか期間中の申し込みがあります")
@@ -236,6 +272,7 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 // contractJSON は、申し込みの中身。相手の名前などは呼ぶ側で足す。
 func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 	return map[string]any{
+		"preferred_dates":  preferredDatesJSON(ct.PreferredDates),
 		"id":               ct.ID,
 		"competition_name": ct.CompetitionName, "competition_date": dateString(ct.CompetitionDate), "support_start_date": dateString(ct.SupportStartDate), "call_count": ct.CallCount, "call_minutes": ct.CallMinutes, "venue_area": ct.VenueArea, "venue_name": ct.VenueName, "session_count": ct.SessionCount, "session_minutes": ct.SessionMinutes, "travel_fee_yen": ct.TravelFeeYen, "max_participants": ct.MaxParticipants, "fulfillment_version": ct.FulfillmentVersion, "fulfillment_state": ct.FulfillmentState,
 		"plan_id":                           ct.PlanID,
@@ -285,7 +322,8 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		c := s.contractJSON(db.CoachingContract{
-			ID: row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
+			PreferredDates: row.PreferredDates,
+			ID:             row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
@@ -314,7 +352,8 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		c := s.contractJSON(db.CoachingContract{
-			ID: row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
+			PreferredDates: row.PreferredDates,
+			ID:             row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
@@ -354,7 +393,8 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := s.contractJSON(db.CoachingContract{
-		ID: row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
+		PreferredDates: row.PreferredDates,
+		ID:             row.ID, PlanID: row.PlanID, CoachID: row.CoachID, RequesterID: row.RequesterID, PlanKind: row.PlanKind,
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,

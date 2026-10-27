@@ -494,6 +494,7 @@ export type CoachingContractStatus =
   | "expired"
   | "cancelled";
 export type CoachingContract = PlanIncludes & {
+  preferred_dates?: string[];
   fulfillment_version?: number;
   fulfillment_state?: string;
   // 最初の動画から数えるプランで、動画が届いて期間を数え始めた時刻。
