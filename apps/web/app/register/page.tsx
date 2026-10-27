@@ -8,7 +8,6 @@ import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
-import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 import { ServiceConsentText } from "@/components/service-consent-text";
 import { rememberOverseasConsent } from "@/lib/overseas-consent";
 import { useCaptcha } from "@/components/auth-captcha";
@@ -112,12 +111,6 @@ export default function RegisterPage() {
           />
           <ServiceConsentText />
         </label>
-        <details className="rounded-lg border border-slate-700 px-3 py-2">
-          <summary className="cursor-pointer text-sm text-slate-200">海外の事業者に預けることについて</summary>
-          <div className="pt-2">
-            <OverseasConsentNotice />
-          </div>
-        </details>
         {captcha.widget}
         <Button type="submit" className="w-full" disabled={pending || !agreed || !captcha.ready}>
           登録

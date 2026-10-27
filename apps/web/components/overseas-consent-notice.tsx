@@ -1,5 +1,5 @@
 // 海外の事業者に個人情報を預けることへの同意(個人情報保護法28条)の前に示す説明。
-// 登録画面、同意の画面、プライバシーポリシー第7条で同じ文を使う。中身を変えたら API の overseasConsentVersion も上げる。
+// 登録画面と同意画面からリンクするプライバシーポリシー第7条に掲載。中身を変えたら API の overseasConsentVersion も上げる。
 export const usSystemReportUrl = "https://www.ppc.go.jp/enforcement/infoprovision/laws/offshore_report_america/";
 
 export function OverseasConsentNotice() {
