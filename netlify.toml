@@ -15,6 +15,9 @@
   # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。
   NEXT_PUBLIC_POSTHOG_KEY = "phc_rRHpSCdA2jSgQuTnAUMTGPWbd2No24S4vdU25RMFGwmA"
   NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com"
+  # 登録・ログインの自動操作対策(Cloudflare Turnstile)の公開用の鍵。秘密の鍵は Supabase にだけ入れる。
+  # これで確認の枠が出るのを確かめてから、Supabase の CAPTCHA を有効にする(docs/account-security.md)。
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAFn-wwNGiE8fdc4e"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
