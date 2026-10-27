@@ -38,19 +38,12 @@ export function AppIconMark({ className = "" }: { className?: string }) {
 
 // アプリ内もホーム画面と同じマークを使う。ヘッダーでは白地を敷かず、濃紺の上にレーンだけを乗せる。
 // 白地の余白がなくなる分、viewBox をレーンの範囲に切り詰めて大きさを保つ。
-// タイトルは暗いヘッダーでも読める青にする。
+// タイトルは濃紺の上で読みやすい白にする。
 export function AppLogo() {
   return (
     <span className="inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap">
       <TrackLanesMark viewBox="112 122 286 286" className="size-8 shrink-0" />
-      <span
-        className="bg-clip-text text-xl font-black leading-none tracking-tight text-transparent"
-        style={{
-          backgroundImage: `linear-gradient(135deg, ${appIconColors.from}, color-mix(in srgb, ${appIconColors.to} 60%, white))`,
-        }}
-      >
-        TrackTalk
-      </span>
+      <span className="text-xl font-black leading-none tracking-tight text-white">TrackTalk</span>
     </span>
   );
 }
