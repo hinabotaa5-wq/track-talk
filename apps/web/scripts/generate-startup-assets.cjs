@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- ロゴ定義の変換にCommonJSのModuleを使用する生成スクリプト。 */
 // 実行: node scripts/generate-startup-assets.cjs
-// アプリと同じロゴから、PWAとiOSの起動画像を再生成する。
+// アプリと同じロゴから、PWAとiOSの起動画像を再生成する。起動画像の背景はヘッダーと同じ濃紺。
 const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
@@ -33,7 +33,7 @@ async function generate() {
   for (const [width, height, ratio] of screens) {
     const logo = await sharp(Buffer.from(svg)).resize(192 * ratio, 192 * ratio).png().toBuffer();
     for (const [w, h] of [[width * ratio, height * ratio], [height * ratio, width * ratio]]) {
-      await sharp({ create: { width: w, height: h, channels: 3, background: "white" } })
+      await sharp({ create: { width: w, height: h, channels: 3, background: "#16243a" } })
         .composite([{ input: logo, gravity: "centre" }]).png()
         .toFile(path.join(startup, `${w}x${h}.png`));
     }

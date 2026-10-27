@@ -22,18 +22,18 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-it("JavaScriptの実行前から白背景の中央にインラインロゴを描ける", () => {
+it("JavaScriptの実行前からヘッダーと同じ濃紺の中央にインラインロゴを描ける", () => {
   const html = renderToStaticMarkup(<StartupSplash />);
   container.innerHTML = html;
   const splash = container.querySelector<HTMLElement>("#startup-splash")!;
   expect(splash.style.position).toBe("fixed");
-  expect(splash.style.background).toBe("rgb(255, 255, 255)");
+  expect(splash.style.background).toBe("rgb(22, 36, 58)");
   expect(splash.style.placeItems).toBe("center");
   expect(splash.querySelectorAll("svg path")).toHaveLength(3);
   expect(splash.querySelector("img")).toBeNull();
 });
 
-it("準備が済んだ次の描画で閉じ、その後の再読み込み状態では再表示しない", async () => {
+it("準備が済んだらフェードしてから閉じ、その後の再読み込み状態では再表示しない", async () => {
   await act(async () => root.render(<StartupSplash />));
   expect(container.querySelector("#startup-splash")).not.toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(500));
@@ -41,6 +41,9 @@ it("準備が済んだ次の描画で閉じ、その後の再読み込み状態�
   auth.loading = false;
   await act(async () => root.render(<StartupSplash />));
   await act(async () => vi.advanceTimersByTimeAsync(20));
+  // 急に消さず、フェード中の状態を経由する。
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
+  await act(async () => vi.advanceTimersByTimeAsync(400));
   expect(container.querySelector("#startup-splash")).toBeNull();
   auth.loading = true;
   await act(async () => root.render(<StartupSplash />));
@@ -50,5 +53,7 @@ it("準備が済んだ次の描画で閉じ、その後の再読み込み状態�
 it("認証の応答がない場合もロゴを表示したまま閉じ込めない", async () => {
   await act(async () => root.render(<StartupSplash />));
   await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
+  await act(async () => vi.advanceTimersByTimeAsync(400));
   expect(container.querySelector("#startup-splash")).toBeNull();
 });

@@ -18,7 +18,19 @@ body {
 
 /* 起動用JSが届かなかった場合もロゴで画面を隠し続けない。 */
 @keyframes startup-splash-release {
-  to { visibility: hidden; }
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* 読み込みが済んだら、急に消さずにふわっと消す。長さは startup-splash.tsx の fadeMs と合わせる。 */
+#startup-splash[data-state="leaving"] {
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #startup-splash[data-state="leaving"] {
+    transition-duration: 1ms;
+  }
 }
 
 @theme inline {

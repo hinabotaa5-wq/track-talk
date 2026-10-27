@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "陸上競技を、もっと深く楽しむコミュニティ",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
+    background_color: "#16243a",
     theme_color: "#16243a",
     lang: "ja",
     icons: [
