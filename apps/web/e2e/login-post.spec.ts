@@ -8,6 +8,10 @@ test("login then publish a text post", async ({ page }) => {
   await page.getByPlaceholder("メール").fill("runner@example.com");
   await page.getByPlaceholder("パスワード").fill("password1");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  // 登録画面を通らずにログインした人は、海外の事業者に預けることへの同意から始まる。
+  await expect(page.getByRole("heading", { name: "海外の事業者に預けることへの同意" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "同意して続ける" }).click();
   // はじめてのログインは、ニックネームと種目を決めるまで先に進めない。
   await expect(page.getByRole("heading", { name: "ニックネームと種目を決めよう" })).toBeVisible({ timeout: 20_000 });
   await page.getByPlaceholder("ニックネーム").fill("あされん");

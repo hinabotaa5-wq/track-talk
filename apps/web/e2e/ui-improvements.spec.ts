@@ -306,6 +306,8 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
   await expect(track.locator("img")).toHaveCount(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
+  // 画像のloadで予約された配置計算とReactの描画を待ってから、更新前の配置を記録する。
+  await track.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const before = await layout();
   await page.reload();
   await expect(track.locator("img")).toHaveCount(6);

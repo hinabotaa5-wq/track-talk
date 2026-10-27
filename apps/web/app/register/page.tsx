@@ -8,6 +8,8 @@ import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
+import { rememberOverseasConsent } from "@/lib/overseas-consent";
 import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -47,7 +49,7 @@ export default function RegisterPage() {
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     if (!agreed) {
-      setError("登録には利用規約・ガイドライン・プライバシーポリシーへの同意が必要です。");
+      setError("登録には利用規約・ガイドライン・プライバシーポリシーと、海外の事業者に預けることへの同意が必要です。");
       return;
     }
     const supabase = createClient();
@@ -62,6 +64,7 @@ export default function RegisterPage() {
     if (!acquire()) return;
     setError("");
     rememberNextPath("/me/profile?onboarding=1", 86400);
+    rememberOverseasConsent();
     const { data, error: err } = await supabase.auth
       .signUp({
         email: values.email,
@@ -118,15 +121,21 @@ export default function RegisterPage() {
             <Link href="/privacy" className="inline-block text-blue-400 transition active:scale-[0.98]">
               プライバシーポリシー
             </Link>
-            に同意する
+            に同意し、個人情報を米国などの海外の事業者に預けること（プライバシーポリシー第7条）にも同意する
           </span>
         </label>
+        <details className="rounded-lg border border-slate-700 px-3 py-2">
+          <summary className="cursor-pointer text-sm text-slate-200">海外の事業者に預けることについて</summary>
+          <div className="pt-2">
+            <OverseasConsentNotice />
+          </div>
+        </details>
         {captcha.widget}
         <Button type="submit" className="w-full" disabled={pending || !agreed || !captcha.ready}>
           登録
         </Button>
       </form>
-      <GoogleSignInButton nextPath="/me/profile?onboarding=1" label="Googleで登録" disabled={!agreed} />
+      <GoogleSignInButton nextPath="/me/profile?onboarding=1" label="Googleで登録" disabled={!agreed} onStart={rememberOverseasConsent} />
       <p className="text-sm">
         アカウントがある場合は <Link href="/login" className="inline-block text-blue-400 transition active:scale-[0.98]">ログイン</Link>
       </p>
