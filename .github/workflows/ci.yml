@@ -45,11 +45,14 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: "1.25"
+          go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
       - name: Test
         working-directory: apps/api
         run: go test ./...
+      - name: Check Go vulnerabilities
+        working-directory: apps/api
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   web:
     runs-on: ubuntu-latest
@@ -103,7 +106,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: "1.25"
+          go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
