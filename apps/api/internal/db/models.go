@@ -722,6 +722,13 @@ type PracticeRating struct {
 	HiddenAt      *time.Time `json:"hidden_at"`
 }
 
+type PrivacyConsent struct {
+	UserID      uuid.UUID `json:"user_id"`
+	Kind        string    `json:"kind"`
+	Version     string    `json:"version"`
+	ConsentedAt time.Time `json:"consented_at"`
+}
+
 type Product struct {
 	ID             uuid.UUID  `json:"id"`
 	Kind           string     `json:"kind"`
@@ -918,4 +925,9 @@ type SenseNoteSummary struct {
 type SenseNoteSummaryClaim struct {
 	AuthorID  uuid.UUID `json:"author_id"`
 	ClaimedAt time.Time `json:"claimed_at"`
+}
+
+type SenseSummaryAttempt struct {
+	ID          int64     `json:"id"`
+	AttemptedAt time.Time `json:"attempted_at"`
 }

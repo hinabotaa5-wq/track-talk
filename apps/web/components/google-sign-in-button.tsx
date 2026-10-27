@@ -33,10 +33,13 @@ export function GoogleSignInButton({
   nextPath,
   label = "Googleでログイン",
   disabled = false,
+  onStart,
 }: {
   nextPath?: string;
   label?: string;
   disabled?: boolean;
+  // Google へ移る直前に呼ぶ(登録画面で、同意した印を残すため)。
+  onStart?: () => void;
 }) {
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -49,6 +52,7 @@ export function GoogleSignInButton({
     }
     if (!acquire()) return;
     setError("");
+    onStart?.();
     if (nextPath) {
       document.cookie = `tracktalk-next=${encodeURIComponent(nextPath)}; Path=/; Max-Age=600; SameSite=Lax`;
     }
