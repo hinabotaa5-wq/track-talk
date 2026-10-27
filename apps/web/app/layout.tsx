@@ -14,6 +14,7 @@ import { LastTabRestorer } from "@/components/last-tab-restorer";
 import { lastTabStartupScript } from "@/lib/last-tab";
 import { pendingLinkStartupScript } from "@/lib/pending-link-startup";
 import { PendingLinkReset } from "@/components/pending-link-reset";
+import { ScreenLoader } from "@/components/screen-loader";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -114,6 +115,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
             <AccountMfaGate>{children}</AccountMfaGate>
           </main>
+          <ScreenLoader />
           <BottomNav />
           <ScrollTopOnTabChange />
           <CaretGuard />

@@ -27,7 +27,7 @@ test("起動直後の通信が終わらなくても検索とホームの切替�
   }
 });
 
-test("下部バーは移動が0.2秒以上かかる場合だけ回し、待っている間も別のタブへ移れる", async ({ page }) => {
+test("タブの移動に時間がかかるあいだは画面に読み込み表示を出し、待っている間も別のタブへ移れる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let release: (() => void) | undefined;
   await page.route("**/competitions?*", async (route) => {
@@ -43,10 +43,13 @@ test("下部バーは移動が0.2秒以上かかる場合だけ回し、待っ�
     // 起動準備が終わった後でも、遅い移動だけを表示する。
     await page.waitForTimeout(4000);
     await competitions.click();
-    await expect(competitions.getByRole("status")).toHaveText("大会を開いています");
+    await expect(page.getByRole("status").filter({ hasText: "画面を開いています" })).toHaveCount(1);
+    await expect(page.locator(".screen-loader")).toBeVisible();
+    await expect(competitions.locator("svg.animate-spin")).toHaveCount(0);
     await nav.getByRole("link", { name: "コーチ", exact: true }).click();
     await expect(page).toHaveURL(/\/coaching$/);
     await expect(nav.getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".screen-loader")).toBeHidden();
   } finally {
     release?.();
     await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -66,8 +69,8 @@ test("投稿画面の通信が遅くても、押した直後に待機表示が�
     await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
     const post = page.getByRole("link", { name: "投稿する", exact: true });
     await post.click();
-    await expect(post.getByRole("status")).toHaveText("投稿画面を開いています");
-    await expect(post.locator('[aria-busy="true"]')).toBeVisible();
+    await expect(page.locator(".screen-loader")).toBeVisible();
+    await expect(post.locator('[aria-busy="true"]')).toHaveCount(1);
     const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
     await nav.getByRole("link", { name: "コーチ", exact: true }).click();
     await expect(page).toHaveURL(/\/coaching$/);

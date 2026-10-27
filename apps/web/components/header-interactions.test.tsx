@@ -71,14 +71,14 @@ describe("ヘッダーの開閉", () => {
     expect(replace).toHaveBeenCalledWith("/injury?tab=data");
   });
 
-  it("マイページへの移動に時間がかかるあいだはクルクルを出す", async () => {
+  it("マイページへの移動に時間がかかっても、アイコンは回さずに薄い色にする", async () => {
     vi.useFakeTimers();
     linkStatus.pending = true;
     await act(async () => root.render(<HeaderAccountPanel signedIn />));
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.querySelector("[aria-busy]")).toBeNull();
     await act(async () => vi.advanceTimersByTime(200));
-    expect(container.querySelector('[role="status"]')?.textContent).toBe("マイページを開いています");
-    expect(container.querySelector("svg.animate-spin")).not.toBeNull();
+    expect(container.querySelector("[aria-busy]")).not.toBeNull();
+    expect(container.querySelector("svg.animate-spin")).toBeNull();
   });
 
   it("マイページを開いている間はアイコンを選択状態にする", async () => {
