@@ -13,6 +13,12 @@ updates:
     directory: /apps/web
     schedule:
       interval: monthly
+    # Node は 22 で動かしているので、型定義は 22 のまま。TypeScript は Next.js が対応してから上げる。
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       web:
         patterns: ["*"]
@@ -28,6 +34,10 @@ updates:
     directories: ["/apps/api", "/apps/web"]
     schedule:
       interval: monthly
+    # Node のメジャーは、Netlify のビルドの版とあわせて手で上げる。
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
     groups:
       docker:
         patterns: ["*"]
