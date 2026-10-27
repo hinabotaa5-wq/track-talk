@@ -64,6 +64,12 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Content-Security-Policy", value: contentSecurityPolicy() },
+          // カメラ・マイク・位置情報などは使わないので、埋め込みや混入したスクリプトからも使えないようにする。
+          // 動画はファイルを選んで送るだけで、カメラの API は使わない。
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=()",
+          },
         ],
       },
       // ホームはログインに関係なく同じ中身なので、Netlify の端で短くキャッシュする。
