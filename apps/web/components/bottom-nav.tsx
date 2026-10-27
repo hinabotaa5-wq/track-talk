@@ -1,6 +1,6 @@
 "use client";
 
-import { MainTabLink, PendingIcon } from "./main-tab-link";
+import { MainTabLink } from "./main-tab-link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
@@ -195,9 +195,7 @@ export function BottomNav() {
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  <PendingIcon className="size-5" label={`${tab.label}を開いています`}>
-                    <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                  </PendingIcon>
+                  <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
                   <span>{tab.label}</span>
                 </MainTabLink>
               </li>

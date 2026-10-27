@@ -2,7 +2,9 @@
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MainTabLink, PendingIcon } from "./main-tab-link";
+import { MainTabLink } from "./main-tab-link";
+import { ScreenLoader } from "./screen-loader";
+import { clearLinkPending, markLinkPending } from "@/lib/pending-link";
 import { HomePostFab, PostFab } from "./post-fab";
 import { ComposerPage } from "./composer-page";
 import UploadPage from "@/app/upload/page";
@@ -44,8 +46,8 @@ it("起動後に投稿画面全体を先読みし、遷移中は反応を表示�
   expect(state.prefetch).toBe(true);
   state.pending = true;
   await act(async () => root.render(<PostFab />));
-  expect(container.querySelector('[role="status"]')?.textContent).toBe("投稿画面を開いています");
-  expect(container.querySelector("svg.animate-spin")).not.toBeNull();
+  expect(container.querySelector("[aria-busy]")).not.toBeNull();
+  expect(container.querySelector("svg.animate-spin")).toBeNull();
 });
 it("ログイン済みならプロフィール取得待ちでも投稿の入口とフォームを表示する", async () => {
   state.loading = true;
@@ -68,31 +70,45 @@ it("認証の確認中はログインへ飛ばさず、未ログイン確定後�
   expect(state.replace).toHaveBeenLastCalledWith("/login?next=/upload");
 });
 
-it("下部バーは0.2秒待った場合だけ回し、移動が終われば戻す", async () => {
+it("下部バーのタブは0.2秒待った場合だけ薄い色にし、アイコンは回さない", async () => {
   vi.useFakeTimers();
-  const view = () => <MainTabLink pendingDelay={200} href="/memo"><PendingIcon className="size-5" label="開いています"><span>メモのアイコン</span></PendingIcon></MainTabLink>;
+  const view = () => <MainTabLink pendingDelay={200} href="/memo"><span>メモのアイコン</span></MainTabLink>;
+  const busy = () => container.querySelector("[aria-busy]");
   try {
     state.pending = true;
     await act(async () => root.render(view()));
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(busy()).toBeNull();
     await act(async () => vi.advanceTimersByTime(199));
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(busy()).toBeNull();
     await act(async () => vi.advanceTimersByTime(1));
-    expect(container.querySelector('[role="status"]')?.textContent).toBe("開いています");
-    await act(async () => state.ready?.());
-    expect(container.querySelector('[role="status"]')).not.toBeNull();
+    expect(busy()).not.toBeNull();
+    expect(container.querySelector("svg")).toBeNull();
     state.pending = false;
     await act(async () => root.render(view()));
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(busy()).toBeNull();
     state.pending = true;
     await act(async () => root.render(view()));
     await act(async () => vi.advanceTimersByTime(100));
     state.pending = false;
     await act(async () => root.render(view()));
     await act(async () => vi.advanceTimersByTime(500));
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(busy()).toBeNull();
     expect(container.textContent).toContain("メモのアイコン");
   } finally { vi.useRealTimers(); }
+});
+
+it("タブをタップすると画面に読み込み表示を出し、URL が変われば消す", async () => {
+  const view = () => <><MainTabLink href="/memo">メモ</MainTabLink><ScreenLoader /></>;
+  await act(async () => root.render(view()));
+  const loader = () => container.querySelector(".screen-loader");
+  expect(loader()?.className).toContain("hidden");
+  expect(container.querySelector('a[href="/memo"]')?.hasAttribute("data-screen-loader")).toBe(true);
+  await act(async () => markLinkPending("memo", "/memo"));
+  expect(loader()?.className).toContain("flex");
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("画面を開いています");
+  await act(async () => clearLinkPending());
+  expect(loader()?.className).toContain("hidden");
+  expect(container.querySelector('[role="status"]')).toBeNull();
 });
 
 it("レビューのタブでは投稿ボタンを出さない", async () => {

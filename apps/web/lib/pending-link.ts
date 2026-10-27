@@ -10,13 +10,13 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-// いまの画面と同じ URL へのタップは URL が変わらないので、クルクルを出さない。
+// いまの画面と同じ URL へのタップは URL が変わらないので、読み込み表示を出さない。
 export function markLinkPending(id: string, href: string) {
   const url = new URL(href, window.location.href);
   if (url.pathname + url.search === window.location.pathname + window.location.search) return;
   pendingId = id;
   clearTimeout(timer);
-  // 移動が取り消されたときなどに回り続けないよう、しばらくしたら止める。
+  // 移動が取り消されたときなどに出たままにならないよう、しばらくしたら止める。
   timer = setTimeout(clearLinkPending, 15_000);
   emit();
 }
@@ -38,6 +38,11 @@ function subscribe(listener: () => void) {
 
 export function useIsLinkPending(id: string) {
   return useSyncExternalStore(subscribe, () => pendingId === id, () => false);
+}
+
+// どれかのリンクが開いている途中か。画面の読み込み表示に使う。
+export function useIsAnyLinkPending() {
+  return useSyncExternalStore(subscribe, () => pendingId !== null, () => false);
 }
 
 export function markAppHydrated() {
