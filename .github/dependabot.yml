@@ -1,0 +1,33 @@
+# 使っているライブラリに既知の脆弱性が見つかったり、古くなったりしたときに、更新の PR を自動で作る。
+# PR が増えすぎないよう、月1回・種類ごとに1本にまとめる。マージしても自動では本番に出ない。
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /apps/api
+    schedule:
+      interval: monthly
+    groups:
+      go:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: monthly
+    groups:
+      web:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directories: ["/apps/api", "/apps/web"]
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns: ["*"]
