@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 import { ServiceConsentText } from "@/components/service-consent-text";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -44,7 +43,7 @@ function ConsentForm() {
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">利用にあたっての同意</h1>
       <p className="text-sm leading-7 text-slate-300">
-        TrackTalk を利用する前に、利用規約・コミュニティガイドライン・プライバシーポリシーと、海外の事業者に個人情報を預けることについて確認してください。
+        TrackTalk を利用する前に、以下の内容を確認してください。海外への個人情報提供の詳細は、プライバシーポリシー第7条に記載しています。
       </p>
       <label className="flex cursor-pointer items-start gap-2 text-sm">
         <input
@@ -55,12 +54,6 @@ function ConsentForm() {
         />
         <ServiceConsentText />
       </label>
-      <details className="rounded-lg border border-slate-700 px-3 py-2">
-        <summary className="cursor-pointer text-sm text-slate-200">海外の事業者に預けることについて</summary>
-        <div className="pt-2">
-          <OverseasConsentNotice />
-        </div>
-      </details>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="button" className="w-full" disabled={!checked || pending || !session} onClick={onConsent}>
         同意して続ける
