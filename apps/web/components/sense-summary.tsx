@@ -183,5 +183,5 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
 // 送信の説明は瓶の横の細い欄に詰めず、作成できるときにその下で全文を示す。
 export function SenseSummaryNotice({ state }: { state: ReturnType<typeof useSenseSummaries> }) {
   if (!state.loaded || state.pendingNotes < state.minNotes) return null;
-  return <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{state.minNotes}個、GoogleのGeminiへ送ります。送信内容はGoogleの製品改善に使われ、担当者が読む場合があります。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p>;
+  return <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{state.minNotes}個、Anthropic（米国）のAI「Claude」へ送ります。送った内容はAIの学習には使われません。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p>;
 }

@@ -10,12 +10,12 @@ import (
 )
 
 func TestSenseSummaryBudgetCountsFailuresAndSkipsInvalidRequests(t *testing.T) {
-	ai := &fakeGemini{reply: "invalid JSON"}
+	ai := &fakeClaude{reply: "invalid JSON"}
 	endpoint := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = endpoint
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = endpoint
 		c.SenseSummaryDailyLimit = 2
 	})
 	me := token(t, uuid.New())
@@ -39,12 +39,12 @@ func TestSenseSummaryBudgetCountsFailuresAndSkipsInvalidRequests(t *testing.T) {
 }
 
 func TestSenseSummaryBudgetMinuteAndRollingDay(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"ok"}`}
+	ai := &fakeClaude{reply: `{"overview":"ok"}`}
 	endpoint := ai.serve(t)
 	h := setupConfig(t, func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = endpoint
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = endpoint
 		c.SenseSummaryDailyLimit = 2
 		c.SenseSummaryMinuteLimit = 1
 	})
@@ -68,12 +68,12 @@ func TestSenseSummaryBudgetMinuteAndRollingDay(t *testing.T) {
 }
 
 func TestSenseSummaryBudgetSerializesAcrossServers(t *testing.T) {
-	ai := &fakeGemini{reply: `{"overview":"ok"}`}
+	ai := &fakeClaude{reply: `{"overview":"ok"}`}
 	endpoint := ai.serve(t)
 	configure := func(c *config.Config) {
 		c.SenseSummaryEnabled = true
-		c.GeminiAPIKey = "test"
-		c.GeminiEndpoint = endpoint
+		c.AnthropicAPIKey = "test"
+		c.AnthropicEndpoint = endpoint
 		c.SenseSummaryDailyLimit = 2
 	}
 	first, second := setupConfig(t, configure), setupConfig(t, configure)

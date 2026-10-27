@@ -84,6 +84,8 @@ type injuryJoinReq struct {
 	// Hindsight は、前から入っている人の更新やむかしの画面からも来るので、空でもよい。
 	Hindsight []string `json:"hindsight"`
 	Stage     string   `json:"stage"`
+	// HealthConsent は、ケガの情報を健康に関する情報として扱うことへの同意(要配慮個人情報なので、取る前に同意がいる)。
+	HealthConsent bool `json:"health_consent"`
 }
 
 type injuryJoin struct {
@@ -178,6 +180,9 @@ func normalizeInjuryJoin(part string, req injuryJoinReq, now time.Time) (injuryJ
 	out.Stage = strings.TrimSpace(req.Stage)
 	if !validInjuryStage(out.Stage) {
 		fields["stage"] = "いまの段階を選んでください"
+	}
+	if !req.HealthConsent {
+		fields["health_consent"] = "ケガの情報の取り扱いに同意してください"
 	}
 	return out, fields
 }

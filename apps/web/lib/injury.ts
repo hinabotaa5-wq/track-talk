@@ -334,6 +334,7 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
     pre_changes: answers.preChanges,
     hindsight: answers.hindsight,
     stage: answers.stage,
+    health_consent: true,
   };
 }
 

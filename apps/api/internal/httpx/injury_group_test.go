@@ -14,6 +14,7 @@ func joinBody(stage string) map[string]any {
 	return map[string]any{
 		"severity": "moderate", "saw_doctor": true, "injured_on": "2026-09-20", "place": "tartan",
 		"activity": "sprint", "pre_changes": []string{"more-volume", "new-shoes"}, "stage": stage,
+		"health_consent": true,
 	}
 }
 
@@ -60,19 +61,20 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 	h := setup(t)
 	tok := token(t, uuid.New())
 	for name, body := range map[string]map[string]any{
-		"no severity":      joinBodyWith("rehab", map[string]any{"severity": nil}),
-		"bad severity":     joinBodyWith("rehab", map[string]any{"severity": "light"}),
-		"no doctor answer": joinBodyWith("rehab", map[string]any{"saw_doctor": nil}),
-		"no date":          joinBodyWith("rehab", map[string]any{"injured_on": nil}),
-		"month only":       joinBodyWith("rehab", map[string]any{"injured_on": "2026-09"}),
-		"future date":      joinBodyWith("rehab", map[string]any{"injured_on": "2999-01-01"}),
-		"too old":          joinBodyWith("rehab", map[string]any{"injured_on": "2000-01-01"}),
-		"bad place":        joinBodyWith("rehab", map[string]any{"place": "練習中のトラック"}),
-		"bad activity":     joinBodyWith("rehab", map[string]any{"activity": "run"}),
-		"no pre changes":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{}}),
-		"none with others": joinBodyWith("rehab", map[string]any{"pre_changes": []string{"none", "fatigue"}}),
-		"bad pre change":   joinBodyWith("rehab", map[string]any{"pre_changes": []string{"rain"}}),
-		"bad stage":        joinBodyWith("sprint", nil),
+		"no severity":       joinBodyWith("rehab", map[string]any{"severity": nil}),
+		"bad severity":      joinBodyWith("rehab", map[string]any{"severity": "light"}),
+		"no doctor answer":  joinBodyWith("rehab", map[string]any{"saw_doctor": nil}),
+		"no health consent": joinBodyWith("rehab", map[string]any{"health_consent": nil}),
+		"no date":           joinBodyWith("rehab", map[string]any{"injured_on": nil}),
+		"month only":        joinBodyWith("rehab", map[string]any{"injured_on": "2026-09"}),
+		"future date":       joinBodyWith("rehab", map[string]any{"injured_on": "2999-01-01"}),
+		"too old":           joinBodyWith("rehab", map[string]any{"injured_on": "2000-01-01"}),
+		"bad place":         joinBodyWith("rehab", map[string]any{"place": "練習中のトラック"}),
+		"bad activity":      joinBodyWith("rehab", map[string]any{"activity": "run"}),
+		"no pre changes":    joinBodyWith("rehab", map[string]any{"pre_changes": []string{}}),
+		"none with others":  joinBodyWith("rehab", map[string]any{"pre_changes": []string{"none", "fatigue"}}),
+		"bad pre change":    joinBodyWith("rehab", map[string]any{"pre_changes": []string{"rain"}}),
+		"bad stage":         joinBodyWith("sprint", nil),
 	} {
 		if rec := doJSON(t, h, http.MethodPost, "/v1/injury/groups/jumpers-knee/join", tok, body); rec.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body.String())
