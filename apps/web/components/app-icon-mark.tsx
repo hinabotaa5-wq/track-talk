@@ -36,11 +36,13 @@ export function AppIconMark({ className = "" }: { className?: string }) {
   );
 }
 
-// アプリ内もホーム画面と同じマークを使う。タイトルは暗いヘッダーでも読める青にする。
+// アプリ内もホーム画面と同じマークを使う。ヘッダーでは白地を敷かず、濃紺の上にレーンだけを乗せる。
+// 白地の余白がなくなる分、viewBox をレーンの範囲に切り詰めて大きさを保つ。
+// タイトルは暗いヘッダーでも読める青にする。
 export function AppLogo() {
   return (
     <span className="inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-      <AppIconMark className="size-9" />
+      <TrackLanesMark viewBox="112 122 286 286" className="size-8 shrink-0" />
       <span
         className="bg-clip-text text-xl font-black leading-none tracking-tight text-transparent"
         style={{
