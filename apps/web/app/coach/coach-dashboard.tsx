@@ -6,6 +6,7 @@ import { CoachApplyLink } from "@/components/coach-apply-link";
 import { useAuth } from "@/components/auth-provider";
 import { CoachEarningsSection } from "@/components/coach-payouts";
 import { CoachPhotoForm } from "@/components/coach-photo";
+import { CoachAvailabilityEditor } from "@/components/coach-availability";
 import { CoachContractsSection } from "@/components/coaching-contracts";
 import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
@@ -300,6 +301,8 @@ export function CoachDashboard() {
       <CoachRequestsSection token={token} />
 
       <CoachContractsSection token={token} />
+
+      <CoachAvailabilityEditor token={token} />
 
       <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 

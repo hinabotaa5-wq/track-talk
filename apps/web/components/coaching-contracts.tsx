@@ -1,5 +1,6 @@
 "use client";
 
+import { availabilityDateLabel } from "@/lib/coach-availability";
 import { PlanIncludesList } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -74,6 +75,11 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
         <dt className="text-xs text-slate-300">種目</dt>
         <dd className="text-slate-100">{coachEventLabels[contract.event]}</dd>
       </div>
+      {contract.preferred_dates?.length ? <div>
+        <dt className="text-xs text-slate-300">希望日（未確定）</dt>
+        <dd className="text-slate-100">{contract.preferred_dates.map(availabilityDateLabel).join("、")}</dd>
+        <dd className="text-xs text-slate-300">日程はメッセージで相談して決めます。</dd>
+      </div> : null}
       <div>
         <dt className="text-xs text-slate-300">目標</dt>
         <dd className="whitespace-pre-wrap text-slate-100">{contract.goal}</dd>
