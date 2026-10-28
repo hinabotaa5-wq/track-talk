@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 function coachPrice(coach: PublicCoach) {
-  const prices = (coach.plans ?? []).filter((plan) => plan.published).map((plan) => plan.price_yen);
+  const prices = (coach.plans ?? []).filter((plan) => plan.published && plan.service_type !== "video_review").map((plan) => plan.price_yen);
   if (prices.length === 0) return "プラン未公開";
   const minimum = Math.min(...prices);
   return `${formatYen(minimum)}${prices.some((price) => price !== minimum) ? "〜" : ""}`;

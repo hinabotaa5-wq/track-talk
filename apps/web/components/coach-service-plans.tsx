@@ -1,13 +1,12 @@
 "use client";
 
-import { ChevronDown, MapPin, Trophy, Video } from "lucide-react";
+import { ChevronDown, MapPin, Trophy } from "lucide-react";
 import { useId, useState } from "react";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import type { CoachingPlan, CoachingServiceType } from "@/lib/types";
 import { PublicPlanList } from "./coaching-plans";
 
 const choices = [
-  { service: "video_review", icon: Video, description: "走りの動画を送り、フォームの改善点や練習のアドバイスを受ける" },
   { service: "competition_support", icon: Trophy, description: "目標の大会まで、練習や調整を継続して相談する" },
   { service: "in_person", icon: MapPin, description: "コーチと現地で会い、動きを見てもらいながら指導を受ける" },
 ] as const;
@@ -15,7 +14,7 @@ const choices = [
 export function CoachServicePlans({ services, plans }: { services: CoachingServiceType[]; plans: CoachingPlan[] }) {
   const [selected, setSelected] = useState<CoachingServiceType | null>(null);
   const panelID = useId();
-  const publicPlans = plans.filter((plan) => plan.published);
+  const publicPlans = plans.filter((plan) => plan.published && plan.service_type !== "video_review");
   const available = (service: CoachingServiceType) => services.includes(service) && publicPlans.some((plan) => plan.service_type === service);
   const active = selected && available(selected) ? selected : null;
   const legacy = publicPlans.filter((plan) => !plan.service_type);

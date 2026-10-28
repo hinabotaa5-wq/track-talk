@@ -226,7 +226,7 @@ FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 WHERE pl.published
   AND c.status = 'approved'
-  AND (pl.service_type IS NULL OR (pl.service_type IN ('video_review','competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
+  AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
   AND c.pledge_version >= $1::smallint
 ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id
@@ -332,7 +332,7 @@ SET pledged_at = now(),
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, nomination_fee_yen
 `
 
 type PledgeCoachParams struct {
@@ -368,6 +368,7 @@ func (q *Queries) PledgeCoach(ctx context.Context, arg PledgeCoachParams) (Coach
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.NominationFeeYen,
 	)
 	return i, err
 }

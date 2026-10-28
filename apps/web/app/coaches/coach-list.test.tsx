@@ -51,8 +51,8 @@ it("詳細URLを直接開いても対象コーチのプロフィールと公開�
   expect(container.textContent).toContain("成績や指導経験");
   expect(container.textContent).not.toContain("公開中の動画添削");
   const video = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("動画添削"));
-  await act(async () => video!.click());
-  expect(container.textContent).toContain("公開中の動画添削");
+  expect(video).toBeUndefined();
+  expect(container.textContent).not.toContain("公開中の動画添削");
   const sns = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "https://www.instagram.com/testcoach/");
   expect(sns?.getAttribute("target")).toBe("_blank");
 });

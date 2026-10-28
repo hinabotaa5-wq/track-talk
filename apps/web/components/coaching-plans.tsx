@@ -103,7 +103,7 @@ function CoachServicesForm({ coach, token, onSaved }: { coach: CoachApplication;
   }
   return <fieldset className="space-y-3 rounded-xl border border-white/20 p-3" disabled={pending}>
     <legend className="text-sm font-semibold">担当するサービス（複数選択可）</legend>
-    {(Object.keys(coachingServiceLabels) as CoachingServiceType[]).map((service) => <label key={service} className="flex items-center gap-2 text-sm text-slate-100">
+    {(Object.keys(coachingServiceLabels) as CoachingServiceType[]).filter((service) => service !== "video_review").map((service) => <label key={service} className="flex items-center gap-2 text-sm text-slate-100">
       <input type="checkbox" checked={services.includes(service)} onChange={() => { setSaved(false); setServices((values) => values.includes(service) ? values.filter((v) => v !== service) : [...values, service]); }} />
       {coachingServiceLabels[service]}{!serviceReady(service) ? "（公開準備中）" : ""}
     </label>)}
@@ -371,14 +371,14 @@ function PlanForm({
         <legend className="text-sm text-slate-200">サービス</legend>
         <div className="flex flex-wrap gap-2">
           {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来のサポートプラン（分類を選んで移行できます）</span> : null}
-          {services.map((service) => (
+          {services.filter((service) => service !== "video_review").map((service) => (
             <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
               onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
               {coachingServiceLabels[service]}
             </button>
           ))}
         </div>
-        {services.length === 0 ? <p className="text-xs text-slate-300">先に担当するサービスを登録してください。</p> : null}
+        {services.filter((service) => service !== "video_review").length === 0 ? <p className="text-xs text-slate-300">先に担当するサービスを登録してください。</p> : null}
         {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">このサービスは準備中です。下書きとして保存されます。</p> : null}
         {fieldError("service_type")}
       </fieldset>
@@ -573,7 +573,8 @@ export function CoachPlansSection({
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h2 className="font-bold">パーソナル指導のプラン</h2>
+        <h2 className="font-bold">サポートプラン</h2>
+        <p className="text-xs text-slate-300">動画添削の指名は「動画添削の指名料」で設定します。ここでは大会サポートと対面指導を管理します。</p>
         <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
       </div>
       <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />
@@ -603,14 +604,14 @@ export function CoachPlansSection({
                       <PlanIncludesList plan={p} />
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-white" : "bg-white/15 text-slate-300"}`}>
-                      {p.published ? "公開中" : "非公開"}
+                      {p.service_type === "video_review" ? "指名設定へ移行" : p.published ? "公開中" : "非公開"}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap text-slate-200">{p.description}</p>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      disabled={pending || editing !== null}
+                      disabled={pending || editing !== null || p.service_type === "video_review"}
                       onClick={() => setEditing(p.id)}
                       className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
                     >

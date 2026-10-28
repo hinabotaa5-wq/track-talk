@@ -11,13 +11,13 @@ export const metadata: Metadata = {
 const choices = [
   {
     title: "動画添削プラン",
-    description: "おまかせで動画添削",
+    description: "おまかせで動画添削・コーチの指名も可能",
     href: "/coaching/new",
     icon: Shuffle,
   },
   {
     title: "サポートプラン",
-    description: "コーチとプランを選ぶ",
+    description: "大会サポート・対面指導を選ぶ",
     href: "/coaches",
     icon: UserRound,
   },

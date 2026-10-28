@@ -306,6 +306,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/me/coaching/contracts", s.listMyCoachingContracts)
 				// フォーム添削（利用者側）
 				r.Get("/coaching/estimate", s.reviewEstimate)
+				r.Get("/coaching/nominees", s.listReviewNominees)
 				r.Post("/coaching/demo", s.joinCoachingDemo)
 				r.With(s.requireNewAcceptance).Post("/coaching/requests", s.createReviewRequest)
 				r.Get("/coaching/requests/{id}/consultations", s.listConsultationRoom)
