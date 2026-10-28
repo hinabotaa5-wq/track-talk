@@ -1,6 +1,7 @@
 package competitions
 
 import (
+	"errors"
 	xhtml "golang.org/x/net/html"
 	"strings"
 	"testing"
@@ -393,5 +394,12 @@ func TestParsePageEraOnlySeasonYear(t *testing.T) {
 	year, ok := findSeasonYear(doc)
 	if !ok || year != 2026 {
 		t.Fatalf("season %d ok %v", year, ok)
+	}
+}
+
+func TestGifuPreparingIsSkipped(t *testing.T) {
+	_, err := ParsePage(strings.NewReader(`<html><body>只今準備中です。</body></html>`), "https://www.gifu-riku.com/schedule/")
+	if !errors.Is(err, ErrSourceSkipped) {
+		t.Fatalf("%v", err)
 	}
 }

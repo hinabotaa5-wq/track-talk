@@ -145,24 +145,32 @@ func main() {
 		log.Fatal("GEMINI_API_KEY is required")
 	}
 	client := competitions.Client{Key: key}
+	var results importResults
 	for i, source := range targets {
 		if i > 0 {
-			time.Sleep(15 * time.Second)
+			if err := competitions.Wait(ctx, 15*time.Second); err != nil {
+				break
+			}
 		}
 		if err := importSource(ctx, pool, client, source); err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
-			if errors.Is(err, competitions.ErrRateLimited) {
+			results.record(err)
+			if errors.Is(err, competitions.ErrRateLimited) || errors.Is(err, competitions.ErrAuthentication) {
 				os.Exit(1)
 			}
-			failed = true
+		} else {
+			results.record(nil)
 		}
 	}
+	failed = failed || results.failed() || ctx.Err() != nil
 	if len(newsSources) > 0 {
 		// 県と県のあいだと同じ間隔をあけ、無料枠の1分あたりの上限に当たらないようにする。
 		if len(targets) > 0 {
-			time.Sleep(15 * time.Second)
+			if err := competitions.Wait(ctx, 15*time.Second); err != nil {
+				os.Exit(1)
+			}
 		}
-		if importNews(ctx, pool, client, newsSources, newsBudget, false) {
+		if importNews(ctx, pool, client, newsSources, newsBudget, false, &results) {
 			failed = true
 		}
 	}
@@ -234,6 +242,9 @@ func importTimes(ctx context.Context, pool *pgxpool.Pool) (map[string]time.Time,
 func readMeets(ctx context.Context, client competitions.Client, source competitions.Source) ([]competitions.Meet, error) {
 	urls, err := source.ResolveURLs(ctx)
 	if err != nil {
+		if source.Prefecture == "26" && strings.Contains(err.Error(), "403 Forbidden") {
+			return nil, fmt.Errorf("%w: 26 京都陸協が取得元へのアクセスを403で拒否。既存データを維持: %v", competitions.ErrSourceSkipped, err)
+		}
 		return nil, err
 	}
 	if len(urls) == 0 {
@@ -265,7 +276,9 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 		u := pageURLs[i]
 		if i > 0 {
 			// Tier 0 の Flash は5回/分。県内の複数ページ間にも県のあいだと同じ余裕を残す。
-			time.Sleep(15 * time.Second)
+			if err := competitions.Wait(ctx, 15*time.Second); err != nil {
+				return nil, err
+			}
 		}
 		drafts, err := client.Extract(ctx, page)
 		if err != nil {

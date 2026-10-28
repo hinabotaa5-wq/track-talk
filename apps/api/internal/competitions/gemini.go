@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +17,22 @@ import (
 const Model = "gemini-3.8-flash"
 
 var ErrRateLimited = errors.New("gemini rate limit")
+var ErrTransient = errors.New("gemini temporary failure")
+var ErrAuthentication = errors.New("gemini authentication rejected")
+
+// Wait はキャンセル可能な待機。県間の間隔も全体の20分の上限に従う。
+func Wait(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+var retryWait = Wait
 
 var generateEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
@@ -52,10 +69,26 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 
 // geminiClient は、HTTP を指定しないときの Gemini 用のクライアント。応答しないまま
 // 全体の時間を使い切って、残りの県が取り込めなくならないよう、1回ごとに時間を区切る。
-var geminiClient = &http.Client{Timeout: 3 * time.Minute}
+var geminiClient = &http.Client{Timeout: 45 * time.Second}
 
-// generate は、Gemini にリクエストを1回送り、返ってきた JSON の文字列を返す。
+// generate は503とタイムアウトだけを15秒、30秒待って再試行する。
+// 最長は45秒×3回+45秒。親の期限・キャンセルは再試行しない。
 func (c Client) generate(ctx context.Context, parts []map[string]any) (string, error) {
+	for attempt := 0; ; attempt++ {
+		text, err := c.generateOnce(ctx, parts)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if !errors.Is(err, ErrTransient) || attempt == 2 {
+			return text, err
+		}
+		if err := retryWait(ctx, time.Duration(attempt+1)*15*time.Second); err != nil {
+			return "", err
+		}
+	}
+}
+
+func (c Client) generateOnce(ctx context.Context, parts []map[string]any) (string, error) {
 	model := c.Model
 	if model == "" {
 		model = Model
@@ -92,18 +125,33 @@ func (c Client) generate(ctx context.Context, parts []map[string]any) (string, e
 	req.Header.Set("x-goog-api-key", c.Key)
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return "", err
+		var timeout net.Error
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			return "", fmt.Errorf("%w: request timeout", ErrTransient)
+		}
+		// URLやサーバー本文にはキーが含まれ得るのでログに返さない。
+		return "", errors.New("gemini request failed")
 	}
 	defer res.Body.Close()
 	payload, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 	if err != nil {
-		return "", err
+		var timeout net.Error
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			return "", fmt.Errorf("%w: request timeout", ErrTransient)
+		}
+		return "", errors.New("gemini response read failed")
 	}
 	if res.StatusCode == http.StatusTooManyRequests || bytes.Contains(payload, []byte("RESOURCE_EXHAUSTED")) {
-		return "", fmt.Errorf("%w: %s", ErrRateLimited, truncate(payload))
+		return "", ErrRateLimited
+	}
+	if res.StatusCode == 401 || res.StatusCode == 403 || bytes.Contains(payload, []byte("API_KEY_INVALID")) || bytes.Contains(payload, []byte("API key not valid")) {
+		return "", ErrAuthentication
+	}
+	if res.StatusCode == http.StatusServiceUnavailable {
+		return "", fmt.Errorf("%w: HTTP 503 high demand", ErrTransient)
 	}
 	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini %s: %s", res.Status, truncate(payload))
+		return "", fmt.Errorf("gemini HTTP %d", res.StatusCode)
 	}
 	return responseText(payload)
 }
