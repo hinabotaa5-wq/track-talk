@@ -203,7 +203,7 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 				return e
 			}
-			notice, err = queueGuardianPurchaseNotice(ctx, q, *c.RequesterID, "consultation", c.ID, c.PriceYen, name)
+			notice, err = queueGuardianPurchaseNotice(ctx, q, *c.RequesterID, "consultation", c.ID, c.PriceYen, name, c.PaymentIntentID)
 			return err
 		}
 		return nil

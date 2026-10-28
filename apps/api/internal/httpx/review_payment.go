@@ -225,7 +225,7 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		}
 		started = &rr
 		// 18歳未満が自分で払ったときは、保護者への購入の通知を支払いと一緒に予約する。
-		notice, err = queueGuardianPurchaseNotice(ctx, q, rr.RequesterID, "review", rr.ID, pay.AmountYen, rr.RequestedCoachName)
+		notice, err = queueGuardianPurchaseNotice(ctx, q, rr.RequesterID, "review", rr.ID, pay.AmountYen, rr.RequestedCoachName, pay.PaymentIntentID)
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {

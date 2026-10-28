@@ -552,6 +552,8 @@ type GuardianConsent struct {
 	TermsVersion       *string    `json:"terms_version"`
 	ConsentTokenHash   *string    `json:"consent_token_hash"`
 	LimitRequestSentAt *time.Time `json:"limit_request_sent_at"`
+	AccountDeletedAt   *time.Time `json:"account_deleted_at"`
+	LastTransactionAt  *time.Time `json:"last_transaction_at"`
 }
 
 type GuardianConsentEvent struct {
@@ -576,21 +578,22 @@ type GuardianManageLink struct {
 }
 
 type GuardianNotice struct {
-	ID            uuid.UUID  `json:"id"`
-	MinorID       uuid.UUID  `json:"minor_id"`
-	Kind          string     `json:"kind"`
-	RefType       *string    `json:"ref_type"`
-	RefID         *uuid.UUID `json:"ref_id"`
-	GuardianEmail string     `json:"guardian_email"`
-	AmountYen     *int32     `json:"amount_yen"`
-	CoachName     *string    `json:"coach_name"`
-	PurchasedAt   *time.Time `json:"purchased_at"`
-	Status        string     `json:"status"`
-	Attempts      int32      `json:"attempts"`
-	LastError     *string    `json:"last_error"`
-	SentAt        *time.Time `json:"sent_at"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID              uuid.UUID  `json:"id"`
+	MinorID         uuid.UUID  `json:"minor_id"`
+	Kind            string     `json:"kind"`
+	RefType         *string    `json:"ref_type"`
+	RefID           *uuid.UUID `json:"ref_id"`
+	GuardianEmail   string     `json:"guardian_email"`
+	AmountYen       *int32     `json:"amount_yen"`
+	CoachName       *string    `json:"coach_name"`
+	PurchasedAt     *time.Time `json:"purchased_at"`
+	Status          string     `json:"status"`
+	Attempts        int32      `json:"attempts"`
+	LastError       *string    `json:"last_error"`
+	SentAt          *time.Time `json:"sent_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	PaymentIntentID *string    `json:"payment_intent_id"`
 }
 
 type InjuryDetail struct {
