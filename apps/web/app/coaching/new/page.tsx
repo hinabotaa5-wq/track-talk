@@ -48,6 +48,8 @@ export default function NewReviewRequestPage() {
   const [question, setQuestion] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
+  // 18歳未満で、保護者の同意や上限のために買えなかったとき。保護者の同意の画面への案内を出す。
+  const [guardianBlocked, setGuardianBlocked] = useState(false);
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
@@ -161,6 +163,7 @@ export default function NewReviewRequestPage() {
     }
     if (!acquire()) return;
     setError("");
+    setGuardianBlocked(false);
     try {
       const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
       setUploadPhase("upload");
@@ -181,6 +184,7 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
+      if (err instanceof ApiRequestError && err.code.startsWith("guardian_")) setGuardianBlocked(true);
       if (err instanceof ApiRequestError && ["nomination_changed", "validation_error"].includes(err.code)) {
         try { const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setCoaches(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
       }
@@ -224,6 +228,23 @@ export default function NewReviewRequestPage() {
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
           >
             生まれた年月を登録する
+          </Link>
+        </div>
+      ) : me.is_minor && me.guardian?.status !== "consented" ? (
+        // 文面はたたき台。運営者が確定する。
+        <div className="space-y-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm">
+          <p className="font-semibold text-white">保護者の同意が必要です</p>
+          <p className="text-slate-200">
+            {me.guardian?.status === "declined"
+              ? "保護者が同意しなかったため、動画添削は購入できません。"
+              : me.guardian?.status === "revoked"
+                ? "保護者が同意を取り消したため、新しい動画添削は購入できません。購入済みの添削はそのまま見られます。"
+                : me.guardian?.status === "pending"
+                  ? "保護者にメールを送りました。保護者がメールのリンクから同意すると、保護者が選んだ月の上限の範囲で、自分の PayPay（またはカード）で購入できます。"
+                  : "18歳未満の人は、保護者の同意が済むまで購入できません。保護者のメールアドレスに同意のリンクを送り、保護者に同意してもらってください。"}
+          </p>
+          <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white">
+            {me.guardian ? "保護者の同意の状況を見る" : "保護者にメールを送る"}
           </Link>
         </div>
       ) : (
@@ -273,6 +294,12 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {guardianBlocked ? <Link href="/me/coaching" className="block text-sm text-blue-300 underline">保護者の同意・上限の状況を見る</Link> : null}
+          {me.is_minor && me.guardian?.status === "consented" ? (
+            <p className="text-xs text-slate-300">
+              保護者が同意済みです。今月はあと{formatYen(Math.max(me.guardian.self_pay_limit_yen - (me.guardian.month_spent_yen ?? 0), 0))}まで、自分の PayPay（またはカード）で払えます。購入すると保護者にお知らせが届きます。
+            </p>
+          ) : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">

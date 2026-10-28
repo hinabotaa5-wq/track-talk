@@ -84,7 +84,7 @@ function ConsultationDraft({ draft, roomPath, token, funding, price, requiresVid
     <Textarea aria-label="追加相談の質問" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder="新しく相談したいこと" />
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}
-    <p className="text-xs text-slate-300">購入前に下書きを7日間保存します。送信後は内容を変更できません。未成年の個別決済は保護者が支払います。</p>
+    <p className="text-xs text-slate-300">購入前に下書きを7日間保存します。送信後は内容を変更できません。18歳未満の方は、保護者が同意した月の上限の範囲で自分で支払います（パーソナル指導の相談は保護者が支払います）。</p>
     <Button type="button" disabled={pending || !body.trim() && !file && !videoID} onClick={() => void submit()}>{pending ? "保存・送信中…" : funding === "ticket" ? "質問する（チケット1枚）" : `質問する（${formatYen(price)}）`}</Button>
     {buy ? <Link className="block text-sm text-blue-300 underline" href={`/me/coaching/tickets?return_to=${encodeURIComponent(returnPath)}`}>チケットを購入して、この部屋へ戻る</Link> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
@@ -131,8 +131,8 @@ function ConsultationCard({ consultation: c, role, base, token, guardian, reload
         {reply ? <label className="block text-xs">実践動画（30秒・100MB以内、任意）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? "回答を送る" : clarify ? "回答について確認する（1回無料）" : "補足を送る"}</Button>
       </div> : null}
-      {c.status === "awaiting_payment" && (role === "guardian" || role === "requester" && !c.minor) ? <Button disabled={pending} onClick={() => void act("checkout")}>お支払いへ</Button> : null}
-      {c.status === "awaiting_payment" && c.minor && role === "requester" ? <p className="text-sm">保護者に、この契約のページからお支払いをお願いしてください。保護者リンクはマイコーチングで確認できます。</p> : null}
+      {c.status === "awaiting_payment" && role === c.payer ? <Button disabled={pending} onClick={() => void act("checkout")}>お支払いへ</Button> : null}
+      {c.status === "awaiting_payment" && c.payer === "guardian" && role === "requester" ? <p className="text-sm">保護者に、この契約のページからお支払いをお願いしてください。保護者リンクはマイコーチングで確認できます。</p> : null}
       {c.status === "awaiting_payment" && role === "requester" ? <Button disabled={pending} onClick={() => void act("cancel")}>支払い前の質問を取り下げる</Button> : null}
       {((role === "coach" || role === "guardian") && !["draft", "awaiting_payment"].includes(c.status) || role === "requester" && c.answered_at) ? <button disabled={pending || reported} onClick={() => void report()} className="text-xs underline">{reported ? "通報しました" : "この追加相談を通報する"}</button> : null}
     </>}

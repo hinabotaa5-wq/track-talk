@@ -19,10 +19,11 @@ import (
 
 // guardianMinor は、保護者のリンクから子の ID を返す。添削と同じ同意が済んでいないと使えない。
 func (s *Server) guardianMinor(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	_, consent, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
 		return uuid.Nil, false
 	}
+	consent := a.consent
 	if consent.Status != "consented" {
 		Error(w, http.StatusConflict, "guardian_not_consented", "先に、このページの上の同意を済ませてください")
 		return uuid.Nil, false

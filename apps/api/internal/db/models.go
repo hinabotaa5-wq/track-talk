@@ -531,22 +531,66 @@ type DomesticMajor struct {
 }
 
 type GuardianConsent struct {
-	MinorID         uuid.UUID  `json:"minor_id"`
-	TokenHash       string     `json:"token_hash"`
-	Status          string     `json:"status"`
-	GuardianName    *string    `json:"guardian_name"`
-	Relationship    *string    `json:"relationship"`
-	MonthlyLimitYen *int32     `json:"monthly_limit_yen"`
-	AllowPublish    bool       `json:"allow_publish"`
-	ConsentedAt     *time.Time `json:"consented_at"`
-	DeclinedAt      *time.Time `json:"declined_at"`
-	RevokedAt       *time.Time `json:"revoked_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	GuardianEmail   *string    `json:"guardian_email"`
-	LinkSentOn      *time.Time `json:"link_sent_on"`
-	LinkSends       int32      `json:"link_sends"`
-	LinkIssuedAt    time.Time  `json:"link_issued_at"`
+	MinorID            uuid.UUID  `json:"minor_id"`
+	TokenHash          string     `json:"token_hash"`
+	Status             string     `json:"status"`
+	GuardianName       *string    `json:"guardian_name"`
+	Relationship       *string    `json:"relationship"`
+	MonthlyLimitYen    *int32     `json:"monthly_limit_yen"`
+	AllowPublish       bool       `json:"allow_publish"`
+	ConsentedAt        *time.Time `json:"consented_at"`
+	DeclinedAt         *time.Time `json:"declined_at"`
+	RevokedAt          *time.Time `json:"revoked_at"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	GuardianEmail      *string    `json:"guardian_email"`
+	LinkSentOn         *time.Time `json:"link_sent_on"`
+	LinkSends          int32      `json:"link_sends"`
+	LinkIssuedAt       time.Time  `json:"link_issued_at"`
+	SelfPayLimitYen    int32      `json:"self_pay_limit_yen"`
+	ConsentIp          *string    `json:"consent_ip"`
+	TermsVersion       *string    `json:"terms_version"`
+	ConsentTokenHash   *string    `json:"consent_token_hash"`
+	LimitRequestSentAt *time.Time `json:"limit_request_sent_at"`
+}
+
+type GuardianConsentEvent struct {
+	ID                      int64     `json:"id"`
+	MinorID                 uuid.UUID `json:"minor_id"`
+	Event                   string    `json:"event"`
+	GuardianEmail           *string   `json:"guardian_email"`
+	GuardianName            *string   `json:"guardian_name"`
+	Relationship            *string   `json:"relationship"`
+	SelfPayLimitYen         *int32    `json:"self_pay_limit_yen"`
+	PreviousSelfPayLimitYen *int32    `json:"previous_self_pay_limit_yen"`
+	TermsVersion            *string   `json:"terms_version"`
+	Ip                      *string   `json:"ip"`
+	CreatedAt               time.Time `json:"created_at"`
+}
+
+type GuardianManageLink struct {
+	TokenHash string    `json:"token_hash"`
+	MinorID   uuid.UUID `json:"minor_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type GuardianNotice struct {
+	ID            uuid.UUID  `json:"id"`
+	MinorID       uuid.UUID  `json:"minor_id"`
+	Kind          string     `json:"kind"`
+	RefType       *string    `json:"ref_type"`
+	RefID         *uuid.UUID `json:"ref_id"`
+	GuardianEmail string     `json:"guardian_email"`
+	AmountYen     *int32     `json:"amount_yen"`
+	CoachName     *string    `json:"coach_name"`
+	PurchasedAt   *time.Time `json:"purchased_at"`
+	Status        string     `json:"status"`
+	Attempts      int32      `json:"attempts"`
+	LastError     *string    `json:"last_error"`
+	SentAt        *time.Time `json:"sent_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 type InjuryDetail struct {

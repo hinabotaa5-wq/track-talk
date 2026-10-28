@@ -24,6 +24,8 @@ type coachingMe struct {
 		Status          string `json:"status"`
 		MonthlyLimitYen *int   `json:"monthly_limit_yen"`
 		AllowPublish    bool   `json:"allow_publish"`
+		SelfPayLimitYen int    `json:"self_pay_limit_yen"`
+		MonthSpentYen   int    `json:"month_spent_yen"`
 	} `json:"guardian"`
 	PushDevices int `json:"push_devices"`
 }
@@ -263,6 +265,15 @@ func TestGuardianConsentFlow(t *testing.T) {
 	if view.Status != "consented" || view.MonthlyLimitYen == nil || *view.MonthlyLimitYen != 3000 || view.AllowPublish {
 		t.Fatalf("consented %+v", view)
 	}
+	// 本人が自分で払う分の上限は、選ばなければいちばん低い1,500円。候補にない値と上限なしは選べない。
+	if !strings.Contains(rec.Body.String(), `"self_pay_limit_yen":1500`) || !strings.Contains(rec.Body.String(), `"self_pay_limit_options":[1500,3000,5000,10000]`) {
+		t.Fatalf("self pay limit %s", rec.Body.String())
+	}
+	for _, bad := range []any{nil, 2000, 1000} {
+		if rec := doJSON(t, h, http.MethodPatch, path, "", map[string]any{"self_pay_limit_yen": bad}); rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("self pay limit %v %d %s", bad, rec.Code, rec.Body.String())
+		}
+	}
 
 	// null は上限なし。
 	rec = doJSON(t, h, http.MethodPatch, path, "", map[string]any{"monthly_limit_yen": nil, "allow_publish": true})
@@ -308,7 +319,8 @@ func TestGuardianConsentFlow(t *testing.T) {
 	if reissued.Status != "revoked" {
 		t.Fatalf("reissued %+v", reissued)
 	}
-	if again := guardianTokenFromMail(t, email); again == issued || mailsTo(email) != 2 {
+	// 届くのは、最初のリンク・同意の確認・新しいリンクの3通。
+	if again := guardianTokenFromMail(t, email); again == issued || mailsTo(email) != 3 {
 		t.Fatalf("reissued mail %s %d", again, mailsTo(email))
 	}
 	if rec := doJSON(t, h, http.MethodGet, path, "", nil); rec.Code != http.StatusNotFound {
@@ -525,8 +537,8 @@ func TestGuardianConsentNotifiesTheMinor(t *testing.T) {
 	if got := received.Load(); got != 1 {
 		t.Fatalf("pushes after consent %d", got)
 	}
-	// 同意済みのまま送り直しても、もう一度は知らせない。
-	if rec := doJSON(t, h, http.MethodPost, path+"/consent", "", body); rec.Code != http.StatusOK {
+	// 同意済みのまま送り直しても受け付けず、もう一度は知らせない。
+	if rec := doJSON(t, h, http.MethodPost, path+"/consent", "", body); rec.Code != http.StatusConflict {
 		t.Fatalf("consent again %d %s", rec.Code, rec.Body.String())
 	}
 	if got := received.Load(); got != 1 {

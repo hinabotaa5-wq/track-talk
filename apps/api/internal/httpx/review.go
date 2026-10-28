@@ -323,20 +323,20 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	minor := isMinor(*p.BirthMonth, time.Now())
 	if minor {
-		if code, message := s.minorRequestBlock(r.Context(), s.q, p.ID); code != "" {
-			Error(w, http.StatusUnprocessableEntity, code, message)
+		// 18歳未満は、保護者の有効な同意がないと頼めない。支払いがあるときは月の上限も確かめる。
+		// 動画を受け取る前に一度確かめ、支払い画面を作る時にロックの中でもう一度確かめる。
+		price := int32(0)
+		if payments {
+			price = cashPrice
+		}
+		block, err := s.minorSelfPayBlock(r.Context(), s.q, p.ID, price, uuid.Nil, uuid.Nil)
+		if err != nil {
+			MapDBError(w, err)
 			return
 		}
-		if payments {
-			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, cashPrice)
-			if err != nil {
-				MapDBError(w, err)
-				return
-			}
-			if msg != "" {
-				Error(w, http.StatusUnprocessableEntity, "monthly_limit", msg)
-				return
-			}
+		if block != nil {
+			s.writeMinorBlock(w, r, block)
+			return
 		}
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
@@ -380,9 +380,16 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, err)
 			return
 		}
-		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); minor && code != "" {
-			Error(w, http.StatusUnprocessableEntity, code, message)
-			return
+		if minor {
+			block, err := s.minorSelfPayBlock(r.Context(), q, p.ID, 0, uuid.Nil, uuid.Nil)
+			if err != nil {
+				MapDBError(w, err)
+				return
+			}
+			if block != nil {
+				s.writeMinorBlock(w, r, block)
+				return
+			}
 		}
 	}
 	if err := lockUnusedCoachingVideo(r.Context(), q, &req.VideoPublicID, nil); err != nil {
@@ -428,8 +435,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, code, msg, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
-		if err != nil || code != "" {
+		url, block, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
+		if err != nil || block != nil {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.tx(r.Context(), func(q *db.Queries) error {
 				if t, e := q.GetTicketReservationForReview(r.Context(), &rr.ID); e == nil {
@@ -446,7 +453,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				writeCheckoutError(w, err)
 			} else {
-				Error(w, http.StatusUnprocessableEntity, code, msg)
+				s.writeMinorBlock(w, r, block)
 			}
 			return
 		}
@@ -463,32 +470,6 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	JSON(w, http.StatusCreated, s.reviewRequestJSON(rr))
-}
-
-// minorRequestBlock は、18歳未満が依頼を送れない理由を返す。送れるなら空。
-// 保護者の同意を待たずに1本目は送れるが、同意が済むまで2本目は送れない。同意しないと言われたら送れない。
-func (s *Server) minorRequestBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID) (string, string) {
-	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
-	status := "none"
-	if err == nil {
-		status = consent.Status
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return "internal_error", "サーバーエラーが発生しました"
-	}
-	switch status {
-	case "consented":
-		return "", ""
-	case "declined", "revoked":
-		return "guardian_declined", "保護者の同意がないため、フォーム添削は使えません"
-	}
-	sent, err := q.CountReviewRequestsByRequester(ctx, minorID)
-	if err != nil {
-		return "internal_error", "サーバーエラーが発生しました"
-	}
-	if sent > 0 {
-		return "guardian_pending", "2本目からは保護者の同意が必要です。保護者にリンクを送ってください"
-	}
-	return "", ""
 }
 
 func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {

@@ -73,7 +73,7 @@ func (s *Server) consultationRoot(ctx context.Context, q *db.Queries, id uuid.UU
 
 // reviewConsultationFunding は、フォーム添削の追加相談の払い方を決める。購入済みのチケットが残っていれば
 // チケット1枚、なければ申込み時の都度払い（カード・PayPay）。チケットの新規販売は止めた。
-// 18歳未満の都度払いは、保護者が払う画面が契約のページにしかないので、まだ受け付けない。
+// 18歳未満の都度払いは本人が自分で払い、送る時に保護者の同意と月の上限を確かめる（minorSelfPayBlock）。
 func reviewConsultationFunding(ctx context.Context, q *db.Queries, room consultationRoom) (string, error) {
 	balance, err := q.TicketBalance(ctx, &room.owner)
 	if err != nil {
@@ -81,9 +81,6 @@ func reviewConsultationFunding(ctx context.Context, q *db.Queries, room consulta
 	}
 	if balance.Available > 0 {
 		return "ticket", nil
-	}
-	if room.minor {
-		return "", &ticketRuleError{"minor_cash_unavailable", "18歳未満の方の追加相談のお支払いは準備中です"}
 	}
 	return "cash", nil
 }
@@ -227,7 +224,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 	return *c.AdditionalConsultationPriceYen, 100 - personalFeePercent, requiresVideo, nil
 }
 func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
-	out := map[string]any{"id": c.ID, "request_key": c.RequestKey, "status": c.Status, "funding": c.Funding, "price_yen": c.PriceYen, "payment_state": c.PaymentState,
+	out := map[string]any{"id": c.ID, "request_key": c.RequestKey, "status": c.Status, "funding": c.Funding, "price_yen": c.PriceYen, "payment_state": c.PaymentState, "payer": consultationPayer(c),
 		"minor": c.Minor, "question": c.Question, "answer": c.Answer, "video_public_id": c.VideoPublicID, "video_url": nil, "answer_video_url": nil,
 		"clarify_body": c.ClarifyBody, "clarification": c.Clarification, "clarify_requested_at": c.ClarifyRequestedAt, "clarified_at": c.ClarifiedAt,
 		"respond_by": c.RespondBy, "answer_by": c.AnswerBy, "answered_at": c.AnsweredAt, "created_at": c.CreatedAt, "expires_at": c.ExpiresAt,
@@ -524,7 +521,15 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		if !s.stripe.Configured() {
 			return &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
 		}
-		if current.Minor {
+		if current.Minor && current.ContractID == nil {
+			block, err := s.minorSelfPayBlock(r.Context(), q, *current.RequesterID, current.PriceYen, uuid.Nil, current.ID)
+			if err != nil {
+				return err
+			}
+			if block != nil {
+				return block
+			}
+		} else if current.Minor {
 			msg, err := s.coachingMonthlyBlock(r.Context(), q, *current.RequesterID, uuid.Nil, uuid.Nil, uuid.Nil, current.PriceYen, current.ID)
 			if err != nil {
 				return err
@@ -536,12 +541,18 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		saved, err = q.StartCashConsultationPayment(r.Context(), current.ID)
 		return err
 	})
+	if s.writeMinorBlockError(w, r, err) {
+		return
+	}
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
 	}
-	if saved.Funding == "cash" && saved.Status == "awaiting_payment" && !saved.Minor {
+	if saved.Funding == "cash" && saved.Status == "awaiting_payment" && consultationPayer(saved) == "requester" {
 		url, err := s.consultationCheckout(r.Context(), saved)
+		if s.writeMinorBlockError(w, r, err) {
+			return
+		}
 		if err != nil {
 			writeCheckoutError(w, err)
 			return

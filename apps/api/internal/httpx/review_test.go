@@ -215,13 +215,10 @@ func TestMinorReviewRequestWaitsForGuardian(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
 		t.Fatalf("birth month %d", rec.Code)
 	}
-	// 1本目は同意を待たずに送れる。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm)); rec.Code != http.StatusCreated {
-		t.Fatalf("first %d %s", rec.Code, rec.Body.String())
-	}
+	// 保護者の同意が済むまでは、1本目から送れない。
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm))
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_pending") {
-		t.Fatalf("second before consent %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_required") {
+		t.Fatalf("first before consent %d %s", rec.Code, rec.Body.String())
 	}
 	execSQLArgs(t, `INSERT INTO guardian_consents (minor_id, token_hash, status, guardian_name, relationship, consented_at)
 		VALUES ($1, $2, 'consented', '保護者', 'mother', now())`, minor, uuid.NewString())
@@ -232,6 +229,11 @@ func TestMinorReviewRequestWaitsForGuardian(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm))
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_declined") {
 		t.Fatalf("declined %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `UPDATE guardian_consents SET status = 'revoked', revoked_at = now() WHERE minor_id = $1`, minor)
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, reviewBodyFor(t, h, tm))
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_revoked") {
+		t.Fatalf("revoked %d %s", rec.Code, rec.Body.String())
 	}
 }
 
