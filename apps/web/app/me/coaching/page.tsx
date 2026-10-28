@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { formatYen } from "@/lib/format";
 import { monthlyLimitLabel, pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -182,8 +183,17 @@ export default function CoachingSetupPage() {
           <h2 className="font-bold">保護者の同意</h2>
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
-            {me.guardian?.status === "consented" ? `（${monthlyLimitLabel(me.guardian.monthly_limit_yen)}）` : null}
           </p>
+          {me.guardian?.status === "consented" ? (
+            <p className="text-sm text-slate-300">
+              動画添削・追加相談は、自分の PayPay（またはカード）で{monthlyLimitLabel(me.guardian.self_pay_limit_yen)}払えます（今月は
+              {formatYen(me.guardian.month_spent_yen ?? 0)}使用）。購入のたびに保護者にメールでお知らせが届きます。
+            </p>
+          ) : (
+            <p className="text-sm text-slate-300">
+              動画添削・追加相談を買うには、保護者の同意が必要です。同意は保護者だけが、メールで届くリンクから行えます。
+            </p>
+          )}
           {me.guardian?.guardian_email ? (
             <p className="text-sm text-slate-300">送り先: {me.guardian.guardian_email}</p>
           ) : null}

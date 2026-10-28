@@ -2,7 +2,10 @@ import type { WorkOrder, WorkOrderTerms } from "@/lib/types";
 export type Consultation = {
   id: string; request_key: string; status: "draft" | "awaiting_payment" | "offered" | "in_review" | "answered" | "declined" | "expired" | "cancelled";
   funding: "ticket" | "cash"; price_yen: number; payment_state: "unpaid" | "paid" | "refund_pending" | "refunded";
-  minor: boolean; question: string; answer: string; video_public_id: string | null; video_url: string | null; answer_video_url: string | null;
+  minor: boolean;
+  // 支払う人。18歳未満のパーソナル指導の相談は保護者、それ以外（18歳未満の添削のあとの相談を含む）は本人。
+  payer: "requester" | "guardian";
+  question: string; answer: string; video_public_id: string | null; video_url: string | null; answer_video_url: string | null;
   clarify_body: string | null; clarification: string | null; clarify_requested_at: string | null; clarified_at: string | null;
   answered_at: string | null; respond_by: string | null; answer_by: string | null; expires_at: string; created_at: string; purged: boolean; hidden: boolean;
   // フォーム添削の追加相談で、コーチにだけ付く取引条件。引き受ける前は terms、引き受けた後は work_order。

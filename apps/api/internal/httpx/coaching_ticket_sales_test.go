@@ -201,31 +201,3 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 		t.Fatal(state)
 	}
 }
-
-// 18歳未満の都度払いの追加相談は、保護者が払う画面がまだないので受け付けない（チケットがあればチケットで払える）。
-func TestReviewConsultationMinorWithoutTicketsIsClosed(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, _ := setupTicketSalesClosed(t)
-	tadmin := adminToken(t, h)
-	_, coach := onDutyCoach(t, h, tadmin)
-	_, owner := demoRequester(t, h, tadmin)
-	root := paidReview(t, h, owner, "paypay", "pi_paypay_minor")
-	offers := coachRequests(t, h, coach).Offers
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	// 依頼のあとで18歳未満として登録し直した扱いにする（保護者は同意済み）。
-	execSQLArgs(t, `UPDATE profiles SET birth_month=date_trunc('month',now()-interval '15 years')::date WHERE id=(SELECT requester_id FROM review_requests WHERE id=$1)`, root)
-	execSQLArgs(t, `INSERT INTO guardian_consents (minor_id,guardian_email,token_hash,status,guardian_name,relationship,consented_at) SELECT requester_id,'parent@example.com',gen_random_uuid()::text,'consented','保護者','mother',now() FROM review_requests WHERE id=$1`, root)
-	path := "/v1/coaching/requests/" + root + "/consultations"
-	room := doJSON(t, h, "GET", path, owner, nil)
-	if room.Code != 200 || !strings.Contains(room.Body.String(), `"can_purchase":false`) || !strings.Contains(room.Body.String(), "準備中") {
-		t.Fatalf("room %s", room.Body.String())
-	}
-	if r := doJSON(t, h, "POST", path, owner, map[string]any{"request_key": uuid.NewString(), "body": "質問"}); r.Code != 422 || !strings.Contains(r.Body.String(), "minor_cash_unavailable") {
-		t.Fatalf("draft %d %s", r.Code, r.Body.String())
-	}
-}
