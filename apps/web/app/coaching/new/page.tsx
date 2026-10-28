@@ -4,6 +4,7 @@ import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { SellerNote } from "@/components/seller-note";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
+import { GuardianAllowance } from "@/components/guardian-allowance";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingGuardian, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ export default function NewReviewRequestPage() {
   const [error, setError] = useState("");
   // 18歳未満で、保護者の同意や上限のために買えなかったとき。保護者の同意の画面への案内を出す。
   const [guardianBlocked, setGuardianBlocked] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
@@ -193,6 +195,21 @@ export default function NewReviewRequestPage() {
     }
   }
 
+  // 保護者がまだ答えていないときに、前と同じアドレスへ同意のお願いを送り直す（前のリンクは使えなくなる）。
+  async function onResendGuardianLink() {
+    if (!acquire()) return;
+    setResendMessage("");
+    try {
+      const guardian = await apiFetch<CoachingGuardian>("/v1/me/guardian-link", { method: "POST", token, body: JSON.stringify({}) });
+      setMe((prev) => (prev ? { ...prev, guardian } : prev));
+      setResendMessage("保護者の方に、同意のお願いメールを送り直しました。");
+    } catch (err) {
+      setResendMessage(apiErrorText(err, "メールを送れませんでした"));
+    } finally {
+      release();
+    }
+  }
+
   if (loading || !session || (!me && !loadError)) {
     return <p className="text-sm text-slate-200">読み込み中...</p>;
   }
@@ -231,21 +248,27 @@ export default function NewReviewRequestPage() {
           </Link>
         </div>
       ) : me.is_minor && me.guardian?.status !== "consented" ? (
-        // 文面はたたき台。運営者が確定する。
+        // 文面は運営者の確定版。API の minorSelfPayBlock のエラー文と合わせる。
         <div className="space-y-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm">
-          <p className="font-semibold text-white">保護者の同意が必要です</p>
           <p className="text-slate-200">
             {me.guardian?.status === "declined"
-              ? "保護者が同意しなかったため、動画添削は購入できません。"
+              ? "保護者の方の同意が得られなかったため、有料サービスは利用できません。"
               : me.guardian?.status === "revoked"
-                ? "保護者が同意を取り消したため、新しい動画添削は購入できません。購入済みの添削はそのまま見られます。"
+                ? "保護者の方の同意が取り消されたため、有料サービスは利用できません。再度利用するには、保護者の方の同意が必要です。"
                 : me.guardian?.status === "pending"
-                  ? "保護者にメールを送りました。保護者がメールのリンクから同意すると、保護者が選んだ月の上限の範囲で、自分の PayPay（またはカード）で購入できます。"
-                  : "18歳未満の人は、保護者の同意が済むまで購入できません。保護者のメールアドレスに同意のリンクを送り、保護者に同意してもらってください。"}
+                  ? "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送っています。同意が完了すると、ここから依頼できるようになります。"
+                  : "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送ってください。同意が完了すると、ここから依頼できるようになります。"}
           </p>
-          <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white">
-            {me.guardian ? "保護者の同意の状況を見る" : "保護者にメールを送る"}
-          </Link>
+          {me.guardian?.status === "pending" ? (
+            <Button type="button" className="w-full" disabled={pending} onClick={() => void onResendGuardianLink()}>
+              同意のお願いを再送する
+            </Button>
+          ) : !me.guardian ? (
+            <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white">
+              保護者にメールを送る
+            </Link>
+          ) : null}
+          {resendMessage ? <p role="status" className="text-slate-200">{resendMessage}</p> : null}
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
@@ -296,9 +319,7 @@ export default function NewReviewRequestPage() {
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {guardianBlocked ? <Link href="/me/coaching" className="block text-sm text-blue-300 underline">保護者の同意・上限の状況を見る</Link> : null}
           {me.is_minor && me.guardian?.status === "consented" ? (
-            <p className="text-xs text-slate-300">
-              保護者が同意済みです。今月はあと{formatYen(Math.max(me.guardian.self_pay_limit_yen - (me.guardian.month_spent_yen ?? 0), 0))}まで、自分の PayPay（またはカード）で払えます。購入すると保護者にお知らせが届きます。
-            </p>
+            <GuardianAllowance guardian={me.guardian} className="space-y-1 text-xs text-slate-300" />
           ) : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (

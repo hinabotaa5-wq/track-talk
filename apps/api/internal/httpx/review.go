@@ -329,7 +329,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		if payments {
 			price = cashPrice
 		}
-		block, err := s.minorSelfPayBlock(r.Context(), s.q, p.ID, price, uuid.Nil, uuid.Nil)
+		block, err := s.minorSelfPayBlock(r.Context(), s.q, p.ID, minorPurchase{refType: "review", coachName: coachName, price: price}, uuid.Nil, uuid.Nil)
 		if err != nil {
 			MapDBError(w, err)
 			return
@@ -381,7 +381,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if minor {
-			block, err := s.minorSelfPayBlock(r.Context(), q, p.ID, 0, uuid.Nil, uuid.Nil)
+			block, err := s.minorSelfPayBlock(r.Context(), q, p.ID, minorPurchase{refType: "review"}, uuid.Nil, uuid.Nil)
 			if err != nil {
 				MapDBError(w, err)
 				return

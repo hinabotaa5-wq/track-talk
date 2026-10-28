@@ -1,11 +1,11 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { GuardianAllowance } from "@/components/guardian-allowance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen } from "@/lib/format";
-import { monthlyLimitLabel, pushSupported, subscribePush } from "@/lib/push";
+import { pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -185,10 +185,7 @@ export default function CoachingSetupPage() {
             {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
           </p>
           {me.guardian?.status === "consented" ? (
-            <p className="text-sm text-slate-300">
-              動画添削・追加相談は、自分の PayPay（またはカード）で{monthlyLimitLabel(me.guardian.self_pay_limit_yen)}払えます（今月は
-              {formatYen(me.guardian.month_spent_yen ?? 0)}使用）。購入のたびに保護者にメールでお知らせが届きます。
-            </p>
+            <GuardianAllowance guardian={me.guardian} />
           ) : (
             <p className="text-sm text-slate-300">
               動画添削・追加相談を買うには、保護者の同意が必要です。同意は保護者だけが、メールで届くリンクから行えます。
