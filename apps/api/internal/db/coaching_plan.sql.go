@@ -332,7 +332,7 @@ SET pledged_at = now(),
     updated_at = now()
 WHERE profile_id = $2
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, nomination_fee_yen
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
 `
 
 type PledgeCoachParams struct {
@@ -368,7 +368,6 @@ func (q *Queries) PledgeCoach(ctx context.Context, arg PledgeCoachParams) (Coach
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
-		&i.NominationFeeYen,
 	)
 	return i, err
 }

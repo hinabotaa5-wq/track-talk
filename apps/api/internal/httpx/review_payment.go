@@ -16,12 +16,12 @@ import (
 )
 
 // フォーム添削の支払い（Stripe Checkout）。Stripe の鍵があるときだけ使い、なければ支払いなしのデモ版。
-// 送ると支払い画面に進み、支払いが届いたら割り当てが始まる。
+// 送ると支払い画面に進み、支払いが届いたら選んだコーチに依頼が届く。
 // カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
 // PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する。
 
-// ランダム添削はチケット2枚分の共通料金。
-const reviewPriceYen int32 = 2 * ticketFaceYen
+// 動画添削の料金。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。報酬はこの70%。
+const reviewPriceYen int32 = 1500
 
 // 保護者が月の上限を選ぶ前の上限（design-review.md「18歳未満の支払い」）。
 const defaultMinorMonthlyLimit = 3000
@@ -73,13 +73,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	price := reviewCashPrice(rr)
 	id := uuid.New()
 	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
-	name := "動画添削（おまかせ）"
-	if rr.RequestedCoachID != nil {
-		name = "動画添削（指名）"
-	}
-	if rr.UseTickets {
-		name = "動画添削の指名料（基本料金はチケット2枚）"
-	}
+	name := "動画添削"
 	params := stripe.CheckoutParams{
 		Name:           name,
 		AmountYen:      int(price),

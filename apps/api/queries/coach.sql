@@ -169,7 +169,8 @@ SELECT
     )::boolean AS open_consultation;
 
 -- name: DeclineCoachOpenOffers :many
--- やめるコーチへの、返事をしていない添削の打診を断った扱いにして、依頼を待ちに戻す。戻した依頼の ID を返す。
+-- やめるコーチへの、返事をしていない添削の打診を断った扱いにする。選ばれていた依頼は別のコーチに回さず終わりにし、
+-- おまかせの依頼は待ちに戻す。扱った依頼の ID を返す。
 WITH declined AS (
     UPDATE review_offers o
     SET result = 'declined',
@@ -179,7 +180,7 @@ WITH declined AS (
     RETURNING o.request_id
 )
 UPDATE review_requests r
-SET status = 'queued',
+SET status = CASE WHEN r.requested_coach_id IS NULL THEN 'queued' ELSE 'expired' END,
     coach_id = NULL,
     updated_at = now()
 FROM declined

@@ -81,7 +81,6 @@ INSERT INTO coach_earnings (id,coach_id,source,review_request_id,gross_yen,share
 SELECT gen_random_uuid(),r.coach_id,'review',r.id,t.nominal_yen,t.share_percent,t.nominal_yen*t.share_percent/100
 FROM coaching_ticket_reservations t JOIN review_requests r ON r.id = t.request_id
 WHERE t.id = $1 AND t.status = 'consumed' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
-  AND r.nomination_fee_yen = 0
 ON CONFLICT (review_request_id) DO NOTHING;
 
 -- name: CreateTicketRefund :one

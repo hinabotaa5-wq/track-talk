@@ -10,11 +10,10 @@ import (
 )
 
 func reviewCashPrice(rr db.ReviewRequest) int32 {
-	price := rr.NominationFeeYen
-	if !rr.UseTickets {
-		price += rr.BasePriceYen
+	if rr.UseTickets {
+		return 0
 	}
-	return price
+	return rr.BasePriceYen
 }
 
 func (s *Server) reviewNominees(ctx context.Context, q *db.Queries, requester uuid.UUID, event string, coach *uuid.UUID) ([]db.ListReviewNomineesRow, error) {
@@ -42,9 +41,9 @@ func (s *Server) listReviewNominees(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
+		// 選ぶ材料は種目・経験年数・記録・紹介文だけ。添削の件数・評価・売上などの人気の指標は出さない。
 		out = append(out, map[string]any{"id": c.ProfileID, "nickname": c.Nickname, "photo_url": s.coachPhotoURL(c.PhotoPublicID),
-			"best_record": c.BestRecord, "achievements": c.Achievements, "nomination_fee_yen": c.NominationFeeYen,
-			"total_price_yen": reviewPriceYen + *c.NominationFeeYen})
+			"events": c.Events, "years": c.Years, "best_record": c.BestRecord, "achievements": c.Achievements})
 	}
-	JSON(w, http.StatusOK, map[string]any{"coaches": out, "base_price_yen": reviewPriceYen})
+	JSON(w, http.StatusOK, map[string]any{"coaches": out, "price_yen": reviewPriceYen})
 }
