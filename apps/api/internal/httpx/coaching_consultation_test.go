@@ -118,26 +118,22 @@ func TestConsultationTicketConversationAndFreeConfirmation(t *testing.T) {
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
 }
-func TestConsultationDraftSurvivesTicketPurchaseAndConcurrentSubmit(t *testing.T) {
+func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
+	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
-	// 初回添削後の残りを別の初回依頼で予約し、追加相談を一度送って不足させる。
 	c0 := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "最初の相談")
 	consultationAction(t, h, owner, c0.ID, "submit", nil)
 	consultationAction(t, h, coach, c0.ID, "accept", nil)
 	consultationAction(t, h, coach, c0.ID, "answer", map[string]any{"body": "回答です"})
-	ticketReview(t, h, owner) // 残り2枚を確保
 	path := "/v1/coaching/requests/" + root + "/consultations"
-	key := uuid.NewString()
-	c := consultationDraft(t, h, owner, path, key, "購入後も残る質問")
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, nil); r.Code != 422 || !strings.Contains(r.Body.String(), "insufficient_tickets") {
-		t.Fatalf("insufficient %d %s", r.Code, r.Body.String())
+	c := consultationDraft(t, h, owner, path, uuid.NewString(), "残高が変わっても残る質問")
+	if c.Funding != "ticket" {
+		t.Fatalf("draft %+v", c)
 	}
-	if r := doJSON(t, h, "GET", path, owner, nil); !strings.Contains(r.Body.String(), "購入後も残る質問") {
-		t.Fatal(r.Body.String())
-	}
-	buyFiveTickets(t, h, owner)
+	// 下書きのあとで残りの2枚を別の依頼で確保し、チケットが尽きた状態で送る。チケットの新規販売は止めたので、
+	// 送信時の残高で都度払いに切り替える。同時に送っても支払いは1件分。
+	ticketReview(t, h, owner)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 2)
@@ -153,17 +149,25 @@ func TestConsultationDraftSurvivesTicketPurchaseAndConcurrentSubmit(t *testing.T
 	wg.Wait()
 	for _, code := range codes {
 		if code != 200 {
-			t.Fatalf("retry codes %v", codes)
+			t.Fatalf("submit codes %v", codes)
 		}
 	}
-	var n int
-	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_reservations WHERE consultation_id=$1`, []any{c.ID}, &n)
-	if n != 1 {
-		t.Fatalf("duplicate reservation %d", n)
+	var funding, status string
+	var reservations int
+	queryRowArgs(t, `SELECT funding,status FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &funding, &status)
+	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_reservations WHERE consultation_id=$1`, []any{c.ID}, &reservations)
+	if funding != "cash" || status != "awaiting_payment" || reservations != 0 {
+		t.Fatalf("switched %s %s %d", funding, status, reservations)
+	}
+	if form := f.lastSession(); form.Get("metadata[consultation_id]") != c.ID || form.Get("payment_method_types[1]") != "paypay" {
+		t.Fatalf("session %v", form)
+	}
+	if code := payConsultation(t, h, c.ID, 600); code != 200 {
+		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, c.ID, "decline", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 {
-		t.Fatalf("declined ticket not released %+v", b)
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 2 {
+		t.Fatalf("tickets touched %+v", b)
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
 }

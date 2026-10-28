@@ -70,6 +70,23 @@ func (s *Server) consultationRoot(ctx context.Context, q *db.Queries, id uuid.UU
 	}
 	return room, nil
 }
+
+// reviewConsultationFunding は、フォーム添削の追加相談の払い方を決める。購入済みのチケットが残っていれば
+// チケット1枚、なければ申込み時の都度払い（カード・PayPay）。チケットの新規販売は止めた。
+// 18歳未満の都度払いは、保護者が払う画面が契約のページにしかないので、まだ受け付けない。
+func reviewConsultationFunding(ctx context.Context, q *db.Queries, room consultationRoom) (string, error) {
+	balance, err := q.TicketBalance(ctx, &room.owner)
+	if err != nil {
+		return "", err
+	}
+	if balance.Available > 0 {
+		return "ticket", nil
+	}
+	if room.minor {
+		return "", &ticketRuleError{"minor_cash_unavailable", "18歳未満の方の追加相談のお支払いは準備中です"}
+	}
+	return "cash", nil
+}
 func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) (consultationRoom, string, bool) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
@@ -269,6 +286,10 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 	price, _, requiresVideo, offerErr := s.consultationOffer(r.Context(), s.q, room)
+	funding := "cash"
+	if room.review != nil && offerErr == nil {
+		funding, offerErr = reviewConsultationFunding(r.Context(), s.q, room)
+	}
 	reason := ""
 	if offerErr != nil {
 		if !writeTicketEligibilityReason(offerErr, &reason) {
@@ -281,7 +302,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		coachID = *room.coach
 	}
 	JSON(w, 200, map[string]any{"consultations": items, "role": role, "price_yen": price, "can_purchase": offerErr == nil && role == "requester",
-		"block_reason": reason, "requires_video": requiresVideo, "coach_id": coachID, "funding": map[bool]string{true: "ticket", false: "cash"}[room.review != nil]})
+		"block_reason": reason, "requires_video": requiresVideo, "coach_id": coachID, "funding": funding})
 }
 
 func (s *Server) validateConsultationContent(w http.ResponseWriter, r *http.Request, body, video string, owner uuid.UUID, existing *string) (*string, bool) {
@@ -402,7 +423,9 @@ func (s *Server) saveConsultationDraft(w http.ResponseWriter, r *http.Request) {
 			Funding: "cash", PriceYen: price, SharePercent: share, Question: req.Body, VideoPublicID: video}
 		if room.review != nil {
 			params.ReviewRequestID = &room.id
-			params.Funding = "ticket"
+			if params.Funding, err = reviewConsultationFunding(r.Context(), q, fresh); err != nil {
+				return err
+			}
 		} else {
 			params.ContractID = &room.id
 		}
@@ -477,6 +500,19 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.ticketEligibility(r.Context(), q, owner); err != nil {
 			return err
+		}
+		if room.review != nil {
+			// 下書きを保存してから残高が変わっていたら、送信時の残高で払い方を決め直す。
+			funding, err := reviewConsultationFunding(r.Context(), q, room)
+			if err != nil {
+				return err
+			}
+			if funding != current.Funding {
+				if current, err = q.SetConsultationDraftFunding(r.Context(), db.SetConsultationDraftFundingParams{ID: current.ID, Funding: funding}); err != nil {
+					return err
+				}
+				saved = current
+			}
 		}
 		if current.Funding == "ticket" {
 			if err := s.reserveConsultationTickets(r.Context(), q, owner, current); err != nil {

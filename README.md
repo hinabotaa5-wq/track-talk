@@ -97,6 +97,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | 現在は両方 `0`。APIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
 | `COACHING_NEW_ACCEPTANCE_ENABLED` | 現在は `0`。画面を公開する場合も、新しい申込み・購入の受付は別途判断 |
 | `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | 現在は両方 `0`。有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_TICKET_SALES_ENABLED` | 空（停止）のまま。チケットの新規販売は終了し、動画添削・追加相談は都度払い（カード・PayPay）。購入済みチケットの残高・履歴・返金は使える |
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |
 | `VAPID_*` | 端末へのプッシュ通知 |
 | `SENSE_SUMMARY_ENABLED` / `NEXT_PUBLIC_SENSE_SUMMARY_ENABLED` | 感覚メモのAI振り返りの公開設定 |

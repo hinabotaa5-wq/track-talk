@@ -29,6 +29,10 @@ const (
 	checkoutMaxLife = 24 * time.Hour
 )
 
+// checkoutPaymentMethods は、支払い方法をコードで指定する支払い画面に出す方法。カード（Apple Pay・Google Pay を含む）と
+// PayPay だけにする。コンビニ払い・銀行振込は出さない。PayPay は Stripe のダッシュボードで有効にしてから使う。
+var checkoutPaymentMethods = []string{"card", "paypay"}
+
 // errStripe は、Stripe とのやりとりがうまくいかなかったこと（つながらない、断られた）。
 var errStripe = errors.New("stripe request failed")
 

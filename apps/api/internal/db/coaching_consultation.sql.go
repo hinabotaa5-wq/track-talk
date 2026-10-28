@@ -1249,6 +1249,59 @@ func (q *Queries) SaveConsultationRefund(ctx context.Context, arg SaveConsultati
 	return err
 }
 
+const setConsultationDraftFunding = `-- name: SetConsultationDraftFunding :one
+UPDATE coaching_consultations SET funding=$2,updated_at=now()
+WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+`
+
+type SetConsultationDraftFundingParams struct {
+	ID      uuid.UUID `json:"id"`
+	Funding string    `json:"funding"`
+}
+
+// 送信前の下書きの支払い方法(チケットか都度払いか)を、送信時の残高に合わせて変える。
+func (q *Queries) SetConsultationDraftFunding(ctx context.Context, arg SetConsultationDraftFundingParams) (CoachingConsultation, error) {
+	row := q.db.QueryRow(ctx, setConsultationDraftFunding, arg.ID, arg.Funding)
+	var i CoachingConsultation
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.CoachID,
+		&i.RequestKey,
+		&i.ReviewRequestID,
+		&i.ContractID,
+		&i.Minor,
+		&i.Funding,
+		&i.PriceYen,
+		&i.SharePercent,
+		&i.Status,
+		&i.Question,
+		&i.VideoPublicID,
+		&i.Answer,
+		&i.AnswerVideoPublicID,
+		&i.ClarifyBody,
+		&i.Clarification,
+		&i.ClarifyRequestedAt,
+		&i.ClarifiedAt,
+		&i.RespondBy,
+		&i.AnswerBy,
+		&i.AnsweredAt,
+		&i.ClosedAt,
+		&i.ExpiresAt,
+		&i.PaymentState,
+		&i.CheckoutSessionID,
+		&i.CheckoutUrl,
+		&i.SessionExpiresAt,
+		&i.PaymentIntentID,
+		&i.PaidAt,
+		&i.HiddenAt,
+		&i.PurgedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const setConsultationPaymentState = `-- name: SetConsultationPaymentState :exec
 UPDATE coaching_consultations SET payment_state=$2,updated_at=now() WHERE id=$1
 `

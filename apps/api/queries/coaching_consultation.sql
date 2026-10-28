@@ -15,6 +15,11 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *;
 UPDATE coaching_consultations SET question=$2,video_public_id=$3,updated_at=now()
 WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING *;
 
+-- name: SetConsultationDraftFunding :one
+-- 送信前の下書きの支払い方法(チケットか都度払いか)を、送信時の残高に合わせて変える。
+UPDATE coaching_consultations SET funding=$2,updated_at=now()
+WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING *;
+
 -- name: GetConsultation :one
 SELECT * FROM coaching_consultations WHERE id=$1;
 
