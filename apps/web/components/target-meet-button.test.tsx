@@ -57,10 +57,12 @@ it("セットすると置き換わり、セット中をもう一度押すと解�
   await act(async () => buttons()[1].click());
   expect(fetch).toHaveBeenLastCalledWith("/v1/me/target-meet", { method: "PUT", token: "t", body: JSON.stringify({ source: "major", ref: "b:2026" }) });
   expect(buttons().map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+  expect(document.body.querySelector('[role="status"]')?.textContent).toBe("スケジュールされました");
 
   await act(async () => buttons()[1].click());
   expect(fetch).toHaveBeenLastCalledWith("/v1/me/target-meet", { method: "DELETE", token: "t" });
   expect(buttons().map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false"]);
+  expect(document.body.querySelector('[role="status"]')).toBeNull();
 });
 
 it("未ログインならログインへ案内する", async () => {

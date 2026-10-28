@@ -127,11 +127,11 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
             );
           })}
         </div>
-        {shared ? <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300"><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-amber-300" />大会記録</span></p> : null}
+        {shared ? <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300"><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-amber-300" />記録</span></p> : null}
         {summaries.length ? <p className="flex items-center gap-1 text-xs text-slate-300"><span aria-hidden className="size-1.5 rounded-full bg-violet-300" />まとめた感覚（対象期間の最終日）</p> : null}
         {summariesLoading ? <p role="status" className="text-sm text-slate-300">まとめた感覚を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">まとめた感覚を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
-        {recordsLoading ? <p role="status" className="text-sm text-slate-300">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">大会記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
-        {loading ? <p role="status" className="text-sm text-slate-300">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・大会記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
+        {recordsLoading ? <p role="status" className="text-sm text-slate-300">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
+        {loading ? <p role="status" className="text-sm text-slate-300">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
       </div>
       {detailsOpen && selectedDay ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/60 px-2 backdrop-blur-sm" style={{ paddingTop: overlayPadding.top, paddingBottom: overlayPadding.bottom }} onClick={(event) => { if (event.target === event.currentTarget) closeDetails(); }}>
@@ -143,7 +143,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
             <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3">
               {selectedSummaries.length ? <h4 className="text-sm font-semibold text-violet-200">まとめた感覚</h4> : null}
               {selectedSummaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} open />)}
-              {selectedRecords.length ? <h4 className="text-sm font-semibold text-amber-200">大会記録</h4> : null}
+              {selectedRecords.length ? <h4 className="text-sm font-semibold text-amber-200">記録</h4> : null}
               {selectedRecords.map((record) => <RaceRecordRow key={record.id} record={record} kind={raceMarkKind(record.event)} token={token} onChanged={(next) => onRecordsChanged?.(next)} />)}
               {shared && selectedNotes.length ? <h4 className="text-sm font-semibold text-sky-200">感覚メモ</h4> : null}
               {selectedNotes.map((note) => <SenseNoteItem key={note.id} note={note} token={token} onDeleted={onDeleted} />)}

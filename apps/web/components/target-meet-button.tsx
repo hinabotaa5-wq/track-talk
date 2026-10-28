@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Plus } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { apiErrorText } from "@/lib/api";
@@ -17,6 +18,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
   const { target } = useTargetMeet(session ? token : null);
   const { pending, acquire, release } = useActionLock();
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(false);
   const selected = target?.source === source && target.ref === meetRef;
 
   async function toggle() {
@@ -27,14 +29,26 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
     if (!acquire()) return;
     setError("");
     try {
-      if (selected) await clearTargetMeet(token);
-      else await setTargetMeet(token, source, meetRef);
+      if (selected) {
+        await clearTargetMeet(token);
+        setToast(false);
+      } else {
+        await setTargetMeet(token, source, meetRef);
+        setToast(true);
+      }
     } catch (e) {
       setError(apiErrorText(e, "セットできませんでした"));
     } finally {
       release();
     }
   }
+
+  // セットしたことを画面の下に少しだけ出す。カードの glass は fixed の基準になってしまうので body に出す。
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(false), 2500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   // 見た目はメモタブの瓶の横の「+」と同じ丸。セット中はチェックにする。
   return (
@@ -56,6 +70,17 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
         </span>
       </button>
       {error ? <p role="alert" className="mt-1 max-w-32 text-right text-xs text-red-300">{error}</p> : null}
+      {toast
+        ? createPortal(
+            <p
+              role="status"
+              className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-fit rounded-full bg-slate-900/90 px-4 py-2 text-sm font-semibold text-slate-100 shadow-lg md:bottom-6"
+            >
+              スケジュールされました
+            </p>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
