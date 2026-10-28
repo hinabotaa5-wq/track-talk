@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SenseSummary } from "@/lib/sense-notes";
-import { SenseSummaryCard, useSenseSummaries } from "./sense-summary";
+import { SenseSummaryCard, SenseSummaryResult, useSenseSummaries } from "./sense-summary";
 
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
@@ -116,4 +116,61 @@ it("瓶の横では作成状況とボタンを表示し、まとめ本文はカ�
   await click("6個の感覚をまとめる");
   expect(container.textContent).toContain("あと6個でまとめられます");
   expect(container.textContent).not.toContain(saved.summary.overview);
+});
+
+it("新しい要約へスクロールして文字を順に表示する", async () => {
+  vi.useFakeTimers();
+  const scroll = vi.fn();
+  const previous = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scroll;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
+  try {
+    const state = { busy: false, createdSummary: saved } as ReturnType<typeof useSenseSummaries>;
+    await act(async () => root.render(<SenseSummaryResult state={state}><div>カレンダー</div></SenseSummaryResult>));
+    const text = container.querySelector('[aria-hidden="true"].whitespace-pre-wrap')!;
+    expect(text.textContent).not.toContain(saved.summary.overview);
+    await act(async () => vi.advanceTimersByTime(32));
+    expect(scroll).toHaveBeenCalled();
+    expect(text.textContent).toContain("リ");
+    expect(text.textContent).not.toContain(saved.summary.overview);
+    await act(async () => vi.advanceTimersByTime(10000));
+    expect(text.textContent).toContain(saved.summary.overview);
+    expect(text.textContent).toContain("腕振りを意識する");
+    expect(text.textContent).not.toContain("▍");
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.className).toContain("absolute inset-0");
+    expect(container.querySelector('[inert]')?.textContent).toContain("カレンダー");
+    await act(async () => (container.querySelector('[aria-label="AI要約を閉じる"]') as HTMLButtonElement).click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('[inert]')).toBeNull();
+    expect(container.textContent).toContain("カレンダー");
+  } finally {
+    await act(async () => root.render(null));
+    HTMLElement.prototype.scrollIntoView = previous;
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("次の作成に失敗したとき、前回の要約を新しい結果として再表示しない", async () => {
+  let attempts = 0;
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (options?.method === "POST") {
+      if (++attempts === 1) return { summary: saved, pending_notes: 6 };
+      throw new Error("failed");
+    }
+    if (path.endsWith("/summaries")) return { summaries: [], next_cursor: null };
+    return { pending_notes: 6, min_notes: 6 };
+  });
+  function ResultHarness() {
+    const state = useSenseSummaries("test", 18);
+    return <><SenseSummaryCard state={state} compact /><output>{state.createdSummary?.id ?? ""}</output></>;
+  }
+  await act(async () => root.render(<ResultHarness />));
+  await click("6個の感覚をまとめる");
+  expect(container.querySelector("output")?.textContent).toBe(saved.id);
+  await click("6個の感覚をまとめる");
+  expect(container.querySelector("output")?.textContent).toBe("");
+  expect(container.textContent).toContain("まとめを作れませんでした");
 });
