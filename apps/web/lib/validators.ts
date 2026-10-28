@@ -50,13 +50,15 @@ export const commentSchema = z.object({
   body: z.string("コメントを入力してください").trim().min(1, "コメントを入力してください").max(2000, "2000文字以内"),
 });
 
-export const inquiryCategories = ["bug", "account", "request", "other"] as const;
+// disclosure は、特定商取引法の表記で省略した住所・電話番号の開示請求。
+export const inquiryCategories = ["bug", "account", "request", "other", "disclosure"] as const;
 
 export const inquiryCategoryLabels: Record<(typeof inquiryCategories)[number], string> = {
   bug: "不具合",
   account: "アカウント",
   request: "機能の要望",
   other: "その他",
+  disclosure: "特商法表記の開示請求",
 };
 
 export const inquirySchema = z.object({

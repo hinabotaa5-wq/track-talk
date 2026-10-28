@@ -7,6 +7,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { PlanIncludesList, TrialBadge } from "@/components/coaching-plans";
+import { SellerNote } from "@/components/seller-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -128,6 +129,7 @@ export default function ApplyCoachingPlanPage() {
           </p>
         )}
         <h1 className="text-2xl font-bold">パーソナル指導に申し込む</h1>
+        <SellerNote coachName={coach.nickname} />
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4 text-sm">

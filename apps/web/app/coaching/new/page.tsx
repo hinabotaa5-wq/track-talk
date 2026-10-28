@@ -1,5 +1,6 @@
 "use client";
 
+import { SellerNote } from "@/components/seller-note";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { ArrowRight } from "lucide-react";
@@ -176,6 +177,7 @@ export default function NewReviewRequestPage() {
           </p>
         )}
         <h1 className="text-2xl font-bold">フォーム添削を頼む</h1>
+        <SellerNote />
         <Link href="/coaches" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
           コーチ一覧<ArrowRight className="size-4 text-blue-300" aria-hidden />
         </Link>

@@ -1911,3 +1911,15 @@ func TestPracticeRatingCommentCanBeReportedAndHidden(t *testing.T) {
 		t.Fatalf("hidden comment still shown %+v", after.Practice.Reputation)
 	}
 }
+
+// 特商法の表記で省略した住所・電話番号の開示請求は、お問い合わせの種類として受け付ける。
+func TestInquiryAcceptsCommerceDisclosureRequest(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "disclosure", "subject": "所在地の開示", "body": "特定商取引法の表記の所在地と電話番号を教えてください", "email": "buyer@example.com",
+	})
+	if rec.Code != 201 || !strings.Contains(rec.Body.String(), `"category":"disclosure"`) {
+		t.Fatalf("disclosure %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, apiErrorText } from "@/lib/api";
+import { coachingEnabled } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
 import type { Inquiry, Meta } from "@/lib/types";
@@ -28,6 +29,13 @@ export default function ContactPage() {
     resolver: zodResolver(inquirySchema),
     defaultValues: { category: "bug", email: "", subject: "", body: "" },
   });
+
+  // 特商法の表記のページから来たときは、開示請求を選んだ状態にする。
+  useEffect(() => {
+    if (coachingEnabled && new URLSearchParams(window.location.search).get("category") === "disclosure") {
+      form.setValue("category", "disclosure");
+    }
+  }, [form]);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -92,7 +100,8 @@ export default function ContactPage() {
             className="w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
             {...form.register("category")}
           >
-            {inquiryCategories.map((category) => (
+            {/* 開示請求は、有料の機能と表記のページを出している間だけ選べる。 */}
+            {inquiryCategories.filter((category) => coachingEnabled || category !== "disclosure").map((category) => (
               <option key={category} value={category}>
                 {inquiryCategoryLabels[category]}
               </option>
