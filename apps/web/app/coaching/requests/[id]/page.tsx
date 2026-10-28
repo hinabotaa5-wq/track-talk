@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
@@ -217,7 +219,7 @@ function ReviewRequestView() {
   }, [waitingForPayment, polls]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !request) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || !request) return <PageLoading label="読み込み中..." />;
 
   const waiting = request.status === "queued" || request.status === "offered" || request.status === "in_review";
 
@@ -295,7 +297,7 @@ function ReviewRequestView() {
 
 export default function ReviewRequestPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
       <ReviewRequestView />
     </Suspense>
   );

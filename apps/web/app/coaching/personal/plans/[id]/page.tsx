@@ -2,6 +2,8 @@
 
 import { PublicAvailability } from "@/components/coach-availability";
 import { hasAvailability } from "@/lib/coach-availability";
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
@@ -116,7 +118,7 @@ export default function ApplyCoachingPlanPage() {
   }
 
   if (loadError) return <p className="text-sm text-red-400">{loadError}</p>;
-  if (loading || !session || !data || !me) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || !data || !me) return <PageLoading label="読み込み中..." />;
 
   const { plan, coach } = data;
   const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);

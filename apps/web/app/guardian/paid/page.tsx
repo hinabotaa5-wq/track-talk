@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -26,7 +28,7 @@ function GuardianPaid() {
 
 export default function GuardianPaidPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
       <GuardianPaid />
     </Suspense>
   );

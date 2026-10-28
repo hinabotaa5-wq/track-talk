@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { GuardianConsultationReviews } from "@/components/guardian-consultation-reviews";
 
 import { GuardianPersonalSection } from "@/components/coaching-guardian";
@@ -212,7 +214,7 @@ export default function GuardianPage() {
     );
   }
   if (!consent) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (

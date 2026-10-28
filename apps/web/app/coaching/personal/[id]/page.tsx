@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachingSupportPanel } from "@/components/coaching-support";
 import { CoachingInPersonPanel } from "@/components/coaching-in-person";
 
@@ -104,7 +106,7 @@ function CoachingContractView() {
   }
 
   if (error && !contract) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !contract) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || !contract) return <PageLoading label="読み込み中..." />;
 
   const isCoach = contract.role === "coach";
 
@@ -191,7 +193,7 @@ function CoachingContractView() {
 
 export default function CoachingContractPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
       <CoachingContractView />
     </Suspense>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import { SellerNote } from "@/components/seller-note";
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -92,7 +94,7 @@ function TicketsPage() {
     } finally { release(); }
   }
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session) return <PageLoading label="読み込み中..." />;
   return <div className="mx-auto max-w-md space-y-5">
     <h1 className="text-2xl font-bold">コーチングチケット</h1>
     <SellerNote />
@@ -130,4 +132,4 @@ function TicketsPage() {
   </div>;
 }
 
-export default function Page() { return <Suspense fallback={<p>読み込み中...</p>}><TicketsPage /></Suspense>; }
+export default function Page() { return <Suspense fallback={<PageLoading label="読み込み中..." />}><TicketsPage /></Suspense>; }

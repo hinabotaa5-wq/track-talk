@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
@@ -38,7 +40,7 @@ export function MajorHostsPanel({ initialHosts = null }: { initialHosts?: MajorH
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-100">今後の世界陸上・オリンピック</h1>
-      {loading ? <p className="text-sm text-slate-200">読み込み中...</p> : <MajorHostList hosts={hosts ?? []} error={error} />}
+      {loading ? <PageLoading label="読み込み中..." /> : <MajorHostList hosts={hosts ?? []} error={error} />}
     </div>
   );
 }

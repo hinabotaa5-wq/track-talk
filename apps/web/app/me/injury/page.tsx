@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
@@ -101,7 +103,7 @@ export default function MyInjuryHistoryPage() {
     setReload((value) => value + 1);
   }
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session) return <PageLoading label="読み込み中..." />;
 
   return (
     <div className="space-y-4">
@@ -115,7 +117,7 @@ export default function MyInjuryHistoryPage() {
       {failed ? (
         <ErrorState message="履歴の取得に失敗しました。時間をおいて、もう一度開いてください。" />
       ) : items === null ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
+        <PageLoading label="読み込み中..." />
       ) : items.length === 0 ? (
         <EmptyState title="まだケガの投稿がありません" body="ケガのグループに投稿すると、ここに履歴がたまります。" />
       ) : (

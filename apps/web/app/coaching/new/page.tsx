@@ -2,6 +2,8 @@
 
 import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { SellerNote } from "@/components/seller-note";
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { GuardianAllowance } from "@/components/guardian-allowance";
@@ -211,7 +213,7 @@ export default function NewReviewRequestPage() {
   }
 
   if (loading || !session || (!me && !loadError)) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
   if (!me) {
     return <p className="text-sm text-red-400">{loadError}</p>;

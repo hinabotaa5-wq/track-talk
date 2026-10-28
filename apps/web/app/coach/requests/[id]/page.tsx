@@ -1,6 +1,8 @@
 "use client";
 
 import { WorkOrderView } from "@/components/work-order-terms";
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
@@ -212,7 +214,7 @@ export default function CoachReviewRequestPage() {
   }, [token, id]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !request) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || !request) return <PageLoading label="読み込み中..." />;
 
   const response = request.response;
   const needsClarification = request.status === "clarifying" && response && !response.hidden;

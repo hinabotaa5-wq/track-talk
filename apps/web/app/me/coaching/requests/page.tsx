@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
@@ -39,7 +41,7 @@ export default function MyReviewRequestsPage() {
   }, [token]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !requests) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || !requests) return <PageLoading label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">

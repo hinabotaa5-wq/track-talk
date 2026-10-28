@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -81,7 +83,7 @@ function NotificationSettings({ token }: { token: string | null }) {
       <p className="text-sm text-slate-200">
         種類ごとに、アプリ内(ベルの一覧)とプッシュ(この画面でオンにした端末)を選べます。
       </p>
-      {settings === null && !error ? <p className="text-sm text-slate-300">読み込み中...</p> : null}
+      {settings === null && !error ? <PageLoading label="読み込み中..." /> : null}
       {settings ? (
         <ul className="divide-y divide-white/15">
           <li className="flex items-center gap-3 pb-2 text-xs text-slate-300" aria-hidden>
@@ -198,7 +200,7 @@ export default function PushSettingsPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (

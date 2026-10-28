@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -107,7 +109,7 @@ export function DataView() {
       {failed ? (
         <ErrorState message="データの取得に失敗しました。時間をおいて、もう一度開いてください。" />
       ) : data === null ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
+        <PageLoading label="読み込み中..." />
       ) : data.groups.length === 0 ? (
         <EmptyState title="まだデータがありません" body="共有のグループに参加する人が増えると、ここに集計が出ます。" />
       ) : (

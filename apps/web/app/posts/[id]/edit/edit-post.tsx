@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { InjuryForm } from "@/components/injury-form";
 import { PostForm } from "@/components/post-form";
 import { PracticeForm } from "@/components/practice-form";
@@ -41,7 +43,7 @@ export function EditPost({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }, [id, token]);
 
   if (error && !post) return <p className="text-red-400">{error}</p>;
-  if (loading || !post) return <p>読み込み中…</p>;
+  if (loading || !post) return <PageLoading label="読み込み中…" />;
   if (!post.mine) {
     return <p>この投稿を編集する権限がありません。</p>;
   }

@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLoading } from "@/components/page-loading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, apiErrorText } from "@/lib/api";
@@ -40,7 +42,7 @@ export function CoachingSupportPanel({ contract, token, guardianToken }: { contr
       </article>)}
       {isCoach && contract.status === "active" && data.fulfillment_state === "open" && data.usage.calls_reserved + data.usage.calls_completed < data.call_count ? <div className="space-y-3 border-t border-white/20 pt-3"><h3 className="text-sm font-semibold">通話の候補を登録（{data.call_minutes}分）</h3><label className="block text-sm">日時<Input aria-label="通話の候補日時" type="datetime-local" value={starts} onChange={(e) => setStarts(e.target.value)} disabled={pending} /></label><label className="block text-sm">参加リンク<Input aria-label="通話の参加リンク" type="url" value={url} onChange={(e) => setURL(e.target.value)} disabled={pending} placeholder="Google Meet・Zoom・Teams" /></label><Button disabled={pending || !starts || !url} onClick={() => void propose()}>候補を登録する</Button><p className="text-xs text-slate-300">日時変更は取り消してから登録します。参加者との重複予約はできません。</p></div> : null}
       {data.minor ? <p className="text-xs text-slate-300">未成年の通話は保護者が日時と実施を確認します。保護者も通話に参加できます。</p> : null}
-    </> : <p className="text-sm">読み込み中…</p>}
+    </> : <PageLoading label="読み込み中…" />}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
 }

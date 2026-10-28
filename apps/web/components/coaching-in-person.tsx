@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLoading } from "@/components/page-loading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, apiErrorText } from "@/lib/api";
@@ -39,7 +41,7 @@ export function CoachingInPersonPanel({ contract, token, guardianToken }: { cont
       </article>)}
       {isCoach && contract.status === "active" && data.fulfillment_state === "open" && data.usage.reserved + data.usage.completed < data.session_count ? <div className="space-y-3 border-t border-white/20 pt-3"><h3 className="text-sm font-semibold">対面の候補を登録（{data.session_minutes}分）</h3><label className="block text-sm">日時<Input aria-label="対面の候補日時" type="datetime-local" value={starts} onChange={(e) => setStarts(e.target.value)} disabled={pending} /></label><label className="block text-sm">地域<Input aria-label="対面の地域" value={area} onChange={(e) => setArea(e.target.value)} disabled={pending} /></label><label className="block text-sm">会場<Input aria-label="対面の会場" value={venue} onChange={(e) => setVenue(e.target.value)} disabled={pending} /></label><label className="block text-sm">集合方法<Input aria-label="集合方法" value={note} onChange={(e) => setNote(e.target.value)} disabled={pending} /></label><Button disabled={pending || !starts || !venue || !area} onClick={() => void propose()}>候補を登録する</Button><p className="text-xs text-slate-300">変更は取り消してから登録します。参加者との重複予約はできません。</p></div> : null}
       {data.minor ? <p className="text-xs text-slate-300">未成年の対面は保護者が日時・場所・料金を確認します。</p> : null}
-    </> : <p className="text-sm">読み込み中…</p>}
+    </> : <PageLoading label="読み込み中…" />}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
 }
