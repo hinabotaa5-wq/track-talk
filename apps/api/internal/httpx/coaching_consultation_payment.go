@@ -46,7 +46,7 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		}
 		if current.Minor && current.ContractID == nil {
 			// 添削のあとの追加相談は、本人が自分で払う。保護者の有効な同意と月の上限を、このロックの中で確かめる。
-			block, err := s.minorSelfPayBlock(ctx, q, owner.ID, current.PriceYen, uuid.Nil, current.ID)
+			block, err := s.minorSelfPayBlock(ctx, q, owner.ID, minorPurchase{refType: "consultation", coachID: current.CoachID, price: current.PriceYen}, uuid.Nil, current.ID)
 			if err != nil {
 				return err
 			}
@@ -199,13 +199,9 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		notify = true
 		if c.Minor && c.ContractID == nil {
 			// 添削のあとの追加相談を18歳未満が自分で払ったときは、保護者への購入の通知を予約する。
-			coach, e := q.GetProfileByID(ctx, *c.CoachID)
-			if e != nil {
+			name, e := coachDisplayName(ctx, q, *c.CoachID)
+			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 				return e
-			}
-			name := ""
-			if coach.Nickname != nil {
-				name = *coach.Nickname
 			}
 			notice, err = queueGuardianPurchaseNotice(ctx, q, *c.RequesterID, "consultation", c.ID, c.PriceYen, name)
 			return err

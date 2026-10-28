@@ -169,7 +169,7 @@ func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_limit") || !strings.Contains(rec.Body.String(), "あと0円") {
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_limit") || !strings.Contains(rec.Body.String(), "今月の上限（3,000円）に達したため") {
 		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
 	}
 	body["tier"] = "coach"

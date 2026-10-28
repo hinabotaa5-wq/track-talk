@@ -248,7 +248,7 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if err := s.mail.Send(r.Context(), guardianLinkMail(email, s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
+		if err := s.mail.Send(r.Context(), guardianLinkMail(email, accountNameText(p.Nickname), s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
 			slog.Warn("guardian link mail", "err", err)
 			return errMail
 		}
@@ -277,22 +277,19 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusCreated, guardianStatusJSON(consent))
 }
 
-// guardianLinkMail は、保護者に送る同意のお願い。届く先を間違えていてもよいよう、子のアカウントの情報は書かない。
-// 文面はたたき台で、運営者が確定する。
-func guardianLinkMail(to, link string) mail.Message {
+// guardianLinkMail は、保護者に送る同意のお願い。文面は運営者の確定版。
+func guardianLinkMail(to, child, link string) mail.Message {
 	return mail.Message{
 		To:      to,
-		Subject: "【TrackTalk】お子さんの利用について保護者の同意のお願い",
-		Text: "TrackTalk（陸上競技のコミュニティサービス）をご利用中のお子さんが、オンラインコーチング" +
-			"（動画添削・追加相談、パーソナル指導）を使うために、保護者の方の同意を求めています。\n\n" +
-			"同意いただくと、保護者の方が選んだ月の上限の範囲で、お子さんが購入のたびにお子さん自身の PayPay（またはカード）で" +
-			"お支払いできるようになります。購入があるたびに、このアドレスにお知らせします。\n\n" +
-			"次のページで内容をご確認のうえ、同意するかどうかを選んでください。\n" +
-			link + "\n\n" +
-			"・このリンクは保護者の方だけが使うものです。お子さんを含め、他の人には渡さないでください。\n" +
-			"・リンクは30日間使えます。同意に使えるのは1回だけです。お子さんが新しいリンクを送ると、このリンクは使えなくなります。\n" +
-			"・心当たりがない場合は、このメールを破棄してください。同意しない限り何も始まりません。\n\n" +
-			"TrackTalk\n",
+		Subject: "お子さまの有料サービス利用についての同意のお願い",
+		Text: guardianMailGreeting +
+			"お子さま（アカウント名：" + child + "）から、有料サービス（動画添削・追加相談）を利用するための同意依頼が届いています。\n\n" +
+			"未成年のお子さまが有料サービスを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
+			"同意手続きはこちら：" + link + "\n" +
+			"（リンクの有効期限は30日です。このリンクからは1回だけ同意できます。）\n\n" +
+			"同意いただくと、お子さまは保護者の方が設定した月の上限の範囲で、ご自身のクレジットカードまたはPayPayでサービスを購入できるようになります。購入のたびに、このメールアドレスへお知らせします。\n\n" +
+			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまが有料サービスを購入することはありません。\n" +
+			guardianMailSignature,
 	}
 }
 

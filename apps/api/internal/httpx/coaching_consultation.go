@@ -522,7 +522,7 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 			return &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
 		}
 		if current.Minor && current.ContractID == nil {
-			block, err := s.minorSelfPayBlock(r.Context(), q, *current.RequesterID, current.PriceYen, uuid.Nil, current.ID)
+			block, err := s.minorSelfPayBlock(r.Context(), q, *current.RequesterID, minorPurchase{refType: "consultation", coachID: current.CoachID, price: current.PriceYen}, uuid.Nil, current.ID)
 			if err != nil {
 				return err
 			}

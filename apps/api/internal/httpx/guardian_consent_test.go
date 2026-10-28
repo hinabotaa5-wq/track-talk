@@ -41,6 +41,13 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 	coach, tc := onDutyCoach(t, h, admin)
 	minor, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
 	email := guardianEmail()
+	// 保護者へのメールには、お子さまのアカウント名（ニックネーム）と担当コーチの名前を書く。
+	execSQLArgs(t, `UPDATE profiles SET nickname = 'はしるこ' WHERE id = $1`, minor)
+	var coachName string
+	queryRowArgs(t, `SELECT COALESCE(NULLIF(c.name, ''), p.nickname, '') FROM coach_profiles c JOIN profiles p ON p.id = c.profile_id WHERE c.profile_id = $1`, []any{coach}, &coachName)
+	if coachName == "" {
+		t.Fatal("coach has no name")
+	}
 
 	newReview := func(method string) *httptest.ResponseRecorder {
 		b := reviewBodyFor(t, h, tm)
@@ -60,8 +67,9 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 
 	// 本人が保護者のアドレスを入れると、同意のリンクは保護者のメールにだけ届く（本人には返らない）。
 	gt := issueGuardianLink(t, h, tm, email)
-	if mailsTo(email) != 1 || !strings.Contains(lastMailTo(t, email).Text, "PayPay") {
-		t.Fatalf("consent request mail %d", mailsTo(email))
+	if m := lastMailTo(t, email); mailsTo(email) != 1 || m.Subject != "お子さまの有料サービス利用についての同意のお願い" ||
+		!strings.Contains(m.Text, "お子さま（アカウント名：はしるこ）") || !strings.Contains(m.Text, "PayPay") || !strings.Contains(m.Text, "TrackTalk 運営者") {
+		t.Fatalf("consent request mail %d %+v", mailsTo(email), m)
 	}
 	// 同意依頼中もまだ買えない。
 	if r := newReview("paypay"); r.Code != 422 || !strings.Contains(r.Body.String(), "guardian_required") {
@@ -79,11 +87,12 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 	var ip, terms string
 	var tokenUsed bool
 	queryRowArgs(t, `SELECT COALESCE(consent_ip,''), COALESCE(terms_version,''), consent_token_hash = token_hash FROM guardian_consents WHERE minor_id = $1`, []any{minor}, &ip, &terms, &tokenUsed)
-	if ip == "" || terms == "" || !tokenUsed {
+	if ip == "" || terms != "guardian-consent-2026-10-final" || !tokenUsed {
 		t.Fatalf("consent record ip=%q terms=%q used=%v", ip, terms, tokenUsed)
 	}
-	if mailsTo(email) != 2 || !strings.Contains(lastMailTo(t, email).Subject, "同意を受け付けました") {
-		t.Fatalf("consented mail %d", mailsTo(email))
+	if m := lastMailTo(t, email); mailsTo(email) != 2 || m.Subject != "保護者同意を受け付けました" ||
+		!strings.Contains(m.Text, "アカウント名：はしるこ") || !strings.Contains(m.Text, "お子さまが自分で支払える月の上限：3,000円") {
+		t.Fatalf("consented mail %d %+v", mailsTo(email), m)
 	}
 
 	// 同意の範囲で、本人が1,500円の添削を自分の PayPay で買える。支払いが届くと保護者に通知が届く。
@@ -93,8 +102,9 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 	}
 	payChosenReview(t, h, first, "paypay")
 	notice := lastMailTo(t, email)
-	if mailsTo(email) != 3 || !strings.Contains(notice.Subject, "動画添削") || !strings.Contains(notice.Text, "1,500円") ||
-		strings.Contains(notice.Text, "（不明）") || !guardianLinkPattern.MatchString(notice.Text) {
+	if mailsTo(email) != 3 || notice.Subject != "お子さまの購入のお知らせ（1,500円）" || !strings.Contains(notice.Text, "アカウント名：はしるこ") ||
+		!strings.Contains(notice.Text, "・内容：動画添削（担当コーチ："+coachName+"）") || !strings.Contains(notice.Text, "・金額：1,500円") ||
+		!strings.Contains(notice.Text, "・今月の利用合計：1,500円（月の上限：3,000円）") || !guardianLinkPattern.MatchString(notice.Text) {
 		t.Fatalf("purchase notice %+v", notice)
 	}
 	// 同じ支払いの知らせが2回届いても、保護者への通知は1回。
@@ -124,12 +134,14 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 		t.Fatalf("draft %+v", c)
 	}
 	rec = doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tm, nil)
-	if rec.Code != 422 || !strings.Contains(rec.Body.String(), "guardian_limit") || !strings.Contains(rec.Body.String(), "保護者の確認が必要") ||
-		!strings.Contains(rec.Body.String(), "お願いするメールを送りました") {
+	if rec.Code != 422 || !strings.Contains(rec.Body.String(), "guardian_limit") ||
+		!strings.Contains(rec.Body.String(), "今月の上限（3,000円）に達したため、この購入はできませんでした。保護者の方に、上限の引き上げをお願いするメールを送りました。") {
 		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
 	}
 	request := lastMailTo(t, email)
-	if mailsTo(email) != 5 || !strings.Contains(request.Subject, "上限") {
+	if mailsTo(email) != 5 || request.Subject != "お子さまの購入が月の上限に達しました" || !strings.Contains(request.Text, "月の上限（3,000円）") ||
+		!strings.Contains(request.Text, "・購入しようとした内容：追加相談（担当コーチ："+coachName+"）") || !strings.Contains(request.Text, "・金額：600円") ||
+		!strings.Contains(request.Text, "・今月の利用合計：3,000円") {
 		t.Fatalf("limit request mail %+v", request)
 	}
 	// お願いのメールは12時間に1回まで。
@@ -159,7 +171,8 @@ func TestGuardianFullConsentPurchaseFlow(t *testing.T) {
 		t.Fatalf("pay consultation %d", code)
 	}
 	notice = lastMailTo(t, email)
-	if mailsTo(email) != 6 || !strings.Contains(notice.Subject, "追加相談") || !strings.Contains(notice.Text, "600円") {
+	if mailsTo(email) != 6 || notice.Subject != "お子さまの購入のお知らせ（600円）" || !strings.Contains(notice.Text, "・内容：追加相談（担当コーチ："+coachName+"）") ||
+		!strings.Contains(notice.Text, "・今月の利用合計：3,600円（月の上限：5,000円）") {
 		t.Fatalf("consultation notice %+v", notice)
 	}
 

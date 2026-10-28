@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,8 +25,7 @@ import (
 // サポートプランなど保護者が自分で払う契約には、この仕組みは使わない（保護者が契約・支払いの当事者になる）。
 
 // guardianTermsVersion は、保護者が同意した文面の版。同意ページや規約の文面を変えたら上げる。
-// 文面はたたき台で、運営者が確定したら版を付け直す。
-const guardianTermsVersion = "guardian-consent-2026-10-draft"
+const guardianTermsVersion = "guardian-consent-2026-10-final"
 
 // guardianManageLinkLife は、上限の変更・撤回のためのリンクが使える期間。メールを送るたびに新しく作る。
 const guardianManageLinkLife = 30 * 24 * time.Hour
@@ -64,10 +65,21 @@ func optionalText(v string) *string {
 	return &v
 }
 
-// minorBlockError は、18歳未満が自分で払う購入を止める理由。
+// minorPurchase は、18歳未満が自分で払おうとしている購入。上限で止めたときの、保護者へのお願いのメールに書く。
+type minorPurchase struct {
+	refType   string // "review" または "consultation"
+	coachName string
+	coachID   *uuid.UUID // coachName が空でコーチが決まっているときは、送る時に名前を引く
+	price     int32
+}
+
+// minorBlockError は、18歳未満が自分で払う購入を止める理由。上限で止めたときは、購入と今月の合計・上限も持つ。
 type minorBlockError struct {
 	code, message string
 	minor         uuid.UUID
+	item          minorPurchase
+	used          int64
+	limit         int32
 }
 
 func (e *minorBlockError) Error() string { return e.message }
@@ -75,7 +87,7 @@ func (e *minorBlockError) Error() string { return e.message }
 // minorSelfPayBlock は、18歳未満が自分で price 円を払ってよいかを確かめる。払えないときは理由を返す。
 // 保護者の有効な同意（同意済みで、撤回されていない）があり、今月の合計が上限に収まるときだけ払える。
 // 同時の購入で上限をすり抜けないよう、呼ぶ側は LockReviewRequester を取ったトランザクションの q を渡す。
-func (s *Server) minorSelfPayBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID, price int32, excludeReview, excludeConsultation uuid.UUID) (*minorBlockError, error) {
+func (s *Server) minorSelfPayBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID, item minorPurchase, excludeReview, excludeConsultation uuid.UUID) (*minorBlockError, error) {
 	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
 	status := "none"
 	if err == nil {
@@ -86,12 +98,16 @@ func (s *Server) minorSelfPayBlock(ctx context.Context, q *db.Queries, minorID u
 	switch status {
 	case "consented":
 	case "declined":
-		return &minorBlockError{"guardian_declined", "保護者が同意しなかったため、購入できません", minorID}, nil
+		return &minorBlockError{code: "guardian_declined", message: "保護者の方の同意が得られなかったため、有料サービスは利用できません。", minor: minorID}, nil
 	case "revoked":
-		return &minorBlockError{"guardian_revoked", "保護者が同意を取り消したため、新しい購入はできません。もう一度使うには、保護者にあらためて同意してもらってください", minorID}, nil
+		return &minorBlockError{code: "guardian_revoked", message: "保護者の方の同意が取り消されたため、有料サービスは利用できません。再度利用するには、保護者の方の同意が必要です。", minor: minorID}, nil
+	case "pending":
+		return &minorBlockError{code: "guardian_required", message: "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送っています。同意が完了すると、ここから依頼できるようになります。", minor: minorID}, nil
 	default:
-		return &minorBlockError{"guardian_required", "18歳未満の方は、保護者の同意が済むまで購入できません。「フォーム添削の準備」から保護者にメールを送り、同意してもらってください", minorID}, nil
+		// まだ保護者のメールを入力していない（お願いのメールを送っていない）。
+		return &minorBlockError{code: "guardian_required", message: "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送ってください。同意が完了すると、ここから依頼できるようになります。", minor: minorID}, nil
 	}
+	price := item.price
 	// 0円（購入済みのチケットで払う）は、同意だけを確かめる。
 	if price == 0 {
 		return nil, nil
@@ -106,11 +122,10 @@ func (s *Server) minorSelfPayBlock(ctx context.Context, q *db.Queries, minorID u
 	if used+int64(price) <= int64(limit) {
 		return nil, nil
 	}
-	left := int32(max(int64(limit)-used, 0))
 	return &minorBlockError{
-		"guardian_limit",
-		fmt.Sprintf("今月の上限（%s円）を超えるため、保護者の確認が必要です。今月はあと%s円です。", formatYenNumber(limit), formatYenNumber(left)),
-		minorID,
+		code:    "guardian_limit",
+		message: fmt.Sprintf("今月の上限（%s円）に達したため、この購入はできませんでした。", formatYenNumber(limit)),
+		minor:   minorID, item: item, used: used, limit: limit,
 	}, nil
 }
 
@@ -118,10 +133,10 @@ func (s *Server) minorSelfPayBlock(ctx context.Context, q *db.Queries, minorID u
 func (s *Server) writeMinorBlock(w http.ResponseWriter, r *http.Request, e *minorBlockError) {
 	msg := e.message
 	if e.code == "guardian_limit" {
-		if s.requestGuardianLimitRaise(r.Context(), e.minor, clientIP(r)) {
-			msg += "保護者に、上限の変更をお願いするメールを送りました。"
+		if s.requestGuardianLimitRaise(r.Context(), e, clientIP(r)) {
+			msg += "保護者の方に、上限の引き上げをお願いするメールを送りました。"
 		} else {
-			msg += "保護者に上限を上げてもらうと購入できます（お願いのメールは12時間に1回まで送ります）。"
+			msg += "上限の変更は保護者の方にお願いしてください。"
 		}
 	}
 	Error(w, http.StatusUnprocessableEntity, e.code, msg)
@@ -137,18 +152,22 @@ func (s *Server) writeMinorBlockError(w http.ResponseWriter, r *http.Request, er
 	return true
 }
 
-// requestGuardianLimitRaise は、保護者に上限の変更をお願いするメールを送る。12時間に1回まで。送ったら true。
-func (s *Server) requestGuardianLimitRaise(ctx context.Context, minorID uuid.UUID, ip string) bool {
+// requestGuardianLimitRaise は、保護者に上限の変更をお願いするメールを送る。12時間に1回まで。
+// 送った、またはこの12時間のうちに送ってあるときは true。
+func (s *Server) requestGuardianLimitRaise(ctx context.Context, e *minorBlockError, ip string) bool {
 	if !s.mail.Configured() {
 		return false
 	}
+	minorID := e.minor
 	ctx = context.WithoutCancel(ctx)
 	consent, err := s.q.ClaimGuardianLimitRequest(ctx, minorID)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("claim guardian limit request", "err", err)
+			return false
 		}
-		return false
+		// 同意済みで行が返らないのは、12時間のうちにもう送ってあるとき。
+		return true
 	}
 	link, err := s.newGuardianManageLink(ctx, s.q, minorID)
 	if err != nil {
@@ -157,7 +176,16 @@ func (s *Server) requestGuardianLimitRaise(ctx context.Context, minorID uuid.UUI
 		return false
 	}
 	id := uuid.New()
-	m := guardianLimitRequestMail(*consent.GuardianEmail, consent.SelfPayLimitYen, link)
+	coach := e.item.coachName
+	if coach == "" && e.item.coachID != nil {
+		if coach, err = coachDisplayName(ctx, s.q, *e.item.coachID); err != nil {
+			slog.Warn("guardian limit request coach", "err", err)
+		}
+	}
+	m := guardianLimitRequestMail(*consent.GuardianEmail, guardianLimitRequest{
+		child: guardianChildName(ctx, s.q, minorID), refType: e.item.refType, coach: coach,
+		price: e.item.price, used: e.used, limit: consent.SelfPayLimitYen,
+	}, link)
 	status, lastErr := "sent", (*string)(nil)
 	if err := s.mail.Send(ctx, m, "guardian-limit-"+id.String()); err != nil {
 		slog.Warn("guardian limit request mail", "err", err)
@@ -224,7 +252,18 @@ func (s *Server) sendGuardianNotice(ctx context.Context, n db.GuardianNotice) bo
 		slog.Error("guardian manage link", "err", err)
 		return false
 	}
-	if err := s.mail.Send(ctx, guardianPurchaseMail(n, link), "guardian-purchase-"+n.ID.String()); err != nil {
+	consent, err := s.q.GetGuardianConsentByMinor(ctx, n.MinorID)
+	if err != nil {
+		slog.Error("guardian purchase consent", "err", err)
+		return false
+	}
+	used, err := s.q.SumMinorSelfPaidSpend(ctx, db.SumMinorSelfPaidSpendParams{MinorID: n.MinorID})
+	if err != nil {
+		slog.Error("guardian purchase month spend", "err", err)
+		return false
+	}
+	m := guardianPurchaseMail(n, guardianChildName(ctx, s.q, n.MinorID), used, consent.SelfPayLimitYen, link)
+	if err := s.mail.Send(ctx, m, "guardian-purchase-"+n.ID.String()); err != nil {
 		slog.Warn("guardian purchase mail", "notice", n.ID, "err", err)
 		if err := s.q.MarkGuardianNotice(ctx, db.MarkGuardianNoticeParams{ID: n.ID, Status: "failed", LastError: optionalText(err.Error())}); err != nil {
 			slog.Error("mark guardian notice", "err", err)
@@ -268,7 +307,7 @@ func (s *Server) sendGuardianConsentedMail(ctx context.Context, consent db.Guard
 	}
 	id := uuid.New()
 	status, lastErr := "sent", (*string)(nil)
-	if err := s.mail.Send(ctx, guardianConsentedMail(*consent.GuardianEmail, consent, link), "guardian-consented-"+id.String()); err != nil {
+	if err := s.mail.Send(ctx, guardianConsentedMail(*consent.GuardianEmail, guardianChildName(ctx, s.q, consent.MinorID), consent, link), "guardian-consented-"+id.String()); err != nil {
 		slog.Warn("guardian consented mail", "err", err)
 		status, lastErr = "failed", optionalText(err.Error())
 	}
@@ -281,43 +320,79 @@ func (s *Server) sendGuardianConsentedMail(ctx context.Context, consent db.Guard
 	}
 }
 
-// 以下のメールの文面はたたき台。運営者が確定する。
+// guardianChildName は、保護者へのメールに書くお子さまのアカウント名（ニックネーム）。
+func guardianChildName(ctx context.Context, q *db.Queries, minorID uuid.UUID) string {
+	p, err := q.GetProfileByID(ctx, minorID)
+	if err != nil {
+		slog.Warn("guardian mail child name", "err", err)
+		return accountNameText(nil)
+	}
+	return accountNameText(p.Nickname)
+}
 
-const guardianMailFooter = "\n・このメールのリンクは保護者の方だけが使うものです。お子さんを含め、他の人には渡さないでください。\n" +
-	"・リンクは30日間使えます。期限が切れたあとも、次の通知のメールに新しいリンクが入ります。\n" +
-	"・ご不明な点は、TrackTalk のお問い合わせフォームからご連絡ください。\n\n" +
-	"TrackTalk\n"
+func accountNameText(nickname *string) string {
+	if nickname == nil || strings.TrimSpace(*nickname) == "" {
+		return "未設定"
+	}
+	return *nickname
+}
+
+func guardianItemText(refType string) string {
+	if refType == "consultation" {
+		return "追加相談"
+	}
+	return "動画添削"
+}
+
+// guardianCoachText は、メールの「担当コーチ」。コーチを選ばずに頼んだ添削は、支払いのあとに担当が決まる。
+func guardianCoachText(name string) string {
+	if name == "" {
+		return "これから決まります"
+	}
+	return name
+}
+
+func guardianMailTime(t time.Time) string {
+	return t.In(jst.Zone).Format("2006年1月2日 15:04")
+}
+
+// 以下のメールの文面は運営者の確定版（guardianTermsVersion と同じ版）。
+
+const guardianMailGreeting = "TrackTalkをご利用いただきありがとうございます。\n"
+
+const guardianMailSignature = "\nTrackTalk 運営者\n"
 
 // guardianConsentedMail は、同意を受け付けたことの確認。
-func guardianConsentedMail(to string, c db.GuardianConsent, link string) mail.Message {
+func guardianConsentedMail(to, child string, c db.GuardianConsent, link string) mail.Message {
 	when := ""
 	if c.ConsentedAt != nil {
-		when = c.ConsentedAt.In(jst.Zone).Format("2006年1月2日 15:04")
+		when = guardianMailTime(*c.ConsentedAt)
 	}
 	return mail.Message{
 		To:      to,
-		Subject: "【TrackTalk】保護者の同意を受け付けました",
-		Text: "TrackTalk のオンラインコーチング（動画添削・追加相談）について、保護者の同意を受け付けました。\n\n" +
-			"同意した日時: " + when + "\n" +
-			"お子さんが支払う月の上限: " + guardianLimitText(&c.SelfPayLimitYen) + "\n\n" +
-			"この範囲で、お子さんは購入のたびにお子さん自身の PayPay（またはカード）でお支払いします。\n" +
-			"購入があるたびに、金額・コーチ名・日時をこのアドレスにお知らせします。\n\n" +
-			"上限の変更と同意の取り消しは、次のページからいつでもできます。\n" + link + "\n" +
-			guardianMailFooter,
+		Subject: "保護者同意を受け付けました",
+		Text: guardianMailGreeting +
+			"お子さま（アカウント名：" + child + "）の有料サービス利用について、保護者の方の同意を受け付けました。\n\n" +
+			"・同意日時：" + when + "\n" +
+			"・お子さまが自分で支払える月の上限：" + formatYenNumber(c.SelfPayLimitYen) + "円\n\n" +
+			"お子さまが購入するたびに、このメールアドレスへ購入内容をお知らせします。\n" +
+			"上限の変更、または同意の取り消しは、下記のリンクからいつでも行えます。\n\n" +
+			"上限の変更・同意の取り消しはこちら：" + link + "\n" +
+			guardianMailSignature,
 	}
 }
 
-// guardianPurchaseMail は、お子さんの購入の通知。
-func guardianPurchaseMail(n db.GuardianNotice, link string) mail.Message {
-	what := "動画添削"
-	if n.RefType != nil && *n.RefType == "consultation" {
-		what = "追加相談"
+// guardianPurchaseMail は、お子さまの購入の通知。used は今月の利用合計（この購入を含む）。
+func guardianPurchaseMail(n db.GuardianNotice, child string, used int64, limit int32, link string) mail.Message {
+	what := guardianItemText("")
+	if n.RefType != nil {
+		what = guardianItemText(*n.RefType)
 	}
 	amount := int32(0)
 	if n.AmountYen != nil {
 		amount = *n.AmountYen
 	}
-	coach := "（不明）"
+	coach := ""
 	if n.CoachName != nil {
 		coach = *n.CoachName
 	}
@@ -327,26 +402,45 @@ func guardianPurchaseMail(n db.GuardianNotice, link string) mail.Message {
 	}
 	return mail.Message{
 		To:      n.GuardianEmail,
-		Subject: "【TrackTalk】お子さんが" + what + "を購入しました（" + formatYenNumber(amount) + "円）",
-		Text: "保護者の方が同意した範囲で、お子さんが TrackTalk のオンラインコーチングを購入しました。\n\n" +
-			"内容: " + what + "\n" +
-			"金額: " + formatYenNumber(amount) + "円\n" +
-			"コーチ: " + coach + "\n" +
-			"日時: " + at.In(jst.Zone).Format("2006年1月2日 15:04") + "\n\n" +
-			"このお知らせは、購入のたびに事後にお送りしています。月の上限の変更や同意の取り消しは、次のページからできます。\n" +
-			"取り消したあとは新しい購入ができなくなります（すでに購入した分には影響しません）。\n" + link + "\n" +
-			guardianMailFooter,
+		Subject: "お子さまの購入のお知らせ（" + formatYenNumber(amount) + "円）",
+		Text: guardianMailGreeting +
+			"お子さま（アカウント名：" + child + "）が有料サービスを購入しました。\n\n" +
+			"・内容：" + what + "（担当コーチ：" + guardianCoachText(coach) + "）\n" +
+			"・金額：" + formatYenNumber(amount) + "円\n" +
+			"・日時：" + guardianMailTime(at) + "\n" +
+			"・今月の利用合計：" + formatYen64(used) + "円（月の上限：" + formatYenNumber(limit) + "円）\n\n" +
+			"上限の変更、または同意の取り消しは、下記のリンクから行えます。\n" +
+			link + "\n\n" +
+			"購入に心当たりがない場合は、このメールへの返信で運営者までご連絡ください。\n" +
+			guardianMailSignature,
 	}
 }
 
-// guardianLimitRequestMail は、お子さんが上限を超える購入をしようとしたときの、上限の変更のお願い。
-func guardianLimitRequestMail(to string, limit int32, link string) mail.Message {
+// guardianLimitRequest は、上限で止めた購入の中身。used はこの購入を含まない今月の利用合計。
+type guardianLimitRequest struct {
+	child, refType, coach string
+	price                 int32
+	used                  int64
+	limit                 int32
+}
+
+// guardianLimitRequestMail は、お子さまが上限を超える購入をしようとしたときの、上限の変更のお願い。
+func guardianLimitRequestMail(to string, r guardianLimitRequest, link string) mail.Message {
 	return mail.Message{
 		To:      to,
-		Subject: "【TrackTalk】月の支払い上限の確認のお願い",
-		Text: "お子さんが TrackTalk のオンラインコーチングで、今月の支払い上限（" + guardianLimitText(&limit) + "）を超える購入をしようとしたため、購入を止めています。\n\n" +
-			"上限を上げてもよい場合は、次のページから変更してください。変更しない場合は、何もしなくてかまいません（上限は毎月1日にリセットされます）。\n" +
-			link + "\n" +
-			guardianMailFooter,
+		Subject: "お子さまの購入が月の上限に達しました",
+		Text: guardianMailGreeting +
+			"お子さま（アカウント名：" + r.child + "）が有料サービスの購入を希望しましたが、今月の利用合計が、設定いただいた月の上限（" +
+			formatYenNumber(r.limit) + "円）に達しているため、購入を止めています。\n\n" +
+			"・購入しようとした内容：" + guardianItemText(r.refType) + "（担当コーチ：" + guardianCoachText(r.coach) + "）\n" +
+			"・金額：" + formatYenNumber(r.price) + "円\n" +
+			"・今月の利用合計：" + formatYen64(r.used) + "円\n\n" +
+			"購入を許可する場合は、下記のリンクから上限を引き上げてください。変更しない場合、お子さまは来月になるまで新たな購入はできません。\n\n" +
+			"上限の変更はこちら：" + link + "\n" +
+			guardianMailSignature,
 	}
+}
+
+func formatYen64(v int64) string {
+	return formatYenNumber(int32(min(v, int64(math.MaxInt32))))
 }

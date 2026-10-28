@@ -37,7 +37,7 @@ function LimitChoices({
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm text-slate-300">保護者がお支払いする契約の月の上限（毎月1日にリセットされます）</legend>
-      <p className="text-xs text-slate-300">パーソナル指導・サポートプランなど、保護者の方がお支払いする契約にかかる上限です。お子さんが自分で支払った分も合算します。</p>
+      <p className="text-xs text-slate-300">パーソナル指導・サポートプランなど、保護者の方がお支払いする契約にかかる上限です。お子さまが自分で支払った分も合算します。</p>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => (
           <label
@@ -60,7 +60,7 @@ function LimitChoices({
   );
 }
 
-// SelfPayLimitChoices は、お子さんが自分で支払う動画添削・追加相談の月の上限。上限なしは選べない。
+// SelfPayLimitChoices は、お子さまが自分で支払う動画添削・追加相談の月の上限。上限なしは選べない。
 function SelfPayLimitChoices({
   options,
   value,
@@ -72,9 +72,9 @@ function SelfPayLimitChoices({
 }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold text-white">お子さんが支払う月の上限（毎月1日にリセットされます）</legend>
+      <legend className="text-sm font-semibold text-white">お子さまが自分で支払える月の上限</legend>
       <p className="text-xs text-slate-300">
-        動画添削（1回{formatYen(1500)}）と追加相談（1回{formatYen(600)}）の、その月の合計です。超える購入は止まり、保護者の方に確認のメールが届きます。
+        動画添削は1回{formatYen(1500)}、追加相談は1回{formatYen(600)}です。上限は毎月1日にリセットされます。
       </p>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => (
@@ -184,7 +184,7 @@ export default function GuardianPage() {
       "/consent",
       "POST",
       { guardian_name: name.trim(), relationship, self_pay_limit_yen: selfPayLimit, monthly_limit_yen: limit, allow_publish: allowPublish, agree },
-      "同意を受け付けました。確認のメールをお送りしました。上限の変更と同意の取り消しは、このページかメールのリンクからできます。",
+      "同意を受け付けました。お子さまは、設定いただいた月の上限の範囲で有料サービスを購入できます。購入のたびに、このメールアドレスへお知らせします。",
     );
   }
 
@@ -194,12 +194,12 @@ export default function GuardianPage() {
   }
 
   function onRevoke() {
-    if (!confirm("同意を取り消すと、お子さんは新しい動画添削・追加相談を購入できなくなります（購入済みの分はそのまま使えます）。取り消しますか？")) return;
+    if (!confirm("同意を取り消すと、お子さまは新しい動画添削・追加相談を購入できなくなります（購入済みの分はそのまま使えます）。取り消しますか？")) return;
     void send("/revoke", "POST", undefined, "同意を取り消しました。");
   }
 
   function onDecline() {
-    if (!confirm("同意しない場合、お子さんは動画添削・追加相談を購入できません。よろしいですか？")) return;
+    if (!confirm("同意しない場合、お子さまは動画添削・追加相談を購入できません。よろしいですか？")) return;
     void send("/decline", "POST", undefined, "「同意しない」を受け付けました。");
   }
 
@@ -218,32 +218,46 @@ export default function GuardianPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">オンラインコーチングの保護者同意</h1>
+        <h1 className="text-2xl font-bold">お子さまの有料サービス利用についての同意のお願い</h1>
         <p className="text-sm text-slate-300">
-          お子さんが TrackTalk のオンラインコーチングを使うために、このページをお送りしました。TrackTalk は陸上競技をする人のための匿名のコミュニティです。
+          TrackTalkは、陸上競技の選手とコーチをつなぐサービスです。未成年（18歳未満）のお子さまが有料サービスを利用するには、保護者の方の同意が必要です。このページから同意いただくと、お子さまは下記の範囲で、ご自身の支払い方法（クレジットカード・PayPay）でサービスを購入できるようになります。
         </p>
       </div>
 
-      {/* 同意の範囲の文面はたたき台。運営者が確定する。版は terms_version で記録する。 */}
-      <section className="space-y-2 rounded-md border border-white/20 p-4 text-sm text-slate-200">
+      {/* 運営者の確定文面。変えたら API の guardianTermsVersion を上げる（同意した版は terms_version で記録する）。 */}
+      <section className="space-y-3 rounded-md border border-white/20 p-4 text-sm text-slate-200">
         <h2 className="font-bold text-white">同意いただく内容</h2>
-        <ol className="list-decimal space-y-2 pl-5">
+        <ol className="list-decimal space-y-3 pl-5">
           <li>
-            コーチングサービスの利用：お子さんが練習の動画（30秒まで）を送り、運営が身元と競技実績を確認したコーチが改善点を返す「動画添削」（1回{formatYen(1500)}）と、その後の「追加相談」（1回{formatYen(600)}）、コーチとのサービス内のメッセージ。
+            <p className="font-semibold text-white">サービスの利用について</p>
+            <p>
+              お子さまが、TrackTalkの有料コーチングサービス（動画添削、および添削を担当したコーチへの追加相談）を利用することに同意します。これには、担当コーチとのサービス内でのメッセージのやりとりが含まれます。コーチとの連絡は、サービスの外（SNSや個人の連絡先など）では行わないルールです。
+            </p>
           </li>
-          <li>お子さんが購入のたびに、お子さん自身の PayPay（またはカード）でお支払いすること。月額料金や前払いはありません。</li>
-          <li>保護者の方が下で選ぶ「お子さんが支払う月の上限」。その月の合計が上限を超える購入はできません。</li>
           <li>
-            <a href="/terms" className="underline" target="_blank" rel="noreferrer">利用規約</a>・
-            <a href="/privacy" className="underline" target="_blank" rel="noreferrer">プライバシーポリシー</a>
-            と安全面のルール：コーチとの連絡はサービス内だけで行い、連絡先の交換や直接会うことはできません。動画は非公開で、担当のコーチと運営だけが見られます。
+            <p className="font-semibold text-white">お子さまご自身による支払いについて</p>
+            <p>上記サービスの代金を、お子さまがご自身のクレジットカードまたはPayPayで支払うことに同意します。</p>
+          </li>
+          <li>
+            <p className="font-semibold text-white">月の支払い上限について</p>
+            <p>
+              お子さまがご自身で支払える金額の月の上限を、下記で設定いただきます（1,500円／3,000円／5,000円／10,000円から選択。初期値は1,500円）。当月の合計が上限を超える購入は、自動的に止まります。上限は、後からいつでも変更できます。
+            </p>
+          </li>
+          <li>
+            <p className="font-semibold text-white">購入の通知について</p>
+            <p>
+              お子さまが購入するたびに、このメールアドレスへ購入内容（金額・コーチ名・日時）をお知らせします。通知のメールから、上限の変更や、同意の取り消し（撤回）ができます。同意を撤回すると、それ以降お子さまは有料サービスを購入できなくなります（購入済みのサービスはそのまま利用できます）。
+            </p>
           </li>
         </ol>
-        <ul className="list-disc space-y-1 pl-5 text-xs text-slate-300">
-          <li>購入があるたびに、金額・コーチ名・日時をこのメールアドレスにお知らせします（事前の承認ではなく、事後のお知らせです）。</li>
-          <li>上限の変更と同意の取り消しは、このページとお知らせのメールのリンクからいつでもできます。取り消すと以後の購入は止まり、購入済みの分には影響しません。</li>
-          <li>同意した日時・接続元の IP アドレス・同意した文面の版（{consent.terms_version}）を記録します。</li>
-        </ul>
+        <p>
+          同意にあたっては、TrackTalkの
+          <a href="/terms" className="underline" target="_blank" rel="noreferrer">利用規約</a>
+          および
+          <a href="/privacy" className="underline" target="_blank" rel="noreferrer">プライバシーポリシー</a>
+          もあわせてご確認ください。
+        </p>
       </section>
 
       {notice ? <p className="rounded-md bg-emerald-500/15 p-3 text-sm text-emerald-200">{notice}</p> : null}
@@ -254,14 +268,14 @@ export default function GuardianPage() {
       {consent.status === "consented" ? (
         <form onSubmit={onUpdate} className="space-y-5">
           <p className="text-sm text-slate-200">
-            {consent.guardian_name} さんが同意済みです。お子さんが支払う月の上限と公開の可否は、このページからいつでも変えられます。
+            {consent.guardian_name} さんが同意済みです。お子さまが支払う月の上限と公開の可否は、このページからいつでも変えられます。
           </p>
           <SelfPayLimitChoices options={consent.self_pay_limit_options} value={selfPayLimit} onChange={setSelfPayLimit} />
           {fields.self_pay_limit_yen ? <p className="text-sm text-red-400">{fields.self_pay_limit_yen}</p> : null}
           <ContractLimit options={consent.limit_options} value={limit} onChange={setLimit} error={fields.monthly_limit_yen} />
           <label className="flex items-start gap-2 text-sm text-slate-200">
             <input type="checkbox" checked={allowPublish} onChange={(e) => setAllowPublish(e.target.checked)} className="mt-1" />
-            添削の内容を、お子さんが選んだときに他の利用者の参考として公開することを認める（名前などは出ません）
+            添削の内容を、お子さまが選んだときに他の利用者の参考として公開することを認める（名前などは出ません）
           </label>
           <Button type="submit" className="w-full" disabled={pending}>
             変更を保存する
@@ -273,7 +287,7 @@ export default function GuardianPage() {
       ) : !consent.can_consent ? (
         <p className="rounded-md border border-white/20 p-3 text-sm text-slate-200">
           {consent.status === "revoked" ? "同意は取り消されています。" : null}
-          このリンクでは同意できません（同意に使えるのは、お子さんから届いた同意用のリンクで1回だけです）。もう一度同意する場合は、お子さんに新しいリンクをメールで送ってもらってください。
+          このリンクでは同意できません（同意に使えるのは、お子さまから届いた同意用のリンクで1回だけです）。もう一度同意する場合は、お子さまに新しいリンクをメールで送ってもらってください。
         </p>
       ) : (
         <form onSubmit={onConsent} className="space-y-5">
@@ -289,7 +303,7 @@ export default function GuardianPage() {
             {fields.guardian_name ? <span className="text-red-400">{fields.guardian_name}</span> : null}
           </label>
           <fieldset className="space-y-2">
-            <legend className="text-sm text-slate-300">お子さんとの続柄</legend>
+            <legend className="text-sm text-slate-300">お子さまとの続柄</legend>
             <div className="flex flex-wrap gap-2">
               {relationships.map((option) => (
                 <label
@@ -315,11 +329,11 @@ export default function GuardianPage() {
           <ContractLimit options={consent.limit_options} value={limit} onChange={setLimit} error={fields.monthly_limit_yen} />
           <label className="flex items-start gap-2 text-sm text-slate-200">
             <input type="checkbox" checked={allowPublish} onChange={(e) => setAllowPublish(e.target.checked)} className="mt-1" />
-            添削の内容を、お子さんが選んだときに他の利用者の参考として公開することを認める（任意。名前などは出ません）
+            添削の内容を、お子さまが選んだときに他の利用者の参考として公開することを認める（任意。名前などは出ません）
           </label>
           <label className="flex items-start gap-2 text-sm text-slate-200">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1" />
-            <span>上の「同意いただく内容」の1〜4と選んだ上限を確認し、お子さんがオンラインコーチングを使い、その範囲で自分で支払うことに同意します</span>
+            <span>上記の内容と、利用規約・プライバシーポリシーを確認し、お子さまの利用と支払いに同意します。</span>
           </label>
           {fields.agree ? <p className="text-sm text-red-400">{fields.agree}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>

@@ -161,7 +161,7 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	if err := q.LockReviewRequester(ctx, p.ID); err != nil {
 		return "", nil, err
 	}
-	block, err := s.minorSelfPayBlock(ctx, q, p.ID, reviewCashPrice(rr), rr.ID, uuid.Nil)
+	block, err := s.minorSelfPayBlock(ctx, q, p.ID, minorPurchase{refType: "review", coachName: rr.RequestedCoachName, price: reviewCashPrice(rr)}, rr.ID, uuid.Nil)
 	if err != nil || block != nil {
 		return "", block, err
 	}
