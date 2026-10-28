@@ -3,7 +3,6 @@
 UPDATE coach_profiles
 SET on_duty = sqlc.arg(on_duty),
     daily_cap = sqlc.arg(daily_cap),
-    nomination_fee_yen = CASE WHEN sqlc.arg(update_nomination_fee)::boolean THEN sqlc.narg(nomination_fee_yen)::integer ELSE nomination_fee_yen END,
     updated_at = now()
 WHERE profile_id = sqlc.arg(profile_id)
   AND status = 'approved'
@@ -44,8 +43,8 @@ WHERE requester_id = $1;
 
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: ListMyReviewRequests :many
@@ -250,11 +249,12 @@ ORDER BY due_at;
 SELECT pg_advisory_xact_lock(hashtext('review_requester:' || sqlc.arg(requester_id)::uuid::text));
 
 -- name: ListReviewNominees :many
-SELECT c.profile_id, COALESCE(NULLIF(c.name, ''),p.nickname, 'コーチ')::text AS nickname, c.nomination_fee_yen, c.best_record, c.achievements, c.photo_public_id
+-- 動画添削で選べるコーチ。受付中で、担当種目・受付上限・報酬口座の条件を満たす人。
+-- 並びは人気や実績によらず日替わり(コーチの ID と今日の日付から決める)にし、全員が上に来る日が同じように回る。
+SELECT c.profile_id, COALESCE(NULLIF(c.name, ''),p.nickname, 'コーチ')::text AS nickname, c.events, c.years, c.best_record, c.achievements, c.photo_public_id
 FROM coach_profiles c JOIN profiles p ON p.id = c.profile_id
 WHERE c.status = 'approved'
   AND c.on_duty
-  AND c.nomination_fee_yen IS NOT NULL
   AND (NOT sqlc.arg(payments)::boolean OR c.payouts_enabled)
   AND c.tier = sqlc.arg(tier)
   AND (sqlc.narg(requested_coach_id)::uuid IS NULL OR c.profile_id = sqlc.narg(requested_coach_id)::uuid)
@@ -279,5 +279,5 @@ WHERE c.status = 'approved'
     HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
        AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
   )
-ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
+ORDER BY md5(c.profile_id::text || extract(epoch FROM sqlc.arg(day_start)::timestamptz)::bigint::text)
 LIMIT 200;

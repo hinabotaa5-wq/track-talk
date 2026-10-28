@@ -116,11 +116,13 @@ func (s *Server) withdrawCoach(w http.ResponseWriter, r *http.Request) {
 	if oldPhoto != nil {
 		s.deleteUnusedMedia(r.Context(), postMedia{Images: []string{*oldPhoto}})
 	}
-	// 断った扱いにした依頼は、ほかのコーチに打診し直す。
+	// 断った扱いにした依頼のうち、おまかせのものはほかのコーチに打診し直す（止めている間は何もしない）。
+	// 選ばれていた依頼は終わったことを依頼した人に知らせる。代金とチケットは tick が戻す。
 	for _, id := range requeued {
 		if _, err := s.offerReview(r.Context(), id); err != nil {
 			slog.Warn("review offer after coach withdraw", "err", err)
 		}
+		s.notifyNominationEnded(r.Context(), id)
 	}
 	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
 	if err != nil {

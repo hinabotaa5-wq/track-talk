@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const choices = [
   {
     title: "動画添削プラン",
-    description: "おまかせで動画添削・コーチの指名も可能",
+    description: "コーチを選んで動画を送る",
     href: "/coaching/new",
     icon: Shuffle,
   },

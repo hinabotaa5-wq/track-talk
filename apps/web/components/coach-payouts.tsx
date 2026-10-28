@@ -94,7 +94,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
         </div>
       </div>
       <p className="text-xs text-slate-300">
-        取り分は、動画添削が基本料金の{data.review_share}%と指名料の80％、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは翌月に繰り越し、翌月は届かなくても送金します（繰り越しは1回まで）。銀行口座への入金は毎月15日ごろです。
+        取り分は、動画添削が料金の{data.review_share}%、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは翌月に繰り越し、翌月は届かなくても送金します（繰り越しは1回まで）。銀行口座への入金は毎月15日ごろです。
       </p>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">

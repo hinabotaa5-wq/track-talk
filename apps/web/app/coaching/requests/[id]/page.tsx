@@ -229,13 +229,14 @@ function ReviewRequestView() {
       </div>
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{request.status === "expired" && request.requested_coach_id ? "指名の依頼は終了しました" : reviewStatusLabels[request.status]}</p>
+        <p className="text-sm font-semibold text-white">{request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p>
         ) : null}
         {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
-          <p className="font-semibold">指名：{request.requested_coach_name || "選択したコーチ"}</p>
-          <p>基本料金{formatYen(request.base_price_yen ?? 1200)} ＋ 指名料{formatYen(request.nomination_fee_yen ?? 0)}（合計{formatYen(request.total_price_yen ?? 1200)}）</p>
+          <p className="font-semibold">選んだコーチ：{request.requested_coach_name || "選択したコーチ"}</p>
+          <p>料金{formatYen(request.total_price_yen ?? request.base_price_yen ?? 1500)}</p>
+          {request.status === "expired" ? <Link href="/coaching/new" className="mt-1 inline-block text-blue-300 underline">別のコーチを選んで申し込む</Link> : null}
         </div> : null}
         {request.tickets ? <p className="text-sm text-slate-200">チケット{request.tickets.quantity}枚：{request.tickets.status === "reserved" ? "添削のために確保中" : request.tickets.status === "consumed" ? "利用済み" : "残高に返却済み"}</p> : null}
       {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}

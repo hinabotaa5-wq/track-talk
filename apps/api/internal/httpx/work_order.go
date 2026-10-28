@@ -83,7 +83,7 @@ func buildWorkOrderTerms(coachName, work string, amount int32, deliverBy, consig
 
 // reviewWorkOrderTerms は、フォーム添削の依頼の通知。報酬は依頼のときに確定した割引前の価格と報酬率から出す。
 func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.ReviewRequest, coachName string, consignedAt time.Time) (workOrderTerms, error) {
-	price, share := reviewPriceYen, int32(reviewSharePercent)
+	price, share := rr.BasePriceYen, int32(reviewSharePercent)
 	t, err := q.GetReviewTicketTerms(ctx, &rr.ID)
 	if err == nil {
 		price, share = t.NominalYen, int32(t.SharePercent)

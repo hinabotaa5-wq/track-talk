@@ -10,7 +10,6 @@ import { CoachEarningsSection } from "@/components/coach-payouts";
 import { CoachPhotoForm } from "@/components/coach-photo";
 import { CoachAvailabilityEditor } from "@/components/coach-availability";
 import { CoachContractsSection } from "@/components/coaching-contracts";
-import { CoachNominationSettings } from "@/components/coach-nomination-settings";
 import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -40,7 +39,7 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
       <p className="font-semibold text-white">
         {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
       </p>
-      {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">あなたへの指名 · 指名料{formatYen(request.nomination_fee_yen ?? 0)} · 報酬{formatYen(request.coach_reward_yen ?? 0)}</p> : null}
+      {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">あなたを選んだ依頼 · 報酬{formatYen(request.coach_reward_yen ?? 0)}</p> : null}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
       <p className="text-xs text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
     </div>
@@ -300,8 +299,6 @@ export function CoachDashboard() {
           </p>
         ) : null}
       </section>
-
-      <CoachNominationSettings coach={coach} token={token} onSaved={setCoach} />
 
       <CoachEarningsSection token={token} onReady={onPayoutsReady} />
 

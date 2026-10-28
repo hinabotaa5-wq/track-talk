@@ -22,7 +22,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 it("添削のコーチからコーチ詳細へ直接進み、成績や指導経験と表示する", async () => {
   await act(async () => root.render(<ReviewCoachCard coach={coach} />));
-  const link = [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("このコーチに指名で依頼する"));
+  const link = [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("このコーチのプロフィールを見る"));
   expect(link?.getAttribute("href")).toBe("/coaches/coach-1");
   expect(container.textContent).toContain("成績や指導経験");
 });
