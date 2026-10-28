@@ -18,7 +18,7 @@ func TestRequireAuthRejectsMissingExpAndWrongIssuer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := RequireAuth(v)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := RequireAuth(v, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	id := "11111111-1111-4111-8111-111111111111"

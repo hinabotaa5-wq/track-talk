@@ -96,13 +96,26 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
-func OptionalAuth(v *auth.Verifier) func(http.Handler) http.Handler {
+// mfaPending は、二段階認証を設定済みなのに、いまのログインでコードを入れていない(aal2 でない)ときに true。
+func mfaPending(ctx context.Context, mfa *MFAEnrollment, identity auth.Identity) (bool, error) {
+	if identity.AAL == "aal2" {
+		return false, nil
+	}
+	return mfa.Enrolled(ctx, identity.UserID)
+}
+
+// OptionalAuth は、ログインしていれば利用者を入れる。二段階認証のコードを入れる前のログインは、ログインしていないものとして扱う。
+func OptionalAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if raw := bearer(r); raw != "" {
 				identity, err := v.ParseIdentity(raw)
 				if err == nil {
-					r = r.WithContext(withUser(r.Context(), identity))
+					if pending, err := mfaPending(r.Context(), mfa, identity); err != nil {
+						slog.Error("mfa check", "err", err)
+					} else if !pending {
+						r = r.WithContext(withUser(r.Context(), identity))
+					}
 				}
 			}
 			next.ServeHTTP(w, r)
@@ -110,7 +123,9 @@ func OptionalAuth(v *auth.Verifier) func(http.Handler) http.Handler {
 	}
 }
 
-func RequireAuth(v *auth.Verifier) func(http.Handler) http.Handler {
+// RequireAuth は、ログインしていなければ 401 を返す。
+// 二段階認証を設定済みの人が、コードを入れる前のログインで呼んだら 403(mfa_required)を返す。
+func RequireAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := bearer(r)
@@ -121,6 +136,16 @@ func RequireAuth(v *auth.Verifier) func(http.Handler) http.Handler {
 			identity, err := v.ParseIdentity(raw)
 			if err != nil {
 				Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
+				return
+			}
+			pending, err := mfaPending(r.Context(), mfa, identity)
+			if err != nil {
+				slog.Error("mfa check", "err", err)
+				Error(w, http.StatusServiceUnavailable, "unavailable", "いまは確認できません。しばらくしてからもう一度試してください")
+				return
+			}
+			if pending {
+				Error(w, http.StatusForbidden, "mfa_required", "二段階認証のコードを入れてください")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(withUser(r.Context(), identity)))
