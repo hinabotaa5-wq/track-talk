@@ -28,6 +28,7 @@ func planCoach(t *testing.T, h http.Handler, capacity int) (uuid.UUID, string, s
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tc, map[string]any{"agree": true}); rec.Code != http.StatusOK {
 		t.Fatalf("pledge %d", rec.Code)
 	}
+	registerCommerceIdentity(t, h, tc)
 	body := planBody()
 	body["capacity"] = capacity
 	rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tc, body)

@@ -336,6 +336,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// 顔写真（PUT /coach/me/photo）は応募の審査に使うので、閉じない方に置いてある。
 				r.Patch("/coach/me", s.updateCoachDuty)
 				r.Post("/coach/me/pledge", s.pledgeCoach)
+				r.Get("/coach/me/commerce", s.getCoachCommerce)
+				r.Put("/coach/me/commerce/identity", s.saveCoachIdentity)
+				r.Put("/coach/me/commerce/exemption", s.declareCoachExemption)
 				r.Patch("/coach/me/services", s.updateCoachServices)
 				r.Get("/coach/me/earnings", s.coachEarnings)
 				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
@@ -355,6 +358,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
 				// 運営のお金の動き（送金と返金）
 				r.Get("/admin/coaching/payouts", s.adminCoachPayouts)
+				// 見るたびに目的を記録するので POST。
+				r.Post("/admin/coaching/coaches/{id}/commerce-identity", s.adminViewCoachIdentity)
+				r.Post("/admin/coaching/coaches/{id}/commerce-required", s.adminForceCoachRequired)
 				r.Post("/admin/coaching/payouts/run", s.adminRunCoachPayouts)
 				r.Post("/admin/coaching/contracts/{id}/refund", s.adminRefundCoachingContract)
 			})

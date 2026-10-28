@@ -42,6 +42,16 @@ type CoachAvailability struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type CoachCommerceSetting struct {
+	CoachID                uuid.UUID  `json:"coach_id"`
+	DisclosureRequired     bool       `json:"disclosure_required"`
+	ExemptChecklistVersion *int16     `json:"exempt_checklist_version"`
+	ExemptDeclaredAt       *time.Time `json:"exempt_declared_at"`
+	ForcedRequiredAt       *time.Time `json:"forced_required_at"`
+	ForcedBy               *uuid.UUID `json:"forced_by"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+}
+
 type CoachEarning struct {
 	ID              uuid.UUID  `json:"id"`
 	CoachID         *uuid.UUID `json:"coach_id"`
@@ -54,6 +64,24 @@ type CoachEarning struct {
 	PayoutID        *uuid.UUID `json:"payout_id"`
 	CreatedAt       time.Time  `json:"created_at"`
 	ConsultationID  *uuid.UUID `json:"consultation_id"`
+}
+
+type CoachIdentityAccessLog struct {
+	ID        uuid.UUID  `json:"id"`
+	CoachID   uuid.UUID  `json:"coach_id"`
+	AdminID   *uuid.UUID `json:"admin_id"`
+	Purpose   string     `json:"purpose"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type CoachLegalIdentity struct {
+	CoachID      uuid.UUID `json:"coach_id"`
+	KeyID        string    `json:"key_id"`
+	LegalNameEnc []byte    `json:"legal_name_enc"`
+	AddressEnc   []byte    `json:"address_enc"`
+	PhoneEnc     []byte    `json:"phone_enc"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type CoachPayout struct {

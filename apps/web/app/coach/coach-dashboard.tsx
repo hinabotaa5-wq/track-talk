@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkOrderTermsView } from "@/components/work-order-terms";
+import { CoachCommerceSection } from "@/components/coach-commerce";
 import { CoachConsultationQueue } from "@/components/coaching-consultations";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 
@@ -306,6 +307,8 @@ export function CoachDashboard() {
       <CoachContractsSection token={token} />
 
       <CoachAvailabilityEditor token={token} />
+
+      <CoachCommerceSection token={token} />
 
       <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 
