@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { loginPathFrom } from "@/lib/safe-next";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import type { Comment, Meta, Post } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
@@ -135,7 +136,7 @@ export function PostDetail({
 
   async function toggleLike() {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!action.acquire()) return;
@@ -152,7 +153,7 @@ export function PostDetail({
 
   async function toggleSave() {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!action.acquire()) return;
@@ -189,7 +190,7 @@ export function PostDetail({
 
   async function report(targetType: "post" | "comment", targetId: string) {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!(await confirmDialog(reportConfirmOptions()))) return;
@@ -219,7 +220,7 @@ export function PostDetail({
 
   async function onComment(values: { body: string }) {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!commentLock.acquire()) return;
@@ -731,7 +732,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
 
   async function run(path: string, confirmMessage?: string) {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (confirmMessage && !confirm(confirmMessage)) return;
@@ -749,7 +750,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
 
   async function rate(applicationId: string, score: string, comment: string) {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!acquire()) return;

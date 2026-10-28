@@ -7,6 +7,11 @@ export function safeNextPath(value: string | null | undefined) {
   return value;
 }
 
+// ログイン画面のパス。ログインしたら、いま開いている画面に戻す。
+export function loginPathFrom(location: { pathname: string; search: string }) {
+  return `/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+}
+
 export function rememberNextPath(path: string, maxAge = 600) {
   document.cookie = `tracktalk-next=${encodeURIComponent(safeNextPath(path))}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }

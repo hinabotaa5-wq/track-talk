@@ -106,7 +106,7 @@ export default function SecurityPage() {
       await load();
       await refreshProfile();
       const next = new URLSearchParams(window.location.search).get("next");
-      if (next) router.push(safeNextPath(next));
+      if (next) router.replace(safeNextPath(next));
     } finally {
       release();
     }

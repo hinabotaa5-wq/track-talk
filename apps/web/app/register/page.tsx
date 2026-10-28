@@ -82,7 +82,7 @@ export default function RegisterPage() {
     }
     saveDraft(emptyDraft);
     if (data.session) {
-      router.push("/me/profile?onboarding=1");
+      router.replace("/me/profile?onboarding=1");
       return;
     }
     // 登録済みのアドレスでも、Supabase はアドレスの有無を隠すためにエラーを返さず、メールも送らない。

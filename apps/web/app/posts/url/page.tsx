@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, apiErrorText } from "@/lib/api";
@@ -36,7 +37,7 @@ export default function VideoUrlPostPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     if (!kind) {

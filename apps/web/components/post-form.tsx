@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useForm } from "react-hook-form";
 import { postSchema } from "@/lib/validators";
 import type { z } from "zod";
@@ -40,7 +41,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
 
   async function onSubmit(values: Values) {
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     const validatesTextContent = !initial || initial.kind === "text";
