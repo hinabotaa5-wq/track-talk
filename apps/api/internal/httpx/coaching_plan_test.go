@@ -53,6 +53,7 @@ func TestCoachingPlans(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"pledged":true`) {
 		t.Fatalf("pledge %d %s", rec.Code, rec.Body.String())
 	}
+	registerCommerceIdentity(t, h, tc)
 
 	// 入力の確認。
 	bad := planBody()
@@ -185,6 +186,7 @@ func TestCoachingPlanLimitUnderConcurrency(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tc, map[string]any{"agree": true}); rec.Code != http.StatusOK {
 		t.Fatalf("pledge %d", rec.Code)
 	}
+	registerCommerceIdentity(t, h, tc)
 	var wg sync.WaitGroup
 	for i := 0; i < 15; i++ {
 		wg.Add(1)

@@ -148,6 +148,14 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	delete(out, "rating")
+	// 引き受けた時に書き留めた取引条件。引き受ける前の版のコードで受けた依頼には無い。
+	wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID})
+	if err == nil {
+		out["work_order"] = workOrderJSON(wo)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, out)
 }
 

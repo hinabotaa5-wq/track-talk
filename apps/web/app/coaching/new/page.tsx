@@ -1,6 +1,7 @@
 "use client";
 
 import { ReviewNomination } from "@/components/review-nomination";
+import { SellerNote } from "@/components/seller-note";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { ArrowRight } from "lucide-react";
@@ -206,6 +207,7 @@ export default function NewReviewRequestPage() {
         )}
         <h1 className="text-2xl font-bold">動画添削を頼む</h1>
         <p className="text-sm text-slate-300">基本はおまかせ。希望する場合だけコーチを指名できます。</p>
+        <SellerNote />
 
       </div>
 

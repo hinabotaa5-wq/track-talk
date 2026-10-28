@@ -6,6 +6,8 @@ import { ApiRequestError } from "@/lib/api";
 import { canClarify, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { CoachingConsultations } from "./coaching-consultations";
 const apiFetch = vi.fn();
+const flags = vi.hoisted(() => ({ messaging: true }));
+vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get coachingMessagingEnabled() { return flags.messaging; } }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => vi.fn(async () => true), reportConfirmOptions: (x: unknown) => x }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
@@ -17,7 +19,7 @@ const draft: Consultation = {
 };
 const room: ConsultationRoom = { consultations: [draft], role: "requester", funding: "ticket", price_yen: 500, can_purchase: true, block_reason: "", requires_video: false };
 let root: Root; let container: HTMLDivElement;
-beforeEach(() => { (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true; container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); apiFetch.mockReset(); });
+beforeEach(() => { (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true; container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); apiFetch.mockReset(); flags.messaging = true; });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function click(text: string) { const b = [...container.querySelectorAll("button")].find((x) => x.textContent === text); if (!b) throw new Error(`missing ${text}`); await act(async () => b.click()); }
 async function render(data: ConsultationRoom = room, guardianToken?: string) { apiFetch.mockResolvedValue(data); await act(async () => root.render(<CoachingConsultations rootID="review-room" kind={guardianToken ? "contract" : "review"} token={guardianToken ? null : "token"} guardianToken={guardianToken} />)); }
@@ -63,4 +65,13 @@ it("担当コーチには受諾と辞退を表示する", async () => {
  expect(container.textContent).toContain("引き受ける");
  expect(container.textContent).toContain("辞退する");
  expect(container.querySelector("textarea")).toBeNull();
+});
+it("届出が済むまでは、新しい質問・確認・回答の欄を出さず、届いた内容だけを見せる", async () => {
+ flags.messaging = false;
+ const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString() };
+ await render({ ...room, consultations: [c] });
+ expect(container.textContent).toContain("コーチの回答");
+ expect(container.textContent).toContain("メッセージのやりとりは準備中です");
+ expect(container.textContent).not.toContain("回答について確認する（1回無料）");
+ expect(container.textContent).not.toContain("質問する（チケット1枚）");
 });

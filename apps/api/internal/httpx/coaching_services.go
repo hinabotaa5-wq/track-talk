@@ -105,5 +105,10 @@ func (s *Server) planServiceAllowed(w http.ResponseWriter, r *http.Request, q *d
 		FieldError(w, map[string]string{"published": "対面指導を含む新しい誓約をしてから公開してください"})
 		return false
 	}
+	// 大会サポートと対面指導は、日程の相談をやりとり欄で行うので、やりとりを開くまで公開できない。
+	if published && (*service == "in_person" || *service == "competition_support") && !s.cfg.CoachingMessaging {
+		FieldError(w, map[string]string{"published": "このサービスはメッセージのやりとりの準備ができるまで公開できません。下書きで保存してください"})
+		return false
+	}
 	return true
 }

@@ -126,6 +126,11 @@ export default function DeleteAccountPage() {
       <p className="text-sm text-slate-300">
         他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます。
       </p>
+      {coaching ? (
+        <p className="text-sm text-slate-300">
+          コーチとして登録した氏名・住所・電話番号（特定商取引法の表記のためのもの）は、開示請求と紛争の対応のため退会後も残し、最後の取引と退会の遅いほうから5年たったら削除します。
+        </p>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
           <span className="text-slate-300">確認のため「退会する」と入力</span>

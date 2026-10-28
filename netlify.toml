@@ -10,6 +10,8 @@
   NODE_VERSION = "22"
   # 現在はコーチ募集のみ。利用者向け画面は準備中の案内にする。
   NEXT_PUBLIC_COACHING_ENABLED = "0"
+  # 有料の1対1のやりとり。電気通信事業の届出が受理されるまで "0" のまま
+  NEXT_PUBLIC_COACHING_MESSAGING_ENABLED = "0"
 
 [context.production.environment]
   # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。
