@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { coachingEnabled } from "@/lib/features";
 import { operatorName, supportEmail } from "@/lib/operator";
 
 // 特定商取引法に基づく表記(運営者が販売するフォーム添削・添削の追加相談)。チケットの新規販売は終了した。
-// 弁護士Q&Aの回答をもとにしたたたき台で、文面は確定していない。有料の機能を出すまでは表示しない。
+// 弁護士Q&Aの回答をもとにしたたたき台で、文面は確定していない。Stripe で PayPay を有効にするには公開 URL が要るので、
+// 有料の機能(COACHING_ENABLED)を出す前から、このページだけはログインなしで表示する。
 // サポートプランはコーチが販売するので対象外。各プランの表記はコーチごとに出す。
 // 価格は API の reviewPriceYen・ticketFaceYen(追加相談の料金)に合わせる。支払方法は API の checkoutPaymentMethods に合わせる。
 
@@ -31,7 +30,6 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
 }
 
 export default function CommercePage() {
-  if (!coachingEnabled) notFound();
   return (
     <div className="mx-auto max-w-2xl space-y-6 [overflow-wrap:anywhere]">
       <div className="space-y-2">

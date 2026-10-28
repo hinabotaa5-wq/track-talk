@@ -18,7 +18,7 @@
 
 ## 2. 特定商取引法に基づく表記
 
-- 運営者の分（(1)用）: `apps/web/app/legal/commerce/page.tsx`。`NEXT_PUBLIC_COACHING_ENABLED` が空の間は 404。
+- 運営者の分（(1)用）: `apps/web/app/legal/commerce/page.tsx`。Stripe で PayPay を有効にするのに公開 URL が要るため、`NEXT_PUBLIC_COACHING_ENABLED` が空の間もこのページだけはログインなしで表示する（コーチングの他の画面は閉じたまま）。
   - 所在地・電話番号は「請求があれば遅滞なく開示します」で省略する（ココナラ回答1の省略方法①）。実際に速やかに開示できる体制が前提。
   - 開示請求は、お問い合わせの種類「特商法表記の開示請求」（`disclosure`）か、メールで受け付ける。
   - 支払方法は「クレジットカード（Apple Pay・Google Pay を含む）、PayPay」の都度払い。チケットの新規販売は終了し、購入済みチケットの扱いと支払方法・返金の条件は「要確認」。
