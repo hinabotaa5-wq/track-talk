@@ -173,6 +173,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/coach/me", s.coachMe)
 			r.Post("/coach/applications", s.submitCoachApplication)
 			r.Put("/coach/me/photo", s.setCoachPhoto)
+			// コーチをやめるのは、提供を閉じているあいだもできるようにする。
+			r.Post("/coach/me/withdraw", s.withdrawCoach)
 			r.Post("/posts", s.createPost)
 			r.Post("/posts/youtube", s.citeYouTube)
 			r.Post("/posts/instagram", s.citeInstagram)

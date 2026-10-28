@@ -487,7 +487,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
       <DemoCodesAdmin token={token} />
       <CoachProbationAdmin token={token} />
       <div className="flex flex-wrap gap-2">
-        {(["pending", "approved", "rejected"] as const).map((s) => (
+        {(["pending", "approved", "rejected", "withdrawn"] as const).map((s) => (
           <button
             key={s}
             type="button"

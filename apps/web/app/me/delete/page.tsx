@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { clearHomeFeeds, clearSavedFeeds } from "@/lib/home-feed-cache";
+import type { CoachApplication } from "@/lib/types";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -20,6 +22,22 @@ export default function DeleteAccountPage() {
   const [error, setError] = useState("");
   const { pending: submitting, acquire, release } = useActionLock();
   const [authLeft, setAuthLeft] = useState(false);
+  // コーチとして活動中なら、退会しなくてもコーチだけをやめられることを案内する。
+  const [coaching, setCoaching] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    apiFetch<{ application: CoachApplication | null }>("/v1/coach/me", { token })
+      .then((d) => {
+        const status = d?.application?.status;
+        if (!cancelled) setCoaching(status === "approved" || status === "pending");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!loading && !session && !leaving.current) router.replace("/login");
@@ -88,6 +106,15 @@ export default function DeleteAccountPage() {
         <h1 className="text-2xl font-bold">退会</h1>
         <p className="text-sm text-slate-300">退会すると、次のデータが削除され、元に戻せません。</p>
       </div>
+      {coaching ? (
+        <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-white">
+          コーチだけをやめたいときは、退会しなくても大丈夫です。
+          <Link href="/coach/withdraw" className="text-blue-300 underline">
+            コーチをやめる
+          </Link>
+          から手続きすると、アカウントは残ります。
+        </p>
+      ) : null}
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
         <li>あなたの投稿、コメント、レビュー、いいね、保存、通知</li>
         <li>感覚メモと競技会の記録、エグ練大会のエントリーと投票</li>

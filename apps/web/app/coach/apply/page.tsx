@@ -39,6 +39,7 @@ const statusNotes: Record<CoachApplication["status"], string> = {
   approved: coachingEnabled ? "応募が承認されました。コーチ画面で受付を始められます。" : "応募が承認されました。コーチングは準備中です。活動の開始は公開後にご案内します。",
   rejected: "今回は見送りになりました。内容を見直して、もう一度応募できます。",
   suspended: "コーチの活動を停止しています。詳しくはお問い合わせください。",
+  withdrawn: "コーチをやめました。もう一度応募すると、審査からやり直します。",
 };
 
 function draftFrom(a: CoachApplication): Draft {
@@ -153,7 +154,7 @@ export default function CoachApplyPage() {
     return <p className="text-sm text-slate-200">読み込み中...</p>;
   }
 
-  const editable = !application || application.status === "pending" || application.status === "rejected";
+  const editable = !application || application.status === "pending" || application.status === "rejected" || application.status === "withdrawn";
   const fieldError = (key: string) =>
     fieldErrors[key] ? <p className="text-sm text-red-400">{fieldErrors[key]}</p> : null;
 
@@ -174,6 +175,11 @@ export default function CoachApplyPage() {
           {application.status === "approved" ? (
             <Link href="/coach" className="text-sm text-blue-300 underline">
               コーチ画面へ
+            </Link>
+          ) : null}
+          {application.status === "pending" ? (
+            <Link href="/coach/withdraw" className="block text-sm text-blue-300 underline">
+              応募を取り下げる
             </Link>
           ) : null}
           {application.status === "pending" && coachingEnabled ? (
