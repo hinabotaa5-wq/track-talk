@@ -65,7 +65,7 @@ export function CoachCommerceSection({ token }: { token: string | null }) {
         <label className="block text-sm">氏名（本名）<Input value={identity.legal_name} maxLength={80} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} aria-label="氏名" /></label>
         <label className="block text-sm">住所<Input value={identity.address} maxLength={200} onChange={(e) => setIdentity({ ...identity, address: e.target.value })} aria-label="住所" /></label>
         <label className="block text-sm">電話番号<Input value={identity.phone} maxLength={20} inputMode="tel" onChange={(e) => setIdentity({ ...identity, phone: e.target.value })} aria-label="電話番号" /></label>
-        <p className="text-xs text-slate-300">暗号化して保存します。表記不要と申告した場合は表示せず、開示請求と紛争の対応にだけ使います。</p>
+        <p className="text-xs text-slate-300">暗号化して保存します。表記不要と申告した場合は表示せず、開示請求と紛争の対応にだけ使います。コーチをやめたり退会したりしても、最後の取引とやめた時の遅いほうから5年間は保管し、その後に削除します。</p>
         <Button type="submit" disabled={pending}>{data.identity ? "登録内容を更新する" : "登録する"}</Button>
       </form>
 

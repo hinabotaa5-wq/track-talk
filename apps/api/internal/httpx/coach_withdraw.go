@@ -103,6 +103,11 @@ func (s *Server) withdrawCoach(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 特商法の登録情報は消さずに残し、保持期間の起算点を書き留める。
+	if err := q.EndCoachLegalIdentity(r.Context(), p.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return

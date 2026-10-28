@@ -75,13 +75,15 @@ type CoachIdentityAccessLog struct {
 }
 
 type CoachLegalIdentity struct {
-	CoachID      uuid.UUID `json:"coach_id"`
-	KeyID        string    `json:"key_id"`
-	LegalNameEnc []byte    `json:"legal_name_enc"`
-	AddressEnc   []byte    `json:"address_enc"`
-	PhoneEnc     []byte    `json:"phone_enc"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	CoachID           uuid.UUID  `json:"coach_id"`
+	KeyID             string     `json:"key_id"`
+	LegalNameEnc      []byte     `json:"legal_name_enc"`
+	AddressEnc        []byte     `json:"address_enc"`
+	PhoneEnc          []byte     `json:"phone_enc"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	CoachingEndedAt   *time.Time `json:"coaching_ended_at"`
+	LastTransactionAt *time.Time `json:"last_transaction_at"`
 }
 
 type CoachPayout struct {

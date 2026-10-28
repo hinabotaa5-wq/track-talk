@@ -3,9 +3,12 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
@@ -146,5 +149,127 @@ func TestCoachCommerceRefusesWithoutKey(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/commerce/identity", tc, map[string]string{"legal_name": testLegalName, "address": testAddress, "phone": testPhone})
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("without key %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 登録情報は、最後の取引とコーチをやめた時の遅いほうから5年たったら日次の処理で消す。活動中は消さない。
+func TestCoachIdentityDeletedFiveYearsAfterCoachingEnds(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			id := r.URL.Query().Get("public_ids[]")
+			json.NewEncoder(w).Encode(map[string]any{"deleted": map[string]string{id: "deleted"}})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"resources": []any{}})
+	}))
+	defer cloud.Close()
+	now := time.Now()
+	h := setupConfig(t, func(c *config.Config) {
+		c.StorageCleanupSecret = "storage-secret"
+		c.Clock = func() time.Time { return now }
+		c.CloudName = "demo"
+		c.CloudAPIKey = "key"
+		c.CloudAPISecret = "secret"
+		c.CloudAPIBase = cloud.URL
+	})
+	identities := func(coach uuid.UUID) int {
+		t.Helper()
+		var n int
+		queryRowArgs(t, `SELECT count(*) FROM coach_legal_identities WHERE coach_id=$1`, []any{coach}, &n)
+		return n
+	}
+	cleanup := func(at time.Time) {
+		t.Helper()
+		now = at
+		if rec := cleanupRequest(h, "storage-secret"); rec.Code != http.StatusOK {
+			t.Fatalf("cleanup %d %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	coach, tc, _ := planCoach(t, h, 5)
+	start := time.Now()
+	// 活動中は、何年たっても消さない。
+	cleanup(start.AddDate(10, 0, 0))
+	if identities(coach) != 1 {
+		t.Fatal("active coach identity deleted")
+	}
+
+	// やめた後に取引(残りの報酬の記録)があれば、その時から数える。
+	if rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody()); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,created_at) VALUES(gen_random_uuid(),$1,'review',1200,70,840,now()+interval '1 year')`, coach)
+	cleanup(start.AddDate(5, 0, 7))
+	if identities(coach) != 1 {
+		t.Fatal("deleted before 5 years from the last transaction")
+	}
+	cleanup(start.AddDate(6, 0, 7))
+	if identities(coach) != 0 {
+		t.Fatal("identity kept after 5 years")
+	}
+	// コーチの行とアカウントは残る。
+	var status string
+	queryRowArgs(t, `SELECT status FROM coach_profiles WHERE profile_id=$1`, []any{coach}, &status)
+	if status != "withdrawn" {
+		t.Fatalf("coach profile %s", status)
+	}
+
+	// もう一度応募したら、やめた日時は空に戻り、消さない。
+	other, to, _ := planCoach(t, h, 5)
+	if rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, to, withdrawCoachBody()); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", to, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("reapply %d %s", rec.Code, rec.Body.String())
+	}
+	cleanup(start.AddDate(10, 0, 0))
+	if identities(other) != 1 {
+		t.Fatal("reapplied coach identity deleted")
+	}
+}
+
+// 退会しても登録情報は残り(開示請求・紛争対応のため)、退会から5年で消す。
+func TestCoachIdentityKeptAfterAccountDeletion(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			id := r.URL.Query().Get("public_ids[]")
+			json.NewEncoder(w).Encode(map[string]any{"deleted": map[string]string{id: "deleted"}})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"resources": []any{}})
+	}))
+	defer cloud.Close()
+	now := time.Now()
+	h := setupConfig(t, func(c *config.Config) {
+		c.StorageCleanupSecret = "storage-secret"
+		c.Clock = func() time.Time { return now }
+		c.CloudName = "demo"
+		c.CloudAPIKey = "key"
+		c.CloudAPISecret = "secret"
+		c.CloudAPIBase = cloud.URL
+	})
+	coach, tc, _ := planCoach(t, h, 5)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tc, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusOK {
+		t.Fatalf("delete account %d %s", rec.Code, rec.Body.String())
+	}
+	var n int
+	var ended *time.Time
+	queryRowArgs(t, `SELECT count(*) FROM profiles WHERE id=$1`, []any{coach}, &n)
+	queryRowArgs(t, `SELECT coaching_ended_at FROM coach_legal_identities WHERE coach_id=$1`, []any{coach}, &ended)
+	if n != 0 || ended == nil {
+		t.Fatalf("after account deletion profiles=%d ended=%v", n, ended)
+	}
+	// 運営は退会後も開示請求のために見られる。
+	admin := adminToken(t, h)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+coach.String()+"/commerce-identity", admin, map[string]string{"purpose": "開示請求への対応"}); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), testAddress) {
+		t.Fatalf("admin view after deletion %d %s", rec.Code, rec.Body.String())
+	}
+	now = time.Now().AddDate(5, 0, 7)
+	if rec := cleanupRequest(h, "storage-secret"); rec.Code != http.StatusOK {
+		t.Fatalf("cleanup %d %s", rec.Code, rec.Body.String())
+	}
+	queryRowArgs(t, `SELECT count(*) FROM coach_legal_identities WHERE coach_id=$1`, []any{coach}, &n)
+	if n != 0 {
+		t.Fatal("identity kept after 5 years")
 	}
 }

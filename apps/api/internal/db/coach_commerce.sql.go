@@ -66,6 +66,47 @@ func (q *Queries) DeclareCoachRequired(ctx context.Context, coachID uuid.UUID) (
 	return i, err
 }
 
+const deleteExpiredCoachLegalIdentities = `-- name: DeleteExpiredCoachLegalIdentities :execrows
+DELETE FROM coach_legal_identities li
+WHERE li.coaching_ended_at IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM coach_profiles cp WHERE cp.profile_id = li.coach_id AND cp.status IN ('pending', 'approved'))
+  AND GREATEST(li.coaching_ended_at, li.last_transaction_at,
+        (SELECT max(created_at) FROM coach_earnings WHERE coach_id = li.coach_id),
+        (SELECT max(paid_at) FROM coach_payouts WHERE coach_id = li.coach_id),
+        (SELECT max(returned_at) FROM review_requests WHERE coach_id = li.coach_id),
+        (SELECT max(updated_at) FROM coaching_contracts WHERE coach_id = li.coach_id AND status IN ('ended', 'refunded')),
+        (SELECT max(GREATEST(answered_at, clarified_at, closed_at)) FROM coaching_consultations WHERE coach_id = li.coach_id))
+      < $1::timestamptz
+`
+
+// 最後の取引が終わった時とコーチをやめた時の遅いほうが cutoff(今から5年前)より前の登録情報を消す。
+// やめたあとに取引(返金・残りの報酬の支払い)があれば、その日時から数える。活動中・審査待ちのコーチは消さない。
+func (q *Queries) DeleteExpiredCoachLegalIdentities(ctx context.Context, cutoff time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredCoachLegalIdentities, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const endCoachLegalIdentity = `-- name: EndCoachLegalIdentity :exec
+UPDATE coach_legal_identities li
+SET coaching_ended_at = now(),
+    last_transaction_at = GREATEST(li.last_transaction_at,
+        (SELECT max(created_at) FROM coach_earnings WHERE coach_id = li.coach_id),
+        (SELECT max(paid_at) FROM coach_payouts WHERE coach_id = li.coach_id),
+        (SELECT max(returned_at) FROM review_requests WHERE coach_id = li.coach_id),
+        (SELECT max(updated_at) FROM coaching_contracts WHERE coach_id = li.coach_id AND status IN ('ended', 'refunded')),
+        (SELECT max(GREATEST(answered_at, clarified_at, closed_at)) FROM coaching_consultations WHERE coach_id = li.coach_id))
+WHERE li.coach_id = $1
+`
+
+// コーチをやめた時に、保持期間の起算点を書き留める。最後の取引はこの時点の記録から取る(退会すると記録から本人が外れるため)。
+func (q *Queries) EndCoachLegalIdentity(ctx context.Context, coachID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, endCoachLegalIdentity, coachID)
+	return err
+}
+
 const forceCoachRequired = `-- name: ForceCoachRequired :one
 INSERT INTO coach_commerce_settings (coach_id, disclosure_required, forced_required_at, forced_by, updated_at)
 VALUES ($1, true, now(), $2, now())
@@ -115,7 +156,7 @@ func (q *Queries) GetCoachCommerceSettings(ctx context.Context, coachID uuid.UUI
 }
 
 const getCoachLegalIdentity = `-- name: GetCoachLegalIdentity :one
-SELECT coach_id, key_id, legal_name_enc, address_enc, phone_enc, created_at, updated_at FROM coach_legal_identities WHERE coach_id = $1
+SELECT coach_id, key_id, legal_name_enc, address_enc, phone_enc, created_at, updated_at, coaching_ended_at, last_transaction_at FROM coach_legal_identities WHERE coach_id = $1
 `
 
 func (q *Queries) GetCoachLegalIdentity(ctx context.Context, coachID uuid.UUID) (CoachLegalIdentity, error) {
@@ -129,6 +170,8 @@ func (q *Queries) GetCoachLegalIdentity(ctx context.Context, coachID uuid.UUID) 
 		&i.PhoneEnc,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoachingEndedAt,
+		&i.LastTransactionAt,
 	)
 	return i, err
 }
@@ -205,6 +248,16 @@ func (q *Queries) ListCoachIdentityAccessLogs(ctx context.Context, coachID uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const reopenCoachLegalIdentity = `-- name: ReopenCoachLegalIdentity :exec
+UPDATE coach_legal_identities SET coaching_ended_at = NULL WHERE coach_id = $1
+`
+
+// もう一度応募したら、やめた日時を空に戻す(活動中は消さない)。
+func (q *Queries) ReopenCoachLegalIdentity(ctx context.Context, coachID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, reopenCoachLegalIdentity, coachID)
+	return err
 }
 
 const upsertCoachLegalIdentity = `-- name: UpsertCoachLegalIdentity :exec
