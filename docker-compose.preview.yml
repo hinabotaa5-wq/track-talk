@@ -73,6 +73,7 @@ services:
       MAIL_DEV_LOG: "1"
       COACHING_ENABLED: "1"
       COACHING_NEW_ACCEPTANCE_ENABLED: "1"
+      COACHING_MESSAGING_ENABLED: "1"
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -112,6 +113,7 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: local-anon-key
         NEXT_PUBLIC_SITE_URL: http://localhost:3000
         NEXT_PUBLIC_COACHING_ENABLED: "1"
+        NEXT_PUBLIC_COACHING_MESSAGING_ENABLED: "1"
     environment:
       API_INTERNAL_URL: http://api:8080
       SUPABASE_INTERNAL_URL: http://auth:9999

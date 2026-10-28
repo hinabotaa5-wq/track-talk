@@ -549,11 +549,16 @@ func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultati
 	s.notify(ctx, *target, notifyCoaching, push.Message{Title: title, Body: "追加相談の部屋を開いて確認してください", URL: room.path(toCoach), Tag: "consultation-" + c.ID.String()}, 24*time.Hour)
 }
 func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
+	action := chi.URLParam(r, "action")
+	// 回答・質問・補足はやりとりにあたるので、届出が済むまで止める。取り消しは止めない。
+	if (action == "answer" || action == "clarify" || action == "clarification") && !s.cfg.CoachingMessaging {
+		Error(w, http.StatusConflict, "messaging_closed", "メッセージのやりとりは準備中です")
+		return
+	}
 	c, role, ok := s.consultationParty(w, r)
 	if !ok {
 		return
 	}
-	action := chi.URLParam(r, "action")
 	ownerAction := action == "clarify" || action == "cancel"
 	if ownerAction && role != "requester" || !ownerAction && role != "coach" {
 		Error(w, 403, "forbidden", "この操作はできません")

@@ -274,12 +274,12 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/guardian/{token}/contracts/{id}/in-person/{cid}/{action}", s.actInPersonSession)
 			r.Post("/guardian/{token}/contracts/{id}/calls/{cid}/{action}", s.actSupportCall)
 			r.Get("/guardian/{token}/contracts/{id}/messages", s.listGuardianMessages)
-			r.Post("/guardian/{token}/contracts/{id}/messages", s.createGuardianMessage)
+			r.With(s.requireMessaging).Post("/guardian/{token}/contracts/{id}/messages", s.createGuardianMessage)
 			r.Post("/guardian/{token}/messages/{mid}/report", s.reportGuardianMessage)
 			r.Get("/guardian/{token}/consultation-reviews", s.listGuardianConsultationReviews)
 			r.Get("/guardian/{token}/contracts/{id}/consultations", s.listConsultationRoom)
 			r.Get("/guardian/{token}/reviews/{id}/consultations", s.listConsultationRoom)
-			r.With(s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
+			r.With(s.requireMessaging, s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
 			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
@@ -301,7 +301,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coaching/contracts/{id}/calls", s.createSupportCall)
 				r.Post("/coaching/contracts/{id}/calls/{cid}/{action}", s.actSupportCall)
 				r.Get("/coaching/contracts/{id}/messages", s.listCoachingMessages)
-				r.Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
+				r.With(s.requireMessaging).Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
 				r.Post("/coaching/contracts/{id}/rating", s.rateCoachingContract)
 				r.Get("/me/coaching/contracts", s.listMyCoachingContracts)
 				// フォーム添削（利用者側）
@@ -312,8 +312,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coaching/requests/{id}/consultations", s.saveConsultationDraft)
 				r.Get("/coaching/contracts/{id}/consultations", s.listConsultationRoom)
 				r.Post("/coaching/contracts/{id}/consultations", s.saveConsultationDraft)
-				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
-				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
+				r.With(s.requireMessaging, s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
+				r.With(s.requireMessaging, s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
 				r.Post("/coaching/consultations/{id}/{action}", s.actConsultation)
 				r.Get("/coach/consultations", s.coachConsultations)
 				r.Get("/admin/coaching/consultations", s.adminConsultations)
@@ -329,7 +329,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.With(s.requireNewAcceptance).Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
-				r.Post("/coaching/requests/{id}/clarify", s.clarifyReview)
+				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarify", s.clarifyReview)
 				r.Post("/coaching/requests/{id}/rating", s.rateReview)
 				r.Post("/coaching/requests/{id}/helpful", s.answerHelpful)
 				// コーチ側（プロフィール・報酬・プラン・契約・添削の返却）
@@ -350,7 +350,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/coach/requests", s.listCoachRequests)
 				r.Get("/coach/requests/{id}", s.getCoachReviewRequest)
 				r.Post("/coaching/requests/{id}/response", s.submitReviewResponse)
-				r.Post("/coaching/requests/{id}/clarification", s.submitClarification)
+				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarification", s.submitClarification)
 				r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
 				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
 				// 運営のお金の動き（送金と返金）
@@ -369,6 +369,18 @@ func (s *Server) requireNewAcceptance(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.cfg.CoachingNewAcceptance {
 			Error(w, http.StatusConflict, "new_acceptance_closed", "新しい申し込みは準備中です")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireMessaging は、電気通信事業の届出が済むまで、有料の1対1のやりとりの送信を止める。
+// 読む・通報・返金は止めない。COACHING_ENABLED とは別に切り替える。
+func (s *Server) requireMessaging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.CoachingMessaging {
+			Error(w, http.StatusConflict, "messaging_closed", "メッセージのやりとりは準備中です")
 			return
 		}
 		next.ServeHTTP(w, r)

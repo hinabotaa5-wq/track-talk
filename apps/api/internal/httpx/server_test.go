@@ -72,6 +72,7 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		// 確かめるものがほとんどなので開けておく。閉じたときの 404 は coaching_test.go で確かめる。
 		CoachingEnabled:       true,
 		CoachingNewAcceptance: true,
+		CoachingMessaging:     true,
 		CloudName:             os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		CloudAPIKey:           os.Getenv("CLOUDINARY_API_KEY"),
 		CloudAPISecret:        os.Getenv("CLOUDINARY_API_SECRET"),

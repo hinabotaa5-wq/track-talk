@@ -60,6 +60,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 | `COACHING_ENABLED=1` | APIの既存契約・会話・Webhook・返金・定期処理を稼働する |
 | `NEXT_PUBLIC_COACHING_ENABLED=1` | Webのコーチング画面を表示する（ビルド時に設定） |
 | `COACHING_NEW_ACCEPTANCE_ENABLED=1` | 新しい指名申込・添削依頼・チケット購入・追加相談の送信／支払いを受け付ける |
+| `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**（届出は開始前に必要で、受理まで約2〜4週間）。空の間は大会サポート・対面指導のプランを公開できない |
 
 - 新規受付は既定で停止。APIを更新した後に既存の公開設定だけでは受付が再開しないことに注意する。
 - 問題時は `COACHING_NEW_ACCEPTANCE_ENABLED` だけを空にしてAPIを再デプロイする。APIとWebの `COACHING_ENABLED` は維持し、購入済みの履行と返金を続ける。

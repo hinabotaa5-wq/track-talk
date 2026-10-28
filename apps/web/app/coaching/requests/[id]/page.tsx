@@ -7,6 +7,7 @@ import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
 import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
@@ -99,7 +100,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
         </div>
       </section>
 
-      {response.clarify_reason || !response.created_at || now >= new Date(response.created_at).getTime() + 7 * 86400000 ? null : (
+      {!coachingMessagingEnabled || response.clarify_reason || !response.created_at || now >= new Date(response.created_at).getTime() + 7 * 86400000 ? null : (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">回答について確認する（1回無料）</h2>
           <p className="text-xs text-slate-300">返却から7日以内に、回答のわからなかった点を1回確認できます。新しい相談は下の「追加相談」から送れます。</p>
