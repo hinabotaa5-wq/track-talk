@@ -27,6 +27,9 @@ import (
 // guardianTermsVersion は、保護者が同意した文面の版。同意ページや規約の文面を変えたら上げる。
 const guardianTermsVersion = "guardian-consent-2026-10-final"
 
+// guardianRecordRetentionYears は、退会した本人の保護者同意の証跡と購入の記録を残す年数（最後の取引から）。
+const guardianRecordRetentionYears = 5
+
 // guardianManageLinkLife は、上限の変更・撤回のためのリンクが使える期間。メールを送るたびに新しく作る。
 const guardianManageLinkLife = 30 * 24 * time.Hour
 
@@ -211,7 +214,8 @@ func (s *Server) requestGuardianLimitRaise(ctx context.Context, e *minorBlockErr
 
 // queueGuardianPurchaseNotice は、18歳未満の本人が払った購入の通知を、支払いと同じトランザクションで予約する。
 // 本人が18歳未満でない、または保護者のメールがないときは何もしない。予約したら行を返す（送るのは呼ぶ側）。
-func queueGuardianPurchaseNotice(ctx context.Context, q *db.Queries, minorID uuid.UUID, refType string, refID uuid.UUID, amount int32, coachName string) (*db.GuardianNotice, error) {
+// paymentIntentID は Stripe の支払いの ID。退会で依頼が消えたあとも、どの支払いだったかを突き合わせられるように残す。
+func queueGuardianPurchaseNotice(ctx context.Context, q *db.Queries, minorID uuid.UUID, refType string, refID uuid.UUID, amount int32, coachName string, paymentIntentID *string) (*db.GuardianNotice, error) {
 	p, err := q.GetProfileByID(ctx, minorID)
 	if err != nil {
 		return nil, err
@@ -230,7 +234,7 @@ func queueGuardianPurchaseNotice(ctx context.Context, q *db.Queries, minorID uui
 	n, err := q.CreateGuardianNotice(ctx, db.CreateGuardianNoticeParams{
 		ID: uuid.New(), MinorID: minorID, Kind: "purchase", RefType: &refType, RefID: &refID,
 		GuardianEmail: *consent.GuardianEmail, AmountYen: &amount, CoachName: optionalText(coachName), PurchasedAt: &now,
-		Status: "pending",
+		Status: "pending", PaymentIntentID: paymentIntentID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
