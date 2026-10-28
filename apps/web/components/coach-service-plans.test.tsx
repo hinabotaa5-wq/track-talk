@@ -21,7 +21,7 @@ it("最初は大会と対面の2択だけを表示し、受付していないサ
   const buttons = [...container.querySelectorAll("button")];
   expect(buttons).toHaveLength(2);
   expect(buttons.map((button) => button.disabled)).toEqual([false, true]);
-  expect(buttons[0].textContent).toContain("大会までのサポート");
+  expect(buttons[0].textContent).toContain("大会まで");
   expect(container.textContent).not.toContain(plan.description);
   await act(async () => buttons[0].click());
   expect(buttons[0].getAttribute("aria-expanded")).toBe("true");

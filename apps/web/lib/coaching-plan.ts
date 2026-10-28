@@ -14,7 +14,7 @@ import type {
 
 export const coachingServiceLabels: Record<CoachingServiceType, string> = {
   video_review: "動画添削",
-  competition_support: "大会までのサポート",
+  competition_support: "大会まで",
   in_person: "対面指導",
 };
 
