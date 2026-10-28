@@ -310,8 +310,8 @@ func (s *Server) createSenseSummary(w http.ResponseWriter, r *http.Request) {
 func senseSummaryPrompt(notes []db.ListSenseNotesBetweenRow) string {
 	var b strings.Builder
 	b.WriteString(`あなたは陸上競技の選手の練習ノートを読む、落ち着いた先輩です。次の「感覚メモ」は、選手本人が練習で体を動かして感じたことを、前回のふりかえりのあとに書き溜めたものです。
-これを本人向けにまとめて、JSONだけで返してください。形式は {"overview":"","good":[],"concerns":[],"next":[]} です。
-- overview: このあいだの感覚の流れを、2〜3文で。
+これを本人向けにまとめて、overview・good・concerns・next の4項目を持つJSONオブジェクトだけで返してください。
+- overview: このあいだの感覚の流れを、2〜3文の日本語の文章で必ず書いてください。空文字や空白だけにはしないでください。短いメモでも、書かれた範囲の内容を振り返ってください。
 - good: つかめてきた感覚、うまくいった感覚。3つまで。
 - concerns: 気になる感覚、うまくいかなかった感覚、痛みや違和感。3つまで。無ければ空の配列。
 - next: 次の練習で意識するとよさそうなこと。メモに書かれた感覚から言えることだけ。3つまで。
@@ -358,6 +358,17 @@ func parseSenseSummary(raw string) (senseSummaryContent, error) {
 		return senseSummaryContent{}, fmt.Errorf("sense summary json: %w (%s)", err, senseSummaryReplyShape(raw))
 	}
 	out = cleanSenseSummary(out)
+	if out.Overview == "" {
+		// 本文だけ空の返事は、AIが返した各項目の文章を利用する。
+		// 追加のAPI呼び出しや、元のメモからの文章の作り足しはしない。
+		var parts []string
+		for _, items := range [][]string{out.Good, out.Concerns, out.Next} {
+			if len(items) > 0 {
+				parts = append(parts, items[0])
+			}
+		}
+		out.Overview = clipRunes(strings.Join(parts, "\n"), maxSenseSummaryOverview)
+	}
 	if out.Overview == "" {
 		return senseSummaryContent{}, errors.New("sense summary: overview が空です")
 	}

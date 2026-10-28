@@ -111,7 +111,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
                 key={day}
                 type="button"
                 disabled={!hasContent}
-                aria-label={`${year}年${monthNumber}月${number}日${written ? "、感覚メモあり" : "、感覚メモなし"}${shared ? hasRecord ? "、記録あり" : "、記録なし" : ""}${hasSummary ? "、まとめた感覚あり" : ""}`}
+                aria-label={`${year}年${monthNumber}月${number}日${written ? "、感覚メモあり" : "、感覚メモなし"}${shared ? hasRecord ? "、記録あり" : "、記録なし" : ""}${hasSummary ? "、AI要約あり" : ""}`}
                 aria-pressed={selectedDay === day}
                 aria-current={day === today ? "date" : undefined}
                 onClick={(event) => { trigger.current = event.currentTarget; setSelectedDay(day); }}
@@ -127,9 +127,11 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
             );
           })}
         </div>
-        {shared ? <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300"><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 rounded-full bg-amber-300" />大会記録</span></p> : null}
-        {summaries.length ? <p className="flex items-center gap-1 text-xs text-slate-300"><span aria-hidden className="size-1.5 rounded-full bg-violet-300" />まとめた感覚（対象期間の最終日）</p> : null}
-        {summariesLoading ? <p role="status" className="text-sm text-slate-300">まとめた感覚を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">まとめた感覚を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
+        {shared || summaries.length ? <p className="flex flex-nowrap items-center gap-3 whitespace-nowrap text-xs text-slate-300 sm:gap-4">
+          {shared ? <><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-300" />大会記録</span></> : null}
+          <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-violet-300" />AI要約</span>
+        </p> : null}
+        {summariesLoading ? <p role="status" className="text-sm text-slate-300">AI要約を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">AI要約を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
         {recordsLoading ? <p role="status" className="text-sm text-slate-300">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">大会記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
         {loading ? <p role="status" className="text-sm text-slate-300">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・大会記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
       </div>
@@ -141,7 +143,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
               <button type="button" ref={closeButton} aria-label="詳細を閉じる" onClick={closeDetails} className="flex size-10 items-center justify-center rounded-full hover:bg-white/10"><X className="size-4" aria-hidden /></button>
             </div>
             <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3">
-              {selectedSummaries.length ? <h4 className="text-sm font-semibold text-violet-200">まとめた感覚</h4> : null}
+              {selectedSummaries.length ? <h4 className="text-sm font-semibold text-violet-200">AI要約</h4> : null}
               {selectedSummaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} open />)}
               {selectedRecords.length ? <h4 className="text-sm font-semibold text-amber-200">大会記録</h4> : null}
               {selectedRecords.map((record) => <RaceRecordRow key={record.id} record={record} kind={raceMarkKind(record.event)} token={token} onChanged={(next) => onRecordsChanged?.(next)} />)}
