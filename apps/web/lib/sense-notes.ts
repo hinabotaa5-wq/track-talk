@@ -36,8 +36,9 @@ export function senseJarLevel(total: number) {
   return { filled: Math.floor(safe / senseJarSize), current: safe % senseJarSize };
 }
 
-// 保存直後と、今日のメモを保存済みの画面で同じ一文を表示する。
+// 保存直後と、今日のメモを保存済みの画面で同じ一文を表示する。連続1日目は続けた日数を出さない。
 export function senseCheer(stats: Pick<SenseNoteStats, "streak">) {
+  if (stats.streak <= 1) return "また明日も書こう！";
   return `${stats.streak}日続けて書けてる。また明日も書こう！`;
 }
 
