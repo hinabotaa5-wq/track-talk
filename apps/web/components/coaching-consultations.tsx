@@ -1,11 +1,13 @@
 "use client";
 
+import { WorkOrderTermsView, WorkOrderView } from "@/components/work-order-terms";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
+import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -37,8 +39,9 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <p className="text-sm text-slate-200">新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。</p>
     <p className="text-xs text-slate-300">コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。</p>
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} />)}
-    {data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} draft={draft} roomPath={roomPath} token={token} funding={data.funding} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
-    {!data.can_purchase && data.role === "requester" && !draft ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
+    {!coachingMessagingEnabled ? <p className="text-xs text-slate-300">{messagingClosedNote}</p> : null}
+    {coachingMessagingEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} draft={draft} roomPath={roomPath} token={token} funding={data.funding} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
+    {coachingMessagingEnabled && !data.can_purchase && data.role === "requester" && !draft ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
 }
@@ -120,8 +123,10 @@ function ConsultationCard({ consultation: c, role, base, token, guardian, reload
       {c.clarification ? <p className="whitespace-pre-wrap text-sm">補足：{c.clarification}</p> : null}
       {c.status === "offered" && c.respond_by ? <p className="text-xs text-slate-300">受諾期限：{formatDateTime(c.respond_by)}</p> : null}
       {c.status === "in_review" && c.answer_by ? <p className="text-xs text-slate-300">回答期限：{formatDateTime(c.answer_by)}</p> : null}
+      {role === "coach" && c.terms && c.status === "offered" ? <WorkOrderTermsView terms={c.terms} /> : null}
+      {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
       {role === "coach" && c.status === "offered" ? <div className="flex gap-3"><Button disabled={pending} onClick={() => void act("accept")}>引き受ける</Button><Button disabled={pending} onClick={() => void act("decline")}>辞退する</Button></div> : null}
-      {reply || clarify || clarifyReply ? <div className="space-y-2">
+      {coachingMessagingEnabled && (reply || clarify || clarifyReply) ? <div className="space-y-2">
         <Textarea aria-label={reply ? "コーチの回答" : clarify ? "回答への確認質問" : "コーチの補足"} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} disabled={pending} />
         {reply ? <label className="block text-xs">実践動画（30秒・100MB以内、任意）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? "回答を送る" : clarify ? "回答について確認する（1回無料）" : "補足を送る"}</Button>

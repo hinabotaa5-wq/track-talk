@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingSupport } from "@/lib/coaching-support";
@@ -445,7 +446,9 @@ export function CoachingMessages({
         </ul>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
-      {contract.status === "active" ? (
+      {contract.status === "active" && !coachingMessagingEnabled ? (
+        <p className="text-sm text-slate-300">{messagingClosedNote}</p>
+      ) : contract.status === "active" ? (
         <Composer contract={contract} access={access} onSent={(m) => {
             loadSeq.current++;
             setMessages((list) => [...(list ?? []), m]);

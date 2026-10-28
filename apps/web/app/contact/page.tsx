@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { coachingEnabled } from "@/lib/features";
 import { operatorName, supportEmail } from "@/lib/operator";
 
 export const metadata: Metadata = {
@@ -17,6 +18,6 @@ export default function ContactPage() {
     </dl>
     <p className="text-sm leading-7 text-slate-300">ログインできない場合や、退会後のお問い合わせもメールで受け付けます。支払い・返金については、分かる範囲で購入日時や購入番号をお知らせください。パスワード、カード番号、保護者の同意ページのリンクは送らないでください。</p>
     <p className="text-sm leading-7 text-slate-300">ログインしている場合は、マイページの<Link href="/me/contact" className="text-blue-300 underline">お問い合わせ</Link>も利用できます。</p>
-    <nav className="flex flex-wrap gap-4 text-sm text-blue-300 underline"><Link href="/terms">利用規約</Link><Link href="/privacy">プライバシーポリシー</Link></nav>
+    <nav className="flex flex-wrap gap-4 text-sm text-blue-300 underline"><Link href="/terms">利用規約</Link><Link href="/privacy">プライバシーポリシー</Link>{coachingEnabled ? <Link href="/legal/commerce">特定商取引法に基づく表記</Link> : null}</nav>
   </div>;
 }

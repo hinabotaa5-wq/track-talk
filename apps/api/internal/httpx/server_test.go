@@ -72,10 +72,13 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		// 確かめるものがほとんどなので開けておく。閉じたときの 404 は coaching_test.go で確かめる。
 		CoachingEnabled:       true,
 		CoachingNewAcceptance: true,
-		CloudName:             os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:           os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:        os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:          os.Getenv("CLOUDINARY_API_BASE"),
+		CoachingMessaging:     true,
+		// テスト用の鍵(32バイトの 0x01)。本番の鍵は Secret Manager に置く。
+		CoachIdentityKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+		CloudName:        os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:      os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:   os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:     os.Getenv("CLOUDINARY_API_BASE"),
 		// 保護者の同意のリンクは、Resend の代わりのサーバーに送る（mail_helper_test.go）。
 		ResendAPIKey: "re_test",
 		MailFrom:     "TrackTalk <no-reply@example.com>",
@@ -1908,5 +1911,17 @@ func TestPracticeRatingCommentCanBeReportedAndHidden(t *testing.T) {
 	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/posts/"+created.ID, "", nil).Body.Bytes(), &after)
 	if len(after.Practice.Reputation.Comments) != 0 {
 		t.Fatalf("hidden comment still shown %+v", after.Practice.Reputation)
+	}
+}
+
+// 特商法の表記で省略した住所・電話番号の開示請求は、お問い合わせの種類として受け付ける。
+func TestInquiryAcceptsCommerceDisclosureRequest(t *testing.T) {
+	h := setup(t)
+	ta := token(t, uuid.New())
+	rec := doJSON(t, h, http.MethodPost, "/v1/me/inquiries", ta, map[string]string{
+		"category": "disclosure", "subject": "所在地の開示", "body": "特定商取引法の表記の所在地と電話番号を教えてください", "email": "buyer@example.com",
+	})
+	if rec.Code != 201 || !strings.Contains(rec.Body.String(), `"category":"disclosure"`) {
+		t.Fatalf("disclosure %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -64,7 +64,16 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
+	// サポートプランはコーチが販売者なので、コーチの特商法の表記を一緒に出す(表記不要のコーチは要否だけ)。
+	commerce, err := s.publicCommerceJSON(r.Context(), s.q, p.CoachID)
+	if err != nil {
+		if !s.writeIdentityKeyError(w, err) {
+			MapDBError(w, err)
+		}
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{
+		"commerce": commerce,
 		// payments が false のあいだは、支払いなしのデモ版。
 		"payments": s.stripe.Configured(),
 		"plan":     plan,
@@ -113,6 +122,14 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	if plan.CoachID == me.ID {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "自分のプランには申し込めません")
+		return
+	}
+	// 販売者であるコーチが特商法の登録を済ませていないプランには申し込めない(公開前の登録が必須になる前のプラン向け)。
+	if registered, err := s.q.HasCoachLegalIdentity(r.Context(), plan.CoachID); err != nil {
+		MapDBError(w, err)
+		return
+	} else if !registered {
+		Error(w, http.StatusConflict, "commerce_unregistered", "このプランはいま申し込めません")
 		return
 	}
 	req.Goal = strings.TrimSpace(req.Goal)

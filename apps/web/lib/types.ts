@@ -605,11 +605,29 @@ export type CoachingMessage = {
 };
 
 // 申し込む画面に出すプランとコーチ。
+// コーチの特商法の表記。表記不要のコーチは要否だけで、登録情報は返らない。
+export type PublicCommerce =
+  | { required: false }
+  | { required: true; registered: false }
+  | { required: true; registered: true; legal_name: string; address: string; phone: string };
+
+export type CoachIdentity = { legal_name: string; address: string; phone: string };
+
+export type CoachCommerce = {
+  required: boolean;
+  forced: boolean;
+  exempt_declared_at: string | null;
+  checklist_version: number;
+  checklist: string[];
+  identity: CoachIdentity | null;
+};
+
 export type PublicCoachingPlan = {
   // false のあいだは支払いなしのデモ版。
   payments: boolean;
   plan: CoachingPlan;
   coach: { id: string; nickname: string | null; photo_url: string; tier: CoachTier; events: CoachEvent[] };
+  commerce?: PublicCommerce;
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
@@ -706,15 +724,29 @@ export type CoachProbationResponse = {
 };
 
 // コーチに見せる依頼。動画は引き受けたあとにだけ付く。
+// 運営者がコーチに委託するときの取引条件(フリーランス保護法3条)。文面は API が作る。
+export type WorkOrderTerms = {
+  items: { label: string; value: string }[];
+  amount_yen: number;
+  deliver_by: string;
+  payment_due: string;
+  carried_due: string;
+  consigned_at: string;
+};
+
+export type WorkOrder = { id: string; terms_version: number; terms: WorkOrderTerms; created_at: string };
+
 export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url" | "rating"> & {
   video_url?: string;
   thumbnail_url?: string;
+  work_order?: WorkOrder;
 };
 
 export type ReviewOffer = {
   id: string;
   expires_at: string;
   request: CoachReviewRequest;
+  terms?: WorkOrderTerms;
 };
 
 export type CoachRequests = {

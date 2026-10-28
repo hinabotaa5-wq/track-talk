@@ -296,6 +296,10 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
+	if err := s.q.ReopenCoachLegalIdentity(r.Context(), p.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
@@ -462,6 +466,12 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if c.Status == "rejected" {
+		if err := s.q.EndCoachLegalIdentity(r.Context(), id); err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 	s.notifyCoachReviewed(r.Context(), c)
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})

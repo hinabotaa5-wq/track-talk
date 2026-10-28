@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkOrderView } from "@/components/work-order-terms";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
@@ -10,6 +11,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import {
   clarifyReasonLabels,
@@ -238,6 +240,8 @@ export default function CoachReviewRequestPage() {
         />
       ) : null}
 
+      {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
+
       {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} /> : null}
 
       {response ? <ReviewResponseView response={response} /> : null}
@@ -246,7 +250,7 @@ export default function CoachReviewRequestPage() {
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
           <p className="text-sm font-semibold text-white">「{clarifyReasonLabels[response.clarify_reason]}」と言われました</p>
           {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
-          <ClarificationForm request={request} token={token} onSent={setRequest} />
+          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} /> : <p className="text-sm text-slate-300">{messagingClosedNote}</p>}
         </section>
       ) : null}
 

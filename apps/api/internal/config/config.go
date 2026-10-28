@@ -42,6 +42,13 @@ type Config struct {
 	// CoachingNewAcceptance が false の間は、新しい申し込み・購入だけを止める。
 	// 既存の契約・会話・決済の処理は CoachingEnabled の側で続ける。
 	CoachingNewAcceptance bool
+	// CoachingMessaging が false の間は、有料の1対1のやりとり（契約のやりとり欄・追加相談・
+	// 添削の「わからなかった」と補足回答）の送信を止める。読む・通報・返金は止めない。
+	// 有料の1対1メッセージは電気通信事業の届出の対象なので、届出が受理されるまで本番では立てない。
+	CoachingMessaging bool
+	// CoachIdentityKey は、コーチの本名・住所・電話番号を暗号化する鍵(32バイトを base64 にしたもの)。
+	// DB とは別に Secret Manager などで持つ。空なら、コーチの特商法の登録情報は保存も表示もできない。
+	CoachIdentityKey string
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
 	// StorageCleanupSecret は日次の保存期限処理に使う。空なら呼び出せない。
@@ -120,6 +127,8 @@ func Load() (Config, error) {
 		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
+		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
+		CoachIdentityKey:           os.Getenv("COACH_IDENTITY_KEY"),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
 		ReminderSecret:             os.Getenv("REMINDER_SECRET"),

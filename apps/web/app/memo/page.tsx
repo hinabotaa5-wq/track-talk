@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
-import { SenseSummaryCard, SenseSummaryNotice, useSenseSummaries } from "@/components/sense-summary";
+import { SenseSummaryCard, SenseSummaryResult, useSenseSummaries } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
 import { TargetMeetCountdown } from "@/components/target-meet-countdown";
 import type { RaceRecords } from "@/lib/race-records";
@@ -146,7 +146,6 @@ export default function MySenseNotesPage() {
                   <SenseNoteStatsRow stats={shownStats} />
                 </div>
               </div>
-              {senseSummaryEnabled && !guest ? <SenseSummaryNotice state={summaryState} /> : null}
               <SenseNoteComposer
                 token={token}
                 writtenToday={shownStats.today > 0}
@@ -160,6 +159,7 @@ export default function MySenseNotesPage() {
             </section>
           </>
         )}
+        <SenseSummaryResult state={summaryState}>
             <SenseNoteCalendar
               notes={shownNotes ?? []}
               summaries={summaryState.summaries}
@@ -185,6 +185,7 @@ export default function MySenseNotesPage() {
                 setDropped(false);
               }}
             />
+        </SenseSummaryResult>
 
       </div>
     </div>

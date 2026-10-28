@@ -169,6 +169,8 @@ func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		q.DeleteReportsForUser,
 		q.DeleteCommentsForUser,
 		q.DeletePostsForUser,
+		// コーチの特商法の登録情報は、保持期間がたつまで退会しても残す。
+		q.EndCoachLegalIdentity,
 		q.RememberDeletedAccount,
 		q.DeleteProfile,
 	}

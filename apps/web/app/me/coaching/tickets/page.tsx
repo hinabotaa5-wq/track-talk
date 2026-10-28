@@ -1,5 +1,6 @@
 "use client";
 
+import { SellerNote } from "@/components/seller-note";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -94,6 +95,7 @@ function TicketsPage() {
   if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
   return <div className="mx-auto max-w-md space-y-5">
     <h1 className="text-2xl font-bold">コーチングチケット</h1>
+    <SellerNote />
     {message ? <p role="status" className="text-sm text-blue-200">{message}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError("読み込めませんでした"))}>残高を再読み込み</Button>

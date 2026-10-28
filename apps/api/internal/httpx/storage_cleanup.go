@@ -18,6 +18,7 @@ type storageCleanupResult struct {
 	Competitions   int64 `json:"competitions_deleted"`
 	DomesticMajors int64 `json:"domestic_majors_deleted"`
 	MajorHosts     int64 `json:"major_hosts_deleted"`
+	CoachIdentity  int64 `json:"coach_identities_deleted"`
 	Consultations  int   `json:"consultations_purged"`
 	Messages       int   `json:"message_rooms_purged"`
 	Assets         int   `json:"unused_assets_deleted"`
@@ -64,6 +65,10 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 			return out, err
 		}
 		*target.count = tag.RowsAffected()
+	}
+	// コーチの特商法の登録情報は、最後の取引とコーチをやめた時の遅いほうから5年で消す。
+	if out.CoachIdentity, err = s.q.DeleteExpiredCoachLegalIdentities(ctx, now.AddDate(-coachIdentityRetentionYears, 0, 0)); err != nil {
+		return out, err
 	}
 	// 外部ストレージを消せない設定では文章も消さない。
 	if !s.cloud.Configured() {

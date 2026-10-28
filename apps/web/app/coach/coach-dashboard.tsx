@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkOrderTermsView } from "@/components/work-order-terms";
+import { CoachCommerceSection } from "@/components/coach-commerce";
 import { CoachConsultationQueue } from "@/components/coaching-consultations";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 
@@ -110,6 +112,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
             <li key={offer.id} className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
               <RequestSummary request={offer.request} />
               <p className="text-sm font-semibold text-white">あと{minutesLeft(offer.expires_at, now)}分で次のコーチに回ります</p>
+              {offer.terms ? <WorkOrderTermsView terms={offer.terms} /> : null}
               <div className="flex gap-2">
                 <Button type="button" className="flex-1" disabled={pending} onClick={() => void answer(offer.id, "accept")}>
                   引き受ける
@@ -308,6 +311,8 @@ export function CoachDashboard() {
       <CoachContractsSection token={token} />
 
       <CoachAvailabilityEditor token={token} />
+
+      <CoachCommerceSection token={token} />
 
       <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 

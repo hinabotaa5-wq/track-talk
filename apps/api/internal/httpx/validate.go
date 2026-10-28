@@ -131,7 +131,7 @@ func assetPublicID(v, message string) string {
 
 func InquiryCategory(v string) string {
 	switch v {
-	case "bug", "account", "request", "other":
+	case "bug", "account", "request", "other", "disclosure":
 		return ""
 	default:
 		return "種類が不正です"
