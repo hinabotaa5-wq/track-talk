@@ -12,6 +12,40 @@ import (
 	"github.com/google/uuid"
 )
 
+const coachWithdrawBlockers = `-- name: CoachWithdrawBlockers :one
+SELECT
+    EXISTS (
+        SELECT 1 FROM coaching_contracts ct
+        WHERE ct.coach_id = $1
+          AND (ct.status IN ('applied', 'accepted', 'active', 'suspended') OR (ct.fulfillment_version=1 AND ct.fulfillment_state<>'settled' AND ct.status IN ('ended','refunded')))
+    )::boolean AS open_contract,
+    EXISTS (
+        SELECT 1 FROM review_requests r
+        WHERE r.coach_id = $1
+          AND r.status IN ('in_review', 'clarifying')
+    )::boolean AS open_review,
+    EXISTS (
+        SELECT 1 FROM coaching_consultations c
+        WHERE c.coach_id = $1
+          AND (c.status IN ('awaiting_payment','offered','in_review') OR c.payment_state='refund_pending' OR (c.clarify_requested_at IS NOT NULL AND c.clarified_at IS NULL AND c.hidden_at IS NULL AND c.purged_at IS NULL))
+    )::boolean AS open_consultation
+`
+
+type CoachWithdrawBlockersRow struct {
+	OpenContract     bool `json:"open_contract"`
+	OpenReview       bool `json:"open_review"`
+	OpenConsultation bool `json:"open_consultation"`
+}
+
+// コーチをやめると利用者とのやりとりを続けられなくなるので、コーチとして受けている仕事が残っているあいだはやめさせない。
+// 打診に返事をしていないだけの添削は、やめるときに断った扱いにして待ちに戻す(ここでは数えない)。
+func (q *Queries) CoachWithdrawBlockers(ctx context.Context, coachID uuid.UUID) (CoachWithdrawBlockersRow, error) {
+	row := q.db.QueryRow(ctx, coachWithdrawBlockers, coachID)
+	var i CoachWithdrawBlockersRow
+	err := row.Scan(&i.OpenContract, &i.OpenReview, &i.OpenConsultation)
+	return i, err
+}
+
 const countCoachApplications = `-- name: CountCoachApplications :one
 SELECT count(*) FROM coach_profiles
 WHERE status = $1
@@ -22,6 +56,46 @@ func (q *Queries) CountCoachApplications(ctx context.Context, status string) (in
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const declineCoachOpenOffers = `-- name: DeclineCoachOpenOffers :many
+WITH declined AS (
+    UPDATE review_offers o
+    SET result = 'declined',
+        answered_at = now()
+    WHERE o.coach_id = $1::uuid
+      AND o.result IS NULL
+    RETURNING o.request_id
+)
+UPDATE review_requests r
+SET status = 'queued',
+    coach_id = NULL,
+    updated_at = now()
+FROM declined
+WHERE r.id = declined.request_id
+  AND r.status = 'offered'
+RETURNING r.id
+`
+
+// やめるコーチへの、返事をしていない添削の打診を断った扱いにして、依頼を待ちに戻す。戻した依頼の ID を返す。
+func (q *Queries) DeclineCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, declineCoachOpenOffers, coachID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
@@ -254,6 +328,44 @@ func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow
 	return items, nil
 }
 
+const lockCoachProfile = `-- name: LockCoachProfile :one
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, nomination_fee_yen FROM coach_profiles
+WHERE profile_id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockCoachProfile(ctx context.Context, profileID uuid.UUID) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, lockCoachProfile, profileID)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+		&i.PledgedAt,
+		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
+		&i.NominationFeeYen,
+	)
+	return i, err
+}
+
 const removeCoachPhoto = `-- name: RemoveCoachPhoto :one
 UPDATE coach_profiles c
 SET photo_public_id = NULL,
@@ -400,7 +512,7 @@ SET tier = EXCLUDED.tier,
     applied_at = now(),
     reviewed_at = NULL,
     updated_at = now()
-WHERE coach_profiles.status IN ('pending', 'rejected')
+WHERE coach_profiles.status IN ('pending', 'rejected', 'withdrawn')
 RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, nomination_fee_yen
 `
 
@@ -415,7 +527,7 @@ type SubmitCoachApplicationParams struct {
 	Name         string    `json:"name"`
 }
 
-// 審査待ちのうちは書き直せる。却下されたら出し直せて、また審査待ちに戻る。
+// 審査待ちのうちは書き直せる。却下されたら・自分でやめたら出し直せて、また審査待ちに戻る。
 // 承認済み・停止中は変えられない（行が返らない）。
 func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApplicationParams) (CoachProfile, error) {
 	row := q.db.QueryRow(ctx, submitCoachApplication,
@@ -500,4 +612,26 @@ func (q *Queries) UpdateCoachServices(ctx context.Context, arg UpdateCoachServic
 		&i.NominationFeeYen,
 	)
 	return i, err
+}
+
+const withdrawCoach = `-- name: WithdrawCoach :one
+UPDATE coach_profiles c
+SET status = 'withdrawn',
+    on_duty = false,
+    photo_public_id = NULL,
+    reviewed_at = COALESCE(c.reviewed_at, now()),
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = $1) o
+WHERE c.profile_id = $1
+  AND c.status IN ('pending', 'approved')
+RETURNING o.old_photo_public_id
+`
+
+// 承認済みのコーチ(または審査待ちの応募)を、本人がやめた状態にする。受付も止め、顔写真も外す。
+// 外した写真の ID を返すので、Cloudinary から消す。
+func (q *Queries) WithdrawCoach(ctx context.Context, profileID uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, withdrawCoach, profileID)
+	var old_photo_public_id *string
+	err := row.Scan(&old_photo_public_id)
+	return old_photo_public_id, err
 }

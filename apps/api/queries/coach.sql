@@ -3,7 +3,7 @@ SELECT * FROM coach_profiles
 WHERE profile_id = $1;
 
 -- name: SubmitCoachApplication :one
--- 審査待ちのうちは書き直せる。却下されたら出し直せて、また審査待ちに戻る。
+-- 審査待ちのうちは書き直せる。却下されたら・自分でやめたら出し直せて、また審査待ちに戻る。
 -- 承認済み・停止中は変えられない（行が返らない）。
 INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, name)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -19,7 +19,7 @@ SET tier = EXCLUDED.tier,
     applied_at = now(),
     reviewed_at = NULL,
     updated_at = now()
-WHERE coach_profiles.status IN ('pending', 'rejected')
+WHERE coach_profiles.status IN ('pending', 'rejected', 'withdrawn')
 RETURNING *;
 
 -- name: CountCoachApplications :one
@@ -142,3 +142,61 @@ SELECT EXISTS (
     WHERE coach_id = sqlc.arg(coach_id) AND published AND service_type IS NOT NULL
       AND NOT (service_type = ANY(sqlc.arg(service_types)::text[]))
 )::boolean;
+
+-- name: LockCoachProfile :one
+SELECT * FROM coach_profiles
+WHERE profile_id = $1
+FOR UPDATE;
+
+-- name: CoachWithdrawBlockers :one
+-- コーチをやめると利用者とのやりとりを続けられなくなるので、コーチとして受けている仕事が残っているあいだはやめさせない。
+-- 打診に返事をしていないだけの添削は、やめるときに断った扱いにして待ちに戻す(ここでは数えない)。
+SELECT
+    EXISTS (
+        SELECT 1 FROM coaching_contracts ct
+        WHERE ct.coach_id = sqlc.arg('coach_id')
+          AND (ct.status IN ('applied', 'accepted', 'active', 'suspended') OR (ct.fulfillment_version=1 AND ct.fulfillment_state<>'settled' AND ct.status IN ('ended','refunded')))
+    )::boolean AS open_contract,
+    EXISTS (
+        SELECT 1 FROM review_requests r
+        WHERE r.coach_id = sqlc.arg('coach_id')
+          AND r.status IN ('in_review', 'clarifying')
+    )::boolean AS open_review,
+    EXISTS (
+        SELECT 1 FROM coaching_consultations c
+        WHERE c.coach_id = sqlc.arg('coach_id')
+          AND (c.status IN ('awaiting_payment','offered','in_review') OR c.payment_state='refund_pending' OR (c.clarify_requested_at IS NOT NULL AND c.clarified_at IS NULL AND c.hidden_at IS NULL AND c.purged_at IS NULL))
+    )::boolean AS open_consultation;
+
+-- name: DeclineCoachOpenOffers :many
+-- やめるコーチへの、返事をしていない添削の打診を断った扱いにして、依頼を待ちに戻す。戻した依頼の ID を返す。
+WITH declined AS (
+    UPDATE review_offers o
+    SET result = 'declined',
+        answered_at = now()
+    WHERE o.coach_id = sqlc.arg('coach_id')::uuid
+      AND o.result IS NULL
+    RETURNING o.request_id
+)
+UPDATE review_requests r
+SET status = 'queued',
+    coach_id = NULL,
+    updated_at = now()
+FROM declined
+WHERE r.id = declined.request_id
+  AND r.status = 'offered'
+RETURNING r.id;
+
+-- name: WithdrawCoach :one
+-- 承認済みのコーチ(または審査待ちの応募)を、本人がやめた状態にする。受付も止め、顔写真も外す。
+-- 外した写真の ID を返すので、Cloudinary から消す。
+UPDATE coach_profiles c
+SET status = 'withdrawn',
+    on_duty = false,
+    photo_public_id = NULL,
+    reviewed_at = COALESCE(c.reviewed_at, now()),
+    updated_at = now()
+FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE profile_id = sqlc.arg('profile_id')) o
+WHERE c.profile_id = sqlc.arg('profile_id')
+  AND c.status IN ('pending', 'approved')
+RETURNING o.old_photo_public_id;

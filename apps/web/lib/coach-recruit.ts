@@ -41,4 +41,5 @@ export const coachStatusLabels: Record<CoachStatus, string> = {
   approved: "承認済み",
   rejected: "見送り",
   suspended: "停止中",
+  withdrawn: "やめた",
 };

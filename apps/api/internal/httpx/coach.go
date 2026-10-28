@@ -31,7 +31,7 @@ func validCoachTier(tier string) bool {
 
 func validCoachStatus(status string) bool {
 	switch status {
-	case "pending", "approved", "rejected", "suspended":
+	case "pending", "approved", "rejected", "suspended", "withdrawn":
 		return true
 	}
 	return false

@@ -236,6 +236,7 @@ export function CoachDashboard() {
       <CoachPhotoForm application={coach} nickname={coach.name || profile?.nickname || null} token={token} onSaved={setCoach} />
       <Link href="/coach/about" className="block text-sm text-blue-300 underline">コーチ機能について</Link>
       <Link href="/coach/apply" className="block text-sm text-blue-300 underline">応募内容を確認する</Link>
+      <CoachWithdrawLink />
     </div>
   );
 
@@ -319,6 +320,20 @@ export function CoachDashboard() {
           通知の設定
         </Link>
       </section>
+
+      <CoachWithdrawLink />
     </div>
+  );
+}
+
+// コーチだけをやめる入口。アカウントの退会（マイページ）とは別にする。
+function CoachWithdrawLink() {
+  return (
+    <section className="space-y-1 border-t border-white/15 pt-4">
+      <Link href="/coach/withdraw" className="text-sm text-slate-300 underline">
+        コーチをやめる
+      </Link>
+      <p className="text-xs text-slate-400">アカウントは残り、一般の利用者として使い続けられます。</p>
+    </section>
   );
 }
