@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.skip(process.env.PLAYWRIGHT_COACHING_ENABLED !== "1", "コーチングを有効にしたローカルプレビューで実行します");
 const userID="11111111-1111-4111-8111-111111111111";
-test("スマホの同じ申込み画面で指名と追加料金を選び、おまかせへ戻せる",async({page,context,baseURL})=>{
+test("スマホの申込み画面でコーチを選び、料金は1,500円のまま",async({page,context,baseURL})=>{
  await page.setViewportSize({width:390,height:844});
  const user={id:userID,aud:"authenticated",role:"authenticated",email:"preview@example.com",app_metadata:{},user_metadata:{},identities:[],created_at:new Date().toISOString()};
  const payload={sub:userID,aud:"authenticated",role:"authenticated",aal:"aal1",exp:Math.floor(Date.now()/1000)+3600,iat:Math.floor(Date.now()/1000)};
@@ -15,28 +15,21 @@ test("スマホの同じ申込み画面で指名と追加料金を選び、お�
   let body:unknown={};
   if(p.endsWith("/me"))body={id:userID,nickname:"テスト選手",event:"100m",mfa_required:false,overseas_consent:true};
   else if(p.endsWith("/me/coaching"))body={demo:true,birth_month:"1995-01",is_minor:false,guardian:null,push_devices:0};
-  else if(p.endsWith("/tickets"))body={balance:{available:5,reserved:0},products:[],purchases:[]};
-  else if(p.endsWith("/estimate"))body={due_at:new Date(Date.now()+86400000).toISOString(),coaches_on_duty:true,payments:true,price_yen:1200};
-  else if(p.endsWith("/nominees"))body={coaches:[{id:"coach-1",nickname:"サンプルコーチ",photo_url:"",best_record:"100m 10秒台",achievements:"短距離のフォームと練習方法をアドバイスします。",nomination_fee_yen:800,total_price_yen:2000}]};
+  else if(p.endsWith("/tickets"))body={balance:{available:0,reserved:0},products:[],purchases:[]};
+  else if(p.endsWith("/estimate"))body={due_at:new Date(Date.now()+86400000).toISOString(),coaches_on_duty:true,payments:true,price_yen:1500};
+  else if(p.endsWith("/nominees"))body={price_yen:1500,coaches:[{id:"coach-1",nickname:"サンプルコーチ",photo_url:"",events:["100m"],years:10,best_record:"100m 10秒台",achievements:"短距離のフォームと練習方法をアドバイスします。"},{id:"coach-2",nickname:"別のコーチ",photo_url:"",events:["100m"],years:5,best_record:"",achievements:""}]};
   else if(p.endsWith("/notifications"))body={notifications:[],unread:0};
   await route.fulfill({json:body});
  });
  await page.goto("/coaching/new");
  await expect(page.getByRole("heading",{name:"動画添削を頼む"})).toBeVisible();
- await expect(page.getByLabel("指名するコーチ")).toHaveCount(0);
- await expect(page.getByText("合計 1,200円／回",{exact:true})).toBeVisible();
- await page.getByLabel("コーチを選んで指名料を追加する").check();
- await page.getByLabel("指名するコーチ").selectOption("coach-1");
- await expect(page.getByText("合計 2,000円／回",{exact:true})).toBeVisible();
- await expect(page.getByText("チケット2枚 ＋ 指名料800円",{exact:true})).toBeVisible();
- await page.getByLabel("指名料のお支払い方法").selectOption("paypay");
+ await expect(page.getByText("おまかせ")).toHaveCount(0);
+ await expect(page.getByText("1,500円／回",{exact:true})).toBeVisible();
+ await page.getByLabel("サンプルコーチ").check();
+ await expect(page.getByText("1,500円／回",{exact:true})).toBeVisible();
  await expect(page.locator("body")).toHaveJSProperty("scrollWidth",390);
  await expect(page.locator("#startup-splash")).toHaveCount(0);
  await expect(page.locator(".screen-loader")).toBeHidden();
- await expect(page.getByRole("heading",{name:"動画添削を頼む"})).toHaveCSS("font-size","24px");
- await page.screenshot({path:"../../docs/screenshots/review-nomination-mobile.png",fullPage:true});
- await page.getByLabel("コーチを選んで指名料を追加する").uncheck();
- await expect(page.getByText("合計 1,200円／回",{exact:true})).toBeVisible();
- await expect(page.getByLabel("指名料のお支払い方法")).toHaveCount(0);
+ await page.screenshot({path:"../../docs/screenshots/review-coach-choice-mobile.png",fullPage:true});
  expect(new URL(page.url()).pathname).toBe("/coaching/new");
 });

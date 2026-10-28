@@ -12,7 +12,7 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => vi.fn(async () => true), reportConfirmOptions: (x: unknown) => x }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 const draft: Consultation = {
- id: "consultation", request_key: "saved-key", status: "draft", funding: "ticket", price_yen: 500, payment_state: "unpaid", minor: false,
+ id: "consultation", request_key: "saved-key", status: "draft", funding: "ticket", price_yen: 500, payment_state: "unpaid", minor: false, payer: "requester",
  question: "購入後に戻っても残る質問", answer: "", video_public_id: null, video_url: null, answer_video_url: null,
  clarify_body: null, clarification: null, clarify_requested_at: null, clarified_at: null, answered_at: null, respond_by: null, answer_by: null,
  expires_at: "2026-12-01T00:00:00Z", created_at: "2026-10-23T00:00:00Z", purged: false, hidden: false,
@@ -48,13 +48,18 @@ it("回答への無料確認と新しい有料相談を区別する", async () =
  expect(canClarify(c, new Date(c.answered_at).getTime() + 7 * 86400000)).toBe(false);
  expect(canClarify({ ...c, clarify_body: "一度確認済み" })).toBe(false);
 });
-it("未成年本人には個別決済を開くボタンを表示しない", async () => {
- await render({ ...room, can_purchase: false, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, status: "awaiting_payment" }] });
+it("未成年本人には、保護者が払うパーソナル指導の個別決済を開くボタンを表示しない", async () => {
+ await render({ ...room, can_purchase: false, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "guardian", status: "awaiting_payment" }] });
  expect(container.textContent).toContain("保護者に");
  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "お支払いへ")).toBe(false);
 });
+it("未成年本人は、添削のあとの追加相談を保護者の同意の範囲で自分で払える", async () => {
+ await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "requester", status: "awaiting_payment" }] });
+ expect([...container.querySelectorAll("button")].some((b) => b.textContent === "お支払いへ")).toBe(true);
+ expect(container.textContent).not.toContain("保護者に、この契約のページから");
+});
 it("保護者は閲覧と支払いができ、新しい有料質問は作れない", async () => {
- await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [{ ...draft, funding: "cash", minor: true, status: "awaiting_payment" }] }, "guardian-secret");
+ await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [{ ...draft, funding: "cash", minor: true, payer: "guardian", status: "awaiting_payment" }] }, "guardian-secret");
  expect(container.querySelector("textarea")).toBeNull();
  expect(container.textContent).toContain("お支払いへ");
  apiFetch.mockImplementation(async (path: string, options?: { method: string }) => options?.method ? {} : { ...room, role: "guardian", consultations: [] }); await click("お支払いへ");

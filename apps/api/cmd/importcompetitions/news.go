@@ -62,11 +62,14 @@ func newsTargets(ctx context.Context, pool *pgxpool.Pool, prefecture string, bud
 
 // importNews は、年間の日程表にすでにある大会に、県のニュースから要項を補う。
 // 県ごとに Gemini のリクエストを1回使い、使うのは多くても budget 回まで（budget が負なら上限なし）。
-// どれかの県が失敗したら true を返す。
-func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Client, sources []competitions.Source, budget int, dryRun bool) bool {
+// 恒久エラーまたは全件失敗なら true。一部の一時エラーはログに残して続ける。
+func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Client, sources []competitions.Source, budget int, dryRun bool, shared ...*importResults) bool {
 	q := db.New(pool)
 	season := int32(competitions.SeasonYear(time.Now()))
-	failed := false
+	results := &importResults{}
+	if len(shared) > 0 {
+		results = shared[0]
+	}
 	requests := 0
 	for _, source := range sources {
 		if budget >= 0 && requests >= budget {
@@ -82,27 +85,30 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 			continue
 		}
 		if requests > 0 {
-			time.Sleep(15 * time.Second)
+			if err := competitions.Wait(ctx, 15*time.Second); err != nil {
+				return true
+			}
 		}
 		requests++
 		linked, err := readNews(ctx, client, source, int(season), known, byKey, q, dryRun)
 		if err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
-			if errors.Is(err, competitions.ErrRateLimited) {
+			results.record(err)
+			if errors.Is(err, competitions.ErrRateLimited) || errors.Is(err, competitions.ErrAuthentication) {
 				return true
 			}
-			failed = true
 			continue
 		}
+		results.record(nil)
 		if !dryRun {
 			if err := q.MarkNewsChecked(ctx, source.Prefecture); err != nil {
 				log.Printf("%s: %v", source.Prefecture, err)
-				failed = true
+				results.permanent = true
 			}
 		}
 		fmt.Fprintf(os.Stdout, "news %s: %d meets got guidelines\n", source.Prefecture, linked)
 	}
-	return failed
+	return results.failed() || ctx.Err() != nil
 }
 
 // newsCandidates は、そのシーズンのすべての大会。ニュースの要項は年間の日程表より新しいので、日程表のものを置き換える。

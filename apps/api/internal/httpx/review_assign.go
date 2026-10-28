@@ -70,6 +70,10 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err != nil {
 		return false, err
 	}
+	// おまかせを止めている間は、コーチを選んでいない依頼を誰にも割り当てない（返却の目安を過ぎたら期限切れにして代金を戻す）。
+	if rr.RequestedCoachID == nil && !s.cfg.ReviewRandomAssign {
+		return false, nil
+	}
 	now := time.Now()
 	coachID, err := q.PickCoachForRequest(ctx, db.PickCoachForRequestParams{
 		Tier:             rr.Tier,
@@ -179,6 +183,8 @@ type coachingTickResult struct {
 	EarningsRecorded int `json:"earnings_recorded"`
 	// 期間が終わって1年たち、やりとりを消した契約。
 	MessagesPurged int `json:"messages_purged"`
+	// 送り直した、保護者への購入の通知。
+	GuardianNoticesSent int `json:"guardian_notices_sent"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
@@ -241,6 +247,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.MessagesPurged, err = s.purgeCoachingMessages(ctx); err != nil {
 		return out, err
 	}
+	if out.GuardianNoticesSent, err = s.retryGuardianNotices(ctx); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -271,8 +280,8 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	}
 }
 
-// notifyNominationEnded は、指名した依頼が辞退・打診の時間切れで終わったら依頼した人に知らせる。
-// 指名の依頼は別のコーチへ回さないので、ここで終わる。代金とチケットは tick が戻す。
+// notifyNominationEnded は、コーチを選んだ依頼が辞退・打診の時間切れで終わったら依頼した人に知らせる。
+// 選んだコーチの依頼は別のコーチへ回さないので、ここで終わる。代金とチケットは tick が戻す。
 func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID) {
 	rr, err := s.q.GetReviewRequest(ctx, id)
 	if err != nil || rr.RequestedCoachID == nil || rr.Status != "expired" {
@@ -282,8 +291,8 @@ func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID) {
 		slog.Warn("nomination ended notification", "err", err)
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
-		Title: "指名したコーチが依頼を引き受けられませんでした",
-		Body:  "別のコーチには回さず、この依頼は終わりました。代金・指名料とチケットはお戻しします",
+		Title: "選んだコーチが依頼を引き受けられませんでした",
+		Body:  "この依頼は終わりました。代金は取り消すか返金し、チケットはお戻しします。別のコーチを選んで申し込み直せます",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
@@ -341,8 +350,8 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"status":             rr.Status,
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
-		"requested_coach_id": rr.RequestedCoachID, "nomination_fee_yen": rr.NominationFeeYen,
-		"coach_reward_yen": rr.BasePriceYen*70/100 + rr.NominationFeeYen*80/100,
+		"requested_coach_id": rr.RequestedCoachID,
+		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
 	}
 	if withVideo {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(rr.VideoPublicID)

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Sparkles, X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -171,7 +173,7 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
         ) : null}
       </div>
       {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
-      {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
+      {!loaded && !error ? <PageLoading label="読み込み中..." /> : null}
       {!compact ? <div className="space-y-2">
         {summaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} />)}
       </div> : null}

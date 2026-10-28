@@ -45,7 +45,7 @@ async function render(plans: CoachingPlan[] = []) {
 it("対面指導は公開して保存できる", async () => {
   await render();
   await click("プランを追加する");
-  await click("対面指導");
+  await click("対面プラン");
   const checkbox = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((el) => el.parentElement?.textContent?.includes("公開する"));
   expect(checkbox?.disabled).toBe(false);
   expect(checkbox?.checked).toBe(true);

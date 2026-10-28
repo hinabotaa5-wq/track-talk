@@ -8,6 +8,7 @@ import { clearCompetitions } from "@/lib/competition-list";
 import { clearDomesticMajors } from "@/lib/domestic-majors";
 import { clearMajorHosts } from "@/lib/major-hosts";
 import { clearSavedFeeds } from "@/lib/home-feed-cache";
+import { refreshPushSubscription } from "@/lib/push";
 import { clearPersonalStorage } from "@/lib/sign-out";
 
 type AuthState = {
@@ -67,10 +68,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       // INITIAL_SESSION もここで受け取る。getSession と重ねてプロフィールを二重取得しない。
-      const { data } = supabase.auth.onAuthStateChange((_e, next) => {
+      const { data } = supabase.auth.onAuthStateChange((event, next) => {
         if (!active) return;
         setSession(next);
         setSessionLoading(false);
+        // 通知の鍵を入れ替えたあとも届くよう、アプリを開いたときとログインしたときに購読を確かめる。
+        if (next && (event === "INITIAL_SESSION" || event === "SIGNED_IN")) {
+          void refreshPushSubscription(next.access_token).catch(() => undefined);
+        }
         if (!next) {
           clearCompetitions();
           clearMajorHosts();

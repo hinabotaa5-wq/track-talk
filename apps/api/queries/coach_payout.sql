@@ -22,15 +22,14 @@ WHERE stripe_account_id = sqlc.arg(stripe_account_id)
 RETURNING *;
 
 -- name: InsertReviewEarnings :many
--- 返却して代金が確定した添削の、コーチの取り分を記録する。
+-- 返却して代金が確定した添削の、コーチの取り分を記録する。チケットで払った添削は RecordTicketReviewEarnings で記録する。
 INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen)
-SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen + CASE WHEN r.use_tickets THEN r.base_price_yen ELSE 0 END, sqlc.arg(share_percent)::smallint,
-       CASE WHEN r.requested_coach_id IS NULL THEN pay.amount_yen * sqlc.arg(share_percent)::int / 100
-            ELSE r.base_price_yen * sqlc.arg(share_percent)::int / 100 + r.nomination_fee_yen * 80 / 100 END
+SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen, sqlc.arg(share_percent)::smallint,
+       pay.amount_yen * sqlc.arg(share_percent)::int / 100
 FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
-  AND (NOT r.use_tickets OR EXISTS (SELECT 1 FROM coaching_ticket_reservations t WHERE t.request_id = r.id AND t.status = 'consumed'))
+  AND NOT r.use_tickets
   AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)
 LIMIT 100
 ON CONFLICT DO NOTHING

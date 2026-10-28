@@ -30,7 +30,7 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
           <dd className="whitespace-pre-wrap text-slate-100">{coach.achievements}</dd>
         </div>
       </dl>
-      {coach.id ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">このコーチに指名で依頼する</Link> : null}
+      {coach.id ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">このコーチのプロフィールを見る</Link> : null}
     </section>
   );
 }

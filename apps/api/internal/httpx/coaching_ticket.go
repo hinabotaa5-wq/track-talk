@@ -17,6 +17,9 @@ import (
 
 const ticketFaceYen int32 = 600
 
+// チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードまたはPayPayでお支払いください"
+
 type ticketRuleError struct{ code, message string }
 
 func (e *ticketRuleError) Error() string { return e.message }
@@ -124,9 +127,15 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 	if !s.stripe.Configured() {
 		reason = "チケットの販売は準備中です"
 	}
+	if !s.cfg.CoachingTicketSales {
+		// 販売を止めている間は商品も出さない。動画添削は申込み時の都度払いだけにした。
+		products = []db.CoachingTicketProduct{}
+		reason = ticketSalesClosedMessage
+	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
 	JSON(w, 200, map[string]any{"products": products, "balance": balance, "purchases": purchases, "ledger": ledger,
-		"can_purchase": eligible == nil && s.stripe.Configured(), "purchase_block_reason": reason, "unit_yen": ticketFaceYen})
+		"can_purchase": eligible == nil && s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
+		"purchase_block_reason": reason, "unit_yen": ticketFaceYen})
 }
 
 func writeTicketEligibilityReason(err error, reason *string) bool {
@@ -141,6 +150,10 @@ func writeTicketEligibilityReason(err error, reason *string) bool {
 func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
+		return
+	}
+	if !s.cfg.CoachingTicketSales {
+		Error(w, 409, "ticket_sales_closed", ticketSalesClosedMessage)
 		return
 	}
 	if !s.stripe.Configured() {

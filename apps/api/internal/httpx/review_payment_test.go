@@ -59,7 +59,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	_, tu := demoRequester(t, h, tadmin)
 
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1200`) {
+	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1500`) {
 		t.Fatalf("estimate %s", rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
@@ -69,7 +69,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	id := paidReview(t, h, tu, "card", "pi_card_1")
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_intent_data[capture_method]") != "manual" ||
-		form.Get("line_items[0][price_data][unit_amount]") != "1200" || form.Get("metadata[kind]") != "review" ||
+		form.Get("line_items[0][price_data][unit_amount]") != "1500" || form.Get("metadata[kind]") != "review" ||
 		form.Get("success_url") != "https://web.test/coaching/requests/"+id+"?paid=1" {
 		t.Fatalf("session %v", form)
 	}
@@ -95,7 +95,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 		t.Fatalf("captured %v", captured)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":1200`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
+	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":1500`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
 		t.Fatalf("detail %s", rec.Body.String())
 	}
 }
@@ -132,7 +132,7 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 		t.Fatalf("canceled %v", canceled)
 	}
 	refunds := f.refundList()
-	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "1200" {
+	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "1500" {
 		t.Fatalf("refunds %v", refunds)
 	}
 	if reviewPaymentStatus(t, card) != "canceled" || reviewPaymentStatus(t, paypay) != "refunded" {
@@ -163,17 +163,17 @@ func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
 	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 3000`)
+	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 3000`)
 	paidReview(t, h, tm, "card", "pi_card_minor")
 	paidReview(t, h, tm, "card", "pi_card_minor_second")
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "monthly_limit") || !strings.Contains(rec.Body.String(), "あと600円") {
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_limit") || !strings.Contains(rec.Body.String(), "今月の上限（3,000円）に達したため") {
 		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
 	}
 	body["tier"] = "coach"
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 5000`)
+	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 5000`)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
 		t.Fatalf("within limit %d %s", rec.Code, rec.Body.String())
 	}
@@ -205,7 +205,7 @@ func TestWithdrawKeepsSettledReviewPayment(t *testing.T) {
 	}
 }
 
-// 保護者の同意を待っている18歳未満は、支払いがまだの依頼を含めて1本目までしか作れない。
+// 保護者の同意を待っている18歳未満は、1本目から依頼を作れない（支払い画面も作らない）。
 func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
@@ -217,15 +217,16 @@ func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
 		t.Fatalf("birth month %d", rec.Code)
 	}
+	issueGuardianLink(t, h, tm, guardianEmail())
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "card"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
-		t.Fatalf("first %d %s", rec.Code, rec.Body.String())
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_required") {
+		t.Fatalf("first while pending %d %s", rec.Code, rec.Body.String())
 	}
-	body = reviewBodyFor(t, h, tm)
-	body["method"] = "card"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_pending") {
-		t.Fatalf("second while unpaid %d %s", rec.Code, rec.Body.String())
+	var open int
+	queryRowArgs(t, `SELECT count(*)::int FROM review_requests WHERE requester_id = (SELECT minor_id FROM guardian_consents WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1)`, nil, &open)
+	if open != 0 {
+		t.Fatalf("requests created while pending %d", open)
 	}
 }
 
@@ -253,7 +254,7 @@ func TestReviewPaymentDuplicateAfterReturn(t *testing.T) {
 	}
 }
 
-// 同意待ちの18歳未満が2本を同時に送っても、作られるのは1本だけ。
+// 同意のない18歳未満が同時に送っても、1本も作られない。
 func TestMinorConcurrentReviewRequests(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setup(t)
@@ -278,7 +279,7 @@ func TestMinorConcurrentReviewRequests(t *testing.T) {
 			created++
 		}
 	}
-	if created != 1 {
+	if created != 0 {
 		t.Fatalf("created %d", created)
 	}
 }
@@ -320,7 +321,7 @@ func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
 	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET monthly_limit_yen = 3000`)
+	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 3000`)
 	codes := make(chan int, 4)
 	for range 4 {
 		body := reviewBodyFor(t, h, tm)

@@ -12,9 +12,10 @@ import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
 import { useCurrentMainTab, headerBackFallback, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
+import { trackHeaderHistory } from "@/lib/header-history";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 // useSearchParams はレイアウトで使うと Suspense が要り、全ページが動的になるので、ここでは location から読む。
 // パスが変わるたびに Header は描き直されるので、その時点のクエリが取れる。
@@ -34,11 +35,29 @@ export function Header() {
   const { confirmLeave } = useLeaveGuard();
   const guardedClick = useGuardedLinkClick();
 
+  const history = useRef<ReturnType<typeof trackHeaderHistory> | null>(null);
+  useEffect(() => {
+    let active = true;
+    let tracker: ReturnType<typeof trackHeaderHistory> | undefined;
+    // 親の Next.js Router が History API を準備したあとに追跡を始める。
+    // Strict Mode の破棄された初回エフェクトでは登録しない。
+    queueMicrotask(() => {
+      if (!active) return;
+      tracker = trackHeaderHistory(window.history, window.location);
+      history.current = tracker;
+    });
+    return () => {
+      active = false;
+      tracker?.dispose();
+      history.current = null;
+    };
+  }, []);
+
   function goBack() {
     const go = () => {
       if (pathname === "/coach/apply") router.replace("/coach");
       else if (pathname === "/coach/about") router.replace("/coach/apply");
-      else if (window.history.length > 1) router.back();
+      else if (history.current?.canGoBack(!!session)) router.back();
       else router.replace(headerBackFallback(pathname));
     };
     if (!confirmLeave(go)) go();

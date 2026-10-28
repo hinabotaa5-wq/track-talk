@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { apiFetch } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import type { AppNotification, Meta, NotificationKind } from "@/lib/types";
@@ -158,7 +160,7 @@ export function NotificationBell() {
               </button>
             ) : null}
           </div>
-          {loading && items.length === 0 ? <p className="px-3 py-6 text-center text-sm text-slate-200">読み込み中</p> : null}
+          {loading && items.length === 0 ? <PageLoading label="読み込み中" /> : null}
           {error && items.length === 0 ? <p className="px-3 py-3 text-sm text-red-400">{error}</p> : null}
           {!loading && !error && items.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-slate-200">通知はありません</p>

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { SuspendToggle } from "@/components/coaching-admin";
 import { ContractDetails, contractPeriod } from "@/components/coaching-contracts";
@@ -51,7 +53,7 @@ function OpenContract() {
     }
   }
 
-  if (loading || !profile?.is_admin) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !profile?.is_admin) return <PageLoading label="読み込み中..." />;
 
   if (!opened) {
     return (
@@ -139,7 +141,7 @@ function OpenContract() {
 
 export default function AdminCoachingContractPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
       <OpenContract />
     </Suspense>
   );

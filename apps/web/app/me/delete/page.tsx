@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +83,7 @@ export default function DeleteAccountPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   if (authLeft) {
@@ -125,6 +127,9 @@ export default function DeleteAccountPage() {
       </ul>
       <p className="text-sm text-slate-300">
         他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます。
+      </p>
+      <p className="text-sm text-slate-300">
+        18歳未満で保護者に同意をお願いしていた場合、保護者の同意の記録と購入の記録は、同意の事実の証明と紛争の対応のため退会後も残し、最後の取引から5年たったら削除します。
       </p>
       {coaching ? (
         <p className="text-sm text-slate-300">

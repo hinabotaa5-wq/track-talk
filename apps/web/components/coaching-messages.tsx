@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -429,7 +431,7 @@ export function CoachingMessages({
           : "このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。"}
       </p>
       <section className="space-y-2" aria-label="やりとり">
-        {messages === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
+        {messages === null && !error ? <PageLoading label="読み込み中..." /> : null}
         {messages?.length === 0 ? (
           <p className="text-sm text-slate-300">
             {contract.role === "coach"

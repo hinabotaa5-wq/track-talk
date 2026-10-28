@@ -49,6 +49,10 @@ func ParsePage(r io.Reader, pageURL string) (Page, error) {
 	if err != nil {
 		return Page{}, fmt.Errorf("parse html: %w", err)
 	}
+	// 岐阜は前後1か月の大会が未掲載のとき、表の代わりに準備中の表示になる。
+	if base.Hostname() == "www.gifu-riku.com" && strings.Contains(cellText(doc), "只今準備中です") {
+		return Page{}, fmt.Errorf("%w: 岐阜の日程ページは準備中で日程表未掲載。既存データを維持", ErrSourceSkipped)
+	}
 	year, ok := yearFromURL(base)
 	if !ok {
 		year, ok = findSeasonYear(doc)

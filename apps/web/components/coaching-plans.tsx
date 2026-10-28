@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -574,7 +576,7 @@ export function CoachPlansSection({
     <section className="space-y-3">
       <div className="space-y-1">
         <h2 className="font-bold">サポートプラン</h2>
-        <p className="text-xs text-slate-300">動画添削の指名は「動画添削の指名料」で設定します。ここでは大会サポートと対面指導を管理します。</p>
+        <p className="text-xs text-slate-300">動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは大会サポートと対面指導を管理します。</p>
         <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
       </div>
       <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />
@@ -585,7 +587,7 @@ export function CoachPlansSection({
       ) : (
         <>
           {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
-          {plans === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
+          {plans === null && !error ? <PageLoading label="読み込み中..." /> : null}
           {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
           <ul className="space-y-2">
             {plans?.map((p) =>
@@ -604,7 +606,7 @@ export function CoachPlansSection({
                       <PlanIncludesList plan={p} />
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-white" : "bg-white/15 text-slate-300"}`}>
-                      {p.service_type === "video_review" ? "指名設定へ移行" : p.published ? "公開中" : "非公開"}
+                      {p.service_type === "video_review" ? "動画添削は出品終了" : p.published ? "公開中" : "非公開"}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap text-slate-200">{p.description}</p>

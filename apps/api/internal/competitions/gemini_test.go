@@ -3,10 +3,14 @@ package competitions
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExtractReadsJSONAndStopsOnRateLimit(t *testing.T) {
@@ -90,5 +94,99 @@ func TestGenerateJSONOutputCapIsOptIn(t *testing.T) {
 	}
 	if received[1]["maxOutputTokens"] != float64(2048) {
 		t.Fatalf("config=%v", received[1])
+	}
+}
+
+func TestGenerateRetriesOnlyTransientFailures(t *testing.T) {
+	old := retryWait
+	defer func() { retryWait = old }()
+	var delays []time.Duration
+	retryWait = func(ctx context.Context, d time.Duration) error { delays = append(delays, d); return ctx.Err() }
+	for _, tc := range []struct {
+		status  int
+		payload string
+		want    error
+		calls   int
+	}{
+		{503, "high demand", ErrTransient, 3},
+		{429, "", ErrRateLimited, 1},
+		{503, "RESOURCE_EXHAUSTED", ErrRateLimited, 1},
+		{401, "secret-key", ErrAuthentication, 1},
+		{403, "API key not valid secret-key", ErrAuthentication, 1},
+		{400, "API_KEY_INVALID secret-key", ErrAuthentication, 1},
+		{500, "secret-key", nil, 1},
+	} {
+		t.Run(strconv.Itoa(tc.status)+tc.payload, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.WriteHeader(tc.status)
+				io.WriteString(w, tc.payload)
+			}))
+			defer srv.Close()
+			_, err := (Client{Endpoint: srv.URL}).GenerateJSON(context.Background(), "test")
+			if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) || calls != tc.calls || strings.Contains(err.Error(), "secret-key") {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+		})
+	}
+	if len(delays) != 2 || delays[0] != 15*time.Second || delays[1] != 30*time.Second {
+		t.Fatal(delays)
+	}
+}
+
+type timeoutTransport struct {
+	calls  int
+	cancel context.CancelFunc
+}
+
+func (rt *timeoutTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	rt.calls++
+	if rt.cancel != nil {
+		rt.cancel()
+	}
+	return nil, context.DeadlineExceeded
+}
+func TestGenerateTimeoutAndParentCancellation(t *testing.T) {
+	old := retryWait
+	defer func() { retryWait = old }()
+	retryWait = func(ctx context.Context, _ time.Duration) error { return ctx.Err() }
+	rt := &timeoutTransport{}
+	_, err := (Client{HTTP: &http.Client{Transport: rt}}).GenerateJSON(context.Background(), "test")
+	if !errors.Is(err, ErrTransient) || rt.calls != 3 {
+		t.Fatalf("%d %v", rt.calls, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rt = &timeoutTransport{cancel: cancel}
+	_, err = (Client{HTTP: &http.Client{Transport: rt}}).GenerateJSON(ctx, "test")
+	if !errors.Is(err, context.Canceled) || rt.calls != 1 {
+		t.Fatalf("%d %v", rt.calls, err)
+	}
+}
+func TestWaitCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if !errors.Is(Wait(ctx, time.Hour), context.Canceled) {
+		t.Fatal("not canceled")
+	}
+}
+func TestGenerateRecoversAfter503(t *testing.T) {
+	old := retryWait
+	defer func() { retryWait = old }()
+	retryWait = func(context.Context, time.Duration) error { return nil }
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.WriteHeader(503)
+			return
+		}
+		io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`)
+	}))
+	defer srv.Close()
+	text, err := (Client{Endpoint: srv.URL}).GenerateJSON(context.Background(), "test")
+	if err != nil || text != "{}" || calls != 2 {
+		t.Fatalf("%s %v %d", text, err, calls)
 	}
 }

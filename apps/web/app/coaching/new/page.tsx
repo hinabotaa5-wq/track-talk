@@ -1,9 +1,12 @@
 "use client";
 
-import { ReviewNomination } from "@/components/review-nomination";
+import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { SellerNote } from "@/components/seller-note";
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
+import { GuardianAllowance } from "@/components/guardian-allowance";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -20,14 +23,15 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import type { CoachEvent, CoachingMe, ReviewNominee, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingGuardian, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 // フォーム添削の依頼を送る。いまは招待コードを入れた人だけが使える。
-// Stripe の鍵があるときは、送るとそのまま支払い画面へ進み、支払いが済んだらコーチを探し始める。
+// 依頼するコーチは選手が選ぶ（運営からの割り当てはしない）。料金はどのコーチでも同じ。
+// Stripe の鍵があるときは、送るとそのまま支払い画面へ進み、支払いが済んだら選んだコーチに依頼が届く。
 // 鍵がない間は支払いなしのデモ版。
 
 const maxBytes = 100 * 1024 * 1024;
@@ -47,30 +51,33 @@ export default function NewReviewRequestPage() {
   const [question, setQuestion] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
+  // 18歳未満で、保護者の同意や上限のために買えなかったとき。保護者の同意の画面への案内を出す。
+  const [guardianBlocked, setGuardianBlocked] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
   const { pending, acquire, release } = useActionLock();
-  const [nominees, setNominees] = useState<ReviewNominee[]>([]);
-  const [nomineeID, setNomineeID] = useState("");
-  const [nomineesLoading, setNomineesLoading] = useState(true);
-  const [nomineesError, setNomineesError] = useState("");
-  const [nominationMethod, setNominationMethod] = useState<ReviewPayMethod>("card");
-  const nominee = nominees.find((c) => c.id === nomineeID);
-  const nominationFee = nominee?.nomination_fee_yen ?? 0;
-  const totalPrice = (estimate?.price_yen ?? 1200) + nominationFee;
-  const cashPrice = method === "tickets" ? nominationFee : totalPrice;
+  const [coaches, setCoaches] = useState<ReviewCoachOption[]>([]);
+  const [coachID, setCoachID] = useState("");
+  const [coachesLoading, setCoachesLoading] = useState(true);
+  const [coachesError, setCoachesError] = useState("");
+  const coach = coaches.find((c) => c.id === coachID);
+  const totalPrice = estimate?.price_yen ?? 1500;
+  const cashPrice = method === "tickets" ? 0 : totalPrice;
+  // チケットの新規販売は止めた。購入済みのチケットが添削1本分（2枚）残っている人にだけ、チケットで払う選択肢を出す。
+  const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 2;
   const cashPayment = !!estimate?.payments && cashPrice > 0;
 
   useEffect(() => {
     if (!token || !me?.demo) return;
     let cancelled = false;
-    apiFetch<{ coaches: ReviewNominee[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token })
-      .then((data) => { if (!cancelled) setNominees(data.coaches); })
-      .catch(() => { if (!cancelled) setNomineesError("指名できるコーチを読み込めませんでした。ページを開き直してください。"); })
-      .finally(() => { if (!cancelled) setNomineesLoading(false); });
+    apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token })
+      .then((data) => { if (!cancelled) setCoaches(data.coaches); })
+      .catch(() => { if (!cancelled) setCoachesError("コーチの一覧を読み込めませんでした。ページを開き直してください。"); })
+      .finally(() => { if (!cancelled) setCoachesLoading(false); });
     return () => { cancelled = true; };
   }, [event, token, me?.demo]);
 
@@ -107,7 +114,7 @@ export default function NewReviewRequestPage() {
     if (!token) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
-      if (!cancelled) { setTicketSummary(data); if (data.balance.available > 0) setMethod("tickets"); }
+      if (!cancelled) { setTicketSummary(data); if (data.balance.available >= 2) setMethod("tickets"); }
     }).catch(() => { if (!cancelled) setTicketSummary(null); });
     return () => { cancelled = true; };
   }, [token]);
@@ -141,7 +148,7 @@ export default function NewReviewRequestPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!estimate) { setError("料金と受付状況を確認してから送信してください。"); return; }
-    if (nomineeID && !nominee) { setError("指名できるコーチを選び直してください。"); return; }
+    if (!coach) { setError("コーチを選んでください。"); return; }
     if (!question.trim()) {
       setError("相談内容を記入してください");
       return;
@@ -160,6 +167,7 @@ export default function NewReviewRequestPage() {
     }
     if (!acquire()) return;
     setError("");
+    setGuardianBlocked(false);
     try {
       const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
       setUploadPhase("upload");
@@ -171,9 +179,7 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
-          method: method === "tickets" && cashPayment ? nominationMethod : method,
-          use_tickets: method === "tickets", requested_coach_id: nominee?.id ?? null,
-          expected_nomination_fee_yen: nominee?.nomination_fee_yen }),
+          method, use_tickets: method === "tickets", requested_coach_id: coach.id }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -182,16 +188,32 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
-      if (err instanceof ApiRequestError && ["price_changed", "nomination_changed", "validation_error"].includes(err.code)) {
-        try { const data = await apiFetch<{ coaches: ReviewNominee[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setNominees(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
+      if (err instanceof ApiRequestError && err.code.startsWith("guardian_")) setGuardianBlocked(true);
+      if (err instanceof ApiRequestError && ["nomination_changed", "validation_error"].includes(err.code)) {
+        try { const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setCoaches(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
       }
       setUpload(null);
       release();
     }
   }
 
+  // 保護者がまだ答えていないときに、前と同じアドレスへ同意のお願いを送り直す（前のリンクは使えなくなる）。
+  async function onResendGuardianLink() {
+    if (!acquire()) return;
+    setResendMessage("");
+    try {
+      const guardian = await apiFetch<CoachingGuardian>("/v1/me/guardian-link", { method: "POST", token, body: JSON.stringify({}) });
+      setMe((prev) => (prev ? { ...prev, guardian } : prev));
+      setResendMessage("保護者の方に、同意のお願いメールを送り直しました。");
+    } catch (err) {
+      setResendMessage(apiErrorText(err, "メールを送れませんでした"));
+    } finally {
+      release();
+    }
+  }
+
   if (loading || !session || (!me && !loadError)) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
   if (!me) {
     return <p className="text-sm text-red-400">{loadError}</p>;
@@ -206,7 +228,7 @@ export default function NewReviewRequestPage() {
           </p>
         )}
         <h1 className="text-2xl font-bold">動画添削を頼む</h1>
-        <p className="text-sm text-slate-300">基本はおまかせ。希望する場合だけコーチを指名できます。</p>
+        <p className="text-sm text-slate-300">コーチを選んで、動画を送ります。料金はどのコーチでも同じです。</p>
         <SellerNote />
 
       </div>
@@ -227,13 +249,36 @@ export default function NewReviewRequestPage() {
             生まれた年月を登録する
           </Link>
         </div>
+      ) : me.is_minor && me.guardian?.status !== "consented" ? (
+        // 文面は運営者の確定版。API の minorSelfPayBlock のエラー文と合わせる。
+        <div className="space-y-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm">
+          <p className="text-slate-200">
+            {me.guardian?.status === "declined"
+              ? "保護者の方の同意が得られなかったため、有料サービスは利用できません。"
+              : me.guardian?.status === "revoked"
+                ? "保護者の方の同意が取り消されたため、有料サービスは利用できません。再度利用するには、保護者の方の同意が必要です。"
+                : me.guardian?.status === "pending"
+                  ? "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送っています。同意が完了すると、ここから依頼できるようになります。"
+                  : "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送ってください。同意が完了すると、ここから依頼できるようになります。"}
+          </p>
+          {me.guardian?.status === "pending" ? (
+            <Button type="button" className="w-full" disabled={pending} onClick={() => void onResendGuardianLink()}>
+              同意のお願いを再送する
+            </Button>
+          ) : !me.guardian ? (
+            <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white">
+              保護者にメールを送る
+            </Link>
+          ) : null}
+          {resendMessage ? <p role="status" className="text-slate-200">{resendMessage}</p> : null}
+        </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
           <fieldset disabled={pending} className="space-y-2">
             <legend className="text-sm font-semibold">種目</legend>
             <div className="flex flex-wrap gap-2">
               {reviewEvents.map((value) => (
-                <button key={value} type="button" aria-pressed={event === value} onClick={() => { if (value !== event) { setEvent(value); setNomineesLoading(true); setNomineesError(""); setNomineeID(""); setNominees([]); } }} className={chip(event === value)}>
+                <button key={value} type="button" aria-pressed={event === value} onClick={() => { if (value !== event) { setEvent(value); setCoachesLoading(true); setCoachesError(""); setCoachID(""); setCoaches([]); } }} className={chip(event === value)}>
                   {coachEventLabels[value]}
                 </button>
               ))}
@@ -241,10 +286,10 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
           </fieldset>
 
-          <ReviewNomination coaches={nominees} value={nomineeID} onChange={setNomineeID} disabled={pending} error={nomineesError} loading={nomineesLoading} />
+          <ReviewCoachPicker coaches={coaches} value={coachID} onChange={setCoachID} disabled={pending} error={coachesError} loading={coachesLoading} />
           <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
-            <p>基本料金 {formatYen(estimate?.price_yen ?? 1200)}{nominee ? ` ＋ 指名料 ${formatYen(nominationFee)}` : "（おまかせ）"}</p>
-            <p className="mt-1 text-lg font-bold">合計 {formatYen(totalPrice)}／回</p>
+            <p>動画添削（動画1本）</p>
+            <p className="mt-1 text-lg font-bold">{formatYen(totalPrice)}／回</p>
           </div>
           <label className="block space-y-2 text-sm">
             <span className="font-semibold">相談内容</span>
@@ -252,11 +297,11 @@ export default function NewReviewRequestPage() {
             <span className="block text-xs text-slate-300">{question.length}/1000文字</span>
           </label>
 
-          {ticketSummary ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
+          {ticketSummary && ticketsUsable ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
             <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
-            <p className="text-xs text-slate-300">基本料金は2枚です。指名料はカードまたはPayPayで別途お支払いください。</p>
+            <p className="text-xs text-slate-300">動画添削1本はチケット2枚です。</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-              チケットを購入・確認する<ArrowRight className="size-4 text-blue-300" aria-hidden />
+              {ticketSummary.can_purchase ? "チケットを購入・確認する" : "チケットの残高・履歴を見る"}<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
           </div> : null}
           <label className="block space-y-1 text-sm">
@@ -274,33 +319,30 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {guardianBlocked ? <Link href="/me/coaching" className="block text-sm text-blue-300 underline">保護者の同意・上限の状況を見る</Link> : null}
+          {me.is_minor && me.guardian?.status === "consented" ? (
+            <GuardianAllowance guardian={me.guardian} className="space-y-1 text-xs text-slate-300" />
+          ) : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
               返ってくる目安: {formatDateTime(estimate.due_at)}まで
               <span className="block text-xs text-slate-300">
-                {nominee ? "選んだコーチが対応します。期限までに回答がなければ代金はかかりません。" : estimate.coaches_on_duty
-                  ? "夜に送っても、翌日の昼までに返ってきます。"
-                  : "いま受付中のコーチはいません。誰かが受付を始めたら回ります。"}
+                {coach ? "選んだコーチが対応します。期限までに回答がなければ代金はかかりません。" : "夜に送っても、翌日の昼までに返ってきます。"}
               </span>
             </p>
           ) : null}
-          {estimate?.payments || (ticketSummary?.balance.available ?? 0) > 0 ? (
+          {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">お支払い（合計 {formatYen(totalPrice)}）</legend>
               <div className="flex flex-wrap gap-2">
-                {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
+                {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
                 {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}
                   </button>
                 ))}
               </div>
-              {method === "tickets" && cashPayment ? <div className="space-y-2">
-                <p className="text-sm">チケット2枚 ＋ 指名料{formatYen(nominationFee)}</p>
-                <label className="block text-sm">指名料のお支払い方法<select aria-label="指名料のお支払い方法" value={nominationMethod} onChange={(e) => setNominationMethod(e.target.value as ReviewPayMethod)} className="ml-2 rounded-md border border-white/25 bg-slate-900 p-2">{Object.entries(reviewPayMethodLabels).map(([m, label]) => <option key={m} value={m}>{label}</option>)}</select></label>
-                <p className="text-xs text-slate-300">指名料のお支払い後にコーチへ依頼します。カードは回答時に確定、PayPayは申込み時に決済します。対応できない場合は指名料を取り消すか返金します。</p>
-              </div> : null}
               <p className="text-xs text-slate-300">
                 {method === "tickets" ? "依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。" : method === "card"
                   ? "送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。"
@@ -310,8 +352,8 @@ export default function NewReviewRequestPage() {
           ) : (
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
-          <Button type="submit" className="w-full" disabled={pending || !file || !estimate}>
-            {pending ? "送っています" : cashPayment ? `${method === "tickets" ? "チケット2枚を確保して" : "送って"}お支払いへ（${formatYen(cashPrice)}）` : method === "tickets" ? "チケット2枚を確保して送る" : "送る"}
+          <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach}>
+            {pending ? "送っています" : cashPayment ? `送ってお支払いへ（${formatYen(cashPrice)}）` : method === "tickets" ? "チケット2枚を確保して送る" : "送る"}
           </Button>
         </form>
       )}

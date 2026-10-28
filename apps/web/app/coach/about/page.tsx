@@ -21,22 +21,22 @@ export default function CoachAboutPage() {
         <h2 id="coach-ways" className="text-lg font-bold">関わり方は、大きく2つ</h2>
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />動画添削プラン：動画1本から支える</h3>
-          <p className="text-sm leading-relaxed text-slate-200">利用者が種目と相談内容、動画を送ると、担当種目に合う受付中のコーチへ順番に依頼が届きます。基本はおまかせで、希望する利用者は同じ申込み画面でコーチを指名できます。コーチは基本料金1,200円に上乗せする指名料を自分で設定します。</p>
+          <p className="text-sm leading-relaxed text-slate-200">利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容、動画を送ります。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1本1,500円で、コーチの報酬はその70％（1,050円）です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。</p>
           <p className="text-sm leading-relaxed text-slate-200">コーチは届いた依頼を確認し、対応できるものを引き受けます。動画を見て、良い点・直す点・おすすめのドリルを返し、選手が次の練習で試せる具体的な一歩を伝えます。</p>
         </article>
         <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><UserRound className="size-5 text-blue-300" aria-hidden />サポートプラン：あなたに相談したい人を支える</h3>
           <p className="text-sm leading-relaxed text-slate-200">コーチが指導内容・料金・期間・定員を決めてプランを公開し、利用者はプロフィールや内容を見て申し込みます。申し込みをコーチが承諾した後、必要な支払い・同意を経て指導が始まります。</p>
           <ul className="space-y-3 text-sm text-slate-200">
-            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">大会までのサポート</strong>：目標の大会に向けて、準備や調整をサポート。</span></li>
-            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">対面指導</strong>：場所や回数などをプランに明記し、現地で指導します。空き日カレンダーから希望日を受け取り、メッセージで相談して日時を提案・確定します。</span></li>
+            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">大会までプラン</strong>：目標の大会に向けて、準備や調整をサポート。</span></li>
+            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">対面プラン</strong>：場所や回数などをプランに明記し、現地で指導します。空き日カレンダーから希望日を受け取り、メッセージで相談して日時を提案・確定します。</span></li>
           </ul>
         </article>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">自分のペースで、責任を持って</h2>
-        <p className="text-sm leading-relaxed text-slate-200">動画添削は、おまかせ・指名を合わせて受付のオン・オフや1日の上限を設定できます。サポートプランは対応できる内容と定員を自分で決めます。引き受けた依頼では期限を守り、選手の経験や目標に合わせて、分かりやすい言葉で伝えてください。</p>
+        <p className="text-sm leading-relaxed text-slate-200">動画添削は、受付のオン・オフと1日の上限で、受ける量を調整できます。受付中で上限に届いていないときだけ、選手の一覧に表示されます。サポートプランは対応できる内容と定員を自分で決めます。引き受けた依頼では期限を守り、選手の経験や目標に合わせて、分かりやすい言葉で伝えてください。</p>
         <p className="text-sm leading-relaxed text-slate-200">やり取りや支払いはTrackTalk上で行います。未成年の利用には保護者の同意など、所定の手続きが必要です。</p>
       </section>
 

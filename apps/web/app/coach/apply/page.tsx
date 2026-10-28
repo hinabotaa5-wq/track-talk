@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm, uploadCoachPhoto } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
@@ -151,7 +153,7 @@ export default function CoachApplyPage() {
   }
 
   if (loading || !session || (!loaded && !error)) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   const editable = !application || application.status === "pending" || application.status === "rejected" || application.status === "withdrawn";

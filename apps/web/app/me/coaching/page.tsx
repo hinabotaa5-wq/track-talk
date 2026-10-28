@@ -1,10 +1,13 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
+import { GuardianAllowance } from "@/components/guardian-allowance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { monthlyLimitLabel, pushSupported, subscribePush } from "@/lib/push";
+import { pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -143,18 +146,18 @@ export default function CoachingSetupPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
   if (loadError) {
     return <p className="text-sm text-red-400">{loadError}</p>;
   }
   if (!me) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-8">
-      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">チケットの残高・購入履歴</Link>
+      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">チケットの残高・履歴</Link>
       <h1 className="text-2xl font-bold">フォーム添削の準備</h1>
 
       <section className="space-y-3">
@@ -182,8 +185,14 @@ export default function CoachingSetupPage() {
           <h2 className="font-bold">保護者の同意</h2>
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
-            {me.guardian?.status === "consented" ? `（${monthlyLimitLabel(me.guardian.monthly_limit_yen)}）` : null}
           </p>
+          {me.guardian?.status === "consented" ? (
+            <GuardianAllowance guardian={me.guardian} />
+          ) : (
+            <p className="text-sm text-slate-300">
+              動画添削・追加相談を買うには、保護者の同意が必要です。同意は保護者だけが、メールで届くリンクから行えます。
+            </p>
+          )}
           {me.guardian?.guardian_email ? (
             <p className="text-sm text-slate-300">送り先: {me.guardian.guardian_email}</p>
           ) : null}

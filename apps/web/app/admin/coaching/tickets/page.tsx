@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { CoachingGate } from "@/components/coaching-gate";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -63,7 +65,7 @@ function TicketAdmin() {
           {p.refund_pending ? "返金状況を照合・再試行" : "未使用分を返金する"}
         </Button>
       </li>)}</ul>
-    </> : <p>読み込み中...</p>}
+    </> : <PageLoading label="読み込み中..." />}
   </div>;
 }
 

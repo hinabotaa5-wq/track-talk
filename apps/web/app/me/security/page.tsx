@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { MfaEnrollSteps } from "@/components/mfa-enroll-steps";
@@ -138,7 +140,7 @@ export default function SecurityPage() {
     }
   }
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session) return <PageLoading label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">
@@ -153,7 +155,7 @@ export default function SecurityPage() {
       ) : null}
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
         {factors === null ? (
-          <p className="text-sm text-slate-300">読み込み中...</p>
+          <PageLoading label="読み込み中..." />
         ) : factors.length > 0 ? (
           <>
             <p className="text-sm font-semibold text-emerald-300">設定済み</p>

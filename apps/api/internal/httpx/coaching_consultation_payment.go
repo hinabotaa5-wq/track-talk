@@ -44,7 +44,16 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		if err := s.ticketEligibility(ctx, q, owner); err != nil {
 			return err
 		}
-		if current.Minor {
+		if current.Minor && current.ContractID == nil {
+			// 添削のあとの追加相談は、本人が自分で払う。保護者の有効な同意と月の上限を、このロックの中で確かめる。
+			block, err := s.minorSelfPayBlock(ctx, q, owner.ID, minorPurchase{refType: "consultation", coachID: current.CoachID, price: current.PriceYen}, uuid.Nil, current.ID)
+			if err != nil {
+				return err
+			}
+			if block != nil {
+				return block
+			}
+		} else if current.Minor {
 			consented, err := q.HasGuardianContractConsent(ctx, *current.ContractID)
 			if err != nil {
 				return err
@@ -82,12 +91,17 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 	if c.CheckoutUrl != nil {
 		return *c.CheckoutUrl, nil
 	}
-	path := "/coaching/personal/" + c.ContractID.String()
-	if c.Minor {
+	path := "/coaching/personal/"
+	if c.ContractID != nil {
+		path += c.ContractID.String()
+	} else if c.ReviewRequestID != nil {
+		path = "/coaching/requests/" + c.ReviewRequestID.String()
+	}
+	if c.Minor && c.ContractID != nil {
 		path = "/guardian/paid"
 	}
 	page := s.cfg.WebBaseURL + path
-	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: []string{"card"}, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
+	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: checkoutPaymentMethods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errStripe, err)
 	}
@@ -101,11 +115,14 @@ func (s *Server) checkoutConsultation(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if role == "coach" || c.Minor && role != "guardian" || !c.Minor && role != "requester" {
-		Error(w, 403, "guardian_pays", "未成年の追加相談は保護者のページからお支払いください")
+	if role != consultationPayer(c) {
+		Error(w, 403, "guardian_pays", "未成年のパーソナル指導の追加相談は保護者のページからお支払いください")
 		return
 	}
 	url, err := s.consultationCheckout(r.Context(), c)
+	if s.writeMinorBlockError(w, r, err) {
+		return
+	}
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
@@ -125,6 +142,7 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		return err
 	}
 	var saved db.CoachingConsultation
+	var notice *db.GuardianNotice
 	notify := false
 	err = s.tx(ctx, func(q *db.Queries) error {
 		root, _ := consultationParent(initial)
@@ -179,12 +197,33 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 			return s.releaseConsultationFunding(ctx, q, c)
 		}
 		notify = true
+		if c.Minor && c.ContractID == nil {
+			// 添削のあとの追加相談を18歳未満が自分で払ったときは、保護者への購入の通知を予約する。
+			name, e := coachDisplayName(ctx, q, *c.CoachID)
+			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+				return e
+			}
+			notice, err = queueGuardianPurchaseNotice(ctx, q, *c.RequesterID, "consultation", c.ID, c.PriceYen, name, c.PaymentIntentID)
+			return err
+		}
 		return nil
 	})
 	if err == nil && notify {
+		if notice != nil {
+			s.sendGuardianNotice(ctx, *notice)
+		}
 		s.notifyConsultation(ctx, saved, true, "追加相談が届きました")
 	}
 	return err
+}
+
+// consultationPayer は、追加相談を払う人。18歳未満のパーソナル指導（保護者が契約・支払いの当事者）の相談は保護者、
+// それ以外（大人の相談と、18歳未満の添削のあとの相談）は本人。
+func consultationPayer(c db.CoachingConsultation) string {
+	if c.Minor && c.ContractID != nil {
+		return "guardian"
+	}
+	return "requester"
 }
 func (s *Server) releaseConsultationFunding(ctx context.Context, q *db.Queries, c db.CoachingConsultation) error {
 	if c.Funding == "ticket" {

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,7 +161,7 @@ export function AccountPageShell({ title, path, children }: { title: string; pat
     if (!loading && !session) router.replace(`/login?next=${path}`);
   }, [loading, session, router, path]);
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session) return <PageLoading label="読み込み中..." />;
 
   const email = session.user.email ?? "";
   const providers = session.user.app_metadata?.providers as string[] | undefined;

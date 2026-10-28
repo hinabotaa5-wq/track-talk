@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -216,7 +218,7 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
       <section className="space-y-2">
         <h2 className="font-semibold">送信の記録</h2>
         {history === null ? (
-          <p className="text-sm text-slate-200">読み込み中...</p>
+          <PageLoading label="読み込み中..." />
         ) : history.length === 0 ? (
           <p className="text-sm text-slate-300">まだ送っていません</p>
         ) : (

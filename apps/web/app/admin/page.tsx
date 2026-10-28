@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { AdminStatsView } from "@/components/admin-stats";
 import { AnnouncementsAdmin } from "@/components/announcements-admin";
 import { CoachAvatar } from "@/components/coach-photo";
@@ -617,7 +619,7 @@ export default function AdminPage() {
   }, [loading, session, profile, router]);
 
   if (loading || !isAdmin) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   const lists = { reports, feedback, contact, requests };

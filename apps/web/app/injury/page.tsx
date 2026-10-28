@@ -1,3 +1,4 @@
+import { PageLoading } from "@/components/page-loading";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { InjuryHome } from "./injury-home";
@@ -15,7 +16,7 @@ export default function InjuryPage() {
   // 他のタブと同じく、読み込み中も1画面より高くしておく。
   return (
     <div className="min-h-svh md:min-h-0">
-      <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+      <Suspense fallback={<PageLoading label="読み込み中..." />}>
         <InjuryHome initialView="share" />
       </Suspense>
     </div>

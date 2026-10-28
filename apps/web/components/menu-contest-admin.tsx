@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError, apiFetch } from "@/lib/api";
@@ -68,7 +70,7 @@ export function MenuContestAdmin({ token }: { token: string | null }) {
     }
   }
 
-  if (!state) return error ? <p className="text-sm text-red-400">{error}</p> : <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!state) return error ? <p className="text-sm text-red-400">{error}</p> : <PageLoading label="読み込み中..." />;
 
   const round = state.round;
   if (!round) {

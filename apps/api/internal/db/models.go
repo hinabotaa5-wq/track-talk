@@ -99,30 +99,29 @@ type CoachPayout struct {
 }
 
 type CoachProfile struct {
-	ProfileID        uuid.UUID  `json:"profile_id"`
-	Tier             string     `json:"tier"`
-	Events           []string   `json:"events"`
-	BestRecord       string     `json:"best_record"`
-	Achievements     string     `json:"achievements"`
-	Years            int16      `json:"years"`
-	Status           string     `json:"status"`
-	AppliedAt        time.Time  `json:"applied_at"`
-	ReviewedAt       *time.Time `json:"reviewed_at"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	OnDuty           bool       `json:"on_duty"`
-	DailyCap         int16      `json:"daily_cap"`
-	LastOfferedAt    *time.Time `json:"last_offered_at"`
-	RatingResetAt    *time.Time `json:"rating_reset_at"`
-	PhotoPublicID    *string    `json:"photo_public_id"`
-	PledgedAt        *time.Time `json:"pledged_at"`
-	PledgeVersion    *int16     `json:"pledge_version"`
-	StripeAccountID  *string    `json:"stripe_account_id"`
-	PayoutsEnabled   bool       `json:"payouts_enabled"`
-	ServiceTypes     []string   `json:"service_types"`
-	SnsUrls          []string   `json:"sns_urls"`
-	Name             string     `json:"name"`
-	NominationFeeYen *int32     `json:"nomination_fee_yen"`
+	ProfileID       uuid.UUID  `json:"profile_id"`
+	Tier            string     `json:"tier"`
+	Events          []string   `json:"events"`
+	BestRecord      string     `json:"best_record"`
+	Achievements    string     `json:"achievements"`
+	Years           int16      `json:"years"`
+	Status          string     `json:"status"`
+	AppliedAt       time.Time  `json:"applied_at"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	OnDuty          bool       `json:"on_duty"`
+	DailyCap        int16      `json:"daily_cap"`
+	LastOfferedAt   *time.Time `json:"last_offered_at"`
+	RatingResetAt   *time.Time `json:"rating_reset_at"`
+	PhotoPublicID   *string    `json:"photo_public_id"`
+	PledgedAt       *time.Time `json:"pledged_at"`
+	PledgeVersion   *int16     `json:"pledge_version"`
+	StripeAccountID *string    `json:"stripe_account_id"`
+	PayoutsEnabled  bool       `json:"payouts_enabled"`
+	ServiceTypes    []string   `json:"service_types"`
+	SnsUrls         []string   `json:"sns_urls"`
+	Name            string     `json:"name"`
 }
 
 type CoachWorkOrder struct {
@@ -532,22 +531,69 @@ type DomesticMajor struct {
 }
 
 type GuardianConsent struct {
+	MinorID            uuid.UUID  `json:"minor_id"`
+	TokenHash          string     `json:"token_hash"`
+	Status             string     `json:"status"`
+	GuardianName       *string    `json:"guardian_name"`
+	Relationship       *string    `json:"relationship"`
+	MonthlyLimitYen    *int32     `json:"monthly_limit_yen"`
+	AllowPublish       bool       `json:"allow_publish"`
+	ConsentedAt        *time.Time `json:"consented_at"`
+	DeclinedAt         *time.Time `json:"declined_at"`
+	RevokedAt          *time.Time `json:"revoked_at"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	GuardianEmail      *string    `json:"guardian_email"`
+	LinkSentOn         *time.Time `json:"link_sent_on"`
+	LinkSends          int32      `json:"link_sends"`
+	LinkIssuedAt       time.Time  `json:"link_issued_at"`
+	SelfPayLimitYen    int32      `json:"self_pay_limit_yen"`
+	ConsentIp          *string    `json:"consent_ip"`
+	TermsVersion       *string    `json:"terms_version"`
+	ConsentTokenHash   *string    `json:"consent_token_hash"`
+	LimitRequestSentAt *time.Time `json:"limit_request_sent_at"`
+	AccountDeletedAt   *time.Time `json:"account_deleted_at"`
+	LastTransactionAt  *time.Time `json:"last_transaction_at"`
+}
+
+type GuardianConsentEvent struct {
+	ID                      int64     `json:"id"`
+	MinorID                 uuid.UUID `json:"minor_id"`
+	Event                   string    `json:"event"`
+	GuardianEmail           *string   `json:"guardian_email"`
+	GuardianName            *string   `json:"guardian_name"`
+	Relationship            *string   `json:"relationship"`
+	SelfPayLimitYen         *int32    `json:"self_pay_limit_yen"`
+	PreviousSelfPayLimitYen *int32    `json:"previous_self_pay_limit_yen"`
+	TermsVersion            *string   `json:"terms_version"`
+	Ip                      *string   `json:"ip"`
+	CreatedAt               time.Time `json:"created_at"`
+}
+
+type GuardianManageLink struct {
+	TokenHash string    `json:"token_hash"`
+	MinorID   uuid.UUID `json:"minor_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type GuardianNotice struct {
+	ID              uuid.UUID  `json:"id"`
 	MinorID         uuid.UUID  `json:"minor_id"`
-	TokenHash       string     `json:"token_hash"`
+	Kind            string     `json:"kind"`
+	RefType         *string    `json:"ref_type"`
+	RefID           *uuid.UUID `json:"ref_id"`
+	GuardianEmail   string     `json:"guardian_email"`
+	AmountYen       *int32     `json:"amount_yen"`
+	CoachName       *string    `json:"coach_name"`
+	PurchasedAt     *time.Time `json:"purchased_at"`
 	Status          string     `json:"status"`
-	GuardianName    *string    `json:"guardian_name"`
-	Relationship    *string    `json:"relationship"`
-	MonthlyLimitYen *int32     `json:"monthly_limit_yen"`
-	AllowPublish    bool       `json:"allow_publish"`
-	ConsentedAt     *time.Time `json:"consented_at"`
-	DeclinedAt      *time.Time `json:"declined_at"`
-	RevokedAt       *time.Time `json:"revoked_at"`
+	Attempts        int32      `json:"attempts"`
+	LastError       *string    `json:"last_error"`
+	SentAt          *time.Time `json:"sent_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
-	GuardianEmail   *string    `json:"guardian_email"`
-	LinkSentOn      *time.Time `json:"link_sent_on"`
-	LinkSends       int32      `json:"link_sends"`
-	LinkIssuedAt    time.Time  `json:"link_issued_at"`
+	PaymentIntentID *string    `json:"payment_intent_id"`
 }
 
 type InjuryDetail struct {
@@ -936,7 +982,6 @@ type ReviewRequest struct {
 	Question           string     `json:"question"`
 	RequestedCoachID   *uuid.UUID `json:"requested_coach_id"`
 	RequestedCoachName string     `json:"requested_coach_name"`
-	NominationFeeYen   int32      `json:"nomination_fee_yen"`
 	BasePriceYen       int32      `json:"base_price_yen"`
 	UseTickets         bool       `json:"use_tickets"`
 }

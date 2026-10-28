@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
@@ -25,10 +26,17 @@ import (
 )
 
 // 18歳未満の月の上限で選べる金額。nil は上限なし。
+// 保護者が払うパーソナル指導・サポートプランなどにかかる上限で、本人が自分で払う分の上限（selfPayLimitOptions）とは別。
 var guardianLimitOptions = []int32{1000, 3000, 5000}
 
 // 親が上限を選ばなかったときの金額。
 const defaultGuardianLimitYen int32 = 3000
+
+// 本人が自分で払う動画添削・追加相談の、月の上限で保護者が選べる金額。上限なしは選べない。
+var selfPayLimitOptions = []int32{1500, 3000, 5000, 10000}
+
+// 保護者が本人の支払いの上限を選ばなかったときの金額（いちばん低い候補）。
+const defaultSelfPayLimitYen int32 = 1500
 
 // isMinor は、生まれた年月から18歳未満かを判定する。
 // 誕生日が分からないので、生まれた月の翌月1日を18歳の誕生日とみなす（大人として扱うのが遅れる側に倒す）。
@@ -79,6 +87,9 @@ func guardianStatusJSON(c db.GuardianConsent) map[string]any {
 		"allow_publish":     c.AllowPublish,
 		"consented_at":      c.ConsentedAt,
 		"guardian_email":    c.GuardianEmail,
+		// 本人が自分で払う動画添削・追加相談の月の上限と、今月の合計（writeCoachingMe で入れる）。
+		"self_pay_limit_yen": c.SelfPayLimitYen,
+		"month_spent_yen":    nil,
 	}
 }
 
@@ -106,7 +117,15 @@ func (s *Server) writeCoachingMe(w http.ResponseWriter, r *http.Request, p db.Pr
 	consent, err := s.q.GetGuardianConsentByMinor(r.Context(), p.ID)
 	switch {
 	case err == nil:
-		out["guardian"] = guardianStatusJSON(consent)
+		g := guardianStatusJSON(consent)
+		// 今月、本人が自分で払った動画添削・追加相談の合計。購入の前に「あと何円」を出すのに使う。
+		spent, err := s.q.SumMinorSelfPaidSpend(r.Context(), db.SumMinorSelfPaidSpendParams{MinorID: p.ID})
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		g["month_spent_yen"] = spent
+		out["guardian"] = g
 	case !errors.Is(err, pgx.ErrNoRows):
 		MapDBError(w, err)
 		return
@@ -229,7 +248,7 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if err := s.mail.Send(r.Context(), guardianLinkMail(email, s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
+		if err := s.mail.Send(r.Context(), guardianLinkMail(email, accountNameText(p.Nickname), s.cfg.WebBaseURL+"/guardian/"+token), "guardian-link-"+hash); err != nil {
 			slog.Warn("guardian link mail", "err", err)
 			return errMail
 		}
@@ -247,52 +266,76 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	recordGuardianEvent(r.Context(), s.q, db.InsertGuardianConsentEventParams{
+		MinorID: p.ID, Event: "link_sent", GuardianEmail: &email, Ip: optionalText(clientIP(r)),
+	})
+	if _, err := s.q.CreateGuardianNotice(r.Context(), db.CreateGuardianNoticeParams{
+		ID: uuid.New(), MinorID: p.ID, Kind: "consent_request", GuardianEmail: email, Status: "sent",
+	}); err != nil {
+		slog.Error("guardian notice", "kind", "consent_request", "err", err)
+	}
 	JSON(w, http.StatusCreated, guardianStatusJSON(consent))
 }
 
-// guardianLinkMail は、保護者に送る同意のお願い。届く先を間違えていてもよいよう、子のアカウントの情報は書かない。
-func guardianLinkMail(to, link string) mail.Message {
+// guardianLinkMail は、保護者に送る同意のお願い。文面は運営者の確定版。
+func guardianLinkMail(to, child, link string) mail.Message {
 	return mail.Message{
 		To:      to,
-		Subject: "【TrackTalk】お子さんの利用について保護者の同意のお願い",
-		Text: "TrackTalk（陸上競技のコミュニティサービス）をご利用中のお子さんが、オンラインコーチング" +
-			"（フォーム添削・パーソナル指導）を使うために、保護者の方の同意を求めています。\n\n" +
-			"次のページで内容をご確認のうえ、同意するかどうかを選んでください。\n" +
-			link + "\n\n" +
-			"・このリンクは保護者の方だけが使うものです。お子さんを含め、他の人には渡さないでください。\n" +
-			"・お子さんが新しいリンクを送ると、このリンクは使えなくなります。\n" +
-			"・心当たりがない場合は、このメールを破棄してください。同意しない限り何も始まりません。\n\n" +
-			"TrackTalk\n",
+		Subject: "お子さまの有料サービス利用についての同意のお願い",
+		Text: guardianMailGreeting +
+			"お子さま（アカウント名：" + child + "）から、有料サービス（動画添削・追加相談）を利用するための同意依頼が届いています。\n\n" +
+			"未成年のお子さまが有料サービスを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
+			"同意手続きはこちら：" + link + "\n" +
+			"（リンクの有効期限は30日です。このリンクからは1回だけ同意できます。）\n\n" +
+			"同意いただくと、お子さまは保護者の方が設定した月の上限の範囲で、ご自身のクレジットカードまたはPayPayでサービスを購入できるようになります。購入のたびに、このメールアドレスへお知らせします。\n\n" +
+			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまが有料サービスを購入することはありません。\n" +
+			guardianMailSignature,
 	}
 }
 
-func (s *Server) guardianByToken(w http.ResponseWriter, r *http.Request) (string, db.GuardianConsent, bool) {
+// guardianByToken は、保護者のリンクを確かめる。同意用のリンク（本人が送ったもの。出してから30日）か、
+// 上限の変更・撤回のためのリンク（保護者へのメールに入れたもの。作ってから30日）のどちらか。
+func (s *Server) guardianByToken(w http.ResponseWriter, r *http.Request) (guardianAccess, bool) {
+	const gone = "このリンクは使えません。お子さんに頼んで、新しいリンクをメールで送ってもらってください"
 	token := chi.URLParam(r, "token")
 	if len(token) != 43 {
-		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに頼んで、新しいリンクをメールで送ってもらってください")
-		return "", db.GuardianConsent{}, false
+		Error(w, http.StatusNotFound, "not_found", gone)
+		return guardianAccess{}, false
 	}
 	hash := hashGuardianToken(token)
 	consent, err := s.q.GetGuardianConsentByToken(r.Context(), hash)
+	if err == nil {
+		return guardianAccess{hash: hash, consent: consent}, true
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return guardianAccess{}, false
+	}
+	consent, err = s.q.GetGuardianConsentByManageLink(r.Context(), hash)
 	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusNotFound, "not_found", "このリンクは使えません。お子さんに頼んで、新しいリンクをメールで送ってもらってください")
-		return "", db.GuardianConsent{}, false
+		Error(w, http.StatusNotFound, "not_found", gone)
+		return guardianAccess{}, false
 	}
 	if err != nil {
 		MapDBError(w, err)
-		return "", db.GuardianConsent{}, false
+		return guardianAccess{}, false
 	}
-	return hash, consent, true
+	return guardianAccess{hash: hash, consent: consent, manage: true}, true
 }
 
 // guardianPublicJSON は保護者のページに返す内容。子のアカウントの情報は含めない。
-func guardianPublicJSON(c db.GuardianConsent) map[string]any {
+// can_consent は、このリンクで同意できるか（同意用のリンクで、まだ同意に使っていない）。
+func guardianPublicJSON(a guardianAccess) map[string]any {
+	c := a.consent
 	options := make([]any, 0, len(guardianLimitOptions)+1)
 	for _, v := range guardianLimitOptions {
 		options = append(options, v)
 	}
 	options = append(options, nil)
+	canConsent := !a.manage && c.Status != "consented" && (c.ConsentTokenHash == nil || *c.ConsentTokenHash != a.hash)
 	return map[string]any{
+		"can_consent":       canConsent,
+		"terms_version":     guardianTermsVersion,
 		"status":            c.Status,
 		"guardian_name":     c.GuardianName,
 		"relationship":      c.Relationship,
@@ -301,15 +344,19 @@ func guardianPublicJSON(c db.GuardianConsent) map[string]any {
 		"consented_at":      c.ConsentedAt,
 		"limit_options":     options,
 		"default_limit_yen": defaultGuardianLimitYen,
+		// 本人が自分で払う動画添削・追加相談の月の上限。
+		"self_pay_limit_yen":         c.SelfPayLimitYen,
+		"self_pay_limit_options":     selfPayLimitOptions,
+		"default_self_pay_limit_yen": defaultSelfPayLimitYen,
 	}
 }
 
 func (s *Server) getGuardian(w http.ResponseWriter, r *http.Request) {
-	_, consent, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
 		return
 	}
-	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+	JSON(w, http.StatusOK, guardianPublicJSON(a))
 }
 
 // parseGuardianLimit は月の上限を読む。項目がなければ既定の3,000円、null なら上限なし。
@@ -333,17 +380,50 @@ func parseGuardianLimit(raw json.RawMessage) (*int32, bool) {
 	return nil, false
 }
 
+// parseSelfPayLimit は、本人が自分で払う分の月の上限を読む。項目がなければ fallback。候補にない値と null は不正。
+func parseSelfPayLimit(raw json.RawMessage, fallback int32) (int32, bool) {
+	if len(raw) == 0 {
+		return fallback, true
+	}
+	var v int32
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return 0, false
+	}
+	for _, option := range selfPayLimitOptions {
+		if v == option {
+			return v, true
+		}
+	}
+	return 0, false
+}
+
 type guardianConsentReq struct {
 	GuardianName    string          `json:"guardian_name"`
 	Relationship    string          `json:"relationship"`
 	MonthlyLimitYen json.RawMessage `json:"monthly_limit_yen"`
+	SelfPayLimitYen json.RawMessage `json:"self_pay_limit_yen"`
 	AllowPublish    bool            `json:"allow_publish"`
 	Agree           bool            `json:"agree"`
 }
 
+// consentGuardian は、保護者が同意する。同意用のリンクからだけ、1つのリンクにつき1回だけできる。
+// 同意した日時・IP・同意した文面の版を残し、保護者に確認のメール（上限の変更・撤回のリンク入り）を送る。
 func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
-	hash, current, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
+		return
+	}
+	current := a.consent
+	if a.manage {
+		Error(w, http.StatusForbidden, "consent_link_required", "同意は、お子さんが送った同意用のリンクからだけできます")
+		return
+	}
+	if current.Status == "consented" {
+		Error(w, http.StatusConflict, "already_consented", "すでに同意済みです")
+		return
+	}
+	if current.ConsentTokenHash != nil && *current.ConsentTokenHash == a.hash {
+		Error(w, http.StatusConflict, "consent_link_used", "このリンクは同意に使用済みです。もう一度同意する場合は、お子さんに新しいリンクを送ってもらってください")
 		return
 	}
 	var req guardianConsentReq
@@ -368,6 +448,10 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 	if !valid {
 		fields["monthly_limit_yen"] = "月の上限を選んでください"
 	}
+	selfPay, valid := parseSelfPayLimit(req.SelfPayLimitYen, defaultSelfPayLimitYen)
+	if !valid {
+		fields["self_pay_limit_yen"] = "お子さんが支払う月の上限を選んでください"
+	}
 	if !req.Agree {
 		fields["agree"] = "内容を確認して、同意にチェックを入れてください"
 	}
@@ -376,21 +460,41 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	relationship := req.Relationship
-	consent, err := s.q.ConsentGuardian(r.Context(), db.ConsentGuardianParams{
-		TokenHash:       hash,
-		GuardianName:    &name,
-		Relationship:    &relationship,
-		MonthlyLimitYen: limit,
-		AllowPublish:    req.AllowPublish,
+	ip := clientIP(r)
+	terms := guardianTermsVersion
+	var consent db.GuardianConsent
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		var err error
+		consent, err = q.ConsentGuardian(r.Context(), db.ConsentGuardianParams{
+			TokenHash:       a.hash,
+			GuardianName:    &name,
+			Relationship:    &relationship,
+			MonthlyLimitYen: limit,
+			SelfPayLimitYen: selfPay,
+			AllowPublish:    req.AllowPublish,
+			ConsentIp:       optionalText(ip),
+			TermsVersion:    &terms,
+		})
+		if err != nil {
+			return err
+		}
+		return q.InsertGuardianConsentEvent(r.Context(), db.InsertGuardianConsentEventParams{
+			MinorID: consent.MinorID, Event: "consented", GuardianEmail: consent.GuardianEmail,
+			GuardianName: &name, Relationship: &relationship, SelfPayLimitYen: &selfPay,
+			TermsVersion: &terms, Ip: optionalText(ip),
+		})
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusConflict, "consent_link_used", "このリンクでは同意できません。お子さんに新しいリンクを送ってもらってください")
+		return
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	if current.Status != "consented" {
-		s.notifyGuardianConsented(r.Context(), consent)
-	}
-	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+	s.notifyGuardianConsented(r.Context(), consent)
+	s.sendGuardianConsentedMail(r.Context(), consent)
+	JSON(w, http.StatusOK, guardianPublicJSON(guardianAccess{hash: a.hash, consent: consent}))
 }
 
 // notifyGuardianConsented は、保護者が同意したことを本人に知らせる。
@@ -398,7 +502,7 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 func (s *Server) notifyGuardianConsented(ctx context.Context, consent db.GuardianConsent) {
 	s.notify(ctx, consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意しました",
-		Body:  "フォーム添削を" + guardianLimitText(consent.MonthlyLimitYen) + "の範囲で頼めます",
+		Body:  "動画添削・追加相談を" + guardianLimitText(&consent.SelfPayLimitYen) + "の範囲で購入できます",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)
@@ -424,17 +528,21 @@ func formatYenNumber(v int32) string {
 	return b.String()
 }
 
+// guardianSettingsReq は、同意したあとの設定の変更。送らなかった項目は今のまま。
 type guardianSettingsReq struct {
 	MonthlyLimitYen json.RawMessage `json:"monthly_limit_yen"`
-	AllowPublish    bool            `json:"allow_publish"`
+	SelfPayLimitYen json.RawMessage `json:"self_pay_limit_yen"`
+	AllowPublish    *bool           `json:"allow_publish"`
 }
 
+// updateGuardian は、保護者が月の上限と公開の可否を変える。同意用・変更用のどちらのリンクからでもできる。
+// 本人が自分で払う分の上限の変更は、証跡に残す。
 func (s *Server) updateGuardian(w http.ResponseWriter, r *http.Request) {
-	hash, current, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
 		return
 	}
-	if current.Status != "consented" {
+	if a.consent.Status != "consented" {
 		Error(w, http.StatusConflict, "conflict", "同意したあとに変更できます")
 		return
 	}
@@ -443,16 +551,56 @@ func (s *Server) updateGuardian(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	limit, valid := parseGuardianLimit(req.MonthlyLimitYen)
-	if !valid || len(req.MonthlyLimitYen) == 0 {
-		FieldError(w, map[string]string{"monthly_limit_yen": "月の上限を選んでください"})
+	if len(req.MonthlyLimitYen) == 0 && len(req.SelfPayLimitYen) == 0 && req.AllowPublish == nil {
+		FieldError(w, map[string]string{"self_pay_limit_yen": "変更する項目を選んでください"})
 		return
 	}
-	consent, err := s.q.UpdateGuardianSettings(r.Context(), db.UpdateGuardianSettingsParams{
-		TokenHash:       hash,
-		MonthlyLimitYen: limit,
-		AllowPublish:    req.AllowPublish,
+	fields := map[string]string{}
+	var consent db.GuardianConsent
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		before, err := q.GetGuardianConsentByMinor(r.Context(), a.consent.MinorID)
+		if err != nil {
+			return err
+		}
+		limit := before.MonthlyLimitYen
+		if len(req.MonthlyLimitYen) > 0 {
+			var valid bool
+			if limit, valid = parseGuardianLimit(req.MonthlyLimitYen); !valid {
+				fields["monthly_limit_yen"] = "月の上限を選んでください"
+			}
+		}
+		selfPay, valid := parseSelfPayLimit(req.SelfPayLimitYen, before.SelfPayLimitYen)
+		if !valid {
+			fields["self_pay_limit_yen"] = "お子さんが支払う月の上限を選んでください"
+		}
+		if len(fields) > 0 {
+			return errInvalidSettings
+		}
+		allowPublish := before.AllowPublish
+		if req.AllowPublish != nil {
+			allowPublish = *req.AllowPublish
+		}
+		consent, err = q.UpdateGuardianSettings(r.Context(), db.UpdateGuardianSettingsParams{
+			MinorID:         a.consent.MinorID,
+			MonthlyLimitYen: limit,
+			AllowPublish:    allowPublish,
+			SelfPayLimitYen: selfPay,
+		})
+		if err != nil {
+			return err
+		}
+		if before.SelfPayLimitYen == selfPay {
+			return nil
+		}
+		return q.InsertGuardianConsentEvent(r.Context(), db.InsertGuardianConsentEventParams{
+			MinorID: consent.MinorID, Event: "limit_changed", GuardianEmail: consent.GuardianEmail,
+			SelfPayLimitYen: &selfPay, PreviousSelfPayLimitYen: &before.SelfPayLimitYen, Ip: optionalText(clientIP(r)),
+		})
 	})
+	if errors.Is(err, errInvalidSettings) {
+		FieldError(w, fields)
+		return
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "同意したあとに変更できます")
 		return
@@ -461,15 +609,23 @@ func (s *Server) updateGuardian(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+	a.consent = consent
+	JSON(w, http.StatusOK, guardianPublicJSON(a))
 }
 
+var errInvalidSettings = errors.New("invalid guardian settings")
+
+// declineGuardian は、同意する前に「同意しない」と答える。同意用のリンクからだけ。
 func (s *Server) declineGuardian(w http.ResponseWriter, r *http.Request) {
-	hash, _, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
 		return
 	}
-	consent, err := s.q.DeclineGuardian(r.Context(), hash)
+	if a.manage {
+		Error(w, http.StatusConflict, "conflict", "同意を取りやめる場合は「同意を取り消す」を選んでください")
+		return
+	}
+	consent, err := s.q.DeclineGuardian(r.Context(), a.hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "同意を取りやめる場合は「同意を取り消す」を選んでください")
 		return
@@ -478,15 +634,20 @@ func (s *Server) declineGuardian(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+	recordGuardianEvent(r.Context(), s.q, db.InsertGuardianConsentEventParams{
+		MinorID: consent.MinorID, Event: "declined", GuardianEmail: consent.GuardianEmail, Ip: optionalText(clientIP(r)),
+	})
+	a.consent = consent
+	JSON(w, http.StatusOK, guardianPublicJSON(a))
 }
 
+// revokeGuardian は、保護者が同意を取り消す。以後の新しい購入は止まり、すでに購入した分はそのまま。
 func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
-	hash, _, ok := s.guardianByToken(w, r)
+	a, ok := s.guardianByToken(w, r)
 	if !ok {
 		return
 	}
-	consent, err := s.q.RevokeGuardian(r.Context(), hash)
+	consent, err := s.q.RevokeGuardian(r.Context(), a.consent.MinorID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "まだ同意していません")
 		return
@@ -495,7 +656,18 @@ func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, guardianPublicJSON(consent))
+	recordGuardianEvent(r.Context(), s.q, db.InsertGuardianConsentEventParams{
+		MinorID: consent.MinorID, Event: "revoked", GuardianEmail: consent.GuardianEmail,
+		SelfPayLimitYen: &consent.SelfPayLimitYen, Ip: optionalText(clientIP(r)),
+	})
+	s.notify(r.Context(), consent.MinorID, notifyImportant, push.Message{
+		Title: "保護者が同意を取り消しました",
+		Body:  "新しい動画添削・追加相談は購入できません。購入済みの分はそのまま使えます",
+		URL:   "/me/coaching",
+		Tag:   "guardian-consent",
+	}, 24*time.Hour)
+	a.consent = consent
+	JSON(w, http.StatusOK, guardianPublicJSON(a))
 }
 
 // signCoachingVideoUpload は、添削の動画を非公開でアップロードするための署名を返す。

@@ -3,7 +3,6 @@ package httpx
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -91,17 +90,16 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
 		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
-		"nomination_fee_yen": rr.NominationFeeYen, "base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
-		"total_price_yen": rr.BasePriceYen + rr.NominationFeeYen, "cash_price_yen": reviewCashPrice(rr),
+		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
+		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
 		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
 		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
 	}
 }
 
 type coachDutyReq struct {
-	OnDuty           *bool           `json:"on_duty"`
-	DailyCap         *int            `json:"daily_cap"`
-	NominationFeeYen json.RawMessage `json:"nomination_fee_yen"`
+	OnDuty   *bool `json:"on_duty"`
+	DailyCap *int  `json:"daily_cap"`
 }
 
 // updateCoachDuty は、承認済みのコーチの「受付中」と1日の上限本数を変える。
@@ -127,13 +125,6 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.requireStaffMFA(w, r) {
 		return
-	}
-	fee := current.NominationFeeYen
-	if len(req.NominationFeeYen) > 0 {
-		if err := json.Unmarshal(req.NominationFeeYen, &fee); err != nil || (fee != nil && (*fee < 0 || *fee > 9998700 || *fee%100 != 0)) {
-			FieldError(w, map[string]string{"nomination_fee_yen": "指名料は0〜9,998,700円の範囲で100円単位で入力してください"})
-			return
-		}
 	}
 	onDuty := current.OnDuty
 	if req.OnDuty != nil {
@@ -177,7 +168,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	c, err := s.q.UpdateCoachDuty(r.Context(), db.UpdateCoachDutyParams{OnDuty: onDuty, DailyCap: int16(dailyCap), NominationFeeYen: fee, UpdateNominationFee: len(req.NominationFeeYen) > 0, ProfileID: p.ID})
+	c, err := s.q.UpdateCoachDuty(r.Context(), db.UpdateCoachDutyParams{OnDuty: onDuty, DailyCap: int16(dailyCap), ProfileID: p.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけが受付を設定できます")
 		return
@@ -249,10 +240,10 @@ type reviewRequestReq struct {
 	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
 	// 支払い方法（card か paypay）。Stripe の鍵があるときだけ使う。
-	Method                   string     `json:"method"`
-	UseTickets               bool       `json:"use_tickets"`
-	RequestedCoachID         *uuid.UUID `json:"requested_coach_id"`
-	ExpectedNominationFeeYen *int32     `json:"expected_nomination_fee_yen"`
+	Method     string `json:"method"`
+	UseTickets bool   `json:"use_tickets"`
+	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
+	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 }
 
 func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
@@ -297,28 +288,26 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
 	useTickets := req.Method == "tickets" || req.UseTickets
-	fee := int32(0)
+	if req.RequestedCoachID == nil && !s.cfg.ReviewRandomAssign {
+		fields["requested_coach_id"] = "コーチを選んでください"
+	}
 	coachName := ""
-	if req.RequestedCoachID != nil {
+	if req.RequestedCoachID != nil && len(fields) == 0 {
 		nominees, err := s.reviewNominees(r.Context(), s.q, p.ID, req.Event, req.RequestedCoachID)
 		if err != nil {
 			MapDBError(w, err)
 			return
 		}
 		if len(nominees) != 1 {
-			FieldError(w, map[string]string{"requested_coach_id": "このコーチは現在指名を受け付けていません。選び直してください"})
+			FieldError(w, map[string]string{"requested_coach_id": "このコーチはいま依頼を受け付けていません。別のコーチを選んでください"})
 			return
 		}
-		fee = *nominees[0].NominationFeeYen
 		coachName = nominees[0].Nickname
-		if req.ExpectedNominationFeeYen == nil || *req.ExpectedNominationFeeYen != fee {
-			Error(w, http.StatusConflict, "price_changed", "指名料が変更されました。コーチを選び直して料金を確認してください")
-			return
-		}
 	}
-	cashPrice := fee
+	// 料金は全コーチ共通。チケットで払うときは現金の支払いはない。
+	cashPrice := int32(0)
 	if !useTickets {
-		cashPrice += reviewPriceYen
+		cashPrice = reviewPriceYen
 	}
 	payments := s.stripe.Configured() && cashPrice > 0
 	if payments && !validReviewPayMethod(req.Method) {
@@ -334,20 +323,20 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	minor := isMinor(*p.BirthMonth, time.Now())
 	if minor {
-		if code, message := s.minorRequestBlock(r.Context(), s.q, p.ID); code != "" {
-			Error(w, http.StatusUnprocessableEntity, code, message)
+		// 18歳未満は、保護者の有効な同意がないと頼めない。支払いがあるときは月の上限も確かめる。
+		// 動画を受け取る前に一度確かめ、支払い画面を作る時にロックの中でもう一度確かめる。
+		price := int32(0)
+		if payments {
+			price = cashPrice
+		}
+		block, err := s.minorSelfPayBlock(r.Context(), s.q, p.ID, minorPurchase{refType: "review", coachName: coachName, price: price}, uuid.Nil, uuid.Nil)
+		if err != nil {
+			MapDBError(w, err)
 			return
 		}
-		if payments {
-			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, cashPrice)
-			if err != nil {
-				MapDBError(w, err)
-				return
-			}
-			if msg != "" {
-				Error(w, http.StatusUnprocessableEntity, "monthly_limit", msg)
-				return
-			}
+		if block != nil {
+			s.writeMinorBlock(w, r, block)
+			return
 		}
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
@@ -380,8 +369,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, err)
 			return
 		}
-		if len(nominees) != 1 || *nominees[0].NominationFeeYen != fee {
-			Error(w, http.StatusConflict, "nomination_changed", "指名の受付状況または料金が変更されました。コーチを選び直してください")
+		if len(nominees) != 1 {
+			Error(w, http.StatusConflict, "nomination_changed", "このコーチの受付状況が変わりました。別のコーチを選んでください")
 			return
 		}
 	}
@@ -391,9 +380,16 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, err)
 			return
 		}
-		if code, message := s.minorRequestBlock(r.Context(), q, p.ID); minor && code != "" {
-			Error(w, http.StatusUnprocessableEntity, code, message)
-			return
+		if minor {
+			block, err := s.minorSelfPayBlock(r.Context(), q, p.ID, minorPurchase{refType: "review"}, uuid.Nil, uuid.Nil)
+			if err != nil {
+				MapDBError(w, err)
+				return
+			}
+			if block != nil {
+				s.writeMinorBlock(w, r, block)
+				return
+			}
 		}
 	}
 	if err := lockUnusedCoachingVideo(r.Context(), q, &req.VideoPublicID, nil); err != nil {
@@ -413,7 +409,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Focus:            focus,
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
-		NominationFeeYen: fee, BasePriceYen: reviewPriceYen, UseTickets: useTickets,
+		BasePriceYen: reviewPriceYen, UseTickets: useTickets,
 		VideoPublicID: req.VideoPublicID,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。
@@ -439,8 +435,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, code, msg, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
-		if err != nil || code != "" {
+		url, block, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
+		if err != nil || block != nil {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.tx(r.Context(), func(q *db.Queries) error {
 				if t, e := q.GetTicketReservationForReview(r.Context(), &rr.ID); e == nil {
@@ -457,7 +453,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				writeCheckoutError(w, err)
 			} else {
-				Error(w, http.StatusUnprocessableEntity, code, msg)
+				s.writeMinorBlock(w, r, block)
 			}
 			return
 		}
@@ -474,32 +470,6 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	JSON(w, http.StatusCreated, s.reviewRequestJSON(rr))
-}
-
-// minorRequestBlock は、18歳未満が依頼を送れない理由を返す。送れるなら空。
-// 保護者の同意を待たずに1本目は送れるが、同意が済むまで2本目は送れない。同意しないと言われたら送れない。
-func (s *Server) minorRequestBlock(ctx context.Context, q *db.Queries, minorID uuid.UUID) (string, string) {
-	consent, err := q.GetGuardianConsentByMinor(ctx, minorID)
-	status := "none"
-	if err == nil {
-		status = consent.Status
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return "internal_error", "サーバーエラーが発生しました"
-	}
-	switch status {
-	case "consented":
-		return "", ""
-	case "declined", "revoked":
-		return "guardian_declined", "保護者の同意がないため、フォーム添削は使えません"
-	}
-	sent, err := q.CountReviewRequestsByRequester(ctx, minorID)
-	if err != nil {
-		return "internal_error", "サーバーエラーが発生しました"
-	}
-	if sent > 0 {
-		return "guardian_pending", "2本目からは保護者の同意が必要です。保護者にリンクを送ってください"
-	}
-	return "", ""
 }
 
 func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {

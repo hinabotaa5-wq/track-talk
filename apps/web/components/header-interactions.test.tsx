@@ -150,7 +150,7 @@ it("感覚メモの日付は日本時間の今日に固定し、保存日はAPI�
   await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(apiFetch).toHaveBeenCalledWith("/v1/me/sense-notes", expect.objectContaining({ body: JSON.stringify({ body: "リズムよく走れた" }) }));
   expect(onCreated).toHaveBeenCalledOnce();
-  expect(container.querySelector('[role="status"]')?.textContent).toBe("1日続けて書けてる。また明日も書こう！");
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("また明日も書こう！");
 });
 
 it("保存済みの画面でも連続日数の一文だけを表示する", async () => {

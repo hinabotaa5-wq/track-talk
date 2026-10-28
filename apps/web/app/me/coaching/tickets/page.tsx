@@ -1,6 +1,8 @@
 "use client";
 
 import { SellerNote } from "@/components/seller-note";
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -92,7 +94,7 @@ function TicketsPage() {
     } finally { release(); }
   }
 
-  if (loading || !session) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session) return <PageLoading label="読み込み中..." />;
   return <div className="mx-auto max-w-md space-y-5">
     <h1 className="text-2xl font-bold">コーチングチケット</h1>
     <SellerNote />
@@ -104,6 +106,7 @@ function TicketsPage() {
         <p className="text-xl font-bold">利用できるチケット：{summary.balance.available}枚</p>
         <p className="text-sm text-slate-300">添削のために確保中：{summary.balance.reserved}枚</p>
       </div>
+      {summary.sales_open === false ? <p role="status" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">{summary.purchase_block_reason}</p> : null}
       <p className="text-sm text-slate-200">動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。</p>
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
@@ -129,4 +132,4 @@ function TicketsPage() {
   </div>;
 }
 
-export default function Page() { return <Suspense fallback={<p>読み込み中...</p>}><TicketsPage /></Suspense>; }
+export default function Page() { return <Suspense fallback={<PageLoading label="読み込み中..." />}><TicketsPage /></Suspense>; }

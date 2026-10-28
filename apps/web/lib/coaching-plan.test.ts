@@ -15,7 +15,7 @@ describe("planIncludes", () => {
   it("対面指導の地域・会場・回数・追加交通費を購入前に表示する", () => {
     const rows = planIncludes({ service_type: "in_person", venue_area: "東京都", venue_name: "国立競技場", session_count: 2, session_minutes: 60, travel_fee_yen: 1000, max_participants: 3, video_reviews: null, menu_updates: null, reply_formats: [], start_on_first_video: false });
     expect(rows).toEqual([
-      { label: "サービス", value: "対面指導" },
+      { label: "サービス", value: "対面プラン" },
       { label: "地域", value: "東京都" },
       { label: "会場", value: "国立競技場" },
       { label: "対面指導", value: "2回・1回60分" },

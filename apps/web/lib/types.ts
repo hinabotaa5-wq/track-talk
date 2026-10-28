@@ -318,13 +318,21 @@ export type GuardianStatus = "pending" | "consented" | "declined" | "revoked";
 
 export type GuardianLimitYen = 1000 | 3000 | 5000 | null;
 
+// 本人が自分で払う動画添削・追加相談の月の上限で、保護者が選べる金額。
+export type SelfPayLimitYen = 1500 | 3000 | 5000 | 10000;
+
 export type CoachingGuardian = {
   status: GuardianStatus;
+  // 保護者が払う契約（パーソナル指導など）にかかる月の上限。
   monthly_limit_yen: GuardianLimitYen;
+  // 本人が自分で払う動画添削・追加相談の月の上限。
+  self_pay_limit_yen: SelfPayLimitYen;
   allow_publish: boolean;
   consented_at: string | null;
   // 同意のリンクを送った保護者のメールアドレス。本人のアカウントにだけ返す。
   guardian_email?: string | null;
+  // 今月、本人が自分で払った動画添削・追加相談の合計。本人のアカウントにだけ返す。
+  month_spent_yen?: number | null;
 };
 
 export type CoachingMe = {
@@ -340,6 +348,11 @@ export type GuardianPublic = CoachingGuardian & {
   relationship: "father" | "mother" | "other" | null;
   limit_options: GuardianLimitYen[];
   default_limit_yen: number;
+  self_pay_limit_options: SelfPayLimitYen[];
+  default_self_pay_limit_yen: SelfPayLimitYen;
+  // このリンクで同意できるか（同意用のリンクで、まだ同意に使っていない）。
+  can_consent: boolean;
+  terms_version: string;
 };
 
 export type CoachTier = "coach";
@@ -383,7 +396,6 @@ export type CoachApplication = {
   reviewed_at: string | null;
   on_duty: boolean;
   daily_cap: number;
-  nomination_fee_yen?: number | null;
   // 顔写真。登録していなければ空。
   photo_url: string;
   // いまの版のパーソナル指導の誓約をしたか。
@@ -659,15 +671,14 @@ export type ReviewRating = {
   helpful: HelpfulAnswer | null;
 };
 
-export type ReviewNominee = {
-  id: string; nickname: string | null; photo_url: string; best_record: string; achievements: string;
-  nomination_fee_yen: number; total_price_yen: number;
+// 動画添削で選べるコーチ。料金はどのコーチでも同じなので値段は持たない。人気の指標（件数・評価）も持たない。
+export type ReviewCoachOption = {
+  id: string; nickname: string | null; photo_url: string; events: CoachEvent[]; years: number; best_record: string; achievements: string;
 };
 
 export type ReviewRequest = {
   requested_coach_id?: string | null;
   requested_coach_name?: string;
-  nomination_fee_yen?: number;
   base_price_yen?: number;
   total_price_yen?: number;
   cash_price_yen?: number;

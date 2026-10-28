@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import Link from "next/link";
 import { Check, Crown, Flame } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -274,7 +276,7 @@ export default function MenuContestPage() {
       {failed ? (
         <ErrorState message="エグ練大会を読み込めませんでした。時間をおいてもう一度開いてください。" />
       ) : !state ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
+        <PageLoading label="読み込み中..." />
       ) : (
         <>
           {round ? (

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -407,7 +409,7 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
   if (failed) return <ErrorState message="記録の取得に失敗しました。時間をおいて、もう一度開いてください。" />;
   // ログインしていない人には、空の記録の画面を見せる(書こうとするとログインへ案内する)。
   const shown = token ? (externalData === undefined ? data : externalData) : noRecords;
-  if (!shown) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!shown) return <PageLoading label="読み込み中..." />;
 
   const events = sortRaceEvents(shown.events);
   const current = events.find((item) => item.event === selected) ?? events[0];

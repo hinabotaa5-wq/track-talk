@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachingSupportPanel } from "@/components/coaching-support";
 import { CoachingInPersonPanel } from "@/components/coaching-in-person";
 
@@ -36,7 +38,7 @@ export default function GuardianContractPage() {
   }, [token, id]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!contract) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!contract) return <PageLoading label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-6">

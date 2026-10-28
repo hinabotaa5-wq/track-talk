@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabel } from "@/lib/coaching-plan";
 import { formatDateTime, formatYen } from "@/lib/format";
@@ -138,7 +140,7 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
   }, [fetchData]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!data) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!data) return <PageLoading label="読み込み中..." />;
 
   function patch(id: string, change: Partial<AdminCoachingContract>) {
     setData((d) => (d ? { ...d, contracts: d.contracts.map((c) => (c.id === id ? { ...c, ...change } : c)) } : d));
