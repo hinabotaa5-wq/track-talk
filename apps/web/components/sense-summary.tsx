@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, Sparkles, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -59,6 +59,7 @@ export function SenseSummaryEntry({ summary, open = false }: { summary: SenseSum
 
 // 作成と履歴の状態を共有し、感覚・記録のどちらのカレンダーにも反映する。
 export function useSenseSummaries(token: string | null, total: number, calendarMonth?: string) {
+  const [createdResult, setCreatedResult] = useState<{ token: string; summary: SenseSummary } | null>(null);
   const [summaries, setSummaries] = useState<SenseSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [pendingNotes, setPendingNotes] = useState(0);
@@ -97,6 +98,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
   async function create() {
     if (!token || !acquire()) return;
     const requestedVersion = version.current;
+    setCreatedResult(null);
     setError("");
     try {
       const d = await apiFetch<SenseSummaryResponse>("/v1/me/sense-notes/summary", { method: "POST", token });
@@ -105,6 +107,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
       version.current++;
       if (d.summary) {
         const created = d.summary;
+        setCreatedResult({ token, summary: created });
         setSummaries((list) => [created, ...list.filter((item) => item.id !== created.id)]);
       }
       setPendingNotes(d.pending_notes ?? 0);
@@ -145,7 +148,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
     void loadMore();
   }, [loaded, calendarMonth, cursor, summaries, error, loadingMore, loadMore]);
 
-  return { summaries: loaded ? summaries : [], cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry: () => setReload((value) => value + 1) };
+  return { createdSummary: createdResult?.token === token ? createdResult.summary : null, summaries: loaded ? summaries : [], cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry: () => setReload((value) => value + 1) };
 }
 
 // 瓶の横では作成状況とボタンだけを表示し、まとめの本文はカレンダーで読む。
@@ -153,21 +156,20 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
   const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label="まとめた感覚">
+    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label="AI要約">
       <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />
-          まとめた感覚
+          AI要約
         </h2>
         {loaded ? shortBy > 0 ? (
           <span className="block text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
         ) : (
-          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={create} disabled={busy}>
+          <Button variant="secondary" className="border-amber-300/50 bg-amber-300/20 px-3 py-1 text-xs text-amber-100 hover:bg-amber-300/30 hover:text-amber-50 active:bg-amber-300/40" onClick={create} disabled={busy}>
             {busy ? "まとめています..." : `${minNotes}個の感覚をまとめる`}
           </Button>
         ) : null}
       </div>
-      {!compact ? <SenseSummaryNotice state={state} /> : null}
       {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
       {!loaded && !error ? <p className="text-xs text-slate-300">読み込み中...</p> : null}
       {!compact ? <div className="space-y-2">
@@ -180,8 +182,72 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
   );
 }
 
-// 送信の説明は瓶の横の細い欄に詰めず、作成できるときにその下で全文を示す。
-export function SenseSummaryNotice({ state }: { state: ReturnType<typeof useSenseSummaries> }) {
-  if (!state.loaded || state.pendingNotes < state.minNotes) return null;
-  return <p className="text-xs leading-relaxed text-slate-300">まだまとめていない感覚を保存した順に{state.minNotes}個、Anthropic（米国）のAI「Claude」へ送ります。送った内容はAIの学習には使われません。元の感覚はまとめにも保存され、メモを個別に削除しても残ります。<a href="/privacy" className="text-blue-300 underline">プライバシーポリシー</a></p>;
+// 作成後の本文だけを順に表示する。履歴は全文のまま。
+function AnimatedSummary({ summary }: { summary: SenseSummary }) {
+  const sections: [string, string[]][] = [["つかめてきた感覚", summary.summary.good], ["気になる感覚", summary.summary.concerns], ["次に意識すること", summary.summary.next]];
+  const text = [summary.summary.overview, ...sections.flatMap(([title, items]) => items.length ? [`${title}\n${items.map((item) => `・${item}`).join("\n")}`] : [])].join("\n\n");
+  const characters = Array.from(text);
+  const [visible, setVisible] = useState(0);
+  useEffect(() => {
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const length = Array.from(text).length;
+    let frame: number;
+    let start: number | undefined;
+    function tick(now: number) {
+      start ??= now;
+      const count = reduceMotion ? length : Math.floor((now - start) / 12) + 1;
+      setVisible(count);
+      if (count < length) frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [text]);
+  const done = visible >= characters.length;
+  return <>
+    <p className="text-xs text-slate-300">{senseSummaryRangeLabel(summary)} · {summary.note_count}個の感覚</p>
+    <p aria-hidden="true" className="whitespace-pre-wrap break-words text-sm leading-7">{characters.slice(0, visible).join("")}{!done ? <span className="ml-0.5 text-amber-300">▍</span> : null}</p>
+    <p className="sr-only" role="status">{done ? text : "AI要約を表示しています"}</p>
+  </>;
+}
+
+export function SenseSummaryResult({ state, children }: { state: ReturnType<typeof useSenseSummaries>; children?: ReactNode }) {
+  const target = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const { busy, createdSummary } = state;
+  const visible = busy || Boolean(createdSummary && createdSummary.id !== dismissed);
+  function close() {
+    if (busy || !createdSummary) return;
+    setDismissed(createdSummary.id);
+
+  }
+  useEffect(() => {
+    if (!visible) {
+      if (!trigger.current) return;
+      const frame = requestAnimationFrame(() => {
+        const destination = trigger.current?.isConnected ? trigger.current : target.current?.querySelector<HTMLElement>("button");
+        destination?.focus({ preventScroll: true });
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = requestAnimationFrame(() => {
+      target.current?.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+      target.current?.querySelector<HTMLElement>('[role="dialog"]')?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
+  return <div ref={target} className="relative isolate scroll-mt-24">
+    <div inert={visible || undefined}>{children}</div>
+    {visible ? <section role="dialog" tabIndex={-1} aria-label="新しいAI要約" onKeyDown={(event) => { if (event.key === "Escape") close(); }} className="absolute inset-0 z-20 flex min-h-0 flex-col rounded-2xl border border-amber-200/30 bg-slate-950/65 p-4 shadow-xl backdrop-blur-[1px]">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-amber-200" aria-hidden />AI要約</h2>
+        <button ref={closeButton} type="button" disabled={busy} onClick={close} aria-label="AI要約を閉じる" className="flex size-9 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300 disabled:opacity-40"><X className="size-4" aria-hidden /></button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
+        {busy ? <p role="status" className="text-sm text-slate-300">まとめています…</p> : createdSummary ? <AnimatedSummary key={createdSummary.id} summary={createdSummary} /> : null}
+      </div>
+    </section> : null}
+  </div>;
 }

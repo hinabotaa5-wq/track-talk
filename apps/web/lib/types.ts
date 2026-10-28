@@ -383,6 +383,7 @@ export type CoachApplication = {
   reviewed_at: string | null;
   on_duty: boolean;
   daily_cap: number;
+  nomination_fee_yen?: number | null;
   // 顔写真。登録していなければ空。
   photo_url: string;
   // いまの版のパーソナル指導の誓約をしたか。
@@ -658,7 +659,20 @@ export type ReviewRating = {
   helpful: HelpfulAnswer | null;
 };
 
+export type ReviewNominee = {
+  id: string; nickname: string | null; photo_url: string; best_record: string; achievements: string;
+  nomination_fee_yen: number; total_price_yen: number;
+};
+
 export type ReviewRequest = {
+  requested_coach_id?: string | null;
+  requested_coach_name?: string;
+  nomination_fee_yen?: number;
+  base_price_yen?: number;
+  total_price_yen?: number;
+  cash_price_yen?: number;
+  use_tickets?: boolean;
+  coach_reward_yen?: number;
   tickets?: { quantity: number; status: "reserved" | "consumed" | "released"; nominal_yen: number };
   id: string;
   tier: CoachTier;

@@ -192,21 +192,18 @@ func TestCoachingPreferredDatesValidationAndSnapshot(t *testing.T) {
 	}
 }
 
-func TestVideoReviewRejectsPreferredDates(t *testing.T) {
+func TestRetiredVideoSupportRejectsNewContracts(t *testing.T) {
 	h := setup(t)
 	id, _, plan := planCoach(t, h, 3)
 	execSQLArgs(t, `UPDATE coach_profiles SET service_types=ARRAY['video_review'] WHERE profile_id=$1`, id)
 	execSQLArgs(t, `UPDATE coaching_plans SET service_type='video_review' WHERE id=$1`, plan)
 	_, user := demoUser(t, h, time.Date(1995, 1, 1, 0, 0, 0, 0, time.UTC))
-	body := contractBody(plan)
-	body["preferred_dates"] = []string{availabilityDay(0)}
-	r := doJSON(t, h, "POST", "/v1/coaching/contracts", user, body)
-	if r.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("video preferred dates: %d %s", r.Code, r.Body.String())
-	}
-	// 希望日なしの既存の申し込みを妨げない。
-	r = doJSON(t, h, "POST", "/v1/coaching/contracts", user, contractBody(plan))
-	if r.Code != 201 || !strings.Contains(r.Body.String(), `"preferred_dates":[]`) {
-		t.Fatal(r.Body.String())
+	for _, dates := range [][]string{nil, {availabilityDay(0)}} {
+		body := contractBody(plan)
+		body["preferred_dates"] = dates
+		r := doJSON(t, h, "POST", "/v1/coaching/contracts", user, body)
+		if r.Code != http.StatusNotFound {
+			t.Fatalf("retired video support: %d %s", r.Code, r.Body.String())
+		}
 	}
 }

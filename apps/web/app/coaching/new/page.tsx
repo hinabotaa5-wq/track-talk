@@ -1,5 +1,6 @@
 "use client";
 
+import { ReviewNomination } from "@/components/review-nomination";
 import { SellerNote } from "@/components/seller-note";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
@@ -7,7 +8,7 @@ import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
-import { apiFetch, apiErrorText } from "@/lib/api";
+import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import type { CoachEvent, CoachingMe, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingMe, ReviewNominee, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -52,6 +53,26 @@ export default function NewReviewRequestPage() {
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
   const { pending, acquire, release } = useActionLock();
+  const [nominees, setNominees] = useState<ReviewNominee[]>([]);
+  const [nomineeID, setNomineeID] = useState("");
+  const [nomineesLoading, setNomineesLoading] = useState(true);
+  const [nomineesError, setNomineesError] = useState("");
+  const [nominationMethod, setNominationMethod] = useState<ReviewPayMethod>("card");
+  const nominee = nominees.find((c) => c.id === nomineeID);
+  const nominationFee = nominee?.nomination_fee_yen ?? 0;
+  const totalPrice = (estimate?.price_yen ?? 1200) + nominationFee;
+  const cashPrice = method === "tickets" ? nominationFee : totalPrice;
+  const cashPayment = !!estimate?.payments && cashPrice > 0;
+
+  useEffect(() => {
+    if (!token || !me?.demo) return;
+    let cancelled = false;
+    apiFetch<{ coaches: ReviewNominee[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token })
+      .then((data) => { if (!cancelled) setNominees(data.coaches); })
+      .catch(() => { if (!cancelled) setNomineesError("指名できるコーチを読み込めませんでした。ページを開き直してください。"); })
+      .finally(() => { if (!cancelled) setNomineesLoading(false); });
+    return () => { cancelled = true; };
+  }, [event, token, me?.demo]);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -119,6 +140,8 @@ export default function NewReviewRequestPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!estimate) { setError("料金と受付状況を確認してから送信してください。"); return; }
+    if (nomineeID && !nominee) { setError("指名できるコーチを選び直してください。"); return; }
     if (!question.trim()) {
       setError("相談内容を記入してください");
       return;
@@ -147,15 +170,21 @@ export default function NewReviewRequestPage() {
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
-        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id, method }),
+        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
+          method: method === "tickets" && cashPayment ? nominationMethod : method,
+          use_tickets: method === "tickets", requested_coach_id: nominee?.id ?? null,
+          expected_nomination_fee_yen: nominee?.nomination_fee_yen }),
       });
       if (created.checkout_url) {
-        window.location.href = created.checkout_url;
+        window.location.assign(created.checkout_url);
         return;
       }
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
+      if (err instanceof ApiRequestError && ["price_changed", "nomination_changed", "validation_error"].includes(err.code)) {
+        try { const data = await apiFetch<{ coaches: ReviewNominee[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setNominees(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
+      }
       setUpload(null);
       release();
     }
@@ -171,16 +200,15 @@ export default function NewReviewRequestPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        {estimate?.payments ? null : (
+        {!estimate || estimate.payments ? null : (
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
             デモ版
           </p>
         )}
-        <h1 className="text-2xl font-bold">フォーム添削を頼む</h1>
+        <h1 className="text-2xl font-bold">動画添削を頼む</h1>
+        <p className="text-sm text-slate-300">基本はおまかせ。希望する場合だけコーチを指名できます。</p>
         <SellerNote />
-        <Link href="/coaches" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-          コーチ一覧<ArrowRight className="size-4 text-blue-300" aria-hidden />
-        </Link>
+
       </div>
 
       {!me.demo ? (
@@ -201,11 +229,11 @@ export default function NewReviewRequestPage() {
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
-          <fieldset className="space-y-2">
+          <fieldset disabled={pending} className="space-y-2">
             <legend className="text-sm font-semibold">種目</legend>
             <div className="flex flex-wrap gap-2">
               {reviewEvents.map((value) => (
-                <button key={value} type="button" aria-pressed={event === value} onClick={() => setEvent(value)} className={chip(event === value)}>
+                <button key={value} type="button" aria-pressed={event === value} onClick={() => { if (value !== event) { setEvent(value); setNomineesLoading(true); setNomineesError(""); setNomineeID(""); setNominees([]); } }} className={chip(event === value)}>
                   {coachEventLabels[value]}
                 </button>
               ))}
@@ -213,6 +241,11 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">最初は100mだけです。コーチが増えしだい、種目を増やします。</p>
           </fieldset>
 
+          <ReviewNomination coaches={nominees} value={nomineeID} onChange={setNomineeID} disabled={pending} error={nomineesError} loading={nomineesLoading} />
+          <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
+            <p>基本料金 {formatYen(estimate?.price_yen ?? 1200)}{nominee ? ` ＋ 指名料 ${formatYen(nominationFee)}` : "（おまかせ）"}</p>
+            <p className="mt-1 text-lg font-bold">合計 {formatYen(totalPrice)}／回</p>
+          </div>
           <label className="block space-y-2 text-sm">
             <span className="font-semibold">相談内容</span>
             <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} maxLength={1000} required disabled={pending} placeholder="例：後半にスピードが落ちます。動画を見て、改善点や練習方法を教えてください。" />
@@ -221,7 +254,7 @@ export default function NewReviewRequestPage() {
 
           {ticketSummary ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
             <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
-            <p className="text-xs text-slate-300">この添削は2枚です。先に購入してから動画を選んでください。</p>
+            <p className="text-xs text-slate-300">基本料金は2枚です。指名料はカードまたはPayPayで別途お支払いください。</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
               チケットを購入・確認する<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
@@ -241,19 +274,20 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
               返ってくる目安: {formatDateTime(estimate.due_at)}まで
               <span className="block text-xs text-slate-300">
-                {estimate.coaches_on_duty
+                {nominee ? "選んだコーチが対応します。期限までに回答がなければ代金はかかりません。" : estimate.coaches_on_duty
                   ? "夜に送っても、翌日の昼までに返ってきます。"
                   : "いま受付中のコーチはいません。誰かが受付を始めたら回ります。"}
               </span>
             </p>
           ) : null}
           {estimate?.payments || (ticketSummary?.balance.available ?? 0) > 0 ? (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold">お支払い（1本 {formatYen(estimate?.price_yen ?? 1200)}）</legend>
+            <fieldset disabled={pending} className="space-y-2">
+              <legend className="text-sm font-semibold">お支払い（合計 {formatYen(totalPrice)}）</legend>
               <div className="flex flex-wrap gap-2">
                 {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
                 {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
@@ -262,6 +296,11 @@ export default function NewReviewRequestPage() {
                   </button>
                 ))}
               </div>
+              {method === "tickets" && cashPayment ? <div className="space-y-2">
+                <p className="text-sm">チケット2枚 ＋ 指名料{formatYen(nominationFee)}</p>
+                <label className="block text-sm">指名料のお支払い方法<select aria-label="指名料のお支払い方法" value={nominationMethod} onChange={(e) => setNominationMethod(e.target.value as ReviewPayMethod)} className="ml-2 rounded-md border border-white/25 bg-slate-900 p-2">{Object.entries(reviewPayMethodLabels).map(([m, label]) => <option key={m} value={m}>{label}</option>)}</select></label>
+                <p className="text-xs text-slate-300">指名料のお支払い後にコーチへ依頼します。カードは回答時に確定、PayPayは申込み時に決済します。対応できない場合は指名料を取り消すか返金します。</p>
+              </div> : null}
               <p className="text-xs text-slate-300">
                 {method === "tickets" ? "依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。" : method === "card"
                   ? "送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。"
@@ -271,8 +310,8 @@ export default function NewReviewRequestPage() {
           ) : (
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
-          <Button type="submit" className="w-full" disabled={pending || !file}>
-            {pending ? "送っています" : method === "tickets" ? "チケット2枚を確保して送る" : estimate?.payments ? `送ってお支払いへ進む（${formatYen(estimate.price_yen)}）` : "送る"}
+          <Button type="submit" className="w-full" disabled={pending || !file || !estimate}>
+            {pending ? "送っています" : cashPayment ? `${method === "tickets" ? "チケット2枚を確保して" : "送って"}お支払いへ（${formatYen(cashPrice)}）` : method === "tickets" ? "チケット2枚を確保して送る" : "送る"}
           </Button>
         </form>
       )}

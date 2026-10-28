@@ -1,6 +1,7 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // tokenWithAAL は、二段階認証の段階(aal1・aal2)を入れたトークンを作る。
@@ -125,5 +127,55 @@ func TestStaffMFANotRequiredWhenOff(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/stats", ta, nil); rec.Code != http.StatusOK {
 		t.Fatalf("admin %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 二段階認証を設定済みの人は、コードを入れる前のログイン(aal1)では API を使えない。
+// 画面で止めるだけだと、パスワードだけ知った人がトークンで直に API を呼べてしまうため。
+func TestMFAEnrolledUserNeedsAAL2(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("postgres unavailable: %v", err)
+	}
+	h := setup(t)
+	// 本番の Supabase にある auth.mfa_factors の、使う列だけを作る。
+	if _, err := pool.Exec(ctx, `
+		CREATE SCHEMA IF NOT EXISTS auth;
+		CREATE TABLE IF NOT EXISTS auth.mfa_factors (id uuid PRIMARY KEY, user_id uuid NOT NULL, status text NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	enrolled, pending, plain := uuid.New(), uuid.New(), uuid.New()
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.mfa_factors WHERE user_id = ANY($1)`, []uuid.UUID{enrolled, pending})
+	})
+	if _, err := pool.Exec(ctx, `INSERT INTO auth.mfa_factors (id, user_id, status) VALUES ($1, $2, 'verified'), ($3, $4, 'unverified')`,
+		uuid.New(), enrolled, uuid.New(), pending); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/me", tokenWithAAL(t, enrolled, "aal1"), nil)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "mfa_required") {
+		t.Fatalf("enrolled aal1 %d %s", rec.Code, rec.Body.String())
+	}
+	// ログインなしで読めるものは、ログインしていない人として読める。
+	rec = doJSON(t, h, http.MethodGet, "/v1/posts", tokenWithAAL(t, enrolled, "aal1"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enrolled aal1 public %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me", tokenWithAAL(t, enrolled, "aal2"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enrolled aal2 %d %s", rec.Code, rec.Body.String())
+	}
+	// 設定の途中(コードを確かめていない)の人と、設定していない人は、これまでどおり使える。
+	for _, id := range []uuid.UUID{pending, plain} {
+		rec = doJSON(t, h, http.MethodGet, "/v1/me", tokenWithAAL(t, id, "aal1"), nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("not enrolled aal1 %d %s", rec.Code, rec.Body.String())
+		}
 	}
 }

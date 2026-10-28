@@ -17,13 +17,15 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 
 ## 2. 二段階認証(認証アプリ)
 
-**公開は保留中。** Supabase のパスキーが正式に出てから公開する方針で、マイページの入口(`/me/security` へのリンク)は隠してある。画面と API は入っていて、URL を直に開けば設定できるが、`STAFF_MFA_REQUIRED` は立てない。公開するときは、`apps/web/app/me/page.tsx` の `accountLinks` に「二段階認証」のリンクを戻す。
+2026-10-28 に公開(マイページの入口を戻した)。パスキーは Supabase で正式に出てから足す。
 
 - 利用者は マイページ → 二段階認証(`/me/security`)で設定・解除する。設定した人は、ログインのたびに6桁のコードを求められる(パスワードでも Google でも)。
-- `STAFF_MFA_REQUIRED=1` の API は、管理者と承認済みコーチの操作を、二段階認証を済ませたログイン(JWT の `aal` が `aal2`)でしか受け付けない(403 `mfa_required`)。画面は `/v1/me` の `mfa_required` を見て、管理・コーチの画面の前に設定・確認を求める。
-- ふつうの利用者は、二段階認証を設定していても API 側では求めない(画面で止める)。
+- API も、設定済みの人(Supabase の `auth.mfa_factors` に `verified` がある人)がコードを入れる前のログイン(JWT の `aal` が `aal1`)で呼んだら、ログインが要る操作を 403 `mfa_required` で断る。ログインなしで読めるものは、ログインしていない人として返す。画面で止めるだけだと、パスワードだけ知った人がトークンで直に API を呼べてしまうため(`apps/api/internal/httpx/mfa_enforce.go`)。
+  - 設定済みかどうかは1人1分だけ覚えて、毎回は DB に聞かない。
+  - `auth.mfa_factors` が無い・読めない DB(手元やテストの素の Postgres)では調べない。本番の API がそうなっていたら、ログに `mfa enforcement disabled` が出る(正しく動いていれば最初の利用で `mfa enforcement enabled`)。
+- `STAFF_MFA_REQUIRED=1` の API は、管理者と承認済みコーチの操作を、二段階認証を済ませたログイン(`aal2`)でしか受け付けない(403 `mfa_required`)。画面は `/v1/me` の `mfa_required` を見て、管理・コーチの画面の前に設定・確認を求める。
 
-本番で有効にする順番:
+管理者・コーチに必須にする順番:
 
 1. Supabase の Authentication → Multi-Factor で TOTP が有効なことを確かめる(既定で有効)。
 2. Web を出し直し、管理者・コーチ全員が `/me/security` で設定する。

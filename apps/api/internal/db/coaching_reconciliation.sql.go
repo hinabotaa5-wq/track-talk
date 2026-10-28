@@ -24,9 +24,10 @@ SELECT
  (SELECT count(*)::int FROM coaching_ticket_reservations t
    WHERE t.status='consumed' AND (
      (t.request_id IS NOT NULL AND NOT EXISTS (
-       SELECT 1 FROM coach_earnings e WHERE e.review_request_id=t.request_id
-       AND e.gross_yen=t.nominal_yen AND e.share_percent=t.share_percent
-       AND e.amount_yen=t.nominal_yen::bigint*t.share_percent/100))
+       SELECT 1 FROM coach_earnings e JOIN review_requests r ON r.id=e.review_request_id
+       WHERE e.review_request_id=t.request_id
+       AND e.gross_yen=t.nominal_yen+r.nomination_fee_yen AND e.share_percent=t.share_percent
+       AND e.amount_yen=t.nominal_yen::bigint*t.share_percent/100+r.nomination_fee_yen::bigint*80/100))
      OR (t.consultation_id IS NOT NULL AND NOT EXISTS (
        SELECT 1 FROM coach_earnings e WHERE e.consultation_id=t.consultation_id
        AND e.gross_yen=t.nominal_yen AND e.share_percent=t.share_percent

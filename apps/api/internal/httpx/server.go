@@ -31,6 +31,7 @@ type Server struct {
 	stripe    stripe.Client
 	mail      mail.Client
 	ai        claude.Client
+	mfa       *MFAEnrollment
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -44,6 +45,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			APIKey:  cfg.SupabaseServiceRoleKey,
 		},
 		limit: NewRateLimiter(v),
+		mfa:   NewMFAEnrollment(pool),
 		cloud: cloudinary.Client{
 			Cloud:        cfg.CloudName,
 			Key:          cfg.CloudAPIKey,
@@ -104,7 +106,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.Post("/internal/storage/cleanup", s.storageCleanup)
 
 	r.Route("/v1", func(r chi.Router) {
-		r.Use(OptionalAuth(v))
+		r.Use(OptionalAuth(v, s.mfa))
 		r.Get("/posts", s.listPosts)
 		r.Get("/posts/{id}", s.getPost)
 		r.Get("/posts/{id}/comments", s.listComments)
@@ -129,7 +131,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/prefectures/{code}", s.getPrefecturePage)
 
 		r.Group(func(r chi.Router) {
-			r.Use(RequireAuth(v))
+			r.Use(RequireAuth(v, s.mfa))
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Patch("/me/badge", s.updateBadge)
@@ -283,7 +285,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
-				r.Use(RequireAuth(v))
+				r.Use(RequireAuth(v, s.mfa))
 				// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
 				r.Get("/me/coaching", s.coachingMe)
 				r.Put("/me/birth-month", s.setBirthMonth)
@@ -306,6 +308,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/me/coaching/contracts", s.listMyCoachingContracts)
 				// フォーム添削（利用者側）
 				r.Get("/coaching/estimate", s.reviewEstimate)
+				r.Get("/coaching/nominees", s.listReviewNominees)
 				r.Post("/coaching/demo", s.joinCoachingDemo)
 				r.With(s.requireNewAcceptance).Post("/coaching/requests", s.createReviewRequest)
 				r.Get("/coaching/requests/{id}/consultations", s.listConsultationRoom)

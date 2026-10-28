@@ -48,9 +48,8 @@ func TestCoachingServicesAndPublication(t *testing.T) {
 	}
 	body := planBody()
 	body["service_type"] = "video_review"
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+planID, tc, body); rec.Code != 200 {
-		t.Fatal(rec.Body.String())
-	}
+	// 移行前から公開されていた動画プランを再現する。
+	execSQLArgs(t, `UPDATE coaching_plans SET service_type='video_review' WHERE id=$1`, planID)
 	if rec := doJSON(t, h, http.MethodPatch, path, tc, map[string]any{"service_types": []string{}}); rec.Code != 409 {
 		t.Fatalf("remove published service %d %s", rec.Code, rec.Body.String())
 	}
@@ -76,11 +75,11 @@ func TestCoachingServicesAndPublication(t *testing.T) {
 func TestCoachingServiceTermsSnapshot(t *testing.T) {
 	h := setup(t)
 	_, tc, planID := planCoach(t, h, 3)
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/services", tc, map[string]any{"service_types": []string{"video_review"}}); rec.Code != 200 {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/services", tc, map[string]any{"service_types": []string{"in_person"}}); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
-	body := planBody()
-	body["service_type"] = "video_review"
+	body := nominationSupportTestBody()
+	body["service_type"] = "in_person"
 	body["additional_consultation_price_yen"] = 500
 	for _, bad := range []any{499, 10000000, 500.5, "500"} {
 		body["additional_consultation_price_yen"] = bad
@@ -112,12 +111,12 @@ func TestCoachingServiceTermsSnapshot(t *testing.T) {
 		{"/v1/coach/contracts", tc},
 	} {
 		rec := doJSON(t, h, http.MethodGet, check.path, check.tok, nil)
-		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"service_type":"video_review"`) || !strings.Contains(rec.Body.String(), `"additional_consultation_price_yen":500`) || !strings.Contains(rec.Body.String(), `"plan_description":"`+oldDescription+`"`) {
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"service_type":"in_person"`) || !strings.Contains(rec.Body.String(), `"additional_consultation_price_yen":500`) || !strings.Contains(rec.Body.String(), `"plan_description":"`+oldDescription+`"`) {
 			t.Fatalf("snapshot %s %d %s", check.path, rec.Code, rec.Body.String())
 		}
 	}
 	// 古いクライアントの保存では新しい設定を消さない。
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+planID, tc, planBody()); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"additional_consultation_price_yen":1000`) || !strings.Contains(rec.Body.String(), `"service_type":"video_review"`) {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/plans/"+planID, tc, nominationSupportTestBody()); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"additional_consultation_price_yen":1000`) || !strings.Contains(rec.Body.String(), `"service_type":"in_person"`) {
 		t.Fatal(rec.Body.String())
 	}
 	body["additional_consultation_price_yen"] = nil
@@ -125,7 +124,7 @@ func TestCoachingServiceTermsSnapshot(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil)
-	if !strings.Contains(rec.Body.String(), `"service_types":["video_review"]`) || !strings.Contains(rec.Body.String(), `"service_type":"video_review"`) {
+	if !strings.Contains(rec.Body.String(), `"service_types":["in_person"]`) || !strings.Contains(rec.Body.String(), `"service_type":"in_person"`) {
 		t.Fatal(rec.Body.String())
 	}
 }
@@ -133,7 +132,7 @@ func TestCoachingServiceTermsSnapshot(t *testing.T) {
 func TestCoachingServiceRemovalAndPublicationAreSerialized(t *testing.T) {
 	h := setup(t)
 	_, tc, _ := planCoach(t, h, 3)
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/services", tc, map[string]any{"service_types": []string{"video_review"}}); rec.Code != 200 {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me/services", tc, map[string]any{"service_types": []string{"in_person"}}); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	var wg sync.WaitGroup
@@ -143,8 +142,8 @@ func TestCoachingServiceRemovalAndPublicationAreSerialized(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		body := planBody()
-		body["service_type"] = "video_review"
+		body := nominationSupportTestBody()
+		body["service_type"] = "in_person"
 		codes[0] = doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tc, body).Code
 	}()
 	go func() {
@@ -157,4 +156,15 @@ func TestCoachingServiceRemovalAndPublicationAreSerialized(t *testing.T) {
 	if !((codes[0] == 201 && codes[1] == 409) || (codes[0] == 422 && codes[1] == 200)) {
 		t.Fatalf("publication and removal must not both succeed: %v", codes)
 	}
+}
+
+func nominationSupportTestBody() map[string]any {
+	b := planBody()
+	b["venue_area"] = "東京都"
+	b["venue_name"] = "競技場"
+	b["session_count"] = 1
+	b["session_minutes"] = 60
+	b["travel_fee_yen"] = 0
+	b["max_participants"] = 1
+	return b
 }

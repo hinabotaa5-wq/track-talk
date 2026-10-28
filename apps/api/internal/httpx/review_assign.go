@@ -72,14 +72,15 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	}
 	now := time.Now()
 	coachID, err := q.PickCoachForRequest(ctx, db.PickCoachForRequestParams{
-		Tier:        rr.Tier,
-		Event:       rr.Event,
-		RequesterID: rr.RequesterID,
-		RequestID:   rr.ID,
-		MaxActive:   maxActiveReviews,
-		DayStart:    dayStart(now),
-		MinRatings:  lowRatingMinCount,
-		LowStars:    lowRatingStars,
+		Tier:             rr.Tier,
+		RequestedCoachID: rr.RequestedCoachID,
+		Event:            rr.Event,
+		RequesterID:      rr.RequesterID,
+		RequestID:        rr.ID,
+		MaxActive:        maxActiveReviews,
+		DayStart:         dayStart(now),
+		MinRatings:       lowRatingMinCount,
+		LowStars:         lowRatingStars,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
@@ -197,6 +198,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	out.Requeued = len(requeued)
+	for _, id := range requeued {
+		s.notifyNominationEnded(ctx, id)
+	}
 	out.Offered = s.dispatchQueuedReviews(ctx)
 	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
 		return out, err
@@ -267,6 +271,24 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	}
 }
 
+// notifyNominationEnded は、指名した依頼が辞退・打診の時間切れで終わったら依頼した人に知らせる。
+// 指名の依頼は別のコーチへ回さないので、ここで終わる。代金とチケットは tick が戻す。
+func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID) {
+	rr, err := s.q.GetReviewRequest(ctx, id)
+	if err != nil || rr.RequestedCoachID == nil || rr.Status != "expired" {
+		return
+	}
+	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
+		slog.Warn("nomination ended notification", "err", err)
+	}
+	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
+		Title: "指名したコーチが依頼を引き受けられませんでした",
+		Body:  "別のコーチには回さず、この依頼は終わりました。代金・指名料とチケットはお戻しします",
+		URL:   "/coaching/requests/" + rr.ID.String(),
+		Tag:   "review-" + rr.ID.String(),
+	}, 24*time.Hour)
+}
+
 // coachingTick は Cloud Scheduler から1分ごとに呼ばれる。共有の秘密のヘッダーがないと受け付けない。
 func (s *Server) coachingTick(w http.ResponseWriter, r *http.Request) {
 	secret := s.cfg.CoachingTickSecret
@@ -311,14 +333,16 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 // 動画は引き受けたあとにだけ見られる。
 func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[string]any {
 	out := map[string]any{
-		"id":         rr.ID,
-		"tier":       rr.Tier,
-		"event":      rr.Event,
-		"focus":      rr.Focus,
-		"question":   rr.Question,
-		"status":     rr.Status,
-		"due_at":     rr.DueAt,
-		"created_at": rr.CreatedAt,
+		"id":                 rr.ID,
+		"tier":               rr.Tier,
+		"event":              rr.Event,
+		"focus":              rr.Focus,
+		"question":           rr.Question,
+		"status":             rr.Status,
+		"due_at":             rr.DueAt,
+		"created_at":         rr.CreatedAt,
+		"requested_coach_id": rr.RequestedCoachID, "nomination_fee_yen": rr.NominationFeeYen,
+		"coach_reward_yen": rr.BasePriceYen*70/100 + rr.NominationFeeYen*80/100,
 	}
 	if withVideo {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(rr.VideoPublicID)
@@ -479,5 +503,6 @@ func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.offerReview(r.Context(), offer.RequestID); err != nil {
 		slog.Warn("review offer after decline", "err", err)
 	}
+	s.notifyNominationEnded(r.Context(), offer.RequestID)
 	w.WriteHeader(http.StatusNoContent)
 }

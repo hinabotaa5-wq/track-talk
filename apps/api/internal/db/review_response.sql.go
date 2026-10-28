@@ -79,7 +79,7 @@ func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID uuid.UUID) 
 }
 
 const getCoachReviewRequest = `-- name: GetCoachReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets FROM review_requests
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status IN ('in_review', 'returned', 'clarifying')
@@ -107,6 +107,11 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 		&i.UpdatedAt,
 		&i.ReturnedAt,
 		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.NominationFeeYen,
+		&i.BasePriceYen,
+		&i.UseTickets,
 	)
 	return i, err
 }
@@ -324,7 +329,7 @@ SET status = 'returned',
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status = 'clarifying'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets
 `
 
 type MarkReviewClarifiedParams struct {
@@ -349,6 +354,11 @@ func (q *Queries) MarkReviewClarified(ctx context.Context, arg MarkReviewClarifi
 		&i.UpdatedAt,
 		&i.ReturnedAt,
 		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.NominationFeeYen,
+		&i.BasePriceYen,
+		&i.UseTickets,
 	)
 	return i, err
 }
@@ -361,7 +371,7 @@ WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
   AND returned_at > now()-interval '7 days'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets
 `
 
 type MarkReviewClarifyingParams struct {
@@ -386,6 +396,11 @@ func (q *Queries) MarkReviewClarifying(ctx context.Context, arg MarkReviewClarif
 		&i.UpdatedAt,
 		&i.ReturnedAt,
 		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.NominationFeeYen,
+		&i.BasePriceYen,
+		&i.UseTickets,
 	)
 	return i, err
 }
@@ -399,7 +414,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'in_review'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets
 `
 
 type MarkReviewReturnedParams struct {
@@ -425,6 +440,11 @@ func (q *Queries) MarkReviewReturned(ctx context.Context, arg MarkReviewReturned
 		&i.UpdatedAt,
 		&i.ReturnedAt,
 		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.NominationFeeYen,
+		&i.BasePriceYen,
+		&i.UseTickets,
 	)
 	return i, err
 }

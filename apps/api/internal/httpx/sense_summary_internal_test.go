@@ -13,7 +13,7 @@ func TestParseSenseSummary(t *testing.T) {
 	if got.Overview != "流れ" || len(got.Good) != 3 || got.Good[1] != "b" || got.Concerns == nil || len([]rune(got.Next[0])) != maxSenseSummaryItem {
 		t.Fatalf("got = %+v", got)
 	}
-	if _, err := parseSenseSummary(`{"overview":"","good":["a"]}`); err == nil {
+	if _, err := parseSenseSummary(`{"overview":"  ","good":["  "],"concerns":[],"next":[]}`); err == nil {
 		t.Fatal("empty overview accepted")
 	}
 	// 配列で包んで返ってきても、1つ目をまとめとして使う。
@@ -39,5 +39,18 @@ func TestParseSenseSummaryErrorHidesReply(t *testing.T) {
 		if strings.Contains(err.Error(), "左ひざ") {
 			t.Fatalf("返事の中身がエラーに入っている: %v", err)
 		}
+	}
+}
+
+func TestParseSenseSummaryUsesReturnedItemsForEmptyOverview(t *testing.T) {
+	for _, field := range []string{"good", "concerns", "next"} {
+		got, err := parseSenseSummary(`{"overview":" ","` + field + `":["  AIが返した文章  "]}`)
+		if err != nil || got.Overview != "AIが返した文章" {
+			t.Fatalf("%s: %#v, %v", field, got, err)
+		}
+	}
+	got, err := parseSenseSummary(`{"overview":"","good":["安定しました","別の感覚"],"concerns":["力みました"],"next":["リズムを意識しましょう"]}`)
+	if err != nil || got.Overview != "安定しました\n力みました\nリズムを意識しましょう" {
+		t.Fatalf("%#v, %v", got, err)
 	}
 }

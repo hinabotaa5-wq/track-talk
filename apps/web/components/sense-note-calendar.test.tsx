@@ -98,7 +98,7 @@ it("元のメモを削除した後も、まとめだけの日をカレンダー�
     notes: [note], created_at: "2026-10-07T00:00:00Z",
   };
   await act(async () => root.render(<SenseNoteCalendar notes={[]} summaries={[summary]} token="token" month="2026-10" onMonthChange={onMonthChange} loading={false} failed={false} onRetry={onRetry} onDeleted={() => {}} />));
-  const day = container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月6日、感覚メモなし、まとめた感覚あり"]')!;
+  const day = container.querySelector<HTMLButtonElement>('button[aria-label="2026年10月6日、感覚メモなし、AI要約あり"]')!;
   expect(day.disabled).toBe(false);
   expect(day.querySelector(".bg-violet-300")).not.toBeNull();
   expect(container.textContent).not.toContain("この月の感覚メモはありません");

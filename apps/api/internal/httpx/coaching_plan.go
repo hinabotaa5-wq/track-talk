@@ -276,6 +276,10 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
+	if req.ServiceType != nil && *req.ServiceType == "video_review" {
+		FieldError(w, map[string]string{"service_type": "動画添削はコーチ画面の指名料から設定してください"})
+		return
+	}
 	fields := req.supportFields(db.CoachingPlan{}, req.Published == nil || *req.Published)
 	for k, v := range req.inPersonFields(db.CoachingPlan{}, req.Published == nil || *req.Published) {
 		fields[k] = v

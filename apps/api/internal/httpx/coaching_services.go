@@ -81,6 +81,10 @@ func (s *Server) updateCoachServices(w http.ResponseWriter, r *http.Request) {
 
 // 後続フェーズで提供管理が整うまでは大会・対面を販売しない。既存の分類なしプランは維持する。
 func (s *Server) planServiceAllowed(w http.ResponseWriter, r *http.Request, q *db.Queries, coachID uuid.UUID, service *string, published bool) bool {
+	if published && service != nil && *service == "video_review" {
+		FieldError(w, map[string]string{"service_type": "動画添削は動画添削プランの指名設定へ移りました。コーチ画面で指名料を設定してください"})
+		return false
+	}
 	if service == nil {
 		return true
 	}

@@ -132,9 +132,9 @@ function paymentText(p: ReviewPayment): string {
     case "captured":
       return `${price}をお支払い済みです（${reviewPayMethodLabels[p.method]}）。`;
     case "canceled":
-      return `目安までに返ってこなかったため、${price}の仮押さえを取り消しました。代金はかかりません。`;
+      return `添削が成立しなかったため、${price}の仮押さえを取り消しました。代金はかかりません。`;
     case "refunded":
-      return `目安までに返ってこなかったため、${price}を返金しました。`;
+      return `添削が成立しなかったため、${price}を返金しました。`;
   }
 }
 
@@ -229,10 +229,14 @@ function ReviewRequestView() {
       </div>
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{reviewStatusLabels[request.status]}</p>
+        <p className="text-sm font-semibold text-white">{request.status === "expired" && request.requested_coach_id ? "指名の依頼は終了しました" : reviewStatusLabels[request.status]}</p>
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p>
         ) : null}
+        {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
+          <p className="font-semibold">指名：{request.requested_coach_name || "選択したコーチ"}</p>
+          <p>基本料金{formatYen(request.base_price_yen ?? 1200)} ＋ 指名料{formatYen(request.nomination_fee_yen ?? 0)}（合計{formatYen(request.total_price_yen ?? 1200)}）</p>
+        </div> : null}
         {request.tickets ? <p className="text-sm text-slate-200">チケット{request.tickets.quantity}枚：{request.tickets.status === "reserved" ? "添削のために確保中" : request.tickets.status === "consumed" ? "利用済み" : "残高に返却済み"}</p> : null}
       {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
       </section>

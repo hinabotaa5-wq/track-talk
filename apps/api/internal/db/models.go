@@ -99,29 +99,30 @@ type CoachPayout struct {
 }
 
 type CoachProfile struct {
-	ProfileID       uuid.UUID  `json:"profile_id"`
-	Tier            string     `json:"tier"`
-	Events          []string   `json:"events"`
-	BestRecord      string     `json:"best_record"`
-	Achievements    string     `json:"achievements"`
-	Years           int16      `json:"years"`
-	Status          string     `json:"status"`
-	AppliedAt       time.Time  `json:"applied_at"`
-	ReviewedAt      *time.Time `json:"reviewed_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	OnDuty          bool       `json:"on_duty"`
-	DailyCap        int16      `json:"daily_cap"`
-	LastOfferedAt   *time.Time `json:"last_offered_at"`
-	RatingResetAt   *time.Time `json:"rating_reset_at"`
-	PhotoPublicID   *string    `json:"photo_public_id"`
-	PledgedAt       *time.Time `json:"pledged_at"`
-	PledgeVersion   *int16     `json:"pledge_version"`
-	StripeAccountID *string    `json:"stripe_account_id"`
-	PayoutsEnabled  bool       `json:"payouts_enabled"`
-	ServiceTypes    []string   `json:"service_types"`
-	SnsUrls         []string   `json:"sns_urls"`
-	Name            string     `json:"name"`
+	ProfileID        uuid.UUID  `json:"profile_id"`
+	Tier             string     `json:"tier"`
+	Events           []string   `json:"events"`
+	BestRecord       string     `json:"best_record"`
+	Achievements     string     `json:"achievements"`
+	Years            int16      `json:"years"`
+	Status           string     `json:"status"`
+	AppliedAt        time.Time  `json:"applied_at"`
+	ReviewedAt       *time.Time `json:"reviewed_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	OnDuty           bool       `json:"on_duty"`
+	DailyCap         int16      `json:"daily_cap"`
+	LastOfferedAt    *time.Time `json:"last_offered_at"`
+	RatingResetAt    *time.Time `json:"rating_reset_at"`
+	PhotoPublicID    *string    `json:"photo_public_id"`
+	PledgedAt        *time.Time `json:"pledged_at"`
+	PledgeVersion    *int16     `json:"pledge_version"`
+	StripeAccountID  *string    `json:"stripe_account_id"`
+	PayoutsEnabled   bool       `json:"payouts_enabled"`
+	ServiceTypes     []string   `json:"service_types"`
+	SnsUrls          []string   `json:"sns_urls"`
+	Name             string     `json:"name"`
+	NominationFeeYen *int32     `json:"nomination_fee_yen"`
 }
 
 type CoachWorkOrder struct {
@@ -920,19 +921,24 @@ type ReviewRating struct {
 }
 
 type ReviewRequest struct {
-	ID            uuid.UUID  `json:"id"`
-	RequesterID   uuid.UUID  `json:"requester_id"`
-	Tier          string     `json:"tier"`
-	Event         string     `json:"event"`
-	Focus         []string   `json:"focus"`
-	VideoPublicID string     `json:"video_public_id"`
-	Status        string     `json:"status"`
-	DueAt         time.Time  `json:"due_at"`
-	CoachID       *uuid.UUID `json:"coach_id"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	ReturnedAt    *time.Time `json:"returned_at"`
-	Question      string     `json:"question"`
+	ID                 uuid.UUID  `json:"id"`
+	RequesterID        uuid.UUID  `json:"requester_id"`
+	Tier               string     `json:"tier"`
+	Event              string     `json:"event"`
+	Focus              []string   `json:"focus"`
+	VideoPublicID      string     `json:"video_public_id"`
+	Status             string     `json:"status"`
+	DueAt              time.Time  `json:"due_at"`
+	CoachID            *uuid.UUID `json:"coach_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	ReturnedAt         *time.Time `json:"returned_at"`
+	Question           string     `json:"question"`
+	RequestedCoachID   *uuid.UUID `json:"requested_coach_id"`
+	RequestedCoachName string     `json:"requested_coach_name"`
+	NominationFeeYen   int32      `json:"nomination_fee_yen"`
+	BasePriceYen       int32      `json:"base_price_yen"`
+	UseTickets         bool       `json:"use_tickets"`
 }
 
 type ReviewResponse struct {
