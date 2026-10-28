@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { z } from "zod";
 
 function subscribeToNothing() {
@@ -29,6 +30,12 @@ function nextParam() {
   return new URLSearchParams(window.location.search).get("next");
 }
 
+// ログイン後の画面へは、履歴のログイン画面を置き換えて進む。
+// push で進むと、戻るボタンでまたログイン画面に戻ってしまう。
+function leaveLogin() {
+  window.location.replace(safeNextPath(nextParam()));
+}
+
 export default function LoginPage() {
   const [submitError, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -36,6 +43,24 @@ export default function LoginPage() {
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
   const next = useSyncExternalStore(subscribeToNothing, nextParam, () => null);
   const error = submitError || (code ? (callbackErrorMessages[code] ?? "") : "");
+  const { session, sessionLoading } = useAuth();
+
+  // Google でログインして戻ったあとなど、履歴に残ったログイン画面へ戻ってきたときは、
+  // ログイン済みならフォームを見せずに戻り先へ進む。
+  useEffect(() => {
+    if (!sessionLoading && session) leaveLogin();
+  }, [session, sessionLoading]);
+  useEffect(() => {
+    function onPageShow(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      // 戻る/進むのキャッシュから復元された画面は、ログイン前の状態のままなので読み直して確かめる。
+      void createClient()?.auth.getSession().then(({ data }) => {
+        if (data.session) leaveLogin();
+      });
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -62,7 +87,7 @@ export default function LoginPage() {
       return;
     }
     // ログイン前に先読みした「/login への転送」を捨てるため、ページを読み直す。
-    window.location.assign(safeNextPath(new URLSearchParams(window.location.search).get("next")));
+    leaveLogin();
   }
 
   return (

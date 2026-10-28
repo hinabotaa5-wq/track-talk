@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useRouter } from "next/navigation";
 import { recruitmentSchema } from "@/lib/validators";
 import { PREFECTURES } from "@/lib/prefectures";
@@ -85,7 +86,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     setError("");

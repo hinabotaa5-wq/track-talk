@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useRouter } from "next/navigation";
 import { practiceSchema } from "@/lib/validators";
 import { appEvents } from "@/lib/practice-events";
@@ -34,7 +35,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   async function onSubmit(formEvent: FormEvent) {
     formEvent.preventDefault();
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     setError("");

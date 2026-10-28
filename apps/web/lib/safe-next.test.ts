@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextCookiePath, safeNextPath } from "./safe-next";
+import { loginPathFrom, nextCookiePath, safeNextPath } from "./safe-next";
 
 describe("safeNextPath", () => {
   it("keeps same-site paths", () => {
@@ -33,5 +33,13 @@ describe("safeNextPath", () => {
     expect(nextCookiePath("/me/delete")).toBe("/me/delete");
     expect(nextCookiePath("https%3A%2F%2Fevil.example")).toBe("/");
     expect(nextCookiePath(null)).toBe("/");
+  });
+});
+
+describe("loginPathFrom", () => {
+  it("returns to the current page after login", () => {
+    const path = loginPathFrom({ pathname: "/posts/abc", search: "?tab=comments" });
+    expect(path).toBe("/login?next=%2Fposts%2Fabc%3Ftab%3Dcomments");
+    expect(safeNextPath(new URLSearchParams(path.split("?")[1]).get("next"))).toBe("/posts/abc?tab=comments");
   });
 });

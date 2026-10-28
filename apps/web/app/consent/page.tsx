@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth-provider";
 import { ServiceConsentText } from "@/components/service-consent-text";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { safeNextPath } from "@/lib/safe-next";
+import { loginPathFrom, safeNextPath } from "@/lib/safe-next";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +22,7 @@ function ConsentForm() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) router.replace("/login");
+    if (!session) router.replace(loginPathFrom(window.location));
     else if (profile?.overseas_consent) router.replace(next);
   }, [loading, session, profile, next, router]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useRouter } from "next/navigation";
 import { injuryBodyPartLabel, injuryBodyParts, injuryGroupPath, isInjuryBodyPart } from "@/lib/injury";
 import { Input } from "./ui/input";
@@ -29,7 +30,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!session) {
-      router.push("/login");
+      router.push(loginPathFrom(window.location));
       return;
     }
     setError("");
