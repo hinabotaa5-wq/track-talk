@@ -76,7 +76,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
               role="status"
               className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-fit rounded-full bg-slate-900/90 px-4 py-2 text-sm font-semibold text-slate-100 shadow-lg md:bottom-6"
             >
-              スケジュールされました
+              目標の大会にセットしました
             </p>,
             document.body,
           )

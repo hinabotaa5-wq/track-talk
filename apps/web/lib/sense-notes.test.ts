@@ -28,12 +28,17 @@ describe("sense notes", () => {
   });
 
   it.each([
-    { total: 1, days: 1, streak: 1, today: 1 },
     { total: 5, days: 3, streak: 3, today: 1 },
-    { total: 5, days: 3, streak: 1, today: 2 },
     { total: 6, days: 6, streak: 6, today: 1 },
   ])("shows only the streak encouragement for $total notes", (stats) => {
     expect(senseCheer(stats)).toBe(`${stats.streak}日続けて書けてる。また明日も書こう！`);
+  });
+
+  it.each([
+    { total: 1, days: 1, streak: 1, today: 1 },
+    { total: 5, days: 3, streak: 1, today: 2 },
+  ])("drops the streak count on the first day ($total notes)", (stats) => {
+    expect(senseCheer(stats)).toBe("また明日も書こう！");
   });
 
   it("groups notes by day keeping the order", () => {
