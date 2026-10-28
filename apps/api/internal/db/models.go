@@ -94,6 +94,17 @@ type CoachProfile struct {
 	Name            string     `json:"name"`
 }
 
+type CoachWorkOrder struct {
+	ID              uuid.UUID  `json:"id"`
+	Kind            string     `json:"kind"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ConsultationID  *uuid.UUID `json:"consultation_id"`
+	CoachID         *uuid.UUID `json:"coach_id"`
+	TermsVersion    int16      `json:"terms_version"`
+	Terms           []byte     `json:"terms"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
 type CoachingAccessLog struct {
 	ID         uuid.UUID `json:"id"`
 	AdminID    uuid.UUID `json:"admin_id"`

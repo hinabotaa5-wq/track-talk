@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkOrderView } from "@/components/work-order-terms";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
@@ -238,6 +239,8 @@ export default function CoachReviewRequestPage() {
           className="w-full rounded-xl bg-black"
         />
       ) : null}
+
+      {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
 
       {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} /> : null}
 

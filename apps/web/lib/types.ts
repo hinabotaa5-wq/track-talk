@@ -692,15 +692,29 @@ export type CoachProbationResponse = {
 };
 
 // コーチに見せる依頼。動画は引き受けたあとにだけ付く。
+// 運営者がコーチに委託するときの取引条件(フリーランス保護法3条)。文面は API が作る。
+export type WorkOrderTerms = {
+  items: { label: string; value: string }[];
+  amount_yen: number;
+  deliver_by: string;
+  payment_due: string;
+  carried_due: string;
+  consigned_at: string;
+};
+
+export type WorkOrder = { id: string; terms_version: number; terms: WorkOrderTerms; created_at: string };
+
 export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url" | "rating"> & {
   video_url?: string;
   thumbnail_url?: string;
+  work_order?: WorkOrder;
 };
 
 export type ReviewOffer = {
   id: string;
   expires_at: string;
   request: CoachReviewRequest;
+  terms?: WorkOrderTerms;
 };
 
 export type CoachRequests = {

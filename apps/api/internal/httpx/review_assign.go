@@ -343,12 +343,25 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	name, err := coachDisplayName(r.Context(), s.q, p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	now := time.Now()
 	offerOut := make([]map[string]any, 0, len(offers))
 	for _, o := range offers {
+		// 引き受ける前に、この案件の取引条件を見せる。委託した日は引き受けた時になる。
+		terms, err := s.reviewWorkOrderTerms(r.Context(), s.q, o.ReviewRequest, name, now)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
 		offerOut = append(offerOut, map[string]any{
 			"id":         o.OfferID,
 			"expires_at": o.OfferExpiresAt,
 			"request":    s.coachRequestJSON(o.ReviewRequest, false),
+			"terms":      terms,
 		})
 	}
 	reviewOut := make([]map[string]any, 0, len(reviewing))
@@ -400,11 +413,30 @@ func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
+	name, err := coachDisplayName(r.Context(), q, p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	terms, err := s.reviewWorkOrderTerms(r.Context(), q, rr, name, time.Now())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := saveWorkOrder(r.Context(), q, "review", &rr.ID, nil, p.ID, terms); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, s.coachRequestJSON(rr, true))
+	out := s.coachRequestJSON(rr, true)
+	if wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID}); err == nil {
+		out["work_order"] = workOrderJSON(wo)
+	}
+	JSON(w, http.StatusOK, out)
 }
 
 func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {

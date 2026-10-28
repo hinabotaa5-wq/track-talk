@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkOrderTermsView, WorkOrderView } from "@/components/work-order-terms";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,6 +123,8 @@ function ConsultationCard({ consultation: c, role, base, token, guardian, reload
       {c.clarification ? <p className="whitespace-pre-wrap text-sm">補足：{c.clarification}</p> : null}
       {c.status === "offered" && c.respond_by ? <p className="text-xs text-slate-300">受諾期限：{formatDateTime(c.respond_by)}</p> : null}
       {c.status === "in_review" && c.answer_by ? <p className="text-xs text-slate-300">回答期限：{formatDateTime(c.answer_by)}</p> : null}
+      {role === "coach" && c.terms && c.status === "offered" ? <WorkOrderTermsView terms={c.terms} /> : null}
+      {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
       {role === "coach" && c.status === "offered" ? <div className="flex gap-3"><Button disabled={pending} onClick={() => void act("accept")}>引き受ける</Button><Button disabled={pending} onClick={() => void act("decline")}>辞退する</Button></div> : null}
       {coachingMessagingEnabled && (reply || clarify || clarifyReply) ? <div className="space-y-2">
         <Textarea aria-label={reply ? "コーチの回答" : clarify ? "回答への確認質問" : "コーチの補足"} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} disabled={pending} />

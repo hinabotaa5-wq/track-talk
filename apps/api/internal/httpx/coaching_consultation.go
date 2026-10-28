@@ -258,7 +258,15 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		if role == "guardian" && !c.Minor {
 			continue
 		}
-		items = append(items, s.consultationJSON(c))
+		item := s.consultationJSON(c)
+		// フォーム添削の追加相談は運営者がコーチに委託するので、コーチには取引条件を見せる。
+		if role == "coach" && room.review != nil && c.CoachID != nil {
+			if err := s.attachConsultationWorkOrder(r.Context(), item, c); err != nil {
+				MapDBError(w, err)
+				return
+			}
+		}
+		items = append(items, item)
 	}
 	price, _, requiresVideo, offerErr := s.consultationOffer(r.Context(), s.q, room)
 	reason := ""
@@ -610,6 +618,15 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		switch action {
 		case "accept":
 			saved, err = q.AcceptConsultation(r.Context(), db.AcceptConsultationParams{ID: c.ID, CoachID: c.CoachID})
+			// フォーム添削の追加相談は、引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
+			// サポートプランの追加相談はコーチが販売者なので、要否は弁護士の回答(Q9)を待つ。
+			if err == nil && saved.ReviewRequestID != nil {
+				name, e := coachDisplayName(r.Context(), q, *saved.CoachID)
+				if e != nil {
+					return e
+				}
+				err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, consultationWorkOrderTerms(saved, name, time.Now()))
+			}
 		case "decline":
 			if current.Status != "offered" {
 				return &ticketRuleError{"invalid_state", "受諾前の相談だけ辞退できます"}
