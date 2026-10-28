@@ -1,3 +1,4 @@
+import { PageLoading } from "@/components/page-loading";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -20,7 +21,7 @@ export default async function RegionalCompetitionsPage({
   if (target) redirect(target);
 
   return (
-    <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
       <RegionalCompetitionsView />
     </Suspense>
   );

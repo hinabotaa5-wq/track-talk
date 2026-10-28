@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -66,7 +68,7 @@ export default function UpdatePasswordPage() {
           パスワードを変更しました。<Link href="/" className="underline">ホームへ</Link>
         </p>
       ) : ready === "checking" ? (
-        <p className="text-sm">確認しています…</p>
+        <PageLoading label="確認しています…" />
       ) : ready === "expired" ? (
         <p className="text-sm">
           リンクの有効期限が切れたか、リセットを申し込んだのとは別のブラウザで開いています。

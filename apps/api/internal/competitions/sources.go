@@ -1,13 +1,18 @@
 package competitions
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var ErrSourceSkipped = errors.New("取り込み元をスキップ")
 
 // Sources は、読みに行く陸上競技協会のホームページ。
 // ほかの県は、日程のページの URL が分かったらここに足す。
 var Sources = []Source{
 	{Prefecture: "01", PageURL: "https://hokkaido-rikkyo.jp/schedule/index.html", PDFLinks: []string{`北海道内全競技会日程|schedule_hokkaido`}, NewsURL: "https://hokkaido-rikkyo.jp/information/index.html"},
 	{Prefecture: "02", PageURL: "https://www.jaafaomori.com/schedule/", NewsURL: "https://www.jaafaomori.com/news/"},
-	{Prefecture: "03", PageURL: "https://iwate-rk.com/competition-info/", NewsURL: "https://iwate-rk.com/"},
+	{Prefecture: "03", PageURL: "https://iwate-rk.com/competition-info/", PDFLinks: []string{`主要競技会日程`}, NewsURL: "https://iwate-rk.com/"},
 	{
 		Prefecture: "04",
 		NewsURL:    "https://www.jaaf-miyagi.com/",

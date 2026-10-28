@@ -2,6 +2,8 @@
 
 import { WorkOrderTermsView } from "@/components/work-order-terms";
 import { CoachCommerceSection } from "@/components/coach-commerce";
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachConsultationQueue } from "@/components/coaching-consultations";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 
@@ -218,7 +220,7 @@ export function CoachDashboard() {
   }
 
   if (error && coach === undefined) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || coach === undefined) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading || !session || coach === undefined) return <PageLoading label="読み込み中..." />;
 
   if (!coach || coach.status !== "approved") {
     return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -82,7 +84,7 @@ export default function MePage() {
   }, [loading, session, router]);
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (

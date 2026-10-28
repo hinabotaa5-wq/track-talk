@@ -2,6 +2,8 @@
 
 import { PublicAvailability } from "@/components/coach-availability";
 import { hasAvailability } from "@/lib/coach-availability";
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachServicePlans } from "@/components/coach-service-plans";
 import { apiFetch } from "@/lib/api";
@@ -35,7 +37,7 @@ export default function CoachDetailPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6">
-      {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : coach === undefined ? <p className="text-sm text-slate-200">読み込み中...</p> : coach === null ? <p className="text-sm text-slate-200">このコーチは現在公開されていません。</p> : <>
+      {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : coach === undefined ? <PageLoading label="読み込み中..." /> : coach === null ? <p className="text-sm text-slate-200">このコーチは現在公開されていません。</p> : <>
         <section className="glass space-y-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm" aria-label="コーチのプロフィール">
           <div className="flex items-center gap-4">
             <CoachAvatar url={coach.photo_url} name={coach.nickname} size={80} />

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { CoachAvatar } from "@/components/coach-photo";
 import { apiFetch } from "@/lib/api";
 import { formatYen } from "@/lib/format";
@@ -34,7 +36,7 @@ export function CoachList() {
   }, []);
 
   if (error) return <p role="alert" className="text-sm text-red-400">{error}</p>;
-  if (!coaches) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!coaches) return <PageLoading label="読み込み中..." />;
   if (coaches.length === 0) return <p className="text-sm text-slate-200">まだいません</p>;
 
   return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError, apiFetch } from "@/lib/api";
@@ -62,7 +64,7 @@ export function MeetSessionsAdmin({ token }: { token: string | null }) {
     }
   }
 
-  if (!meets) return error ? <p className="text-sm text-red-400">{error}</p> : <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!meets) return error ? <p className="text-sm text-red-400">{error}</p> : <PageLoading label="読み込み中..." />;
   if (meets.length === 0) return <p className="text-sm text-slate-200">タイムテーブルを入れられる大会(これから開催か開催中の主要大会)はありません。</p>;
 
   return (

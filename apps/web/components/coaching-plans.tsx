@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -585,7 +587,7 @@ export function CoachPlansSection({
       ) : (
         <>
           {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
-          {plans === null && !error ? <p className="text-sm text-slate-200">読み込み中...</p> : null}
+          {plans === null && !error ? <PageLoading label="読み込み中..." /> : null}
           {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
           <ul className="space-y-2">
             {plans?.map((p) =>

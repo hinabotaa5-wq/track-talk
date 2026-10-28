@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
@@ -98,7 +100,7 @@ export default function MySenseNotesPage() {
     return () => controller.abort();
   }, [token, cursor, notes, month, historyFailed]);
 
-  if (loading) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (loading) return <PageLoading label="読み込み中..." />;
   const shownNotes = guest ? [] : notes;
   const shownStats = guest ? guestStats : stats;
   const needsOlderNotes = Boolean(cursor && shownNotes?.length && shownNotes[shownNotes.length - 1].day >= `${month}-01`);
@@ -134,7 +136,7 @@ export default function MySenseNotesPage() {
         ) : failed ? (
           <ErrorState message="感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。" />
         ) : shownNotes === null || shownStats === null ? (
-          <p className="text-sm text-slate-200">読み込み中...</p>
+          <PageLoading label="読み込み中..." />
         ) : (
           <>
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">

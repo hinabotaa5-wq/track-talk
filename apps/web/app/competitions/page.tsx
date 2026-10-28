@@ -1,3 +1,4 @@
+import { PageLoading } from "@/components/page-loading";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -32,7 +33,7 @@ export default async function CompetitionsPage({
   // 他のタブと同じく、読み込み中も1画面より高くしておく。
   return (
     <div className="min-h-svh md:min-h-0">
-      <Suspense fallback={<p className="text-sm text-slate-200">読み込み中...</p>}>
+      <Suspense fallback={<PageLoading label="読み込み中..." />}>
         <CompetitionsHome initialMajors={majors} />
       </Suspense>
     </div>

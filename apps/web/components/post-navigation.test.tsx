@@ -23,7 +23,7 @@ vi.mock("next/link", () => ({
   useLinkStatus: () => ({ pending: state.pending }),
 }));
 vi.mock("@/lib/after-startup", () => ({ afterStartup: (callback: () => void) => { state.ready = callback; return () => {}; } }));
-vi.mock("./auth-provider", () => ({ useAuth: () => ({ session: state.session, loading: state.loading }) }));
+vi.mock("./auth-provider", () => ({ useAuth: () => ({ session: state.session, loading: state.loading, sessionLoading: state.loading }) }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/posts/new",
   useRouter: () => ({ replace: state.replace }),
@@ -120,4 +120,10 @@ it("レビューのタブでは投稿ボタンを出さない", async () => {
   state.search = "sort=review";
   await act(async () => root.render(<HomePostFab key="review" />));
   expect(container.querySelector('a[aria-label="投稿する"]')).toBeNull();
+});
+
+it("未ログインの投稿ボタンはログインへ直接案内する", async () => {
+  state.session = null;
+  await act(async () => root.render(<PostFab />));
+  expect(container.querySelector("a")?.getAttribute("href")).toBe("/login?next=/upload");
 });

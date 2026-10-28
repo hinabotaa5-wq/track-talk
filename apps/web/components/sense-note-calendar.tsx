@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { SenseNoteItem } from "./sense-notes";
@@ -131,9 +133,9 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
           {shared ? <><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-300" />記録</span></> : null}
           <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-violet-300" />AI要約</span>
         </p> : null}
-        {summariesLoading ? <p role="status" className="text-sm text-slate-300">AI要約を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">AI要約を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
-        {recordsLoading ? <p role="status" className="text-sm text-slate-300">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
-        {loading ? <p role="status" className="text-sm text-slate-300">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
+        {summariesLoading ? <PageLoading label="AI要約を読み込み中..." /> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">AI要約を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
+        {recordsLoading ? <PageLoading label="記録を読み込み中..." /> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
+        {loading ? <PageLoading label="この月のメモを読み込み中..." /> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
       </div>
       {detailsOpen && selectedDay ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/60 px-2 backdrop-blur-sm" style={{ paddingTop: overlayPadding.top, paddingBottom: overlayPadding.bottom }} onClick={(event) => { if (event.target === event.currentTarget) closeDetails(); }}>

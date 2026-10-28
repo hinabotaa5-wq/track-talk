@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import { UploadOpening } from "./upload-opening";
 
 export default function UploadPage() {
-  const { session, loading } = useAuth();
+  const { session, sessionLoading: loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {

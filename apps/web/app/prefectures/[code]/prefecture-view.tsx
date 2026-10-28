@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -44,7 +46,7 @@ export function PrefectureView({ code, initialPage }: { code: string; initialPag
       {failed ? (
         <ErrorState message="取得に失敗しました。時間をおいて開き直してください。" />
       ) : !page ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
+        <PageLoading label="読み込み中..." />
       ) : (
         <>
           <section className="space-y-2">

@@ -135,6 +135,8 @@ func RequireAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.H
 			}
 			identity, err := v.ParseIdentity(raw)
 			if err != nil {
+				// 鍵の入れ替えなどで全員が弾かれたときに理由を追えるよう、失敗の理由だけ残す(トークンは残さない)。
+				slog.Warn("auth rejected", "err", err, "path", logPath(r.URL.Path))
 				Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 				return
 			}

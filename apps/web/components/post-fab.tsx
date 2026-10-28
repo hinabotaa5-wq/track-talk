@@ -1,17 +1,19 @@
 "use client";
 
+import { useAuth } from "./auth-provider";
 import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { parseHomeSort } from "@/lib/home-sort";
 import { MainTabLink } from "./main-tab-link";
 
-// 投稿はタブではなく、ホームの左下のボタンから始める。ログインしていなければ proxy がログインへ送る。
+// 未ログイン時は投稿画面の先読みや転送を経由せず、直接ログインへ案内する。
 // 背景や下のメニュー、選んでいるタブは青なので、投稿の入口は白地に青の＋にして青に埋もれないようにする。
 export function PostFab() {
+  const { session, sessionLoading } = useAuth();
   return (
     <MainTabLink
       prefetch={true}
-      href="/upload"
+      href={!sessionLoading && !session ? "/login?next=/upload" : "/upload"}
       aria-label="投稿する"
       className="fixed left-4 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] z-30 flex size-14 items-center justify-center rounded-full bg-white text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-[0.98] md:left-8 md:bottom-8"
     >

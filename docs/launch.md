@@ -5,7 +5,7 @@
 ## Supabase
 
 - プロジェクトを作成し、Auth のメール確認と Redirect URLs にサイトURLを登録する
-- JWT secret（Dashboard の JWT Settings）を API の `SUPABASE_JWT_SECRET` に入れる。空のときは API がプロジェクトの JWKS で検証する
+- JWT は非対称鍵（JWT Keys の Current を ECC P-256）で署名し、API はプロジェクトの JWKS で検証する。本番の API には `SUPABASE_JWT_SECRET` を入れない（旧 HS256 の秘密は 2026-10-28 に Revoke 済み）。HS256 の秘密はローカルの `cmd/localauth` とテストだけで使う
 - `DATABASE_URL` は Go API のみ。anon key 以外をフロントに置かない
 - 全テーブルで RLS 有効（マイグレーション済み）。PostgREST からの直接CRUDは許可しない
 - 退会時に Auth ユーザーを削除するため、service_role key を API の `SUPABASE_SERVICE_ROLE_KEY` に入れる。フロントエンドには置かない
@@ -15,7 +15,7 @@
 ## Cloud Run（Go API）
 
 - 初回は [Cloud Run で動かす手順](cloud-run-deploy.md) の `deploy/cloud-run/setup.sh` で作る。以降は Actions の「Deploy API」を手動で流してデプロイする（マージでは自動デプロイしない）
-- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_AUTH_TOKEN_KEY`(任意。空なら非公開の動画は API シークレットの署名付き URL で配信する。Cloudinary の有料のトークン認証を有効にしたときだけ鍵を入れると、URL が3時間で切れる), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- 環境変数: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_AUTH_TOKEN_KEY`(任意。空なら非公開の動画は API シークレットの署名付き URL で配信する。Cloudinary の有料のトークン認証を有効にしたときだけ鍵を入れると、URL が3時間で切れる), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - `COACHING_ENABLED` はオンラインコーチングを提供するまで設定しない（Web の `NEXT_PUBLIC_COACHING_ENABLED` も同じ）。空のうちは保護者の同意・決済、パーソナル指導、フォーム添削、プッシュ通知、コーチの報酬と送金、運営の送金が 404 になり、コーチの応募と運営の審査だけが残る
 - `CORS_ORIGINS` は画面の本番 URL
 - ヘルスチェック: `/health`

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useAuth } from "@/components/auth-provider";
 import { GuardianAllowance } from "@/components/guardian-allowance";
 import { Button } from "@/components/ui/button";
@@ -144,13 +146,13 @@ export default function CoachingSetupPage() {
   }
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
   if (loadError) {
     return <p className="text-sm text-red-400">{loadError}</p>;
   }
   if (!me) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (

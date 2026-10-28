@@ -89,7 +89,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | 設定 | 用途 |
 | --- | --- |
 | `DATABASE_URL` | APIのPostgreSQL接続先 |
-| `SUPABASE_URL` / `SUPABASE_JWT_SECRET` / `SUPABASE_JWT_AUD` | JWT検証 |
+| `SUPABASE_URL` / `SUPABASE_JWT_AUD` | JWT検証（JWKS）。`SUPABASE_JWT_SECRET` はローカルの HS256 用で、本番では入れない |
 | `SUPABASE_SERVICE_ROLE_KEY` | 退会時の認証アカウント削除 |
 | `CLOUDINARY_*` | ファイル保存と署名 |
 | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SITE_URL` | ブラウザ向けの公開設定 |

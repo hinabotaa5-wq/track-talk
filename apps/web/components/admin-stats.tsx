@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { coachingEnabled } from "@/lib/features";
@@ -165,7 +167,7 @@ export function AdminStatsView({ token }: { token: string | null }) {
   }, [token]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!stats || !coaching) return <p className="text-sm text-slate-200">読み込み中...</p>;
+  if (!stats || !coaching) return <PageLoading label="読み込み中..." />;
 
   const days = stats.recent_days;
   return (

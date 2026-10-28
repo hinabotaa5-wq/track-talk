@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoading } from "@/components/page-loading";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
@@ -22,7 +24,7 @@ export default function MyPostsPage() {
   }, [loading, session, router]);
 
   if (loading || !session) {
-    return <p className="text-sm text-slate-200">読み込み中...</p>;
+    return <PageLoading label="読み込み中..." />;
   }
 
   return (
@@ -41,7 +43,7 @@ export default function MyPostsPage() {
       {feed.error ? (
         <p className="text-sm text-red-400">{feed.error}</p>
       ) : feed.posts === null ? (
-        <p className="text-sm text-slate-200">読み込み中...</p>
+        <PageLoading label="読み込み中..." />
       ) : posts.length === 0 ? (
         <p className="text-sm text-slate-200">まだ投稿がありません</p>
       ) : (
