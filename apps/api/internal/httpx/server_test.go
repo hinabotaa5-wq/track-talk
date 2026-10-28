@@ -73,6 +73,9 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		CoachingEnabled:       true,
 		CoachingNewAcceptance: true,
 		CoachingMessaging:     true,
+		// 本番はチケットの新規販売を止めている（空が既定）。購入済みチケットの消費・返金を確かめる
+		// テストが多いので開けておき、止めたときの動きは coaching_ticket_sales_test.go で確かめる。
+		CoachingTicketSales: true,
 		// テスト用の鍵(32バイトの 0x01)。本番の鍵は Secret Manager に置く。
 		CoachIdentityKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
 		CloudName:        os.Getenv("CLOUDINARY_CLOUD_NAME"),

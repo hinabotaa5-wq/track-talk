@@ -65,7 +65,7 @@ export default function CoachingPage() {
         <h2 className="text-sm font-semibold text-slate-100">利用中の方</h2>
         <nav aria-label="コーチングの利用状況" className="divide-y divide-white/15 overflow-hidden rounded-xl border border-white/20 bg-white/5">
           {[
-            ["/me/coaching/tickets", "チケットの残高・購入"],
+            ["/me/coaching/tickets", "チケットの残高・履歴"],
             ["/me/coaching/requests", "依頼した動画添削"],
             ["/me/coaching/personal", "申し込んだサポートプラン"],
           ].map(([href, label]) => (

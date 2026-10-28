@@ -62,6 +62,8 @@ export default function NewReviewRequestPage() {
   const nominationFee = nominee?.nomination_fee_yen ?? 0;
   const totalPrice = (estimate?.price_yen ?? 1200) + nominationFee;
   const cashPrice = method === "tickets" ? nominationFee : totalPrice;
+  // チケットの新規販売は止めた。購入済みのチケットが添削1本分（2枚）残っている人にだけ、チケットで払う選択肢を出す。
+  const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 2;
   const cashPayment = !!estimate?.payments && cashPrice > 0;
 
   useEffect(() => {
@@ -107,7 +109,7 @@ export default function NewReviewRequestPage() {
     if (!token) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
-      if (!cancelled) { setTicketSummary(data); if (data.balance.available > 0) setMethod("tickets"); }
+      if (!cancelled) { setTicketSummary(data); if (data.balance.available >= 2) setMethod("tickets"); }
     }).catch(() => { if (!cancelled) setTicketSummary(null); });
     return () => { cancelled = true; };
   }, [token]);
@@ -252,11 +254,11 @@ export default function NewReviewRequestPage() {
             <span className="block text-xs text-slate-300">{question.length}/1000文字</span>
           </label>
 
-          {ticketSummary ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
+          {ticketSummary && ticketsUsable ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
             <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
             <p className="text-xs text-slate-300">基本料金は2枚です。指名料はカードまたはPayPayで別途お支払いください。</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-              チケットを購入・確認する<ArrowRight className="size-4 text-blue-300" aria-hidden />
+              {ticketSummary.can_purchase ? "チケットを購入・確認する" : "チケットの残高・履歴を見る"}<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
           </div> : null}
           <label className="block space-y-1 text-sm">
@@ -285,11 +287,11 @@ export default function NewReviewRequestPage() {
               </span>
             </p>
           ) : null}
-          {estimate?.payments || (ticketSummary?.balance.available ?? 0) > 0 ? (
+          {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">お支払い（合計 {formatYen(totalPrice)}）</legend>
               <div className="flex flex-wrap gap-2">
-                {ticketSummary ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
+                {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
                 {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}

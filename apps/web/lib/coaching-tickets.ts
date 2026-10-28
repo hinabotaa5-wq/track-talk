@@ -10,6 +10,8 @@ export type TicketSummary = {
   purchases: TicketPurchase[] | null;
   ledger: { id: string; kind: string; available_delta: number; reserved_delta: number; created_at: string }[] | null;
   can_purchase: boolean; purchase_block_reason: string; unit_yen: number;
+  // false の間はチケットの新規販売を止めている。購入済みの残高・履歴・返金はそのまま。
+  sales_open?: boolean;
 };
 
 export function ticketReturnPath(value: string | null | undefined): string {

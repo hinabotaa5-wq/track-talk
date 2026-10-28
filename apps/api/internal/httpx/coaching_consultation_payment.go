@@ -45,6 +45,9 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 			return err
 		}
 		if current.Minor {
+			if current.ContractID == nil {
+				return &ticketRuleError{"minor_cash_unavailable", "18歳未満の方の追加相談のお支払いは準備中です"}
+			}
 			consented, err := q.HasGuardianContractConsent(ctx, *current.ContractID)
 			if err != nil {
 				return err
@@ -82,12 +85,17 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 	if c.CheckoutUrl != nil {
 		return *c.CheckoutUrl, nil
 	}
-	path := "/coaching/personal/" + c.ContractID.String()
+	path := "/coaching/personal/"
+	if c.ContractID != nil {
+		path += c.ContractID.String()
+	} else if c.ReviewRequestID != nil {
+		path = "/coaching/requests/" + c.ReviewRequestID.String()
+	}
 	if c.Minor {
 		path = "/guardian/paid"
 	}
 	page := s.cfg.WebBaseURL + path
-	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: []string{"card"}, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
+	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: checkoutPaymentMethods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errStripe, err)
 	}

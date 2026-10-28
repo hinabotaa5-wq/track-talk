@@ -46,6 +46,10 @@ type Config struct {
 	// 添削の「わからなかった」と補足回答）の送信を止める。読む・通報・返金は止めない。
 	// 有料の1対1メッセージは電気通信事業の届出の対象なので、届出が受理されるまで本番では立てない。
 	CoachingMessaging bool
+	// CoachingTicketSales が false の間は、コーチングチケットの新規購入を止める。動画添削は都度払い
+	// （カード・PayPay）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
+	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
+	CoachingTicketSales bool
 	// CoachIdentityKey は、コーチの本名・住所・電話番号を暗号化する鍵(32バイトを base64 にしたもの)。
 	// DB とは別に Secret Manager などで持つ。空なら、コーチの特商法の登録情報は保存も表示もできない。
 	CoachIdentityKey string
@@ -128,6 +132,7 @@ func Load() (Config, error) {
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
 		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
+		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		CoachIdentityKey:           os.Getenv("COACH_IDENTITY_KEY"),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
