@@ -1,3 +1,4 @@
+import { apiFetch } from "./api";
 import { formatYen } from "./format";
 
 // Web Push の購読まわり。通知はブラウザが対応していて、ホーム画面のアプリかブラウザで許可したときだけ届く。
@@ -24,12 +25,39 @@ export async function subscribePush(publicKey: string): Promise<PushSubscription
   const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
-  if (existing) return existing.toJSON();
+  if (existing && subscriptionMatchesKey(existing, publicKey)) return existing.toJSON();
+  // 前の鍵で作った購読には、鍵を入れ替えたあと通知が届かない。外してから作り直す。
+  if (existing) await existing.unsubscribe();
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: base64UrlToBytes(publicKey),
   });
   return subscription.toJSON();
+}
+
+// 購読が、いまの VAPID 公開鍵で作られたものか。鍵が分からない古いブラウザでは作り直さない。
+export function subscriptionMatchesKey(subscription: Pick<PushSubscription, "options">, publicKey: string): boolean {
+  const key = subscription.options?.applicationServerKey;
+  if (!key) return true;
+  const current = new Uint8Array(key);
+  const expected = base64UrlToBytes(publicKey);
+  return current.length === expected.length && current.every((value, i) => value === expected[i]);
+}
+
+// VAPID の鍵を入れ替えたあと、前の鍵の購読を今の鍵で作り直して API に登録し直す。
+// 通知をオンにしていない端末や、鍵が変わっていない端末では何もしない。
+export async function refreshPushSubscription(token: string): Promise<void> {
+  const existing = await currentPushSubscription();
+  if (!existing) return;
+  const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
+  if (!public_key || subscriptionMatchesKey(existing, public_key)) return;
+  await apiFetch<void>("/v1/me/push-subscriptions", {
+    method: "DELETE",
+    token,
+    body: JSON.stringify({ endpoint: existing.endpoint }),
+  }).catch(() => undefined);
+  const subscription = await subscribePush(public_key);
+  await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
 }
 
 // この端末でいま通知を受け取る設定になっているか。service worker を新しく登録はしない。
