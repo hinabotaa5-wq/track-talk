@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -81,22 +82,26 @@ func newDemoCode() (string, error) {
 
 func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 	return map[string]any{
-		"id":            rr.ID,
-		"tier":          rr.Tier,
-		"event":         rr.Event,
-		"focus":         rr.Focus,
-		"question":      rr.Question,
-		"status":        rr.Status,
-		"due_at":        rr.DueAt,
-		"created_at":    rr.CreatedAt,
+		"id":                 rr.ID,
+		"tier":               rr.Tier,
+		"event":              rr.Event,
+		"focus":              rr.Focus,
+		"question":           rr.Question,
+		"status":             rr.Status,
+		"due_at":             rr.DueAt,
+		"created_at":         rr.CreatedAt,
+		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
+		"nomination_fee_yen": rr.NominationFeeYen, "base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
+		"total_price_yen": rr.BasePriceYen + rr.NominationFeeYen, "cash_price_yen": reviewCashPrice(rr),
 		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
 		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
 	}
 }
 
 type coachDutyReq struct {
-	OnDuty   *bool `json:"on_duty"`
-	DailyCap *int  `json:"daily_cap"`
+	OnDuty           *bool           `json:"on_duty"`
+	DailyCap         *int            `json:"daily_cap"`
+	NominationFeeYen json.RawMessage `json:"nomination_fee_yen"`
 }
 
 // updateCoachDuty は、承認済みのコーチの「受付中」と1日の上限本数を変える。
@@ -122,6 +127,13 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.requireStaffMFA(w, r) {
 		return
+	}
+	fee := current.NominationFeeYen
+	if len(req.NominationFeeYen) > 0 {
+		if err := json.Unmarshal(req.NominationFeeYen, &fee); err != nil || (fee != nil && (*fee < 0 || *fee > 9998700 || *fee%100 != 0)) {
+			FieldError(w, map[string]string{"nomination_fee_yen": "指名料は0〜9,998,700円の範囲で100円単位で入力してください"})
+			return
+		}
 	}
 	onDuty := current.OnDuty
 	if req.OnDuty != nil {
@@ -165,7 +177,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	c, err := s.q.UpdateCoachDuty(r.Context(), db.UpdateCoachDutyParams{OnDuty: onDuty, DailyCap: int16(dailyCap), ProfileID: p.ID})
+	c, err := s.q.UpdateCoachDuty(r.Context(), db.UpdateCoachDutyParams{OnDuty: onDuty, DailyCap: int16(dailyCap), NominationFeeYen: fee, UpdateNominationFee: len(req.NominationFeeYen) > 0, ProfileID: p.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけが受付を設定できます")
 		return
@@ -237,7 +249,10 @@ type reviewRequestReq struct {
 	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
 	// 支払い方法（card か paypay）。Stripe の鍵があるときだけ使う。
-	Method string `json:"method"`
+	Method                   string     `json:"method"`
+	UseTickets               bool       `json:"use_tickets"`
+	RequestedCoachID         *uuid.UUID `json:"requested_coach_id"`
+	ExpectedNominationFeeYen *int32     `json:"expected_nomination_fee_yen"`
 }
 
 func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
@@ -281,8 +296,31 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
-	useTickets := req.Method == "tickets"
-	payments := s.stripe.Configured() && !useTickets
+	useTickets := req.Method == "tickets" || req.UseTickets
+	fee := int32(0)
+	coachName := ""
+	if req.RequestedCoachID != nil {
+		nominees, err := s.reviewNominees(r.Context(), s.q, p.ID, req.Event, req.RequestedCoachID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if len(nominees) != 1 {
+			FieldError(w, map[string]string{"requested_coach_id": "このコーチは現在指名を受け付けていません。選び直してください"})
+			return
+		}
+		fee = *nominees[0].NominationFeeYen
+		coachName = nominees[0].Nickname
+		if req.ExpectedNominationFeeYen == nil || *req.ExpectedNominationFeeYen != fee {
+			Error(w, http.StatusConflict, "price_changed", "指名料が変更されました。コーチを選び直して料金を確認してください")
+			return
+		}
+	}
+	cashPrice := fee
+	if !useTickets {
+		cashPrice += reviewPriceYen
+	}
+	payments := s.stripe.Configured() && cashPrice > 0
 	if payments && !validReviewPayMethod(req.Method) {
 		fields["method"] = "支払い方法を選んでください"
 	}
@@ -301,7 +339,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if payments {
-			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, reviewPriceYen)
+			msg, err := s.minorMonthlyBlock(r.Context(), s.q, p.ID, uuid.Nil, cashPrice)
 			if err != nil {
 				MapDBError(w, err)
 				return
@@ -332,6 +370,21 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
+	if req.RequestedCoachID != nil {
+		if err := q.LockReviewAssignment(r.Context()); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		nominees, err := s.reviewNominees(r.Context(), q, p.ID, req.Event, req.RequestedCoachID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if len(nominees) != 1 || *nominees[0].NominationFeeYen != fee {
+			Error(w, http.StatusConflict, "nomination_changed", "指名の受付状況または料金が変更されました。コーチを選び直してください")
+			return
+		}
+	}
 	if minor || useTickets {
 		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
@@ -353,12 +406,14 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rr, err := q.CreateReviewRequest(r.Context(), db.CreateReviewRequestParams{
-		ID:            uuid.New(),
-		RequesterID:   p.ID,
-		Tier:          req.Tier,
-		Event:         req.Event,
-		Focus:         focus,
-		Question:      question,
+		ID:               uuid.New(),
+		RequesterID:      p.ID,
+		Tier:             req.Tier,
+		Event:            req.Event,
+		Focus:            focus,
+		Question:         question,
+		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
+		NominationFeeYen: fee, BasePriceYen: reviewPriceYen, UseTickets: useTickets,
 		VideoPublicID: req.VideoPublicID,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。
@@ -387,7 +442,16 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		url, code, msg, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
 		if err != nil || code != "" {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
-			if derr := s.q.DeleteAwaitingReviewRequest(r.Context(), rr.ID); derr != nil {
+			if derr := s.tx(r.Context(), func(q *db.Queries) error {
+				if t, e := q.GetTicketReservationForReview(r.Context(), &rr.ID); e == nil {
+					if e = settleReviewTickets(r.Context(), q, t, false); e != nil {
+						return e
+					}
+				} else if !errors.Is(e, pgx.ErrNoRows) {
+					return e
+				}
+				return q.DeleteAwaitingReviewRequest(r.Context(), rr.ID)
+			}); derr != nil {
 				slog.Warn("delete unpaid review request", "err", derr)
 			}
 			if err != nil {

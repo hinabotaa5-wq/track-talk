@@ -420,7 +420,7 @@ UPDATE review_requests
 SET status = 'queued',
     updated_at = now()
 WHERE id = $1 AND status = 'awaiting_payment' AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, nomination_fee_yen, base_price_yen, use_tickets
 `
 
 // 支払いが届いたら、割り当ての待ち行列に入れる。目安を過ぎていたら入れない（行が返らない）。
@@ -441,6 +441,11 @@ func (q *Queries) StartPaidReviewRequest(ctx context.Context, id uuid.UUID) (Rev
 		&i.UpdatedAt,
 		&i.ReturnedAt,
 		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.NominationFeeYen,
+		&i.BasePriceYen,
+		&i.UseTickets,
 	)
 	return i, err
 }

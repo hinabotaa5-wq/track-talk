@@ -19,8 +19,7 @@ export const coachingServiceLabels: Record<CoachingServiceType, string> = {
 };
 
 export function serviceReady(service: CoachingServiceType | null | undefined): boolean {
-  void service;
-  return true;
+  return service !== "video_review";
 }
 
 function serviceLabel(service: CoachingServiceType | null | undefined): string {

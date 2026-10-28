@@ -70,10 +70,16 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
-	price := reviewPriceYen
+	price := reviewCashPrice(rr)
 	id := uuid.New()
 	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
-	name := "フォーム添削（コーチ）"
+	name := "動画添削（おまかせ）"
+	if rr.RequestedCoachID != nil {
+		name = "動画添削（指名）"
+	}
+	if rr.UseTickets {
+		name = "動画添削の指名料（基本料金はチケット2枚）"
+	}
 	params := stripe.CheckoutParams{
 		Name:           name,
 		AmountYen:      int(price),
@@ -172,7 +178,7 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	if err == nil && (consent.Status == "declined" || consent.Status == "revoked") {
 		return "", "guardian_declined", "保護者の同意がないため、フォーム添削は使えません", nil
 	}
-	msg, err = s.minorMonthlyBlock(ctx, q, p.ID, rr.ID, reviewPriceYen)
+	msg, err = s.minorMonthlyBlock(ctx, q, p.ID, rr.ID, reviewCashPrice(rr))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -345,13 +351,16 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 		if pay.PayerID != nil && pay.Status == "captured" {
 			s.notify(ctx, *pay.PayerID, notifyImportant, push.Message{
 				Title: "フォーム添削の代金を返金しました",
-				Body:  "返却の目安までに返せなかったため、全額を返金しました",
+				Body:  "添削が成立しなかったため、お支払い額を全額返金しました",
 				URL:   "/me/coaching/requests",
 				Tag:   "review-refund-" + pay.ID.String(),
 			}, 24*time.Hour)
 		}
 	}
 	if _, err := s.q.DeleteUnpaidReviewRequests(ctx); err != nil {
+		return released, err
+	}
+	if _, err := s.releaseExpiredTickets(ctx); err != nil {
 		return released, err
 	}
 	return released, nil
