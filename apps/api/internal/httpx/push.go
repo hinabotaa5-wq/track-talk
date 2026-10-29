@@ -174,6 +174,10 @@ func (s *Server) sendPush(ctx context.Context, profileID uuid.UUID, msg push.Mes
 		case err == nil:
 			sent++
 		case errors.Is(err, push.ErrGone):
+			if err != push.ErrGone {
+				// 401・403 で拒否された宛先を消すときは、理由を残す。設定の誤りで消えていないかを確かめられるように。
+				slog.Warn("push: remove rejected subscription", "err", err)
+			}
 			if err := s.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
 				slog.Warn("push: delete gone subscription", "err", err)
 			}
