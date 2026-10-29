@@ -322,6 +322,21 @@ func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
 	if err != nil || !known {
 		return err
 	}
+	// 同じ口座の通知が並行して届いたときも、読み直しと保存を一組で直列化する。
+	// 読み直しの後だけロックすると、先に読んだ古い状態で上書きしてしまう。
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var coachID uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT profile_id FROM coach_profiles WHERE stripe_account_id = $1 FOR UPDATE`, a.ID).Scan(&coachID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	// 知らせは順番どおりに届くとは限らないので、中身ではなく、いまのアカウントを読み直して決める。
 	// 読めなければ失敗を返し、Stripe に送り直してもらう。
 	current, err := s.stripe.GetAccount(ctx, a.ID)
@@ -329,11 +344,14 @@ func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
 		return err
 	}
 	a.PayoutsEnabled = current.PayoutsEnabled
-	_, err = s.q.SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
+	_, err = s.q.WithTx(tx).SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // alertDispute は、チャージバック（利用者がカード会社に異議を申し立てた）を運営に知らせる。中身は載せない。

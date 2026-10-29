@@ -23,7 +23,7 @@
 
 ## Stripe（コーチングの支払い・送金）
 
-コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（空のうちは支払いも Webhook も 404）。
+コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（空のうちは支払いも通常の `/webhooks/stripe` も 404）。Connect口座状態専用の `/webhooks/stripe/connect` は、Stripe APIキーと専用署名キーが設定されていればフラグを閉じたまま受信できる。通常の決済通知は処理しない。
 API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番の鍵で https でないときは、起動しない（お金だけ動いて期間が始まらない状態を防ぐため）。
 
 - ダッシュボードで本番に切り替え、本番用の鍵を作る（サンドボックスの鍵・Webhook の鍵は本番では使えない）。秘密鍵は `STRIPE_SECRET_KEY`（`sk_live_...`、または必要な権限だけの制限付きキー `rk_live_...`）
@@ -38,7 +38,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
   - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
   - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`。署名の鍵を `STRIPE_WEBHOOK_SECRET` に入れる
-  - 接続アカウント用: `account.updated`。署名の鍵（別の値）を `STRIPE_CONNECT_WEBHOOK_SECRET` に入れる
+  - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する
 - `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を Cloud Run の環境変数に入れて、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
 - 提供を始めるときに、`COACHING_ENABLED`（API）と `NEXT_PUBLIC_COACHING_ENABLED`（Web）を入れ、Web も「Deploy Web」を流す
 - 公開前に、少額で支払い→返金までを通して確かめる（本番の鍵で自分のカードを使い、運営の「パーソナル」タブから返金する）

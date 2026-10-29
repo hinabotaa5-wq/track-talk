@@ -101,6 +101,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
 	// 支払いはコーチングの一部なので、提供していない間は Webhook も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
+	// 口座の状態同期だけは、コーチングの公開前から受け付ける。決済イベントは扱わない。
+	r.Post("/webhooks/stripe/connect", s.stripeConnectWebhook)
 	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
 	r.Post("/internal/monthly-reminder", s.monthlyReminder)
 	r.Post("/internal/storage/cleanup", s.storageCleanup)

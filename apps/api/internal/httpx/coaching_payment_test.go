@@ -35,7 +35,9 @@ type fakeStripe struct {
 	enabled   map[string]bool
 	transfers []url.Values
 	// 送金を断らせるときの数。
-	failTransfers int
+	failTransfers    int
+	failAccountReads bool
+	accountReads     int
 	// 返金に答えるまで待つ時間（同時に送ったときの確かめに使う）。
 	refundDelay time.Duration
 	// 返金の Idempotency-Key ごとの中身。Stripe と同じく、同じキーなら前の返金を返し、中身が違えば断る。
@@ -136,6 +138,11 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			f.accounts = append(f.accounts, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "acct_" + r.PostForm.Get("metadata[profile_id]")})
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/accounts/"):
+			f.accountReads++
+			if f.failAccountReads {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
 			id := strings.TrimPrefix(r.URL.Path, "/v1/accounts/")
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "payouts_enabled": f.enabled[id], "details_submitted": f.enabled[id]})
 		case r.URL.Path == "/v1/account_links":
@@ -213,9 +220,14 @@ func sessionIDFor(t *testing.T, contractID string) string {
 
 func stripeWebhook(t *testing.T, h http.Handler, secret, typ string, object map[string]any) *httptest.ResponseRecorder {
 	t.Helper()
+	return stripeWebhookAt(t, h, "/webhooks/stripe", secret, typ, object)
+}
+
+func stripeWebhookAt(t *testing.T, h http.Handler, path, secret, typ string, object map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
 	payload, _ := json.Marshal(map[string]any{"id": "evt_" + fmt.Sprint(time.Now().UnixNano()), "type": typ, "data": map[string]any{"object": object}})
 	ts := time.Now().Unix()
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(string(payload)))
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(payload)))
 	req.Header.Set("Stripe-Signature", fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(stripe.Sign(payload, secret, ts))))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
