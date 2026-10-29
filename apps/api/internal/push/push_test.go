@@ -66,6 +66,11 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 	if err := s.Send(ctx, sub, msg, time.Minute); err != ErrGone {
 		t.Fatalf("not found: %v", err)
 	}
+	// 前の鍵で作った購読は、鍵を入れ替えたあと 403 で拒否され続けるので、使えない宛先として扱う。
+	status = http.StatusForbidden
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrGone) || !strings.Contains(err.Error(), "status 403") {
+		t.Fatalf("forbidden: %v", err)
+	}
 	status = http.StatusInternalServerError
 	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrFailed) || !strings.Contains(err.Error(), "status 500") {
 		t.Fatalf("server error: %v", err)
