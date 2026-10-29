@@ -5,6 +5,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,7 +67,7 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 		t.Fatalf("not found: %v", err)
 	}
 	status = http.StatusInternalServerError
-	if err := s.Send(ctx, sub, msg, time.Minute); err != ErrFailed {
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrFailed) || !strings.Contains(err.Error(), "status 500") {
 		t.Fatalf("server error: %v", err)
 	}
 	if err := (Sender{}).Send(ctx, sub, msg, time.Minute); err != ErrNotConfigured {

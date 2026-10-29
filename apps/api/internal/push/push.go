@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -72,15 +75,30 @@ func (s Sender) Send(ctx context.Context, sub Subscription, msg Message, ttl tim
 		VAPIDPrivateKey: s.PrivateKey,
 	})
 	if err != nil {
-		return ErrFailed
+		// url.Error は宛先の URL を含む。宛先は知っていれば送れてしまうので、ログに残さない。
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return fmt.Errorf("%w: %v", ErrFailed, err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return ErrGone
 	case resp.StatusCode < 200 || resp.StatusCode >= 300:
-		return ErrFailed
+		// 失敗の理由（Apple の BadJwtToken など）を、原因を調べられるように残す。
+		return fmt.Errorf("%w: status %d: %s", ErrFailed, resp.StatusCode, failureReason(body))
 	}
 	return nil
+}
+
+// failureReason は、プッシュサービスが返した失敗の理由を、ログに残せる短さにする。
+func failureReason(body []byte) string {
+	reason := strings.Join(strings.Fields(string(body)), " ")
+	if len(reason) > 200 {
+		reason = reason[:200]
+	}
+	return reason
 }
