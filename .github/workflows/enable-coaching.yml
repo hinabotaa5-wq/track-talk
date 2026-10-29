@@ -1,15 +1,28 @@
 name: Configure Coaching Availability
 
 # 募集のみ／コーチング公開を明示的に切り替える。Web側のフラグも合わせること。
-# この操作では新規の申し込み・購入を常に停止する。受付開始は別途判断する。
+# 既定の公開切替では新規の申し込み・購入を停止する。受付開始は専用操作と確認入力で分ける。
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: 操作（既定は公開切替・新規受付停止。受付開始はPayPay承認と手順書C成功後のみ）
+        type: choice
+        options:
+          - configure_availability
+          - open_new_acceptance
+        default: configure_availability
+        required: true
       enabled:
         description: コーチング利用を公開する（falseはコーチ募集のみ）
         type: boolean
         default: false
         required: true
+      confirm_open_new_acceptance:
+        description: PayPay承認済み・同日の手順書C成功を確認し、新規受付だけを開ける
+        type: boolean
+        default: false
+        required: false
 
 concurrency:
   group: configure-coaching
@@ -28,7 +41,26 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: projects/274141774717/locations/global/workloadIdentityPools/github/providers/github
       GCP_SERVICE_ACCOUNT: github-deploy@refined-bolt-493709-a8.iam.gserviceaccount.com
       REGION: asia-northeast1
+      # operationを省略した既存の呼び出しも、従来の公開切替として扱う。
+      COACHING_OPERATION: ${{ inputs.operation || 'configure_availability' }}
+      CONFIRM_OPEN_NEW_ACCEPTANCE: ${{ inputs.confirm_open_new_acceptance && '1' || '0' }}
     steps:
+      - name: Validate operation
+        shell: bash
+        run: |
+          case "$COACHING_OPERATION" in
+            configure_availability) ;;
+            open_new_acceptance)
+              if [ "$CONFIRM_OPEN_NEW_ACCEPTANCE" != "1" ]; then
+                echo "::error::新規受付を開けるには、PayPay承認と同日の手順書C成功の確認入力が必要です。"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::未対応の操作です。"
+              exit 1
+              ;;
+          esac
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -38,8 +70,16 @@ jobs:
         env:
           COACHING_SCREEN_FLAG: ${{ inputs.enabled && '1' || '0' }}
         run: |
+          case "$COACHING_OPERATION" in
+            configure_availability)
+              COACHING_UPDATES="COACHING_ENABLED=$COACHING_SCREEN_FLAG,COACHING_NEW_ACCEPTANCE_ENABLED=0"
+              ;;
+            open_new_acceptance)
+              COACHING_UPDATES="COACHING_NEW_ACCEPTANCE_ENABLED=1"
+              ;;
+          esac
           gcloud run services update track-talk-api \
             --region "$REGION" \
             --project "$GCP_PROJECT_ID" \
-            --update-env-vars "COACHING_ENABLED=$COACHING_SCREEN_FLAG,COACHING_NEW_ACCEPTANCE_ENABLED=0" \
+            --update-env-vars "$COACHING_UPDATES" \
             --quiet

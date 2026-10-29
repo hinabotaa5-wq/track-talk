@@ -1,0 +1,436 @@
+<title>TrackTalk 本番残作業ランブック</title>
+<meta charset="utf-8">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 一本の読み物カラム。先頭に要点、続いて再確認表 → 手順書A/B/C → 外部待ち → 判断事項。手順書は4区分（事前条件・手順・判定・失敗時）を同じ型で並べる */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5a6577;
+  --line: #dde2ea;
+  --accent: #1f5fd1;
+  --accent-soft: #e6eefc;
+  --ok: #1d7a4c; --ok-bg: #e3f4ea;
+  --warn: #9a5b00; --warn-bg: #fdf1dc;
+  --bad: #b3261e; --bad-bg: #fbe5e3;
+  --unk: #5a6577; --unk-bg: #eceff4;
+  --code-bg: #eef1f6;
+  --display: "M PLUS 1p", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11151c; --surface: #181e28; --fg: #e4e8ef; --muted: #9aa5b6; --line: #2a3342;
+  --accent: #7aa8ff; --accent-soft: #1c2a44;
+  --ok: #6fd3a0; --ok-bg: #16342a; --warn: #f0bd6a; --warn-bg: #3a2c12;
+  --bad: #ff8f86; --bad-bg: #3d1c1a; --unk: #aab4c4; --unk-bg: #252c38; --code-bg: #212836;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11151c; --surface: #181e28; --fg: #e4e8ef; --muted: #9aa5b6; --line: #2a3342;
+  --accent: #7aa8ff; --accent-soft: #1c2a44;
+  --ok: #6fd3a0; --ok-bg: #16342a; --warn: #f0bd6a; --warn-bg: #3a2c12;
+  --bad: #ff8f86; --bad-bg: #3d1c1a; --unk: #aab4c4; --unk-bg: #252c38; --code-bg: #212836;
+  color-scheme: dark; }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.75; }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 48px; }
+h1, h2, h3, h4 { font-family: var(--display); text-wrap: balance; line-height: 1.35; margin: 0; }
+h1 { font-size: 1.9rem; font-weight: 800; }
+h2 { font-size: 1.4rem; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+h3 { font-size: 1.15rem; font-weight: 700; }
+h4 { font-size: .8rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+p, ul, ol { margin: 0; }
+ul, ol { padding-left: 1.4em; display: grid; gap: 6px; }
+section { display: grid; gap: 18px; min-width: 0; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: .85em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { font-family: var(--mono); font-size: .82rem; background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 0; line-height: 1.6; }
+.meta { color: var(--muted); font-size: .88rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.lead { font-size: 1.02rem; }
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; display: grid; gap: 10px; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; font-size: .88rem; }
+.toc a { text-decoration: none; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg); }
+.toc a:hover, .toc a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--display); font-weight: 700; font-size: .82rem; color: var(--muted); background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.k { font-weight: 700; min-width: 9em; }
+.pill { display: inline-block; font-size: .78rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.ok { color: var(--ok); background: var(--ok-bg); }
+.warn { color: var(--warn); background: var(--warn-bg); }
+.bad { color: var(--bad); background: var(--bad-bg); }
+.unk { color: var(--unk); background: var(--unk-bg); }
+.runbook { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 20px; }
+.runbook-head { display: grid; gap: 6px; }
+.tag { font-family: var(--mono); font-size: .8rem; color: var(--accent); font-weight: 500; }
+.block { display: grid; gap: 8px; border-left: 3px solid var(--line); padding-left: 14px; min-width: 0; }
+.block.pre { border-color: var(--warn); }
+.block.steps { border-color: var(--accent); }
+.block.pass { border-color: var(--ok); }
+.block.fail { border-color: var(--bad); }
+.note { font-size: .88rem; color: var(--muted); }
+.callout { background: var(--warn-bg); color: var(--fg); border-radius: 6px; padding: 10px 14px; font-size: .9rem; }
+.callout b { color: var(--warn); }
+.decision { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; display: grid; gap: 10px; }
+.opt { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: baseline; }
+.opt .lbl { font-family: var(--display); font-weight: 800; color: var(--accent); }
+.rec { font-size: .78rem; font-weight: 700; color: var(--ok); margin-left: 6px; }
+ol.steps-list > li::marker { font-family: var(--mono); color: var(--accent); }
+@media (max-width: 520px) { h1 { font-size: 1.5rem; } .runbook { padding: 16px; } }
+</style>
+
+<div class="wrap">
+
+<header style="display:grid;gap:14px">
+  <h1>TrackTalk 本番残作業ランブック</h1>
+<p class="note">手順書Bの操作改訂：2026-10-30。運営者指定の2026-10-29 13:02版を取得し、PR #287の操作へ更新。再確認表・外部待ち・他ドキュメントの食い違いは元の調査時点の記録で、現在の再調査結果ではない。</p>
+  <div class="meta"><span>作成 2026-10-29</span><span>改訂 2026-10-29：判断1〜3をすべて案1で決定、反映済み</span><span>対象 main <code>54b05d9</code>（#284 マージ後）</span><span>読み取り専用の確認のみ。コード変更・デプロイ・フラグ・Stripe操作・秘密値の表示はしていない</span></div>
+  <nav class="toc" aria-label="目次">
+    <a href="#check">再確認の結果</a><a href="#rb-a">手順書A PayPay</a><a href="#rb-b">手順書B 少額実決済</a><a href="#rb-c">手順書C Connect同期</a><a href="#waiting">外部待ち</a><a href="#decisions">決定事項</a><a href="#constraints">未解決の制約</a><a href="#other-docs">他ドキュメントの食い違い</a>
+  </nav>
+</header>
+
+<div class="summary">
+  <h3>要点</h3>
+  <ul>
+    <li>確認した項目はすべて現状と<b>一致</b>しました。公開ページ・準備中表示・購入経路のフラグ・Checkout 期限・Connect Webhook に食い違いはありません。</li>
+    <li>実施の流れは <b>A（PayPay 承認）→ フラグを開ける → C（口座同期）→ B（カードと PayPay の実決済）</b> で確定しました。C と B はフラグを開けた同じ日に続けて行います。PayPay が承認されるまでフラグは開けません。</li>
+    <li>この順番になるのは、コード上の制約が3つあるためです。①動画添削で選べるコーチは送金口座の登録が済んだ人だけ、②コーチの口座登録APIもフラグの内側、③追加相談の支払いはメッセージ機能のフラグも必要（追加相談のテストは届出受理〜11/25目安の後）。</li>
+    <li>実決済テストの返金確認は、テスト1（辞退による仮押さえ取消し）とテスト3（PayPay の全額返金）だけで行い、確定済みのテスト2は返金しません。テストで指名するコーチは運営者自身の別アカウントです。ただし<b>実運用で確定済みの添削を返金するとアプリと Stripe の記録がずれる問題は未解決</b>のままです（<a href="#constraints">未解決の制約</a>）。</li>
+  </ul>
+</div>
+
+<section id="check">
+  <h2>1. 再確認の結果</h2>
+  <p class="note">公開ページはページ取得ツールで内容を読みました。この作業環境から Netlify への直接の HTTP 接続はネットワーク方針で拒否されたため、ステータスコードの数値そのものは見ていません（ページ本文が取得できたことで、開けることは確認）。コードは main <code>54b05d9</code> を読みました。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>項目</th><th>結果</th><th>根拠</th></tr></thead>
+    <tbody>
+      <tr><td class="k">/legal/commerce が開ける</td><td><span class="pill ok">一致</span></td><td>ログインなしで本文を取得。HTTP コードの数値は上記の理由で<span class="pill unk">未確認</span></td></tr>
+      <tr><td class="k">下書きマーカーなし</td><td><span class="pill ok">一致</span></td><td>たたき台・要確認・未確定・下書き・TODO いずれも本文になし。リポジトリでも <code>apps/web/app/legal/commerce/page.test.tsx:24</code> が同じ語の不在を検査</td></tr>
+      <tr><td class="k">チケット記載なし</td><td><span class="pill ok">一致</span></td><td>「チケット」「回数券」とも本文になし。価格はフォーム添削 ¥1,500・追加相談 ¥600、支払いはカード（Apple Pay・Google Pay含む）と PayPay の都度払い</td></tr>
+      <tr><td class="k">/coaches が準備中</td><td><span class="pill ok">一致</span></td><td>「ただいま準備中です」とコーチ応募リンクのみ。コーチ一覧・購入ボタンなし</td></tr>
+      <tr><td class="k">/coaching/new が準備中</td><td><span class="pill ok">一致</span></td><td>同じ準備中表示。申込フォームなし（<code>components/coaching-gate.tsx</code>）</td></tr>
+      <tr><td class="k">購入経路がフラグの内側</td><td><span class="pill ok">一致</span></td><td>Checkout を作る呼び出しは4か所（パーソナル指導・動画添削・追加相談・旧チケット）のみで、入口はすべて <code>server.go</code> の <code>requireCoaching</code> グループ内。10経路×認証あり/なしで404を確認するテスト <code>TestStripePaymentWebhookDoesNotOpenPurchases</code> あり</td></tr>
+      <tr><td class="k">Checkout 有効期限</td><td><span class="pill ok">一致</span></td><td>パーソナル指導は最大24時間（<code>checkoutMaxLife</code>）、動画添削は31分（<code>checkoutMinLife</code>）、追加相談は1時間か相談の期限の早い方、旧チケットは1時間。24時間を超える設定なし</td></tr>
+      <tr><td class="k">Connect Webhook</td><td><span class="pill ok">一致</span></td><td><code>stripe_connect_webhook.go</code>：Connect 専用の署名キーだけで検証、<code>account.updated</code> 以外は400。既知の口座だけ、行ロックの後に Stripe から最新状態を取り直して <code>payouts_enabled</code> を保存。未知の口座は200で無視</td></tr>
+      <tr><td class="k">決済モデル</td><td><span class="pill ok">一致</span></td><td>コード全体で <code>transfer_data</code>・<code>on_behalf_of</code>・<code>application_fee_amount</code> の指定は0件。口座は <code>type=express</code>・<code>country=JP</code></td></tr>
+      <tr><td class="k">カード分割払いオフ</td><td><span class="pill unk">未確認</span></td><td>コードでは分割払いを指定していない。Stripe Dashboard の設定は見ていない（手順書Bで確認）</td></tr>
+      <tr><td class="k">実コーチ口座の DB 同期</td><td><span class="pill unk">未確認</span></td><td>前提どおり。署名付き診断は済みだが、Stripe からの実配信と実口座での反映はまだ（手順書C）</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>現状とは矛盾しないが、手順に影響する観察（修正はしていません）</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>観察</th><th>影響</th><th>場所</th></tr></thead>
+    <tbody>
+      <tr><td class="k">動画添削の候補は口座登録済みのコーチだけ</td><td>決済ありの本番では <code>payouts_enabled</code> が true のコーチしか選べない。<b>B の前に C が必要</b></td><td><code>queries/review.sql:258</code></td></tr>
+      <tr><td class="k">コーチの口座登録 API もフラグの内側</td><td><code>/v1/coach/stripe/onboarding</code> は <code>requireCoaching</code> 内。<b>フラグを開けるまで実コーチは Express 登録できない</b>ので C はフラグ開放後</td><td><code>server.go</code></td></tr>
+      <tr><td class="k">追加相談の支払いはメッセージフラグも必要</td><td>本人・保護者の追加相談 checkout に <code>requireMessaging</code>。届出受理まで追加相談の実決済テストは不可</td><td><code>server.go</code></td></tr>
+      <tr><td class="k">確定済み添削の返金 API がない</td><td><span class="pill bad">未解決</span> 添削の返金はコード上「期限切れ・辞退時の取消し／PayPay返金」だけ。Dashboard で返金すると <code>review_payments</code> は captured のまま、報酬は <code>coach_earnings</code> に残り月次送金の対象になる。テストでは返金しないと決めたが、実運用の問題は残る（<a href="#constraints">未解決の制約</a>）</td><td><code>review_payment.go</code>、<code>queries/coach_payout.sql</code></td></tr>
+      <tr><td class="k">DB の口座状態は画面表示でも更新される</td><td>コーチの報酬画面・受付中への切替・契約の受諾のたびに Stripe を読み、true に更新することがある。DB が true でも Webhook 経由とは限らない</td><td><code>coach_payout.go</code> <code>refreshPayoutsEnabled</code></td></tr>
+      <tr><td class="k">パーソナル指導の支払い方法は Dashboard 任せ</td><td>支払い方法をコードで指定していないため、Dashboard でオンの方法がすべて出る。カードと PayPay 以外がオフかの確認が要る</td><td><code>coaching_payment.go</code>、<code>docs/launch.md:32</code></td></tr>
+      <tr><td class="k">PayPay が無効だと支払い画面を作れない経路がある</td><td>添削で PayPay を選んだ場合と追加相談は <code>paypay</code> を指定するので、PayPay 未承認のままだと Checkout 作成がエラーになる</td><td><code>docs/launch.md:31</code></td></tr>
+      <tr><td class="k">Web のフラグは netlify.toml に直書き</td><td><code>NEXT_PUBLIC_COACHING_ENABLED = "0"</code> が netlify.toml にあり、Netlify は UI の値よりファイルの値を優先する。開けるには PR と「Deploy Web」（1回15クレジット）が要る</td><td><code>netlify.toml:12</code></td></tr>
+      <tr><td class="k">準備中表示の文言</td><td><span class="pill warn">軽微</span>「チケットの購入は、公開までお待ちください」とあり、チケット販売停止の方針だと公開後に買えるように読める。<a href="https://github.com/hinabotaa5-wq/track-talk/pull/285">#285</a> で「動画添削とサポートプランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。」に直す（未マージ）</td><td><code>components/coaching-gate.tsx:11</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="rb-a">
+  <h2>2. 手順書</h2>
+  <div class="summary">
+    <h3>実施の流れ（決定済み）</h3>
+    <ol class="steps-list">
+      <li><b>手順書A</b>：PayPay を申請し、承認を待つ。承認が下りるまでフラグは開けない。</li>
+      <li><b>フラグを開ける</b>（手順書B の冒頭）：承認が下りた後の1日で行う。</li>
+      <li><b>手順書C</b>：同じ日に、運営者の別アカウントのコーチで口座登録し、Connect の同期を確かめる。</li>
+      <li><b>新規受付だけを開始 → 手順書B</b>：C の成功後、専用操作で新規受付だけを開け、カードと PayPay の実決済テストを行い、フラグを戻す。</li>
+    </ol>
+    <p class="note">追加相談の実決済テストだけは、電気通信事業の届出が受理されてから別の日に行う。</p>
+  </div>
+  <article class="runbook">
+    <div class="runbook-head">
+      <span class="tag">RUNBOOK A</span>
+      <h3>PayPay の有効化・審査申請</h3>
+      <p class="note">実施者：運営者（Stripe Dashboard）。この手順は申請までで、実際に PayPay で払えるかは手順書Bで確かめます。</p>
+    </div>
+
+    <div class="block pre">
+      <h4>事前条件</h4>
+      <ul>
+        <li><b>Netlify クレジットの auto recharge が設定済みで、残量に余裕がある</b>こと。残量が尽きるとサイト全体が止まり、審査担当が特商法ページを開けなくなります。</li>
+        <li>シークレットウィンドウで <code>https://track-talk.netlify.app/legal/commerce</code> がログインなしで開けること。</li>
+        <li>Stripe 本番アカウントの公開情報（事業者名・サポート連絡先・Web サイト URL <code>https://track-talk.netlify.app</code>）が特商法ページと食い違っていないこと。tracktalk.jp は使わない。</li>
+        <li>PayPay の区分・手数料は Stripe に質問中で、回答待ち。回答が届く前に申請する場合も、区分や手数料を確定値として扱わない。</li>
+        <li>可能ならサンドボックスで先に有効化し、テスト支払いで PayPay が出ることを見ておく（<code>docs/launch.md:34</code> の順番）。</li>
+      </ul>
+    </div>
+
+    <div class="block steps">
+      <h4>手順</h4>
+      <ol class="steps-list">
+        <li>Stripe Dashboard を本番に切り替え、設定 → 支払い → 支払い方法 → PayPay を開き、有効化（申請）を始める。</li>
+        <li>URL を求められたら、サイトは <code>https://track-talk.netlify.app</code>、特商法表記は <code>https://track-talk.netlify.app/legal/commerce</code> を入れる。</li>
+        <li>区分（業種・商品カテゴリなど）は <b>Stripe の回答に従って選ぶ</b>。回答前に何かを選んだ場合は、運営メモに「暫定・Stripe確認中」と書き、文書・ページ・コードのコメントに確定した区分や手数料として書かない。</li>
+        <li>同じ画面で、カードと PayPay 以外（コンビニ払い・銀行振込など）がオフであることを確認する。パーソナル指導の支払い画面は Dashboard の設定がそのまま出るため。</li>
+        <li>カードの分割払いがオフであることを確認する。</li>
+        <li>申請日時、申請の受付番号（表示されれば）、選んだ区分を運営メモに残す。これらは秘密値ではない。</li>
+      </ol>
+      <h4 style="margin-top:6px">審査で聞かれうる項目と回答方針</h4>
+      <div class="tbl"><table>
+        <thead><tr><th>聞かれうること</th><th>回答方針</th></tr></thead>
+        <tbody>
+          <tr><td class="k">商品・サービス</td><td>陸上競技のフォーム動画添削。利用者がコーチを指名し、1件ごとに支払う。¥1,500（税込）、追加相談 ¥600（税込）。オンラインで提供。</td></tr>
+          <tr><td class="k">いま購入できない理由</td><td>公開前で、コーチを募集中。審査後に受付を開始する予定。購入画面は公開まで閉じている。</td></tr>
+          <tr><td class="k">売り手と代金の流れ</td><td>運営者が売り手として代金を受け取り、コーチには月次で報酬を送金する（separate charges and transfers、コーチは Express 口座）。コーチの口座上では課金しない。</td></tr>
+          <tr><td class="k">提供時期</td><td>依頼の翌日12時（日本時間）までの返却が目安。特商法ページの記載どおり。</td></tr>
+          <tr><td class="k">返金・キャンセル</td><td>特商法ページの記載どおり（期限内に返却されない・辞退・30分以内に引き受けがない場合は、カードは確保を取消し、PayPay は全額返金）。</td></tr>
+          <tr><td class="k">未成年の利用</td><td>18歳未満は保護者の同意が必要な仕組みがある、までを答える。同意の扱いの細部は弁護士に確認中のため断定しない。</td></tr>
+          <tr><td class="k">資金決済法・収納代行</td><td>専門家に確認中と答え、該当・非該当を断定しない。</td></tr>
+          <tr><td class="k">手数料・区分</td><td>Stripe の回答内容に従う。回答前に料率や区分を自分から確定値として書かない。</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="block pass">
+      <h4>成功の判定基準</h4>
+      <ul>
+        <li>支払い方法の一覧で PayPay が「有効」になっている（審査中なら「審査中」の表示を記録し、承認まで待つ）。</li>
+        <li>カード・PayPay 以外がオフ、カード分割払いがオフのまま。</li>
+        <li>実際に払えることの確認は、手順書Bのテスト3（PayPay）で行う。</li>
+      </ul>
+    </div>
+
+    <div class="block fail">
+      <h4>失敗時の切り戻し・確認先</h4>
+      <ul>
+        <li>追加情報を求められた・却下された：理由の文面を記録し、Stripe サポートに問い合わせる。特商法ページの修正が要る場合は別作業として PR にする（規約本文や価格は変えない）。</li>
+        <li>PayPay が承認されない間はコーチングのフラグを開けない（決定済み：<a href="#decisions">判断2</a>）。手順書C・B も承認後まで行わない。PayPay なしで開けると、添削で PayPay を選んだ人と追加相談の支払い画面がエラーになる。</li>
+        <li>申請を取り下げたい場合は、同じ画面で PayPay を無効にする。カード決済には影響しない。</li>
+      </ul>
+    </div>
+  </article>
+</section>
+
+<section id="rb-b">
+  <article class="runbook">
+    <div class="runbook-head">
+      <span class="tag">RUNBOOK B</span>
+      <h3>フラグを開けたときの少額実決済テスト</h3>
+      <p class="note">実施者：運営者。本番の鍵と運営者自身のカードを使う。対象は動画添削（¥1,500）。カードと PayPay を同じ日に試す。追加相談は届出受理後に同じ型で行う。</p>
+    </div>
+
+    <div class="block pre">
+      <h4>事前条件</h4>
+      <ul>
+        <li><b>手順書A の PayPay が承認済みであること（必須）。</b>承認前はフラグを開けず、カードだけを先に試すこともしない。</li>
+        <li>同じ日に、フラグを開けた後で手順書C を済ませ、テスト用コーチの口座登録と同期の確認（Stripe 配信 200 と Cloud Run 受信ログ 200）が終わっていること。口座登録が済んだコーチだけが候補に出るため。</li>
+        <li>テストで指名するコーチは<b>運営者自身の別アカウント</b>（手順書C で口座登録したもの）。報酬は運営者の口座に戻り、実際の損は Stripe の手数料だけになる。</li>
+        <li>本番 API が #284 以降（リビジョン <code>track-talk-api-00096-mbp</code> 以降）で、通常の送信先 <code>tracktalk-live-payments</code> がアクティブ。</li>
+        <li>Cloud Scheduler のコーチング定期処理ジョブが有効。フラグを開けると定期処理が動き始め、30分の打診期限や確定の再試行を担う。</li>
+        <li>Netlify のクレジットに余裕がある（開ける・戻すで Deploy Web 2回＝30クレジット）。</li>
+        <li>テスト用に2つのアカウント：依頼者（18歳以上、運営者のカード）と、指名されるコーチ（上記の運営者の別アカウント。依頼者と同じアカウントは指名できない）。</li>
+        <li>返金の確認はテスト1（辞退による仮押さえ取消し）とテスト3（PayPay の全額返金）で行い、確定済みのテスト2は返金しない（決定済み：<a href="#decisions">判断1</a>）。</li>
+        <li>開けている間は一般の人も申し込める。告知せず、短時間で行う。</li>
+      </ul>
+    </div>
+
+    <div class="block steps">
+      <h4>手順：公開 → C → 新規受付だけ開始 → B</h4>
+      <p class="note">新規受付の専用操作を追加するPR #287がマージされた後、mainのワークフローで実施する。PayPay承認前には実行しない。以下は開放日の手順で、今回の文書更新では本番実行していない。</p>
+      <ol class="steps-list">
+        <li>API：GitHub Actions の「Configure Coaching Availability」（<code>enable-coaching.yml</code>）を <code>operation=configure_availability</code>（既定）、<code>enabled=true</code> で実行する。確認チェックは既定のfalseのまま。<code>COACHING_ENABLED=1</code> と <code>COACHING_NEW_ACCEPTANCE_ENABLED=0</code> を設定し、新規受付を止めた状態で公開する。</li>
+        <li>Web：<code>netlify.toml</code> の <code>NEXT_PUBLIC_COACHING_ENABLED</code> を <code>"1"</code> にする PR をマージし、Actions の「Deploy Web」を1回流す。メッセージ側は <code>"0"</code> のまま。</li>
+        <li>新規受付を止めたまま、同日に<a href="#rb-c">手順書C</a>を実施する。Stripe側の実配信200、同時刻のCloud Run受信ログ200、DBの口座状態の一致を確認する。Cが成功しなければ受付を開けず、実決済テストへ進まない。</li>
+        <li>C成功後、同じ「Configure Coaching Availability」を <code>operation=open_new_acceptance</code>、<code>confirm_open_new_acceptance=true</code> で別途実行する。この操作では <code>enabled</code> は使わない。<code>COACHING_NEW_ACCEPTANCE_ENABLED=1</code> だけを更新し、<code>COACHING_ENABLED</code>・<code>COACHING_MESSAGING_ENABLED</code>・<code>COACHING_TICKET_SALES_ENABLED</code>・<code>REVIEW_RANDOM_ASSIGN_ENABLED</code> は現在値を保持する。PayPay承認・同日のC成功は運営者が確認する前提で、自動判定ではない。確認入力は既定falseで、未確認なら認証・更新前に失敗する。</li>
+        <li><code>COACHING_MESSAGING_ENABLED</code>・<code>COACHING_TICKET_SALES_ENABLED</code>・<code>REVIEW_RANDOM_ASSIGN_ENABLED</code> は停止を維持する。このワークフローにこれらを開ける操作はない。<code>/coaches</code> に口座登録済みのコーチが出ること、専用操作が成功したことを確認して、以下の手順書Bの実決済テストへ進む。</li>
+      </ol>
+
+      <h4 style="margin-top:6px">テスト1：カード（仮押さえ → 取消し）</h4>
+      <ol class="steps-list">
+        <li>依頼者で <code>/coaching/new</code> からテスト用コーチを指名し、動画添削を申し込み、支払い方法でカードを選ぶ。</li>
+        <li>Stripe の支払い画面で、金額 ¥1,500・商品名「動画添削」を確認。Safari（Wallet にカードあり）で Apple Pay、Chrome（保存済みカードあり）で Google Pay のボタンが出ることも見る。分割払いの選択肢が出ないこと。</li>
+        <li>運営者のカードで支払う。</li>
+        <li>Dashboard の支払い一覧で、該当の支払いが「未確定（仮押さえ）」¥1,500 になっている。</li>
+        <li>Dashboard の Webhook 送信先 <code>tracktalk-live-payments</code> → イベントの配信で、<code>checkout.session.completed</code> が 200。</li>
+        <li>アプリの依頼詳細が支払い済み・コーチへの打診中になっている。DB を読むだけで確かめるなら：
+<pre>SELECT method, status, amount_yen, authorized_at
+FROM review_payments ORDER BY created_at DESC LIMIT 1;
+-- 期待: card / authorized / 1500</pre></li>
+        <li>コーチ側で打診を辞退する。Dashboard で支払いが「キャンセル」になり、上の行が <code>canceled</code> になる。請求額は0（カード明細に仮押さえが数日残ることはある）。</li>
+      </ol>
+
+      <h4 style="margin-top:6px">テスト2：カード（確定）</h4>
+      <ol class="steps-list">
+        <li>もう一度申し込み、カードで支払う。コーチ側で受諾し、添削を返却する。</li>
+        <li>Dashboard で支払いが「成功」に変わり、<code>review_payments.status</code> が <code>captured</code> になる。</li>
+        <li>この支払いは返金しない。報酬 ¥1,050 は運営者の別アカウントのコーチに記録され、月次送金で運営者の口座に戻る。</li>
+      </ol>
+
+      <h4 style="margin-top:6px">テスト3：PayPay</h4>
+      <ol class="steps-list">
+        <li>テスト1と同じ流れで、支払い方法に PayPay を選ぶ。支払い画面で PayPay が出て、承認できること。</li>
+        <li>PayPay は申込みの時点で確定する。<code>review_payments</code> が <code>paypay / captured</code>、Webhook 配信が 200。</li>
+        <li>コーチ側で辞退し、Dashboard で全額返金、<code>review_payments.status</code> が <code>refunded</code> になる。返金は PayPay 残高に戻る。</li>
+      </ol>
+
+      <h4 style="margin-top:6px">テスト後にフラグを戻す</h4>
+      <ol class="steps-list">
+        <li>まず新規受付だけを止める。「Configure Coaching Availability」を <code>operation=configure_availability</code>、<code>enabled=true</code> でもう一度実行すると、<code>COACHING_ENABLED=1</code> のまま <code>COACHING_NEW_ACCEPTANCE_ENABLED=0</code> になる。新規申込は止まり、進行中の取引の取消し・確定・返金は続く（<code>docs/launch.md:74</code>）。</li>
+        <li>テストの取引がすべて終わった（<code>review_payments</code> に <code>pending</code>・<code>authorized</code> が残っていない）ことを確認してから、同じワークフローを <code>operation=configure_availability</code>、<code>enabled=false</code> で実行し、<code>COACHING_ENABLED</code> を切る。先に切ると定期処理が止まり、仮押さえが期限で取り消されなくなる。</li>
+        <li>Web：<code>netlify.toml</code> を <code>"0"</code> に戻す PR をマージし、「Deploy Web」を流す。</li>
+        <li><code>/coaches</code> と <code>/coaching/new</code> が準備中表示に戻ったことを確認する。</li>
+        <li>管理画面「コーチングの会計照合」（<code>/admin/coaching/reconciliation</code>）で不一致0、Dashboard の支払い・返金と <code>review_payments</code> の件数・状態が一致することを確認し、日付とともに運営メモへ残す。</li>
+      </ol>
+    </div>
+
+    <div class="block pass">
+      <h4>成功の判定基準</h4>
+      <ul>
+        <li>各テストで、Stripe の支払い状態・Webhook 配信 200・アプリの依頼状態・<code>review_payments.status</code> の4つがそろう（テスト1：authorized → canceled、テスト2：captured、テスト3：captured → refunded）。</li>
+        <li>カードの支払い画面に Apple Pay・Google Pay が出て、分割払いは出ない。</li>
+        <li>フラグを戻した後、準備中表示に戻り、会計照合の不一致が0。</li>
+      </ul>
+    </div>
+
+    <div class="block fail">
+      <h4>失敗時の切り戻し・確認先</h4>
+      <ul>
+        <li>何かおかしいと感じたら、まず「Configure Coaching Availability」を <code>operation=configure_availability</code>、<code>enabled=true</code> で実行して新規申込を止める。<code>enabled = false</code>（<code>COACHING_ENABLED</code> を切る）はすぐには使わない。</li>
+        <li>Webhook が 400 <code>bad_signature</code>：送信先の署名シークレットと、Cloud Run が参照している Secret Manager のバージョンが対応しているかを、名前とバージョン番号だけで確認する（値は表示しない）。</li>
+        <li>Webhook が 500：Cloud Run のログで <code>stripe webhook</code> のエラーとイベント ID を見る。Stripe は自動で再送する。</li>
+        <li>支払い画面が作れない：PayPay を選んでいないか確認する（承認前は不可）。</li>
+        <li>DB を手で書き換えない。報酬や状態を直す前に、既存の処理が済んでいないかを照合画面で確認する（<code>docs/launch.md</code>「日次の照合と復旧」）。</li>
+        <li>テスト2の支払いを誤って Dashboard で返金してしまった場合：アプリの記録は直らない。下の「未解決の制約」に当たるので、月次送金の前に記録の扱いを開発側と相談する。</li>
+      </ul>
+      <p class="callout"><b>既知の制約（未解決）</b>　返却済み（確定済み）の添削を返金する仕組みがアプリにありません。実運用で返金が必要になったとき、Dashboard で返金すると、アプリ側は「確定」のまま、コーチ報酬も送金対象に残ります。テストでは返金しないことで避けていますが、問題そのものは解決していません。</p>
+    </div>
+  </article>
+</section>
+
+<section id="rb-c">
+  <article class="runbook">
+    <div class="runbook-head">
+      <span class="tag">RUNBOOK C</span>
+      <h3>実コーチ口座での Connect 同期確認</h3>
+      <p class="note">実施者：運営者（運営者自身の別アカウントをコーチとして使う）。秘密値は一切使わず、Stripe の配信記録・Cloud Run のログ・DB の読み取りだけで確かめる。フラグを開けた日に、手順書B の直前に行う。</p>
+    </div>
+
+    <div class="block pre">
+      <h4>事前条件</h4>
+      <ul>
+        <li>手順書A の PayPay が承認済みで、手順書B の「公開 → C → 新規受付だけ開始 → B」のAPI・Web公開までを済ませた直後で、新規受付は停止中であること（API の <code>COACHING_ENABLED=1</code>。口座登録 API がフラグの内側のため）。口座登録 API をフラグの外に出す変更はしない。</li>
+        <li>送信先 <code>tracktalk-live-connect</code> がアクティブ（送信元 Connected accounts、Snapshot、<code>account.updated</code> のみ、URL は <code>/webhooks/stripe/connect</code>）。</li>
+        <li>テスト用コーチ（運営者の別アカウント）が審査で承認済み。本人確認書類と受取口座を手元に用意しておく。</li>
+      </ul>
+    </div>
+
+    <div class="block steps">
+      <h4>手順</h4>
+      <ol class="steps-list">
+        <li>登録の開始時刻を記録する。テスト用コーチのアカウントでコーチ画面から口座登録を始め、Stripe の Express 登録を最後まで進める。</li>
+        <li>Dashboard → Connect → 連結アカウントで該当アカウントを開く（メタデータの <code>profile_id</code> でコーチを特定できる）。「入金」が有効になっていることを見る。</li>
+        <li><b>実配信の証拠</b>：Dashboard → Workbench → Webhooks → <code>tracktalk-live-connect</code> → イベントの配信で、該当アカウントの <code>account.updated</code> が記録され、応答が 200 であることを確認し、イベント ID と時刻を控える。</li>
+        <li><b>受信側の証拠</b>：Cloud Run のログ（Logs Explorer）で、サービス <code>track-talk-api</code>、パス <code>/webhooks/stripe/connect</code> のリクエストログが同じ時刻に 200 で残っていること、<code>stripe connect webhook</code> のエラーログがないことを確認する。</li>
+        <li><b>DB の一致</b>（読み取りのみ）：
+<pre>SELECT profile_id, payouts_enabled, updated_at
+FROM coach_profiles
+WHERE stripe_account_id IS NOT NULL
+ORDER BY updated_at DESC;
+-- 期待: 該当コーチが true、updated_at が手順3の配信時刻と近い</pre></li>
+        <li>任意：Dashboard でその <code>account.updated</code> を再送し、200 が返り、DB の値が変わらないこと（同じ通知を何度受けても結果が同じ）を確認する。</li>
+      </ol>
+      <p class="callout"><b>注意</b>　DB の <code>payouts_enabled</code> は、コーチが報酬画面を開いたときなどにも Stripe を読みに行って true になることがあります。DB が true になっただけでは Webhook が届いた証拠になりません。確認済みと書くには、手順3（Stripe 側の配信 200）と手順4（受信側のログ 200）の両方が必要です。</p>
+    </div>
+
+    <div class="block pass">
+      <h4>成功の判定基準</h4>
+      <ul>
+        <li>Stripe 側の配信記録で該当口座の <code>account.updated</code> が 200。</li>
+        <li>Cloud Run 側で同じ時刻の <code>/webhooks/stripe/connect</code> が 200、エラーログなし。</li>
+        <li>DB の <code>payouts_enabled</code> が Dashboard の「入金」の状態と一致。</li>
+        <li>3つがそろったら、運営メモの「実コーチ口座の DB 同期：未確認」を「確認済み（日付・運営者の別アカウントのコーチ・イベント ID）」に更新する。それまでは未確認のまま。外部の協力コーチの口座では、その人が登録したときに同じ確認を行う。</li>
+        <li>そろったら手順書B の専用ワークフロー操作で新規受付だけを開け、成功後にテストに進む。そろわない場合は B に進まず、下の失敗時の確認をする。</li>
+      </ul>
+    </div>
+
+    <div class="block fail">
+      <h4>失敗時の切り戻し・確認先</h4>
+      <ul>
+        <li>配信が記録されない：送信先の送信元が Connected accounts か、イベントが <code>account.updated</code> か、URL が <code>/webhooks/stripe/connect</code> かを見る。</li>
+        <li>400 <code>bad_signature</code>：送信先の署名シークレットと、<code>STRIPE_CONNECT_WEBHOOK_SECRET</code> が参照する Secret Manager のバージョンの対応を、名前と番号だけで確認する。入れ替えるときは運営者が Secret Manager に新しいバージョンを直接登録し、Cloud Run の参照を更新する。</li>
+        <li>400 <code>unsupported_event</code>：送信先に <code>account.updated</code> 以外のイベントが追加されていないか見る。</li>
+        <li>500：Cloud Run のログのイベント ID とエラー内容を見る（Stripe からの読み直しか DB の失敗）。Stripe が自動で再送する。</li>
+        <li>200 なのに DB が変わらない：その口座 ID がアプリに登録されていない（コーチ画面の登録ボタン以外で作られた）可能性。未知の口座は無視する仕様。</li>
+        <li>この手順で切り戻すものはない。DB を手で書き換えない。原因がその日に分からなければ、手順書B は行わずにフラグを戻す（手順書B の「テスト後にフラグを戻す」と同じ手順）。</li>
+      </ul>
+    </div>
+  </article>
+</section>
+
+<section id="waiting">
+  <h2>3. 外部待ち一覧</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>事項</th><th>状態</th><th>回答が来たら次にやること</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Stripe：PayPay の区分・手数料</td><td><span class="pill warn">回答待ち</span><br>2026-10-29 送信</td><td>回答を運営メモに記録し、区分を決めて手順書A を実行する。手数料が想定と違えば、価格・報酬率への影響を運営者が判断する（方針の変更は運営者の判断事項）。</td></tr>
+      <tr><td class="k">弁護士：資金決済法（ベンゴ4 相談 1513434）</td><td><span class="pill warn">回答待ち</span></td><td>収納代行の文言を確定する（特商法ページ・規約・コーチ向け案内）。文言の修正が要れば別の PR にする。</td></tr>
+      <tr><td class="k">弁護士：未成年の同意（ココナラ 相談 217168）</td><td><span class="pill warn">回答待ち</span></td><td>保護者同意の文面と手順を確定する。修正が要れば別の PR にする。</td></tr>
+      <tr><td class="k">電気通信事業の届出</td><td><span class="pill warn">受理待ち</span><br>〜2026-11-25 目安</td><td>受理番号を記録し、<code>COACHING_MESSAGING_ENABLED</code>（API）と <code>NEXT_PUBLIC_COACHING_MESSAGING_ENABLED</code>（netlify.toml）を開ける。追加相談の少額実決済テストを手順書B の型で行う。</td></tr>
+      <tr><td class="k">Netlify クレジットの auto recharge</td><td><span class="pill bad">運営者対応</span></td><td>Netlify の Billing で自動追加が有効と表示されることを確認する。設定までは Deploy Web をまとめて回数を減らす。手順書A・B の事前条件。</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="decisions">
+  <h2>4. 決定事項（2026-10-29、すべて案1）</h2>
+
+  <div class="decision">
+    <h3>判断1：返却済み（確定済み）の添削の返金テスト <span class="pill ok">案1で決定</span></h3>
+    <p>返金の確認はテスト1（辞退による仮押さえ取消し）とテスト3（PayPay の全額返金）だけで行い、確定済みのテスト2は返金しない。テストで指名するコーチは運営者自身の別アカウントにする（報酬は自分の口座に戻り、実際の損は Stripe の手数料だけ）。</p>
+    <p class="note">採用しない：案2（Dashboard で返金して記録を手で調整）、案3（管理画面の返金機能を先に開発）。実運用での返金の問題は<a href="#constraints">未解決の制約</a>として残す。</p>
+  </div>
+
+  <div class="decision">
+    <h3>判断2：PayPay の承認前にフラグを開けるか <span class="pill ok">案1で決定</span></h3>
+    <p>PayPay の承認が下りるまで、コーチング系のフラグは開けない。承認後に、カードと PayPay の実決済テストを同じ日に行う。PayPay の区分・手数料は Stripe の回答待ちのままで、確定扱いしない。</p>
+    <p class="note">採用しない：案2（カードだけ先に短時間開ける）。</p>
+  </div>
+
+  <div class="decision">
+    <h3>判断3：Connect 同期（手順書C）のタイミング <span class="pill ok">案1で決定</span></h3>
+    <p>フラグを開けた日に、手順書B の直前に続けて行う。順番は「フラグを開ける → C → B」。C の成功判定（Stripe 側の配信 200 と Cloud Run 側の受信ログ 200 の両方。DB が true なだけでは証拠にしない）は変えない。</p>
+    <p class="note">採用しない：案2（口座登録 API をフラグの外に出すコード変更）。着手しない。</p>
+  </div>
+</section>
+
+<section id="constraints">
+  <h2>5. 未解決の運用上の制約</h2>
+  <div class="decision">
+    <h3>確定済みの添削を返金すると、アプリと Stripe の記録がずれる <span class="pill bad">未解決</span></h3>
+    <p>返却済み（確定済み）の動画添削を返金する仕組みがアプリにありません。実運用で返金が必要になったとき、Stripe Dashboard で返金すると、<code>review_payments</code> は <code>captured</code> のまま、コーチ報酬は <code>coach_earnings</code> に残り、月次送金の対象になります。会計照合画面は Stripe 側だけの手動返金を検出しません。</p>
+    <p>判断1の決定はテストでこの経路を通らないようにしただけで、この問題は解決していません。公開後に返金の依頼が来る前に、扱いを決める必要があります。同じ注意を手順書B の「失敗時」にも書いています。</p>
+  </div>
+</section>
+
+<section id="other-docs">
+  <h2>6. 他ドキュメントに残る食い違い（修正していません）</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>場所</th><th>書かれていること</th><th>決定・現状とのずれ</th></tr></thead>
+    <tbody>
+      <tr><td class="k"><code>docs/launch.md:44</code></td><td>公開前に少額で支払い→返金まで通す。運営の「パーソナル」タブから返金する</td><td>判断1では、動画添削の辞退による取消し（テスト1）と PayPay 返金（テスト3）で確かめ、確定済みは返金しない。パーソナル指導での返金テストは手順にない</td></tr>
+      <tr><td class="k"><code>docs/launch.md:43</code></td><td>提供を始めるときに <code>COACHING_ENABLED</code> と <code>NEXT_PUBLIC_COACHING_ENABLED</code> を入れ、Deploy Web を流す</td><td>判断2・3の前提（PayPay 承認後に開ける、開けた日に C → B）が書かれていない。また Web のフラグは <code>netlify.toml</code> に <code>"0"</code> が直書きなので、環境変数を入れるだけでは開かず PR が要る</td></tr>
+      <tr><td class="k"><code>docs/stripe-connect-webhook.md</code> 手順9</td><td>既知の Express 口座の更新イベントが発生したときに、Stripe の <code>payouts_enabled</code> と DB の値が一致することを確認する</td><td>判断3で維持した判定基準では、DB の一致だけでは足りず、Stripe 側の配信 200 と Cloud Run 側の受信ログ 200 の両方が要る</td></tr>
+      <tr><td class="k"><code>docs/stripe-connect-webhook.md:46</code> ほか</td><td>本番にはこの修正をまだ反映していない／専用受信口がデプロイされるまでは疎通しない</td><td>#284 は本番反映済み（リビジョン <code>track-talk-api-00096-mbp</code>）。決定とは別の、古くなった記述</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note"><code>docs/launch.md:34</code>（サンドボックスで先に有効化してから本番）と <code>docs/legal-drafts.md:24</code>（返却後の返金条件は運営判断の論点として残す）は、決定と矛盾しません。</p>
+</section>
+
+</div>
