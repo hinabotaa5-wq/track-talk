@@ -31,7 +31,7 @@ export function sanitizePosthogEvent(event: CaptureResult): CaptureResult | null
   if (!page) return null;
   const properties: Record<string, unknown> = {
     $pathname: page,
-    $current_url: `https://tracktalk.jp${page}`,
+    $current_url: `https://track-talk.netlify.app${page}`,
     $process_person_profile: false,
     $geoip_disable: true,
     $ip: "0.0.0.0",
@@ -83,7 +83,7 @@ function getClient(): Promise<PostHog | null> {
 }
 
 export function capturePosthog(event: AnalyticsEvent | "$pageview", pathname?: string): void {
-  if (typeof window === "undefined" || !["tracktalk.jp", "www.tracktalk.jp", "track-talk.netlify.app"].includes(window.location.hostname)) return;
+  if (typeof window === "undefined" || !["track-talk.netlify.app"].includes(window.location.hostname)) return;
   const page = analyticsPage(pathname ?? window.location.pathname ?? "/");
   if (!page) return;
   void getClient().then((posthog) => {
