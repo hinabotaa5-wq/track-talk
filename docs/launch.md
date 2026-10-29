@@ -23,7 +23,7 @@
 
 ## Stripe（コーチングの支払い・送金）
 
-コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（空のうちは支払いも Webhook も 404）。
+コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（購入APIは404）。通常の `/webhooks/stripe` は、通常用署名キーで検証した決済完了・非同期決済成功・不審請求の通知をフラグを閉じたまま受信する。Connect口座状態専用の `/webhooks/stripe/connect` は、専用署名キーで検証した `account.updated` だけを受信する。いずれもStripe APIキーが必要。
 API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番の鍵で https でないときは、起動しない（お金だけ動いて期間が始まらない状態を防ぐため）。
 
 - ダッシュボードで本番に切り替え、本番用の鍵を作る（サンドボックスの鍵・Webhook の鍵は本番では使えない）。秘密鍵は `STRIPE_SECRET_KEY`（`sk_live_...`、または必要な権限だけの制限付きキー `rk_live_...`）
@@ -38,7 +38,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
   - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
   - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`。署名の鍵を `STRIPE_WEBHOOK_SECRET` に入れる
-  - 接続アカウント用: `account.updated`。署名の鍵（別の値）を `STRIPE_CONNECT_WEBHOOK_SECRET` に入れる
+  - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する
 - `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を Cloud Run の環境変数に入れて、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
 - 提供を始めるときに、`COACHING_ENABLED`（API）と `NEXT_PUBLIC_COACHING_ENABLED`（Web）を入れ、Web も「Deploy Web」を流す
 - 公開前に、少額で支払い→返金までを通して確かめる（本番の鍵で自分のカードを使い、運営の「パーソナル」タブから返金する）
@@ -62,7 +62,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 
 | 設定 | 用途 |
 |---|---|
-| `COACHING_ENABLED=1` | APIの既存契約・会話・Webhook・返金・定期処理を稼働する |
+| `COACHING_ENABLED=1` | APIの既存契約・会話・手動返金・定期処理を稼働する（Webhookはこのフラグによらず受信） |
 | `NEXT_PUBLIC_COACHING_ENABLED=1` | Webのコーチング画面を表示する（ビルド時に設定） |
 | `COACHING_NEW_ACCEPTANCE_ENABLED=1` | 新しい動画添削の依頼・チケット購入・追加相談の送信／支払いを受け付ける |
 | `COACH_IDENTITY_KEY` | コーチの本名・住所・電話番号を暗号化する鍵（`openssl rand -base64 32`）。DB とは別に Secret Manager に置く。変えると登録済みの情報が読めなくなる。空の間はコーチの特商法の登録ができず、プランを公開できない |
@@ -73,7 +73,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 - 新規受付は既定で停止。APIを更新した後に既存の公開設定だけでは受付が再開しないことに注意する。
 - 問題時は `COACHING_NEW_ACCEPTANCE_ENABLED` だけを空にしてAPIを再デプロイする。APIとWebの `COACHING_ENABLED` は維持し、購入済みの履行と返金を続ける。
 - 受付停止中も、既に申込済みの指名契約の受諾・基本料金の支払い、既存の添削回答・会話・通話／対面予約、返金、送金、停止前に作成した決済画面への遅延通知を受け付ける。追加相談の新しい送信・支払いとチケットの追加購入は止める。下書きの保存と閲覧は続けられる。
-- `COACHING_ENABLED` 自体を切るとWebhookと定期処理まで404になるので、取引開始後の受付停止には使わない。
+- `COACHING_ENABLED` 自体を切ると既存取引の画面・操作と定期処理が404になるので、取引開始後の受付停止には使わない。署名検証された決済・Connect Webhookは引き続き受信する。
 
 ### 移行前の確認
 

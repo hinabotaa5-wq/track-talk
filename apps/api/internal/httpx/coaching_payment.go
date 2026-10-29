@@ -252,6 +252,15 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "bad_signature", "署名が正しくありません")
 		return
 	}
+	if !s.cfg.CoachingEnabled {
+		// 作成済みの決済への通知だけを処理する。口座更新は専用受信口に分ける。
+		switch ev.Type {
+		case "checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.dispute.created":
+		default:
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+	}
 	switch ev.Type {
 	case "account.updated":
 		if err := s.syncCoachAccount(r.Context(), ev); err != nil {
@@ -290,10 +299,15 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // webhookSecrets は、署名を確かめる鍵。Stripe は platform の知らせと Connect（コーチのアカウント）の知らせで
-// 送り先ごとに鍵を分けるので、両方を受け付ける。
+// 送り先ごとに鍵を分ける。公開前の通常決済通知は通常用の鍵だけで検証する。
+// 公開済み環境の既存 Connect 登録との互換性のため、公開中は従来どおり両方を受け付ける。
 func (s *Server) webhookSecrets() []string {
 	var out []string
-	for _, k := range []string{s.cfg.StripeWebhookSecret, s.cfg.StripeConnectWebhookSecret} {
+	keys := []string{s.cfg.StripeWebhookSecret}
+	if s.cfg.CoachingEnabled {
+		keys = append(keys, s.cfg.StripeConnectWebhookSecret)
+	}
+	for _, k := range keys {
 		if k != "" {
 			out = append(out, k)
 		}
@@ -322,6 +336,21 @@ func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
 	if err != nil || !known {
 		return err
 	}
+	// 同じ口座の通知が並行して届いたときも、読み直しと保存を一組で直列化する。
+	// 読み直しの後だけロックすると、先に読んだ古い状態で上書きしてしまう。
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var coachID uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT profile_id FROM coach_profiles WHERE stripe_account_id = $1 FOR UPDATE`, a.ID).Scan(&coachID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	// 知らせは順番どおりに届くとは限らないので、中身ではなく、いまのアカウントを読み直して決める。
 	// 読めなければ失敗を返し、Stripe に送り直してもらう。
 	current, err := s.stripe.GetAccount(ctx, a.ID)
@@ -329,11 +358,14 @@ func (s *Server) syncCoachAccount(ctx context.Context, ev stripe.Event) error {
 		return err
 	}
 	a.PayoutsEnabled = current.PayoutsEnabled
-	_, err = s.q.SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
+	_, err = s.q.WithTx(tx).SetCoachPayoutsEnabledByAccount(ctx, db.SetCoachPayoutsEnabledByAccountParams{PayoutsEnabled: a.PayoutsEnabled, StripeAccountID: &a.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // alertDispute は、チャージバック（利用者がカード会社に異議を申し立てた）を運営に知らせる。中身は載せない。
