@@ -8,7 +8,7 @@ export function CoachingGate({ children }: { children: React.ReactNode }) {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-3">
         <h1 className="text-2xl font-bold">ただいま準備中です</h1>
-        <p className="text-sm leading-relaxed text-slate-200">動画添削やサポートプランの受付・チケットの購入は、公開までお待ちください。現在は、選手を支えるコーチを募集しています。</p>
+        <p className="text-sm leading-relaxed text-slate-200">動画添削とサポートプランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。</p>
       </div>
       <CoachApplyLink />
     </div>
