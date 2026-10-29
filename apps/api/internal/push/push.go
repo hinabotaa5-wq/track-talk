@@ -87,6 +87,11 @@ func (s Sender) Send(ctx context.Context, sub Subscription, msg Message, ttl tim
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return ErrGone
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+		// VAPID の鍵を入れ替えたあと、前の鍵で作った購読はずっと拒否される（Apple の BadJwtToken、
+		// Chrome の「credentials do not correspond」）。残しても届かないので、宛先を消す。端末は次に
+		// アプリを開いたとき、いまの鍵で購読を作り直して登録し直す。
+		return fmt.Errorf("%w: status %d: %s", ErrGone, resp.StatusCode, failureReason(body))
 	case resp.StatusCode < 200 || resp.StatusCode >= 300:
 		// 失敗の理由（Apple の BadJwtToken など）を、原因を調べられるように残す。
 		return fmt.Errorf("%w: status %d: %s", ErrFailed, resp.StatusCode, failureReason(body))

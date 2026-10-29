@@ -25,20 +25,48 @@ export async function subscribePush(publicKey: string): Promise<PushSubscription
   const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
-  if (existing && subscriptionMatchesKey(existing, publicKey)) return existing.toJSON();
+  if (existing && subscriptionMatchesKey(existing, publicKey, rememberedPushKey())) {
+    rememberPushKey(publicKey);
+    return existing.toJSON();
+  }
   // 前の鍵で作った購読には、鍵を入れ替えたあと通知が届かない。外してから作り直す。
   if (existing) await existing.unsubscribe();
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: base64UrlToBytes(publicKey),
   });
+  rememberPushKey(publicKey);
   return subscription.toJSON();
 }
 
-// 購読が、いまの VAPID 公開鍵で作られたものか。鍵が分からない古いブラウザでは作り直さない。
-export function subscriptionMatchesKey(subscription: Pick<PushSubscription, "options">, publicKey: string): boolean {
+// 購読を作ったときの公開鍵。iPhone の Safari は購読の鍵を教えないので、この端末に覚えておいて比べる。
+const pushKeyStorage = "tracktalk-push-key";
+
+function rememberedPushKey(): string | null {
+  try {
+    return window.localStorage.getItem(pushKeyStorage);
+  } catch {
+    return null;
+  }
+}
+
+function rememberPushKey(publicKey: string) {
+  try {
+    window.localStorage.setItem(pushKeyStorage, publicKey);
+  } catch {
+    // 保存できない端末では、次に開いたときも作り直す。
+  }
+}
+
+// 購読が、いまの VAPID 公開鍵で作られたものか。ブラウザが鍵を教えないときは、この端末に覚えた鍵で比べ、
+// 覚えていなければ作り直す。
+export function subscriptionMatchesKey(
+  subscription: Pick<PushSubscription, "options">,
+  publicKey: string,
+  remembered: string | null = null,
+): boolean {
   const key = subscription.options?.applicationServerKey;
-  if (!key) return true;
+  if (!key) return remembered === publicKey;
   const current = new Uint8Array(key);
   const expected = base64UrlToBytes(publicKey);
   return current.length === expected.length && current.every((value, i) => value === expected[i]);
@@ -50,7 +78,7 @@ export async function refreshPushSubscription(token: string): Promise<void> {
   const existing = await currentPushSubscription();
   if (!existing) return;
   const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
-  if (!public_key || subscriptionMatchesKey(existing, public_key)) return;
+  if (!public_key || subscriptionMatchesKey(existing, public_key, rememberedPushKey())) return;
   await apiFetch<void>("/v1/me/push-subscriptions", {
     method: "DELETE",
     token,

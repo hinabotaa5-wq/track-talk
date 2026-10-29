@@ -28,7 +28,9 @@ describe("subscriptionMatchesKey", () => {
     expect(subscriptionMatchesKey(withKey([1, 2]), "AQID")).toBe(false);
   });
 
-  it("does not recreate when the browser does not report the key", () => {
-    expect(subscriptionMatchesKey(withKey(null), "AQID")).toBe(true);
+  it("uses the remembered key when the browser does not report the key", () => {
+    expect(subscriptionMatchesKey(withKey(null), "AQID", "AQID")).toBe(true);
+    expect(subscriptionMatchesKey(withKey(null), "AQID", "AQIE")).toBe(false);
+    expect(subscriptionMatchesKey(withKey(null), "AQID", null)).toBe(false);
   });
 });
