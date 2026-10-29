@@ -92,7 +92,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           src="https://cloud.umami.is/script.js"
           data-website-id="0442ad3b-c5a2-45d8-825e-09bb48eded74"
           data-before-send={umamiBeforeSendName}
-          data-domains="tracktalk.jp,www.tracktalk.jp,track-talk.netlify.app"
+          data-domains="track-talk.netlify.app"
           strategy="lazyOnload"
         />
         <AuthProvider>

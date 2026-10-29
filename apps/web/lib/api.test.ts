@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("successful operation tracking", () => {
   it.each([201, 204])("counts a successful response (%s) once", async (status) => {
     const track = vi.fn();
-    vi.stubGlobal("window", { location: { hostname: "tracktalk.jp" }, umami: { track } });
+    vi.stubGlobal("window", { location: { hostname: "track-talk.netlify.app" }, umami: { track } });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(status === 204 ? null : '{"id":"123"}', { status })));
     await apiFetch("/v1/posts", { method: "POST", body: '{"body":"private"}', token: "secret" });
     expect(track).toHaveBeenCalledExactlyOnceWith("post_created");
@@ -14,7 +14,7 @@ describe("successful operation tracking", () => {
 
   it("does not count failed HTTP responses or network failures", async () => {
     const track = vi.fn();
-    vi.stubGlobal("window", { location: { hostname: "tracktalk.jp" }, umami: { track } });
+    vi.stubGlobal("window", { location: { hostname: "track-talk.netlify.app" }, umami: { track } });
     const fetch = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 422 })).mockRejectedValueOnce(new Error("offline"));
     vi.stubGlobal("fetch", fetch);
     await expect(apiFetch("/v1/posts", { method: "POST" })).rejects.toBeInstanceOf(ApiRequestError);

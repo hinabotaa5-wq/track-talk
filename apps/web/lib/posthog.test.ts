@@ -14,7 +14,7 @@ beforeEach(() => {
   sdk.capture.mockReset();
   vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_public");
   vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.i.posthog.com");
-  vi.stubGlobal("window", { location: { hostname: "tracktalk.jp", pathname: "/" } });
+  vi.stubGlobal("window", { location: { hostname: "track-talk.netlify.app", pathname: "/" } });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
@@ -34,8 +34,8 @@ describe("PostHog data boundaries", () => {
       $set: { email: "secret@example.com" }, $set_once: { secret: "private" },
       properties: {
         token: "phc_public", distinct_id: "anonymous", $session_id: "session",
-        $pathname: "/posts/private-id", $current_url: "https://tracktalk.jp/?q=secret",
-        $referrer: "https://tracktalk.jp/guardian/secret", $initial_referrer: "private",
+        $pathname: "/posts/private-id", $current_url: "https://track-talk.netlify.app/?q=secret",
+        $referrer: "https://track-talk.netlify.app/guardian/secret", $initial_referrer: "private",
         $set: { email: "secret@example.com" }, body: "private", $title: "private",
       },
     });
@@ -43,7 +43,7 @@ describe("PostHog data boundaries", () => {
       uuid: "event-id", event: "post_created", timestamp: undefined,
       properties: {
         token: "phc_public", distinct_id: "anonymous", $session_id: "session",
-        $pathname: "/posts/:id", $current_url: "https://tracktalk.jp/posts/:id",
+        $pathname: "/posts/:id", $current_url: "https://track-talk.netlify.app/posts/:id",
         $process_person_profile: false, $geoip_disable: true, $ip: "0.0.0.0",
       },
     });

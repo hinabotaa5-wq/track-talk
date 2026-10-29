@@ -16,9 +16,9 @@ describe("umamiBeforeSend", () => {
 
   it("hides the guardian token in the url and referrer", () => {
     const send = load();
-    expect(send("event", { url: `/guardian/${token}`, referrer: `https://tracktalk.jp/guardian/${token}/personal/1` })).toEqual({
+    expect(send("event", { url: `/guardian/${token}`, referrer: `https://track-talk.netlify.app/guardian/${token}/personal/1` })).toEqual({
       url: "/guardian/:token",
-      referrer: "https://tracktalk.jp/guardian/:token/personal/1",
+      referrer: "https://track-talk.netlify.app/guardian/:token/personal/1",
     });
     expect(send("event", { url: `/guardian/${token}?x=1` }).url).toBe("/guardian/:token");
   });
@@ -32,13 +32,13 @@ describe("umamiBeforeSend", () => {
   it("removes search terms and authentication query/hash values", () => {
     expect(load()("event", {
       url: "/?q=private+search#secret",
-      referrer: "https://tracktalk.jp/auth/callback?code=secret#access_token=secret",
-    })).toEqual({ url: "/", referrer: "https://tracktalk.jp/auth/callback" });
+      referrer: "https://track-talk.netlify.app/auth/callback?code=secret#access_token=secret",
+    })).toEqual({ url: "/", referrer: "https://track-talk.netlify.app/auth/callback" });
   });
 });
 
 describe("operation analytics", () => {
-  function tracker(hostname = "tracktalk.jp") {
+  function tracker(hostname = "track-talk.netlify.app") {
     const track = vi.fn();
     vi.stubGlobal("window", { location: { hostname }, umami: { track } });
     return track;
@@ -80,7 +80,7 @@ describe("operation analytics", () => {
 
   it("works without a browser or a loaded tracker", () => {
     expect(() => trackEvent("search_submitted")).not.toThrow();
-    vi.stubGlobal("window", { location: { hostname: "tracktalk.jp" } });
+    vi.stubGlobal("window", { location: { hostname: "track-talk.netlify.app" } });
     expect(() => trackEvent("search_submitted")).not.toThrow();
   });
 

@@ -23,7 +23,7 @@ export type AnalyticsEvent =
 // 計測が拒否・遮断されても、保存や画面遷移を失敗させない。
 export function trackEvent(event: AnalyticsEvent): void {
   if (typeof window === "undefined") return;
-  if (!["tracktalk.jp", "www.tracktalk.jp", "track-talk.netlify.app"].includes(window.location.hostname)) return;
+  if (!["track-talk.netlify.app"].includes(window.location.hostname)) return;
   capturePosthog(event);
   const tracker = (window as Window & {
     umami?: { track: (name: string) => unknown };

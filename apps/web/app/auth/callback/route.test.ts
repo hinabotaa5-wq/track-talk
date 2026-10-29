@@ -94,7 +94,7 @@ describe("auth callback redirect", () => {
       expect(location.startsWith("/")).toBe(true);
       expect(location.startsWith("//")).toBe(false);
       // 同じレスポンスをどちらの公開ホストで受けても、そのホストから移動しない。
-      for (const origin of ["https://track-talk.netlify.app", "https://tracktalk.jp"]) {
+      for (const origin of ["https://track-talk.netlify.app", "http://localhost:3000"]) {
         const destination = new URL(location, `${origin}/auth/callback`);
         expect(destination.origin).toBe(origin);
         expect(destination.pathname).toBe(scenario === "success" ? "/me" : "/login");

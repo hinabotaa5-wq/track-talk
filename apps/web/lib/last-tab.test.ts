@@ -3,7 +3,7 @@ import { expect, it, vi } from "vitest";
 import { lastTabHref, lastTabStartupScript } from "./last-tab";
 
 function start(saved: string | null, url = "/", blocked = false, requestAnimationFrame?: (callback: () => void) => void) {
-  const parsed = new URL(url, "https://tracktalk.jp");
+  const parsed = new URL(url, "https://track-talk.netlify.app");
   const replace = vi.fn();
   const window = { __tracktalkLastTabRedirect: false };
   const getItem = vi.fn(() => {
