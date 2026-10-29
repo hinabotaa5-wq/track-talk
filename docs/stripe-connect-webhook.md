@@ -10,13 +10,40 @@
 
 本番への反映が必要。今回の作業ではデプロイ・フラグ変更・Stripe設定変更・実決済を行わない。特商法ページやWebのデプロイとも分ける。
 
-## 通常の決済Webhookの確認結果
+## 通常の決済Webhook：本番の現状と修正後
 
 2026-10-29、main `3b170c1` では `/webhooks/stripe` は `requireCoaching` 配下にあり、`COACHING_ENABLED` がオフなら署名検証前に404を返す。`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created` も同じ。今回の変更でもこの動作は維持する。
 
 本番の `https://track-talk-api-y2wva5o5zq-an.a.run.app` に対し、`/health` は200、通常Webhookへ署名なしの空JSONを送る診断は404だった。Connect専用パスも未デプロイのため404だった。実イベント・正しい署名・秘密値は送受信していない。
 
-この診断だけでは本番フラグの実値やStripeの配信履歴は確定しない。ただし「フラグがオフでも通常の決済通知が処理される」という前提はコード上成立しない。Stripe Dashboard の通常Webhookの配信履歴で、既存の `checkout.session.completed` 等に404がないか、未配信の取引がないかを運営者が確認する。実決済テスト前に、通常Webhookを動かす方針を別途決める必要がある。今回のConnect受信口追加だけでは通常決済の問題は解消しない。機能公開のためにフラグを独断で開けたり、配信済みイベントを無条件に再送したりしない。
+今回、通常の `/webhooks/stripe` もフラグから切り離す。`COACHING_ENABLED` がオフのときは通常用 `STRIPE_WEBHOOK_SECRET` の署名だけを認め、`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created` の3種類だけを既存処理に渡す。通常キーが無い場合は404、署名不正は400、その他のイベントは404。コーチング公開中の既存Connect登録との互換性は維持する。新設Connect専用受信口は、公開状態によらずConnect用署名しか認めない。
+
+これにより、閉鎖前に作ったCheckoutへの遅延通知でも注文を成立させられる。既存の期限切れ・二重払いに対する取消し／返金処理も引き続き実行される。新しい支払い・返金ルールを追加する変更ではない。定期処理は依然フラグの内側にあるため、既存取引の履行・返金運用をWebhookだけで完結したとは扱わない。
+
+### 購入経路の確認
+
+Stripe Checkout作成の呼び出しは次の4系統のみで、入口はすべて `server.go` の `requireCoaching` 配下。フラグオフでアプリから新規Checkoutを作成・取得できる経路は見つからなかった。保護者の同意から決済画面へ進む経路も同じグループ内にある。Webの添削新規申込・依頼詳細・パーソナル指導・保護者・チケット画面もCoachingGate配下。
+
+| 系統 | 購入・決済画面を作る入口 | フラグオフ |
+| --- | --- | --- |
+| パーソナル指導 | `/v1/coaching/contracts/{id}/checkout`、保護者の契約checkout/consent | 404 |
+| 動画添削 | `/v1/coaching/requests`、`/v1/coaching/requests/{id}/checkout` | 404 |
+| 追加相談 | `/v1/coaching/consultations/{id}/submit`、本人・保護者のcheckout | 404 |
+| 旧チケット | `/v1/coaching/tickets/checkout` | 404。販売停止フラグも維持 |
+
+認証あり・なし双方で購入関係10経路が404となり、偽StripeへCheckout作成が一度も発生しないことをテストした。加えて、閉鎖前の注文へ閉鎖後に通知を送り、パーソナル指導の成立、動画添削カードの仮押さえ反映・PayPayの決済反映、追加相談の入金反映、旧チケットの一度だけの付与を確認する。
+
+これはアプリの入口に関する確認であり、過去に発行済みで有効なStripe Checkout URLを失効させるものではない。そのURLからは停止後でも支払いが完了し得るため、Webhookを独立して動かす必要がある。現在の本番で未失効のCheckoutが0件かどうかは未確認。新規購入経路が閉じていることだけを理由に、過去の取りこぼしも0件とは断定しない。
+
+### Stripe Dashboardの読み取り確認（2026-10-29）
+
+- 本番の通常送信先 `tracktalk-live-payments`（`we_1UVZN6RqDMOeFIE9kjEZkaOv`）はアクティブ、対象イベントは3件。
+- 登録URLは `https://track-talk-api-274141774717.asia-northeast1.run.app/webhooks/stripe`。上記のCloud Run URLとはホスト表記が異なるため、デプロイ後の疎通は必ずこの登録URLで確認する。
+- 概要の「今週」は配信合計0・失敗0。「イベントの配信」タブ（検索・ステータス指定なし）も「イベント配信は見つかりません」。確認した表示範囲で失敗配信は見つからなかった。全期間・削除済み送信先まで含む保証ではない。
+- 本番の「決済用リンク」は新規作成の案内画面で、既存リンクは表示されなかった。Checkout画面も利用開始の案内で、未失効セッションの全件確認はできていない。
+- Dashboardは閲覧のみ。送信先作成・設定変更・再送・署名の表示は行わない。
+
+本番にはこの修正をまだ反映していない。機能フラグを開ける前・少額の実決済テスト前にAPIをデプロイし、通常決済用送信先で署名付きのテスト通知が2xxとなり、既存注文への反映まで確認する。署名なしのHTTP応答確認だけでは成功扱いにしない。
 
 ## 運営者の設定手順
 
@@ -38,10 +65,10 @@ Stripe Connect本番送信先にはテストモードのイベントが届く場
 
 ## 本番投入前に確認する差分
 
-- `server.go`：Connect専用パス追加。通常Webhookの公開条件は維持。
+- `server.go`：Connect専用パス追加と、通常決済Webhookの公開フラグからの分離。購入APIは閉じたまま。
 - `stripe_connect_webhook.go`：専用署名・イベント限定・本文サイズ制限・既存同期呼び出し。
-- `coaching_payment.go`：口座同期で行ロックを取得してからStripe最新状態を取得・保存。
-- テスト：フラグオフでの同期、同一イベントの再送、古い本文、排他、署名違い、未知口座、取得失敗と再試行、キー未設定、通常決済イベントの拒否、既存ルートの404を確認。
+- `coaching_payment.go`：閉鎖中の通常Webhookを通常署名と決済イベント3種に限定。口座同期は行ロック取得後にStripe最新状態を取得・保存。
+- テスト：フラグオフでの同期、同一イベントの再送、古い本文、排他、署名違い、未知口座、取得失敗と再試行、キー未設定、Connect側の通常決済イベント拒否、通常側の決済成立、購入APIの404を確認。
 - 本手順書と公開チェックリストのリンク。
 
 DBスキーマ、料金、Checkout作成、決済・返金・送金ルール、利用規約、Web画面、フラグの変更はない。

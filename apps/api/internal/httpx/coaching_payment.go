@@ -252,6 +252,15 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "bad_signature", "署名が正しくありません")
 		return
 	}
+	if !s.cfg.CoachingEnabled {
+		// 作成済みの決済への通知だけを処理する。口座更新は専用受信口に分ける。
+		switch ev.Type {
+		case "checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.dispute.created":
+		default:
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+	}
 	switch ev.Type {
 	case "account.updated":
 		if err := s.syncCoachAccount(r.Context(), ev); err != nil {
@@ -290,10 +299,15 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // webhookSecrets は、署名を確かめる鍵。Stripe は platform の知らせと Connect（コーチのアカウント）の知らせで
-// 送り先ごとに鍵を分けるので、両方を受け付ける。
+// 送り先ごとに鍵を分ける。公開前の通常決済通知は通常用の鍵だけで検証する。
+// 公開済み環境の既存 Connect 登録との互換性のため、公開中は従来どおり両方を受け付ける。
 func (s *Server) webhookSecrets() []string {
 	var out []string
-	for _, k := range []string{s.cfg.StripeWebhookSecret, s.cfg.StripeConnectWebhookSecret} {
+	keys := []string{s.cfg.StripeWebhookSecret}
+	if s.cfg.CoachingEnabled {
+		keys = append(keys, s.cfg.StripeConnectWebhookSecret)
+	}
+	for _, k := range keys {
 		if k != "" {
 			out = append(out, k)
 		}

@@ -276,14 +276,14 @@ func TestStripeWebhookSyncsCoachAccountAndAlertsDispute(t *testing.T) {
 	}
 }
 
-// コーチングを提供していない間は、鍵があっても Webhook は無いものとして扱う。
-func TestStripeWebhookIs404WhileCoachingIsOff(t *testing.T) {
+// コーチングを閉じても、決済への通知は署名を確かめて受け付ける。
+func TestStripeWebhookAcceptsDisputeWhileCoachingIsOff(t *testing.T) {
 	h := setupConfig(t, func(cfg *config.Config) {
 		cfg.CoachingEnabled = false
 		cfg.StripeSecretKey = "sk_test_x"
 		cfg.StripeWebhookSecret = testWebhookSecret
 	})
-	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1"}); rec.Code != http.StatusNotFound {
+	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{"id": "dp_1"}); rec.Code != http.StatusOK {
 		t.Fatalf("webhook while off %d", rec.Code)
 	}
 }

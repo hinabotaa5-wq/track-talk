@@ -135,7 +135,7 @@ func TestStripeConnectWebhookWhileCoachingIsOff(t *testing.T) {
 		if rec := stripeWebhookAt(t, h, connectWebhookPath, testConnectWebhookSecret, typ, map[string]any{}); rec.Code != http.StatusBadRequest {
 			t.Fatalf("connect accepted payment event %s: %d", typ, rec.Code)
 		}
-		if rec := stripeWebhook(t, h, testWebhookSecret, typ, map[string]any{}); rec.Code != http.StatusNotFound {
+		if rec := stripeWebhook(t, h, testWebhookSecret, typ, map[string]any{}); rec.Code != http.StatusOK {
 			t.Fatalf("payment route while off %s: %d", typ, rec.Code)
 		}
 	}

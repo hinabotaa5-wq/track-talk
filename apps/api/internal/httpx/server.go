@@ -99,8 +99,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	// Cloud Scheduler から1分ごとに呼ばれる。秘密のヘッダーで確かめる。
 	// コーチングを提供していない間は、tick も無いものとして扱う。
 	r.With(s.requireCoaching).Post("/internal/coaching/tick", s.coachingTick)
-	// 支払いはコーチングの一部なので、提供していない間は Webhook も無いものとして扱う。
-	r.With(s.requireCoaching).Post("/webhooks/stripe", s.stripeWebhook)
+	// 受付を閉じても、作成済みの決済画面への遅延通知は受け付ける。購入APIは閉じたまま。
+	r.Post("/webhooks/stripe", s.stripeWebhook)
 	// 口座の状態同期だけは、コーチングの公開前から受け付ける。決済イベントは扱わない。
 	r.Post("/webhooks/stripe/connect", s.stripeConnectWebhook)
 	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
@@ -256,7 +256,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		// 404 を返す。プライバシーポリシーもその前提で書いている。
 		// 閉じないもの: コーチの応募（POST /coach/applications、GET /coach/me、審査に必要な顔写真）と、
 		// 運営の審査・準備に使う /admin/coach-applications、/admin/coaching の閲覧系。
-		// お金の動き（送金・返金）は閉じる。
+		// 購入・手動の送金・返金APIは閉じる。既存決済へのWebhookはこのグループの外で受け付ける。
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
 			r.Get("/coaches", s.listCoaches)
