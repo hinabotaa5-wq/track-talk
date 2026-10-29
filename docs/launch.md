@@ -41,7 +41,8 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
   - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する
 - `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を Cloud Run の環境変数に入れて、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
 - 運営者の決定（2026-10-29）：PayPayの承認が下りるまで、コーチング公開・新規受付のフラグは開けない。承認後、同じ日に「公開フラグを開ける → 手順書C（Connect同期確認）→ 手順書B（実決済テスト）」の順で進める。`COACHING_NEW_ACCEPTANCE_ENABLED` はCが成功するまでオフを維持し、成功後、Bの実施前に開ける。
-  - APIの `COACHING_ENABLED` は既存の「Configure Coaching Availability」（`.github/workflows/enable-coaching.yml`）で切り替える。このワークフローは `COACHING_NEW_ACCEPTANCE_ENABLED=0` を必ず設定し、新規受付を開ける入力はない。C成功後の新規受付開始に使う操作方法は、別途運営者の判断が必要であり、このワークフローで開始できるとは扱わない。
+  - APIの `COACHING_ENABLED` は「Configure Coaching Availability」（`.github/workflows/enable-coaching.yml`）の `operation=configure_availability`（既定）と `enabled=true` で開ける。この操作は従来どおり `COACHING_NEW_ACCEPTANCE_ENABLED=0` にし、Cの間は新規受付を停止する。公開を戻す場合は同じ操作で `enabled=false` を選ぶ。
+  - 同日の手順書Cが成功した後に、同ワークフローを `operation=open_new_acceptance`、`confirm_open_new_acceptance=true` で別途実行し、新規受付だけを開けてから手順書Bへ進む。この操作の `enabled` は使わず、`COACHING_NEW_ACCEPTANCE_ENABLED=1` だけを更新する。`COACHING_ENABLED`・`COACHING_MESSAGING_ENABLED`・`COACHING_TICKET_SALES_ENABLED`・`REVIEW_RANDOM_ASSIGN_ENABLED` は現在値を維持する。確認入力は既定でfalseで、未確認なら認証・更新前に失敗する。PayPay承認・C成功は運営者が確認する前提で、自動判定ではない。
   - Webの `NEXT_PUBLIC_COACHING_ENABLED` は `netlify.toml` に直書きされているため、同ファイルを変更するPRのマージと「Deploy Web」の実行が必要。API側の切り替えだけではWebは公開されない。
 - 公開前の少額の実決済・返金確認は、手順書Bの動画添削テストで行う。テスト1はコーチの辞退によるカードの仮押さえ取消し、テスト3はPayPayの全額返金を確認する。テスト2は確定済みのため返金しない。確定済みの添削を返金する管理画面はなく、Stripe Dashboardで返金するとアプリの記録とずれる。これは未解決の制約であり、返金機能が整備済みとは扱わない。
 - 特定商取引法に基づく表記のページ（事業者名・所在地・連絡先・返金の条件など）が公開前に必要。事業者の情報は運営が用意する
