@@ -58,6 +58,15 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 	if !strings.HasPrefix(auth, "vapid t=") {
 		t.Fatalf("authorization %q", auth)
 	}
+	// 設定の mailto: が二重にならない(Apple は mailto:mailto: を BadJwtToken で拒否する)。
+	token := strings.TrimPrefix(strings.SplitN(auth, ",", 2)[0], "vapid t=")
+	claims, err := base64.RawURLEncoding.DecodeString(strings.Split(token, ".")[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(claims), `"sub":"mailto:test@example.com"`) {
+		t.Fatalf("claims %s", claims)
+	}
 	status = http.StatusGone
 	if err := s.Send(ctx, sub, msg, time.Minute); err != ErrGone {
 		t.Fatalf("gone: %v", err)

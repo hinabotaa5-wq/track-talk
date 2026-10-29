@@ -73,12 +73,17 @@ export function subscriptionMatchesKey(
 }
 
 // VAPID の鍵を入れ替えたあと、前の鍵の購読を今の鍵で作り直して API に登録し直す。
-// 通知をオンにしていない端末や、鍵が変わっていない端末では何もしない。
+// 鍵が変わっていなくても登録し直す。API は届かなかった宛先を消すので、消されたままにしない。
+// 通知をオンにしていない端末では何もしない。
 export async function refreshPushSubscription(token: string): Promise<void> {
   const existing = await currentPushSubscription();
   if (!existing) return;
   const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
-  if (!public_key || subscriptionMatchesKey(existing, public_key, rememberedPushKey())) return;
+  if (!public_key) return;
+  if (subscriptionMatchesKey(existing, public_key, rememberedPushKey())) {
+    await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(existing.toJSON()) });
+    return;
+  }
   await apiFetch<void>("/v1/me/push-subscriptions", {
     method: "DELETE",
     token,

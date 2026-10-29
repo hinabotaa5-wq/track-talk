@@ -67,8 +67,10 @@ func (s Sender) Send(ctx context.Context, sub Subscription, msg Message, ttl tim
 		Endpoint: sub.Endpoint,
 		Keys:     webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth},
 	}, &webpush.Options{
-		HTTPClient:      client,
-		Subscriber:      s.Subject,
+		HTTPClient: client,
+		// webpush-go は https: で始まらない宛先に自分で mailto: を付ける。設定に mailto: が付いていると
+		// mailto:mailto: になり、Apple に BadJwtToken で拒否されるので、外してから渡す。
+		Subscriber:      strings.TrimPrefix(s.Subject, "mailto:"),
 		TTL:             int(ttl.Seconds()),
 		Urgency:         webpush.UrgencyHigh,
 		VAPIDPublicKey:  s.PublicKey,
