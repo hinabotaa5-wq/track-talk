@@ -214,10 +214,11 @@ func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (Ch
 }
 
 type Refund struct {
-	Metadata map[string]string `json:"metadata"`
-	ID       string            `json:"id"`
-	Amount   int               `json:"amount"`
-	Status   string            `json:"status"`
+	Metadata      map[string]string `json:"metadata"`
+	ID            string            `json:"id"`
+	Amount        int               `json:"amount"`
+	Status        string            `json:"status"`
+	PaymentIntent string            `json:"payment_intent"`
 }
 
 // CreateRefund は、支払いの一部か全部を返金する。
@@ -385,8 +386,10 @@ func (c Client) CreateAccountLink(ctx context.Context, account, refreshURL, retu
 }
 
 type Transfer struct {
-	ID     string `json:"id"`
-	Amount int    `json:"amount"`
+	ID          string            `json:"id"`
+	Amount      int               `json:"amount"`
+	Destination string            `json:"destination"`
+	Metadata    map[string]string `json:"metadata"`
 }
 
 // CreateTransfer は、TrackTalk の残高からコーチのアカウントへ送金する。
@@ -405,6 +408,75 @@ func (c Client) CreateTransfer(ctx context.Context, account string, amountYen in
 	var t Transfer
 	err := c.post(ctx, "/v1/transfers", form, idempotencyKey, &t)
 	return t, err
+}
+
+// GetPayoutDestinationLast4 は、入金（payout）の宛先口座の末尾4桁だけを返す。
+// 宛先を展開して読み、口座番号そのものは扱わない。宛先が読めなければ空を返す。
+func (c Client) GetPayoutDestinationLast4(ctx context.Context, payoutID string) (string, error) {
+	if !c.Configured() {
+		return "", ErrNotConfigured
+	}
+	q := url.Values{}
+	q.Set("expand[]", "destination")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/payouts/"+url.PathEscape(payoutID)+"?"+q.Encode(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var out struct {
+		Destination json.RawMessage `json:"destination"`
+	}
+	if err := c.do(req, &out); err != nil {
+		return "", err
+	}
+	// 展開できていないときは ID の文字列が返る。その場合は末尾4桁は分からない。
+	var dest struct {
+		Last4 string `json:"last4"`
+	}
+	if err := json.Unmarshal(out.Destination, &dest); err != nil {
+		return "", nil
+	}
+	return dest.Last4, nil
+}
+
+// ListRefunds は、since 以後に作られた返金を返す（見覚えのない返金の日次照合用）。
+func (c Client) ListRefunds(ctx context.Context, since time.Time) ([]Refund, error) {
+	if !c.Configured() {
+		return nil, ErrNotConfigured
+	}
+	q := url.Values{}
+	q.Set("created[gte]", strconv.FormatInt(since.Unix(), 10))
+	q.Set("limit", "100")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/refunds?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var out struct {
+		Data []Refund `json:"data"`
+	}
+	err = c.do(req, &out)
+	return out.Data, err
+}
+
+// ListTransfers は、since 以後に作られた送金を返す（見覚えのない送金の日次照合用）。
+func (c Client) ListTransfers(ctx context.Context, since time.Time) ([]Transfer, error) {
+	if !c.Configured() {
+		return nil, ErrNotConfigured
+	}
+	q := url.Values{}
+	q.Set("created[gte]", strconv.FormatInt(since.Unix(), 10))
+	q.Set("limit", "100")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/transfers?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var out struct {
+		Data []Transfer `json:"data"`
+	}
+	err = c.do(req, &out)
+	return out.Data, err
 }
 
 // FindTransfers は、transfer_group が group の送金を返す。Idempotency-Key は約24時間で切れるので、

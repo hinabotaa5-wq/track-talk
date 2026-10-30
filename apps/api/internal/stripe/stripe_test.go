@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -82,5 +83,57 @@ func TestPostDoesNotRetryClientErrors(t *testing.T) {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.Code != "amount_too_small" || calls != 1 {
 		t.Fatalf("4xx: %v calls=%d", err, calls)
+	}
+}
+
+func TestListRefundsAndTransfers(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path+"?"+r.URL.RawQuery)
+		if r.URL.Path == "/v1/refunds" {
+			_, _ = w.Write([]byte(`{"data":[{"id":"re_1","amount":500,"payment_intent":"pi_1"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"tr_1","amount":3000,"destination":"acct_1","metadata":{"payout_id":"p1"}}]}`))
+	}))
+	defer srv.Close()
+	c := Client{Secret: "sk_test_x", APIBase: srv.URL, RetryDelay: time.Millisecond}
+	since := time.Unix(1700000000, 0)
+	refunds, err := c.ListRefunds(context.Background(), since)
+	if err != nil || len(refunds) != 1 || refunds[0].PaymentIntent != "pi_1" {
+		t.Fatalf("refunds: %+v %v", refunds, err)
+	}
+	transfers, err := c.ListTransfers(context.Background(), since)
+	if err != nil || len(transfers) != 1 || transfers[0].Destination != "acct_1" || transfers[0].Metadata["payout_id"] != "p1" {
+		t.Fatalf("transfers: %+v %v", transfers, err)
+	}
+	for _, p := range paths {
+		if !strings.Contains(p, "created%5Bgte%5D=1700000000") {
+			t.Fatalf("missing created filter: %s", p)
+		}
+	}
+}
+
+func TestGetPayoutDestinationLast4(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.RawQuery, "expand") {
+			t.Errorf("query = %s", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"id":"po_1","destination":{"object":"bank_account","last4":"4242"}}`))
+	}))
+	defer srv.Close()
+	c := Client{Secret: "sk_test_x", APIBase: srv.URL, RetryDelay: time.Millisecond}
+	last4, err := c.GetPayoutDestinationLast4(context.Background(), "po_1")
+	if err != nil || last4 != "4242" {
+		t.Fatalf("last4=%q err=%v", last4, err)
+	}
+	// 展開されず ID の文字列だけのときは、末尾4桁は不明として空を返す。
+	srv2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":"po_1","destination":"ba_1"}`))
+	}))
+	defer srv2.Close()
+	c2 := Client{Secret: "sk_test_x", APIBase: srv2.URL, RetryDelay: time.Millisecond}
+	if last4, err := c2.GetPayoutDestinationLast4(context.Background(), "po_1"); err != nil || last4 != "" {
+		t.Fatalf("unexpanded: last4=%q err=%v", last4, err)
 	}
 }
