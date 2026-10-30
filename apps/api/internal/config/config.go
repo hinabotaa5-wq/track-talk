@@ -62,6 +62,10 @@ type Config struct {
 	StorageCleanupSecret string
 	// ReminderSecret は Cloud Scheduler が月1回の記録のお知らせを呼ぶときのヘッダーの値。空なら使えない。
 	ReminderSecret string
+	// SecurityCheckSecret は Cloud Scheduler が見慣れない DB 接続の見回りを呼ぶときのヘッダーの値。空なら使えない。
+	SecurityCheckSecret string
+	// OpsAlertEmail は、見覚えのないお金の動きや DB 接続などを運営へ知らせる宛先。秘密情報ではない。空ならメールは送らない。
+	OpsAlertEmail string
 	// Stripe の鍵。秘密鍵が空なら、パーソナル指導は支払いなしのデモ版として動く。
 	StripeSecretKey     string
 	StripeWebhookSecret string
@@ -141,6 +145,8 @@ func Load() (Config, error) {
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
 		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
+		SecurityCheckSecret:        os.Getenv("SECURITY_CHECK_SECRET"),
+		OpsAlertEmail:              strings.TrimSpace(os.Getenv("OPS_ALERT_EMAIL")),
 		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),

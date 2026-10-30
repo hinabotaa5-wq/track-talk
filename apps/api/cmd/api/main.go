@@ -16,7 +16,6 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -35,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL, db.AppNameAPI)
 	if err != nil {
 		slog.Error("db", "err", err)
 		os.Exit(1)

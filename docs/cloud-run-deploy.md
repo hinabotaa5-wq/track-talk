@@ -92,6 +92,19 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
 
 tick が止まっていても、依頼した人が依頼を開いたときに期限切れは片付き、期限の過ぎた打診は引き受けられません。ただ、時間切れの打診が次のコーチに回るのは tick だけです。
 
+## 見慣れない DB 接続の見回り
+
+API・imports・移行の DB 接続には `application_name` の名札（`track-talk-api` / `track-talk-import` / `track-talk-migrate`）が付きます。Cloud Scheduler が15分ごとに `/internal/security/check` を呼び、同じ DB ユーザーの接続のうち名札が許可リスト（自前の名札と Supabase 内部）にないものがあれば、`OPS_ALERT_EMAIL` へ「名札・接続開始時刻・状態」だけをメールします。クエリ本文や IP は送りません。setup.sh のあと、Cloud Shell で一度だけ流します。
+
+```bash
+PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/security-check.sh
+```
+
+秘密の値を作って API の `SECURITY_CHECK_SECRET` に入れ、同じ値をヘッダーに付けて呼ぶジョブ `track-talk-security-check` を作ります。無料枠（月3ジョブ）を超える分は1ジョブ約$0.10/月です。止めるときは `gcloud scheduler jobs pause track-talk-security-check --location asia-northeast1`。Supabase 内部の接続で誤検知したら、その `application_name` を `security_check.go` の許可リストに足してください。15分ごとの見回りのため短い接続は見逃すことがあり、名札の偽装は DB ユーザーの用途別分離（未実施）で塞ぎます。
+
+Secret Manager の「データ読み取り」監査ログと、想定外の読み出し・IAM 変更・SA キー作成のログアラートは、GCP コンソールで一度だけ作る設定です（手順は漏えい検知の実装計画 P1 4-A / 4-B）。
+
+
 ## 月1回の記録のお知らせ
 
 通知をオンにした全員に、毎月1日の19時(日本時間)に「大会の記録、残せていますか？」をプッシュ通知で送ります。Cloud Scheduler が API を呼びます。`VAPID_PUBLIC_KEY`・`VAPID_PRIVATE_KEY`・`VAPID_SUBJECT` が入っていることが前提です。setup.sh のあと、Cloud Shell で一度だけ流します。
