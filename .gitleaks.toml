@@ -1,0 +1,14 @@
+# gitleaks の設定。検出時は CI 側で --redact を付け、値はログに出さない。
+title = "TrackTalk"
+
+[allowlist]
+description = "テスト用のダミー値と、値が空の設定例だけを許可する"
+paths = [
+  "deploy/cloud-run/env\\.example\\.yaml",
+  "\\.env\\.example",
+]
+regexes = [
+  "test-jwt-secret-for-ci-only",
+  "test-anon-key",
+  "SUPABASE_JWT_SECRET=dummy",
+]
