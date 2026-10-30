@@ -58,6 +58,11 @@ func (s *Server) securityCheck(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "internal_error", "処理できませんでした")
 		return
 	}
+	// 同じ見回りで、1日1回だけ Stripe の返金・送金も照合する（Webhook の取りこぼし対策）。
+	if err := s.reconcileStripeMoney(r.Context()); err != nil {
+		// 照合の失敗で DB の見回りの結果まで落とさない。
+		slog.Warn("stripe reconcile", "err", err)
+	}
 	JSON(w, http.StatusOK, map[string]any{"unknown_connections": unknown, "alerted": alerted})
 }
 

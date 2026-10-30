@@ -254,14 +254,18 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.cfg.CoachingEnabled {
 		// 作成済みの決済への通知だけを処理する。口座更新は専用受信口に分ける。
+		// 見覚えのない返金・送金の検知は、コーチングを止めている間も続ける。
 		switch ev.Type {
-		case "checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.dispute.created":
+		case "checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.dispute.created",
+			"charge.refunded", "refund.created", "transfer.created", "transfer.reversed", "payout.created":
 		default:
 			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 			return
 		}
 	}
 	switch ev.Type {
+	case "charge.refunded", "refund.created", "transfer.created", "transfer.reversed", "payout.created":
+		s.handleStripeMoneyAlert(r.Context(), ev)
 	case "account.updated":
 		if err := s.syncCoachAccount(r.Context(), ev); err != nil {
 			slog.Error("stripe webhook", "event", ev.ID, "err", err)

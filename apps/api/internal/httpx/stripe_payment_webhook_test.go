@@ -179,3 +179,32 @@ func TestStripePaymentWebhookRequiresOwnKeysWhileClosed(t *testing.T) {
 		})
 	}
 }
+
+// コーチングを止めている間も、見覚えのない返金・送金の検知だけは受け付ける。
+func TestStripeMoneyAlertsAcceptedWhileClosed(t *testing.T) {
+	h, _ := setupStripeConfig(t, func(c *config.Config) {
+		c.CoachingEnabled = false
+		c.CoachingNewAcceptance = false
+		c.CoachingMessaging = false
+		c.CoachingTicketSales = false
+	})
+	cases := []struct {
+		typ string
+		obj map[string]any
+	}{
+		{"refund.created", map[string]any{"id": "re_unknown_1", "amount": 500, "payment_intent": "pi_unknown_1"}},
+		{"charge.refunded", map[string]any{"id": "ch_unknown_1", "amount_refunded": 500, "payment_intent": "pi_unknown_2"}},
+		{"transfer.created", map[string]any{"id": "tr_unknown_1", "amount": 3000, "destination": "acct_unknown"}},
+		{"transfer.reversed", map[string]any{"id": "tr_unknown_2", "amount": 3000}},
+		{"payout.created", map[string]any{"id": "po_1", "amount": 3000}},
+	}
+	for _, tc := range cases {
+		if rec := stripeWebhook(t, h, testWebhookSecret, tc.typ, tc.obj); rec.Code != http.StatusOK {
+			t.Fatalf("%s while closed: %d %s", tc.typ, rec.Code, rec.Body.String())
+		}
+	}
+	// 検知対象でないイベントは、これまでどおり閉じたまま。
+	if rec := stripeWebhook(t, h, testWebhookSecret, "customer.created", map[string]any{}); rec.Code != http.StatusNotFound {
+		t.Fatalf("customer.created while closed: %d", rec.Code)
+	}
+}

@@ -104,6 +104,13 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/security-check.sh
 
 Secret Manager の「データ読み取り」監査ログと、想定外の読み出し・IAM 変更・SA キー作成のログアラートは、GCP コンソールで一度だけ作る設定です（手順は漏えい検知の実装計画 P1 4-A / 4-B）。
 
+### Stripe の見覚えのない返金・送金
+
+通常 Webhook（`/webhooks/stripe`）で `charge.refunded`・`refund.created`・`transfer.created`・`transfer.reversed`・`payout.created` を追加で受け、DB に記録のない返金・送金を `OPS_ALERT_EMAIL` へ知らせます。コーチングを止めている間も検知だけは続けます。取りこぼし対策として、上の見回りが1日1回、過去25時間の返金・送金も Stripe から一覧して照合します。
+
+運営がすること（マージ・デプロイ後）: Stripe ダッシュボード → 開発者 → Webhook → 本番の通常エンドポイントで上の5イベントを追加します（署名シークレットは変わりません）。そのあとテストモードで少額の返金をして、メールが届くか確認してください。
+
+`payout.created`（運営の銀行への入金）は、`OPS_PAYOUT_EXPECTED_LAST4` にいつもの入金先口座の末尾4桁（数字4桁だけ。秘密情報ではありません）を入れたときだけ宛先を確かめ、違う口座への入金なら知らせます。未設定ならログだけです。末尾4桁の実際の値は、Cloud Run の環境変数にだけ入れ、コードや設定例には書かないでください。メール本文には末尾4桁も含めません。
 
 ## 月1回の記録のお知らせ
 

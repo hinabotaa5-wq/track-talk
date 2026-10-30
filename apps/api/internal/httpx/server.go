@@ -36,6 +36,8 @@ type Server struct {
 	// securitySeen は、見慣れない DB 接続を同じ接続で繰り返し知らせないための記録。
 	securityMu   sync.Mutex
 	securitySeen map[string]bool
+	// stripeReconciledDay は、Stripe の日次照合を最後に走らせた日（1日1回にするため）。
+	stripeReconciledDay string
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
