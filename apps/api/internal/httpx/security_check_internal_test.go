@@ -14,7 +14,7 @@ import (
 func TestAllowedDBApplicationName(t *testing.T) {
 	allowed := []string{
 		"track-talk-api", "track-talk-import", "track-talk-migrate",
-		"supavisor", "postgrest", "Supabase Auth", "Supabase Realtime",
+		"supavisor", "Supavisor", "postgrest", "Supabase Auth", "Supabase Realtime",
 	}
 	for _, name := range allowed {
 		if !allowedDBApplicationName(name) {
