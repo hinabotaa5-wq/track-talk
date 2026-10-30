@@ -26,6 +26,7 @@ var ownDBApplicationNames = map[string]bool{
 // Supabase 内部の接続。pg_stat_activity での実測で増えたらここへ足す。
 var supabaseDBApplicationNames = map[string]bool{
 	"supavisor":         true,
+	"Supavisor":         true, // 本番の pg_stat_activity で実測した表記
 	"postgrest":         true,
 	"Supabase Auth":     true,
 	"Supabase Realtime": true,
