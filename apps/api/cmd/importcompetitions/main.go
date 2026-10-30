@@ -46,7 +46,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, err := db.NewPool(ctx, databaseURL, db.AppNameImport)
 	if err != nil {
 		log.Fatal(err)
 	}

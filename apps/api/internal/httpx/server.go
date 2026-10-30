@@ -3,6 +3,7 @@ package httpx
 import (
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -32,6 +33,9 @@ type Server struct {
 	mail      mail.Client
 	ai        claude.Client
 	mfa       *MFAEnrollment
+	// securitySeen は、見慣れない DB 接続を同じ接続で繰り返し知らせないための記録。
+	securityMu   sync.Mutex
+	securitySeen map[string]bool
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
@@ -106,6 +110,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 	// Cloud Scheduler から毎月1日に呼ばれる。秘密のヘッダーで確かめる。
 	r.Post("/internal/monthly-reminder", s.monthlyReminder)
 	r.Post("/internal/storage/cleanup", s.storageCleanup)
+	// Cloud Scheduler から定期的に呼ばれる、見慣れない DB 接続の見回り。秘密のヘッダーで確かめる。
+	r.Post("/internal/security/check", s.securityCheck)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(OptionalAuth(v, s.mfa))

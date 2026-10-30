@@ -42,7 +42,7 @@ func main() {
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
 	}
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, err := db.NewPool(ctx, databaseURL, db.AppNameImport)
 	if err != nil {
 		log.Fatal(err)
 	}
