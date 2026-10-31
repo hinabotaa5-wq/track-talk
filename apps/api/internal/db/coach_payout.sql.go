@@ -67,7 +67,7 @@ func (q *Queries) AdminListCoachPayouts(ctx context.Context) ([]AdminListCoachPa
 const adminListPayoutCoaches = `-- name: AdminListPayoutCoaches :many
 SELECT cp.profile_id, p.nickname, cp.tier, (cp.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
        cp.payouts_enabled,
-       COALESCE((SELECT sum(e.amount_yen) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL), 0)::int AS unpaid_yen
+       COALESCE((SELECT sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)), 0)::int AS unpaid_yen
 FROM coach_profiles cp
 JOIN profiles p ON p.id = cp.profile_id
 WHERE cp.status = 'approved'
@@ -113,9 +113,11 @@ func (q *Queries) AdminListPayoutCoaches(ctx context.Context) ([]AdminListPayout
 }
 
 const attachEarningsToPayout = `-- name: AttachEarningsToPayout :execrows
-UPDATE coach_earnings
+UPDATE coach_earnings e
 SET payout_id = $1
 WHERE coach_id = $2 AND payout_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
+  AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
   AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
 `
 
@@ -155,11 +157,9 @@ func (q *Queries) DeleteUnpaidContractEarning(ctx context.Context, contractID *u
 
 const getCoachEarningsSummary = `-- name: GetCoachEarningsSummary :one
 SELECT
-    COALESCE(sum(amount_yen) FILTER (
-        WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'), 0)::int AS this_month_yen,
-    COALESCE(sum(amount_yen) FILTER (WHERE payout_id IS NULL), 0)::int AS unpaid_yen
-FROM coach_earnings
-WHERE coach_id = $1
+ COALESCE(sum(e.amount_yen) FILTER (WHERE e.created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
+ COALESCE(sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) FILTER (WHERE e.payout_id IS NULL),0)::int AS unpaid_yen
+FROM coach_earnings e WHERE e.coach_id=$1 AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
 `
 
 type GetCoachEarningsSummaryRow struct {
@@ -167,7 +167,6 @@ type GetCoachEarningsSummaryRow struct {
 	UnpaidYen    int32 `json:"unpaid_yen"`
 }
 
-// 今月（日本時間）の報酬と、まだ送金していない報酬。
 func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUID) (GetCoachEarningsSummaryRow, error) {
 	row := q.db.QueryRow(ctx, getCoachEarningsSummary, coachID)
 	var i GetCoachEarningsSummaryRow
@@ -339,14 +338,17 @@ func (q *Queries) ListCoachPayouts(ctx context.Context, coachID *uuid.UUID) ([]C
 }
 
 const listPayableCoachEarnings = `-- name: ListPayableCoachEarnings :many
-SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen)::int AS amount_yen
+SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0))::int AS amount_yen
 FROM coach_earnings e
 JOIN coach_profiles cp ON cp.profile_id = e.coach_id
 WHERE e.payout_id IS NULL
+  AND e.amount_yen > COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)
+  AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
+  AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
 GROUP BY e.coach_id, cp.status
-HAVING sum(e.amount_yen) >= $1::int OR cp.status <> 'approved'
+HAVING sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) >= $1::int OR cp.status <> 'approved'
     OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo'
 `
 

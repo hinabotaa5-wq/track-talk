@@ -41,6 +41,10 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if err := s.q.WithTx(tx).LockCoachPayouts(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
 
 	if err := s.q.WithTx(tx).LockReviewRequester(r.Context(), uid); err != nil {
 		MapDBError(w, err)

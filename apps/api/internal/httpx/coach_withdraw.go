@@ -44,6 +44,10 @@ func (s *Server) withdrawCoach(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
+	if err := q.LockCoachPayouts(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
 
 	coach, err := q.LockCoachProfile(r.Context(), p.ID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && coach.Status != "pending" && coach.Status != "approved") {
