@@ -67,14 +67,17 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 -- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
 -- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
 -- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
-SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen)::int AS amount_yen
+SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0))::int AS amount_yen
 FROM coach_earnings e
 JOIN coach_profiles cp ON cp.profile_id = e.coach_id
 WHERE e.payout_id IS NULL
+  AND e.amount_yen > COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)
+  AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
+  AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
 GROUP BY e.coach_id, cp.status
-HAVING sum(e.amount_yen) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved'
+HAVING sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved'
     OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo';
 
 -- name: UpsertCoachPayout :one
@@ -90,9 +93,11 @@ WHERE coach_payouts.status <> 'paid'
 RETURNING *;
 
 -- name: AttachEarningsToPayout :execrows
-UPDATE coach_earnings
+UPDATE coach_earnings e
 SET payout_id = sqlc.arg(payout_id)
 WHERE coach_id = sqlc.arg(coach_id) AND payout_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
+  AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
   AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo';
 
 -- name: ListUnpaidCoachPayouts :many
@@ -128,19 +133,16 @@ ORDER BY created_at DESC
 LIMIT 30;
 
 -- name: GetCoachEarningsSummary :one
--- 今月（日本時間）の報酬と、まだ送金していない報酬。
 SELECT
-    COALESCE(sum(amount_yen) FILTER (
-        WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'), 0)::int AS this_month_yen,
-    COALESCE(sum(amount_yen) FILTER (WHERE payout_id IS NULL), 0)::int AS unpaid_yen
-FROM coach_earnings
-WHERE coach_id = $1;
+ COALESCE(sum(e.amount_yen) FILTER (WHERE e.created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
+ COALESCE(sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) FILTER (WHERE e.payout_id IS NULL),0)::int AS unpaid_yen
+FROM coach_earnings e WHERE e.coach_id=$1 AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded);
 
 -- name: AdminListPayoutCoaches :many
 -- 運営の送金の画面に出す、承認済みのコーチ。
 SELECT cp.profile_id, p.nickname, cp.tier, (cp.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
        cp.payouts_enabled,
-       COALESCE((SELECT sum(e.amount_yen) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL), 0)::int AS unpaid_yen
+       COALESCE((SELECT sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id),0)) FROM coach_earnings e WHERE e.coach_id = cp.profile_id AND e.payout_id IS NULL AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)), 0)::int AS unpaid_yen
 FROM coach_profiles cp
 JOIN profiles p ON p.id = cp.profile_id
 WHERE cp.status = 'approved'

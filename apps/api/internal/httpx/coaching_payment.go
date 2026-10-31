@@ -265,7 +265,13 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	switch ev.Type {
 	case "charge.refunded", "refund.created", "transfer.created", "transfer.reversed", "payout.created":
+		// Keep anomaly detection before synchronization so Dashboard refunds remain visible.
 		s.handleStripeMoneyAlert(r.Context(), ev)
+		if err := s.syncCapturedRefund(r.Context(), ev); err != nil {
+			slog.Error("stripe refund sync", "event", ev.ID, "err", err)
+			Error(w, 500, "internal_error", "返金を同期できませんでした")
+			return
+		}
 	case "account.updated":
 		if err := s.syncCoachAccount(r.Context(), ev); err != nil {
 			slog.Error("stripe webhook", "event", ev.ID, "err", err)
@@ -473,6 +479,9 @@ func (s *Server) refundPayment(ctx context.Context, pay db.CoachingPayment, amou
 	// まだ返金していないことは、ロックしてから確かめ直す（返し終えていたら ErrNoRows）。
 	refunded := pay
 	err := s.tx(ctx, func(q *db.Queries) error {
+		if err := q.LockCoachPayouts(ctx); err != nil {
+			return err
+		}
 		if _, err := q.LockPaidCoachingPayment(ctx, pay.ID); err != nil {
 			return err
 		}

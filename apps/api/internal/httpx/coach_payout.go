@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -147,11 +148,16 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 
 // recordCoachEarnings は、返却した添削と、終わったパーソナル指導の報酬を記録する（tick から）。
 func (s *Server) recordCoachEarnings(ctx context.Context) (int, error) {
-	return recordCoachEarningsWith(ctx, s.q)
+	var n int
+	err := s.refundTx(ctx, func(tx pgx.Tx) error { var err error; n, err = recordCoachEarningsWith(ctx, db.New(tx)); return err })
+	return n, err
 }
 
 // recordCoachEarningsWith は recordCoachEarnings を q(トランザクションの中など)で行う。
 func recordCoachEarningsWith(ctx context.Context, q *db.Queries) (int, error) {
+	if err := q.LockCoachPayouts(ctx); err != nil {
+		return 0, err
+	}
 	reviews, err := q.InsertReviewEarnings(ctx, reviewSharePercent)
 	if err != nil {
 		return 0, err
@@ -178,8 +184,9 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	if _, err := s.recordCoachEarnings(ctx); err != nil {
 		return out, err
 	}
-	err := s.tx(ctx, func(q *db.Queries) error {
-		if err := q.LockCoachPayouts(ctx); err != nil {
+	err := s.refundTx(ctx, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		if err := applyCoachRefundOffsets(ctx, tx); err != nil {
 			return err
 		}
 		rows, err := q.ListPayableCoachEarnings(ctx, minPayoutYen)
@@ -201,6 +208,9 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 			if _, err := q.AttachEarningsToPayout(ctx, db.AttachEarningsToPayoutParams{PayoutID: &p.ID, CoachID: &row.CoachID}); err != nil {
 				return err
 			}
+			if _, err := tx.Exec(ctx, `UPDATE coach_refund_applications a SET payout_id=$1 FROM coach_earnings e WHERE e.id=a.earning_id AND e.payout_id=$1 AND a.payout_id IS NULL`, p.ID); err != nil {
+				return err
+			}
 			out.Created++
 		}
 		return nil
@@ -208,63 +218,69 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	if err != nil {
 		return out, err
 	}
-	unpaid, err := s.q.ListUnpaidCoachPayouts(ctx)
-	if err != nil {
-		return out, err
-	}
-	for _, p := range unpaid {
-		group := "payout-" + p.ID.String()
-		// 前の送金が Stripe 側では成功していた（通信エラーや DB の更新失敗で failed/pending のまま残った）ら、
-		// 送り直さずにその送金で済ませる。Idempotency-Key は約24時間で切れるので、それだけでは二重送金を防げない。
-		sent, err := s.stripe.FindTransfers(ctx, group)
+	var notices []db.ListUnpaidCoachPayoutsRow
+	err = s.refundTx(ctx, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		unpaid, err := q.ListUnpaidCoachPayouts(ctx)
 		if err != nil {
-			slog.Warn("stripe find transfers", "payout", p.ID, "err", err)
-			msg := err.Error()
-			if dbErr := s.q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
-				return out, dbErr
-			}
-			out.Failed++
-			continue
+			return err
 		}
-		if len(sent) > 0 {
-			if sent[0].Amount != int(p.AmountYen) {
-				// 金額の違う送金がすでにある。差額をどうするかは運営が確かめる。
-				msg := fmt.Sprintf("金額の違う送金 %s（%d円）がすでにあります", sent[0].ID, sent[0].Amount)
-				if dbErr := s.q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
-					return out, dbErr
+		for _, p := range unpaid {
+			group := "payout-" + p.ID.String()
+			// 前の送金が Stripe 側では成功していた（通信エラーや DB の更新失敗で failed/pending のまま残った）ら、
+			// 送り直さずにその送金で済ませる。Idempotency-Key は約24時間で切れるので、それだけでは二重送金を防げない。
+			sent, err := s.stripe.FindTransfers(ctx, group)
+			if err != nil {
+				slog.Warn("stripe find transfers", "payout", p.ID, "err", err)
+				msg := err.Error()
+				if dbErr := q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
+					return dbErr
 				}
 				out.Failed++
 				continue
 			}
-			if _, err := s.q.MarkCoachPayoutPaid(ctx, db.MarkCoachPayoutPaidParams{ID: p.ID, StripeTransferID: &sent[0].ID}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return out, err
+			if len(sent) > 0 {
+				if sent[0].Amount != int(p.AmountYen) {
+					// 金額の違う送金がすでにある。差額をどうするかは運営が確かめる。
+					msg := fmt.Sprintf("金額の違う送金 %s（%d円）がすでにあります", sent[0].ID, sent[0].Amount)
+					if dbErr := q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
+						return dbErr
+					}
+					out.Failed++
+					continue
+				}
+				if _, err := q.MarkCoachPayoutPaid(ctx, db.MarkCoachPayoutPaidParams{ID: p.ID, StripeTransferID: &sent[0].ID}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+					return err
+				}
+				out.Paid++
+				continue
+			}
+			t, err := s.stripe.CreateTransfer(ctx, p.StripeAccountID, int(p.AmountYen), group,
+				map[string]string{"payout_id": p.ID.String(), "month": p.Month.Format("2006-01")},
+				fmt.Sprintf("payout-%s-%d", p.ID, p.AmountYen))
+			if err != nil {
+				slog.Warn("stripe transfer", "payout", p.ID, "err", err)
+				msg := err.Error()
+				if dbErr := q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
+					return dbErr
+				}
+				out.Failed++
+				continue
+			}
+			if _, err := q.MarkCoachPayoutPaid(ctx, db.MarkCoachPayoutPaidParams{ID: p.ID, StripeTransferID: &t.ID}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return err
 			}
 			out.Paid++
-			continue
+			notices = append(notices, p)
 		}
-		t, err := s.stripe.CreateTransfer(ctx, p.StripeAccountID, int(p.AmountYen), group,
-			map[string]string{"payout_id": p.ID.String(), "month": p.Month.Format("2006-01")},
-			fmt.Sprintf("payout-%s-%d", p.ID, p.AmountYen))
-		if err != nil {
-			slog.Warn("stripe transfer", "payout", p.ID, "err", err)
-			msg := err.Error()
-			if dbErr := s.q.MarkCoachPayoutFailed(ctx, db.MarkCoachPayoutFailedParams{ID: p.ID, Failure: &msg}); dbErr != nil {
-				return out, dbErr
-			}
-			out.Failed++
-			continue
-		}
-		if _, err := s.q.MarkCoachPayoutPaid(ctx, db.MarkCoachPayoutPaidParams{ID: p.ID, StripeTransferID: &t.ID}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return out, err
-		}
-		out.Paid++
+		return nil
+	})
+	if err != nil {
+		return out, err
+	}
+	for _, p := range notices {
 		if p.CoachID != nil {
-			s.notify(ctx, *p.CoachID, notifyImportant, push.Message{
-				Title: "報酬を送金しました",
-				Body:  fmt.Sprintf("%s分までの報酬 %d円を Stripe のアカウントに送金しました", p.Month.Format("2006年1月"), p.AmountYen),
-				URL:   "/coach",
-				Tag:   "payout-" + p.ID.String(),
-			}, 24*time.Hour)
+			s.notify(ctx, *p.CoachID, notifyImportant, push.Message{Title: "報酬を送金しました", Body: fmt.Sprintf("%s分までの報酬 %d円を Stripe のアカウントに送金しました", p.Month.Format("2006年1月"), p.AmountYen), URL: "/coach", Tag: "payout-" + p.ID.String()}, 24*time.Hour)
 		}
 	}
 	return out, nil

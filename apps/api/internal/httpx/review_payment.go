@@ -252,23 +252,33 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 
 // releaseReviewPayment は、仮押さえを取り消すか、確定済み（PayPay）なら全額を返金する。
 func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment) error {
-	if pay.PaymentIntentID == nil {
-		return errors.New("payment has no payment intent")
-	}
-	var err error
-	if pay.Status == "authorized" {
-		_, err = s.stripe.CancelPaymentIntent(ctx, *pay.PaymentIntentID, "cancel-"+pay.ID.String())
-	} else {
-		_, err = s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(pay.AmountYen), "refund-"+pay.ID.String())
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %w", errStripe, err)
-	}
-	_, err = s.q.MarkReviewPaymentReleased(ctx, pay.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
-	return err
+	return s.refundTx(ctx, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		var err error
+		pay, err = q.GetReviewPaymentForRefund(ctx, pay.ID)
+		if err != nil {
+			return err
+		}
+		if pay.Status != "authorized" && pay.Status != "captured" {
+			return nil
+		}
+		if pay.PaymentIntentID == nil {
+			return errors.New("payment has no payment intent")
+		}
+		if pay.Status == "authorized" {
+			_, err = s.stripe.CancelPaymentIntent(ctx, *pay.PaymentIntentID, "cancel-"+pay.ID.String())
+		} else {
+			_, err = s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(pay.AmountYen), "refund-"+pay.ID.String())
+		}
+		if err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		_, err = q.MarkReviewPaymentReleased(ctx, pay.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	})
 }
 
 // captureReviewPayment は、返却された依頼の仮押さえを確定する。
@@ -313,6 +323,9 @@ func (s *Server) touchReviewPayment(ctx context.Context, id uuid.UUID) {
 func (s *Server) settleReviewPayments(ctx context.Context) (released int, err error) {
 	if !s.stripe.Configured() {
 		return 0, nil
+	}
+	if err := s.settleCapturedRefunds(ctx); err != nil {
+		return 0, err
 	}
 	capture, err := s.q.ListReviewPaymentsToCapture(ctx)
 	if err != nil {

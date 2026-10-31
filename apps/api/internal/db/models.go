@@ -23,6 +23,28 @@ type Announcement struct {
 	CanceledAt     *time.Time `json:"canceled_at"`
 }
 
+type CapturedPaymentRefund struct {
+	ID              uuid.UUID  `json:"id"`
+	Source          string     `json:"source"`
+	PaymentID       uuid.UUID  `json:"payment_id"`
+	PaymentIntentID string     `json:"payment_intent_id"`
+	AmountYen       int32      `json:"amount_yen"`
+	Reason          string     `json:"reason"`
+	AdminID         *uuid.UUID `json:"admin_id"`
+	Origin          string     `json:"origin"`
+	Status          string     `json:"status"`
+	StripeRefundID  *string    `json:"stripe_refund_id"`
+	Failure         *string    `json:"failure"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+type CapturedRefundEarning struct {
+	EarningID uuid.UUID `json:"earning_id"`
+	RefundID  uuid.UUID `json:"refund_id"`
+	Excluded  bool      `json:"excluded"`
+}
+
 type CloudinaryRetirement struct {
 	PublicID  string    `json:"public_id"`
 	RetiredAt time.Time `json:"retired_at"`
@@ -122,6 +144,26 @@ type CoachProfile struct {
 	ServiceTypes    []string   `json:"service_types"`
 	SnsUrls         []string   `json:"sns_urls"`
 	Name            string     `json:"name"`
+}
+
+type CoachRefundAdjustment struct {
+	ID         uuid.UUID  `json:"id"`
+	RefundID   uuid.UUID  `json:"refund_id"`
+	EarningID  uuid.UUID  `json:"earning_id"`
+	CoachID    *uuid.UUID `json:"coach_id"`
+	Kind       string     `json:"kind"`
+	AmountYen  int32      `json:"amount_yen"`
+	AppliedYen int32      `json:"applied_yen"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+type CoachRefundApplication struct {
+	ID           uuid.UUID  `json:"id"`
+	AdjustmentID uuid.UUID  `json:"adjustment_id"`
+	EarningID    uuid.UUID  `json:"earning_id"`
+	AmountYen    int32      `json:"amount_yen"`
+	PayoutID     *uuid.UUID `json:"payout_id"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 type CoachWorkOrder struct {
@@ -956,6 +998,11 @@ type ReviewPayment struct {
 	RefundedAt        *time.Time `json:"refunded_at"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type ReviewPaymentEarningLink struct {
+	PaymentID uuid.UUID `json:"payment_id"`
+	EarningID uuid.UUID `json:"earning_id"`
 }
 
 type ReviewRating struct {

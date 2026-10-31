@@ -90,7 +90,7 @@ UPDATE review_payments SET updated_at = now() WHERE id = $1;
 DELETE FROM review_requests r
 WHERE r.status = 'awaiting_payment'
   AND r.created_at <= now() - interval '2 hours'
-  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured'))
+  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured', 'refund_pending'))
 RETURNING r.id;
 
 -- name: GetLatestReviewPayment :one
@@ -103,3 +103,6 @@ LIMIT 1;
 -- name: DeleteAwaitingReviewRequest :exec
 DELETE FROM review_requests
 WHERE id = $1 AND status = 'awaiting_payment';
+
+-- name: GetReviewPaymentForRefund :one
+SELECT * FROM review_payments WHERE id=$1 FOR UPDATE;

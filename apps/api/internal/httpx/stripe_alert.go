@@ -74,7 +74,8 @@ func (s *Server) knownRefund(ctx context.Context, n refundNotice) (bool, error) 
 	err := s.pool.QueryRow(ctx, `
 		SELECT
 		  EXISTS(SELECT 1 FROM coaching_ticket_refunds WHERE stripe_refund_id = $1 AND $1 <> '')
-		  OR EXISTS(SELECT 1 FROM coaching_consultation_refunds WHERE stripe_refund_id = $1 AND $1 <> ''),
+		  OR EXISTS(SELECT 1 FROM coaching_consultation_refunds WHERE stripe_refund_id = $1 AND $1 <> '')
+ OR EXISTS(SELECT 1 FROM captured_payment_refunds WHERE stripe_refund_id=$1 AND $1<>'' AND origin='admin'),
 		  EXISTS(SELECT 1 FROM coaching_payments WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_yen > 0)
 		  OR EXISTS(SELECT 1 FROM coaching_ticket_purchases WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_yen > 0)
 		  OR EXISTS(SELECT 1 FROM review_payments WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_at IS NOT NULL)`,
