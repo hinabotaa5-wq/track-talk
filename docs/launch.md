@@ -5,7 +5,7 @@
 ## Supabase
 
 - プロジェクトを作成し、Auth のメール確認と Redirect URLs にサイトURLを登録する
-- JWT は非対称鍵（JWT Keys の Current を ECC P-256）で署名し、API はプロジェクトの JWKS で検証する。本番の API には `SUPABASE_JWT_SECRET` を入れない（旧 HS256 の秘密は 2026-10-28 に Revoke 済み）。HS256 の秘密はローカルの `cmd/localauth` とテストだけで使う
+- JWT は非対称鍵（JWT Keys の Current を ECC P-256）で署名し、API はプロジェクトの JWKS で検証する。本番の API には `SUPABASE_JWT_SECRET` を入れない。HS256 の秘密はローカルの `cmd/localauth` とテストだけで使う
 - `DATABASE_URL` は Go API のみ。anon key 以外をフロントに置かない
 - 全テーブルで RLS 有効（マイグレーション済み）。PostgREST からの直接CRUDは許可しない
 - 退会時に Auth ユーザーを削除するため、service_role key を API の `SUPABASE_SERVICE_ROLE_KEY` に入れる。フロントエンドには置かない
@@ -23,23 +23,23 @@
 
 ## Stripe（コーチングの支払い・送金）
 
-コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（購入APIは404）。通常の `/webhooks/stripe` は、通常用署名キーで検証した決済完了・非同期決済成功・不審請求の通知をフラグを閉じたまま受信する。Connect口座状態専用の `/webhooks/stripe/connect` は、専用署名キーで検証した `account.updated` だけを受信する。いずれもStripe APIキーが必要。
+コーチングを提供するまでは、`COACHING_ENABLED` を空にしたまま準備だけ進められる（購入APIは404）。通常の `/webhooks/stripe` は、通常用署名キーで検証した決済完了・非同期決済成功・不審請求と、返金・送金・入金検知の通知をフラグを閉じたまま受信する。Connect口座状態専用の `/webhooks/stripe/connect` は、専用署名キーで検証した `account.updated` だけを受信する。いずれもStripe APIキーが必要。
 API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番の鍵で https でないときは、起動しない（お金だけ動いて期間が始まらない状態を防ぐため）。
 
 - ダッシュボードで本番に切り替え、本番用の鍵を作る（サンドボックスの鍵・Webhook の鍵は本番では使えない）。秘密鍵は `STRIPE_SECRET_KEY`（`sk_live_...`、または必要な権限だけの制限付きキー `rk_live_...`）
 - 支払い方法はカード（Apple Pay・Google Pay を含む）と PayPay だけにする。コンビニ払い・銀行振込は有効にしない
-  - 動画添削・追加相談・チケットの支払い画面は、コードで支払い方法を指定している（添削はカードか PayPay を選んで開く、追加相談はカードと PayPay）。PayPay を有効にしていないアカウントで `paypay` を指定すると支払い画面を作れずエラーになるので、先に有効にする
+  - 動画添削・追加相談の支払い画面は、コードで支払い方法を指定している（添削はカードか PayPay を選んで開く、追加相談はカードと PayPay）。PayPay を有効にしていないアカウントで `paypay` を指定すると支払い画面を作れずエラーになるので、先に有効にする
   - サポートプラン（パーソナル指導・大会サポート・対面指導）の支払い画面は指定しておらず、ダッシュボードの「支払い方法」で有効にしたものが出る。カードと PayPay 以外はオフにする
   - PayPay の有効化: ダッシュボードの「設定 → 支払い → 支払い方法」で PayPay を有効にする。事業の追加情報（特商法ページの URL など）を求められたら答える。審査に日数がかかる場合があるので、特商法ページ `/legal/commerce` を先に用意しておく
   - 順番: サンドボックスで有効化 → サンドボックスでカード・PayPay の支払いと返金を通す → 本番で有効化
-  - PayPay は一回払いだけ（継続課金には使えない）、50円〜100万円、承認の有効時間は1時間、返金は PayPay 残高へすぐ戻る。課金は運営のアカウントで行う（コーチの Connect アカウント上の課金には非対応）
+  - PayPayは一回払いで使い、課金は運営のアカウントで行う（separate charges and transfers）。利用可能な金額・決済と返金の制約は、公開前にStripeの現行条件を確認する
 - Connect を有効にする（コーチへの送金。コーチは Express アカウントで、国は日本）
   - コーチの銀行口座への入金は、アカウントを作るときに月1回・毎月15日に設定する。運営は毎月1〜14日に「送金」を押す
   - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
-  - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`。署名の鍵を `STRIPE_WEBHOOK_SECRET` に入れる
+  - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`transfer.created`、`transfer.reversed`、`payout.created` の8種類。署名の鍵は `STRIPE_WEBHOOK_SECRET` としてSecret Managerの承認した数値バージョンを参照する
   - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する
-- `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` を Cloud Run の環境変数に入れて、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
+- `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` をCloud RunからSecret Managerの数値バージョンへの参照として設定して、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
 - 運営者の決定（2026-10-29）：PayPayの承認が下りるまで、コーチング公開・新規受付のフラグは開けない。承認後、同じ日に「公開フラグを開ける → 手順書C（Connect同期確認）→ 手順書B（実決済テスト）」の順で進める。`COACHING_NEW_ACCEPTANCE_ENABLED` はCが成功するまでオフを維持し、成功後、Bの実施前に開ける。
   - APIの `COACHING_ENABLED` は「Configure Coaching Availability」（`.github/workflows/enable-coaching.yml`）の `operation=configure_availability`（既定）と `enabled=true` で開ける。この操作は従来どおり `COACHING_NEW_ACCEPTANCE_ENABLED=0` にし、Cの間は新規受付を停止する。公開を戻す場合は同じ操作で `enabled=false` を選ぶ。
   - 同日の手順書Cが成功した後に、同ワークフローを `operation=open_new_acceptance`、`confirm_open_new_acceptance=true` で別途実行し、新規受付だけを開けてから[手順書B](runbooks/stripe-live-20261029.html#rb-b)へ進む。この操作の `enabled` は使わず、`COACHING_NEW_ACCEPTANCE_ENABLED=1` だけを更新する。`COACHING_ENABLED`・`COACHING_MESSAGING_ENABLED`・`COACHING_TICKET_SALES_ENABLED`・`REVIEW_RANDOM_ASSIGN_ENABLED` は現在値を維持する。確認入力は既定でfalseで、未確認なら認証・更新前に失敗する。PayPay承認・C成功は運営者が確認する前提で、自動判定ではない。
@@ -59,7 +59,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 
 ## コーチング改革の移行・限定公開
 
-フェーズ1〜5とフェーズ6の追加実装を公開する前の手順。ローカル検証の成功だけで本番への適用済みとは扱わない。
+既存の契約・決済記録を維持してコーチングを公開する前の手順。ローカル検証の成功だけで本番への適用済みとは扱わない。
 
 ### 受付と既存対応の切り替え
 
@@ -67,11 +67,11 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 |---|---|
 | `COACHING_ENABLED=1` | APIの既存契約・会話・手動返金・定期処理を稼働する（Webhookはこのフラグによらず受信） |
 | `NEXT_PUBLIC_COACHING_ENABLED=1` | Webのコーチング画面を表示する（ビルド時に設定） |
-| `COACHING_NEW_ACCEPTANCE_ENABLED=1` | 新しい動画添削の依頼・チケット購入・追加相談の送信／支払いを受け付ける |
+| `COACHING_NEW_ACCEPTANCE_ENABLED=1` | 新しい動画添削の依頼・追加相談の送信／支払いを受け付ける（旧チケット購入には別の販売フラグも必要） |
 | `COACH_IDENTITY_KEY` | コーチの本名・住所・電話番号を暗号化する鍵（`openssl rand -base64 32`）。DB とは別に Secret Manager に置く。変えると登録済みの情報が読めなくなる。空の間はコーチの特商法の登録ができず、プランを公開できない |
-| `COACHING_TICKET_SALES_ENABLED=1` | コーチングチケットの新規購入を再開する。動画添削・追加相談は都度払い（カード・PayPay）だけにしたので、空（停止）のままにする。空でも購入済みチケットの残高・履歴・返金は使える |
-| `REVIEW_RANDOM_ASSIGN_ENABLED=1` | 動画添削のおまかせ（受付中のコーチへの割り当て・再割り当て）を再開する。選手がコーチを選ぶ方式だけにしたので、空（停止）のままにする |
-| `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**（届出は開始前に必要で、受理まで約2〜4週間）。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_TICKET_SALES_ENABLED=1` | 技術的には旧チケット購入を許可する設定。新規販売は終了しており、動画添削・追加相談は都度払い（カード・PayPay）だけにしたので、空（停止）のままにする。空でも購入済みチケットの残高・履歴・返金は使える |
+| `REVIEW_RANDOM_ASSIGN_ENABLED=1` | 技術的には動画添削のおまかせ（受付中のコーチへの割り当て・再割り当て）を許可する設定。選手がコーチを選ぶ方式だけにしたので、空（停止）のままにする |
+| `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**。空の間は大会サポート・対面指導のプランを公開できない |
 
 - 新規受付は既定で停止。APIを更新した後に既存の公開設定だけでは受付が再開しないことに注意する。
 - 問題時は `COACHING_NEW_ACCEPTANCE_ENABLED` だけを空にしてAPIを再デプロイする。APIとWebの `COACHING_ENABLED` は維持し、購入済みの履行と返金を続ける。
@@ -81,7 +81,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 ### 移行前の確認
 
 1. DBのバックアップと復元手順を確認し、ステージングへ復元する。旧依頼・旧契約の件数、状態別件数、料金・含有回数・開始終了日時、決済と報酬を保存する。会話本文や保護者の秘密リンクは監査メモへコピーしない。
-2. 既存ファイルは変更せず、追加マイグレーション `000093`〜`000099` を順に適用する。`000098` の返金理由と `000099` の対面条件を含める。旧契約は `fulfillment_version=0`、既存のサービス分類なしはそのまま維持し、新しい条件で上書きしない。
+2. 既存マイグレーションは変更せず、起動時に未適用のものを番号順に適用する。旧契約の移行は `000093`〜`000099`（`000098` の返金理由、`000099` の対面条件）を含み、その後の都度払い・指名制・保護者同意等のマイグレーションも対象コミットまで適用する。旧契約は `fulfillment_version=0`、既存のサービス分類なしはそのまま維持し、新しい条件で上書きしない。
 3. 復元したDBで旧契約の料金・回数・終了条件が変わっていないこと、旧都度払いとチケットが同じ依頼で二重精算されないことを確認する。旧契約の受諾・保護者決済・通常メッセージ・返金も確認する。
 4. 新規受付を停止したままAPI/Webを更新する。Webhookの署名、定期処理の認証と実行履歴、管理者以外が会計照合を読めないことを確認する。
 5. コーチ誓約第2版を案内する。再同意前も既存プランが表示され、対面の公開にだけ再同意が必要であることを確認する。
@@ -90,7 +90,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 
 1. 利用規約の料金・無料確認・返金・保存期間、プライバシーポリシー、事業者情報を確認し、必要な案内を公開する。本番決済・メール・動画の設定を確認する。
 2. 初期の対象は動画添削（選手がコーチを選ぶ方式）に絞る。大会サポート・対面のプランは下書きにする。この受付フラグはサービス別制御や招待認証の代わりにはならない。既存の招待コード制の動作も確認する。
-3. 参加者を案内してから新規受付を開ける。Stripeのテスト環境で購入→回答→報酬、未回答→返却、部分利用→残りの返金、通知の重複・遅延、保護者支払い、受付停止後の既存対応を確認する。本番での実決済試験と公開設定の変更は運営が実施する。
+3. Stripeのテスト環境で購入→回答→報酬、未回答→返却、部分利用→残りの返金、通知の重複・遅延、保護者支払い、受付停止後の既存対応を確認する。本番はPayPay承認後、上記の公開手順とランブックに従い「API・Web公開（新規受付停止）→C成功→新規受付開始→B」を同日に実施する。参加者を案内してから受付を開け、本番での実決済試験と公開設定の変更は運営が実施する。
 4. 日次の会計照合を記録し、不一致や返金の滞留が解消されてから大会サポート、対面の順にプランを公開する。未実施分の返金と双方の実施確認をそれぞれ検証する。
 
 ### 日次の照合と復旧

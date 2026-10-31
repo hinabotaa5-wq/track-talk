@@ -2,14 +2,14 @@
 
 ## 使うAIと上限
 
-2026年10月27日に、まとめを Google の Gemini(無料枠)から Anthropic の Claude Haiku 5.5(`claude-haiku-5-5`、有料の API)に切り替えた。Gemini の無料枠は送った内容が Google の製品改善や学習に使われ、個人情報保護委員会の注意喚起(2023年6月)にあたるため。Claude の API に送った内容は学習に使われない。
+まとめはAnthropicのClaude APIを使い、既定モデルは `claude-haiku-5-5`（`apps/api/internal/claude/claude.go` の `DefaultModel`）。大会の取り込み用Geminiとは設定も用途も分けています。
 
 - 全員合計で直近24時間400回（`SENSE_SUMMARY_DAILY_LIMIT=400`）。
 - 全員合計で直近1分10回（`SENSE_SUMMARY_MINUTE_LIMIT=10`）。
 - 本人のまとめ保存は日本時間の1日3回まで（従来どおり）。
 - 1回に送るのは300文字以下のメモ6個。返事は考える分を含めて4,096トークンまで、考える量は `low`。返事の形は JSON スキーマで決めている。
 
-有料なので、上限は料金が膨らまないためのもの。料金は入力 $0.10・出力 $0.50(100万トークンあたり)で、1回はおよそ入力2,500・出力600トークン、約0.08円。上限の400回を毎日使い切っても、月におよそ1,000円。Claude Console の上限額(Spend limit)も合わせて設定しておく。
+有料APIのため、上限は費用と負荷を抑えるために設けています。金額はモデル・入出力量・最新の料金に依存し、回数上限だけでは保証できません。利用前に料金を確認し、Claude Consoleの上限額（Spend limit）も設定します。
 
 モデルは `SENSE_SUMMARY_MODEL` で変えられる。空なら `claude-haiku-5-5`。
 
@@ -19,20 +19,20 @@ APIを呼ぶ直前にDBで試行枠を予約する。成功分だけでなく、
 
 感覚メモ不足など、APIを呼ばないリクエストは試行枠を使わない。期限切れの試行記録は次の予約時に消す。マイグレーション113で導入前25時間の成功分も初期登録する。導入前の失敗回数は過去に記録していないため復元できない。
 
-空・未設定なら400回/24時間、10回/分を使う。`0`を明示するとその上限を無効にするため、本番の無料運用では指定しない。上限に達したときはAIを呼ばず、既存の「いまはまとめを作れません」の応答を返す。自動再試行はしない。
+空・未設定なら400回/24時間、10回/分を使う。`0`を明示するとその上限を無効にするため、費用を制限する運用では指定しない。上限に達したときはAIを呼ばず、既存の「いまはまとめを作れません」の応答を返す。自動再試行はしない。
 
 ## 本番反映
 
 1. [Claude Console](https://platform.claude.com/) で API キーを作り、上限額(Spend limit)を決める。
-2. Cloud Run に `ANTHROPIC_API_KEY` を入れる(秘密の値なので Secret Manager 経由が望ましい)。モデルを変えないなら `SENSE_SUMMARY_MODEL` は入れない。
+2. APIキーをSecret Managerに保存し、Cloud Runの `ANTHROPIC_API_KEY` は承認した数値バージョンへの参照として設定する。実行サービスアカウントに対象の秘密の読み取り権限を付ける。モデルを変えないなら `SENSE_SUMMARY_MODEL` は入れない。
 
 ```sh
 gcloud run services update track-talk-api \
   --project refined-bolt-493709-a8 --region asia-northeast1 \
-  --update-env-vars ANTHROPIC_API_KEY=sk-ant-... \
+  --update-secrets 'ANTHROPIC_API_KEY=<秘密名>:<数値バージョン>' \
   --remove-env-vars GEMINI_SUMMARY_MODEL
 ```
 
-3. 「Deploy API」を流す。Web はプライバシーポリシーと案内の文を変えたので「Deploy Web」も流す。
+3. APIのコード変更がある場合は「Deploy API」を流す。Webのプライバシーポリシーや案内を変更する場合は「Deploy Web」も流し、利用者向けの説明と実装を合わせる。
 
-大会の県別自動取り込みは、引き続き Gemini の無料枠(`gemini-3.8-flash`)を使う。送るのは公開されている大会のページだけで、個人情報は含まない。1回の定期実行は15リクエストまでで、無料枠の20回/日・5回/分に余裕を残す。県内の複数ページ間も15秒あける。手動実行を重ねるとこの20回の枠を共有するので注意する。
+大会の県別自動取り込みはGemini（`gemini-3.8-flash`）を使います。公開されている大会ページを対象とし、1回の定期実行は15リクエストまで、県内の複数ページ間も15秒あける設定です。手動実行も同じプロジェクトの利用枠を消費するため、契約ごとの料金・クォータを確認してください。

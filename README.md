@@ -4,13 +4,13 @@
 
 本番: https://track-talk.netlify.app
 
-## 現在の公開範囲（2026-10-24）
+## 主な機能
 
 - 投稿・コメント・動画共有・クラブチームと練習相手の募集・商品レビュー。
 - 大会の日程と実況スレッド。開催中の大会は通常ページのヘッダーのトロフィーから開けます。
 - 本人だけが見られる感覚メモと競技会の記録。
 - ケガのグループでの経験共有と、個人を特定しない集計。
-- **コーチングは準備中。現在はコーチ募集・応募内容の確認・運営による審査のみ。** 動画添削、チケット購入、新しい指導の受付は閉じています。
+- コーチ募集・応募内容の確認・運営による審査。動画添削とサポートプランの提供範囲は、API・Webの公開設定と新規受付設定で制御します。
 
 利用者向けの説明は `/guide`、投稿ルールは `/guidelines`、利用規約は `/terms`、個人情報の取り扱いは `/privacy` にあります。マイページから開けます。
 
@@ -19,12 +19,12 @@
 | 入口 | 内容 |
 | --- | --- |
 | `/` | 新しい・人気・募集・レビュー、キーワード検索。投稿カードを左右に送る |
-| `/upload` | 文章、YouTube・InstagramのURL、自分の動画、クラブチームや練習相手の募集 |
+| `/upload` | 文章、YouTube・Instagram・XのURL、自分の動画、クラブチームや練習相手の募集 |
 | `/posts/[id]` | 詳細文の下に画像・動画。コメントのカードから会話を開く |
 | `/competitions` | 月・地域別の大会、国内主要大会、今後の世界大会 |
 | `/memo` | 感覚メモと競技会の記録。感覚メモを書くとビンに玉がたまる |
-| `/coaching` | 動画添削（コーチを選んで依頼）・サポートプラン・コーチ専用画面の縦並び。現在は準備中と募集を案内 |
-| `/coach` | 未ログインはログインへ。未応募は応募案内、承認済みも公開までは準備中 |
+| `/coaching` | 動画添削（コーチを選んで依頼）・サポートプラン・コーチ専用画面の縦並び。公開設定がオフのときは準備中と募集を案内 |
+| `/coach` | 未ログインはログインへ。未応募は応募案内、承認済みも公開設定がオフなら準備中 |
 | `/coach/apply` | 名前・担当種目・記録・成績や指導経験、SNS／ホームページ、顔写真の応募 |
 | `/injury` | ケガのグループと復帰データ。グループの投稿は参加者のみ閲覧できる |
 | `/me` | 自分の投稿・保存・アカウント設定・通知・利用ガイド・問い合わせ・退会 |
@@ -39,13 +39,13 @@
 ## フィードの読み込み
 
 - ホームは12件ずつ取得し、画面付近のカードだけ描画します。表示位置と画像比率を保持します。
-- 配置の探索は12件のブロック内に限定し、追加読み込みで過去の全カードを再探索しません。
+- 配置は12件ずつ計算し、境界では前のブロックの右端付近にあるカードも使って空きを詰めます。同じ寸法・内容のブロックは計算結果を再利用します。
 - 画面幅が同じなら高さを保持し、キーボードやページ更新で組み替わりにくくします。画像を初めて読み込んだ際は実際の比率に合わせて配置します。
 - 本文等の保持量と取得キャッシュには上限を設け、遠いページは必要時に再取得します。
 - 公開ホームのAPIは `pagination=cursor`、`meta.has_more`、`meta.next_cursor` を使用し、毎回の総件数集計と深いOFFSETを避けます。通常のページ番号方式も残しています。
 - 人気順は閲覧中のいいね増減で境界が変わるため、固定順位のスナップショットではありません。
 
-設計、制限、比較条件と計測方法は [docs/home-feed-performance.md](docs/home-feed-performance.md) を参照してください。
+実装は `apps/web/lib/masonry-feed.ts`・`fetch-posts.ts`・`home-feed-cache.ts`、APIは `apps/api/internal/httpx/home_feed.go` を参照してください。画面付近のカードと600件を目安にした本文の保持、取得キャッシュ48ページ・15分の上限を設けます。全座標・IDは閲覧件数に応じて増えるため、全体の保持量が一定になる方式ではありません。
 
 ## 構成
 
@@ -56,7 +56,7 @@
 | `apps/api/migrations` | PostgreSQLのスキーマ変更。API起動時に適用 |
 | `apps/api/queries` | sqlc用SQL。変更後に `make sqlc` で再生成 |
 | `deploy` / `.github/workflows` | Cloud Run・Netlifyへの手動公開と定期処理 |
-| `docs` | 運用・設計・公開手順 |
+| `docs` | 実装の説明・設計・公開手順 |
 
 認証はSupabase Auth、ファイル保存はCloudinary、公開先はWebがNetlify、APIが東京のCloud Runです。業務データの操作はGo APIに集約し、ブラウザからPostgRESTで直接更新しません。
 
@@ -94,9 +94,9 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `CLOUDINARY_*` | ファイル保存と署名 |
 | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SITE_URL` | ブラウザ向けの公開設定 |
 | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | 任意の匿名の利用状況計測。未設定なら無効。接続・無料枠の確認は [計測の説明](docs/analytics.md) |
-| `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | 現在は両方 `0`。APIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
-| `COACHING_NEW_ACCEPTANCE_ENABLED` | 現在は `0`。画面を公開する場合も、新しい申込み・購入の受付は別途判断 |
-| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | 現在は両方 `0`。有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | オフでAPIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
+| `COACHING_NEW_ACCEPTANCE_ENABLED` | 新しい申込み・購入の受付を制御。画面の公開設定とは別に判断 |
+| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | オフで有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
 | `COACHING_TICKET_SALES_ENABLED` | 空（停止）のまま。チケットの新規販売は終了し、動画添削・追加相談は都度払い（カード・PayPay）。購入済みチケットの残高・履歴・返金は使える |
 | `REVIEW_RANDOM_ASSIGN_ENABLED` | 空（停止）のまま。動画添削は選手がコーチを選ぶ方式だけ。空の間はコーチ未選択の申込みを受け付けず、運営からの割り当て・別コーチへの再割り当てをしない |
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |
@@ -110,7 +110,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `STAFF_MFA_REQUIRED` | `1` で管理者・承認済みコーチの API に二段階認証を求める。全員が `/me/security` で設定してから立てる |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 登録・ログイン・パスワード再設定の自動操作対策(Cloudflare Turnstile)。先にこれを入れて Web を出し直し、そのあと Supabase の CAPTCHA を有効にする |
 
-本番Webの募集のみ設定は `netlify.toml` の `NEXT_PUBLIC_COACHING_ENABLED = "0"`。APIは「Configure Coaching Availability」ワークフローを `enabled=false` で実行して閉じます。画面のフラグだけでAPIを保護しないでください。再公開時は説明・規約・プライバシーポリシー、決済・返金・未成年者の同意を確認し、両側の設定を合わせます。
+募集だけを提供する場合は、`netlify.toml` の `NEXT_PUBLIC_COACHING_ENABLED` を `"0"` にします。APIは「Configure Coaching Availability」ワークフローを `enabled=false` で実行して閉じます。画面のフラグだけでAPIを保護しないでください。再公開時は説明・規約・プライバシーポリシー、決済・返金・未成年者の同意を確認し、両側の設定を合わせます。
 
 秘密鍵、DB接続文字列、service role、Cloudinary secret、Stripe secretはAPI・ホスティング・GitHub Secretsのみに保存します。ブラウザには `NEXT_PUBLIC_*` の公開値だけを渡してください。
 
