@@ -1,6 +1,6 @@
 # アカウントの守り(二段階認証・自動操作対策・変更通知メール)
 
-Stripe のセキュリティ申告で挙げた対策の実装と、本番で有効にする順番。どれもコードは入っているが、設定を入れるまで本番では動かない。
+二段階認証・自動操作対策・変更通知メールの実装と、有効にする順番。外部サービス側の設定や環境変数が必要な対策は、コードだけでは有効になりません。
 
 ## 1. 変更通知メール(Supabase の設定だけ)
 
@@ -13,11 +13,9 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 | MFA factor enrolled | `apps/web/emails/mfa-factor-enrolled.html` |
 | MFA factor unenrolled | `apps/web/emails/mfa-factor-unenrolled.html` |
 
-パスワード変更の通知は、2026-10-26 に本番で有効化済み(Codex が設定)。
-
 ## 2. 二段階認証(認証アプリ)
 
-2026-10-28 に公開(マイページの入口を戻した)。パスキーは Supabase で正式に出てから足す。
+認証アプリのTOTPを使います。入口は `/me/security` です。
 
 - 利用者は マイページ → 二段階認証(`/me/security`)で設定・解除する。設定した人は、ログインのたびに6桁のコードを求められる(パスワードでも Google でも)。
 - API も、設定済みの人(Supabase の `auth.mfa_factors` に `verified` がある人)がコードを入れる前のログイン(JWT の `aal` が `aal1`)で呼んだら、ログインが要る操作を 403 `mfa_required` で断る。ログインなしで読めるものは、ログインしていない人として返す。画面で止めるだけだと、パスワードだけ知った人がトークンで直に API を呼べてしまうため(`apps/api/internal/httpx/mfa_enforce.go`)。
@@ -35,7 +33,7 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 
 登録・ログイン・パスワード再設定・メールアドレス/パスワードの変更で、Turnstile の確認を出し、トークンを Supabase に渡す。
 
-2026-10-27 に本番で有効化済み(ウィジェットのホスト名は `track-talk.netlify.app`、公開用の鍵は `netlify.toml`、秘密の鍵は Supabase だけ)。独自ドメインに移るときは、先に Cloudflare のウィジェットにそのホスト名を足す。
+ウィジェットのホスト名には `track-talk.netlify.app` を登録します。公開用の鍵はWebのビルド設定、秘密の鍵はSupabaseに保存します。ホスト名を変更するときは、先にCloudflareのウィジェットの許可ホストを更新します。
 
 本番で有効にする順番(逆にすると、全員がログインできなくなる):
 
