@@ -1,8 +1,11 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"net/url"
 	"sync"
@@ -354,4 +357,37 @@ func TestCapturedRefundOrphanRequiresReconciliation(t *testing.T) {
 	if status != "captured" {
 		t.Fatal("orphan silently synchronized")
 	}
+}
+
+func TestCapturedRefundPendingStillCountsTowardMonthlyLimits(t *testing.T) {
+	x := newCapturedFixture(t)
+	x.f.mu.Lock()
+	x.f.ticketRefundStatus = "pending"
+	x.f.mu.Unlock()
+	x.refund(t)
+	var owner uuid.UUID
+	queryRowArgs(t, `SELECT payer_id FROM review_payments WHERE id=$1`, []any{x.payment}, &owner)
+	conn, err := pgx.Connect(context.Background(), testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	q := db.New(conn)
+	check := func(want int64) {
+		t.Helper()
+		a, err := q.SumMinorSelfPaidSpend(context.Background(), db.SumMinorSelfPaidSpendParams{MinorID: owner})
+		if err != nil || a != want {
+			t.Fatalf("minor limit %d %v", a, err)
+		}
+		b, err := q.SumMonthlyCoachingSpend(context.Background(), db.SumMonthlyCoachingSpendParams{OwnerID: owner})
+		if err != nil || b != want {
+			t.Fatalf("coaching limit %d %v", b, err)
+		}
+	}
+	check(1500)
+	x.f.mu.Lock()
+	x.f.ticketRefundStatus = "succeeded"
+	x.f.mu.Unlock()
+	x.refund(t)
+	check(0)
 }
