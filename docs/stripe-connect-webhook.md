@@ -6,7 +6,7 @@
 
 | 受信口 | 署名 | 公開フラグがオフのときに扱うイベント |
 | --- | --- | --- |
-| `POST /webhooks/stripe` | 通常用 `STRIPE_WEBHOOK_SECRET` | `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`transfer.created`、`transfer.reversed`、`payout.created` の8種類 |
+| `POST /webhooks/stripe` | 通常用 `STRIPE_WEBHOOK_SECRET` | `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`refund.updated`、`refund.failed`、`transfer.created`、`transfer.reversed`、`payout.created` の10種類 |
 | `POST /webhooks/stripe/connect` | 専用 `STRIPE_CONNECT_WEBHOOK_SECRET` のみ | `account.updated` のみ |
 
 Stripe APIキーまたは対象受信口の署名キーがなければ404、署名不正は400です。Connect専用パスに通常用の署名は使えません。Connect専用パスは対象外イベントを400で拒否し、決済・返金・Transferを処理しません。通常パスは公開フラグがオフの間、対象外イベントを404で拒否します。公開中の通常パスでは、既存連携との互換性のためConnect用の署名も認め、`account.updated` も扱います。

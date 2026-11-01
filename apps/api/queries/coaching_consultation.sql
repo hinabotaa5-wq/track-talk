@@ -93,7 +93,7 @@ SELECT * FROM coaching_ticket_reservations WHERE consultation_id=$1;
 -- name: RecordConsultationEarnings :exec
 INSERT INTO coach_earnings (id,coach_id,source,consultation_id,gross_yen,share_percent,amount_yen)
 SELECT gen_random_uuid(),c.coach_id,'consultation',c.id,c.price_yen,c.share_percent,(c.price_yen::bigint*c.share_percent/100)::integer
-FROM coaching_consultations c WHERE c.id=$1 AND c.status='answered' AND c.coach_id IS NOT NULL
+FROM coaching_consultations c WHERE c.id=$1 AND c.status='answered' AND c.coach_id IS NOT NULL AND (c.funding='ticket' OR c.payment_state='paid')
 ON CONFLICT (consultation_id) DO NOTHING;
 
 -- name: ListConsultationsToExpire :many

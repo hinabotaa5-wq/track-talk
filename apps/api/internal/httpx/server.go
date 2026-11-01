@@ -370,6 +370,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
 				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
 				// 運営のお金の動き（送金と返金）
+				r.Get("/admin/coaching/payments", s.adminCapturedPayments)
+				r.Post("/admin/coaching/payments/{id}/refund", s.adminCapturedRefund)
 				r.Get("/admin/coaching/payouts", s.adminCoachPayouts)
 				// 見るたびに目的を記録するので POST。
 				r.Post("/admin/coaching/coaches/{id}/commerce-identity", s.adminViewCoachIdentity)

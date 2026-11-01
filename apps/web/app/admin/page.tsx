@@ -664,7 +664,7 @@ export default function AdminPage() {
       {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
       {tab === "personal" ? <><CoachingContractsAdmin token={token} />
               <Link href="/admin/coaching/reconciliation" className="block text-sm text-blue-300 underline">コーチングの会計照合</Link><Link href="/admin/coaching/tickets" className="block text-sm text-blue-300 underline">チケット購入・返金管理</Link><Link href="/admin/coaching/consultations" className="block text-sm text-blue-300 underline">追加相談・返金管理</Link><Link href="/admin/coaching/identity" className="block text-sm text-blue-300 underline">コーチの特商法の登録情報</Link></> : null}
-      {tab === "payouts" ? <PayoutsAdmin token={token} /> : null}
+      {tab === "payouts" ? <><Link href="/admin/coaching/payments" className="block text-sm text-blue-300 underline">動画添削・追加相談の返金管理</Link><PayoutsAdmin token={token} /></> : null}
       {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
       {tab === "stats" ? <AdminStatsView token={token} /> : null}

@@ -20,6 +20,14 @@ func (c Client) CreateRefundWithMetadata(ctx context.Context, intent string, amo
 }
 
 func (c Client) FindTicketRefund(ctx context.Context, intent, operation string) (*Refund, error) {
+	return c.findRefund(ctx, intent, operation, "")
+}
+
+// FindRefundByID never authorizes creating another refund if a known refund is absent.
+func (c Client) FindRefundByID(ctx context.Context, intent, refundID string) (*Refund, error) {
+	return c.findRefund(ctx, intent, "", refundID)
+}
+func (c Client) findRefund(ctx context.Context, intent, operation, refundID string) (*Refund, error) {
 	if !c.Configured() {
 		return nil, ErrNotConfigured
 	}
@@ -42,7 +50,7 @@ func (c Client) FindTicketRefund(ctx context.Context, intent, operation string) 
 			return nil, err
 		}
 		for _, r := range out.Data {
-			if r.Metadata["ticket_refund_id"] == operation {
+			if (refundID != "" && r.ID == refundID) || (refundID == "" && r.Metadata["ticket_refund_id"] == operation) {
 				return &r, nil
 			}
 		}

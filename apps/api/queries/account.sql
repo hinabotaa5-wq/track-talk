@@ -83,8 +83,8 @@ SELECT
         SELECT 1 FROM review_payments pay
         LEFT JOIN review_requests r ON r.id = pay.request_id
         WHERE pay.payer_id = sqlc.arg('user_id')
-          AND pay.status IN ('authorized', 'captured')
-          AND (pay.status = 'authorized' OR r.id IS NULL OR r.returned_at IS NULL)
+          AND pay.status IN ('authorized', 'captured','refund_pending')
+          AND (pay.status IN ('authorized','refund_pending') OR r.id IS NULL OR r.returned_at IS NULL)
     )::boolean AS open_review_payment;
 
 -- name: ListAccountMedia :many

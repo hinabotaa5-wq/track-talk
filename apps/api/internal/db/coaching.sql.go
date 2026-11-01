@@ -750,7 +750,7 @@ SELECT COALESCE(sum(x.amount), 0)::bigint FROM (
     WHERE payer_id = $1::uuid
       AND request_id IS DISTINCT FROM $2::uuid
       AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-      AND (status IN ('authorized', 'captured') OR (status = 'pending' AND session_expires_at > now()))
+      AND (status IN ('authorized', 'captured', 'refund_pending') OR (status = 'pending' AND session_expires_at > now()))
     UNION ALL
     SELECT c.price_yen::bigint FROM coaching_consultations c
     WHERE c.requester_id = $1::uuid

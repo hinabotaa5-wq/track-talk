@@ -76,7 +76,7 @@ const deleteUnpaidReviewRequests = `-- name: DeleteUnpaidReviewRequests :many
 DELETE FROM review_requests r
 WHERE r.status = 'awaiting_payment'
   AND r.created_at <= now() - interval '2 hours'
-  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured'))
+  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured', 'refund_pending'))
 RETURNING r.id
 `
 
@@ -177,6 +177,34 @@ WHERE checkout_session_id = $1
 
 func (q *Queries) GetReviewPaymentBySession(ctx context.Context, checkoutSessionID string) (ReviewPayment, error) {
 	row := q.db.QueryRow(ctx, getReviewPaymentBySession, checkoutSessionID)
+	var i ReviewPayment
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.PayerID,
+		&i.Method,
+		&i.AmountYen,
+		&i.CheckoutSessionID,
+		&i.CheckoutUrl,
+		&i.SessionExpiresAt,
+		&i.PaymentIntentID,
+		&i.Status,
+		&i.AuthorizedAt,
+		&i.CapturedAt,
+		&i.CanceledAt,
+		&i.RefundedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getReviewPaymentForRefund = `-- name: GetReviewPaymentForRefund :one
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at FROM review_payments WHERE id=$1 FOR UPDATE
+`
+
+func (q *Queries) GetReviewPaymentForRefund(ctx context.Context, id uuid.UUID) (ReviewPayment, error) {
+	row := q.db.QueryRow(ctx, getReviewPaymentForRefund, id)
 	var i ReviewPayment
 	err := row.Scan(
 		&i.ID,

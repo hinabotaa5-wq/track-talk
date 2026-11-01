@@ -417,7 +417,7 @@ export type CoachPayout = {
 };
 export type CoachEarning = {
   id: string;
-  source: "review" | "personal" | "consultation";
+  source: "review" | "personal" | "consultation" | "refund_compensation";
   gross_yen: number;
   share_percent: number;
   amount_yen: number;

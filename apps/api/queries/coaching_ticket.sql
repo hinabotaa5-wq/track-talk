@@ -141,7 +141,7 @@ SELECT COALESCE(sum(x.amount),0)::bigint FROM (
  SELECT amount_yen::bigint AS amount FROM review_payments WHERE payer_id = sqlc.arg(owner_id)::uuid
  AND request_id IS DISTINCT FROM sqlc.arg(exclude_review_id)::uuid
  AND created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
- AND (status IN ('authorized','captured') OR (status='pending' AND session_expires_at>now()))
+ AND (status IN ('authorized','captured','refund_pending') OR (status='pending' AND session_expires_at>now()))
  UNION ALL
  SELECT (pay.amount_yen-pay.refunded_yen)::bigint FROM coaching_payments pay JOIN coaching_contracts ct ON ct.id=pay.contract_id
  WHERE ct.requester_id = sqlc.arg(owner_id)::uuid AND ct.id IS DISTINCT FROM sqlc.arg(exclude_contract_id)::uuid

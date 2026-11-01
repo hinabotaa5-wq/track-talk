@@ -74,7 +74,8 @@ func (s *Server) knownRefund(ctx context.Context, n refundNotice) (bool, error) 
 	err := s.pool.QueryRow(ctx, `
 		SELECT
 		  EXISTS(SELECT 1 FROM coaching_ticket_refunds WHERE stripe_refund_id = $1 AND $1 <> '')
-		  OR EXISTS(SELECT 1 FROM coaching_consultation_refunds WHERE stripe_refund_id = $1 AND $1 <> ''),
+		  OR EXISTS(SELECT 1 FROM coaching_consultation_refunds WHERE stripe_refund_id = $1 AND $1 <> '')
+ OR EXISTS(SELECT 1 FROM captured_payment_refunds WHERE stripe_refund_id=$1 AND $1<>'' AND origin='admin'),
 		  EXISTS(SELECT 1 FROM coaching_payments WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_yen > 0)
 		  OR EXISTS(SELECT 1 FROM coaching_ticket_purchases WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_yen > 0)
 		  OR EXISTS(SELECT 1 FROM review_payments WHERE payment_intent_id = $2 AND $2 <> '' AND refunded_at IS NOT NULL)`,
@@ -191,7 +192,7 @@ func (s *Server) alertUnknownTransfer(ctx context.Context, n transferNotice, whe
 // handleStripeMoneyAlert は、返金・送金の Webhook を照合する。読めない知らせでも落とさず、記録だけ残す。
 func (s *Server) handleStripeMoneyAlert(ctx context.Context, ev stripe.Event) {
 	switch ev.Type {
-	case "charge.refunded", "refund.created":
+	case "charge.refunded", "refund.created", "refund.updated", "refund.failed":
 		n, err := parseRefundObject(ev.Data.Object)
 		if err != nil {
 			slog.Warn("stripe refund parse", "event", ev.ID, "err", err)

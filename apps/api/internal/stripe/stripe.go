@@ -214,6 +214,7 @@ func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (Ch
 }
 
 type Refund struct {
+	FailureReason string            `json:"failure_reason"`
 	Metadata      map[string]string `json:"metadata"`
 	ID            string            `json:"id"`
 	Amount        int               `json:"amount"`

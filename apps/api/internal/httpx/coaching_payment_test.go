@@ -23,6 +23,8 @@ const (
 
 // fakeStripe は、Stripe の代わりに支払い画面と返金を受け付けるサーバー。
 type fakeStripe struct {
+	transferDelay      time.Duration
+	serverConfig       config.Config
 	mu                 sync.Mutex
 	sessions           []url.Values
 	refunds            []url.Values
@@ -156,6 +158,7 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 		case r.URL.Path == "/v1/transfers":
+			time.Sleep(f.transferDelay)
 			if f.failTransfers > 0 {
 				f.failTransfers--
 				w.WriteHeader(http.StatusBadRequest)
@@ -206,6 +209,7 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 		if mutate != nil {
 			mutate(cfg)
 		}
+		f.serverConfig = *cfg
 	})
 	return h, f
 }
