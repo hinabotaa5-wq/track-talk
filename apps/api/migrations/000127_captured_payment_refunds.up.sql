@@ -55,13 +55,13 @@ CREATE TABLE review_payment_earning_links (
 );
 INSERT INTO review_payment_earning_links(payment_id,earning_id)
 SELECT p.id,e.id FROM coach_earnings e JOIN LATERAL (
- SELECT id FROM review_payments p WHERE p.request_id=e.review_request_id AND p.status IN ('captured','refunded','refund_pending') ORDER BY p.authorized_at,p.id LIMIT 1
+ SELECT id FROM review_payments p WHERE p.request_id=e.review_request_id AND p.status IN ('captured','refunded','refund_pending') ORDER BY CASE WHEN p.status='refunded' THEN 1 ELSE 0 END,p.authorized_at,p.id LIMIT 1
 ) p ON true WHERE e.source='review';
 CREATE FUNCTION link_review_payment_earning() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF NEW.source='review' THEN
  INSERT INTO review_payment_earning_links(payment_id,earning_id)
- SELECT p.id,NEW.id FROM review_payments p WHERE p.request_id=NEW.review_request_id AND p.status IN ('captured','refunded','refund_pending') ORDER BY p.authorized_at,p.id LIMIT 1 ON CONFLICT DO NOTHING;
+ SELECT p.id,NEW.id FROM review_payments p WHERE p.request_id=NEW.review_request_id AND p.status IN ('captured','refunded','refund_pending') ORDER BY CASE WHEN p.status='refunded' THEN 1 ELSE 0 END,p.authorized_at,p.id LIMIT 1 ON CONFLICT DO NOTHING;
  END IF;
  RETURN NEW;
 END $$;

@@ -29,7 +29,7 @@ it("返金理由が必要で、確認後に支払い単位の全額返金を送�
  await act(async () => root.render(<Page />));
  const button = Array.from(container.querySelectorAll("button")).find(b => b.textContent === "全額返金する")!;
  expect(button.disabled).toBe(true);
- const input = container.querySelector("input")!;
+ const input = container.querySelector('input[maxlength="1000"]')!;
  await act(async () => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "提供内容を確認して返金");
   input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -48,6 +48,29 @@ it("権限エラーの場合は監査記録や返金ボタンを表示しない"
  mocks.api.mockRejectedValue(new Error("forbidden"));
  await act(async () => root.render(<Page />));
  expect(container.querySelector('[role="alert"]')).not.toBeNull();
- expect(container.querySelector("input")).toBeNull();
+ expect(container.querySelector('input[maxlength="1000"]')).toBeNull();
  expect(container.textContent).not.toContain("admin-id");
+});
+
+it("古いページと発生元返金の監査へ移動できる", async () => {
+ mocks.api.mockResolvedValueOnce({ ...data, page: 1, has_more: true });
+ await act(async () => root.render(<Page />));
+ mocks.api.mockResolvedValueOnce({ ...data, page: 2, has_more: false });
+ const next = Array.from(container.querySelectorAll("button")).find(b => b.textContent === "次のページ")!;
+ await act(async () => next.click());
+ expect(mocks.api).toHaveBeenCalledWith("/v1/admin/coaching/payments?page=2", expect.objectContaining({ token: "admin" }));
+ expect(container.textContent).toContain("2ページ");
+ mocks.api.mockResolvedValueOnce({ ...data, page: 1, has_more: false });
+ const origin = Array.from(container.querySelectorAll("button")).find(b => b.textContent === "発生元の返金・監査を確認")!;
+ await act(async () => origin.click());
+ expect(mocks.api).toHaveBeenCalledWith("/v1/admin/coaching/payments?refund_id=refund-1", expect.objectContaining({ token: "admin" }));
+ expect(container.textContent).toContain("実行者：admin-id");
+});
+
+it("未適用の相殺だけを絞り込む", async () => {
+ mocks.api.mockResolvedValue(data);
+ await act(async () => root.render(<Page />));
+ await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+ await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+ expect(mocks.api).toHaveBeenCalledWith("/v1/admin/coaching/payments?unapplied=true", expect.objectContaining({ token: "admin" }));
 });

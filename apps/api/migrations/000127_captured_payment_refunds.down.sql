@@ -1,3 +1,11 @@
+-- External refunds and accounting history cannot be undone by schema rollback.
+DO $$ BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('coach_payouts'));
+ LOCK TABLE captured_payment_refunds,captured_refund_earnings,coach_refund_adjustments,coach_refund_applications IN ACCESS EXCLUSIVE MODE;
+ IF EXISTS(SELECT 1 FROM captured_payment_refunds) OR EXISTS(SELECT 1 FROM captured_refund_earnings) OR EXISTS(SELECT 1 FROM coach_refund_adjustments) OR EXISTS(SELECT 1 FROM coach_refund_applications) THEN
+ RAISE EXCEPTION 'refund accounting exists: rollback refused; reconcile and roll forward';
+ END IF;
+END $$;
 DROP TRIGGER restore_deleted_earning_offsets ON coach_earnings;
 DROP FUNCTION restore_deleted_earning_offsets();
 DROP TRIGGER link_review_payment_earning ON coach_earnings;

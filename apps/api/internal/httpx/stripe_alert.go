@@ -192,7 +192,7 @@ func (s *Server) alertUnknownTransfer(ctx context.Context, n transferNotice, whe
 // handleStripeMoneyAlert は、返金・送金の Webhook を照合する。読めない知らせでも落とさず、記録だけ残す。
 func (s *Server) handleStripeMoneyAlert(ctx context.Context, ev stripe.Event) {
 	switch ev.Type {
-	case "charge.refunded", "refund.created":
+	case "charge.refunded", "refund.created", "refund.updated", "refund.failed":
 		n, err := parseRefundObject(ev.Data.Object)
 		if err != nil {
 			slog.Warn("stripe refund parse", "event", ev.ID, "err", err)

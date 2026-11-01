@@ -138,3 +138,9 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/monthly-reminder.sh
   gcloud run services describe track-talk-api --region asia-northeast1 --format=json \
     | jq -r '.spec.template.spec.containers[0].env[] | select(.name=="CORS_ORIGINS") | .value'
   ```
+
+### 返金・相殺台帳を使い始めた後のロールバック
+
+migration 000127以降の返金・調整・適用・除外が存在するとき、downは拒否します。実際の返金や送金はDBスキーマの巻き戻しでは取り消せません。取引発生後は前進修正を基本とし、旧APIリビジョンへ戻すだけでは安全と扱いません（旧コードは返金済み報酬の除外台帳を参照しません）。戻す必要がある場合は、先に送金・返金と関連する定期処理を止め、Stripeとアプリの操作・残高・処理中状態を照合し、台帳を保全した復旧手順を個別に確定してください。
+
+遅延返金失敗の継続照合は、Stripeが銀行からの返却に最大30日かかると説明する期間に7日の余裕を加え、成功記録後37日間を対象とします（[Stripe公式](https://docs.stripe.com/refunds#handle-failed-refunds)）。`refund.updated`・`refund.failed`の受信追加も投入時に設定確認してください。tick停止中は定期照合は動かず、再開は機能開放時の別判断です。

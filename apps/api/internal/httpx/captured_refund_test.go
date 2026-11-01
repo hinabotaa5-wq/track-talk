@@ -335,7 +335,7 @@ func TestCapturedRefundRestoresDebtWhenPersonalEarningIsRefunded(t *testing.T) {
 	if scalar(t, `SELECT applied_yen FROM coach_refund_adjustments`) != 0 {
 		t.Fatal("refunded consideration did not restore debt")
 	}
-	if scalar(t, `SELECT count(*) FROM coach_refund_applications`) != 0 {
+	if scalar(t, `SELECT count(*) FROM coach_refund_applications a WHERE NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)`) != 0 {
 		t.Fatal("deleted earning application retained")
 	}
 }

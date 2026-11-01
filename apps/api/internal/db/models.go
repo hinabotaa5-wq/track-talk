@@ -37,6 +37,8 @@ type CapturedPaymentRefund struct {
 	Failure         *string    `json:"failure"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	SucceededAt     *time.Time `json:"succeeded_at"`
+	ReconciledAt    *time.Time `json:"reconciled_at"`
 }
 
 type CapturedRefundEarning struct {
@@ -149,7 +151,7 @@ type CoachProfile struct {
 type CoachRefundAdjustment struct {
 	ID         uuid.UUID  `json:"id"`
 	RefundID   uuid.UUID  `json:"refund_id"`
-	EarningID  uuid.UUID  `json:"earning_id"`
+	EarningID  *uuid.UUID `json:"earning_id"`
 	CoachID    *uuid.UUID `json:"coach_id"`
 	Kind       string     `json:"kind"`
 	AmountYen  int32      `json:"amount_yen"`
@@ -158,12 +160,37 @@ type CoachRefundAdjustment struct {
 }
 
 type CoachRefundApplication struct {
-	ID           uuid.UUID  `json:"id"`
-	AdjustmentID uuid.UUID  `json:"adjustment_id"`
-	EarningID    uuid.UUID  `json:"earning_id"`
-	AmountYen    int32      `json:"amount_yen"`
-	PayoutID     *uuid.UUID `json:"payout_id"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID                 uuid.UUID  `json:"id"`
+	AdjustmentID       uuid.UUID  `json:"adjustment_id"`
+	EarningID          *uuid.UUID `json:"earning_id"`
+	AmountYen          int32      `json:"amount_yen"`
+	PayoutID           *uuid.UUID `json:"payout_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	EarningReferenceID uuid.UUID  `json:"earning_reference_id"`
+}
+
+type CoachRefundApplicationReversal struct {
+	ID                   uuid.UUID  `json:"id"`
+	ApplicationID        uuid.UUID  `json:"application_id"`
+	RecoveryAdjustmentID *uuid.UUID `json:"recovery_adjustment_id"`
+	CreatedAt            time.Time  `json:"created_at"`
+}
+
+type CoachRefundCancellation struct {
+	ID           uuid.UUID `json:"id"`
+	AdjustmentID uuid.UUID `json:"adjustment_id"`
+	RefundID     uuid.UUID `json:"refund_id"`
+	AmountYen    int32     `json:"amount_yen"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type CoachRefundCompensation struct {
+	ID           uuid.UUID `json:"id"`
+	AdjustmentID uuid.UUID `json:"adjustment_id"`
+	RefundID     uuid.UUID `json:"refund_id"`
+	EarningID    uuid.UUID `json:"earning_id"`
+	AmountYen    int32     `json:"amount_yen"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type CoachWorkOrder struct {

@@ -37,7 +37,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
   - コーチの銀行口座への入金は、アカウントを作るときに月1回・毎月15日に設定する。運営は毎月1〜14日に「送金」を押す
   - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
-  - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`transfer.created`、`transfer.reversed`、`payout.created` の8種類。署名の鍵は `STRIPE_WEBHOOK_SECRET` としてSecret Managerの承認した数値バージョンを参照する
+  - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`refund.updated`、`refund.failed`、`transfer.created`、`transfer.reversed`、`payout.created` の10種類。署名の鍵は `STRIPE_WEBHOOK_SECRET` としてSecret Managerの承認した数値バージョンを参照する
   - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する
 - `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` をCloud RunからSecret Managerの数値バージョンへの参照として設定して、「Deploy API」を流す。起動ログの `stripe mode=live` で本番の鍵だと確かめる
 - 運営者の決定（2026-10-29）：PayPayの承認が下りるまで、コーチング公開・新規受付のフラグは開けない。承認後、同じ日に「公開フラグを開ける → 手順書C（Connect同期確認）→ 手順書B（実決済テスト）」の順で進める。`COACHING_NEW_ACCEPTANCE_ENABLED` はCが成功するまでオフを維持し、成功後、Bの実施前に開ける。

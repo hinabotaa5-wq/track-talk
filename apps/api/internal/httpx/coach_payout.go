@@ -208,7 +208,7 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 			if _, err := q.AttachEarningsToPayout(ctx, db.AttachEarningsToPayoutParams{PayoutID: &p.ID, CoachID: &row.CoachID}); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `UPDATE coach_refund_applications a SET payout_id=$1 FROM coach_earnings e WHERE e.id=a.earning_id AND e.payout_id=$1 AND a.payout_id IS NULL`, p.ID); err != nil {
+			if _, err := tx.Exec(ctx, `UPDATE coach_refund_applications a SET payout_id=$1 FROM coach_earnings e WHERE e.id=a.earning_id AND e.payout_id=$1 AND a.payout_id IS NULL AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)`, p.ID); err != nil {
 				return err
 			}
 			out.Created++
