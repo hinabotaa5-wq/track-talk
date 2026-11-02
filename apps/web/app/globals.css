@@ -3,7 +3,7 @@
 /* 配色(白基調+ロゴの青だけをアクセントに)
    画面のクラスは濃い背景の上に白い文字を置く前提で書かれている(text-white, bg-white/10, text-slate-300 など)。
    クラスを書き換えず、明るい表示では白と灰色の段階を裏返して、同じクラスが白地に濃い文字になるようにする。
-   背景は明るい表示では真っ白、暗い表示では少し明るい黒(#121212)にする(色はのせない)。
+   背景は明るい表示では真っ白、暗い表示では黒に近いグレー(#1f1f1f)にする(色はのせない)。
    どちらにするかは端末の設定に合わせるのが基本。マイページで選ぶと html の data-theme(light / dark)で固定する(lib/theme.ts)。
    アクセントはロゴの青(#2ec5ff〜#0a5cff の真ん中あたりの水色寄りの青)だけ。水色・紫・緑などの別の色はすべて同じ青に寄せる。赤(エラー)と黄(注意)だけ残す。
    どちらの表示でも白のままにしたい文字(青いボタンや写真の上の文字)は text-pure-white を使う。 */
@@ -63,9 +63,9 @@
 }
 
 :root[data-theme="dark"] {
-  --background: #121212;
+  --background: #1f1f1f;
   --foreground: #f1f5f9;
-  --surface: #1c1c1e;
+  --surface: #2a2a2c;
 
   --tt-white: #ffffff;
   --tt-slate-50: #f8fafc;
@@ -77,8 +77,8 @@
   --tt-slate-600: #475569;
   --tt-slate-700: #334155;
   --tt-slate-800: #1e293b;
-  --tt-slate-900: #1c1c1e;
-  --tt-slate-950: #121212;
+  --tt-slate-900: #2a2a2c;
+  --tt-slate-950: #1f1f1f;
 
   --tt-blue-50: #ecf8ff;
   --tt-blue-100: #d4f0ff;
@@ -119,9 +119,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #121212;
+    --background: #1f1f1f;
     --foreground: #f1f5f9;
-    --surface: #1c1c1e;
+    --surface: #2a2a2c;
 
     --tt-white: #ffffff;
     --tt-slate-50: #f8fafc;
@@ -133,8 +133,8 @@
     --tt-slate-600: #475569;
     --tt-slate-700: #334155;
     --tt-slate-800: #1e293b;
-    --tt-slate-900: #1c1c1e;
-    --tt-slate-950: #121212;
+    --tt-slate-900: #2a2a2c;
+    --tt-slate-950: #1f1f1f;
 
     --tt-blue-50: #ecf8ff;
     --tt-blue-100: #d4f0ff;

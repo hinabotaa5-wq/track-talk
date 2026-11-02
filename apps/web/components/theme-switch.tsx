@@ -7,7 +7,7 @@ import { readThemePreference, saveThemePreference, type ThemePreference } from "
 const options: readonly { id: ThemePreference; label: string; icon: LucideIcon }[] = [
   { id: "light", label: "ライト", icon: Sun },
   { id: "dark", label: "ダーク", icon: Moon },
-  { id: "system", label: "端末に合わせる", icon: Monitor },
+  { id: "system", label: "端末の設定", icon: Monitor },
 ];
 
 const listeners = new Set<() => void>();
