@@ -38,7 +38,7 @@ export default function GuardianContractPage() {
   }, [token, id]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!contract) return <PageLoading label="読み込み中..." />;
+  if (!contract) return <PageLoading screen label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-6">

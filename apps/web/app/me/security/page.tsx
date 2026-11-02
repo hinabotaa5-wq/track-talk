@@ -140,7 +140,7 @@ export default function SecurityPage() {
     }
   }
 
-  if (loading || !session) return <PageLoading label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">

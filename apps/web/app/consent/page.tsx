@@ -77,7 +77,7 @@ function ConsentForm() {
 
 export default function ConsentPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <ConsentForm />
     </Suspense>
   );

@@ -463,6 +463,21 @@ body:has(a[data-screen-loader][data-boot-pending]) .screen-loader {
     padding-bottom: 0;
   }
 }
+/* ページ全体を読み込むあいだの表示(page-loading.tsx の screen)。タブ移動の表示と同じ位置、
+   ヘッダーと下のバーを除いた中身の真ん中に置く。下の画面は覆わない。 */
+.page-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  padding-top: calc(3.8125rem + env(safe-area-inset-top));
+  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 48rem) {
+  .page-loading-screen {
+    padding-bottom: 0;
+  }
+}
 @keyframes screen-loader-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -471,6 +486,11 @@ body:has(a[data-screen-loader][data-boot-pending]) .screen-loader {
   width: 5.5rem;
   height: auto;
   overflow: visible;
+}
+/* 画面の真ん中に出すとき(タブ移動中・ページ全体の読み込み中)は大きくする。カードの中の表示は小さいまま。 */
+.screen-loader .screen-loader-watch,
+.page-loading-screen .screen-loader-watch {
+  width: 8rem;
 }
 .screen-loader-crown {
   fill: color-mix(in oklab, var(--tt-white) 40%, transparent);

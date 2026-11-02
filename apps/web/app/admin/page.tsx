@@ -619,7 +619,7 @@ export default function AdminPage() {
   }, [loading, session, profile, router]);
 
   if (loading || !isAdmin) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   const lists = { reports, feedback, contact, requests };

@@ -28,7 +28,7 @@ function GuardianPaid() {
 
 export default function GuardianPaidPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <GuardianPaid />
     </Suspense>
   );

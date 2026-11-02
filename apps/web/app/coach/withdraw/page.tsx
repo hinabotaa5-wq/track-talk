@@ -65,7 +65,7 @@ export default function CoachWithdrawPage() {
   }
 
   if (loading || !session || (application === undefined && !error)) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   if (done) {

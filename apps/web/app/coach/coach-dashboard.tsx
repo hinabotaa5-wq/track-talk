@@ -220,7 +220,7 @@ export function CoachDashboard() {
   }
 
   if (error && coach === undefined) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || coach === undefined) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || coach === undefined) return <PageLoading screen label="読み込み中..." />;
 
   if (!coach || coach.status !== "approved") {
     return (

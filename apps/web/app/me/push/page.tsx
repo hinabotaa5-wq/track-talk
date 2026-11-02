@@ -200,7 +200,7 @@ export default function PushSettingsPage() {
   }
 
   if (loading || !session) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   return (

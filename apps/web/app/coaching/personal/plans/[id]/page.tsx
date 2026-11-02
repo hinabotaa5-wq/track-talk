@@ -118,7 +118,7 @@ export default function ApplyCoachingPlanPage() {
   }
 
   if (loadError) return <p className="text-sm text-red-400">{loadError}</p>;
-  if (loading || !session || !data || !me) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !data || !me) return <PageLoading screen label="読み込み中..." />;
 
   const { plan, coach } = data;
   const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);

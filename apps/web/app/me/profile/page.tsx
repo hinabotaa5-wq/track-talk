@@ -68,7 +68,7 @@ export default function ProfilePage() {
   const incomplete = profileIncomplete(profile);
 
   if (loading || !session) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   return (

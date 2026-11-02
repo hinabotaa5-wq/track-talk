@@ -36,7 +36,7 @@ export function CoachList() {
   }, []);
 
   if (error) return <p role="alert" className="text-sm text-red-400">{error}</p>;
-  if (!coaches) return <PageLoading label="読み込み中..." />;
+  if (!coaches) return <PageLoading screen label="読み込み中..." />;
   if (coaches.length === 0) return <p className="text-sm text-slate-200">まだいません</p>;
 
   return (

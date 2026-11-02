@@ -83,7 +83,7 @@ export default function DeleteAccountPage() {
   }
 
   if (loading || !session) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   if (authLeft) {

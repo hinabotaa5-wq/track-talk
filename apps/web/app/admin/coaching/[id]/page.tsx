@@ -53,7 +53,7 @@ function OpenContract() {
     }
   }
 
-  if (loading || !profile?.is_admin) return <PageLoading label="読み込み中..." />;
+  if (loading || !profile?.is_admin) return <PageLoading screen label="読み込み中..." />;
 
   if (!opened) {
     return (
@@ -141,7 +141,7 @@ function OpenContract() {
 
 export default function AdminCoachingContractPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <OpenContract />
     </Suspense>
   );

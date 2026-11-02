@@ -219,7 +219,7 @@ function ReviewRequestView() {
   }, [waitingForPayment, polls]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !request) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !request) return <PageLoading screen label="読み込み中..." />;
 
   const waiting = request.status === "queued" || request.status === "offered" || request.status === "in_review";
 
@@ -297,7 +297,7 @@ function ReviewRequestView() {
 
 export default function ReviewRequestPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <ReviewRequestView />
     </Suspense>
   );

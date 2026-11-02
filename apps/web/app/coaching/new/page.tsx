@@ -213,7 +213,7 @@ export default function NewReviewRequestPage() {
   }
 
   if (loading || !session || (!me && !loadError)) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
   if (!me) {
     return <p className="text-sm text-red-400">{loadError}</p>;
