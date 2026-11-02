@@ -152,7 +152,7 @@ function MySenseNotes() {
           <>
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
               <div className="flex items-center gap-4">
-                <SenseNoteJar total={shownStats.total} dropLatest={dropped} className="h-32 w-24" />
+                <SenseNoteJar total={shownStats.total} summarized={senseSummaryEnabled && !guest && summaryState.loaded && summaryState.pendingNotes === 0} dropLatest={dropped} className="h-32 w-24" />
                 <div className="min-w-0 flex-1 space-y-3">
                   <TargetMeetCountdown token={guest ? null : token} />
                   {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} compact /> : null}

@@ -14,11 +14,13 @@ const grains = [
   { cx: 81, cy: 66, r: 21 },
 ];
 
-export function SenseNoteJar({ total, dropLatest = false, className = "" }: { total: number; dropLatest?: boolean; className?: string }) {
+// summarized は、満杯の6粒をAIでまとめ終えたこと。まとめた後は空の次のビンを見せる。
+export function SenseNoteJar({ total, summarized = false, dropLatest = false, className = "" }: { total: number; summarized?: boolean; dropLatest?: boolean; className?: string }) {
   const { filled, current } = senseJarLevel(total);
-  // 満杯になった直後は、空のビンではなく満杯のビンを見せる。
-  const shown = total > 0 && current === 0 ? senseJarSize : current;
-  const jarIndex = total > 0 && current === 0 ? filled : filled + 1;
+  // 満杯になった直後は、まとめるまで空のビンではなく満杯のビンを見せる。
+  const full = total > 0 && current === 0 && !summarized;
+  const shown = full ? senseJarSize : current;
+  const jarIndex = full ? filled : filled + 1;
   const fillTop = shown === 0 ? 168 : shown === senseJarSize ? 44 : Math.max(44, Math.min(...grains.slice(0, shown).map((g) => g.cy - g.r)) + 6);
   return (
     <div className={`relative shrink-0 ${className}`}>
