@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type SyntheticEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ErrorState } from "@/components/empty-state";
+import { InjuryPreventionCard } from "@/components/injury-prevention-card";
 import { RaceRecordsPanel } from "@/components/race-records";
 import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
@@ -33,7 +34,7 @@ export default function MySenseNotesPage() {
 }
 
 function MySenseNotes() {
-  const { session, token, loading } = useAuth();
+  const { session, token, loading, profile } = useAuth();
   const router = useRouter();
   const requestedTab = useSearchParams().get("tab");
   const [notes, setNotes] = useState<SenseNote[] | null>(null);
@@ -169,6 +170,7 @@ function MySenseNotes() {
                 }}
               />
             </section>
+            {guest ? null : <InjuryPreventionCard event={profile?.event} />}
           </>
         )}
         <SenseSummaryResult state={summaryState}>
