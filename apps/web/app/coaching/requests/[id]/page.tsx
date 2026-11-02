@@ -233,7 +233,7 @@ function ReviewRequestView() {
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
         <p className="text-sm font-semibold text-white">{request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
         {waiting || request.status === "awaiting_payment" ? (
-          <p className="text-sm text-slate-100">返ってくる目安: {formatDateTime(request.due_at)}まで</p>
+          <p className="text-sm text-slate-100">返却期限: {formatDateTime(request.due_at)}</p>
         ) : null}
         {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
           <p className="font-semibold">選んだコーチ：{request.requested_coach_name || "選択したコーチ"}</p>

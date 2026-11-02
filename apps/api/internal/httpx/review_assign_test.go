@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 type coachRequestsView struct {
@@ -144,14 +143,15 @@ func TestReviewOfferFlow(t *testing.T) {
 		t.Fatalf("birth month %d", rec.Code)
 	}
 
-	// 目安はいつでも翌日の12時。受付中のコーチがいるかどうかも返す。
+	// 返却期限は送った時刻から24時間後。受付中のコーチがいるかどうかも返す。
+	before := time.Now()
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil)
 	var est struct {
 		DueAt         time.Time `json:"due_at"`
 		CoachesOnDuty bool      `json:"coaches_on_duty"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &est)
-	if rec.Code != http.StatusOK || !est.CoachesOnDuty || !est.DueAt.Equal(tomorrowNoon()) {
+	if rec.Code != http.StatusOK || !est.CoachesOnDuty || !dueIn24h(est.DueAt, before, time.Now()) {
 		t.Fatalf("estimate %d %s", rec.Code, rec.Body.String())
 	}
 	// いまは100mだけ受け付ける。
@@ -196,7 +196,7 @@ func TestReviewOfferFlow(t *testing.T) {
 		t.Fatalf("B offers %+v", offersB)
 	}
 
-	// B が30分返事をしないと時間切れ。もう打診できる人がいないので待ちに戻る。
+	// B が引受期限まで返事をしないと時間切れ。もう打診できる人がいないので待ちに戻る。
 	execSQLArgs(t, `UPDATE review_offers SET expires_at = now() - interval '1 minute' WHERE result IS NULL`)
 	if rec := tick(t, h, ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("tick without secret %d", rec.Code)
@@ -292,8 +292,7 @@ func TestReviewOfferRespectsActiveLimit(t *testing.T) {
 	}
 }
 
-// tomorrowNoon は、日本時間の翌日12時。
-func tomorrowNoon() time.Time {
-	now := time.Now().In(jst.Zone)
-	return time.Date(now.Year(), now.Month(), now.Day()+1, 12, 0, 0, 0, jst.Zone)
+// dueIn24h は、返却期限が before〜after のあいだに送った時刻の24時間後か。
+func dueIn24h(due, before, after time.Time) bool {
+	return !due.Before(before.Add(24*time.Hour).Truncate(time.Second)) && !due.After(after.Add(24*time.Hour))
 }

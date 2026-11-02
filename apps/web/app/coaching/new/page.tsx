@@ -119,7 +119,7 @@ export default function NewReviewRequestPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // 枠と種目を選ぶと、返ってくる目安（送った翌日の12時）と、いま受付中のコーチがいるかを出す。
+  // 枠と種目を選ぶと、返却期限（送った時刻から24時間後）と、いま受付中のコーチがいるかを出す。
   useEffect(() => {
     if (!token || !me?.demo) return;
     let cancelled = false;
@@ -326,9 +326,9 @@ export default function NewReviewRequestPage() {
           {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
-              返ってくる目安: {formatDateTime(estimate.due_at)}まで
+              返却期限: {formatDateTime(estimate.due_at)}
               <span className="block text-xs text-slate-300">
-                {coach ? "選んだコーチが対応します。期限までに回答がなければ代金はかかりません。" : "夜に送っても、翌日の昼までに返ってきます。"}
+                {coach ? "選んだコーチが対応します。期限までに回答がなければ代金はかかりません。" : "送ってから24時間以内に返ってきます。"}
               </span>
             </p>
           ) : null}
