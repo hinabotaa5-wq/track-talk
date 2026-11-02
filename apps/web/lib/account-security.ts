@@ -8,10 +8,8 @@ export type MfaGateState = "none" | "verify" | "setup";
 // 二段階認証の確認がなくても開ける画面。ログインし直す・規約を読むなどはできるようにする。
 const openPrefixes = ["/login", "/register", "/auth", "/terms", "/privacy", "/contact", "/guidelines"];
 
-// 管理者・コーチは、二段階認証を設定するまで、これらの画面を開けない(API も拒む)。
-const staffPrefixes = ["/admin", "/coach"];
-// コーチの説明と応募は、まだコーチでない人のための画面なので止めない。
-const staffOpenPrefixes = ["/coach/about", "/coach/apply"];
+// 管理者は、二段階認証を設定するまで、これらの画面を開けない(API も拒む)。コーチの画面は止めない。
+const staffPrefixes = ["/admin"];
 
 function under(pathname: string, prefixes: string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -19,7 +17,7 @@ function under(pathname: string, prefixes: string[]) {
 
 // いまの画面で、二段階認証のコードを求めるか(verify)、設定を求めるか(setup)を決める。
 // - 設定済みの人は、ログインのたびにコードを確かめるまでどの画面も開けない。
-// - 管理者・承認済みコーチで未設定の人(mfaRequired)は、管理・コーチの画面だけ止めて設定へ案内する。
+// - 管理者で未設定の人(mfaRequired)は、管理の画面だけ止めて設定へ案内する。
 export function mfaGateState(input: {
   pathname: string;
   currentLevel: AssuranceLevel;
@@ -29,7 +27,7 @@ export function mfaGateState(input: {
   const { pathname, currentLevel, nextLevel, mfaRequired } = input;
   if (under(pathname, openPrefixes)) return "none";
   if (currentLevel === "aal1" && nextLevel === "aal2") return "verify";
-  if (mfaRequired && currentLevel !== "aal2" && under(pathname, staffPrefixes) && !under(pathname, staffOpenPrefixes)) {
+  if (mfaRequired && currentLevel !== "aal2" && under(pathname, staffPrefixes)) {
     return "setup";
   }
   return "none";

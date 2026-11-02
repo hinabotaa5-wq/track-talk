@@ -117,7 +117,7 @@ export default function SecurityPage() {
   async function remove(factor: Factor) {
     const ok = await confirm({
       title: "二段階認証を解除しますか？",
-      body: "解除すると、パスワードだけでログインできるようになります。管理者・コーチは、設定し直すまで管理・コーチの画面と操作が使えなくなります。",
+      body: "解除すると、パスワードだけでログインできるようになります。管理者は、設定し直すまで管理の画面と操作が使えなくなります。",
       confirmLabel: "解除する",
     });
     if (!ok) return;
@@ -150,7 +150,7 @@ export default function SecurityPage() {
       </p>
       {profile?.mfa_required ? (
         <p className="rounded-md border border-amber-300/40 bg-amber-400/10 p-3 text-sm text-amber-100">
-          管理者・コーチの画面と操作は、二段階認証を設定してから使えます。
+          管理の画面と操作は、二段階認証を設定してから使えます。
         </p>
       ) : null}
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">

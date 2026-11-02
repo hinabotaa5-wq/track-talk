@@ -22,7 +22,7 @@ func (s *Server) requireApprovedReviewCoach(w http.ResponseWriter, r *http.Reque
 	return p, true
 }
 
-// requireCurrentCoach は、コーチとして操作する人が、いまも承認済みで、二段階認証の条件を満たすかを確かめる。
+// requireCurrentCoach は、コーチとして操作する人が、いまも承認済みかを確かめる。
 // 申し込みや依頼の担当であっても、承認を取り消されたら読むことも送ることもできない。違えば 403 を返して false。
 func (s *Server) requireCurrentCoach(w http.ResponseWriter, r *http.Request, id uuid.UUID, message string) bool {
 	coach, err := s.q.GetCoachProfile(r.Context(), id)
@@ -34,5 +34,5 @@ func (s *Server) requireCurrentCoach(w http.ResponseWriter, r *http.Request, id 
 		MapDBError(w, err)
 		return false
 	}
-	return s.requireStaffMFA(w, r)
+	return true
 }

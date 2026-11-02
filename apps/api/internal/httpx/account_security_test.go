@@ -48,7 +48,8 @@ func meMFARequired(t *testing.T, h http.Handler, tok string) bool {
 	return me.MFARequired
 }
 
-func TestStaffMFARequiredForAdminAndCoach(t *testing.T) {
+// 二段階認証を必ず求めるのは管理者だけ。コーチには求めない(2026-11-02 運営者決定)。
+func TestStaffMFARequiredForAdminOnly(t *testing.T) {
 	h := setupConfig(t, func(c *config.Config) { c.StaffMFARequired = true })
 
 	admin := uuid.New()
@@ -89,18 +90,22 @@ func TestStaffMFARequiredForAdminAndCoach(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", admin2, nil); rec.Code != http.StatusOK {
 		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
 	}
-	rec = doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", coach1, nil)
-	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), `"mfa_required"`) {
+	// 承認済みのコーチは、二段階認証なしでもコーチの操作ができる。
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", coach1, nil); rec.Code != http.StatusOK {
 		t.Fatalf("coach aal1 %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", coach1, map[string]any{"on_duty": true}); rec.Code != http.StatusForbidden {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", coach1, map[string]any{"on_duty": false}); rec.Code != http.StatusOK {
 		t.Fatalf("coach duty aal1 %d %s", rec.Code, rec.Body.String())
 	}
-	if !meMFARequired(t, h, coach1) {
-		t.Fatal("approved coach aal1 should be asked for mfa")
+	if meMFARequired(t, h, coach1) {
+		t.Fatal("approved coach should not be asked for mfa")
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", coach2, nil); rec.Code != http.StatusOK {
 		t.Fatalf("coach aal2 %d %s", rec.Code, rec.Body.String())
+	}
+	// コーチの操作ができても、管理の操作は管理者でなければ拒む。
+	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/stats", coach1, nil); rec.Code != http.StatusForbidden || strings.Contains(rec.Body.String(), "mfa_required") {
+		t.Fatalf("coach admin %d %s", rec.Code, rec.Body.String())
 	}
 
 	// ふつうの利用者には求めない。
@@ -127,6 +132,22 @@ func TestStaffMFANotRequiredWhenOff(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/stats", ta, nil); rec.Code != http.StatusOK {
 		t.Fatalf("admin %d %s", rec.Code, rec.Body.String())
+	}
+
+	coach := uuid.New()
+	tc := tokenWithAAL(t, coach, "aal1")
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tc, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	withCoachPhoto(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", ta, nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", tc, nil); rec.Code != http.StatusOK {
+		t.Fatalf("coach %d %s", rec.Code, rec.Body.String())
+	}
+	if meMFARequired(t, h, tc) {
+		t.Fatal("off should not ask coach")
 	}
 }
 
@@ -177,5 +198,53 @@ func TestMFAEnrolledUserNeedsAAL2(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("not enrolled aal1 %d %s", rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// 自分で二段階認証を設定したコーチは、必ず求められなくても、これまでどおりコードを入れたログインで使う。
+func TestMFAEnrolledCoachUnchanged(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("postgres unavailable: %v", err)
+	}
+	h := setupConfig(t, func(c *config.Config) { c.StaffMFARequired = true })
+	if _, err := pool.Exec(ctx, `
+		CREATE SCHEMA IF NOT EXISTS auth;
+		CREATE TABLE IF NOT EXISTS auth.mfa_factors (id uuid PRIMARY KEY, user_id uuid NOT NULL, status text NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+
+	admin, coach := uuid.New(), uuid.New()
+	coach1, coach2 := tokenWithAAL(t, coach, "aal1"), tokenWithAAL(t, coach, "aal2")
+	// 登録の有無はしばらく覚えるので、コーチが API を使う前に設定済みにしておく。
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.mfa_factors WHERE user_id = $1`, coach)
+	})
+	if _, err := pool.Exec(ctx, `INSERT INTO auth.mfa_factors (id, user_id, status) VALUES ($1, $2, 'verified')`, uuid.New(), coach); err != nil {
+		t.Fatal(err)
+	}
+	meMFARequired(t, h, tokenWithAAL(t, admin, "aal2"))
+	setAdmin(t, admin)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", coach2, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	withCoachPhoto(t, coach)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tokenWithAAL(t, admin, "aal2"), nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", coach1, nil); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "mfa_required") {
+		t.Fatalf("enrolled coach aal1 %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/plans", coach2, nil); rec.Code != http.StatusOK {
+		t.Fatalf("enrolled coach aal2 %d %s", rec.Code, rec.Body.String())
+	}
+	if meMFARequired(t, h, coach2) {
+		t.Fatal("enrolled coach aal2")
 	}
 }

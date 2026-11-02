@@ -17,12 +17,13 @@ describe("mfaGateState", () => {
     expect(mfaGateState({ pathname: "/admin", currentLevel: "aal2", nextLevel: "aal2", mfaRequired: false })).toBe("none");
   });
 
-  it("未設定の管理者・コーチは、管理とコーチの画面だけ設定へ案内する", () => {
+  it("未設定の管理者は、管理の画面だけ設定へ案内する", () => {
     const base = { currentLevel: "aal1" as const, nextLevel: "aal1" as const, mfaRequired: true };
     expect(mfaGateState({ ...base, pathname: "/admin" })).toBe("setup");
     expect(mfaGateState({ ...base, pathname: "/admin/coaching" })).toBe("setup");
-    expect(mfaGateState({ ...base, pathname: "/coach" })).toBe("setup");
-    expect(mfaGateState({ ...base, pathname: "/coach/requests" })).toBe("setup");
+    // コーチの画面は止めない。
+    expect(mfaGateState({ ...base, pathname: "/coach" })).toBe("none");
+    expect(mfaGateState({ ...base, pathname: "/coach/requests" })).toBe("none");
     expect(mfaGateState({ ...base, pathname: "/coach/apply" })).toBe("none");
     expect(mfaGateState({ ...base, pathname: "/coaches" })).toBe("none");
     expect(mfaGateState({ ...base, pathname: "/me/security" })).toBe("none");

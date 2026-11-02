@@ -126,7 +126,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := profileJSON(p)
-	// 管理者・承認済みコーチで、いまのログインに二段階認証が足りないとき true。
+	// 管理者で、いまのログインに二段階認証が足りないとき true。
 	body["mfa_required"] = mfaRequired
 	// いまの版の説明で、海外の委託先への提供に同意済みなら true。false の人には同意の画面を出す。
 	body["overseas_consent"] = overseasConsent
