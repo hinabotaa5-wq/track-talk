@@ -147,6 +147,25 @@ gcloud run jobs execute track-talk-db-backup --region asia-northeast1 --update-e
 
 `database_backup_completed` と `media_backup_completed` の両方が出れば成功です。手元のテストは `cd deploy/cloud-run/db-backup && python3 -m unittest test_backup` です。
 
+## 決済の件数確認（読み取り専用）
+
+Cloud Run Job `track-talk-payment-counts` は、決済まわりのテーブルの状態別件数と孤立決済の件数だけを、1行の JSON（`event: payment_counts`）でログに出して終わります。行の中身・ID・金額・Stripe の ID は取得も出力もしません。SQL は `SELECT count(*)` と `GROUP BY` だけで、読み取り専用トランザクションで実行してロールバックします。スケジュールは無く、手動で流すときだけ動きます。コードは `deploy/cloud-run/payment-counts/` にあります。
+
+接続はバックアップと同じ秘密 `track-talk-db-backup-url` を `DATABASE_URL` として参照し、同じサービスアカウントで動かします。新しい秘密は作りません。
+
+```bash
+docker build --platform linux/amd64 -t asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/payment-counts:<日付-版> deploy/cloud-run/payment-counts
+docker push asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/payment-counts:<日付-版>
+gcloud run jobs create track-talk-payment-counts --region asia-northeast1 \
+  --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/payment-counts:<日付-版> \
+  --service-account <バックアップと同じサービスアカウント> \
+  --set-secrets DATABASE_URL=track-talk-db-backup-url:<バックアップと同じ版> \
+  --tasks 1 --max-retries 0 --task-timeout 300
+gcloud run jobs execute track-talk-payment-counts --region asia-northeast1 --wait
+```
+
+`result` が `clear` なら孤立・想定外の状態は0件、`attention` なら `orphans`・`flagged_states`・`unexpected_values` のどれかが0でありません。本番のスキーマが想定（migration 128）と違うときは件数を取らず `payment_counts_schema_mismatch` を出して終了コード2で止まります。手元のテストは `cd deploy/cloud-run/payment-counts && python3 -m unittest test_counts` です。
+
 ## トラブル
 
 - **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）
