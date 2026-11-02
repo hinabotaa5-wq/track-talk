@@ -115,7 +115,7 @@ Secret Managerの「データ読み取り」監査ログと、想定外の読み
 
 ## 月1回の記録のお知らせ
 
-通知をオンにした全員に、毎月1日の19時(日本時間)に「大会の記録、残せていますか？」をプッシュ通知で送ります。Cloud Scheduler が API を呼びます。`VAPID_PUBLIC_KEY`・`VAPID_PRIVATE_KEY`・`VAPID_SUBJECT` が入っていることが前提です。setup.sh のあと、Cloud Shell で一度だけ流します。
+通知をオンにした全員に、毎月1日の19時(日本時間)に「大会の記録を残せていますか？」をプッシュ通知で送ります。Cloud Scheduler が API を呼びます。`VAPID_PUBLIC_KEY`・`VAPID_PRIVATE_KEY`・`VAPID_SUBJECT` が入っていることが前提です。setup.sh のあと、Cloud Shell で一度だけ流します。
 
 ```bash
 PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/monthly-reminder.sh

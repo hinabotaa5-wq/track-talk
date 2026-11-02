@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import MySenseNotesPage from "@/app/memo/page";
 import type { SenseNote } from "@/lib/sense-notes";
 const apiFetch = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ session: {}, token: "token", loading: false }) }));
 vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => args[0] === "/v1/me/race-records" ? Promise.resolve({ records: [], events: [] }) : args[0] === "/v1/me/target-meet" ? Promise.resolve({ target_meet: null }) : apiFetch(...args) }));
 vi.mock("@/lib/features", () => ({ senseSummaryEnabled: false }));
