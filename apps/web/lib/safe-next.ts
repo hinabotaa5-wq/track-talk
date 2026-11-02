@@ -3,9 +3,20 @@
 export function safeNextPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   if ([...value].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) return "/";
-  if (value === "/login" || value.startsWith("/login?")) return "/";
-  return value;
+  // 最後に URL として解釈し、同じオリジンのままであることを確かめる。返すのは解釈後のパスだけ。
+  let url: URL;
+  try {
+    url = new URL(value, SAME_ORIGIN);
+  } catch {
+    return "/";
+  }
+  if (url.origin !== SAME_ORIGIN) return "/";
+  if (url.pathname === "/login") return "/";
+  return `${url.pathname}${url.search}${url.hash}`;
 }
+
+// 戻り先の解釈に使う仮のオリジン。外へ出るパスかどうかの判定にだけ使い、実際には開かない。
+const SAME_ORIGIN = "https://tracktalk.invalid";
 
 // ログイン画面のパス。ログインしたら、いま開いている画面に戻す。
 export function loginPathFrom(location: { pathname: string; search: string }) {

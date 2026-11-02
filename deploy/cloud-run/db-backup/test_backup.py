@@ -74,6 +74,19 @@ class CloudinaryGetAuthTest(unittest.TestCase):
         request = self.sent_request("https://api.cloudinary.com/v1_1/demo/image/download", {"public_id": "a", "type": "private"})
         self.assertIsNone(request.get_header("Authorization"))
         self.assertIn("signature=", request.full_url)
+        signature = backup.urllib.parse.parse_qs(backup.urllib.parse.urlsplit(request.full_url).query)["signature"][0]
+        self.assertEqual(len(signature), 64)  # SHA-256
+
+    def test_non_https_urls_are_refused_before_opening(self):
+        for url in ("file:///etc/passwd", "http://res.cloudinary.com/demo/image/upload/a.png", "ftp://example.com/a"):
+            with mock.patch.object(backup.urllib.request, "urlopen") as urlopen:
+                with self.assertRaisesRegex(RuntimeError, "insecure_url_scheme"):
+                    backup.cloudinary_get(self.cfg, url)
+                urlopen.assert_not_called()
+        with mock.patch.object(backup.urllib.request, "urlopen") as urlopen, mock.patch.object(backup, "STORAGE_UPLOAD", "file://"):
+            with self.assertRaisesRegex(RuntimeError, "insecure_url_scheme"):
+                backup.upload("bucket", "name", b"x", "token")
+            urlopen.assert_not_called()
 
 
 if __name__ == "__main__":

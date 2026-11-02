@@ -107,8 +107,19 @@ class Snapshot:
                 self.process.wait()
 
 
+METADATA_TOKEN_URL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+
+
+def https_request(url, **kwargs):
+    """Only https:// is sent anywhere; file://, http:// and other schemes are refused before opening."""
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise RuntimeError("insecure_url_scheme")
+    return urllib.request.Request(url, **kwargs)
+
+
 def token():
-    req = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", headers={"Metadata-Flavor": "Google"})
+    # The Cloud Run metadata server is link-local and only serves plain http (with Metadata-Flavor); the URL is fixed.
+    req = urllib.request.Request(METADATA_TOKEN_URL, headers={"Metadata-Flavor": "Google"})
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.load(response)["access_token"]
 
@@ -118,7 +129,7 @@ def upload(bucket, name, data, access_token, limit=MAX_BYTES):
         raise RuntimeError("backup_size_limit_exceeded")
     query = urllib.parse.urlencode({"uploadType": "media", "name": name, "ifGenerationMatch": "0"})
     url = STORAGE_UPLOAD + "/upload/storage/v1/b/" + urllib.parse.quote(bucket, safe="") + "/o?" + query
-    request = urllib.request.Request(url, data=data, method="POST", headers={"Authorization": "Bearer " + access_token, "Content-Type": "application/octet-stream"})
+    request = https_request(url, data=data, method="POST", headers={"Authorization": "Bearer " + access_token, "Content-Type": "application/octet-stream"})
     with urllib.request.urlopen(request, timeout=90) as response:
         stored = json.load(response)
     if stored.get("md5Hash") != base64.b64encode(hashlib.md5(data).digest()).decode():
@@ -135,15 +146,15 @@ def cloudinary_get(cfg, url, signed_params=None):
     if signed_params is not None:
         params = dict(signed_params, timestamp=str(int(dt.datetime.now(dt.timezone.utc).timestamp())))
         payload = "&".join(f"{k}={params[k]}" for k in sorted(params)) + cfg["secret"]
-        params.update(api_key=cfg["key"], signature=hashlib.sha1(payload.encode()).hexdigest())
+        params.update(api_key=cfg["key"], signature=hashlib.sha256(payload.encode()).hexdigest())  # same SHA-256 signing as the API (internal/cloudinary.Sign)
         url += "?" + urllib.parse.urlencode(params)
-        request = urllib.request.Request(url)
+        request = https_request(url)
     elif urllib.parse.urlsplit(url).netloc == urllib.parse.urlsplit(CLOUDINARY_API).netloc:
         auth = base64.b64encode((cfg["key"] + ":" + cfg["secret"]).encode()).decode()
-        request = urllib.request.Request(url, headers={"Authorization": "Basic " + auth})
+        request = https_request(url, headers={"Authorization": "Basic " + auth})
     else:
         # Credentials go only to the Admin API host; delivery URLs (res.cloudinary.com) are fetched without them.
-        request = urllib.request.Request(url)
+        request = https_request(url)
     with urllib.request.urlopen(request, timeout=90) as response:
         data = response.read(MEDIA_MAX_FILE_BYTES + 1)
     if len(data) > MEDIA_MAX_FILE_BYTES:
