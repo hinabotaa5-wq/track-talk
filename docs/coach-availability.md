@@ -9,7 +9,7 @@
 ## API
 
 - `GET /v1/coaches/{id}/availability`：公開取得。対象プランがない・未承認・誓約未完了の場合は `days: []`。
-- `GET /v1/coach/me/availability`：本人の入力済みデータ。承認と二段階認証の既存条件を適用します。
+- `GET /v1/coach/me/availability`：本人の入力済みデータ。承認の既存条件を適用します(二段階認証は、自分で設定した人だけログインのときに求めます)。
 - `PUT /v1/coach/me/availability`：本人の空き状況を一括保存。送った日のみ更新し、`status: ""` でその日を未設定に戻します。本文は `{"days":[{"date":"2026-10-28","status":"available","note":"午後のみ"}]}`。状態は `available`、`consult`、`unavailable`、空文字。対象外の日・重複・不正な状態・30文字を超えるメモは422です。
 - `POST /v1/coaching/contracts`：任意の `preferred_dates: ["YYYY-MM-DD"]` を受け付け、契約の取得・一覧にも同じ形式で返します。対象サービス・日付範囲・重複・上限・○△を検証します。
 

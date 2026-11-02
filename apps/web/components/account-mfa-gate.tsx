@@ -13,7 +13,7 @@ import { useAuth } from "./auth-provider";
 type Levels = { current: AssuranceLevel; next: AssuranceLevel; token: string | null };
 
 // 二段階認証を設定した人には、ログインのたびに認証アプリのコードを求める(パスワードでも Google でも)。
-// 管理者・承認済みコーチで未設定の人には、管理・コーチの画面を開く前に設定を求める(API も拒む)。
+// 管理者で未設定の人には、管理の画面を開く前に設定を求める(API も拒む)。
 export function AccountMfaGate({ children }: { children: ReactNode }) {
   const { session, profile } = useAuth();
   const pathname = usePathname();
@@ -133,7 +133,7 @@ function MfaSetupRequired({ pathname }: { pathname: string }) {
         二段階認証の設定が必要です
       </h1>
       <p className="text-sm text-slate-300">
-        管理者とコーチの画面は、アカウントの乗っ取りを防ぐため、二段階認証を設定してから使えます。認証アプリ(Google Authenticator など)を用意して、設定してください。
+        管理者の画面は、アカウントの乗っ取りを防ぐため、二段階認証を設定してから使えます。認証アプリ(Google Authenticator など)を用意して、設定してください。
       </p>
       <Link
         href={`/me/security?next=${encodeURIComponent(pathname)}`}

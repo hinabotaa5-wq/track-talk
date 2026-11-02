@@ -21,7 +21,8 @@ Supabase の Authentication → Emails → Security notifications で、次を�
 - API も、設定済みの人(Supabase の `auth.mfa_factors` に `verified` がある人)がコードを入れる前のログイン(JWT の `aal` が `aal1`)で呼んだら、ログインが要る操作を 403 `mfa_required` で断る。ログインなしで読めるものは、ログインしていない人として返す。画面で止めるだけだと、パスワードだけ知った人がトークンで直に API を呼べてしまうため(`apps/api/internal/httpx/mfa_enforce.go`)。
   - 設定済みかどうかは1人1分だけ覚えて、毎回は DB に聞かない。
   - `auth.mfa_factors` が無い・読めない DB(手元やテストの素の Postgres)では調べない。本番の API がそうなっていたら、ログに `mfa enforcement disabled` が出る(正しく動いていれば最初の利用で `mfa enforcement enabled`)。
-- `STAFF_MFA_REQUIRED=1` の API は、管理者と承認済みコーチの操作を、二段階認証を済ませたログイン(`aal2`)でしか受け付けない(403 `mfa_required`)。画面は `/v1/me` の `mfa_required` を見て、管理・コーチの画面の前に設定・確認を求める。
+- `STAFF_MFA_REQUIRED=1` の API は、管理者の操作を、二段階認証を済ませたログイン(`aal2`)でしか受け付けない(403 `mfa_required`)。画面は `/v1/me` の `mfa_required` を見て、管理の画面の前に設定・確認を求める。
+  - コーチには必ずは求めない(外部のコーチに認証アプリの登録を強いると、始めるときの負担になるため。2026-11-02 運営者決定)。コーチも自分で設定でき、設定した人は上のとおりコードを入れたログインで使う。
 
 管理者・コーチに必須にする順番:
 
