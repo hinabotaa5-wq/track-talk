@@ -4,12 +4,13 @@
    画面のクラスは濃い背景の上に白い文字を置く前提で書かれている(text-white, bg-white/10, text-slate-300 など)。
    クラスを書き換えず、明るい表示では白と灰色の段階を裏返して、同じクラスが白地に濃い文字になるようにする。
    端末がダークモードのときは、もとの向きのまま暗い背景にする。
-   アクセントはロゴの青だけ。水色・紫・緑などの別の色はすべて同じ青に寄せる。赤(エラー)と黄(注意)だけ残す。
+   アクセントはロゴの青(#2ec5ff〜#0a5cff の真ん中あたりの水色寄りの青)だけ。水色・紫・緑などの別の色はすべて同じ青に寄せる。赤(エラー)と黄(注意)だけ残す。
    どちらの表示でも白のままにしたい文字(青いボタンや写真の上の文字)は text-pure-white を使う。 */
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
   --surface: #ffffff;
+  --ambient-strength: 22%;
 
   --tt-white: #0f172a;
   --tt-slate-50: #0f172a;
@@ -24,17 +25,17 @@
   --tt-slate-900: #f8fafc;
   --tt-slate-950: #ffffff;
 
-  --tt-blue-50: #0a2157;
-  --tt-blue-100: #003cad;
-  --tt-blue-200: #0049d6;
-  --tt-blue-300: #0a5cff;
-  --tt-blue-400: #0a5cff;
-  --tt-blue-500: #1d6bff;
-  --tt-blue-600: #0a5cff;
-  --tt-blue-700: #0049d6;
-  --tt-blue-800: #bcd6ff;
-  --tt-blue-900: #d9e8ff;
-  --tt-blue-950: #eef5ff;
+  --tt-blue-50: #0c2654;
+  --tt-blue-100: #0a49c2;
+  --tt-blue-200: #0a5cff;
+  --tt-blue-300: #0a7cff;
+  --tt-blue-400: #0a8cff;
+  --tt-blue-500: #1f9fff;
+  --tt-blue-600: #0a8cff;
+  --tt-blue-700: #0a7cff;
+  --tt-blue-800: #a8e1ff;
+  --tt-blue-900: #d4f0ff;
+  --tt-blue-950: #ecf8ff;
 
   --tt-red-50: #450a0a;
   --tt-red-100: #991b1b;
@@ -66,6 +67,7 @@
     --background: #0e1218;
     --foreground: #f1f5f9;
     --surface: #161b23;
+    --ambient-strength: 26%;
 
     --tt-white: #ffffff;
     --tt-slate-50: #f8fafc;
@@ -80,17 +82,17 @@
     --tt-slate-900: #161b23;
     --tt-slate-950: #0e1218;
 
-    --tt-blue-50: #eef5ff;
-    --tt-blue-100: #d9e8ff;
-    --tt-blue-200: #bcd6ff;
-    --tt-blue-300: #8ebdff;
-    --tt-blue-400: #5a9bff;
-    --tt-blue-500: #1d6bff;
-    --tt-blue-600: #0a5cff;
-    --tt-blue-700: #0049d6;
-    --tt-blue-800: #003cad;
-    --tt-blue-900: #06338a;
-    --tt-blue-950: #0a2157;
+    --tt-blue-50: #ecf8ff;
+    --tt-blue-100: #d4f0ff;
+    --tt-blue-200: #a8e1ff;
+    --tt-blue-300: #6ccdff;
+    --tt-blue-400: #38b6ff;
+    --tt-blue-500: #1f9fff;
+    --tt-blue-600: #0a8cff;
+    --tt-blue-700: #0a7cff;
+    --tt-blue-800: #0a5cff;
+    --tt-blue-900: #0d3d8f;
+    --tt-blue-950: #0c2654;
 
     --tt-red-50: #fef2f2;
     --tt-red-100: #fee2e2;
@@ -408,6 +410,19 @@ body {
     -webkit-backdrop-filter: blur(16px) saturate(1.6);
     backdrop-filter: blur(16px) saturate(1.6);
     box-shadow: inset 0 1px 0 color-mix(in oklab, var(--tt-white) 8%, transparent);
+  }
+}
+
+/* 明るい表示では、すりガラスを白く半透明にし、ふちを白く光らせて透明感を出す。
+   層の外に書いて、bg-white/10 などの背景より優先させる。 */
+@media (prefers-color-scheme: light) {
+  .glass {
+    background-color: rgb(255 255 255 / 0.58);
+    border-color: rgb(255 255 255 / 0.9);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 1px 2px rgb(15 23 42 / 0.05),
+      0 10px 28px -16px rgb(10 140 255 / 0.35);
   }
 }
 

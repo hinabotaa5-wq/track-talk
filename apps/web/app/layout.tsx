@@ -18,6 +18,7 @@ import { ScreenLoader } from "@/components/screen-loader";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
 import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
@@ -112,6 +113,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Suspense fallback={null}>
             <PendingLinkReset />
           </Suspense>
+          <AmbientBackground />
           <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

@@ -68,7 +68,7 @@ export function senseDayLabel(day: string, now = new Date()) {
 }
 
 // 器の中の粒の色。アクセントの青の濃淡を少しずつ変えて、積み重なりが見えるようにする。
-const grainColors = ["#8ebdff", "#2f7bff", "#bcd6ff", "#5a9bff", "#0a5cff", "#d9e8ff"];
+const grainColors = ["#6ccdff", "#1f9fff", "#a8e1ff", "#38b6ff", "#0a7cff", "#d4f0ff"];
 
 export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];
