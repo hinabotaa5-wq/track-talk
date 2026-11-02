@@ -377,8 +377,8 @@ export function PostDetail({
               cancelPress();
               setMenuComment(c);
             }}
-            className={`min-w-0 max-w-full select-none rounded-3xl px-4 py-2.5 text-sm text-white transition-colors [-webkit-touch-callout:none] ${
-              c.mine ? "rounded-br-md bg-blue-500/70" : "rounded-bl-md border border-white/20 bg-white/15"
+            className={`min-w-0 max-w-full select-none rounded-3xl px-4 py-2.5 text-sm transition-colors [-webkit-touch-callout:none] ${
+              c.mine ? "rounded-br-md bg-blue-500 text-pure-white" : "rounded-bl-md border border-white/20 bg-white/15 text-white"
             } ${highlightId === c.id ? "ring-2 ring-blue-300" : ""}`}
           >
             {renderQuote(c)}

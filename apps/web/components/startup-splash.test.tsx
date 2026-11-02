@@ -22,12 +22,12 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-it("JavaScriptの実行前からヘッダーと同じ濃紺の中央にインラインロゴを描ける", () => {
+it("JavaScriptの実行前から画面の背景色(既定は白)の中央にインラインロゴを描ける", () => {
   const html = renderToStaticMarkup(<StartupSplash />);
   container.innerHTML = html;
   const splash = container.querySelector<HTMLElement>("#startup-splash")!;
   expect(splash.style.position).toBe("fixed");
-  expect(splash.style.background).toBe("rgb(22, 36, 58)");
+  expect(splash.style.background).toBe("var(--background, #ffffff)");
   expect(splash.style.placeItems).toBe("center");
   expect(splash.querySelectorAll("svg path")).toHaveLength(3);
   expect(splash.querySelector("img")).toBeNull();

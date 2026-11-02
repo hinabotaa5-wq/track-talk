@@ -70,7 +70,7 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
                 type="button"
                 autoFocus
                 onClick={() => setPending(null)}
-                className="h-11 rounded-full bg-blue-500 font-semibold text-white transition active:scale-[0.98]"
+                className="h-11 rounded-full bg-blue-500 font-semibold text-pure-white transition active:scale-[0.98]"
               >
                 入力を続ける
               </button>

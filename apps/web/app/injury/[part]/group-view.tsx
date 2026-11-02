@@ -98,7 +98,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       {cta}
     </div>
   );
-  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-[0.98]";
+  const ctaClass = "block w-full rounded-full bg-blue-600 py-3 text-center text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]";
 
   if (!loading && !session) {
     return intro(

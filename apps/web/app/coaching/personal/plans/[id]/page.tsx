@@ -29,7 +29,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
-    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 export default function ApplyCoachingPlanPage() {
@@ -159,7 +159,7 @@ export default function ApplyCoachingPlanPage() {
       {hasAvailability(plan.service_type) && (plan.full || !me.demo || !me.birth_month) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
 
       {plan.full ? (
-        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-white">
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-pure-white">
           このプランはいま満員です。空いたらまた申し込めます。
         </p>
       ) : !me.demo ? (
@@ -175,7 +175,7 @@ export default function ApplyCoachingPlanPage() {
           </p>
           <Link
             href="/me/coaching"
-            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
           >
             生まれた年月を登録する
           </Link>

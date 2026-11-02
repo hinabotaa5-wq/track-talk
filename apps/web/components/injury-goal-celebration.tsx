@@ -1,6 +1,7 @@
 "use client";
 
-const colors = ["#EF9F27", "#D4537E", "#378ADD", "#1D9E75", "#7F77DD", "#D85A30"];
+// 紙吹雪もアクセントの青の濃淡だけで作る。
+const colors = ["#2ec5ff", "#1f9fff", "#6ccdff", "#0a8cff", "#a8e1ff", "#0a5cff"];
 
 // 初めてゴールに着いたときの演出。紙吹雪は「動きを減らす」設定の人には出ない(CSS側で非表示)。
 export function InjuryGoalCelebration({ onClose }: { onClose: () => void }) {

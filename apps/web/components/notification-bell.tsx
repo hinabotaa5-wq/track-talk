@@ -140,7 +140,7 @@ export function NotificationBell() {
       >
         <Bell className="size-5" strokeWidth={2} aria-hidden />
         {unread > 0 ? (
-          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-xs leading-4 font-semibold text-white">
+          <span className="absolute top-1 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-xs leading-4 font-semibold text-pure-white">
             {badgeText(unread)}
           </span>
         ) : null}
@@ -150,7 +150,7 @@ export function NotificationBell() {
         anchorRef={rootRef}
         panelID={panelID}
         onClose={() => setOpen(false)}
-        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-[#16243a] shadow-xl"
+        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-surface shadow-xl"
       >
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
             <p className="text-sm font-semibold text-slate-100">通知</p>

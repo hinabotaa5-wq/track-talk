@@ -20,7 +20,7 @@ import { Suspense, useEffect, useState } from "react";
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] disabled:opacity-50 ${
-    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 // 返答が届いたあとの操作: ★の評価、「ここがわからなかった」（1回）、7日後の「役に立ちましたか」、通報。
@@ -170,7 +170,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
           type="button"
           disabled={pending}
           onClick={() => void pay(m)}
-          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
         >
           {reviewPayMethodLabels[m]}で払う
         </button>

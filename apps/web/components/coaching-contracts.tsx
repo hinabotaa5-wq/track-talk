@@ -131,7 +131,7 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
     <li className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-white">{contract.requester?.nickname ?? "名前なし"}さん</p>
-        {contract.minor ? <span className="rounded-full bg-amber-500/30 px-2 py-0.5 text-xs text-white">18歳未満</span> : null}
+        {contract.minor ? <span className="rounded-full bg-amber-500/30 px-2 py-0.5 text-xs text-pure-white">18歳未満</span> : null}
       </div>
       <ContractDetails contract={contract} />
       <p className="text-sm font-semibold text-white">{formatDateTime(contract.respond_by)}までに返事をしてください</p>

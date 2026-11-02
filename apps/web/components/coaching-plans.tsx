@@ -43,7 +43,7 @@ import { useEffect, useState } from "react";
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
-    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 function CoachPledgeForm({ token, onSaved }: { token: string | null; onSaved: (c: CoachApplication) => void }) {
@@ -605,7 +605,7 @@ export function CoachPlansSection({
                       </p>
                       <PlanIncludesList plan={p} />
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-white" : "bg-white/15 text-slate-300"}`}>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-pure-white" : "bg-white/15 text-slate-300"}`}>
                       {p.service_type === "video_review" ? "動画添削は出品終了" : p.published ? "公開中" : "非公開"}
                     </span>
                   </div>
@@ -674,7 +674,7 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
             ) : (
               <Link
                 href={`/coaching/personal/plans/${p.id}`}
-                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
               >
                 このプランに申し込む
               </Link>

@@ -170,7 +170,7 @@ function ProductLinkEditor({
         type="button"
         disabled={!dirty}
         onClick={() => onSave({ product_url: url.trim(), discontinued })}
-        className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40"
+        className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-pure-white disabled:opacity-40"
       >
         保存
       </button>
@@ -279,7 +279,7 @@ function ProductsAdmin({ token }: { token: string | null }) {
           公式ページURL（https、任意）
           <input className={input} value={productUrl} maxLength={500} onChange={(e) => setProductUrl(e.target.value)} />
         </label>
-        <button type="submit" disabled={pending} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <button type="submit" disabled={pending} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-pure-white disabled:opacity-50">
           {pending ? "登録中..." : "商品を登録"}
         </button>
         {message ? <p className="text-sm text-slate-200">{message}</p> : null}
@@ -338,7 +338,7 @@ function DemoCodesAdmin({ token }: { token: string | null }) {
     <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">添削デモの招待コード</h2>
-        <button type="button" onClick={() => void create()} className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+        <button type="button" onClick={() => void create()} className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-pure-white">
           コードを作る
         </button>
       </div>
@@ -494,7 +494,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
             key={s}
             type="button"
             onClick={() => setStatus(s)}
-            className={`rounded-full border px-4 py-1.5 text-sm ${status === s ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"}`}
+            className={`rounded-full border px-4 py-1.5 text-sm ${status === s ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"}`}
           >
             {coachStatusLabels[s]}
             {status === s ? ` (${total})` : ""}
@@ -653,7 +653,7 @@ export default function AdminPage() {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={`min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.98] ${
-              tab === t.id ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+              tab === t.id ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
             }`}
           >
             {t.label}{t.total >= 0 ? ` (${t.total})` : ""}

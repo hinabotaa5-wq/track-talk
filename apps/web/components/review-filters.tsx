@@ -62,7 +62,7 @@ export function ReviewFilterBar({ filters, onChange }: { filters: ReviewFilters;
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium ${
-            count > 0 ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+            count > 0 ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
           }`}
         >
           <SlidersHorizontal className="size-4" aria-hidden />

@@ -78,7 +78,7 @@ export function FeedbackBox() {
         panelID={panelID}
         rightShiftRem={3}
         onClose={() => setOpen(false)}
-        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-[#16243a] p-3 shadow-xl"
+        className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-surface p-3 shadow-xl"
       >
           <p className="text-balance text-sm font-semibold leading-snug text-slate-100">{prompt}</p>
           <form

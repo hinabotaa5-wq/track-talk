@@ -33,7 +33,7 @@ const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: ""
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
-    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 const statusNotes: Record<CoachApplication["status"], string> = {

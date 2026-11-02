@@ -75,7 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => answer(true)}
-                className="h-11 rounded-full bg-blue-500 font-semibold text-white transition active:scale-[0.98]"
+                className="h-11 rounded-full bg-blue-500 font-semibold text-pure-white transition active:scale-[0.98]"
               >
                 {open.confirmLabel}
               </button>

@@ -38,7 +38,7 @@ const maxBytes = 100 * 1024 * 1024;
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
-    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 export default function NewReviewRequestPage() {
@@ -244,7 +244,7 @@ export default function NewReviewRequestPage() {
           <p className="text-sm text-slate-200">先に生まれた年月を登録してください。18歳未満の人は保護者の同意が必要です。</p>
           <Link
             href="/me/coaching"
-            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
           >
             生まれた年月を登録する
           </Link>
@@ -266,7 +266,7 @@ export default function NewReviewRequestPage() {
               同意のお願いを再送する
             </Button>
           ) : !me.guardian ? (
-            <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white">
+            <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white">
               保護者にメールを送る
             </Link>
           ) : null}
