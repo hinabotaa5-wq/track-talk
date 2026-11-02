@@ -99,6 +99,24 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	// 退会すると報酬の行からコーチが外れて、まだ送金していない報酬を送れなくなる。
+	// 先に「コーチをやめる」で残りを最低額に関係なく送金し、送金が済んでから退会してもらう（支払いのないデモ版は除く）。
+	if s.stripe.Configured() {
+		summary, err := s.q.WithTx(tx).GetCoachEarningsSummary(r.Context(), &uid)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		var payoutOpen bool
+		if err := tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM coach_payouts WHERE coach_id=$1 AND status IN ('pending','failed'))`, uid).Scan(&payoutOpen); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if summary.UnpaidYen > 0 || payoutOpen {
+			Error(w, http.StatusConflict, "coach_earnings_unpaid", "まだ送金していないコーチの報酬があります。コーチとして活動中なら先に「コーチをやめる」を手続きしてください。残りの報酬は最低額に届かなくても次の月次の送金でお送りします。送金が済んでから退会してください")
+			return
+		}
+	}
 
 	// 消える行が使っている写真・動画は、コミットしたあとで Cloudinary からも消す。
 	mediaRows, err := s.q.WithTx(tx).ListAccountMedia(r.Context(), uid)
