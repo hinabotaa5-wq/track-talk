@@ -127,7 +127,7 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/monthly-reminder.sh
 
 Cloud Run Job `track-talk-db-backup` が毎日3時30分（日本時間、Cloud Scheduler）に DB を読み取り専用でダンプし、バックアップ用バケットの `database/` に置きます。日曜だけ、続けて Cloudinary の全メディアを `media/` に写します。バケットは30日で古いものを消します。コードは `deploy/cloud-run/db-backup/` にあります。
 
-使う設定は、`DATABASE_URL`（秘密 `track-talk-db-backup-url` への参照）、`BACKUP_BUCKET`、`CLOUDINARY_BACKUP`（秘密 `track-talk-cloudinary-backup` への参照。`cloud`・`key`・`secret` を持つ JSON で、Admin API の一覧と非公開メディアのダウンロードを使います）です。Cloudinary のキーを作り直したら、この秘密にも新しいバージョンを足してください。古いキーのままだとメディアだけが `http_status: 401` で失敗します。
+使う設定は、`DATABASE_URL`（秘密 `track-talk-db-backup-url` への参照）、`BACKUP_BUCKET`、`CLOUDINARY_BACKUP`（秘密 `track-talk-cloudinary-backup` への参照。`cloud`・`key`・`secret` を持つ JSON で、Admin API の一覧と非公開メディアのダウンロードを使います。認証は Admin API の宛先にだけ付け、公開メディアの配信 URL は認証なしで取得します）です。Cloudinary のキーを作り直したら、この秘密にも新しいバージョンを足してください。古いキーのままだとメディアだけが `http_status: 401` で失敗します。
 
 失敗ログ（`database_backup_failed`／`media_backup_failed`）には、エラーの種類・HTTP ステータス・宛先ホスト・どの段階か（`list`／`download`／`upload`／`manifest`）だけを残します。URL のクエリ・署名・応答本文・認証情報は残しません。
 
