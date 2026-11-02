@@ -1613,8 +1613,16 @@ func TestNotifications(t *testing.T) {
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &practicePost)
 
-	if items, unread := listNotifications(t, h, viewer); len(items) != 0 || unread != 0 {
-		t.Fatalf("practice and text should not notify, items=%+v unread=%d", items, unread)
+	// 練習相手の募集は本人以外の全員に知らせる。ふつうの投稿は知らせない。
+	if notes, _ := listNotifications(t, h, author); len(notesFor(notes, practicePost.ID, "recruitment_post")) != 0 {
+		t.Fatalf("author was notified of their own practice %+v", notes)
+	}
+	items, unread := listNotifications(t, h, viewer)
+	if len(items) != 1 || unread != 1 || len(notesFor(items, practicePost.ID, "recruitment_post")) != 1 {
+		t.Fatalf("practice should notify and text should not, items=%+v unread=%d", items, unread)
+	}
+	if rec = doJSON(t, h, http.MethodPost, "/v1/me/notifications/read", viewer, nil); rec.Code != 200 && rec.Code != 204 {
+		t.Fatalf("mark all read %d %s", rec.Code, rec.Body.String())
 	}
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
@@ -1659,7 +1667,7 @@ func TestNotifications(t *testing.T) {
 	if !listed {
 		t.Fatalf("recruitment missing from feed %+v", recruitmentFeed.Posts)
 	}
-	if len(notesFor(viewerNotes, practicePost.ID, "")) != 0 || len(notesFor(viewerNotes, textPost.ID, "")) != 0 {
+	if len(notesFor(viewerNotes, practicePost.ID, "")) != 1 || len(notesFor(viewerNotes, textPost.ID, "")) != 0 {
 		t.Fatalf("unexpected post notifications %+v", viewerNotes)
 	}
 
