@@ -30,7 +30,7 @@ export function CoachServicePlans({ services, plans }: { services: CoachingServi
             <button key={service} type="button" disabled={!enabled}
               aria-expanded={expanded} aria-controls={panelID}
               onClick={() => setSelected(expanded ? null : service)}
-              className={`flex min-h-20 w-full items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500 ${expanded ? "border-blue-400 bg-blue-500/20 text-white" : "border-white/20 bg-white/10 text-slate-100 enabled:hover:border-blue-400/60 enabled:hover:bg-white/15"}`}>
+              className={`flex min-h-20 w-full items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500 ${expanded ? "border-blue-400 bg-blue-500/20 text-pure-white" : "border-white/20 bg-white/10 text-slate-100 enabled:hover:border-blue-400/60 enabled:hover:bg-white/15"}`}>
               <Icon className={`size-6 shrink-0 ${enabled ? "text-blue-300" : "text-slate-500"}`} aria-hidden />
               <span className="min-w-0 flex-1 space-y-1">
                 <span className="block font-semibold">{coachingServiceLabels[service]}</span>

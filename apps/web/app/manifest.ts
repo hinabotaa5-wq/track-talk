@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "陸上競技を、もっと深く楽しむコミュニティ",
     start_url: "/",
     display: "standalone",
-    background_color: "#16243a",
-    theme_color: "#16243a",
+    background_color: "#ffffff",
+    theme_color: "#ffffff",
     lang: "ja",
     icons: [
       { src: "/icons/tracktalk-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

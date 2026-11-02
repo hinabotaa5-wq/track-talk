@@ -26,14 +26,14 @@ export function ViewSwitch<T extends string>({
       {views.map((item) => {
         const active = item.id === current;
         const className = `relative flex h-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200 active:scale-[0.98] ${
-          active ? "text-white" : "text-slate-200 hover:text-white"
+          active ? "text-pure-white" : "text-slate-200 hover:text-blue-300"
         }`;
         const inner = (
           <>
             {active ? (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-full bg-white/25"
+                className="absolute inset-0 rounded-full bg-blue-600"
                 transition={{ type: "spring", stiffness: 500, damping: 40 }}
                 aria-hidden
               />

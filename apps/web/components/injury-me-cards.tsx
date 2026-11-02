@@ -54,7 +54,7 @@ export function InjuryMeCards({ token }: { token: string | null }) {
         return (
           <div key={item.part} className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-              <HeartPulse className="size-6 shrink-0 text-rose-300" aria-hidden />
+              <HeartPulse className="size-6 shrink-0 text-blue-300" aria-hidden />
               <Link href={injuryGroupPath(item.part)} className="min-w-0 flex-1 hover:underline">
                 <p className="text-xs text-slate-300">いまのケガ</p>
                 <p className="font-bold">

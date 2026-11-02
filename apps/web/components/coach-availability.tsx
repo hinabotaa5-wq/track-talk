@@ -43,7 +43,7 @@ export function AvailabilityGrid({ today, days, selected = [], onSelect, editing
           <span className="block text-xl leading-6">{availabilityLabels[day.status].split(" ")[0]}</span>
           {day.note ? <span className="mt-0.5 block break-all text-[10px] leading-tight text-slate-200">{day.note}</span> : null}
         </>;
-        const style = `min-h-16 min-w-0 rounded-lg border px-0.5 py-1 text-center ${picked ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/15 bg-white/5 text-slate-100"}`;
+        const style = `min-h-16 min-w-0 rounded-lg border px-0.5 py-1 text-center ${picked ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/15 bg-white/5 text-slate-100"}`;
         return onSelect ? <button key={day.date} type="button" aria-label={`${availabilityDateLabel(day.date)} ${availabilityLabels[day.status]}${day.note ? ` ${day.note}` : ""}`} aria-pressed={picked}
           disabled={disabled || !selectable || (!editing && !picked && selected.length >= 3)} onClick={() => onSelect(day.date)} className={`${style} disabled:opacity-50`}>{content}</button>
           : <div key={day.date} className={style}>{content}</div>;

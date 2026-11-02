@@ -65,7 +65,7 @@ export default function MyReviewRequestsPage() {
       </ul>
       <Link
         href="/coaching/new"
-        className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+        className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
       >
         新しく頼む
       </Link>

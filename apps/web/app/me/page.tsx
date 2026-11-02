@@ -38,7 +38,7 @@ const menuRowClass =
 function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (
     <Link href={href} className={menuRowClass}>
-      <Icon className="size-4 shrink-0 text-slate-300" aria-hidden />
+      <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
       <span className="flex-1">{label}</span>
       <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
     </Link>
@@ -100,12 +100,12 @@ export default function MePage() {
           <MenuLink key={item.href} {...item} />
         ))}
         <Link href="/me/delete" className={menuRowClass}>
-          <UserX className="size-4 shrink-0 text-slate-300" aria-hidden />
+          <UserX className="size-4 shrink-0 text-blue-300" aria-hidden />
           <span className="flex-1">退会する</span>
           <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
         </Link>
         <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass}>
-          <LogOut className="size-4 shrink-0 text-slate-300" aria-hidden />
+          <LogOut className="size-4 shrink-0 text-blue-300" aria-hidden />
           <span className="flex-1">ログアウト</span>
         </button>
       </nav>

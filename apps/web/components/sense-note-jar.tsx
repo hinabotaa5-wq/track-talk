@@ -25,24 +25,24 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
       <svg viewBox="0 0 120 184" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
         <defs>
           <linearGradient id="sense-jar-glass" x1="0" x2="1">
-            <stop offset="0" stopColor="rgb(255 255 255 / 0.22)" />
-            <stop offset="0.5" stopColor="rgb(255 255 255 / 0.06)" />
-            <stop offset="1" stopColor="rgb(255 255 255 / 0.16)" />
+            <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--tt-white) 22%, transparent)" }} />
+            <stop offset="0.5" style={{ stopColor: "color-mix(in oklab, var(--tt-white) 6%, transparent)" }} />
+            <stop offset="1" style={{ stopColor: "color-mix(in oklab, var(--tt-white) 16%, transparent)" }} />
           </linearGradient>
           <linearGradient id="sense-jar-glow" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="rgb(125 211 252 / 0)" />
-            <stop offset="1" stopColor="rgb(125 211 252 / 0.28)" />
+            <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--tt-blue-400) 0%, transparent)" }} />
+            <stop offset="1" style={{ stopColor: "color-mix(in oklab, var(--tt-blue-400) 28%, transparent)" }} />
           </linearGradient>
           <clipPath id="sense-jar-inside">
             <path d="M22 44 Q14 50 14 64 V160 Q14 172 28 172 H92 Q106 172 106 160 V64 Q106 50 98 44 Z" />
           </clipPath>
         </defs>
-        <rect x="34" y="16" width="52" height="14" rx="5" fill="rgb(253 230 138 / 0.85)" />
-        <rect x="38" y="28" width="44" height="12" rx="3" fill="rgb(255 255 255 / 0.18)" />
+        <rect x="34" y="16" width="52" height="14" rx="5" style={{ fill: "var(--tt-blue-400)" }} />
+        <rect x="38" y="28" width="44" height="12" rx="3" style={{ fill: "color-mix(in oklab, var(--tt-white) 18%, transparent)" }} />
         <path
           d="M22 44 Q14 50 14 64 V160 Q14 172 28 172 H92 Q106 172 106 160 V64 Q106 50 98 44 Z"
           fill="url(#sense-jar-glass)"
-          stroke="rgb(255 255 255 / 0.55)"
+          style={{ stroke: "color-mix(in oklab, var(--tt-white) 40%, transparent)" }}
           strokeWidth="2.5"
         />
         <g clipPath="url(#sense-jar-inside)">
@@ -64,7 +64,7 @@ export function SenseNoteJar({ total, dropLatest = false, className = "" }: { to
             );
           })}
         </g>
-        <path d="M24 60 Q22 108 24 150" stroke="rgb(255 255 255 / 0.45)" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <path d="M24 60 Q22 108 24 150" style={{ stroke: "color-mix(in oklab, var(--tt-white) 30%, transparent)" }} strokeWidth="3" strokeLinecap="round" fill="none" />
       </svg>
       {filled > 0 ? (
         <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-xs font-bold text-slate-900 shadow">

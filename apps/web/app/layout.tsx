@@ -18,7 +18,6 @@ import { ScreenLoader } from "@/components/screen-loader";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
-import { AmbientBackground } from "@/components/ambient-background";
 import { InstallGuide } from "@/components/install-guide";
 import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
@@ -71,7 +70,11 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // 検索中の仮想キーボードは投稿一覧を縮めずに上から重ねる。
   interactiveWidget: "overlays-content",
-  themeColor: "#16243a",
+  // ヘッダーと同じ色。端末のダークモードに合わせて切り替える(globals.css の --background)。
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -109,7 +112,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Suspense fallback={null}>
             <PendingLinkReset />
           </Suspense>
-          <AmbientBackground />
           <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

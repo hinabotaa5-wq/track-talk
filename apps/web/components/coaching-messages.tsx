@@ -100,7 +100,7 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
     <li id={`message-${message.id}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
       <div
         className={`max-w-[85%] space-y-2 rounded-2xl p-3 text-sm ${
-          message.mine ? "bg-blue-600/60 text-white" : "border border-white/20 bg-white/10 text-slate-100"
+          message.mine ? "bg-blue-600/60 text-pure-white" : "border border-white/20 bg-white/10 text-slate-100"
         }`}
       >
         <p className="text-xs text-slate-300">

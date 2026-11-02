@@ -36,7 +36,7 @@ export function InjuryBodyMap({
                       r={9}
                       className={`animate-pulse motion-reduce:animate-none ${active ? "fill-blue-400/35" : "fill-orange-400/30"}`}
                     />
-                    <circle cx={spot.x} cy={spot.y} r={5.6} strokeWidth={1.2} className={`stroke-[#16243a] ${active ? "fill-blue-400" : "fill-orange-400"}`} />
+                    <circle cx={spot.x} cy={spot.y} r={5.6} strokeWidth={1.2} className={`stroke-background ${active ? "fill-blue-400" : "fill-orange-400"}`} />
                     <text x={spot.x} y={spot.y} textAnchor="middle" dominantBaseline="central" fontSize={6} fontWeight={700} className="pointer-events-none fill-white">
                       {members[spot.region]}
                     </text>

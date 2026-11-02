@@ -137,7 +137,7 @@ function MfaSetupRequired({ pathname }: { pathname: string }) {
       </p>
       <Link
         href={`/me/security?next=${encodeURIComponent(pathname)}`}
-        className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98]"
+        className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98]"
       >
         二段階認証を設定する
       </Link>
