@@ -87,7 +87,7 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", other, map[string]any{
 		"kind": "practice", "body": "残る練習です", "venue": "競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("practice %d %s", rec.Code, rec.Body.String())

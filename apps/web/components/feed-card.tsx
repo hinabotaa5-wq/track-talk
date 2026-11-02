@@ -5,6 +5,7 @@ import { PosterFallback } from "@/components/poster-card";
 import { InstagramThumb } from "@/components/instagram-thumb";
 import { isInstagramShortcode } from "@/lib/instagram";
 import { CardPending } from "@/components/card-pending";
+import { prefectureName } from "@/lib/prefectures";
 
 export const feedGridClass = "columns-2 gap-3";
 
@@ -65,7 +66,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
               <p className="line-clamp-1 text-sm font-bold text-slate-100 transition-colors group-hover:text-blue-400">{info.event_label}</p>
               <p>日付　{formatDate(info.starts_at)}</p>
               <p>時間　{formatPracticeTime(info.starts_at)}</p>
-              <p className="line-clamp-1">競技場　{info.venue}</p>
+              <p className="line-clamp-1">競技場　{info.prefecture ? `${prefectureName(info.prefecture)} ` : ""}{info.venue}</p>
               <p className="font-semibold">募集 {info.accepted_count}/{info.capacity}人</p>
             </div>
           ) : (

@@ -65,12 +65,14 @@ type recruitmentDTO struct {
 }
 
 type practiceDTO struct {
-	Venue         string     `json:"venue"`
-	StartsAt      time.Time  `json:"starts_at"`
-	Event         string     `json:"event"`
-	EventOther    string     `json:"event_other,omitempty"`
-	EventLabel    string     `json:"event_label"`
-	Capacity      int32      `json:"capacity"`
+	Venue      string    `json:"venue"`
+	StartsAt   time.Time `json:"starts_at"`
+	Event      string    `json:"event"`
+	EventOther string    `json:"event_other,omitempty"`
+	EventLabel string    `json:"event_label"`
+	Capacity   int32     `json:"capacity"`
+	// Prefecture は都道府県のコード。都道府県を持つ前の募集は空。
+	Prefecture    *string    `json:"prefecture"`
 	DissolvedAt   *time.Time `json:"dissolved_at,omitempty"`
 	AcceptedCount int32      `json:"accepted_count"`
 	Status        string     `json:"status"`

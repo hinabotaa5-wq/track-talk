@@ -159,6 +159,8 @@ export type Practice = {
   event_other?: string;
   event_label: string;
   capacity: number;
+  // 都道府県のコード("01"〜"47")。都道府県を持つ前の募集は null。
+  prefecture?: string | null;
   accepted_count: number;
   status: "open" | "full" | "dissolved";
   dissolved_at?: string;

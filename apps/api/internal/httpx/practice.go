@@ -19,6 +19,8 @@ type practiceInput struct {
 	Event      string
 	EventOther string
 	Capacity   int32
+	// Prefecture は都道府県のコード("01"〜"47")。地域と種目で一覧するのに使う。
+	Prefecture string
 }
 
 func validPracticeEvent(code string) bool {
@@ -67,12 +69,17 @@ func normalizePractice(req postReq) (practiceInput, map[string]string) {
 	if req.Capacity < 1 || req.Capacity > 99 {
 		fields["capacity"] = "募集人数は1〜99で入力してください"
 	}
+	prefecture, ok := parsePrefectureCode(req.Prefecture)
+	if !ok || prefecture == "00" {
+		fields["prefecture"] = "都道府県を選んでください"
+	}
 	return practiceInput{
 		Venue:      venue,
 		StartsAt:   starts,
 		Event:      event,
 		EventOther: other,
 		Capacity:   int32(req.Capacity),
+		Prefecture: prefecture,
 	}, fields
 }
 
@@ -90,6 +97,7 @@ func practiceFromDetail(row db.PracticeDetail, accepted int32) *practiceDTO {
 		EventOther:    row.EventOther,
 		EventLabel:    practiceLabel(row.Event, row.EventOther),
 		Capacity:      row.Capacity,
+		Prefecture:    row.Prefecture,
 		DissolvedAt:   row.DissolvedAt,
 		AcceptedCount: accepted,
 		Status:        status,
@@ -111,6 +119,7 @@ func savePractice(ctx context.Context, q *db.Queries, postID uuid.UUID, in pract
 		Event:      in.Event,
 		EventOther: in.EventOther,
 		Capacity:   in.Capacity,
+		Prefecture: &in.Prefecture,
 	})
 }
 

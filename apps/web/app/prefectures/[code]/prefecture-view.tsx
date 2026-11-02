@@ -9,6 +9,7 @@ import { BackButton } from "@/components/major-hosts-panel";
 import { apiFetch } from "@/lib/api";
 import { prefectureCompetitionsHref, type PrefecturePage } from "@/lib/prefecture-page";
 import { prefectureName } from "@/lib/prefectures";
+import { practiceListPath, practicePagePath, type PracticeList } from "@/lib/practice-list";
 import { competitionDates } from "../../competitions/regional/regional-view";
 
 function MoreLink({ href, total, shown }: { href: string; total: number; shown: number }) {
@@ -16,6 +17,27 @@ function MoreLink({ href, total, shown }: { href: string; total: number; shown: 
     <Link href={href} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
       {total > shown ? `もっと見る（全${total}件）` : "一覧で見る"}
     </Link>
+  );
+}
+
+// この県の練習相手募集。件数だけを取りに行き、一覧は /practice で見る。件数が取れなくてもリンクは出す。
+function PracticeSection({ code, name }: { code: string; name: string }) {
+  const [total, setTotal] = useState<number | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    apiFetch<PracticeList>(practiceListPath({ prefecture: code, event: "" }), { signal: controller.signal })
+      .then((list) => setTotal(list.total))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [code]);
+  return (
+    <section className="space-y-2">
+      <h2 className="text-lg font-semibold text-slate-100">{name}の練習相手募集</h2>
+      {total !== null ? <p className="text-sm text-slate-200">これからの募集 {total}件</p> : null}
+      <Link href={practicePagePath({ prefecture: code, event: "" })} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
+        募集を見る
+      </Link>
+    </section>
   );
 }
 
@@ -66,6 +88,7 @@ export function PrefectureView({ code, initialPage }: { code: string; initialPag
             )}
             <MoreLink href={prefectureCompetitionsHref(code, page.competitions[0]?.starts_on)} total={page.competition_total} shown={page.competitions.length} />
           </section>
+          <PracticeSection code={code} name={name} />
         </>
       )}
       <BackButton />

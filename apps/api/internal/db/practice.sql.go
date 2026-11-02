@@ -26,6 +26,32 @@ func (q *Queries) CountAcceptedApplications(ctx context.Context, postID uuid.UUI
 	return column_1, err
 }
 
+const countUpcomingPractice = `-- name: CountUpcomingPractice :one
+SELECT count(*)::int
+FROM practice_details d
+JOIN posts p ON p.id = d.post_id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND p.kind = 'practice'
+  AND d.dissolved_at IS NULL
+  AND d.starts_at > $1::timestamptz
+  AND ($2::text IS NULL OR d.prefecture = $2)
+  AND ($3::text IS NULL OR d.event = $3)
+`
+
+type CountUpcomingPracticeParams struct {
+	Now        time.Time `json:"now"`
+	Prefecture *string   `json:"prefecture"`
+	Event      *string   `json:"event"`
+}
+
+func (q *Queries) CountUpcomingPractice(ctx context.Context, arg CountUpcomingPracticeParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countUpcomingPractice, arg.Now, arg.Prefecture, arg.Event)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const dissolvePractice = `-- name: DissolvePractice :execrows
 UPDATE practice_details
 SET dissolved_at = now(),
@@ -110,7 +136,7 @@ func (q *Queries) GetPracticeApplicationByUser(ctx context.Context, arg GetPract
 }
 
 const getPracticeDetail = `-- name: GetPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = $1
 `
@@ -127,6 +153,7 @@ func (q *Queries) GetPracticeDetail(ctx context.Context, postID uuid.UUID) (Prac
 		&i.Capacity,
 		&i.DissolvedAt,
 		&i.Canceled,
+		&i.Prefecture,
 	)
 	return i, err
 }
@@ -355,7 +382,7 @@ func (q *Queries) ListPracticeApplications(ctx context.Context, postID uuid.UUID
 }
 
 const listPracticeDetails = `-- name: ListPracticeDetails :many
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = ANY($1::uuid[])
 `
@@ -378,6 +405,7 @@ func (q *Queries) ListPracticeDetails(ctx context.Context, postIds []uuid.UUID) 
 			&i.Capacity,
 			&i.DissolvedAt,
 			&i.Canceled,
+			&i.Prefecture,
 		); err != nil {
 			return nil, err
 		}
@@ -507,8 +535,122 @@ func (q *Queries) ListRatedApplicationIDs(ctx context.Context, arg ListRatedAppl
 	return items, nil
 }
 
+const listUpcomingPractice = `-- name: ListUpcomingPractice :many
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.x_post_id,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at,
+    d.starts_at
+FROM practice_details d
+JOIN posts p ON p.id = d.post_id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND p.kind = 'practice'
+  AND d.dissolved_at IS NULL
+  AND d.starts_at > $1::timestamptz
+  AND ($2::text IS NULL OR d.prefecture = $2)
+  AND ($3::text IS NULL OR d.event = $3)
+  AND (
+    $4::timestamptz IS NULL
+    OR (d.starts_at, p.id) > ($4::timestamptz, $5::uuid)
+  )
+ORDER BY d.starts_at, p.id
+LIMIT $6
+`
+
+type ListUpcomingPracticeParams struct {
+	Now        time.Time  `json:"now"`
+	Prefecture *string    `json:"prefecture"`
+	Event      *string    `json:"event"`
+	CursorTime *time.Time `json:"cursor_time"`
+	CursorID   *uuid.UUID `json:"cursor_id"`
+	LimitN     int32      `json:"limit_n"`
+}
+
+type ListUpcomingPracticeRow struct {
+	ID                  uuid.UUID `json:"id"`
+	AuthorID            uuid.UUID `json:"author_id"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Kind                string    `json:"kind"`
+	YoutubeVideoID      *string   `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
+	YoutubeShorts       bool      `json:"youtube_shorts"`
+	InstagramType       *string   `json:"instagram_type"`
+	InstagramShortcode  *string   `json:"instagram_shortcode"`
+	XPostID             *string   `json:"x_post_id"`
+	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
+	SourceTitle         *string   `json:"source_title"`
+	LikeCount           int32     `json:"like_count"`
+	CommentCount        int32     `json:"comment_count"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	StartsAt            time.Time `json:"starts_at"`
+}
+
+// 練習相手の一覧。これからの、解散していない募集を、日時の早い順に読む。都道府県と種目は空ならすべて。
+func (q *Queries) ListUpcomingPractice(ctx context.Context, arg ListUpcomingPracticeParams) ([]ListUpcomingPracticeRow, error) {
+	rows, err := q.db.Query(ctx, listUpcomingPractice,
+		arg.Now,
+		arg.Prefecture,
+		arg.Event,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.LimitN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUpcomingPracticeRow
+	for rows.Next() {
+		var i ListUpcomingPracticeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AuthorID,
+			&i.Title,
+			&i.Body,
+			&i.Kind,
+			&i.YoutubeVideoID,
+			&i.YoutubeThumbnailUrl,
+			&i.YoutubeShorts,
+			&i.InstagramType,
+			&i.InstagramShortcode,
+			&i.XPostID,
+			&i.CloudinaryPublicID,
+			&i.SourceTitle,
+			&i.LikeCount,
+			&i.CommentCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StartsAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPracticeDetail = `-- name: LockPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = $1
 FOR UPDATE
@@ -526,6 +668,7 @@ func (q *Queries) LockPracticeDetail(ctx context.Context, postID uuid.UUID) (Pra
 		&i.Capacity,
 		&i.DissolvedAt,
 		&i.Canceled,
+		&i.Prefecture,
 	)
 	return i, err
 }
@@ -592,10 +735,11 @@ func (q *Queries) UpdatePracticeApplicationStatus(ctx context.Context, arg Updat
 
 const upsertPracticeDetail = `-- name: UpsertPracticeDetail :exec
 INSERT INTO practice_details (
-    post_id, venue, starts_at, event, event_other, capacity
-) VALUES ($1, $2, $3, $4, $5, $6)
+    post_id, venue, starts_at, event, event_other, capacity, prefecture
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (post_id) DO UPDATE SET
     venue = EXCLUDED.venue,
+    prefecture = EXCLUDED.prefecture,
     starts_at = EXCLUDED.starts_at,
     event = EXCLUDED.event,
     event_other = EXCLUDED.event_other,
@@ -609,6 +753,7 @@ type UpsertPracticeDetailParams struct {
 	Event      string    `json:"event"`
 	EventOther string    `json:"event_other"`
 	Capacity   int32     `json:"capacity"`
+	Prefecture *string   `json:"prefecture"`
 }
 
 func (q *Queries) UpsertPracticeDetail(ctx context.Context, arg UpsertPracticeDetailParams) error {
@@ -619,6 +764,7 @@ func (q *Queries) UpsertPracticeDetail(ctx context.Context, arg UpsertPracticeDe
 		arg.Event,
 		arg.EventOther,
 		arg.Capacity,
+		arg.Prefecture,
 	)
 	return err
 }
