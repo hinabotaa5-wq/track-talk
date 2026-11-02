@@ -38,9 +38,21 @@ self.addEventListener("notificationclick", (event) => {
     // そのままトップを開く
   }
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
       for (const client of windows) {
         if (client.url === target.href && "focus" in client) return client.focus();
+      }
+      // アプリがすでに開いているときは、その画面を通知の行き先へ移す。
+      // (開いている画面を前に出すだけだと、行き先に飛ばない)
+      for (const client of windows) {
+        if (!("focus" in client) || !("navigate" in client)) continue;
+        try {
+          const focused = await client.focus();
+          const moved = await focused.navigate(target.href);
+          if (moved) return moved;
+        } catch {
+          // 移せなければ新しく開く
+        }
       }
       return self.clients.openWindow(target.href);
     }),

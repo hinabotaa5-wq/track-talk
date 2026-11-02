@@ -5,7 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Page from "./page";
 const fetch = vi.hoisted(() => vi.fn());
 vi.mock("@/components/auth-provider", () => ({useAuth:()=>({session:{},token:"test",loading:false})}));
-vi.mock("next/navigation", () => ({useRouter:()=>({push:vi.fn()})}));
+const search = vi.hoisted(() => ({tab: null as string | null}));
+vi.mock("next/navigation", () => ({useRouter:()=>({push:vi.fn()}),useSearchParams:()=>({get:(k:string)=>k==="tab"?search.tab:null})}));
 vi.mock("@/lib/api", () => ({apiFetch:fetch,apiErrorText:()=>"失敗"}));
 vi.mock("@/components/confirm-dialog", () => ({useConfirm:()=>vi.fn(),deleteConfirmOptions:vi.fn()}));
 vi.mock("@/components/sense-note-jar", () => ({SenseNoteJar:()=>null}));
@@ -17,6 +18,7 @@ const race = {id:"race",raced_on:"2026-10-24",event:"100m",event_label:"100m",ma
 let root:Root, container:HTMLDivElement;
 beforeEach(()=>{
  (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
+ search.tab=null;
  vi.useFakeTimers();vi.setSystemTime(new Date("2026-10-25T03:00:00Z"));
  fetch.mockReset();fetch.mockImplementation(async (path:string)=>path.includes("/race-records/pb-stats")?{events:[]}:path.includes("/me/race-records")?{records:[race],events:[{event:"100m",event_label:"100m",kind:"time",wind:true,count:1}]}:{notes:[{id:"note",day:"2026-10-24",body:"同じ日の練習の感覚",event:null,event_label:null}],stats,next_cursor:null});
  container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);
@@ -35,4 +37,11 @@ it("感覚と記録のタブで同じ日・月とメモ・記録を共有し、�
  await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="前の月"]')!.click());
  await act(async()=>[...container.querySelectorAll("nav button")].find((b)=>b.textContent==="感覚")!.dispatchEvent(new MouseEvent("click",{bubbles:true})));
  expect(container.textContent).toContain("2026年9月");
+});
+it("記録のお知らせから /memo?tab=records を開くと、メモを開いたままでも記録タブに切り替わる",async()=>{
+ await act(async()=>root.render(<Page/>));
+ expect(container.querySelector('input[type="date"]')).toBeNull();
+ search.tab="records";
+ await act(async()=>root.render(<Page/>));
+ expect(container.querySelector('input[type="date"]')).not.toBeNull();
 });

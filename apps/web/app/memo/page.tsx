@@ -2,8 +2,8 @@
 
 import { PageLoading } from "@/components/page-loading";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type SyntheticEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type SyntheticEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ErrorState } from "@/components/empty-state";
 import { RaceRecordsPanel } from "@/components/race-records";
@@ -25,8 +25,17 @@ const guestStats: SenseNoteStats = { total: 0, days: 0, streak: 0, today: 0 };
 const loginPath = "/login?next=/memo";
 
 export default function MySenseNotesPage() {
+  return (
+    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+      <MySenseNotes />
+    </Suspense>
+  );
+}
+
+function MySenseNotes() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
+  const requestedTab = useSearchParams().get("tab");
   const [notes, setNotes] = useState<SenseNote[] | null>(null);
   const [stats, setStats] = useState<SenseNoteStats | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -52,11 +61,12 @@ export default function MySenseNotesPage() {
     router.push(loginPath);
   }
 
-  // 月1回の記録のお知らせ(プッシュ通知)は /memo?tab=records を開く。
+  // 月1回の記録のお知らせ(プッシュ通知・ベル)は /memo?tab=records を開く。
+  // すでにメモを開いているときも切り替わるよう、URL の変化を見る。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (new URLSearchParams(window.location.search).get("tab") === "records") setTab("records");
-  }, []);
+    if (requestedTab === "records") setTab("records");
+  }, [requestedTab]);
 
   useEffect(() => {
     if (!token) return;
