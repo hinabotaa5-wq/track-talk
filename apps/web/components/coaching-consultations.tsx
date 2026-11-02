@@ -40,7 +40,7 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <p className="text-xs text-slate-300">コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。</p>
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} />)}
     {!coachingMessagingEnabled ? <p className="text-xs text-slate-300">{messagingClosedNote}</p> : null}
-    {coachingMessagingEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} draft={draft} roomPath={roomPath} token={token} funding={data.funding} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
+    {coachingMessagingEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} funding={data.funding} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
     {coachingMessagingEnabled && !data.can_purchase && data.role === "requester" && !draft ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
@@ -54,8 +54,8 @@ async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (uploaded.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
   return uploaded.public_id;
 }
-function ConsultationDraft({ draft, roomPath, token, funding, price, requiresVideo, returnPath, reload }: {
-  draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
+function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requiresVideo, returnPath, reload }: {
+  kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
 }) {
   const [body, setBody] = useState(draft?.question ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -81,6 +81,7 @@ function ConsultationDraft({ draft, roomPath, token, funding, price, requiresVid
   }
   return <div className="space-y-3">
     <p className="text-sm font-semibold">{funding === "ticket" ? `チケット1枚（${formatYen(price)}相当）` : formatYen(price)} / 質問1件と回答1件</p>
+    <ConsultationTermsNote kind={kind} />
     <Textarea aria-label="追加相談の質問" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder="新しく相談したいこと" />
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}
@@ -88,6 +89,19 @@ function ConsultationDraft({ draft, roomPath, token, funding, price, requiresVid
     <Button type="button" disabled={pending || !body.trim() && !file && !videoID} onClick={() => void submit()}>{pending ? "保存・送信中…" : funding === "ticket" ? "質問する（チケット1枚）" : `質問する（${formatYen(price)}）`}</Button>
     {buy ? <Link className="block text-sm text-blue-300 underline" href={`/me/coaching/tickets?return_to=${encodeURIComponent(returnPath)}`}>チケットを購入して、この部屋へ戻る</Link> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
+  </div>;
+}
+// 購入の前に、1回の購入で相談できる範囲と、契約の相手・支払い先を示す（利用規約の第6条と第8条に合わせる）。
+export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" }) {
+  if (kind === "review") {
+    return <div className="space-y-1 text-xs leading-5 text-slate-300">
+      <p>追加相談は、この添削を担当したコーチへの、添削の内容についての相談です。1回の購入で相談できるのは、新しい質問1件とコーチの回答1件の1回限りです（回答への確認は7日以内に1回無料）。さらに相談するときは、改めて購入してください。</p>
+      <p>提供者とお支払い先は TrackTalk の運営者で、相談への回答は運営者がコーチに委託して行います。料金・キャンセル・返金は運営者が責任を持って対応します。</p>
+    </div>;
+  }
+  return <div className="space-y-1 text-xs leading-5 text-slate-300">
+    <p>このプランの追加相談の契約の相手はコーチで、料金もコーチが決めます。1回の購入で相談できるのは、新しい質問1件とコーチの回答1件の1回限りです（回答への確認は7日以内に1回無料）。さらに相談するときは、改めて購入してください。</p>
+    <p>代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。</p>
   </div>;
 }
 function ConsultationCard({ consultation: c, role, base, token, guardian, reload }: { consultation: Consultation; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void> }) {

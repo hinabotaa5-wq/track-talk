@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -147,5 +148,61 @@ func TestCoachWithdrawNeedsPayoutAccountForUnpaidEarnings(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody())
 	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "payouts_not_ready") {
 		t.Fatalf("withdraw without payout account %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 最低額に届かない報酬は、承認済みのあいだは繰り越すが、コーチをやめると次の月次の送金で1回だけ全額を送る。
+// 送金が済むまでは退会できず、送金を何度押しても二重には送らない。
+func TestCoachWithdrawPaysSmallBalanceOnceBeforeAccountDelete(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	tadmin := adminToken(t, h)
+	id, tc := onDutyCoach(t, h, tadmin)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+		VALUES (gen_random_uuid(), $1, 'review', 1500, 70, 1050, `+lastMonthJST+`)`, id)
+	run := func() string {
+		rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("run %d %s", rec.Code, rec.Body.String())
+		}
+		return rec.Body.String()
+	}
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
+		t.Fatalf("approved coach below minimum should carry over %s", out)
+	}
+	deleteMe := func() *httptest.ResponseRecorder {
+		return doJSON(t, h, http.MethodDelete, "/v1/me", tc, map[string]string{"confirm": "退会する"})
+	}
+	if rec := deleteMe(); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "coach_earnings_unpaid") {
+		t.Fatalf("delete with unpaid earnings %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody()); rec.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	if out := run(); !strings.Contains(out, `"created":1,"paid":1`) {
+		t.Fatalf("final payout after withdraw %s", out)
+	}
+	for i := 0; i < 2; i++ {
+		if out := run(); !strings.Contains(out, `"created":0,"paid":0`) {
+			t.Fatalf("payout run repeated %s", out)
+		}
+	}
+	if got := f.transferList(); len(got) != 1 || got[0].Get("amount") != "1050" {
+		t.Fatalf("transfers %v", got)
+	}
+	if rec := deleteMe(); rec.Code != http.StatusOK {
+		t.Fatalf("delete after final payout %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 送金に失敗して残っている送金があるあいだも退会できない。
+func TestAccountDeleteBlockedByFailedCoachPayout(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	tadmin := adminToken(t, h)
+	id, tc := onDutyCoach(t, h, tadmin)
+	execSQLArgs(t, `INSERT INTO coach_payouts (id, coach_id, month, amount_yen, status) VALUES (gen_random_uuid(), $1, date_trunc('month', now())::date, 3000, 'failed')`, id)
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tc, map[string]string{"confirm": "退会する"}); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "coach_earnings_unpaid") {
+		t.Fatalf("delete with failed payout %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -114,7 +114,7 @@ export default function DeleteAccountPage() {
           <Link href="/coach/withdraw" className="text-blue-300 underline">
             コーチをやめる
           </Link>
-          から手続きすると、アカウントは残ります。
+          から手続きすると、アカウントは残ります。まだ送金していないコーチの報酬があるあいだは退会できません。先にコーチをやめると、残りの報酬は最低額に届かなくても次の月次の送金でお送りします。送金が済んでから退会してください。
         </p>
       ) : null}
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
