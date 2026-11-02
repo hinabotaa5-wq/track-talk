@@ -13,11 +13,13 @@ import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
 import { LastTabRestorer } from "@/components/last-tab-restorer";
 import { lastTabStartupScript } from "@/lib/last-tab";
 import { pendingLinkStartupScript } from "@/lib/pending-link-startup";
+import { themeColors, themeStartupScript } from "@/lib/theme";
 import { PendingLinkReset } from "@/components/pending-link-reset";
 import { ScreenLoader } from "@/components/screen-loader";
 import { CompetitionPrefetch } from "@/components/competition-prefetch";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { ThemeSync } from "@/components/theme-sync";
 import { InstallGuide } from "@/components/install-guide";
 import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
@@ -72,8 +74,8 @@ export const viewport: Viewport = {
   interactiveWidget: "overlays-content",
   // ヘッダーと同じ色。端末のダークモードに合わせて切り替える(globals.css の --background)。
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: themeColors.light },
+    { media: "(prefers-color-scheme: dark)", color: themeColors.dark },
   ],
 };
 
@@ -82,8 +84,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   preconnect("https://thumb.wikimedia.org");
 
   return (
-    <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="ja" suppressHydrationWarning className={`${geistSans.variable} h-full antialiased`}>
       <head>
+        {/* マイページで選んだ表示(ライト・ダーク)を、画面を描く前に当てる。 */}
+        <script dangerouslySetInnerHTML={{ __html: themeStartupScript }} />
         <script dangerouslySetInnerHTML={{ __html: pendingLinkStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
@@ -112,6 +116,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Suspense fallback={null}>
             <PendingLinkReset />
           </Suspense>
+          <ThemeSync />
           <CompetitionPrefetch />
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

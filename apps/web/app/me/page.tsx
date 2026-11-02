@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ThemeSwitch } from "@/components/theme-switch";
 
 const accountLinks = [
   { href: "/me/posts", label: "自分の投稿", icon: LayoutGrid },
@@ -90,6 +91,7 @@ export default function MePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-xl font-bold text-slate-100">マイページ</h1>
+      <ThemeSwitch />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {profile?.is_admin ? <MenuLink href="/admin" label="アプリ管理" icon={Shield} /> : null}
         {accountLinks.map((item) => (

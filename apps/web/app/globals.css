@@ -3,7 +3,8 @@
 /* 配色(白基調+ロゴの青だけをアクセントに)
    画面のクラスは濃い背景の上に白い文字を置く前提で書かれている(text-white, bg-white/10, text-slate-300 など)。
    クラスを書き換えず、明るい表示では白と灰色の段階を裏返して、同じクラスが白地に濃い文字になるようにする。
-   背景は明るい表示では真っ白、端末がダークモードのときは真っ黒にする(色はのせない)。
+   背景は明るい表示では真っ白、暗い表示では少し明るい黒(#121212)にする(色はのせない)。
+   どちらにするかは端末の設定に合わせるのが基本。マイページで選ぶと html の data-theme(light / dark)で固定する(lib/theme.ts)。
    アクセントはロゴの青(#2ec5ff〜#0a5cff の真ん中あたりの水色寄りの青)だけ。水色・紫・緑などの別の色はすべて同じ青に寄せる。赤(エラー)と黄(注意)だけ残す。
    どちらの表示でも白のままにしたい文字(青いボタンや写真の上の文字)は text-pure-white を使う。 */
 :root {
@@ -61,11 +62,66 @@
   --tt-amber-950: #fffbeb;
 }
 
+:root[data-theme="dark"] {
+  --background: #121212;
+  --foreground: #f1f5f9;
+  --surface: #1c1c1e;
+
+  --tt-white: #ffffff;
+  --tt-slate-50: #f8fafc;
+  --tt-slate-100: #f1f5f9;
+  --tt-slate-200: #e2e8f0;
+  --tt-slate-300: #cbd5e1;
+  --tt-slate-400: #94a3b8;
+  --tt-slate-500: #64748b;
+  --tt-slate-600: #475569;
+  --tt-slate-700: #334155;
+  --tt-slate-800: #1e293b;
+  --tt-slate-900: #1c1c1e;
+  --tt-slate-950: #121212;
+
+  --tt-blue-50: #ecf8ff;
+  --tt-blue-100: #d4f0ff;
+  --tt-blue-200: #a8e1ff;
+  --tt-blue-300: #6ccdff;
+  --tt-blue-400: #38b6ff;
+  --tt-blue-500: #1f9fff;
+  --tt-blue-600: #0a8cff;
+  --tt-blue-700: #0a7cff;
+  --tt-blue-800: #0a5cff;
+  --tt-blue-900: #0d3d8f;
+  --tt-blue-950: #0c2654;
+
+  --tt-red-50: #fef2f2;
+  --tt-red-100: #fee2e2;
+  --tt-red-200: #fecaca;
+  --tt-red-300: #fca5a5;
+  --tt-red-400: #f87171;
+  --tt-red-500: #ef4444;
+  --tt-red-600: #dc2626;
+  --tt-red-700: #b91c1c;
+  --tt-red-800: #991b1b;
+  --tt-red-900: #7f1d1d;
+  --tt-red-950: #450a0a;
+
+  --tt-amber-50: #fffbeb;
+  --tt-amber-100: #fef3c7;
+  --tt-amber-200: #fde68a;
+  --tt-amber-300: #fcd34d;
+  --tt-amber-400: #fbbf24;
+  --tt-amber-500: #f59e0b;
+  --tt-amber-600: #d97706;
+  --tt-amber-700: #b45309;
+  --tt-amber-800: #92400e;
+  --tt-amber-900: #78350f;
+  --tt-amber-950: #451a03;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #000000;
+  :root:not([data-theme="light"]) {
+    --background: #121212;
     --foreground: #f1f5f9;
-    --surface: #141414;
+    --surface: #1c1c1e;
 
     --tt-white: #ffffff;
     --tt-slate-50: #f8fafc;
@@ -77,8 +133,8 @@
     --tt-slate-600: #475569;
     --tt-slate-700: #334155;
     --tt-slate-800: #1e293b;
-    --tt-slate-900: #141414;
-    --tt-slate-950: #000000;
+    --tt-slate-900: #1c1c1e;
+    --tt-slate-950: #121212;
 
     --tt-blue-50: #ecf8ff;
     --tt-blue-100: #d4f0ff;
@@ -120,6 +176,12 @@
 
 html {
   color-scheme: light dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 /* iPhone で上端を越えて引っ張ると、ヘッダーごと下にずれて、上に後ろの空色の模様がのぞく。
@@ -413,8 +475,15 @@ body {
 
 /* 明るい表示では、すりガラスを白く半透明にし、青みの影で透明感を出す。
    層の外に書いて、bg-white/10 などの背景より優先させる。 */
+:root[data-theme="light"] .glass {
+  background-color: rgb(255 255 255 / 0.58);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 1px 2px rgb(15 23 42 / 0.05),
+    0 10px 28px -16px rgb(10 140 255 / 0.35);
+}
 @media (prefers-color-scheme: light) {
-  .glass {
+  :root:not([data-theme="dark"]) .glass {
     background-color: rgb(255 255 255 / 0.58);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.9),
