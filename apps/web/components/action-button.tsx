@@ -32,7 +32,7 @@ export function LikeButton({
       className={cn(
         actionClass,
         liked
-          ? "bg-rose-950/60 text-rose-300 border border-rose-800/60 hover:bg-rose-900/60"
+          ? "bg-blue-950/60 text-blue-300 border border-blue-800/60 hover:bg-blue-900/60"
           : idleClass
       )}
     >
@@ -45,7 +45,7 @@ export function LikeButton({
         <Heart
           className={cn(
             "size-4 transition-colors",
-            liked ? "fill-rose-500 text-rose-400" : "text-slate-200"
+            liked ? "fill-blue-500 text-blue-400" : "text-slate-200"
           )}
         />
       </motion.span>

@@ -101,7 +101,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           </p>
           <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
             <span>TrackTalk</span>
-            <span className="font-semibold text-rose-300">わかる {post.like_count}</span>
+            <span className="font-semibold text-blue-300">わかる {post.like_count}</span>
           </div>
         </div>
         <CardPending />
