@@ -49,7 +49,7 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 	defer srv.Close()
 	s := testSender(t)
 	sub := testSubscription(t, srv.URL+"/push/abc")
-	msg := Message{Title: "添削の依頼が届きました", Body: "30分以内に引き受けてください", URL: "/coach"}
+	msg := Message{Title: "添削の依頼が届きました", Body: "90分以内に引き受けてください", URL: "/coach"}
 	ctx := context.Background()
 
 	if err := s.Send(ctx, sub, msg, time.Minute); err != nil {

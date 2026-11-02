@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# フォーム添削の tick（打診の30分切れ・返却目安切れの処理）を Cloud Scheduler から1分ごとに呼ぶ設定。
+# フォーム添削の tick（打診の引受期限（90分）切れ・返却目安切れの処理）を Cloud Scheduler から1分ごとに呼ぶ設定。
 # setup.sh のあと、Cloud Shell で一度だけ流す。流し直すと秘密の値を作り直して上書きする。
 #   PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
 set -euo pipefail

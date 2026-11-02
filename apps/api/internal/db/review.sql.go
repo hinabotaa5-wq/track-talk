@@ -327,7 +327,7 @@ WHERE r.id = stale.request_id
 RETURNING r.id
 `
 
-// 30分のうちに返事がなかった打診を閉じ、依頼を待ちに戻す。
+// 引受期限（90分、夜間は数えない）までに返事がなかった打診を閉じ、依頼を待ちに戻す。
 func (q *Queries) ExpireStaleReviewOffers(ctx context.Context) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, expireStaleReviewOffers)
 	if err != nil {

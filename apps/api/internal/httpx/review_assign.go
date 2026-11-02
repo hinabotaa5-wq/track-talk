@@ -90,7 +90,7 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err != nil {
 		return false, err
 	}
-	// 引受期限は30分（日本時間の23時〜翌7時は数えない）。
+	// 引受期限は90分（日本時間の23時〜翌7時は数えない）。
 	// 通常は返却期限よりずっと前に来るが、コーチが受付を止めていて打診が遅れた依頼でも返却期限は越えない。
 	expires := offerExpiresAt(now, offerWindow)
 	if expires.After(rr.DueAt) {
@@ -187,7 +187,7 @@ type coachingTickResult struct {
 	GuardianNoticesSent int `json:"guardian_notices_sent"`
 }
 
-// runCoachingTick は、返却目安を過ぎた依頼と、引受期限（30分、夜間は数えない）を過ぎた打診を片付け、待ちの依頼を打診する。
+// runCoachingTick は、返却目安を過ぎた依頼と、引受期限（90分、夜間は数えない）を過ぎた打診を片付け、待ちの依頼を打診する。
 // 返却から7日たった返答には「役に立ちましたか」を聞く。パーソナル指導の申し込みの期限切れと、期間の終わりも片付ける。
 func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error) {
 	var out coachingTickResult
