@@ -487,6 +487,11 @@ body:has(a[data-screen-loader][data-boot-pending]) .screen-loader {
   height: auto;
   overflow: visible;
 }
+/* 画面の真ん中に出すとき(タブ移動中・ページ全体の読み込み中)は大きくする。カードの中の表示は小さいまま。 */
+.screen-loader .screen-loader-watch,
+.page-loading-screen .screen-loader-watch {
+  width: 8rem;
+}
 .screen-loader-crown {
   fill: color-mix(in oklab, var(--tt-white) 40%, transparent);
 }
