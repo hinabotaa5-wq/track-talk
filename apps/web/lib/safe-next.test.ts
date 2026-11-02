@@ -26,6 +26,13 @@ describe("safeNextPath", () => {
   it("does not loop back to the login page", () => {
     expect(safeNextPath("/login")).toBe("/");
     expect(safeNextPath("/login?next=/me")).toBe("/");
+    expect(safeNextPath("/./login")).toBe("/");
+  });
+
+  it("returns only a same-origin path after URL parsing", () => {
+    expect(safeNextPath("/me#records")).toBe("/me#records");
+    expect(safeNextPath("/%2F%2Fevil.example")).toBe("/%2F%2Fevil.example");
+    expect(safeNextPath("/../me")).toBe("/me");
   });
 
   it("reads a same-site return path from a cookie", () => {
