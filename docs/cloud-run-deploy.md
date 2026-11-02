@@ -123,6 +123,30 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/monthly-reminder.sh
 
 秘密の値を作って API の `REMINDER_SECRET` に入れ、同じ値をヘッダーに付けて `/internal/monthly-reminder` を呼ぶジョブ `track-talk-monthly-reminder` を作ります。送った月は `monthly_reminders` に残り、同じ月に呼び直しても二度は送りません。止めるときは `gcloud scheduler jobs pause track-talk-monthly-reminder --location asia-northeast1`。
 
+## DB とメディアのバックアップ
+
+Cloud Run Job `track-talk-db-backup` が毎日3時30分（日本時間、Cloud Scheduler）に DB を読み取り専用でダンプし、バックアップ用バケットの `database/` に置きます。日曜だけ、続けて Cloudinary の全メディアを `media/` に写します。バケットは30日で古いものを消します。コードは `deploy/cloud-run/db-backup/` にあります。
+
+使う設定は、`DATABASE_URL`（秘密 `track-talk-db-backup-url` への参照）、`BACKUP_BUCKET`、`CLOUDINARY_BACKUP`（秘密 `track-talk-cloudinary-backup` への参照。`cloud`・`key`・`secret` を持つ JSON で、Admin API の一覧と非公開メディアのダウンロードを使います）です。Cloudinary のキーを作り直したら、この秘密にも新しいバージョンを足してください。古いキーのままだとメディアだけが `http_status: 401` で失敗します。
+
+失敗ログ（`database_backup_failed`／`media_backup_failed`）には、エラーの種類・HTTP ステータス・宛先ホスト・どの段階か（`list`／`download`／`upload`／`manifest`）だけを残します。URL のクエリ・署名・応答本文・認証情報は残しません。
+
+イメージを更新するときは次のとおりです。
+
+```bash
+docker build --platform linux/amd64 -t asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/db-backup:<日付-版> deploy/cloud-run/db-backup
+docker push asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/db-backup:<日付-版>
+gcloud run jobs update track-talk-db-backup --region asia-northeast1 --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/db-backup:<日付-版>
+```
+
+日曜以外にメディアまで確かめるときは、その実行だけ `MEDIA_BACKUP_FORCE=1` を付けて手動で流します。
+
+```bash
+gcloud run jobs execute track-talk-db-backup --region asia-northeast1 --update-env-vars MEDIA_BACKUP_FORCE=1 --wait
+```
+
+`database_backup_completed` と `media_backup_completed` の両方が出れば成功です。手元のテストは `cd deploy/cloud-run/db-backup && python3 -m unittest test_backup` です。
+
 ## トラブル
 
 - **画面が「読み込みに失敗しました」「通信に失敗しました」になるのに、API のログには `200` が出ている**: API の `CORS_ORIGINS` に、サイトの URL が入っていない。ブラウザが API の返事を捨てている。次で直す（URL は `https://` から始め、最後に `/` を付けない。複数あるときは、カンマで区切って、コマンドの引数を `"^@^CORS_ORIGINS=https://a.example,https://b.example"` のように書く。先頭の `^@^` は、値の中のカンマを許すための指定）
