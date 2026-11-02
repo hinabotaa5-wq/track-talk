@@ -1,26 +1,27 @@
 -- name: UpsertPracticeDetail :exec
 INSERT INTO practice_details (
-    post_id, venue, starts_at, event, event_other, capacity
-) VALUES ($1, $2, $3, $4, $5, $6)
+    post_id, venue, starts_at, event, event_other, capacity, prefecture
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (post_id) DO UPDATE SET
     venue = EXCLUDED.venue,
+    prefecture = EXCLUDED.prefecture,
     starts_at = EXCLUDED.starts_at,
     event = EXCLUDED.event,
     event_other = EXCLUDED.event_other,
     capacity = EXCLUDED.capacity;
 
 -- name: GetPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = $1;
 
 -- name: ListPracticeDetails :many
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = ANY(sqlc.arg('post_ids')::uuid[]);
 
 -- name: LockPracticeDetail :one
-SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled
+SELECT post_id, venue, starts_at, event, event_other, capacity, dissolved_at, canceled, prefecture
 FROM practice_details
 WHERE post_id = $1
 FOR UPDATE;
@@ -152,3 +153,52 @@ JOIN practice_applications a ON a.id = r.application_id
 WHERE r.ratee_id = a.user_id
   AND a.user_id = ANY(sqlc.arg('user_ids')::uuid[])
 GROUP BY a.user_id;
+
+-- name: ListUpcomingPractice :many
+-- 練習相手の一覧。これからの、解散していない募集を、日時の早い順に読む。都道府県と種目は空ならすべて。
+SELECT
+    p.id,
+    p.author_id,
+    p.title,
+    p.body,
+    p.kind,
+    p.youtube_video_id,
+    p.youtube_thumbnail_url,
+    p.youtube_shorts,
+    p.instagram_type,
+    p.instagram_shortcode,
+    p.x_post_id,
+    p.cloudinary_public_id,
+    p.source_title,
+    p.like_count,
+    p.comment_count,
+    p.created_at,
+    p.updated_at,
+    d.starts_at
+FROM practice_details d
+JOIN posts p ON p.id = d.post_id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND p.kind = 'practice'
+  AND d.dissolved_at IS NULL
+  AND d.starts_at > sqlc.arg('now')::timestamptz
+  AND (sqlc.narg('prefecture')::text IS NULL OR d.prefecture = sqlc.narg('prefecture'))
+  AND (sqlc.narg('event')::text IS NULL OR d.event = sqlc.narg('event'))
+  AND (
+    sqlc.narg('cursor_time')::timestamptz IS NULL
+    OR (d.starts_at, p.id) > (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid)
+  )
+ORDER BY d.starts_at, p.id
+LIMIT sqlc.arg('limit_n');
+
+-- name: CountUpcomingPractice :one
+SELECT count(*)::int
+FROM practice_details d
+JOIN posts p ON p.id = d.post_id
+WHERE p.deleted_at IS NULL
+  AND p.hidden_at IS NULL
+  AND p.kind = 'practice'
+  AND d.dissolved_at IS NULL
+  AND d.starts_at > sqlc.arg('now')::timestamptz
+  AND (sqlc.narg('prefecture')::text IS NULL OR d.prefecture = sqlc.narg('prefecture'))
+  AND (sqlc.narg('event')::text IS NULL OR d.event = sqlc.narg('event'));

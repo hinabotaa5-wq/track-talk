@@ -853,7 +853,7 @@ function PracticeFacts({ post }: { post: Post }) {
   const info = post.practice;
   if (!info) return null;
   const rows = [
-    { label: "練習場所", value: info.venue },
+    { label: "練習場所", value: info.prefecture ? `${prefectureName(info.prefecture)} ${info.venue}` : info.venue },
     { label: "練習日時", value: formatDateTime(info.starts_at) },
     { label: "種目", value: info.event_label },
     { label: "募集人数", value: `${info.accepted_count}/${info.capacity}人` },

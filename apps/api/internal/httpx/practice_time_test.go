@@ -20,7 +20,7 @@ func TestPracticeUpdateRejectsPastStart(t *testing.T) {
 	starts := time.Now().In(loc).Add(48 * time.Hour).Truncate(time.Minute)
 	payload := map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 3,
+		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 3, "prefecture": "13",
 	}
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, payload)
 	if rec.Code != http.StatusCreated {
@@ -77,7 +77,7 @@ func TestPracticeClosesApplicationsAfterStart(t *testing.T) {
 	host := token(t, uuid.New())
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
-		"starts_at": time.Now().Add(48 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 3,
+		"starts_at": time.Now().Add(48 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 3, "prefecture": "13",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -119,7 +119,7 @@ func TestPracticeDissolvedBeforeStartCannotBeRated(t *testing.T) {
 	guest := token(t, uuid.New())
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
-		"starts_at": time.Now().Add(48 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 3,
+		"starts_at": time.Now().Add(48 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 3, "prefecture": "13",
 	})
 	var created struct {
 		ID string `json:"id"`

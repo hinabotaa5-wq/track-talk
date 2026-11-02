@@ -81,6 +81,7 @@ describe("validators", () => {
         starts_at: "2026-10-20T18:00",
         event: "100m",
         event_other: "",
+        prefecture: "13",
         capacity: 3,
         body: "ジョグから入ります",
       }).success,

@@ -118,7 +118,7 @@ func TestHomeFeedCursorRecruitmentAndEmpty(t *testing.T) {
 	h := setup(t)
 	author := token(t, uuid.New())
 	// 既存の練習作成ルートを使って、募集タブの付加情報も検証する。
-	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{"kind": "practice", "body": "練習募集", "venue": "国立競技場", "starts_at": time.Now().Add(72 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 2})
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{"kind": "practice", "body": "練習募集", "venue": "国立競技場", "starts_at": time.Now().Add(72 * time.Hour).Format(time.RFC3339), "event": "100m", "capacity": 2, "prefecture": "13"})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}

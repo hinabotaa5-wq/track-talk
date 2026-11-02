@@ -1013,7 +1013,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
 		"starts_at": time.Now().Add(-time.Hour).Format(time.RFC3339),
-		"event":     "100m", "capacity": 3,
+		"event":     "100m", "capacity": 3, "prefecture": "13",
 	})
 	if rec.Code != 422 {
 		t.Fatalf("past time %d %s", rec.Code, rec.Body.String())
@@ -1022,7 +1022,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "駒沢競技場",
 		"starts_at": starts.Format(time.RFC3339),
-		"event":     "100m", "capacity": 3,
+		"event":     "100m", "capacity": 3, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -1101,7 +1101,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 
 	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, tb, map[string]any{
 		"kind": "practice", "body": "だめ", "venue": "別の場所",
-		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 2, "prefecture": "13",
 	})
 	if rec.Code != 403 {
 		t.Fatalf("other edit %d %s", rec.Code, rec.Body.String())
@@ -1109,7 +1109,7 @@ func TestPracticeSharesTheRecruitmentFeed(t *testing.T) {
 
 	rec = doJSON(t, h, http.MethodPatch, "/v1/posts/"+created.ID, ta, map[string]any{
 		"kind": "practice", "body": "流しをします", "venue": "織田フィールド",
-		"starts_at": starts.Format(time.RFC3339), "event": "relay", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "relay", "capacity": 2, "prefecture": "13",
 	})
 	if rec.Code != 200 {
 		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
@@ -1142,7 +1142,7 @@ func TestPracticeApplicationsFillAndClose(t *testing.T) {
 	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
 	payload := map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2, "prefecture": "13",
 	}
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, payload)
 	if rec.Code != 201 {
@@ -1282,7 +1282,7 @@ func TestPracticeCommentsCloseWhenRecruitmentEnds(t *testing.T) {
 	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1,
+		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -1366,7 +1366,7 @@ func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
 	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
 		"kind": "practice", "body": "流しをします", "venue": "〇〇競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1,
+		"starts_at": starts.Format(time.RFC3339), "event": "200m", "capacity": 1, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -1464,7 +1464,7 @@ func TestPracticeRatingsFollowTheNextPost(t *testing.T) {
 
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
 		"kind": "practice", "body": "次の練習です", "venue": "別の競技場",
-		"starts_at": starts.Add(24 * time.Hour).Format(time.RFC3339), "event": "400m", "capacity": 2,
+		"starts_at": starts.Add(24 * time.Hour).Format(time.RFC3339), "event": "400m", "capacity": 2, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("next post %d %s", rec.Code, rec.Body.String())
@@ -1602,7 +1602,7 @@ func TestNotifications(t *testing.T) {
 	starts = time.Date(starts.Year(), starts.Month(), starts.Day(), 18, 0, 0, 0, loc)
 	practiceBody := map[string]any{
 		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場",
-		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2,
+		"starts_at": starts.Format(time.RFC3339), "event": "100m", "capacity": 2, "prefecture": "13",
 	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/posts", author, practiceBody)
 	if rec.Code != 201 {
@@ -1839,7 +1839,7 @@ func TestPracticeRatingCommentCanBeReportedAndHidden(t *testing.T) {
 	host, guest := token(t, uuid.New()), token(t, uuid.New())
 	starts := time.Now().Add(72 * time.Hour).Format(time.RFC3339)
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", host, map[string]any{
-		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場", "starts_at": starts, "event": "100m", "capacity": 2,
+		"kind": "practice", "body": "ジョグから入ります", "venue": "〇〇競技場", "starts_at": starts, "event": "100m", "capacity": 2, "prefecture": "13",
 	})
 	if rec.Code != 201 {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())

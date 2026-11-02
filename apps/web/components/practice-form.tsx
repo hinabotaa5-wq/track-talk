@@ -5,6 +5,7 @@ import { loginPathFrom } from "@/lib/safe-next";
 import { useRouter } from "next/navigation";
 import { practiceSchema } from "@/lib/validators";
 import { appEvents } from "@/lib/practice-events";
+import { PREFECTURES } from "@/lib/prefectures";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -27,6 +28,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   const [venue, setVenue] = useState(practice?.venue ?? "");
   const [startsAt, setStartsAt] = useState(practice ? toJstInput(practice.starts_at) : "");
   const [event, setEvent] = useState(practice?.event ?? "");
+  const [prefecture, setPrefecture] = useState(practice?.prefecture ?? "");
   const [capacity, setCapacity] = useState(practice ? String(practice.capacity) : "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
@@ -43,6 +45,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       venue,
       starts_at: startsAt,
       event,
+      prefecture,
       capacity: Number(capacity),
       body,
     });
@@ -68,6 +71,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         starts_at: when.toISOString(),
         event: parsed.data.event,
         event_other: "",
+        prefecture: parsed.data.prefecture,
         capacity: parsed.data.capacity,
       };
       const post = initial
@@ -92,6 +96,17 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <label className="block text-sm font-medium">
+        都道府県
+        <select className={selectClass} value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+          <option value="">選んでください</option>
+          {PREFECTURES.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="block text-sm font-medium">
         練習場所
         <Input

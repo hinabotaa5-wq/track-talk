@@ -39,6 +39,7 @@ const post = {
     event: "100m",
     event_label: "100m",
     capacity: 3,
+    prefecture: "13",
     accepted_count: 0,
     status: "open",
   },

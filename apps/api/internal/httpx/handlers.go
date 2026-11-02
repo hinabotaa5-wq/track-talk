@@ -505,6 +505,7 @@ type postReq struct {
 	Event               string   `json:"event"`
 	EventOther          string   `json:"event_other"`
 	Capacity            int      `json:"capacity"`
+	Prefecture          string   `json:"prefecture"`
 	BodyPart            string   `json:"body_part"`
 }
 

@@ -874,6 +874,7 @@ type PracticeDetail struct {
 	Capacity    int32      `json:"capacity"`
 	DissolvedAt *time.Time `json:"dissolved_at"`
 	Canceled    bool       `json:"canceled"`
+	Prefecture  *string    `json:"prefecture"`
 }
 
 type PracticeRating struct {

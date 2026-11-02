@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -45,7 +46,7 @@ export function HomeView({
 
   const path = homeFeedPath(sort, q, page);
   const data = readFeed(path) ?? (path === initialPath ? initial : null);
-  return (
+  const feed = (
     <HomeFeed
       key={path}
       sort={sort === "recruitment" ? "new" : sort}
@@ -54,5 +55,15 @@ export function HomeView({
       page={page}
       initial={data}
     />
+  );
+  if (sort !== "recruitment") return feed;
+  // 募集タブからは、練習相手の募集を都道府県と種目で探せる一覧へ行ける。
+  return (
+    <>
+      <Link href="/practice" className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-sky-200 underline underline-offset-4">
+        練習相手を都道府県と種目で探す
+      </Link>
+      {feed}
+    </>
   );
 }
