@@ -146,10 +146,20 @@ func (s *Server) createPractice(w http.ResponseWriter, r *http.Request, author d
 		MapDBError(w, err)
 		return
 	}
+	// 利用者が少ないうちは募集を広く知らせるため、仲間募集と同じく本人以外の全員に知らせる。
+	// 受け取り方は「新しい募集」の設定に従う(ベルは既定でオン、プッシュは自分でオンにした人だけ)。
+	if err := q.InsertRecruitmentPostNotifications(r.Context(), db.InsertRecruitmentPostNotificationsParams{
+		PostID:   row.ID,
+		AuthorID: author.ID,
+	}); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
+	s.pushToMany(r.Context(), notifyRecruitment, []uuid.UUID{author.ID}, postPushMessage("新しい練習相手の募集", row.ID), 24*time.Hour)
 	s.writePost(w, r, row.ID, http.StatusCreated)
 }
 

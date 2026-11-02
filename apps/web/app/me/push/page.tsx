@@ -18,7 +18,7 @@ function errorMessage(err: unknown, fallback: string) {
 const categoryLabels: Record<NotificationCategory, { title: string; detail: string }> = {
   comment: { title: "コメント・返信", detail: "自分の投稿へのコメントと、自分のコメントへの返信" },
   practice: { title: "練習の参加", detail: "参加申請、承認、解散したあとの評価のお願い" },
-  recruitment: { title: "新しい募集", detail: "ほかの人が練習の募集を投稿したとき" },
+  recruitment: { title: "新しい募集", detail: "ほかの人がチームの仲間や練習相手の募集を投稿したとき" },
   injury: { title: "ケガの経過報告", detail: "「わかる」か保存をしたケガの投稿に経過報告があったとき" },
   review: { title: "フォーム添削", detail: "返答、補足、期限切れ、「役に立ちましたか」" },
   coaching: { title: "パーソナル指導・コーチ", detail: "申し込み、承諾、開始、終了、メッセージ、コーチの応募の結果" },
