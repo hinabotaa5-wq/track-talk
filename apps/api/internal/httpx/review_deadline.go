@@ -9,14 +9,14 @@ import (
 
 // 動画添削の期限（運営者決定 2026-11-02）。
 //   - 返却期限：申込みから24時間。夜間も止まらない。
-//   - 引受期限：コーチに届いてから30分。ただし日本時間の23時〜翌7時はカウントを止める。
+//   - 引受期限：コーチに届いてから90分（2026-11-02 運営者決定、23:59 再確認）。ただし日本時間の23時〜翌7時はカウントを止める。
 //
 // 夜間の判定は日本時間の壁時計で行い、サーバーのタイムゾーンには依存しない。
 const (
 	// 申込みから返却期限までの時間。
 	reviewReturnWindow = 24 * time.Hour
 	// コーチに届いてから引き受けるかどうか決めるまでの時間（夜間を除いて数える）。
-	offerWindow = 30 * time.Minute
+	offerWindow = 90 * time.Minute
 	// 引受タイマーを止める時間帯（日本時間）。quietStartHour 時ちょうどから止め、quietEndHour 時ちょうどから数え直す。
 	quietStartHour = 23
 	quietEndHour   = 7
@@ -28,7 +28,7 @@ func reviewDueAt(now time.Time) time.Time {
 }
 
 // offerExpiresAt は引受期限。start から window を、日本時間の23時〜翌7時を除いて数えた時刻。
-// 例：02:00 → 07:30、22:45 → 07:15（23時までに15分、残りは7時から）、23:30 → 07:30。
+// 例（90分）：02:00 → 08:30、22:45 → 08:15（23時までに15分、残り75分は7時から）、23:30 → 08:30。
 func offerExpiresAt(start time.Time, window time.Duration) time.Time {
 	t := start.In(jst.Zone)
 	remaining := window

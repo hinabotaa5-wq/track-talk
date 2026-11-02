@@ -137,7 +137,7 @@ func TestReviewRandomAssignOff(t *testing.T) {
 	}
 }
 
-// 選んだコーチが辞退した・30分返事がないときは、別のコーチに回さずに終わり、代金を戻す。
+// 選んだコーチが辞退した・引受期限までに返事がないときは、別のコーチに回さずに終わり、代金を戻す。
 func TestReviewChosenCoachDeclineAndTimeoutNeverReassign(t *testing.T) {
 	for _, action := range []string{"decline", "timeout", "withdraw"} {
 		t.Run(action, func(t *testing.T) {

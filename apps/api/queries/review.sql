@@ -168,7 +168,7 @@ WHERE id = $1
   AND status = 'offered';
 
 -- name: ExpireStaleReviewOffers :many
--- 30分のうちに返事がなかった打診を閉じ、依頼を待ちに戻す。
+-- 引受期限（90分、夜間は数えない）までに返事がなかった打診を閉じ、依頼を待ちに戻す。
 WITH stale AS (
     UPDATE review_offers
     SET result = 'expired',

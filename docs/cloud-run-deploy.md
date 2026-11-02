@@ -83,7 +83,7 @@ gcloud run services describe track-talk-api --region asia-northeast1 \
 
 ## フォーム添削の tick
 
-フォーム添削の打診（30分）と返却目安の期限切れは、Cloud Scheduler が1分ごとに API を呼んで片付けます。API は使われないときに0台まで縮むので、自分で時計を持てないためです。setup.sh のあと、Cloud Shell で一度だけ流します。
+フォーム添削の打診（引受期限90分）と返却目安の期限切れは、Cloud Scheduler が1分ごとに API を呼んで片付けます。API は使われないときに0台まで縮むので、自分で時計を持てないためです。setup.sh のあと、Cloud Shell で一度だけ流します。
 
 ```bash
 PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
