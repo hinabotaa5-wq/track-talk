@@ -138,9 +138,12 @@ def cloudinary_get(cfg, url, signed_params=None):
         params.update(api_key=cfg["key"], signature=hashlib.sha1(payload.encode()).hexdigest())
         url += "?" + urllib.parse.urlencode(params)
         request = urllib.request.Request(url)
-    else:
+    elif urllib.parse.urlsplit(url).netloc == urllib.parse.urlsplit(CLOUDINARY_API).netloc:
         auth = base64.b64encode((cfg["key"] + ":" + cfg["secret"]).encode()).decode()
         request = urllib.request.Request(url, headers={"Authorization": "Basic " + auth})
+    else:
+        # Credentials go only to the Admin API host; delivery URLs (res.cloudinary.com) are fetched without them.
+        request = urllib.request.Request(url)
     with urllib.request.urlopen(request, timeout=90) as response:
         data = response.read(MEDIA_MAX_FILE_BYTES + 1)
     if len(data) > MEDIA_MAX_FILE_BYTES:

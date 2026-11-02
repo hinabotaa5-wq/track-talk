@@ -50,5 +50,31 @@ class CopyMediaProgressTest(unittest.TestCase):
         self.assertEqual(progress, {"step": "manifest", "kind": None, "listed": 1, "copied": 1})
 
 
+class CloudinaryGetAuthTest(unittest.TestCase):
+    cfg = {"cloud": "demo", "key": "k", "secret": "s"}
+
+    def sent_request(self, *args):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"foo"
+        with mock.patch.object(backup.urllib.request, "urlopen", return_value=response) as urlopen:
+            backup.cloudinary_get(self.cfg, *args)
+        return urlopen.call_args.args[0]
+
+    def test_admin_api_listing_sends_basic_auth(self):
+        request = self.sent_request("https://api.cloudinary.com/v1_1/demo/resources/image/upload?max_results=500")
+        self.assertTrue(request.get_header("Authorization").startswith("Basic "))
+
+    def test_delivery_fetch_sends_no_credentials(self):
+        for url in ("https://res.cloudinary.com/demo/image/upload/a.png", "https://cdn.example.com/demo/image/upload/a.png"):
+            request = self.sent_request(url)
+            self.assertIsNone(request.get_header("Authorization"))
+            self.assertNotIn("api_key", request.full_url)
+
+    def test_signed_download_keeps_query_signature_without_header(self):
+        request = self.sent_request("https://api.cloudinary.com/v1_1/demo/image/download", {"public_id": "a", "type": "private"})
+        self.assertIsNone(request.get_header("Authorization"))
+        self.assertIn("signature=", request.full_url)
+
+
 if __name__ == "__main__":
     unittest.main()
