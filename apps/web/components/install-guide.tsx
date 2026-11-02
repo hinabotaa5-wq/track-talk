@@ -232,7 +232,7 @@ function InstallStepList({ steps }: { steps: Step[] }) {
       {steps.map((step, index) => (
         <li key={step.title}>
           <div className="mb-2 flex items-start gap-2.5">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-pure-white">
               {index + 1}
             </span>
             <div>

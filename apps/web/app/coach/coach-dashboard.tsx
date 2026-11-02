@@ -152,7 +152,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
               ) : null}
               <Link
                 href={`/coach/requests/${request.id}`}
-                className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white"
+                className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
               >
                 {request.status === "clarifying" ? "補足を書く" : "返答を書く"}
               </Link>
@@ -296,7 +296,7 @@ export function CoachDashboard() {
           </p>
         ) : null}
         {rating?.paused ? (
-          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-white">
+          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-pure-white">
             評価の平均が★3を下回ったため、いまは依頼が回ってきません。
           </p>
         ) : null}

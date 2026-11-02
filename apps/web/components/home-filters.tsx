@@ -16,7 +16,7 @@ const chips: { sort: HomeSort; label: string }[] = [
 
 function chipClass(active: boolean) {
   return active
-    ? "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full border border-white/35 bg-blue-500/75 px-2 text-sm sm:px-4.5 font-semibold text-white shadow-md shadow-blue-950/30 backdrop-blur-xl transition-all duration-200 active:scale-[0.98] cursor-pointer"
+    ? "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full border border-white/35 bg-blue-500/75 px-2 text-sm sm:px-4.5 font-semibold text-pure-white shadow-md shadow-blue-950/30 backdrop-blur-xl transition-all duration-200 active:scale-[0.98] cursor-pointer"
     : "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full glass bg-white/10 border border-white/20 px-2 text-sm sm:px-4.5 font-medium text-slate-300 transition-all duration-200 hover:bg-white/16 hover:text-white active:scale-[0.98] cursor-pointer";
 }
 

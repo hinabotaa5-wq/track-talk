@@ -114,7 +114,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
           <button
             type="button"
             onClick={() => skip(-10)}
-            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-white"
+            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-pure-white"
             aria-label="10秒戻る"
           >
             -10
@@ -122,7 +122,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
           <button
             type="button"
             onClick={togglePlay}
-            className="pointer-events-auto rounded-full bg-black/60 px-4 py-2 text-sm text-white"
+            className="pointer-events-auto rounded-full bg-black/60 px-4 py-2 text-sm text-pure-white"
             aria-label={playing ? "一時停止" : "再生"}
           >
             {playing ? "❚❚" : "▶"}
@@ -130,7 +130,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
           <button
             type="button"
             onClick={() => skip(10)}
-            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-white"
+            className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-pure-white"
             aria-label="10秒進む"
           >
             +10
@@ -141,7 +141,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
         <button
           type="button"
           onClick={() => setView({ scale: 1, x: 0, y: 0 })}
-          className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white"
+          className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-xs text-pure-white"
         >
           元に戻す
         </button>

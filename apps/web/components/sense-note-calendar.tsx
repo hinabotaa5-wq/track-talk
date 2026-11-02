@@ -117,7 +117,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
                 aria-pressed={selectedDay === day}
                 aria-current={day === today ? "date" : undefined}
                 onClick={(event) => { trigger.current = event.currentTarget; setSelectedDay(day); }}
-                className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border text-sm tabular-nums transition focus-visible:outline-2 focus-visible:outline-sky-300 ${selectedDay === day ? "border-sky-300 bg-sky-400/25 text-white" : hasContent ? "border-sky-300/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/20" : "border-transparent text-slate-400"} ${day === today ? "ring-1 ring-inset ring-white/40" : ""}`}
+                className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border text-sm tabular-nums transition focus-visible:outline-2 focus-visible:outline-sky-300 ${selectedDay === day ? "border-sky-300 bg-sky-400/25 text-pure-white" : hasContent ? "border-sky-300/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/20" : "border-transparent text-slate-400"} ${day === today ? "ring-1 ring-inset ring-white/40" : ""}`}
               >
                 <span>{number}</span>
                 <span className="flex h-1.5 items-center justify-center gap-1" aria-hidden>

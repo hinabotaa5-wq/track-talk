@@ -148,7 +148,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
               setFailed(true);
             }}
           />
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-white">
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-pure-white">
             写真: Wikimedia Commons
           </p>
         </>

@@ -67,8 +67,8 @@ export function senseDayLabel(day: string, now = new Date()) {
   return `${y === thisYear ? "" : `${y}年`}${m}月${d}日(${week})`;
 }
 
-// 器の中の粒の色。種目ごとに少しずつ違う色にして、積み重なりが見えるようにする。
-const grainColors = ["#7dd3fc", "#a5b4fc", "#f9a8d4", "#fcd34d", "#6ee7b7", "#fdba74"];
+// 器の中の粒の色。アクセントの青の濃淡を少しずつ変えて、積み重なりが見えるようにする。
+const grainColors = ["#8ebdff", "#2f7bff", "#bcd6ff", "#5a9bff", "#0a5cff", "#d9e8ff"];
 
 export function senseGrainColor(index: number) {
   return grainColors[((index % grainColors.length) + grainColors.length) % grainColors.length];

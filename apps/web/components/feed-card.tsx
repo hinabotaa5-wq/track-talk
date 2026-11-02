@@ -32,7 +32,7 @@ function CardCaption({ text }: { text: string }) {
           maskImage: "linear-gradient(to top, black 65%, transparent)",
           WebkitMaskImage: "linear-gradient(to top, black 65%, transparent)",
         }} />
-      <p className="relative line-clamp-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm font-medium leading-snug text-white">{text}</p>
+      <p className="relative line-clamp-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm font-medium leading-snug text-pure-white">{text}</p>
     </div>
   );
 }
@@ -60,7 +60,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         data-pending-link=""
         className={cardClass}
       >
-        <div className="flex aspect-[4/3] flex-col justify-center gap-2 bg-gradient-to-br from-white/10 to-sky-400/10 p-3.5">
+        <div className="flex aspect-[4/3] flex-col justify-center gap-2 bg-blue-500/10 p-3.5">
           {info ? (
             <div className="space-y-2 text-xs leading-snug text-slate-200">
               <p className="line-clamp-1 text-sm font-bold text-slate-100 transition-colors group-hover:text-blue-400">{info.event_label}</p>
@@ -81,7 +81,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
     const info = post.injury;
     return (
       <Link prefetch={false} href={href} data-pending-link="" className={cardClass}>
-        <div className="flex aspect-[4/3] flex-col justify-between bg-gradient-to-br from-white/10 to-rose-400/10 p-3.5">
+        <div className="flex aspect-[4/3] flex-col justify-between bg-blue-500/10 p-3.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {info ? (
               <>

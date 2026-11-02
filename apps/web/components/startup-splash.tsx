@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { TrackLanesMark } from "@/components/app-icon-mark";
 
-// ヘッダーと同じ濃紺。manifest の background_color と iOS の起動画像もこの色にそろえ、
+// 明るい表示の背景と同じ白。manifest の background_color と iOS の起動画像もこの色にそろえ、
 // OSの起動画面からアプリ内の起動画面へ切り替わるときに色が変わらないようにする。
-export const startupSplashBackground = "#16243a";
+// アプリ内の起動画面は、端末がダークモードなら暗い背景(globals.css の --background)にする。
+export const startupSplashBackground = "#ffffff";
 // 閉じるときのフェードの長さ。globals.css の transition と合わせる。
 const fadeMs = 400;
 
@@ -46,8 +47,7 @@ export function StartupSplash() {
       data-state={phase}
       style={{
         position: "fixed", inset: 0, zIndex: 2147483647,
-        display: "grid", placeItems: "center", background: startupSplashBackground,
-        colorScheme: "dark", pointerEvents: "none",
+        display: "grid", placeItems: "center", background: `var(--background, ${startupSplashBackground})`, pointerEvents: "none",
         animation: "startup-splash-release 400ms 10s forwards",
       }}
     >

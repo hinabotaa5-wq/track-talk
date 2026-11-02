@@ -109,7 +109,7 @@ export default function DeleteAccountPage() {
         <p className="text-sm text-slate-300">退会すると、次のデータが削除され、元に戻せません。</p>
       </div>
       {coaching ? (
-        <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-white">
+        <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-pure-white">
           コーチだけをやめたいときは、退会しなくても大丈夫です。
           <Link href="/coach/withdraw" className="text-blue-300 underline">
             コーチをやめる

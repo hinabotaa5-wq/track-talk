@@ -45,7 +45,7 @@ export function TodayMeetBalloon() {
         className="relative inline-flex size-11 items-center justify-center rounded-full text-amber-300 transition hover:bg-white/16 active:scale-[0.98]"
       >
         <Trophy className="size-5" strokeWidth={2} aria-hidden />
-        <span className="absolute top-2 right-2 size-2 rounded-full bg-amber-400 ring-2 ring-[#16243a]" aria-hidden />
+        <span className="absolute top-2 right-2 size-2 rounded-full bg-amber-400 ring-2 ring-background" aria-hidden />
       </button>
       {/* 吹き出しのしっぽ。トロフィーの真下に置き、下半分は吹き出しの本体が覆う。 */}
       {open ? (

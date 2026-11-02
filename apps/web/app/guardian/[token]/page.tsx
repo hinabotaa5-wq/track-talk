@@ -45,7 +45,7 @@ function LimitChoices({
           <label
             key={limitKey(option)}
             className={`flex min-h-12 items-center gap-2 rounded-md border px-3 text-sm ${
-              value === option ? "border-blue-400 bg-blue-500/15 text-white" : "border-white/25 text-slate-200"
+              value === option ? "border-blue-400 bg-blue-500/15 text-pure-white" : "border-white/25 text-slate-200"
             }`}
           >
             <input
@@ -83,7 +83,7 @@ function SelfPayLimitChoices({
           <label
             key={option}
             className={`flex min-h-12 items-center gap-2 rounded-md border px-3 text-sm ${
-              value === option ? "border-blue-400 bg-blue-500/15 text-white" : "border-white/25 text-slate-200"
+              value === option ? "border-blue-400 bg-blue-500/15 text-pure-white" : "border-white/25 text-slate-200"
             }`}
           >
             <input type="radio" name="self_pay_limit_yen" checked={value === option} onChange={() => onChange(option)} />
@@ -311,7 +311,7 @@ export default function GuardianPage() {
                 <label
                   key={option.value}
                   className={`flex min-h-12 items-center gap-2 rounded-md border px-3 text-sm ${
-                    relationship === option.value ? "border-blue-400 bg-blue-500/15 text-white" : "border-white/25 text-slate-200"
+                    relationship === option.value ? "border-blue-400 bg-blue-500/15 text-pure-white" : "border-white/25 text-slate-200"
                   }`}
                 >
                   <input
