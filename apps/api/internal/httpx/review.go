@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -54,12 +53,6 @@ func normalizeFocus(focus []string) ([]string, bool) {
 		}
 	}
 	return out, len(picked) == 0
-}
-
-// reviewDueAt は返却の目安。設計書の既定どおり、送った翌日の12時（日本時間）にする。
-func reviewDueAt(now time.Time) time.Time {
-	local := now.In(jst.Zone)
-	return time.Date(local.Year(), local.Month(), local.Day()+1, 12, 0, 0, 0, jst.Zone)
 }
 
 // reviewWaiting は、まだ返却を待っている状態か。

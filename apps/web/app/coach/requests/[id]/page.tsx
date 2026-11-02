@@ -227,7 +227,7 @@ export default function CoachReviewRequestPage() {
         </h1>
         <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
         {request.status === "in_review" ? (
-          <p className="text-sm text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
+          <p className="text-sm text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>
         ) : null}
       </div>
 

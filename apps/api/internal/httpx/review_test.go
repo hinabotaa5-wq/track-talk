@@ -13,7 +13,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -180,13 +179,14 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	}
 
 	body := reviewBodyFor(t, h, tu)
+	sentAt := time.Now()
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	if created.Status != "queued" || strings.Join(created.Focus, ",") != "start,rhythm" || !dueAtNoonJST(created.DueAt) || !strings.Contains(created.VideoURL, "/video/authenticated/s--") {
+	if created.Status != "queued" || strings.Join(created.Focus, ",") != "start,rhythm" || !dueAtIn24h(created.DueAt, sentAt, time.Now()) || !strings.Contains(created.VideoURL, "/video/authenticated/s--") {
 		t.Fatalf("created %+v", created)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body); rec.Code != http.StatusConflict {
@@ -281,14 +281,13 @@ func withCoachPhoto(t *testing.T, id uuid.UUID) {
 	execSQLArgs(t, `UPDATE coach_profiles SET photo_public_id = $2 WHERE profile_id = $1`, id, "track-talk/"+uuid.NewString())
 }
 
-// dueAtNoonJST は、返却の目安が日本時間の12時か。DB から読んだ時刻はマシンのタイムゾーンで返るので、文字列ではなく時刻で比べる。
-func dueAtNoonJST(s string) bool {
+// dueAtIn24h は、返却期限が送った時刻（before〜after のあいだ）の24時間後か。DB から読んだ時刻はマシンのタイムゾーンで返るので、文字列ではなく時刻で比べる。
+func dueAtIn24h(s string, before, after time.Time) bool {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
 		return false
 	}
-	t = t.In(jst.Zone)
-	return t.Hour() == 12 && t.Minute() == 0
+	return dueIn24h(t, before, after)
 }
 
 // 通知を使えるときは、登録があっても実際に届かない宛先だけでは受付中にできない。

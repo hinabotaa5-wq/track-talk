@@ -43,7 +43,7 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
       </p>
       {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">あなたを選んだ依頼 · 報酬{formatYen(request.coach_reward_yen ?? 0)}</p> : null}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
-      <p className="text-xs text-slate-300">返却の目安: {formatDateTime(request.due_at)}まで</p>
+      <p className="text-xs text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>
     </div>
   );
 }
@@ -112,7 +112,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
           {data.offers.map((offer) => (
             <li key={offer.id} className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
               <RequestSummary request={offer.request} />
-              <p className="text-sm font-semibold text-white">あと{minutesLeft(offer.expires_at, now)}分で次のコーチに回ります</p>
+              <p className="text-sm font-semibold text-white">{formatDateTime(offer.expires_at)}までに引き受けてください（あと{minutesLeft(offer.expires_at, now)}分）。過ぎると依頼は終了します</p>
               {offer.terms ? <WorkOrderTermsView terms={offer.terms} /> : null}
               <div className="flex gap-2">
                 <Button type="button" className="flex-1" disabled={pending} onClick={() => void answer(offer.id, "accept")}>
@@ -318,7 +318,7 @@ export function CoachDashboard() {
       <section className="space-y-2">
         <h2 className="font-bold">通知</h2>
         <p className="text-sm text-slate-300">
-          依頼は通知で届き、30分以内に引き受けないと次のコーチに回ります。通知を受け取れる端末: {devices}台
+          依頼は通知で届きます。届いてから30分以内（日本時間の23時から翌7時までは数えません）に引き受けないと、依頼は終了します。通知を受け取れる端末: {devices}台
         </p>
         <Link href="/me/coaching" className="text-sm text-blue-300 underline">
           通知の設定

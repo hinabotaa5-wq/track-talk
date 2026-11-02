@@ -20,8 +20,6 @@ import (
 // 時間切れは Cloud Scheduler から1分ごとに呼ばれる tick が処理する（API は使われないと0台まで縮むため）。
 
 const (
-	// 打診してから引き受けるかどうか決めるまでの時間。
-	offerWindow = 30 * time.Minute
 	// 1人のコーチが同時に持てる依頼（打診中・添削中の合計）。
 	maxActiveReviews = 2
 	// 評価が低いコーチを順番から外す基準。★の評価が lowRatingMinCount 件以上たまり、
@@ -36,7 +34,7 @@ func dayStart(now time.Time) time.Time {
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, jst.Zone)
 }
 
-// estimateReviewDue は返却の目安。いつ送っても、送った翌日の12時（日本時間）までにする。
+// estimateReviewDue は返却期限の見込み。いつ送っても、送った時刻から24時間後。
 // 2つ目の戻り値は、いま受付中のコーチがいるかどうか。
 func (s *Server) estimateReviewDue(ctx context.Context, requester uuid.UUID, tier, event string, now time.Time) (time.Time, bool, error) {
 	coaches, err := s.q.CountOnDutyCoaches(ctx, db.CountOnDutyCoachesParams{
@@ -92,7 +90,9 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err != nil {
 		return false, err
 	}
-	expires := now.Add(offerWindow)
+	// 引受期限は30分（日本時間の23時〜翌7時は数えない）。
+	// 通常は返却期限よりずっと前に来るが、コーチが受付を止めていて打診が遅れた依頼でも返却期限は越えない。
+	expires := offerExpiresAt(now, offerWindow)
 	if expires.After(rr.DueAt) {
 		expires = rr.DueAt
 	}
@@ -113,10 +113,10 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	}
 	s.pushQuietly(ctx, coachID, notifyImportant, push.Message{
 		Title: "フォーム添削の依頼が届きました",
-		Body:  "30分以内に、引き受けるかどうか決めてください",
+		Body:  offerDeadlineText(expires) + "までに、引き受けるかどうか決めてください",
 		URL:   "/coach",
 		Tag:   "review-offer",
-	}, offerWindow)
+	}, time.Until(expires))
 	return true, nil
 }
 
@@ -187,7 +187,7 @@ type coachingTickResult struct {
 	GuardianNoticesSent int `json:"guardian_notices_sent"`
 }
 
-// runCoachingTick は、返却目安を過ぎた依頼と、返事のないまま30分たった打診を片付け、待ちの依頼を打診する。
+// runCoachingTick は、返却目安を過ぎた依頼と、引受期限（30分、夜間は数えない）を過ぎた打診を片付け、待ちの依頼を打診する。
 // 返却から7日たった返答には「役に立ちましたか」を聞く。パーソナル指導の申し込みの期限切れと、期間の終わりも片付ける。
 func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error) {
 	var out coachingTickResult
