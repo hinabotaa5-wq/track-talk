@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
+import urllib.error
 import urllib.request
 import uuid
 
@@ -21,6 +22,21 @@ MEDIA_KINDS = [(r, d) for r in ("image", "video", "raw") for d in ("upload", "au
 CLOUDINARY_API = os.environ.get("CLOUDINARY_API_BASE", "https://api.cloudinary.com")
 STORAGE_UPLOAD = os.environ.get("STORAGE_UPLOAD_BASE", "https://storage.googleapis.com")
 TOKYO = dt.timezone(dt.timedelta(hours=9))
+
+
+def failure_details(error, progress=None):
+    """Loggable failure fields: type, HTTP status and host only. URLs, queries, signatures and bodies are never logged."""
+    details = {"error_type": type(error).__name__}
+    if isinstance(error, urllib.error.HTTPError):
+        details["http_status"] = error.code
+        details["host"] = urllib.parse.urlsplit(error.geturl() or "").hostname
+    elif isinstance(error, urllib.error.URLError):
+        details["reason_type"] = type(error.reason).__name__
+    elif isinstance(error, RuntimeError) and re.fullmatch(r"[a-z0-9_]{1,64}", str(error)):
+        details["reason"] = str(error)
+    if progress:
+        details.update(progress)
+    return details
 
 
 def pg_env(url):
@@ -132,9 +148,10 @@ def cloudinary_get(cfg, url, signed_params=None):
     return data
 
 
-def list_media(cfg):
+def list_media(cfg, progress):
     assets = []
     for resource, delivery in MEDIA_KINDS:
+        progress.update(step="list", kind=resource + "/" + delivery)
         cursor = None
         while True:
             query = {"max_results": "500"}
@@ -170,21 +187,26 @@ def fetch_media(cfg, asset):
     return data, "md5" if etag else "size"
 
 
-def copy_media(cfg, bucket, prefix, access_token, upload_fn):
+def copy_media(cfg, bucket, prefix, access_token, upload_fn, progress):
     """Full weekly snapshot under media/; the bucket's 30-day lifecycle removes old snapshots."""
-    assets = list_media(cfg)
+    assets = list_media(cfg, progress)
     if sum(a.get("bytes", 0) for a in assets) > MEDIA_MAX_TOTAL_BYTES:
         raise RuntimeError("media_total_size_limit_exceeded")
     entries = []
+    progress.update(listed=len(assets), copied=0)
     for asset in assets:
+        progress.update(step="download", kind=asset["resource_type"] + "/" + asset["type"])
         data, verified = fetch_media(cfg, asset)
         name = "/".join((asset["resource_type"], asset["type"], asset["public_id"])) + ("." + asset["format"] if asset.get("format") else "")
+        progress["step"] = "upload"
         upload_fn(bucket, prefix + "/" + name, data, access_token)
         entries.append({"name": name, "bytes": len(data), "md5": hashlib.md5(data).hexdigest(), "verified_by": verified})
+        progress["copied"] = len(entries)
     manifest = {"format_version": 1, "created_at": dt.datetime.now(dt.timezone.utc).isoformat(), "files": len(entries),
                 "verified_by_md5": sum(1 for e in entries if e["verified_by"] == "md5"),
                 "bytes": sum(e["bytes"] for e in entries), "entries": entries}
     # The manifest is the completion marker, as for the database set.
+    progress.update(step="manifest", kind=None)
     upload_fn(bucket, prefix + "/manifest.json", (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode(), access_token)
     return manifest
 
@@ -246,13 +268,14 @@ def main():
                           "bytes": manifest["database_bytes"], "tables": len(manifest["tables"])}, ensure_ascii=False), flush=True)
     if os.environ.get("CLOUDINARY_BACKUP") and media_due(dt.datetime.now(dt.timezone.utc)):
         # Runs after the database set is stored, so a media failure never costs the database backup.
+        progress = {"step": "config"}
         try:
             cfg = json.loads(os.environ["CLOUDINARY_BACKUP"])
             media_prefix = "media/" + dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d/%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex
             media = copy_media(cfg, bucket, media_prefix, token(),
-                               lambda b, n, d, t: upload(b, n, d, t, limit=MEDIA_MAX_FILE_BYTES))
+                               lambda b, n, d, t: upload(b, n, d, t, limit=MEDIA_MAX_FILE_BYTES), progress)
         except Exception as error:
-            print(json.dumps({"severity": "ERROR", "event": "media_backup_failed", "error_type": type(error).__name__}), flush=True)
+            print(json.dumps({"severity": "ERROR", "event": "media_backup_failed", **failure_details(error, progress)}), flush=True)
             sys.exit(1)
         print(json.dumps({"severity": "INFO", "event": "media_backup_completed", "prefix": media_prefix,
                           "files": media["files"], "bytes": media["bytes"]}), flush=True)
@@ -263,5 +286,5 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         # Do not log exception text: database clients and HTTP errors can contain secrets or data.
-        print(json.dumps({"severity": "ERROR", "event": "database_backup_failed", "error_type": type(error).__name__}), flush=True)
+        print(json.dumps({"severity": "ERROR", "event": "database_backup_failed", **failure_details(error)}), flush=True)
         sys.exit(1)
