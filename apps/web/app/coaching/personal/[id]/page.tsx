@@ -106,7 +106,7 @@ function CoachingContractView() {
   }
 
   if (error && !contract) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !contract) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !contract) return <PageLoading screen label="読み込み中..." />;
 
   const isCoach = contract.role === "coach";
 
@@ -193,7 +193,7 @@ function CoachingContractView() {
 
 export default function CoachingContractPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <CoachingContractView />
     </Suspense>
   );

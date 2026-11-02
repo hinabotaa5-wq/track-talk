@@ -146,13 +146,13 @@ export default function CoachingSetupPage() {
   }
 
   if (loading || !session) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
   if (loadError) {
     return <p className="text-sm text-red-400">{loadError}</p>;
   }
   if (!me) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   return (

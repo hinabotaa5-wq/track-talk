@@ -21,7 +21,7 @@ export default async function RegionalCompetitionsPage({
   if (target) redirect(target);
 
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <RegionalCompetitionsView />
     </Suspense>
   );

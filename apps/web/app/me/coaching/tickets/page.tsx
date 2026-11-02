@@ -94,7 +94,7 @@ function TicketsPage() {
     } finally { release(); }
   }
 
-  if (loading || !session) return <PageLoading label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
   return <div className="mx-auto max-w-md space-y-5">
     <h1 className="text-2xl font-bold">コーチングチケット</h1>
     <SellerNote />
@@ -132,4 +132,4 @@ function TicketsPage() {
   </div>;
 }
 
-export default function Page() { return <Suspense fallback={<PageLoading label="読み込み中..." />}><TicketsPage /></Suspense>; }
+export default function Page() { return <Suspense fallback={<PageLoading screen label="読み込み中..." />}><TicketsPage /></Suspense>; }

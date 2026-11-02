@@ -27,7 +27,7 @@ const loginPath = "/login?next=/memo";
 
 export default function MySenseNotesPage() {
   return (
-    <Suspense fallback={<PageLoading label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
       <MySenseNotes />
     </Suspense>
   );
@@ -111,7 +111,7 @@ function MySenseNotes() {
     return () => controller.abort();
   }, [token, cursor, notes, month, historyFailed]);
 
-  if (loading) return <PageLoading label="読み込み中..." />;
+  if (loading) return <PageLoading screen label="読み込み中..." />;
   const shownNotes = guest ? [] : notes;
   const shownStats = guest ? guestStats : stats;
   const needsOlderNotes = Boolean(cursor && shownNotes?.length && shownNotes[shownNotes.length - 1].day >= `${month}-01`);

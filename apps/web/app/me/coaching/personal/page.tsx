@@ -40,7 +40,7 @@ export default function MyCoachingContractsPage() {
   }, [token]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !contracts) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !contracts) return <PageLoading screen label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">

@@ -214,7 +214,7 @@ export default function CoachReviewRequestPage() {
   }, [token, id]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !request) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !request) return <PageLoading screen label="読み込み中..." />;
 
   const response = request.response;
   const needsClarification = request.status === "clarifying" && response && !response.hidden;

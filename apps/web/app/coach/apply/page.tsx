@@ -153,7 +153,7 @@ export default function CoachApplyPage() {
   }
 
   if (loading || !session || (!loaded && !error)) {
-    return <PageLoading label="読み込み中..." />;
+    return <PageLoading screen label="読み込み中..." />;
   }
 
   const editable = !application || application.status === "pending" || application.status === "rejected" || application.status === "withdrawn";

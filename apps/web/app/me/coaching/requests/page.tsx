@@ -41,7 +41,7 @@ export default function MyReviewRequestsPage() {
   }, [token]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !requests) return <PageLoading label="読み込み中..." />;
+  if (loading || !session || !requests) return <PageLoading screen label="読み込み中..." />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">
