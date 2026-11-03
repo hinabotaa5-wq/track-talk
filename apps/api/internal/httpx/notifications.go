@@ -68,7 +68,7 @@ func kindCategory(kind string) string {
 		return notifyRecruitment
 	case "injury_update":
 		return notifyInjury
-	case "review_offer":
+	case "review_offer", "review_resubmitted":
 		return notifyImportant
 	default:
 		return notifyReview

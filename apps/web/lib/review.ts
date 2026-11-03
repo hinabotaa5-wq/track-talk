@@ -1,4 +1,4 @@
-import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewPayMethod, ReviewRequest, ReviewStatus } from "./types";
+import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewInfoReason, ReviewPayMethod, ReviewRequest, ReviewStatus } from "./types";
 
 // 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す（API の reviewEvents と合わせる）。
 export const reviewEvents: CoachEvent[] = ["100m"];
@@ -24,6 +24,7 @@ export const reviewStatusLabels: Record<ReviewStatus, string> = {
   queued: "コーチを探しています",
   offered: "コーチを探しています",
   in_review: "添削中",
+  needs_info: "コーチが内容の確認を求めています",
   returned: "返却済み",
   clarifying: "補足を待っています",
   expired: "期限切れ",
@@ -41,6 +42,18 @@ export const clarifyReasonLabels: Record<ClarifyReason, string> = {
   fix: "直す点の意味がわからない",
   other: "その他",
 };
+
+// 返却前の「内容確認のための差し戻し」の種類（任意）。並びは API と同じ。
+export const reviewInfoReasonLabels: Record<ReviewInfoReason, string> = {
+  focus: "見てほしいポイントが分からない",
+  scene: "動画のどの場面か分からない",
+  goal: "目標・現状が分からない",
+  mismatch: "動画と説明が食い違っている",
+  other: "その他",
+};
+
+// 差し戻しの質問の最短の長さ（サーバーと同じ。空白と記号は数えない）。
+export const minInfoRequestChars = 15;
 
 export const helpfulLabels: Record<HelpfulAnswer, string> = {
   yes: "役に立った",

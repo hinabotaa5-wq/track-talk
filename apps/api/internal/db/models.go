@@ -1059,6 +1059,14 @@ type ReviewRequest struct {
 	RequestedCoachName string     `json:"requested_coach_name"`
 	BasePriceYen       int32      `json:"base_price_yen"`
 	UseTickets         bool       `json:"use_tickets"`
+	InfoRequest        *string    `json:"info_request"`
+	InfoReason         *string    `json:"info_reason"`
+	InfoRequestedAt    *time.Time `json:"info_requested_at"`
+	InfoFromStatus     *string    `json:"info_from_status"`
+	ResubmitBy         *time.Time `json:"resubmit_by"`
+	OriginalQuestion   *string    `json:"original_question"`
+	VideoReplaced      bool       `json:"video_replaced"`
+	ResubmittedAt      *time.Time `json:"resubmitted_at"`
 }
 
 type ReviewResponse struct {

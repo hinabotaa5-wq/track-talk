@@ -160,7 +160,7 @@ SELECT
     EXISTS (
         SELECT 1 FROM review_requests r
         WHERE r.coach_id = sqlc.arg('coach_id')
-          AND r.status IN ('in_review', 'clarifying')
+          AND r.status IN ('in_review', 'clarifying', 'needs_info')
     )::boolean AS open_review,
     EXISTS (
         SELECT 1 FROM coaching_consultations c
