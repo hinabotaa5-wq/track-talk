@@ -372,6 +372,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarification", s.submitClarification)
 				// 返却前の「内容確認のための差し戻し」（1依頼1回）。コーチから依頼者への質問なので、メッセージ機能と一緒に開ける。
 				r.With(s.requireMessaging).Post("/coach/requests/{id}/info-request", s.requestReviewInfo)
+				// 引受後・返却前のコーチ都合の辞退。依頼の状態を変えるだけでメッセージではないので、メッセージ機能のフラグには入れない。
+				r.Post("/coach/requests/{id}/withdraw", s.withdrawReviewRequest)
 				r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
 				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
 				// 運営のお金の動き（送金と返金）

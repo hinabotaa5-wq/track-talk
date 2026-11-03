@@ -202,6 +202,7 @@ export type NotificationKind =
   | "review_clarified"
   | "review_info_request"
   | "review_resubmitted"
+  | "review_withdrawn"
   | "review_helpful_ask"
   | "message";
 
@@ -664,6 +665,13 @@ export type ReviewInfoRequest = {
   resubmitted_at: string | null;
 };
 
+// 引受後・返却前にコーチが辞退した記録。辞退した依頼は終了（expired）になる。
+export type ReviewWithdrawal = {
+  withdrawn_at: string;
+  from_status: "in_review" | "needs_info";
+  reason: string | null;
+};
+
 export type ClarifyReason = "term" | "drill" | "fix" | "other";
 export type HelpfulAnswer = "yes" | "some" | "no";
 
@@ -716,6 +724,8 @@ export type ReviewRequest = {
   thumbnail_url: string;
   // コーチが内容確認のために差し戻したときだけ入る。
   info_request?: ReviewInfoRequest | null;
+  // コーチが引受後に辞退したときだけ入る。
+  withdrawal?: ReviewWithdrawal | null;
   // 詳細を開いたときだけ付く。
   response?: ReviewResponse | null;
   rating?: ReviewRating | null;
