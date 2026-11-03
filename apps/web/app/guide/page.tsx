@@ -45,6 +45,7 @@ export default function GuidePage() {
       <Rule title="通知・マイページ・困ったとき">
         <p>ヘッダーのベルから通知、人のアイコンからマイページを開けます。自分の投稿や保存した投稿、プロフィールや通知の設定はマイページにあります。最後に開いたメインタブは、同じブラウザで次回起動時に復元します。</p>
         <p>不具合や要望はヘッダーの箱アイコンの「なんでも書いてね」へ。返信が必要な連絡はマイページの「お問い合わせ」から送ってください。不適切な投稿には通報を使えます。</p>
+        <p>アカウントを乗っ取られたかもしれないときは、<Link href="/contact" className="text-blue-300 underline">運営者・お問い合わせ</Link>のページの案内に沿ってメールでお知らせください。</p>
         <p><Link href="/guidelines" className="text-blue-300 underline">コミュニティガイドライン</Link>と<Link href="/terms" className="text-blue-300 underline">利用規約</Link>、<Link href="/privacy" className="text-blue-300 underline">プライバシーポリシー</Link>も確認してください。</p>
       </Rule>
     </div>
