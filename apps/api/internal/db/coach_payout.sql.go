@@ -362,7 +362,7 @@ type ListPayableCoachEarningsRow struct {
 // 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
 // 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
 // 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
-// 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。
+// 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。戻さずに登録を終えた（ended）コーチには、ここで残りを送る（最終精算）。
 func (q *Queries) ListPayableCoachEarnings(ctx context.Context, minYen int32) ([]ListPayableCoachEarningsRow, error) {
 	rows, err := q.db.Query(ctx, listPayableCoachEarnings, minYen)
 	if err != nil {

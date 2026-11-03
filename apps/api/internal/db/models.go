@@ -193,6 +193,12 @@ type CoachRefundCompensation struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type CoachRegistrationEnding struct {
+	CoachID uuid.UUID  `json:"coach_id"`
+	EndedBy *uuid.UUID `json:"ended_by"`
+	EndedAt time.Time  `json:"ended_at"`
+}
+
 type CoachWorkOrder struct {
 	ID              uuid.UUID  `json:"id"`
 	Kind            string     `json:"kind"`

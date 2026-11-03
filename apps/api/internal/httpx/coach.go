@@ -32,7 +32,7 @@ func validCoachTier(tier string) bool {
 
 func validCoachStatus(status string) bool {
 	switch status {
-	case "pending", "approved", "rejected", "suspended", "withdrawn":
+	case "pending", "approved", "rejected", "suspended", "withdrawn", "ended":
 		return true
 	}
 	return false
@@ -444,6 +444,93 @@ func (s *Server) setCoachSuspended(w http.ResponseWriter, r *http.Request, suspe
 			slog.Warn("review offer after coach suspend", "err", err)
 		}
 		s.notifyNominationEnded(r.Context(), rid)
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
+}
+
+// endCoachRegistration は、運営が止めていたコーチを、戻さないまま登録を終えた状態にする。
+// 止めている間に留保していた報酬は消さず、次の月次送金で最低額に届かなくても残りを送る（最終精算）。
+// 本人確認は運営の手順で先に済ませる。誰がいつ終えたかを残す。
+func (s *Server) endCoachRegistration(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	// 口座登録が済んだかを先に Stripe に聞いて記録する（この下でコーチの行をロックするので、その前に）。
+	if c, err := s.q.GetCoachProfile(r.Context(), id); err == nil {
+		s.refreshPayoutsEnabled(r.Context(), c)
+	}
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	// 送金をまとめている途中に状態を変えないよう、送金の処理と順番にする。
+	if err := q.LockCoachPayouts(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	coach, err := q.LockCoachProfile(r.Context(), id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusNotFound, "not_found", "コーチが見つかりません")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if coach.Status != "suspended" {
+		Error(w, http.StatusConflict, "conflict", "止めているコーチだけ登録を終えられます")
+		return
+	}
+	// 本人がやめるときと同じく、利用者とのやりとりが残っているあいだは終えない（終えたあとに報酬が増えないように）。
+	blockers, err := q.CoachWithdrawBlockers(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if blockers.OpenContract || blockers.OpenReview || blockers.OpenConsultation {
+		Error(w, http.StatusConflict, "coaching_in_progress", "進行中のパーソナル指導・添削中の依頼・対応中の追加相談があるあいだは登録を終えられません。先に終了や返金の手続きを済ませてください")
+		return
+	}
+	// 終えたあとはコーチが口座を登録し直せないので、残りの報酬を受け取る口座がないままでは終えない。
+	for {
+		n, err := recordCoachEarningsWith(r.Context(), q)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if n == 0 {
+			break
+		}
+	}
+	summary, err := q.GetCoachEarningsSummary(r.Context(), &id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if summary.UnpaidYen > 0 && !s.payoutsReady(coach) {
+		Error(w, http.StatusConflict, "payouts_not_ready", "まだ送金していない報酬がありますが、受け取り口座の登録が済んでいません。止めたまま、口座の扱いを決めてから終えてください")
+		return
+	}
+	c, err := q.EndSuspendedCoach(r.Context(), id)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := q.RecordCoachRegistrationEnding(r.Context(), db.RecordCoachRegistrationEndingParams{CoachID: id, EndedBy: &admin.ID}); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }

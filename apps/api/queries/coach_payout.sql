@@ -67,7 +67,7 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 -- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
 -- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
 -- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
--- 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。
+-- 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。戻さずに登録を終えた（ended）コーチには、ここで残りを送る（最終精算）。
 SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0))::int AS amount_yen
 FROM coach_earnings e
 JOIN coach_profiles cp ON cp.profile_id = e.coach_id
