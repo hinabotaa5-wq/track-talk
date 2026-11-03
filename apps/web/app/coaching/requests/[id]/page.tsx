@@ -6,6 +6,7 @@ import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
+import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -235,6 +236,9 @@ function ReviewRequestView() {
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返却期限: {formatDateTime(request.due_at)}</p>
         ) : null}
+        {request.status === "needs_info" && request.info_request ? (
+          <p className="text-sm text-slate-100">再提出の期限: {formatDateTime(request.info_request.resubmit_by)}</p>
+        ) : null}
         {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
           <p className="font-semibold">選んだコーチ：{request.requested_coach_name || "選択したコーチ"}</p>
           <p>料金{formatYen(request.total_price_yen ?? request.base_price_yen ?? 1500)}</p>
@@ -251,6 +255,9 @@ function ReviewRequestView() {
           <PayAgain request={request} token={token} />
         )
       ) : null}
+
+      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" /> : null}
+      {request.status === "needs_info" ? <ResubmitForm request={request} token={token} onChange={setRequest} /> : null}
 
       {request.video_url ? (
         <video

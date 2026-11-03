@@ -87,6 +87,7 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
 		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
 		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
+		"info_request":  infoRequestJSON(rr),
 	}
 }
 
@@ -506,7 +507,17 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 	// tick が遅れていても、目安を過ぎた依頼は開いた時点で期限切れにする。
 	// 返金や報酬の記録まで含む tick 全体はここでは回さない（Scheduler の tick と重ならないように）。
 	// 開いた人が通信を切っても途中で止まらないよう、リクエストの取り消しは引き継がない。
-	if reviewWaiting(rr.Status) && !time.Now().Before(rr.DueAt) {
+	overdue := reviewWaiting(rr.Status) && !time.Now().Before(rr.DueAt)
+	// 再提出期限を過ぎた差し戻しも、開いた時点で終える。
+	unresubmitted := rr.Status == "needs_info" && rr.ResubmitBy != nil && !time.Now().Before(*rr.ResubmitBy)
+	if unresubmitted {
+		if _, err := s.expireUnresubmittedReviews(context.WithoutCancel(r.Context())); err != nil {
+			slog.Warn("expire unresubmitted reviews on read", "err", err)
+		} else if fresh, err := s.q.GetReviewRequest(context.WithoutCancel(r.Context()), id); err == nil {
+			rr = fresh
+		}
+	}
+	if overdue {
 		ctx := context.WithoutCancel(r.Context())
 		if overdue, err := s.q.ExpireOverdueReviewRequests(ctx); err != nil {
 			slog.Warn("expire overdue reviews on read", "err", err)

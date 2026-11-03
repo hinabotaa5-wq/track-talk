@@ -169,9 +169,11 @@ type coachingTickResult struct {
 	TicketsReleased        int `json:"tickets_released"`
 	TicketRefundsProcessed int `json:"ticket_refunds_processed"`
 	Expired                int `json:"expired"`
-	Requeued               int `json:"requeued"`
-	Offered                int `json:"offered"`
-	HelpfulAsk             int `json:"helpful_ask"`
+	// 再提出期限までに再提出がなく終わった差し戻し。
+	Unresubmitted int `json:"unresubmitted"`
+	Requeued      int `json:"requeued"`
+	Offered       int `json:"offered"`
+	HelpfulAsk    int `json:"helpful_ask"`
 	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
 	ContractsExpired int `json:"contracts_expired"`
 	ContractsEnded   int `json:"contracts_ended"`
@@ -198,6 +200,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	out.Expired = len(overdue)
 	for _, rr := range overdue {
 		s.notifyReviewExpired(ctx, rr)
+	}
+	if out.Unresubmitted, err = s.expireUnresubmittedReviews(ctx); err != nil {
+		return out, err
 	}
 	requeued, err := s.q.ExpireStaleReviewOffers(ctx)
 	if err != nil {
@@ -352,6 +357,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"created_at":         rr.CreatedAt,
 		"requested_coach_id": rr.RequestedCoachID,
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
+		"info_request":       infoRequestJSON(rr),
 	}
 	if withVideo {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(rr.VideoPublicID)
@@ -399,7 +405,7 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 	}
 	reviewOut := make([]map[string]any, 0, len(reviewing))
 	for _, rr := range reviewing {
-		reviewOut = append(reviewOut, s.coachRequestJSON(rr, true))
+		reviewOut = append(reviewOut, s.coachRequestJSON(rr, coachSeesVideo(rr)))
 	}
 	JSON(w, http.StatusOK, map[string]any{"offers": offerOut, "reviewing": reviewOut})
 }
@@ -495,6 +501,14 @@ func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		MapDBError(w, err)
+		return
+	}
+	// 差し戻し中の打診は、再提出を待ってから決める（再提出期限を過ぎれば依頼は終わる）。
+	if rr, err := q.GetReviewRequest(r.Context(), offer.RequestID); err != nil {
+		MapDBError(w, err)
+		return
+	} else if rr.Status == "needs_info" {
+		Error(w, http.StatusConflict, "needs_info", "差し戻し中の依頼です。再提出されてから決めてください")
 		return
 	}
 	if err := q.AnswerReviewOffer(r.Context(), db.AnswerReviewOfferParams{ID: offer.ID, Result: "declined"}); err != nil {

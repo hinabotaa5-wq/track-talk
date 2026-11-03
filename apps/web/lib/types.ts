@@ -200,6 +200,8 @@ export type NotificationKind =
   | "review_returned"
   | "review_clarify"
   | "review_clarified"
+  | "review_info_request"
+  | "review_resubmitted"
   | "review_helpful_ask"
   | "message";
 
@@ -645,7 +647,22 @@ export type PublicCoachingPlan = {
 };
 
 export type ReviewFocus = "start" | "acceleration" | "top-speed" | "takeoff" | "arm" | "contact" | "rhythm" | "other";
-export type ReviewStatus = "awaiting_payment" | "queued" | "offered" | "in_review" | "returned" | "clarifying" | "expired";
+export type ReviewStatus = "awaiting_payment" | "queued" | "offered" | "in_review" | "needs_info" | "returned" | "clarifying" | "expired";
+
+// 返却前の「内容確認のための差し戻し」の種類。
+export type ReviewInfoReason = "focus" | "scene" | "goal" | "mismatch" | "other";
+
+// 差し戻しの履歴。コーチの質問、再提出期限、再提出前の相談内容。1依頼1回だけ。
+export type ReviewInfoRequest = {
+  body: string;
+  reason: ReviewInfoReason | null;
+  requested_at: string;
+  from_status: "offered" | "in_review";
+  resubmit_by: string;
+  original_question: string | null;
+  video_replaced: boolean;
+  resubmitted_at: string | null;
+};
 
 export type ClarifyReason = "term" | "drill" | "fix" | "other";
 export type HelpfulAnswer = "yes" | "some" | "no";
@@ -697,6 +714,8 @@ export type ReviewRequest = {
   created_at: string;
   video_url: string;
   thumbnail_url: string;
+  // コーチが内容確認のために差し戻したときだけ入る。
+  info_request?: ReviewInfoRequest | null;
   // 詳細を開いたときだけ付く。
   response?: ReviewResponse | null;
   rating?: ReviewRating | null;

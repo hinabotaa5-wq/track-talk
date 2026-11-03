@@ -11,12 +11,13 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachEarningsSection } from "@/components/coach-payouts";
 import { CoachPhotoForm } from "@/components/coach-photo";
 import { CoachAvailabilityEditor } from "@/components/coach-availability";
+import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
 import { CoachContractsSection } from "@/components/coaching-contracts";
 import { CoachPlansSection } from "@/components/coaching-plans";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath, coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { coachingEnabled } from "@/lib/features";
+import { coachingEnabled, coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewQuestionText } from "@/lib/review";
 import type { CoachApplication, CoachingMe, CoachRatingSummary, CoachRequests, CoachReviewRequest } from "@/lib/types";
@@ -43,7 +44,7 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
       </p>
       {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">あなたを選んだ依頼 · 報酬{formatYen(request.coach_reward_yen ?? 0)}</p> : null}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
-      <p className="text-xs text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>
+      {request.status === "needs_info" ? null : <p className="text-xs text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>}
     </div>
   );
 }
@@ -114,6 +115,9 @@ function CoachRequestsSection({ token }: { token: string | null }) {
               <RequestSummary request={offer.request} />
               <p className="text-sm font-semibold text-white">{formatDateTime(offer.expires_at)}までに引き受けてください（あと{minutesLeft(offer.expires_at, now)}分）。過ぎると依頼は終了します</p>
               {offer.terms ? <WorkOrderTermsView terms={offer.terms} /> : null}
+              {coachingMessagingEnabled && !offer.request.info_request ? (
+                <CoachInfoRequestForm requestID={offer.request.id} token={token} onSent={() => setReload((n) => n + 1)} />
+              ) : null}
               <div className="flex gap-2">
                 <Button type="button" className="flex-1" disabled={pending} onClick={() => void answer(offer.id, "accept")}>
                   引き受ける
@@ -140,6 +144,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
           {data.reviewing.map((request) => (
             <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
               <RequestSummary request={request} />
+              {request.info_request && request.status === "needs_info" ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
               {request.video_url ? (
                 <video
                   src={request.video_url}
@@ -154,7 +159,7 @@ function CoachRequestsSection({ token }: { token: string | null }) {
                 href={`/coach/requests/${request.id}`}
                 className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
               >
-                {request.status === "clarifying" ? "補足を書く" : "返答を書く"}
+                {request.status === "clarifying" ? "補足を書く" : request.status === "needs_info" ? "依頼を開く" : "返答を書く"}
               </Link>
             </li>
           ))}

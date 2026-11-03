@@ -24,6 +24,8 @@ const labels: Record<NotificationKind, string> = {
   review_returned: "フォーム添削の返答が届きました",
   review_clarify: "添削の補足を頼まれました",
   review_clarified: "添削の補足が届きました",
+  review_info_request: "コーチから依頼内容の確認が届きました",
+  review_resubmitted: "差し戻した依頼が再提出されました",
   review_helpful_ask: "アドバイスは役に立ちましたか",
   message: "お知らせ",
 };
@@ -32,7 +34,7 @@ const labels: Record<NotificationKind, string> = {
 function hrefFor(item: AppNotification) {
   // サイト内のパスだけを開く。
   if (item.url?.startsWith("/") && !item.url.startsWith("//")) return item.url;
-  if (item.kind === "review_offer") return "/coach";
+  if (item.kind === "review_offer" || item.kind === "review_resubmitted") return "/coach";
   if (item.kind === "review_clarify" && item.review_request_id) return `/coach/requests/${item.review_request_id}`;
   if (item.review_request_id) return `/coaching/requests/${item.review_request_id}`;
   return `/posts/${item.post_id}`;

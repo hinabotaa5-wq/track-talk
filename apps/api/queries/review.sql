@@ -98,7 +98,7 @@ WHERE c.status = 'approved'
   AND (
     SELECT count(*) FROM review_requests r
     WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review')
+      AND r.status IN ('offered', 'in_review', 'needs_info')
   ) < sqlc.arg(max_active)::int
   AND (
     SELECT count(*) FROM review_offers o
@@ -236,12 +236,16 @@ JOIN review_requests r ON r.id = o.request_id
 WHERE o.coach_id = $1
   AND o.result IS NULL
   AND o.expires_at > now()
+  -- 差し戻し中（needs_info）の打診は、再提出されるまで出さない。
+  AND r.status = 'offered'
 ORDER BY o.offered_at;
 
 -- name: ListCoachReviewing :many
 SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
-  AND status IN ('in_review', 'clarifying')
+  AND (status IN ('in_review', 'clarifying')
+       -- 差し戻し中の依頼も、再提出を待っていることが分かるように出す。
+       OR status = 'needs_info')
 ORDER BY due_at;
 
 -- name: LockReviewRequester :exec
@@ -263,7 +267,7 @@ WHERE c.status = 'approved'
   AND (
     SELECT count(*) FROM review_requests r
     WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review')
+      AND r.status IN ('offered', 'in_review', 'needs_info')
   ) < sqlc.arg(max_active)::int
   AND (
     SELECT count(*) FROM review_offers o
@@ -281,3 +285,81 @@ WHERE c.status = 'approved'
   )
 ORDER BY md5(c.profile_id::text || extract(epoch FROM sqlc.arg(day_start)::timestamptz)::bigint::text)
 LIMIT 200;
+
+-- name: RequestReviewInfo :one
+-- 担当のコーチが、内容確認のために依頼を1回だけ差し戻す。引受前（offered）でも引受後（in_review）でもよく、返却期限までに限る。
+-- 差し戻す前の状態を info_from_status に残す（SET の右辺の status は更新前の値）。
+UPDATE review_requests
+SET status = 'needs_info',
+    info_request = sqlc.arg(body)::text,
+    info_reason = sqlc.narg(reason)::text,
+    info_requested_at = now(),
+    info_from_status = status,
+    resubmit_by = sqlc.arg(resubmit_by)::timestamptz,
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND coach_id = sqlc.arg(coach_id)::uuid
+  AND status IN ('offered', 'in_review')
+  AND info_requested_at IS NULL
+  AND due_at > now()
+RETURNING *;
+
+-- name: LockCoachOpenOfferForRequest :one
+-- 差し戻す依頼の、まだ返事をしていない打診（引受前の差し戻しのとき）。
+SELECT * FROM review_offers
+WHERE request_id = $1
+  AND coach_id = $2
+  AND result IS NULL
+FOR UPDATE;
+
+-- name: SetReviewOfferExpiry :execrows
+-- 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
+UPDATE review_offers
+SET expires_at = sqlc.arg(expires_at)::timestamptz
+WHERE request_id = sqlc.arg(request_id)
+  AND coach_id = sqlc.arg(coach_id)
+  AND result IS NULL;
+
+-- name: ResubmitReviewRequest :one
+-- 依頼者が、差し戻された依頼の相談内容を直して（動画は差し替えてもよい）再提出する。再提出期限までに1回だけ。
+-- 返却期限は再提出から24時間に数え直し、差し戻す前の状態（引受前・引受後）に戻す。
+UPDATE review_requests
+SET status = info_from_status,
+    original_question = question,
+    question = sqlc.arg(question)::text,
+    video_public_id = sqlc.arg(video_public_id)::text,
+    video_replaced = (sqlc.arg(video_public_id)::text <> video_public_id),
+    due_at = sqlc.arg(due_at)::timestamptz,
+    resubmitted_at = now(),
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND requester_id = sqlc.arg(requester_id)
+  AND status = 'needs_info'
+  AND resubmit_by > now()
+RETURNING *;
+
+-- name: ExpireUnresubmittedReviewRequests :many
+-- 再提出期限までに再提出がなかった差し戻しを終える。既存の期限切れと同じく expired にし、
+-- 支払いの取り消し・返金とチケットの返却は tick の既存の処理が行う。返事待ちのままの打診も閉じる。
+WITH target AS (
+    SELECT id, info_from_status
+    FROM review_requests
+    WHERE status = 'needs_info'
+      AND resubmit_by <= now()
+    FOR UPDATE
+), ended AS (
+    UPDATE review_requests r
+    SET status = 'expired',
+        updated_at = now()
+    FROM target
+    WHERE r.id = target.id
+    RETURNING r.id, r.requester_id, r.coach_id, target.info_from_status
+), closed AS (
+    UPDATE review_offers o
+    SET result = 'expired',
+        answered_at = now()
+    FROM ended
+    WHERE o.request_id = ended.id
+      AND o.result IS NULL
+)
+SELECT id, requester_id, coach_id, info_from_status FROM ended;

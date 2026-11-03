@@ -23,7 +23,7 @@ WHERE request_id = $1;
 SELECT * FROM review_requests
 WHERE id = sqlc.arg(id)
   AND coach_id = sqlc.arg(coach_id)::uuid
-  AND status IN ('in_review', 'returned', 'clarifying');
+  AND status IN ('in_review', 'needs_info', 'returned', 'clarifying');
 
 -- name: RequestReviewClarification :one
 -- 「わからなかった」は1つの返答に1回だけ。

@@ -6,6 +6,7 @@ import { PageLoading } from "@/components/page-loading";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -244,7 +245,13 @@ export default function CoachReviewRequestPage() {
 
       {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
 
+      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
+
       {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} /> : null}
+
+      {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
+        <CoachInfoRequestForm requestID={request.id} token={token} onSent={setRequest} />
+      ) : null}
 
       {response ? <ReviewResponseView response={response} /> : null}
 

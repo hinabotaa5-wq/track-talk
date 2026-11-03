@@ -142,7 +142,7 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	out := s.coachRequestJSON(rr, true)
+	out := s.coachRequestJSON(rr, coachSeesVideo(rr))
 	if err := s.withResponse(r.Context(), out, rr.ID); err != nil {
 		MapDBError(w, err)
 		return

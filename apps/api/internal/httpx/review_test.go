@@ -336,3 +336,57 @@ func TestCoachDutyNeedsReachableDevice(t *testing.T) {
 		t.Fatalf("reachable device %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 受付停止中のコーチには新しい依頼が届かず（選べる一覧からも消える）、受付済みの依頼はそのまま進められる。
+// 受付を再開すると、また依頼が届く。状態はサーバーに残る（Issue #320）。
+func TestCoachDutyToggleStopsNewRequestsOnly(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupCoachChoice(t)
+	admin := adminToken(t, h)
+	coach, tc := onDutyCoach(t, h, admin)
+	_, tu := demoRequester(t, h, admin)
+	nominated := func() bool {
+		rec := doJSON(t, h, http.MethodGet, "/v1/coaching/nominees?event=100m", tu, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("nominees %d %s", rec.Code, rec.Body.String())
+		}
+		return strings.Contains(rec.Body.String(), coach.String())
+	}
+	id := chosenReview(t, h, tu, coach.String(), "card", false)
+	payChosenReview(t, h, id, "card")
+	offers := coachRequests(t, h, tc).Offers
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+		t.Fatalf("accept %d", rec.Code)
+	}
+
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": false}); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"on_duty":false`) {
+		t.Fatalf("off %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me", tc, nil); !strings.Contains(rec.Body.String(), `"on_duty":false`) {
+		t.Fatalf("not persisted %s", rec.Body.String())
+	}
+	if nominated() {
+		t.Fatal("off-duty coach is still offered to requesters")
+	}
+	b := reviewBodyFor(t, h, tu)
+	b["method"], b["requested_coach_id"] = "card", coach.String()
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, b); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "requested_coach_id") {
+		t.Fatalf("request to off-duty coach %d %s", rec.Code, rec.Body.String())
+	}
+	// 受付済みの依頼は止まらない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
+		t.Fatalf("response while off duty %d %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
+		t.Fatalf("on %d %s", rec.Code, rec.Body.String())
+	}
+	if !nominated() {
+		t.Fatal("coach not offered after resuming")
+	}
+	next := chosenReview(t, h, tu, coach.String(), "card", false)
+	payChosenReview(t, h, next, "card")
+	if offers := coachRequests(t, h, tc).Offers; len(offers) != 1 || offers[0].Request.ID != next {
+		t.Fatalf("offers after resuming %+v", offers)
+	}
+}
