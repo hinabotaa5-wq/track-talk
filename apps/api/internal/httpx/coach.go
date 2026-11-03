@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -375,6 +376,76 @@ func (s *Server) removeCoachPhoto(w http.ResponseWriter, r *http.Request) {
 		s.deleteUnusedMedia(r.Context(), postMedia{Images: []string{*old}})
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) suspendCoach(w http.ResponseWriter, r *http.Request) {
+	s.setCoachSuspended(w, r, true)
+}
+
+func (s *Server) resumeCoach(w http.ResponseWriter, r *http.Request) {
+	s.setCoachSuspended(w, r, false)
+}
+
+// setCoachSuspended は、運営が承認済みのコーチを止めるか、止めていたコーチを承認済みに戻す。
+// 止めたコーチは一覧から外れ、添削・相談・パーソナル指導・送金先の設定などのコーチの操作が次のリクエストからできなくなる。
+// 返事をしていない添削の打診は、コーチをやめたときと同じく断った扱いにする。止めているあいだは報酬を送金しない。
+// 本人がやめた扱いにはしないので、自分で応募し直したりやめたりはできない。
+func (s *Server) setCoachSuspended(w http.ResponseWriter, r *http.Request, suspend bool) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := s.q.WithTx(tx)
+	// 送金をまとめている途中に止めないよう、送金の処理と順番にする。
+	if err := q.LockCoachPayouts(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	var c db.CoachProfile
+	var requeued []uuid.UUID
+	if suspend {
+		c, err = q.SuspendCoach(r.Context(), id)
+		if err == nil {
+			requeued, err = q.DeclineCoachOpenOffers(r.Context(), id)
+		}
+	} else {
+		c, err = q.ResumeCoach(r.Context(), id)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, getErr := s.q.GetCoachProfile(r.Context(), id); errors.Is(getErr, pgx.ErrNoRows) {
+			Error(w, http.StatusNotFound, "not_found", "コーチが見つかりません")
+		} else if suspend {
+			Error(w, http.StatusConflict, "conflict", "承認済みのコーチだけ止められます")
+		} else {
+			Error(w, http.StatusConflict, "conflict", "止めているコーチだけ戻せます")
+		}
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	// 断った扱いにした依頼のうち、おまかせのものはほかのコーチに打診し直し、選ばれていた依頼は終わったことを知らせる。
+	for _, rid := range requeued {
+		if _, err := s.offerReview(r.Context(), rid); err != nil {
+			slog.Warn("review offer after coach suspend", "err", err)
+		}
+		s.notifyNominationEnded(r.Context(), rid)
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
 // listCoaches は、依頼する前に見られるコーチ一覧。ログインしなくても見られる。
