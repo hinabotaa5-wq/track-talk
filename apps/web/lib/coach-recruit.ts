@@ -42,4 +42,5 @@ export const coachStatusLabels: Record<CoachStatus, string> = {
   rejected: "見送り",
   suspended: "停止中",
   withdrawn: "やめた",
+  ended: "登録終了",
 };

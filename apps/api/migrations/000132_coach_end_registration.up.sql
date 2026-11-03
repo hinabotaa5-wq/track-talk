@@ -10,3 +10,5 @@ CREATE TABLE coach_registration_endings (
     ended_by uuid REFERENCES profiles (id) ON DELETE SET NULL,
     ended_at timestamptz NOT NULL DEFAULT now()
 );
+-- API からだけ読み書きする。anon・authenticated からは見えないようにする。
+ALTER TABLE coach_registration_endings ENABLE ROW LEVEL SECURITY;
