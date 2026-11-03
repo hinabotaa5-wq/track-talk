@@ -88,6 +88,7 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
 		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
 		"info_request":  infoRequestJSON(rr),
+		"withdrawal":    withdrawalJSON(rr),
 	}
 }
 

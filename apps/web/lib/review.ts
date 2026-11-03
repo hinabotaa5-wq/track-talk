@@ -55,6 +55,9 @@ export const reviewInfoReasonLabels: Record<ReviewInfoReason, string> = {
 // 差し戻しの質問の最短の長さ（サーバーと同じ。空白と記号は数えない）。
 export const minInfoRequestChars = 15;
 
+// 引受後の辞退でコーチが添えられる理由の長さ（サーバーと同じ）。
+export const maxWithdrawReasonChars = 200;
+
 export const helpfulLabels: Record<HelpfulAnswer, string> = {
   yes: "役に立った",
   some: "少し",

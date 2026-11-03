@@ -8,6 +8,7 @@ import { CoachingConsultations } from "@/components/coaching-consultations";
 import { useAuth } from "@/components/auth-provider";
 import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
+import { CoachWithdrawForm } from "@/components/review-withdraw";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
@@ -251,6 +252,10 @@ export default function CoachReviewRequestPage() {
 
       {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
         <CoachInfoRequestForm requestID={request.id} token={token} onSent={setRequest} />
+      ) : null}
+
+      {request.status === "in_review" || (request.status === "needs_info" && request.info_request?.from_status === "in_review") ? (
+        <CoachWithdrawForm requestID={request.id} token={token} onWithdrawn={() => router.push("/coach")} />
       ) : null}
 
       {response ? <ReviewResponseView response={response} /> : null}

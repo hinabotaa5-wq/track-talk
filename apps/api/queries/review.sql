@@ -363,3 +363,20 @@ WITH target AS (
       AND o.result IS NULL
 )
 SELECT id, requester_id, coach_id, info_from_status FROM ended;
+
+-- name: WithdrawReviewRequest :one
+-- 担当のコーチが、引き受けた依頼を返却する前に辞退する。添削中か、引受後に差し戻して再提出を待っている間に限る。
+-- その場で expired にし、支払いの取り消し・返金とチケットの返却は既存の期限切れと同じく tick が行う。別のコーチには回さない。
+-- 辞退した時の状態を withdrawn_from_status に残す（SET の右辺の status は更新前の値）。
+UPDATE review_requests
+SET status = 'expired',
+    withdrawn_at = now(),
+    withdrawn_by = sqlc.arg(coach_id)::uuid,
+    withdrawn_from_status = status,
+    withdraw_reason = sqlc.narg(reason)::text,
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND coach_id = sqlc.arg(coach_id)::uuid
+  AND (status = 'in_review' OR (status = 'needs_info' AND info_from_status = 'in_review'))
+  AND returned_at IS NULL
+RETURNING *;

@@ -358,6 +358,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"requested_coach_id": rr.RequestedCoachID,
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
 		"info_request":       infoRequestJSON(rr),
+		"withdrawal":         withdrawalJSON(rr),
 	}
 	if withVideo {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(rr.VideoPublicID)

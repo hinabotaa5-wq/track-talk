@@ -7,6 +7,7 @@ import { CoachingConsultations } from "@/components/coaching-consultations";
 import { useAuth } from "@/components/auth-provider";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
+import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -232,7 +233,7 @@ function ReviewRequestView() {
       </div>
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
+        <p className="text-sm font-semibold text-white">{request.withdrawal ? "コーチの都合で依頼は終了しました" : request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返却期限: {formatDateTime(request.due_at)}</p>
         ) : null}
@@ -256,6 +257,7 @@ function ReviewRequestView() {
         )
       ) : null}
 
+      {request.withdrawal ? <ReviewWithdrawalNotice withdrawal={request.withdrawal} paid={Boolean(request.payment)} /> : null}
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" /> : null}
       {request.status === "needs_info" ? <ResubmitForm request={request} token={token} onChange={setRequest} /> : null}
 
