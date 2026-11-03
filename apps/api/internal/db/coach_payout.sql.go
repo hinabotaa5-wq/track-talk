@@ -347,6 +347,7 @@ WHERE e.payout_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
   AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
+  AND cp.status <> 'suspended'
 GROUP BY e.coach_id, cp.status
 HAVING sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)) >= $1::int OR cp.status <> 'approved'
     OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo'
@@ -361,6 +362,7 @@ type ListPayableCoachEarningsRow struct {
 // 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
 // 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
 // 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
+// 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。
 func (q *Queries) ListPayableCoachEarnings(ctx context.Context, minYen int32) ([]ListPayableCoachEarningsRow, error) {
 	rows, err := q.db.Query(ctx, listPayableCoachEarnings, minYen)
 	if err != nil {
@@ -425,6 +427,7 @@ SELECT p.id, p.coach_id, p.month, p.amount_yen, p.status, p.stripe_transfer_id, 
 FROM coach_payouts p
 JOIN coach_profiles cp ON cp.profile_id = p.coach_id
 WHERE p.status IN ('pending', 'failed') AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
+  AND cp.status <> 'suspended'
 ORDER BY p.created_at
 LIMIT 100
 `
@@ -442,7 +445,7 @@ type ListUnpaidCoachPayoutsRow struct {
 	StripeAccountID  string     `json:"stripe_account_id"`
 }
 
-// まだ送金していない（前に失敗した）送金と、送り先のアカウント。
+// まだ送金していない（前に失敗した）送金と、送り先のアカウント。運営が止めているコーチの分は、戻すまで送らない。
 func (q *Queries) ListUnpaidCoachPayouts(ctx context.Context) ([]ListUnpaidCoachPayoutsRow, error) {
 	rows, err := q.db.Query(ctx, listUnpaidCoachPayouts)
 	if err != nil {

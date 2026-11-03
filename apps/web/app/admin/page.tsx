@@ -421,7 +421,7 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
   );
 }
 
-// コーチの応募の審査。審査中の応募を承認か見送りにする。
+// コーチの応募の審査。審査中の応募を承認か見送りにし、承認済みのコーチを止めたり戻したりする。
 function CoachesAdmin({ token }: { token: string | null }) {
   const confirmDialog = useConfirm();
   const [status, setStatus] = useState<CoachStatus>("pending");
@@ -484,12 +484,28 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  async function setSuspended(a: AdminCoachApplication, action: "suspend" | "resume") {
+    const question =
+      action === "suspend"
+        ? "このコーチを止めますか？添削・相談・パーソナル指導などコーチの操作がすぐにできなくなり、返事待ちの打診は断った扱いになります。止めているあいだは報酬を送金しません。"
+        : "このコーチを承認済みに戻しますか？受付はコーチが自分で入れ直します。";
+    if (!confirm(question)) return;
+    const label = action === "suspend" ? "止めました" : "戻しました";
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/${action}`, { method: "POST", token });
+      setMessage(label);
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "できませんでした");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
       <CoachProbationAdmin token={token} />
       <div className="flex flex-wrap gap-2">
-        {(["pending", "approved", "rejected", "withdrawn"] as const).map((s) => (
+        {(["pending", "approved", "suspended", "rejected", "withdrawn"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -542,6 +558,16 @@ function CoachesAdmin({ token }: { token: string | null }) {
                   順番に戻す
                 </button>
               </div>
+            ) : null}
+            {a.status === "approved" ? (
+              <button type="button" onClick={() => void setSuspended(a, "suspend")} className="text-sm text-red-300 underline">
+                コーチを止める
+              </button>
+            ) : null}
+            {a.status === "suspended" ? (
+              <button type="button" onClick={() => void setSuspended(a, "resume")} className="text-sm text-blue-300 underline">
+                承認済みに戻す
+              </button>
             ) : null}
             {a.status === "pending" ? (
               <div className="flex gap-4 pt-1">

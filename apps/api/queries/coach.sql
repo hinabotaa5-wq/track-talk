@@ -76,6 +76,25 @@ WHERE profile_id = $1
   AND status = 'approved'
 RETURNING *;
 
+-- name: SuspendCoach :one
+-- 運営が承認済みのコーチを止める。受付も止める。コーチの機能は毎回 status を見るので、次の操作から使えなくなる。
+UPDATE coach_profiles
+SET status = 'suspended',
+    on_duty = false,
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'approved'
+RETURNING *;
+
+-- name: ResumeCoach :one
+-- 運営が止めたコーチを承認済みに戻す。受付はコーチが自分で入れ直す。
+UPDATE coach_profiles
+SET status = 'approved',
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'suspended'
+RETURNING *;
+
 -- name: ListPublicCoaches :many
 -- 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
 SELECT
