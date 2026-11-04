@@ -33,6 +33,7 @@ describe("hasBackOnlyHeader", () => {
     expect(hasBackOnlyHeader("/login", "")).toBe(false);
     expect(hasBackOnlyHeader("/login", "?next=/upload")).toBe(true);
     expect(hasBackOnlyHeader("/register")).toBe(true);
+    expect(hasBackOnlyHeader("/register/sent")).toBe(true);
     expect(hasBackOnlyHeader("/reset-password")).toBe(true);
     expect(hasBackOnlyHeader("/reset-password/update")).toBe(true);
   });

@@ -10,6 +10,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { ServiceConsentText } from "@/components/service-consent-text";
 import { rememberOverseasConsent, signupConsentMetadata } from "@/lib/overseas-consent";
+import { rememberSignupSentEmail } from "@/lib/signup-sent";
 import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,6 @@ function saveDraft(next: Draft) {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(draft.agreed);
   const { pending, acquire, release } = useActionLock();
@@ -96,7 +96,9 @@ export default function RegisterPage() {
       setError("このメールアドレスはすでに登録されています。ログインするか、パスワードを再設定してください。");
       return;
     }
-    setMessage("確認メールを送信しました。メール内のリンクを開いてください。数分たっても届かないときは、迷惑メールのフォルダも見てください。");
+    // 送ったアドレスと届かないときの案内は、送信済みの画面で出す(アドレスは URL に載せない)。
+    rememberSignupSentEmail(values.email);
+    router.push("/register/sent");
   }
 
   return (
@@ -106,7 +108,6 @@ export default function RegisterPage() {
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"

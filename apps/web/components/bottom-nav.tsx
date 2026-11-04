@@ -107,7 +107,7 @@ export function headerBackFallback(pathname: string) {
 // 下のメニューの「マイページ」から開いたログイン画面(next なし)は、ふつうのヘッダーのまま。
 export function hasBackOnlyHeader(pathname: string, search = "") {
   if (isDetailPage(pathname)) return true;
-  if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
+  if (pathname === "/register" || pathname === "/register/sent" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   if (pathname === "/login") return new URLSearchParams(search).has("next");
   if (isMeSubPage(pathname)) return true;
   return isInjuryGroupPath(pathname);
@@ -124,7 +124,7 @@ export function hidesHeader(pathname: string, search = "", mustSetProfile = fals
 // search は "?next=/upload" のような URL のクエリ部分。
 export function showsBackButton(pathname: string, search = "") {
   if (isDetailPage(pathname)) return true;
-  if (pathname === "/register" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
+  if (pathname === "/register" || pathname === "/register/sent" || pathname === "/reset-password" || pathname === "/reset-password/update") return true;
   // 投稿の＋などログインが要るページから送られてきたときは、元の画面に戻れるようにする。
   // 下のメニューのタブから開いたときは next が無いので、ロゴのままにする。
   if (pathname === "/login") return new URLSearchParams(search).has("next");
@@ -150,6 +150,7 @@ export function showsHeaderAccountActions(pathname: string, search = "") {
 // ログイン画面では出す(ログインしていなければ、ホームとコーチ以外のタブはログイン画面に戻る)。
 const bottomNavHidden = new Set([
   "/register",
+  "/register/sent",
   "/reset-password",
   "/reset-password/update",
   "/upload",
