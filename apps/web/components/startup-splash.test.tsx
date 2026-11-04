@@ -5,8 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StartupSplash } from "./startup-splash";
 
-const auth = vi.hoisted(() => ({ loading: true }));
+type TestProfile = { nickname: string | null; event: string | null; overseas_consent?: boolean } | null;
+const auth = vi.hoisted(() => ({ loading: true, profile: null as TestProfile }));
+const nav = vi.hoisted(() => ({ pathname: "/" }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => auth }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -14,6 +17,8 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers();
   auth.loading = true;
+  auth.profile = null;
+  nav.pathname = "/";
   container = document.createElement("div");
   root = createRoot(container);
 });
@@ -56,4 +61,42 @@ it("認証の応答がない場合もロゴを表示したまま閉じ込めな�
   expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
   await act(async () => vi.advanceTimersByTimeAsync(400));
   expect(container.querySelector("#startup-splash")).toBeNull();
+});
+
+it("ニックネームを決める前の人は、決める画面に移るまでホームを見せずにロゴを出し続ける", async () => {
+  await act(async () => root.render(<StartupSplash />));
+  auth.loading = false;
+  auth.profile = { nickname: null, event: null, overseas_consent: true };
+  await act(async () => root.render(<StartupSplash />));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("shown");
+  nav.pathname = "/me/profile";
+  await act(async () => root.render(<StartupSplash />));
+  await act(async () => vi.advanceTimersByTimeAsync(20));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
+  await act(async () => vi.advanceTimersByTimeAsync(400));
+  expect(container.querySelector("#startup-splash")).toBeNull();
+});
+
+it("同意を記録するあいだも、ホームを見せずにロゴを出し続ける", async () => {
+  await act(async () => root.render(<StartupSplash />));
+  auth.loading = false;
+  auth.profile = { nickname: null, event: null, overseas_consent: false };
+  nav.pathname = "/me/profile";
+  await act(async () => root.render(<StartupSplash />));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("shown");
+  // 記録できてプロフィールを読み直すと、決める画面のまま閉じる。
+  auth.profile = { nickname: null, event: null, overseas_consent: true };
+  await act(async () => root.render(<StartupSplash />));
+  await act(async () => vi.advanceTimersByTimeAsync(20));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
+});
+
+it("決める画面に移れないままでも、10秒で閉じて閉じ込めない", async () => {
+  auth.loading = false;
+  auth.profile = { nickname: null, event: null, overseas_consent: true };
+  await act(async () => root.render(<StartupSplash />));
+  await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(container.querySelector("#startup-splash")?.getAttribute("data-state")).toBe("leaving");
 });
