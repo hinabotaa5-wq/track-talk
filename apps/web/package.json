@@ -47,6 +47,9 @@
     },
     "@typescript-eslint/typescript-estree": {
       "minimatch": "^11.0.1"
+    },
+    "eslint-config-next": {
+      "minimatch": "^11.0.1"
     }
   }
 }
