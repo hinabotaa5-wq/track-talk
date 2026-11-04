@@ -76,7 +76,7 @@ export function EmailSection({ email }: { email: string }) {
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <p className="text-sm text-slate-300">いま: {email}</p>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" autoComplete="email" placeholder="新しいメールアドレス" {...form.register("email")} />
         {form.formState.errors.email ? <p className="text-sm text-red-400">{form.formState.errors.email.message}</p> : null}
         <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
@@ -132,7 +132,7 @@ export function PasswordSection({ email }: { email: string }) {
 
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
         <ForgotPasswordLink />

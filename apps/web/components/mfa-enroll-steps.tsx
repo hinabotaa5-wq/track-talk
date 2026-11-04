@@ -64,7 +64,7 @@ export function MfaEnrollSteps({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form method="post" onSubmit={onSubmit} className="space-y-5">
       <Step n={1} title="認証アプリを用意する">
         <p className="text-xs text-slate-300">
           iPhone は、最初から入っている「パスワード」アプリで足ります。新しく入れる必要はありません。Android などは、Google Authenticator(無料)を Google Play から入れてください。すでに認証アプリを使っている人は次へ進みます。

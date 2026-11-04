@@ -43,7 +43,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">パスワードリセット</h1>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メールアドレス" {...form.register("email")} />
         {captcha.widget}
         {message ? <p className="whitespace-pre-line text-sm">{message}</p> : null}

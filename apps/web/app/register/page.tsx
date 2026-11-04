@@ -97,7 +97,7 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">新規登録</h1>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード（8文字以上）" {...form.register("password")} />
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
