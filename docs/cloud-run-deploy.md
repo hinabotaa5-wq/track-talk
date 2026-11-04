@@ -164,7 +164,14 @@ gcloud run jobs create track-talk-payment-counts --region asia-northeast1 \
 gcloud run jobs execute track-talk-payment-counts --region asia-northeast1 --wait
 ```
 
-`result` が `clear` なら孤立・想定外の状態は0件、`attention` なら `orphans`・`flagged_states`・`unexpected_values` のどれかが0でありません。本番のスキーマが想定（migration 128）と違うときは件数を取らず `payment_counts_schema_mismatch` を出して終了コード2で止まります。手元のテストは `cd deploy/cloud-run/payment-counts && python3 -m unittest test_counts` です。
+新しい migration を本番に当てたあとは、`counts.py` の `EXPECTED_MIGRATION` を同じ版に上げ、イメージを作り直してジョブのイメージを差し替えます。差し替えるまでは終了コード2で止まります。
+
+```bash
+gcloud run jobs update track-talk-payment-counts --region asia-northeast1 \
+  --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/payment-counts:<日付-版>
+```
+
+`result` が `clear` なら孤立・想定外の状態は0件、`attention` なら `orphans`・`flagged_states`・`unexpected_values` のどれかが0でありません。本番のスキーマが想定（`counts.py` の `EXPECTED_MIGRATION`）と違うときは件数を取らず `payment_counts_schema_mismatch` を出して終了コード2で止まります。手元のテストは `cd deploy/cloud-run/payment-counts && python3 -m unittest test_counts` です。
 
 ## トラブル
 
