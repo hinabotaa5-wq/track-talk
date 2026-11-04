@@ -25,3 +25,12 @@ export function mustConsentOverseas(pathname: string, profile: Pick<Profile, "ov
   if (profile?.overseas_consent !== false) return false;
   return !under(pathname, consentOpenPrefixes);
 }
+
+// いまの画面を、同意かニックネームを決める画面へ移す前提の状態なら true。
+// 移すまでのあいだ起動画面を閉じずに残し、ホームなどが一瞬見えないようにする。
+export function profileGateRedirecting(
+  pathname: string,
+  profile: Pick<Profile, "nickname" | "event" | "overseas_consent"> | null,
+) {
+  return mustConsentOverseas(pathname, profile) || mustCompleteProfile(pathname, profile);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mustCompleteProfile, mustConsentOverseas, profileIncomplete } from "./profile-gate";
+import { mustCompleteProfile, mustConsentOverseas, profileGateRedirecting, profileIncomplete } from "./profile-gate";
 
 describe("profileIncomplete", () => {
   it("ニックネームか種目がまだなら、決めていないとみなす", () => {
@@ -47,5 +47,17 @@ describe("mustConsentOverseas", () => {
 
   it("同意の画面にいる間は、プロフィールの画面へ送り返さない", () => {
     expect(mustCompleteProfile("/consent", { nickname: null, event: null })).toBe(false);
+  });
+});
+
+describe("profileGateRedirecting", () => {
+  it("同意かニックネームを決める画面へ移す前なら true、移った後や決め終えた人は false", () => {
+    expect(profileGateRedirecting("/", { nickname: null, event: null, overseas_consent: true })).toBe(true);
+    expect(profileGateRedirecting("/", { nickname: "ラン", event: "100m", overseas_consent: false })).toBe(true);
+    expect(profileGateRedirecting("/me/profile", { nickname: null, event: null, overseas_consent: false })).toBe(true);
+    expect(profileGateRedirecting("/me/profile", { nickname: null, event: null, overseas_consent: true })).toBe(false);
+    expect(profileGateRedirecting("/consent", { nickname: null, event: null, overseas_consent: false })).toBe(false);
+    expect(profileGateRedirecting("/", { nickname: "ラン", event: "100m", overseas_consent: true })).toBe(false);
+    expect(profileGateRedirecting("/", null)).toBe(false);
   });
 });

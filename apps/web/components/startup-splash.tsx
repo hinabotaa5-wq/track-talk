@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { profileGateRedirecting } from "@/lib/profile-gate";
 import { TrackLanesMark } from "@/components/app-icon-mark";
 
 // 明るい表示の背景と同じ白。manifest の background_color と iOS の起動画像もこの色にそろえ、
@@ -14,7 +16,11 @@ const fadeMs = 400;
 // 初期HTMLにも含め、JavaScriptの読み込み中からロゴを表示する。
 // ルートレイアウトに置くので、アプリ内のタブ移動では表示し直さない。
 export function StartupSplash() {
-  const { loading } = useAuth();
+  const { loading, profile } = useAuth();
+  const pathname = usePathname();
+  // 登録したばかりでニックネームや同意がまだの人は、ProfileGate が決める画面へ移し終えるまで閉じない
+  // (ホームが一瞬見えてから移るのを防ぐ)。移れなかったときも、下の10秒で閉じる。
+  const holding = !loading && profileGateRedirecting(pathname, profile);
   const [phase, setPhase] = useState<"shown" | "leaving" | "gone">("shown");
 
   useEffect(() => {
@@ -24,10 +30,10 @@ export function StartupSplash() {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || holding) return;
     const frame = window.requestAnimationFrame(() => setPhase((p) => (p === "shown" ? "leaving" : p)));
     return () => window.cancelAnimationFrame(frame);
-  }, [loading]);
+  }, [loading, holding]);
 
   useEffect(() => {
     if (phase !== "leaving") return;
