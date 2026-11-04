@@ -197,6 +197,10 @@ func TestDeleteAccountRemovesUserData(t *testing.T) {
 
 func TestDeleteAccountKeepsPurgeWhenAuthDeleteFails(t *testing.T) {
 	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/auth/v1/user" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		if r.Method != http.MethodDelete {
 			t.Errorf("method %s", r.Method)
 		}
@@ -209,7 +213,7 @@ func TestDeleteAccountKeepsPurgeWhenAuthDeleteFails(t *testing.T) {
 		cfg.SupabaseServiceRoleKey = "service-role-test"
 	})
 	authorID := uuid.New()
-	author := token(t, authorID)
+	author := tokenWithSession(t, authorID, uuid.NewString())
 	rec := doJSON(t, h, http.MethodPost, "/v1/posts", author, map[string]any{
 		"title": "消える投稿", "body": "認証削除に失敗しても投稿は残しません",
 	})

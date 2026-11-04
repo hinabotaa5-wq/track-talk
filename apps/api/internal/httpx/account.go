@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/auth"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
@@ -32,6 +33,9 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Confirm != withdrawConfirm {
 		FieldError(w, map[string]string{"confirm": "確認のため「退会する」と入力してください"})
+		return
+	}
+	if !s.requireActiveSession(w, r) {
 		return
 	}
 
@@ -164,6 +168,35 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		slog.Error("auth user remains after account purge", "err", err, "user_id", uid.String())
 	}
 	JSON(w, http.StatusOK, map[string]bool{"auth_deleted": authDeleted})
+}
+
+// requireActiveSession は、トークンのセッションが Supabase Auth でまだ有効かを確かめる。
+// API の認証は JWT の検証だけで、セッションの失効や Ban は有効期限まで届かない。
+// 退会は取り消せないので、ここだけは Auth に確かめ、確かめられないときも進めない。
+// 有効でなければ応答を書いて false を返す。
+func (s *Server) requireActiveSession(w http.ResponseWriter, r *http.Request) bool {
+	if !s.authAdmin.Enabled() {
+		slog.Warn("supabase service role key is not set; session was not checked")
+		return true
+	}
+	identity, ok := userIdentity(r.Context())
+	if !ok || identity.SessionID == "" {
+		slog.Warn("withdraw rejected: token has no session", "user_id", identity.UserID.String())
+		Error(w, http.StatusUnauthorized, "session_inactive", "ログインし直してから、もう一度お試しください")
+		return false
+	}
+	err := s.authAdmin.CheckSession(r.Context(), bearer(r))
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, auth.ErrSessionInactive):
+		slog.Warn("withdraw rejected: session is not active", "err", err, "user_id", identity.UserID.String())
+		Error(w, http.StatusUnauthorized, "session_inactive", "ログインし直してから、もう一度お試しください")
+	default:
+		slog.Error("withdraw session check failed", "err", err, "user_id", identity.UserID.String())
+		Error(w, http.StatusServiceUnavailable, "unavailable", "いまは確認できません。しばらくしてからもう一度試してください")
+	}
+	return false
 }
 
 // finishWithdraw は、Auth のユーザーを消す前に、データの削除をコミットする。コミットに失敗したら Auth のユーザーは残す。
