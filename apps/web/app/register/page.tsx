@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { ServiceConsentText } from "@/components/service-consent-text";
-import { rememberOverseasConsent } from "@/lib/overseas-consent";
+import { rememberOverseasConsent, signupConsentMetadata } from "@/lib/overseas-consent";
 import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,12 @@ export default function RegisterPage() {
       .signUp({
         email: values.email,
         password: values.password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback`, captchaToken: captcha.captchaToken },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          captchaToken: captcha.captchaToken,
+          // 確認メールを別のタブで開いても、ここでの同意をもう一度聞かずに記録できるよう、同意した版を残す。
+          data: signupConsentMetadata(),
+        },
       })
       .finally(() => {
         // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。

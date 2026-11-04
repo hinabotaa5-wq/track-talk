@@ -43,3 +43,32 @@ func TestOverseasConsent(t *testing.T) {
 		t.Fatal("同意したのに false")
 	}
 }
+
+// 登録画面で同意した版を添えて記録する。いまの版と違えば記録しない。
+func TestOverseasConsentWithVersion(t *testing.T) {
+	h := setup(t)
+	user := token(t, uuid.New())
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/consents/overseas", user, map[string]string{"version": "overseas-2000-01"}); rec.Code != 409 {
+		t.Fatalf("old version %d %s", rec.Code, rec.Body.String())
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/me", user, nil)
+	var me struct {
+		OverseasConsent bool `json:"overseas_consent"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &me)
+	if me.OverseasConsent {
+		t.Fatal("古い版の同意で true になった")
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/consents/overseas", user, map[string]string{"version": "overseas-2026-10"}); rec.Code != 204 {
+		t.Fatalf("current version %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, h, http.MethodGet, "/v1/me", user, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &me)
+	if !me.OverseasConsent {
+		t.Fatal("いまの版で同意したのに false")
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/me/consents/overseas", user, map[string]any{"unknown": 1}); rec.Code != 400 {
+		t.Fatalf("unknown field %d", rec.Code)
+	}
+}
