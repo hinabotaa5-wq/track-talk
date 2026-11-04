@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { canCommentOnPost } from "@/lib/practice-comments";
 import { buildCommentThreads, replyLabel, type CommentThread } from "@/lib/comment-thread";
 import { commentSchema } from "@/lib/validators";
-import { deleteConfirmOptions, reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
+import { deleteConfirmOptions, hideConfirmOptions, reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -42,7 +42,8 @@ export function PostDetail({
   // サーバーでログインなしに読めた投稿。最初からこれを描き、ログイン中ならいいね状態などを読み直す。
   initial?: { post: Post; comments: Comment[] };
 }) {
-  const { session, token } = useAuth();
+  const { session, token, profile } = useAuth();
+  const isAdmin = Boolean(profile?.is_admin);
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(initial?.post ?? null);
   const [comments, setComments] = useState<Comment[]>(initial?.comments ?? []);
@@ -167,6 +168,14 @@ export function PostDetail({
     }
   }
 
+  // 投稿がなくなったあと、一覧の控えを捨てて元の一覧へ戻る。
+  function leaveRemovedPost() {
+    clearHomeFeeds();
+    clearSavedFeeds();
+    router.push(returnTo === "me" ? "/me/posts" : current.kind === "injury" ? "/injury" : "/");
+    router.refresh();
+  }
+
   async function remove() {
     if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
     if (!action.acquire()) return;
@@ -177,10 +186,20 @@ export function PostDetail({
       alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
       return;
     }
-    clearHomeFeeds();
-    clearSavedFeeds();
-    router.push(returnTo === "me" ? "/me/posts" : current.kind === "injury" ? "/injury" : "/");
-    router.refresh();
+    leaveRemovedPost();
+  }
+
+  async function hidePost() {
+    if (!(await confirmDialog(hideConfirmOptions("この投稿")))) return;
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/admin/posts/${current.id}/hide`, { method: "POST", token });
+    } catch (e) {
+      action.release();
+      alert(e instanceof ApiRequestError ? e.message : "非表示にできませんでした");
+      return;
+    }
+    leaveRemovedPost();
   }
 
   function markReported(targetType: "post" | "comment", targetId: string) {
@@ -317,6 +336,19 @@ export function PostDetail({
     }
   }
 
+  async function hideComment(cid: string) {
+    if (!(await confirmDialog(hideConfirmOptions("このコメント")))) return;
+    if (!action.acquire()) return;
+    try {
+      await apiFetch(`/v1/admin/comments/${cid}/hide`, { method: "POST", token });
+      await load();
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "非表示にできませんでした");
+    } finally {
+      action.release();
+    }
+  }
+
   function startPress(e: React.PointerEvent, c: Comment) {
     cancelPress();
     longPress.current = {
@@ -385,6 +417,11 @@ export function PostDetail({
             <p className={`whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed ${c.body.length > 280 ? "text-xs" : "text-sm"}`}>{c.body}</p>
           </div>
           <span className="shrink-0 pb-0.5 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</span>
+          {isAdmin ? (
+            <button type="button" className="shrink-0 pb-0.5 text-xs text-red-300 underline disabled:opacity-50" disabled={action.pending} onClick={() => void hideComment(c.id)}>
+              非表示
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -590,6 +627,11 @@ export function PostDetail({
         {post.kind === "meet" ? null : (
           <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
         )}
+        {isAdmin ? (
+          <Button type="button" variant="danger" className="rounded-full shadow-xs active:scale-[0.98]" disabled={action.pending} onClick={hidePost}>
+            非表示にする
+          </Button>
+        ) : null}
       </div>
       </div>
       )}

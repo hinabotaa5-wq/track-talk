@@ -55,7 +55,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 
 ## 管理者
 
-`profiles.is_admin = true` を SQL で自分のUUIDに設定する。通報一覧は `GET /v1/admin/reports`。問い合わせ一覧は `GET /v1/admin/inquiries`。非表示は `POST /v1/admin/posts/{id}/hide`。
+`profiles.is_admin = true` を SQL で自分のUUIDに設定する。通報一覧は `GET /v1/admin/reports`。問い合わせ一覧は `GET /v1/admin/inquiries`。投稿とコメントの非表示は、`/admin` の通報タブか、管理者で開いた投稿画面から行う（API は `POST /v1/admin/posts/{id}/hide` と `POST /v1/admin/comments/{id}/hide`）。
 
 ## コーチング改革の移行・限定公開
 

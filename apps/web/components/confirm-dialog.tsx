@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-type ConfirmOptions = {
+export type ConfirmOptions = {
   title: string;
   /** 補足の説明。なければ出さない。 */
   body?: string;
@@ -107,6 +107,15 @@ export function reportConfirmOptions(options: { title?: string; body?: string } 
     title: options.title ?? "この内容を通報しますか？",
     body: options.body ?? "運営が内容を確認します。",
     confirmLabel: "通報する",
+  };
+}
+
+// 運営が投稿やコメントを非表示にするときの確認。戻す画面がないことを先に伝える。
+export function hideConfirmOptions(noun: string): ConfirmOptions {
+  return {
+    title: `${noun}を非表示にしますか？`,
+    body: "投稿者を含むすべての利用者から見えなくなります。画面からは元に戻せません。",
+    confirmLabel: "非表示にする",
   };
 }
 
