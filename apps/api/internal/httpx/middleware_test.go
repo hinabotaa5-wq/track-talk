@@ -1,6 +1,9 @@
 package httpx
 
 import (
+	"bytes"
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,5 +127,88 @@ func TestLogPathHidesGuardianToken(t *testing.T) {
 		if got := logPath(in); got != want {
 			t.Fatalf("logPath(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestRequestLogRecordsAuthenticatedUser(t *testing.T) {
+	secret := "test-jwt-secret-for-ci-only"
+	supabaseURL := "https://example.invalid"
+	v, err := auth.NewVerifier(secret, supabaseURL, "authenticated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := "11111111-1111-4111-8111-111111111111"
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": id,
+		"aud": "authenticated",
+		"iss": supabaseURL + "/auth/v1",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	optional := OptionalAuth(v, nil)
+	required := RequireAuth(v, nil)
+
+	cases := []struct {
+		name    string
+		handler http.Handler
+		header  string
+		status  int
+		userID  string
+	}{
+		{"optional with token", optional(ok), "Bearer " + tok, http.StatusNoContent, id},
+		{"required with token", optional(required(ok)), "Bearer " + tok, http.StatusNoContent, id},
+		{"optional without token", optional(ok), "", http.StatusNoContent, ""},
+		{"optional with bad token", optional(ok), "Bearer bad", http.StatusNoContent, ""},
+		{"required without token", optional(required(ok)), "", http.StatusUnauthorized, ""},
+		{"required with bad token", optional(required(ok)), "Bearer bad", http.StatusUnauthorized, ""},
+		{"no auth", ok, "Bearer " + tok, http.StatusNoContent, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/v1/me", nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			RequestLog(tc.handler).ServeHTTP(rec, req)
+			if rec.Code != tc.status {
+				t.Fatalf("status %d want %d", rec.Code, tc.status)
+			}
+
+			// 認証の失敗も slog に出るので、リクエストの行だけを見る。
+			var found bool
+			for _, line := range bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n")) {
+				var entry struct {
+					Msg    string  `json:"msg"`
+					UserID *string `json:"user_id"`
+				}
+				if err := json.Unmarshal(line, &entry); err != nil {
+					t.Fatalf("parse %q: %v", line, err)
+				}
+				if entry.Msg != "http" {
+					continue
+				}
+				found = true
+				if entry.UserID == nil {
+					t.Fatalf("user_id missing: %s", line)
+				}
+				if *entry.UserID != tc.userID {
+					t.Fatalf("user_id %q want %q", *entry.UserID, tc.userID)
+				}
+			}
+			if !found {
+				t.Fatalf("no request log: %s", logs.String())
+			}
+		})
 	}
 }
