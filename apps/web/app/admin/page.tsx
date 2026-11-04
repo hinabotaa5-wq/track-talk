@@ -642,7 +642,7 @@ export default function AdminPage() {
     { id: "personal", label: "パーソナル", total: -1 },
     // 送金の API はコーチングを提供するまで 404 なので、タブも出さない。
     ...(coachingEnabled ? ([{ id: "payouts", label: "送金", total: -1 }] as { id: Tab; label: string; total: number }[]) : []),
-    { id: "menu", label: "エグ練", total: -1 },
+    { id: "menu", label: "エグ練グランプリ", total: -1 },
     { id: "meets", label: "タイムテーブル", total: -1 },
     { id: "stats", label: "利用状況", total: -1 },
     { id: "announce", label: "お知らせ", total: -1 },

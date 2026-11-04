@@ -27,7 +27,7 @@ type AdminState = {
 
 const maxPicks = 3;
 
-// 管理者画面の「エグ練」タブ。今の回の応募を全部読み、締め切り後にトップ3を選ぶ。
+// 管理者画面の「エグ練グランプリ」タブ。今の回の応募を全部読み、締め切り後にトップ3を選ぶ。
 export function MenuContestAdmin({ token }: { token: string | null }) {
   const [state, setState] = useState<AdminState | null>(null);
   const [picked, setPicked] = useState<string[]>([]);

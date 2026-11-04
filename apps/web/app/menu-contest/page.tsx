@@ -274,7 +274,7 @@ export default function MenuContestPage() {
       </div>
 
       {failed ? (
-        <ErrorState message="エグ練大会を読み込めませんでした。時間をおいてもう一度開いてください。" />
+        <ErrorState message="エグ練グランプリを読み込めませんでした。時間をおいてもう一度開いてください。" />
       ) : !state ? (
         <PageLoading label="読み込み中..." />
       ) : (

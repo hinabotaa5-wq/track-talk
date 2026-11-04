@@ -67,8 +67,8 @@ const featureLabels: Record<string, string> = {
   product_review: "シューズのレビュー",
   practice_application: "練習への参加申請",
   injury_group: "ケガのグループに参加",
-  menu_contest_entry: "エグ練の応募",
-  menu_contest_vote: "エグ練の投票",
+  menu_contest_entry: "エグ練グランプリの応募",
+  menu_contest_vote: "エグ練グランプリの投票",
 };
 
 const sourceLabels: Record<string, string> = {

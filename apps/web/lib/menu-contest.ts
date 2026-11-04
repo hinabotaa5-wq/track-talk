@@ -1,7 +1,7 @@
-// エグ練大会: 11月〜3月に2週間ごとに開く。その回で一番エグかった練習を1人1件応募し、
+// エグ練グランプリ: 11月〜3月に2週間ごとに開く。その回で一番エグかった練習を1人1件応募し、
 // 運営が選んだトップ3にみんなで投票して1位を決める。日程は API が決める。
 
-export const menuContestName = "エグ練大会";
+export const menuContestName = "エグ練グランプリ";
 export const menuContestMaxLength = 100;
 export const menuContestPlaceholder = "例：300m×15本（レスト3分）。最後の3本は脚が動かなくて、次元が歪んだ";
 

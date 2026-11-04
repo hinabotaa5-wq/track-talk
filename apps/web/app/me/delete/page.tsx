@@ -119,7 +119,7 @@ export default function DeleteAccountPage() {
       ) : null}
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
         <li>あなたの投稿、コメント、レビュー、いいね、保存、通知</li>
-        <li>感覚メモと競技会の記録、エグ練大会のエントリーと投票</li>
+        <li>感覚メモと競技会の記録、エグ練グランプリのエントリーと投票</li>
         <li>ケガのグループへの参加、回答、段階の記録と一言</li>
         <li>練習への参加と評価。あなたが作った練習の投稿も削除されます</li>
         <li>お問い合わせ（商品のリクエストを含みます）、コーチの応募と顔写真、あなたが送った通報</li>
