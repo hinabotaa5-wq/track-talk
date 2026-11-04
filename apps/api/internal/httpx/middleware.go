@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +16,10 @@ import (
 
 type ctxKey int
 
-const identityKey ctxKey = iota
+const (
+	identityKey ctxKey = iota
+	logUserKey
+)
 
 func UserID(ctx context.Context) (uuid.UUID, bool) {
 	identity, ok := ctx.Value(identityKey).(auth.Identity)
@@ -27,8 +31,27 @@ func userIdentity(ctx context.Context) (auth.Identity, bool) {
 	return identity, ok && identity.UserID != uuid.Nil
 }
 
+// withUser は、利用者を入れた context を返す。呼び出し元より外の RequestLog には新しい context が
+// 届かないので、ログに残す ID は RequestLog が用意した入れ物にも書いておく。
 func withUser(ctx context.Context, identity auth.Identity) context.Context {
+	if u, ok := ctx.Value(logUserKey).(*logUser); ok {
+		u.id.Store(identity.UserID)
+	}
 	return context.WithValue(ctx, identityKey, identity)
+}
+
+// logUser は、RequestLog が内側の認証から利用者の ID を受け取るための入れ物。
+type logUser struct {
+	id atomic.Value // uuid.UUID
+}
+
+// String は、ログに残す ID を返す。ログインしていないリクエストでは空。
+func (u *logUser) String() string {
+	id, ok := u.id.Load().(uuid.UUID)
+	if !ok || id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }
 
 func SecurityHeaders(next http.Handler) http.Handler {
@@ -59,15 +82,15 @@ func RequestLog(next http.Handler) http.Handler {
 		id := uuid.NewString()
 		start := time.Now()
 		ww := &statusWriter{ResponseWriter: w, status: 200}
-		next.ServeHTTP(ww, r)
-		uid, _ := UserID(r.Context())
+		user := &logUser{}
+		next.ServeHTTP(ww, r.WithContext(context.WithValue(r.Context(), logUserKey, user)))
 		slog.Info("http",
 			"request_id", id,
 			"method", r.Method,
 			"path", logPath(r.URL.Path),
 			"status", ww.status,
 			"ms", time.Since(start).Milliseconds(),
-			"user_id", uid.String(),
+			"user_id", user.String(),
 		)
 	})
 }
