@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { rememberOverseasConsent, takeOverseasConsent } from "./overseas-consent";
+import {
+  overseasConsentVersion,
+  rememberOverseasConsent,
+  signupConsentMetadata,
+  signupConsentVersion,
+  takeOverseasConsent,
+} from "./overseas-consent";
 
 describe("overseas-consent", () => {
   beforeEach(() => sessionStorage.clear());
@@ -15,5 +21,19 @@ describe("overseas-consent", () => {
     expect(takeOverseasConsent(0)).toBe(false);
     rememberOverseasConsent(0);
     expect(takeOverseasConsent(60 * 60 * 1000 + 1)).toBe(false);
+  });
+});
+
+describe("signupConsentVersion", () => {
+  it("登録画面で残した版を、アカウントの情報から読み出す", () => {
+    expect(signupConsentVersion(signupConsentMetadata())).toBe(overseasConsentVersion);
+    expect(signupConsentVersion({ overseas_consent_version: "overseas-2000-01" })).toBe("overseas-2000-01");
+  });
+
+  it("版が無い・形が違うときは使わない", () => {
+    expect(signupConsentVersion(undefined)).toBeNull();
+    expect(signupConsentVersion({})).toBeNull();
+    expect(signupConsentVersion({ overseas_consent_version: "" })).toBeNull();
+    expect(signupConsentVersion({ overseas_consent_version: true })).toBeNull();
   });
 });
