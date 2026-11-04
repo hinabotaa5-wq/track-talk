@@ -10,6 +10,7 @@ import { PayoutsAdmin } from "@/components/coach-payouts";
 import { useAuth } from "@/components/auth-provider";
 import { MeetSessionsAdmin } from "@/components/meet-sessions-admin";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
+import { ReportHideActions, hideTargets } from "@/components/report-hide-actions";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
@@ -58,47 +59,6 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
 };
 
 const perPage = 20;
-
-// ケガ部の一言・添削の返答・練習の評価のひとことは、それだけの画面がないので、ここから非表示にする。
-const hideTargets: Partial<Record<AdminReport["target_type"], { confirm: string; path: (id: string) => string }>> = {
-  injury_note: { confirm: "この一言を公開ページから外しますか？", path: (id) => `/v1/admin/injury-notes/${id}/hide` },
-  review_response: { confirm: "この返答を利用者から見えなくしますか？", path: (id) => `/v1/admin/coaching/responses/${id}/hide` },
-  practice_rating: { confirm: "このひとことを練習の投稿から外しますか？", path: (id) => `/v1/admin/practice-ratings/${id}/hide` },
-};
-
-function InjuryNoteActions({ report, token }: { report: AdminReport; token: string | null }) {
-  const [hidden, setHidden] = useState(report.target_hidden);
-  const [error, setError] = useState("");
-  const target = hideTargets[report.target_type];
-  async function hide() {
-    if (!target || !confirm(target.confirm)) return;
-    try {
-      const path = target.path(report.target_id);
-      await apiFetch(path, { method: "POST", token });
-      setHidden(true);
-      setError("");
-    } catch {
-      setError("非表示にできませんでした");
-    }
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      {report.target_type !== "injury_note" ? null : (
-        <Link href={`/injury/${report.injury_part}`} className="text-blue-300 underline">
-          公開ページを見る
-        </Link>
-      )}
-      {hidden ? (
-        <span className="text-slate-300">非表示済み</span>
-      ) : (
-        <button type="button" onClick={() => void hide()} className="text-red-300 underline">
-          非表示にする
-        </button>
-      )}
-      {error ? <span className="text-red-400">{error}</span> : null}
-    </div>
-  );
-}
 
 type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats" | "announce";
 
@@ -710,7 +670,7 @@ export default function AdminPage() {
                 <p className="text-sm text-slate-300">中身は、開くと記録が残る画面で確認します。</p>
               ) : r.target_body ? (
                 <p className="line-clamp-4 whitespace-pre-wrap text-sm text-slate-300">{r.target_body}</p>
-              ) : (
+              ) : r.target_title ? null : (
                 <p className="text-sm text-slate-400">対象は削除されています</p>
               )}
               {r.detail ? <p className="whitespace-pre-wrap text-sm">通報内容: {r.detail}</p> : null}
@@ -719,13 +679,9 @@ export default function AdminPage() {
               </p>
               {r.target_type === "coaching_consultation" ? <Link href={`/admin/coaching/consultations/${r.target_id}?report=${r.id}`} className="text-sm text-blue-300 underline">記録を残して追加相談を開く</Link> : r.target_type === "coaching_message" ? (
                 <CoachingReportActions report={r} token={token} />
-              ) : !r.target_body ? null : hideTargets[r.target_type] ? (
-                <InjuryNoteActions report={r} token={token} />
-              ) : (
-                <Link href={`/posts/${r.post_id}`} className="text-sm text-blue-300 underline">
-                  投稿を見る
-                </Link>
-              )}
+              ) : r.target_body || r.target_title ? (
+                hideTargets[r.target_type] ? <ReportHideActions report={r} token={token} /> : null
+              ) : null}
             </li>
           ))}
         </ul>
