@@ -98,7 +98,7 @@ function MfaVerify() {
         二段階認証
       </h1>
       <p className="text-sm text-slate-300">認証アプリに出ている6桁のコードを入れてください。</p>
-      <form onSubmit={verify} className="space-y-3">
+      <form method="post" onSubmit={verify} className="space-y-3">
         <Input
           inputMode="numeric"
           autoComplete="one-time-code"

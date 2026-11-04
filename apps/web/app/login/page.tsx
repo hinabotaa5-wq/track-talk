@@ -93,7 +93,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">ログイン</h1>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder="メール" {...form.register("email")} />
         <Input type="password" placeholder="パスワード" {...form.register("password")} />
         {captcha.widget}

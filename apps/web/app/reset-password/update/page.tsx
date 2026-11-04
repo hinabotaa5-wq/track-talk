@@ -76,7 +76,7 @@ export default function UpdatePasswordPage() {
           ログイン中に変えるときは、<Link href="/me/password" className="underline">マイページのパスワードの変更</Link>から変えられます。
         </p>
       ) : (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+        <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           <Input type="password" autoComplete="new-password" placeholder="新しいパスワード(8文字以上)" {...form.register("password")} />
           {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
           <Input type="password" autoComplete="new-password" placeholder="もう一度" {...form.register("confirm")} />
