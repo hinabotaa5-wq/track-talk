@@ -500,12 +500,28 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  async function endRegistration(a: AdminCoachApplication) {
+    if (
+      !confirm(
+        "このコーチを承認済みに戻さないまま、登録を終えますか？本人確認が済んでいることを確かめてから実行してください。止めているあいだ保留していた報酬は、次の月次送金で最低額に届かなくても精算して送ります。終えたあとは戻せません。",
+      )
+    )
+      return;
+    try {
+      await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/end`, { method: "POST", token });
+      setMessage("登録を終えました");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "できませんでした");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
       <CoachProbationAdmin token={token} />
       <div className="flex flex-wrap gap-2">
-        {(["pending", "approved", "suspended", "rejected", "withdrawn"] as const).map((s) => (
+        {(["pending", "approved", "suspended", "rejected", "withdrawn", "ended"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -567,6 +583,11 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {a.status === "suspended" ? (
               <button type="button" onClick={() => void setSuspended(a, "resume")} className="text-sm text-blue-300 underline">
                 承認済みに戻す
+              </button>
+            ) : null}
+            {a.status === "suspended" ? (
+              <button type="button" onClick={() => void endRegistration(a)} className="text-sm text-red-300 underline">
+                戻さずに登録を終える（最終精算）
               </button>
             ) : null}
             {a.status === "pending" ? (

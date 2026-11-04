@@ -385,7 +385,7 @@ export type CoachEvent =
   | "relay"
   | "heptathlon"
   | "decathlon";
-export type CoachStatus = "pending" | "approved" | "rejected" | "suspended" | "withdrawn";
+export type CoachStatus = "pending" | "approved" | "rejected" | "suspended" | "withdrawn" | "ended";
 
 export type CoachApplication = {
   name?: string;

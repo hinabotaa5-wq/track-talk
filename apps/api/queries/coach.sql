@@ -95,6 +95,21 @@ WHERE profile_id = $1
   AND status = 'suspended'
 RETURNING *;
 
+-- name: EndSuspendedCoach :one
+-- 運営が止めていたコーチを、戻さないまま登録を終えた状態にする。止めている間に留保していた報酬は消さず、
+-- 承認済みでなくなったので次の月次送金で残りをまとめて送る（最終精算）。本人確認は運営の手順で先に済ませる。
+UPDATE coach_profiles
+SET status = 'ended',
+    on_duty = false,
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'suspended'
+RETURNING *;
+
+-- name: RecordCoachRegistrationEnding :exec
+INSERT INTO coach_registration_endings (coach_id, ended_by)
+VALUES (sqlc.arg(coach_id), sqlc.arg(ended_by));
+
 -- name: ListPublicCoaches :many
 -- 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
 SELECT

@@ -99,6 +99,49 @@ func (q *Queries) DeclineCoachOpenOffers(ctx context.Context, coachID uuid.UUID)
 	return items, nil
 }
 
+const endSuspendedCoach = `-- name: EndSuspendedCoach :one
+UPDATE coach_profiles
+SET status = 'ended',
+    on_duty = false,
+    updated_at = now()
+WHERE profile_id = $1
+  AND status = 'suspended'
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+`
+
+// 運営が止めていたコーチを、戻さないまま登録を終えた状態にする。止めている間に留保していた報酬は消さず、
+// 承認済みでなくなったので次の月次送金で残りをまとめて送る（最終精算）。本人確認は運営の手順で先に済ませる。
+func (q *Queries) EndSuspendedCoach(ctx context.Context, profileID uuid.UUID) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, endSuspendedCoach, profileID)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+		&i.PledgedAt,
+		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
+	)
+	return i, err
+}
+
 const getCoachProfile = `-- name: GetCoachProfile :one
 SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name FROM coach_profiles
 WHERE profile_id = $1
@@ -363,6 +406,21 @@ func (q *Queries) LockCoachProfile(ctx context.Context, profileID uuid.UUID) (Co
 		&i.Name,
 	)
 	return i, err
+}
+
+const recordCoachRegistrationEnding = `-- name: RecordCoachRegistrationEnding :exec
+INSERT INTO coach_registration_endings (coach_id, ended_by)
+VALUES ($1, $2)
+`
+
+type RecordCoachRegistrationEndingParams struct {
+	CoachID uuid.UUID  `json:"coach_id"`
+	EndedBy *uuid.UUID `json:"ended_by"`
+}
+
+func (q *Queries) RecordCoachRegistrationEnding(ctx context.Context, arg RecordCoachRegistrationEndingParams) error {
+	_, err := q.db.Exec(ctx, recordCoachRegistrationEnding, arg.CoachID, arg.EndedBy)
+	return err
 }
 
 const removeCoachPhoto = `-- name: RemoveCoachPhoto :one

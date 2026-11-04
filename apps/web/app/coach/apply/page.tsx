@@ -42,6 +42,7 @@ const statusNotes: Record<CoachApplication["status"], string> = {
   rejected: "今回は見送りになりました。内容を見直して、もう一度応募できます。",
   suspended: "コーチの活動を停止しています。詳しくはお問い合わせください。",
   withdrawn: "コーチをやめました。もう一度応募すると、審査からやり直します。",
+  ended: "コーチの登録は終了しました。残りの報酬は次の支払日にお支払いします。詳しくはお問い合わせください。",
 };
 
 function draftFrom(a: CoachApplication): Draft {
