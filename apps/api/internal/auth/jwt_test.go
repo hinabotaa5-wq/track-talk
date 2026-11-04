@@ -40,6 +40,24 @@ func TestParseHS256(t *testing.T) {
 	if got.UserID != id {
 		t.Fatalf("got %s", got.UserID)
 	}
+	if got.SessionID != "" {
+		t.Fatalf("session %q", got.SessionID)
+	}
+	sessionID := uuid.NewString()
+	withSession := jwt.MapClaims{
+		"sub":        id.String(),
+		"aud":        "authenticated",
+		"iss":        supabaseURL + "/auth/v1",
+		"exp":        time.Now().Add(time.Hour).Unix(),
+		"session_id": sessionID,
+	}
+	got, err = v.ParseIdentity(sign(withSession))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SessionID != sessionID {
+		t.Fatalf("session %q", got.SessionID)
+	}
 	if _, err := v.ParseIdentity("abc"); err == nil {
 		t.Fatal("expected error")
 	}

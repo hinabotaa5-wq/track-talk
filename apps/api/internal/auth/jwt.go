@@ -23,6 +23,8 @@ type Identity struct {
 	Email string
 	// AAL は Supabase の JWT の aal。二段階認証を済ませたログインなら "aal2"。
 	AAL string
+	// SessionID は Supabase の JWT の session_id。このトークンを発行したログインのセッション。
+	SessionID string
 }
 
 func NewVerifier(secret, supabaseURL, aud string) (*Verifier, error) {
@@ -56,6 +58,7 @@ func (v *Verifier) ParseIdentity(tokenString string) (Identity, error) {
 	identity := Identity{UserID: id}
 	identity.Email, _ = claims["email"].(string)
 	identity.AAL, _ = claims["aal"].(string)
+	identity.SessionID, _ = claims["session_id"].(string)
 	if metadata, ok := claims["user_metadata"].(map[string]any); ok {
 		identity.Nickname, _ = metadata["nickname"].(string)
 		identity.NicknamePublic, _ = metadata["nickname_public"].(bool)

@@ -385,6 +385,7 @@ func (s *server) accessToken(u user) (string, int64, error) {
 	claims := jwt.MapClaims{
 		"sub":           u.ID.String(),
 		"email":         u.Email,
+		"session_id":    uuid.NewString(),
 		"aud":           "authenticated",
 		"role":          "authenticated",
 		"iss":           s.externalURL,

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -189,6 +190,11 @@ func TestSignupLoginRefreshAndGetUser(t *testing.T) {
 	code, me := do(t, s, http.MethodGet, "/auth/v1/user", "", access)
 	if code != http.StatusOK || me["email"] != "a@example.com" {
 		t.Fatalf("user: %d %v", code, me)
+	}
+	// 本番の Supabase Auth と同じく、トークンにセッションの ID が入ること
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(access, claims); err != nil || claims["session_id"] == "" || claims["session_id"] == nil {
+		t.Fatalf("session_id: %v %v", err, claims)
 	}
 	// API 側の検証器と同じ条件(HS256・aud=authenticated)で読めること
 	u, err := s.bearerUser(httptest.NewRequest(http.MethodGet, "/", nil))
