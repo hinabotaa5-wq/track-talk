@@ -3,11 +3,17 @@ import { createElement } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import RegisterPage from "./page";
 
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const signUp = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
 }));
+vi.mock("@/lib/supabase", () => ({
+  createClient: () => ({ auth: { signUp } }),
+}));
+
+import RegisterPage from "./page";
 
 async function renderPage() {
   const div = document.createElement("div");
@@ -56,6 +62,35 @@ describe("RegisterPage", () => {
       const after = buttons(view.div);
       expect(after.find((b) => b.textContent === "登録")?.disabled).toBe(false);
       expect(after.find((b) => b.textContent?.includes("Googleで登録"))?.disabled).toBe(false);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("確認メールを送ったら、同意の版を残したまま送信済みの画面へ移す。アドレスは URL に載せない", async () => {
+    signUp.mockResolvedValue({ data: { user: { identities: [{ id: "x" }] }, session: null }, error: null });
+    const view = await renderPage();
+    try {
+      const setValue = (el: HTMLInputElement, value: string) => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      await act(async () => {
+        setValue(view.div.querySelector('input[type="email"]') as HTMLInputElement, "runner@example.com");
+        setValue(view.div.querySelector('input[type="password"]') as HTMLInputElement, "password1234");
+        // 前のテストで付けたチェックは画面を離れても残るので、外れているときだけ付ける。
+        const checkbox = view.div.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (!checkbox.checked) checkbox.click();
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+
+      await vi.waitFor(() => expect(router.push).toHaveBeenCalled());
+      expect(signUp).toHaveBeenCalledTimes(1);
+      expect(signUp.mock.calls[0][0].options.data).toEqual({ overseas_consent_version: "overseas-2026-10" });
+      expect(router.push).toHaveBeenCalledWith("/register/sent");
+      expect(sessionStorage.getItem("tracktalk-signup-sent-email")).toBe("runner@example.com");
     } finally {
       await view.unmount();
     }
