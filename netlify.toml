@@ -12,6 +12,8 @@
   NEXT_PUBLIC_COACHING_ENABLED = "0"
   # 有料の1対1のやりとり。電気通信事業の届出が受理されるまで "0" のまま
   NEXT_PUBLIC_COACHING_MESSAGING_ENABLED = "0"
+  # 動画添削のあとの追加相談（一方通行・1つの添削につき1回）の送信。開けるのは運営者の指示があってから
+  NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED = "0"
 
 [context.production.environment]
   # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。

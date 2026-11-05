@@ -119,6 +119,9 @@ func (s *Server) checkoutConsultation(w http.ResponseWriter, r *http.Request) {
 		Error(w, 403, "guardian_pays", "未成年のパーソナル指導の追加相談は保護者のページからお支払いください")
 		return
 	}
+	if !s.requireConsultationSend(w, c) {
+		return
+	}
 	declared, err := decodeMinorDeclaration(r)
 	if err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")

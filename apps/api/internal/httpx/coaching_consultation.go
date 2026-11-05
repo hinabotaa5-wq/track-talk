@@ -154,8 +154,75 @@ func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.C
 	return c, "", false
 }
 
+// consultationSendOpen は、この追加相談の送信系（質問の送信・支払い・コーチの回答）を開けているか。
+// 動画添削のあとの相談は一方通行の単発の相談なので専用の CoachingConsultation で、契約の相談は
+// 有料の1対1のやりとりとして CoachingMessaging で切り替える。
+func (s *Server) consultationSendOpen(c db.CoachingConsultation) bool {
+	if c.ReviewRequestID != nil {
+		return s.cfg.CoachingConsultation
+	}
+	return s.cfg.CoachingMessaging
+}
+func (s *Server) requireConsultationSend(w http.ResponseWriter, c db.CoachingConsultation) bool {
+	if s.consultationSendOpen(c) {
+		return true
+	}
+	if c.ReviewRequestID != nil {
+		Error(w, http.StatusConflict, "consultation_closed_for_now", "追加相談の受付は準備中です")
+	} else {
+		Error(w, http.StatusConflict, "messaging_closed", "メッセージのやりとりは準備中です")
+	}
+	return false
+}
+
+// consultationRespondWindow は、支払い（チケットなら送信）でコーチに届いてから受諾までの期限。
+// SQL の SubmitTicketConsultation・MarkConsultationPaid の interval '48 hours' と揃えること。
+const consultationRespondWindow = 48 * time.Hour
+
+// reviewConsultationAttempted は、動画添削のあとの追加相談が「試行」に数えるものか。
+// 支払い（チケットなら送信）を終えてコーチに届いたものだけを数え、下書き・支払い前の取り下げや期限切れは数えない。
+// 期限切れのうち、届いた後の受諾・回答の期限切れは数える。支払いが期限の後に届いて、そのまま返金で終わったもの
+// （届けた時刻と終了の時刻が同じ）はコーチに届いていないので数えない。
+func reviewConsultationAttempted(c db.CoachingConsultation) bool {
+	switch c.Status {
+	case "offered", "in_review", "answered", "declined":
+		return true
+	case "expired":
+		return c.RespondBy != nil && c.ClosedAt != nil && c.ClosedAt.After(c.RespondBy.Add(-consultationRespondWindow))
+	}
+	return false
+}
+
+// reviewConsultationLimit は、動画添削のあとの追加相談の回数の上限を確かめる。1つの添削につき1回（質問1回と回答1回）。
+// 回答に至らず終わった（辞退・期限切れで返金した）ときだけ、もう1回まで買い直せる。回答が1件でもあれば買えない。
+// 部屋の表示・下書きの保存・送信のどれも consultationOffer を通るので、ここで3か所とも同じ判定になる。
+func reviewConsultationLimit(ctx context.Context, q *db.Queries, reviewID uuid.UUID) error {
+	rows, err := q.ListRoomConsultations(ctx, db.ListRoomConsultationsParams{ReviewRequestID: &reviewID})
+	if err != nil {
+		return err
+	}
+	attempts := 0
+	for _, c := range rows {
+		if c.Status == "answered" {
+			return &ticketRuleError{"consultation_limit", "この添削の追加相談は回答済みです。追加相談は1つの添削につき1回までです"}
+		}
+		if reviewConsultationAttempted(c) {
+			attempts++
+		}
+	}
+	if attempts >= 2 {
+		return &ticketRuleError{"consultation_limit", "この添削の追加相談は、買い直しの1回を含めて上限に達しました"}
+	}
+	return nil
+}
+
 // 期間内の含有分は通常チャットで使う。追加の動画だけは含有回数を使い切った場合に購入できる。
 func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room consultationRoom) (int32, int16, bool, error) {
+	if room.review != nil {
+		if err := reviewConsultationLimit(ctx, q, room.id); err != nil {
+			return 0, 0, false, err
+		}
+	}
 	if room.coach == nil {
 		return 0, 0, false, &ticketRuleError{"coach_unavailable", "担当コーチがいないため追加相談は購入できません"}
 	}
@@ -464,6 +531,9 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		Error(w, 403, "forbidden", "相談する本人だけが送信できます")
 		return
 	}
+	if !s.requireConsultationSend(w, c) {
+		return
+	}
 	declared, err := decodeMinorDeclaration(r)
 	if err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
@@ -597,13 +667,18 @@ func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultati
 }
 func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	action := chi.URLParam(r, "action")
-	// 回答・質問・補足はやりとりにあたるので、届出が済むまで止める。取り消しは止めない。
-	if (action == "answer" || action == "clarify" || action == "clarification") && !s.cfg.CoachingMessaging {
-		Error(w, http.StatusConflict, "messaging_closed", "メッセージのやりとりは準備中です")
-		return
-	}
 	c, role, ok := s.consultationParty(w, r)
 	if !ok {
+		return
+	}
+	clarifying := action == "clarify" || action == "clarification"
+	// 動画添削のあとの追加相談は質問1回・回答1回の一方通行なので、回答への確認・補足はない。
+	if clarifying && c.ReviewRequestID != nil {
+		Error(w, http.StatusConflict, "clarify_unavailable", "動画添削の追加相談には、回答への確認・補足はありません")
+		return
+	}
+	// 回答・確認・補足は送信にあたるので、ゲートが閉じている間は止める。受諾・辞退・取り消しは止めない。
+	if (action == "answer" || clarifying) && !s.requireConsultationSend(w, c) {
 		return
 	}
 	ownerAction := action == "clarify" || action == "cancel"

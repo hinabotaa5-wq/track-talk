@@ -11,6 +11,12 @@ export const coachingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_ENAB
 // 受理されるまで立てない。空の間は読むだけにして、送る欄は出さない。APIのCOACHING_MESSAGING_ENABLEDと揃えること。
 export const coachingMessagingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_MESSAGING_ENABLED);
 
+// 動画添削のあとの追加相談(1つの添削につき質問1回・回答1回の一方通行の相談)の送信。空の間は読むだけにして、
+// 送る欄は出さない。サポートプランの追加相談は coachingMessagingEnabled の側。APIのCOACHING_CONSULTATION_ENABLEDと揃えること。
+export const coachingConsultationEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED);
+
+export const consultationClosedNote = "追加相談の受付は準備中です。届いた内容は読めます。";
+
 export const messagingClosedNote = "メッセージのやりとりは準備中です。届いた内容は読めます。";
 
 // 感覚メモを保存順に6個ずつまとめるふりかえり(AI)。感覚メモを Claude(Anthropic)に送る(プライバシーポリシーの委託先に書いてある)。

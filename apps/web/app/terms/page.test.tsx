@@ -29,8 +29,11 @@ it("フォーム添削と追加相談は運営者が提供者で、料金・返�
   // 指名したコーチが辞退・未応答のときは特商法の表記と同じ扱い。
   expect(text).toContain("クレジットカードは代金の確保を取り消し、PayPayは全額を返金します");
   expect(text).toContain("終了した依頼とは独立した新しい申込みとして、別のコーチに改めて申し込む");
-  expect(text).toContain("新しい質問1件とコーチの回答1件の1回限り");
-  expect(text).toContain("改めて購入してください");
+  // 動画添削のあとの追加相談は一方通行で、1つの添削につき1回。回答がないまま終わった場合だけ1回買い直せる。
+  expect(text).toContain("1つのフォーム添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です");
+  expect(text).toContain("回答への確認など、追加のやりとりはできません");
+  expect(text).toContain("この場合に限り、同じフォーム添削について、もう1回だけ改めて購入できます");
+  expect(text).not.toContain("回答への確認は7日以内に1回無料");
   // 内容確認のための差し戻し（1回）と、再提出期限・返却期限の数え直し・再提出がないときの終了。
   expect(text).toContain("1つの依頼につき1回だけ、質問を付けて依頼を差し戻す");
   expect(text).toContain("差し戻しの間に代金の確保の取消しや返金はしません");
@@ -75,14 +78,19 @@ it("サポートプランは、当事者・債権の帰属・代理受領・債�
 it("追加相談の購入画面は、1回限りであることと契約の相手を示す", () => {
   const review = renderToStaticMarkup(<ConsultationTermsNote kind="review" />);
   for (const word of agencyWords) expect(review).not.toContain(word);
-  expect(review).toContain("新しい質問1件とコーチの回答1件の1回限り");
-  expect(review).toContain("改めて購入してください");
+  expect(review).toContain("この添削について相談できるのは1回限り");
+  expect(review).toContain("追加のやりとりはできません");
+  expect(review).toContain("回答がないまま終わった場合に限り、もう1回だけ改めて購入できます");
+  expect(review).not.toContain("7日以内に1回無料");
   expect(review).toContain("提供者とお支払い先は TrackTalk の運営者");
   expect(review).toContain("料金・キャンセル・返金は運営者が責任を持って対応");
   const contract = renderToStaticMarkup(<ConsultationTermsNote kind="contract" />);
   expect(contract).toContain("契約の相手はコーチ");
   expect(contract).toContain("代理受領の権限");
   expect(contract).toContain("新しい質問1件とコーチの回答1件の1回限り");
+  // サポートプランの追加相談は変えない。
+  expect(contract).toContain("回答への確認は7日以内に1回無料");
+  expect(contract).toContain("改めて購入してください");
 });
 
 it("未成年者の購入は、購入の都度の法定代理人の許可の申告と、申立てによる取消し・返金で定め、同意・上限・通知を前提にしない", () => {

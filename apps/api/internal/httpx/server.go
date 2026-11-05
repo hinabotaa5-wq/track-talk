@@ -295,7 +295,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/guardian/{token}/consultation-reviews", s.listGuardianConsultationReviews)
 			r.Get("/guardian/{token}/contracts/{id}/consultations", s.listConsultationRoom)
 			r.Get("/guardian/{token}/reviews/{id}/consultations", s.listConsultationRoom)
-			r.With(s.requireMessaging, s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
+			r.With(s.requireNewAcceptance).Post("/guardian/{token}/consultations/{id}/checkout", s.checkoutConsultation)
 			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
@@ -329,8 +329,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coaching/requests/{id}/consultations", s.saveConsultationDraft)
 				r.Get("/coaching/contracts/{id}/consultations", s.listConsultationRoom)
 				r.Post("/coaching/contracts/{id}/consultations", s.saveConsultationDraft)
-				r.With(s.requireMessaging, s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
-				r.With(s.requireMessaging, s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/submit", s.submitConsultation)
+				r.With(s.requireNewAcceptance).Post("/coaching/consultations/{id}/checkout", s.checkoutConsultation)
 				r.Post("/coaching/consultations/{id}/{action}", s.actConsultation)
 				r.Get("/coach/consultations", s.coachConsultations)
 				r.Get("/admin/coaching/consultations", s.adminConsultations)

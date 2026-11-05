@@ -71,7 +71,8 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 | `COACH_IDENTITY_KEY` | コーチの本名・住所・電話番号を暗号化する鍵（`openssl rand -base64 32`）。DB とは別に Secret Manager に置く。変えると登録済みの情報が読めなくなる。空の間はコーチの特商法の登録ができず、プランを公開できない |
 | `COACHING_TICKET_SALES_ENABLED=1` | 技術的には旧チケット購入を許可する設定。新規販売は終了しており、動画添削・追加相談は都度払い（カード・PayPay）だけにしたので、空（停止）のままにする。空でも購入済みチケットの残高・履歴・返金は使える |
 | `REVIEW_RANDOM_ASSIGN_ENABLED=1` | 技術的には動画添削のおまかせ（受付中のコーチへの割り当て・再割り当て）を許可する設定。選手がコーチを選ぶ方式だけにしたので、空（停止）のままにする |
-| `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・サポートプランの追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_CONSULTATION_ENABLED=1` / `NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED=1` | 動画添削のあとの追加相談（質問1回・回答1回の一方通行、1つの添削につき1回。回答がないまま終わった場合だけ1回買い直せる）の送信・支払い・回答を開く。`COACHING_MESSAGING_ENABLED` とは別に切り替える。開ける時期は運営者が決める |
 
 - 新規受付は既定で停止。APIを更新した後に既存の公開設定だけでは受付が再開しないことに注意する。
 - 問題時は `COACHING_NEW_ACCEPTANCE_ENABLED` だけを空にしてAPIを再デプロイする。APIとWebの `COACHING_ENABLED` は維持し、購入済みの履行と返金を続ける。

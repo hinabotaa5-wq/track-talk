@@ -20,12 +20,6 @@ func TestMessagingClosedBlocksPaidOneToOneSending(t *testing.T) {
 	for _, path := range []string{
 		"/v1/coaching/contracts/" + id + "/messages",
 		"/v1/guardian/secret/contracts/" + id + "/messages",
-		"/v1/coaching/consultations/" + id + "/submit",
-		"/v1/coaching/consultations/" + id + "/checkout",
-		"/v1/guardian/secret/consultations/" + id + "/checkout",
-		"/v1/coaching/consultations/" + id + "/answer",
-		"/v1/coaching/consultations/" + id + "/clarify",
-		"/v1/coaching/consultations/" + id + "/clarification",
 		"/v1/coaching/requests/" + id + "/clarify",
 		"/v1/coaching/requests/" + id + "/clarification",
 	} {
@@ -34,7 +28,8 @@ func TestMessagingClosedBlocksPaidOneToOneSending(t *testing.T) {
 			t.Fatalf("closed %s: %d %s", path, rec.Code, rec.Body.String())
 		}
 	}
-	// 取り消しはやりとりではないので止めない(この依頼は無いので 404 になる)。
+	// 追加相談は、動画添削のあとの相談か契約の相談かでゲートが分かれるので、相談を読んでから判定する
+	// (coaching_consultation_limit_test.go)。取り消しはやりとりではないので止めない(この依頼は無いので 404 になる)。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/consultations/"+id+"/cancel", owner, nil); strings.Contains(rec.Body.String(), "messaging_closed") {
 		t.Fatalf("cancel should not be blocked: %d %s", rec.Code, rec.Body.String())
 	}

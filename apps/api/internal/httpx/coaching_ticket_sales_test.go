@@ -171,33 +171,38 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 			t.Fatalf("pay %d", code)
 		}
 	}
-	consultationAction(t, h, coach, c.ID, "accept", nil)
-	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "前半の接地を意識してください"})
-	var count, earnings int
-	queryRowArgs(t, `SELECT count(*),sum(amount_yen)::integer FROM coach_earnings WHERE consultation_id=$1`, []any{c.ID}, &count, &earnings)
-	if count != 1 || earnings != 420 {
-		t.Fatalf("earnings %d %d", count, earnings)
-	}
-
-	// 2件目は辞退されたので、カードでも PayPay でも同じ返金 API で全額を返す。
-	c2 := consultationDraft(t, h, owner, path, uuid.NewString(), "練習の量を相談したいです")
-	consultationAction(t, h, owner, c2.ID, "submit", nil)
-	if code := payConsultation(t, h, c2.ID, 600); code != 200 {
-		t.Fatalf("pay %d", code)
-	}
-	consultationAction(t, h, coach, c2.ID, "decline", nil)
+	// 1件目は辞退されたので、カードでも PayPay でも同じ返金 API で全額を返す。
+	consultationAction(t, h, coach, c.ID, "decline", nil)
 	for i := 0; i < 2; i++ {
 		if r := tick(t, h, "tick-secret"); r.Code != 200 {
 			t.Fatal(r.Body.String())
 		}
 	}
 	refunds := f.refundList()
-	if len(refunds) != 1 || refunds[0].Get("amount") != "600" || refunds[0].Get("payment_intent") != "pi_consult_"+c2.ID {
+	if len(refunds) != 1 || refunds[0].Get("amount") != "600" || refunds[0].Get("payment_intent") != "pi_consult_"+c.ID {
 		t.Fatalf("refunds %+v", refunds)
 	}
 	var state string
-	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c2.ID}, &state)
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &state)
 	if state != "refunded" {
+		t.Fatal(state)
+	}
+
+	// 回答がないまま終わったので、同じ添削でもう1回だけ買い直せる。回答すると報酬が確定する。
+	c2 := consultationDraft(t, h, owner, path, uuid.NewString(), "練習の量を相談したいです")
+	consultationAction(t, h, owner, c2.ID, "submit", nil)
+	if code := payConsultation(t, h, c2.ID, 600); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
+	consultationAction(t, h, coach, c2.ID, "accept", nil)
+	consultationAction(t, h, coach, c2.ID, "answer", map[string]any{"body": "前半の接地を意識してください"})
+	var count, earnings int
+	queryRowArgs(t, `SELECT count(*),sum(amount_yen)::integer FROM coach_earnings WHERE consultation_id=$1`, []any{c2.ID}, &count, &earnings)
+	if count != 1 || earnings != 420 {
+		t.Fatalf("earnings %d %d", count, earnings)
+	}
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c2.ID}, &state)
+	if state != "paid" {
 		t.Fatal(state)
 	}
 }
