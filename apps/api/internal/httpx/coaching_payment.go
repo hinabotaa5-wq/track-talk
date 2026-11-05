@@ -33,6 +33,10 @@ const (
 // PayPay だけにする。コンビニ払い・銀行振込は出さない。PayPay は Stripe のダッシュボードで有効にしてから使う。
 var checkoutPaymentMethods = []string{"card", "paypay"}
 
+// supportPlanPaymentMethods は、サポートプラン（パーソナル指導）の契約と、その追加相談の支払い画面に出す方法。カード（Apple Pay・
+// Google Pay を含む）だけにする。PayPay を動画添削のために有効にしても、サポートプランの支払い画面には出さない。
+var supportPlanPaymentMethods = []string{"card"}
+
 // errStripe は、Stripe とのやりとりがうまくいかなかったこと（つながらない、断られた）。
 var errStripe = errors.New("stripe request failed")
 
@@ -123,6 +127,8 @@ func (s *Server) checkoutURLWith(ctx context.Context, q *db.Queries, ct db.Coach
 		Reference:  id.String(),
 		Metadata:   map[string]string{"contract_id": ct.ID.String(), "payment_id": id.String()},
 		ExpiresAt:  expires,
+		// ダッシュボードの既定に任せず、カードだけを指定する。
+		PaymentMethodTypes: supportPlanPaymentMethods,
 		// 同じ支払いの行で送り直しても、支払い画面は1つだけ。
 		IdempotencyKey: "checkout-" + id.String(),
 	})

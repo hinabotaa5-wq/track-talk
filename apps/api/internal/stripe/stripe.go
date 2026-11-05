@@ -184,8 +184,8 @@ type CheckoutSession struct {
 	Metadata          map[string]string `json:"metadata"`
 }
 
-// CreateCheckoutSession は、1回払いの支払い画面を作る。支払い方法（カード・Apple Pay・Google Pay・PayPay）は
-// Stripe のダッシュボードで有効にしたものが出る。
+// CreateCheckoutSession は、1回払いの支払い画面を作る。PaymentMethodTypes を指定すればその方法だけ、空なら
+// Stripe のダッシュボードで有効にしたもの（カード・Apple Pay・Google Pay・PayPay など）が出る。
 func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (CheckoutSession, error) {
 	form := url.Values{}
 	form.Set("mode", "payment")
