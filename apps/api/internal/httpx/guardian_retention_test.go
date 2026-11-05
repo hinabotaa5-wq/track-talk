@@ -21,6 +21,14 @@ func guardianRecordCounts(t *testing.T, minor uuid.UUID) (consents, events, noti
 	return
 }
 
+// declarationCount は、本人の購入のたびの宣言の行数。
+func declarationCount(t *testing.T, minor uuid.UUID) int {
+	t.Helper()
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{minor}, &n)
+	return n
+}
+
 // 保護者同意の証跡と購入の記録は、未成年の本人が退会しても残り（プロフィールなど他の情報は消える）、
 // 最後の取引から5年たったら日次の処理で消える。取引がないときは最後の記録から数える。退会していない人の分は消さない。
 func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
@@ -105,15 +113,18 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	if events := guardianEvents(t, minor); events != "link_sent,consented" {
 		t.Fatalf("events %q", events)
 	}
-	var purchases int
-	queryRowArgs(t, `SELECT count(*) FROM guardian_notices WHERE minor_id = $1 AND kind = 'purchase' AND ref_id = $2 AND amount_yen = 1500 AND payment_intent_id = $3`,
-		[]any{minor, review, intent}, &purchases)
-	if purchases != 1 {
-		t.Fatal("purchase record not kept")
+	// 動画添削・追加相談の購入の通知は、購入のたびの宣言に置き換えたので作らない。宣言の記録は退会しても残る。
+	var purchases, declarations int
+	var declDeleted, declLastTx *time.Time
+	queryRowArgs(t, `SELECT count(*) FROM guardian_notices WHERE minor_id = $1 AND kind = 'purchase'`, []any{minor}, &purchases)
+	queryRowArgs(t, `SELECT count(*), max(account_deleted_at), max(last_transaction_at) FROM minor_purchase_declarations WHERE minor_id = $1 AND ref_type = 'review' AND ref_id = $2`,
+		[]any{minor, review}, &declarations, &declDeleted, &declLastTx)
+	if purchases != 0 || declarations != 1 || declDeleted == nil || declLastTx == nil {
+		t.Fatalf("purchase notices=%d declarations=%d deleted=%v lastTx=%v", purchases, declarations, declDeleted, declLastTx)
 	}
-	// 取引の記録（支払い）も残り、Stripe の支払い ID で購入の通知と突き合わせられる。
+	// 取引の記録（支払い）も残り、未成年の購入の印が付いている。
 	var payments int
-	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE payment_intent_id = $1 AND status = 'captured'`, []any{intent}, &payments)
+	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE payment_intent_id = $1 AND status = 'captured' AND minor`, []any{intent}, &payments)
 	if payments != 1 {
 		t.Fatal("payment record missing")
 	}
@@ -141,6 +152,8 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	}); rec.Code != 200 {
 		t.Fatalf("consent %d %s", rec.Code, rec.Body.String())
 	}
+	// 退会していない人の宣言（支払いはまだ）。
+	chosenReview(t, h, tActive, coach.String(), "paypay", false)
 
 	// 最後の取引（A）・最後の記録（B）から5年たつまでは残す。
 	start := time.Now()
@@ -149,6 +162,9 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 		if c, e, n := guardianRecordCounts(t, m); c != 1 || e == 0 || n == 0 {
 			t.Fatalf("deleted before 5 years %v: %d %d %d", m, c, e, n)
 		}
+	}
+	if declarationCount(t, minor) != 1 || declarationCount(t, active) != 1 {
+		t.Fatal("declarations deleted before 5 years")
 	}
 	// 5年を過ぎたら、同意・証跡・メールの記録をまとめて消す。退会していない人の分は残る。
 	cleanup(start.AddDate(5, 0, 7))
@@ -159,5 +175,9 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	}
 	if c, _, _ := guardianRecordCounts(t, active); c != 1 {
 		t.Fatal("active minor's consent deleted")
+	}
+	// 購入のたびの宣言も、退会した人の分だけ5年で消える。
+	if declarationCount(t, minor) != 0 || declarationCount(t, active) != 1 {
+		t.Fatalf("declarations after 5 years minor=%d active=%d", declarationCount(t, minor), declarationCount(t, active))
 	}
 }

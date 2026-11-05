@@ -797,6 +797,17 @@ type MenuContestVote struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+type MinorPurchaseDeclaration struct {
+	ID                uuid.UUID  `json:"id"`
+	MinorID           uuid.UUID  `json:"minor_id"`
+	RefType           string     `json:"ref_type"`
+	RefID             uuid.UUID  `json:"ref_id"`
+	TextVersion       string     `json:"text_version"`
+	DeclaredAt        time.Time  `json:"declared_at"`
+	AccountDeletedAt  *time.Time `json:"account_deleted_at"`
+	LastTransactionAt *time.Time `json:"last_transaction_at"`
+}
+
 type MonthlyReminder struct {
 	Month      time.Time  `json:"month"`
 	StartedAt  time.Time  `json:"started_at"`
@@ -1032,6 +1043,7 @@ type ReviewPayment struct {
 	RefundedAt        *time.Time `json:"refunded_at"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+	Minor             bool       `json:"minor"`
 }
 
 type ReviewPaymentEarningLink struct {

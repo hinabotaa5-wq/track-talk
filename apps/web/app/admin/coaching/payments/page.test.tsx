@@ -74,3 +74,13 @@ it("未適用の相殺だけを絞り込む", async () => {
  await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
  expect(mocks.api).toHaveBeenCalledWith("/v1/admin/coaching/payments?unapplied=true", expect.objectContaining({ token: "admin" }));
 });
+
+it("未成年の購入に印を付け、未成年の購入の返金の件数と金額を今月と累計で出す", async () => {
+ const counts = { review_count: 2, review_amount_yen: 3000, consultation_count: 1, consultation_amount_yen: 600, admin_count: 1, admin_amount_yen: 1500 };
+ mocks.api.mockResolvedValue({ ...data, payments: [{ ...data.payments[0], minor: true }], minor_refunds: { month: counts, total: { ...counts, review_count: 5 } } });
+ await act(async () => root.render(<Page />));
+ expect(container.textContent).toContain("未成年の購入の返金");
+ expect(container.textContent).toContain("今月：動画添削 2件 3,000円 · 追加相談 1件 600円（うち管理画面から 1件 1,500円）");
+ expect(container.textContent).toContain("累計：動画添削 5件");
+ expect(container.textContent).toContain("· 未成年の購入");
+});

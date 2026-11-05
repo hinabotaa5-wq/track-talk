@@ -15,7 +15,8 @@ import (
 )
 
 // 購入操作は相談ごとに固定する。通知が先に届いても同じレコードで照合できる。
-func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingConsultation) (string, error) {
+// 18歳未満が自分で払う動画添削のあとの追加相談は、declared（購入のたびの宣言）が要り、支払い画面を作る前に同じロックの中で記録する。
+func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingConsultation, declared bool) (string, error) {
 	var c db.CoachingConsultation
 	if !s.stripe.Configured() {
 		return "", &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
@@ -41,17 +42,16 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		if err != nil {
 			return err
 		}
-		if err := s.ticketEligibility(ctx, q, owner); err != nil {
+		if err := s.consultationEligibility(ctx, q, owner, room.review != nil, current.Funding); err != nil {
 			return err
 		}
 		if current.Minor && current.ContractID == nil {
-			// 添削のあとの追加相談は、本人が自分で払う。保護者の有効な同意と月の上限を、このロックの中で確かめる。
-			block, err := s.minorSelfPayBlock(ctx, q, owner.ID, minorPurchase{refType: "consultation", coachID: current.CoachID, price: current.PriceYen}, uuid.Nil, current.ID)
-			if err != nil {
+			// 添削のあとの追加相談は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
+			if err := requireMinorDeclaration(true, declared); err != nil {
 				return err
 			}
-			if block != nil {
-				return block
+			if err := recordMinorDeclaration(ctx, q, owner.ID, "consultation", current.ID); err != nil {
+				return err
 			}
 		} else if current.Minor {
 			consented, err := q.HasGuardianContractConsent(ctx, *current.ContractID)
@@ -119,10 +119,12 @@ func (s *Server) checkoutConsultation(w http.ResponseWriter, r *http.Request) {
 		Error(w, 403, "guardian_pays", "未成年のパーソナル指導の追加相談は保護者のページからお支払いください")
 		return
 	}
-	url, err := s.consultationCheckout(r.Context(), c)
-	if s.writeMinorBlockError(w, r, err) {
+	declared, err := decodeMinorDeclaration(r)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
+	url, err := s.consultationCheckout(r.Context(), c, declared)
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
@@ -142,7 +144,6 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		return err
 	}
 	var saved db.CoachingConsultation
-	var notice *db.GuardianNotice
 	notify := false
 	err = s.tx(ctx, func(q *db.Queries) error {
 		root, _ := consultationParent(initial)
@@ -176,7 +177,14 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 				valid = false
 			}
 		}
-		if valid && c.Minor {
+		if valid && c.Minor && c.ContractID == nil {
+			// 18歳未満が自分で払う動画添削のあとの追加相談は、購入のときの宣言が残っているものだけ受け付ける。
+			declared, e := q.HasMinorPurchaseDeclaration(ctx, db.HasMinorPurchaseDeclarationParams{RefType: "consultation", RefID: c.ID})
+			if e != nil {
+				return e
+			}
+			valid = declared
+		} else if valid && c.Minor {
 			consent, e := q.GetGuardianConsentByMinor(ctx, *c.RequesterID)
 			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 				return e
@@ -197,21 +205,9 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 			return s.releaseConsultationFunding(ctx, q, c)
 		}
 		notify = true
-		if c.Minor && c.ContractID == nil {
-			// 添削のあとの追加相談を18歳未満が自分で払ったときは、保護者への購入の通知を予約する。
-			name, e := coachDisplayName(ctx, q, *c.CoachID)
-			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-				return e
-			}
-			notice, err = queueGuardianPurchaseNotice(ctx, q, *c.RequesterID, "consultation", c.ID, c.PriceYen, name, c.PaymentIntentID)
-			return err
-		}
 		return nil
 	})
 	if err == nil && notify {
-		if notice != nil {
-			s.sendGuardianNotice(ctx, *notice)
-		}
 		s.notifyConsultation(ctx, saved, true, "追加相談が届きました")
 	}
 	return err

@@ -37,7 +37,7 @@ export default function CoachAboutPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold">自分のペースで、責任を持って</h2>
         <p className="text-sm leading-relaxed text-slate-200">動画添削は、受付のオン・オフと1日の上限で、受ける量を調整できます。受付中で上限に届いていないときだけ、選手の一覧に表示されます。サポートプランは対応できる内容と定員を自分で決めます。引き受けた依頼では期限を守り、選手の経験や目標に合わせて、分かりやすい言葉で伝えてください。</p>
-        <p className="text-sm leading-relaxed text-slate-200">やり取りや支払いはTrackTalk上で行います。未成年の利用には保護者の同意など、所定の手続きが必要です。</p>
+        <p className="text-sm leading-relaxed text-slate-200">やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。</p>
       </section>
 
       <section className="space-y-3">

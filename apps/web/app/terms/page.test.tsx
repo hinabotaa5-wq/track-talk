@@ -84,3 +84,11 @@ it("追加相談の購入画面は、1回限りであることと契約の相手
   expect(contract).toContain("代理受領の権限");
   expect(contract).toContain("新しい質問1件とコーチの回答1件の1回限り");
 });
+
+it("未成年者の購入は、購入の都度の法定代理人の許可の申告と、申立てによる取消し・返金で定め、同意・上限・通知を前提にしない", () => {
+  const text = article(4);
+  expect(text).toContain("事前に親権者その他の法定代理人の許可を得るものとし、運営者は購入の都度、その申告を確認します");
+  expect(text).toContain("当該購入を取り消し、代金を返金します");
+  expect(text).toContain("保護者を契約および支払いの当事者として取り扱います");
+  for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
+});

@@ -22,6 +22,8 @@ func chosenReview(t *testing.T, h http.Handler, tu, coach, method string, ticket
 	b["method"] = method
 	b["use_tickets"] = tickets
 	b["requested_coach_id"] = coach
+	// 18歳未満の購入のたびの宣言。18歳以上には使われない。
+	b["guardian_permission"] = true
 	r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, b)
 	if r.Code != 201 {
 		t.Fatalf("create %d %s", r.Code, r.Body.String())

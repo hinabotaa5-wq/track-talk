@@ -47,12 +47,23 @@ func ticketReturnPath(path string) string {
 	return "/me/coaching/tickets"
 }
 
-func (s *Server) ticketEligibility(ctx context.Context, q *db.Queries, p db.Profile) error {
+// coachingEligibility は、招待された利用者で、生まれた年月を登録済みかを確かめる（保護者の同意は見ない）。
+// 18歳未満が自分で払う動画添削のあとの追加相談は、同意の代わりに購入のたびの宣言で確かめる（minor_purchase.go）。
+func coachingEligibility(p db.Profile) error {
 	if !p.CoachingDemo {
 		return &ticketRuleError{"tickets_unavailable", "チケットは招待された利用者のみ購入・利用できます"}
 	}
 	if p.BirthMonth == nil {
 		return &ticketRuleError{"birth_month_required", "先に生まれた年月を登録してください"}
+	}
+	return nil
+}
+
+// ticketEligibility は、coachingEligibility に加えて、18歳未満は保護者の同意を確かめる。
+// チケットの購入・利用と、保護者が契約する指導の追加相談に使う。
+func (s *Server) ticketEligibility(ctx context.Context, q *db.Queries, p db.Profile) error {
+	if err := coachingEligibility(p); err != nil {
+		return err
 	}
 	if !isMinor(*p.BirthMonth, time.Now()) {
 		return nil
