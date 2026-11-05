@@ -21,7 +21,7 @@ import (
 // 前の仕組みで予約済みの購入の通知だけは、tick が送り直す（retryGuardianNotices）。同意・証跡・通知の記録は消さず、保管期間の管理下に残す。
 
 // guardianTermsVersion は、保護者が同意した文面の版。同意ページや規約の文面を変えたら上げる。
-const guardianTermsVersion = "guardian-consent-2026-10-final"
+const guardianTermsVersion = "guardian-consent-2026-11-support-plan"
 
 // minorRecordRetentionAge は、退会した本人の保護者同意の証跡と購入の記録、購入のたびの宣言を残す年齢。
 // 本人がこの年齢になる月の終わりまで残す。未成年者取消しの取消権は成年（18歳）になってから5年で消える（民法126条）ため、それに合わせる。
@@ -183,7 +183,7 @@ func guardianMailTime(t time.Time) string {
 	return t.In(jst.Zone).Format("2006年1月2日 15:04")
 }
 
-// 以下のメールの文面は運営者の確定版（guardianTermsVersion と同じ版）。
+// 以下のメールの文面は、前の版（guardian-consent-2026-10-final）の運営者の確定版のまま。
 
 const guardianMailGreeting = "TrackTalkをご利用いただきありがとうございます。\n"
 

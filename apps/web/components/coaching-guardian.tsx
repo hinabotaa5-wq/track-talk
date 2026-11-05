@@ -86,7 +86,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
         <li>連絡先の交換と、直接会う約束は禁止です。気になるメッセージは「通報する」から運営に知らせてください。</li>
         {contract.payment_required ? (
           <li>
-            料金は{formatYen(contract.price_yen)}で、同意のあとお支払いの画面（カード・Apple Pay・Google Pay・PayPay）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
+            料金は{formatYen(contract.price_yen)}で、同意のあとお支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
           </li>
         ) : (
           <li>いまはお試し期間のため、お支払いはありません。</li>
