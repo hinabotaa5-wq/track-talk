@@ -10,6 +10,7 @@ import (
 
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
+	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -20,7 +21,7 @@ type storageCleanupResult struct {
 	MajorHosts     int64 `json:"major_hosts_deleted"`
 	CoachIdentity  int64 `json:"coach_identities_deleted"`
 	GuardianRecord int64 `json:"guardian_records_deleted"`
-	// 退会した未成年の、購入のたびの宣言の記録（保護者同意の記録と同じ5年）。
+	// 退会した未成年の、購入のたびの宣言の記録（保護者同意の記録と同じく、本人が23歳になる月の終わりまで）。
 	MinorDeclaration int64 `json:"minor_purchase_declarations_deleted"`
 	Consultations    int   `json:"consultations_purged"`
 	Messages         int   `json:"message_rooms_purged"`
@@ -73,12 +74,17 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 	if out.CoachIdentity, err = s.q.DeleteExpiredCoachLegalIdentities(ctx, now.AddDate(-coachIdentityRetentionYears, 0, 0)); err != nil {
 		return out, err
 	}
-	// 退会した未成年の保護者同意の証跡と購入の記録は、最後の取引（なければ同意など最後の記録）から5年で消す。
-	if out.GuardianRecord, err = s.q.DeleteExpiredGuardianRecords(ctx, now.AddDate(-guardianRecordRetentionYears, 0, 0)); err != nil {
+	// 退会した未成年の保護者同意の証跡と購入の記録、購入のたびの宣言は、本人が23歳になる月の終わりまで残してから消す
+	// （未成年者取消しの取消権の行使期間に合わせる）。生まれた年月を書き写す前に退会した分は、最後の取引から5年で消す。
+	legacyCutoff := now.AddDate(-guardianRecordRetentionYears, 0, 0)
+	if out.GuardianRecord, err = s.q.DeleteExpiredGuardianRecords(ctx, db.DeleteExpiredGuardianRecordsParams{
+		KeepUntilAge: minorRecordRetentionAge, Now: now, Cutoff: legacyCutoff,
+	}); err != nil {
 		return out, err
 	}
-	// 未成年の購入のたびの宣言も、同じく最後の取引（なければ最後の宣言）から5年で消す。
-	if out.MinorDeclaration, err = s.q.DeleteExpiredMinorPurchaseDeclarations(ctx, now.AddDate(-guardianRecordRetentionYears, 0, 0)); err != nil {
+	if out.MinorDeclaration, err = s.q.DeleteExpiredMinorPurchaseDeclarations(ctx, db.DeleteExpiredMinorPurchaseDeclarationsParams{
+		KeepUntilAge: minorRecordRetentionAge, Now: now, Cutoff: legacyCutoff,
+	}); err != nil {
 		return out, err
 	}
 	// 外部ストレージを消せない設定では文章も消さない。

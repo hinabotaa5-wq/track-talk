@@ -19,7 +19,7 @@ WHERE minor_id = $1
   AND status = 'consented'
   AND guardian_email IS NOT NULL
   AND (limit_request_sent_at IS NULL OR limit_request_sent_at < now() - interval '12 hours')
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 // 上限変更のお願いは、同じ子について12時間に1回まで。送ってよいときだけ行を返す。
@@ -50,6 +50,7 @@ func (q *Queries) ClaimGuardianLimitRequest(ctx context.Context, minorID uuid.UU
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -73,7 +74,7 @@ WHERE token_hash = $8
   AND status IN ('pending', 'declined', 'revoked')
   AND consent_token_hash IS DISTINCT FROM token_hash
   AND account_deleted_at IS NULL
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 type ConsentGuardianParams struct {
@@ -125,6 +126,7 @@ func (q *Queries) ConsentGuardian(ctx context.Context, arg ConsentGuardianParams
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -211,7 +213,7 @@ SET status = 'declined',
 WHERE token_hash = $1
   AND status IN ('pending', 'declined')
   AND account_deleted_at IS NULL
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 func (q *Queries) DeclineGuardian(ctx context.Context, tokenHash string) (GuardianConsent, error) {
@@ -241,6 +243,7 @@ func (q *Queries) DeclineGuardian(ctx context.Context, tokenHash string) (Guardi
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -249,20 +252,33 @@ const deleteExpiredGuardianRecords = `-- name: DeleteExpiredGuardianRecords :exe
 WITH expired AS (
     SELECT gc.minor_id FROM guardian_consents gc
     WHERE gc.account_deleted_at IS NOT NULL
-      AND COALESCE(gc.last_transaction_at, gc.consented_at,
-            GREATEST(gc.updated_at, (SELECT max(e.created_at) FROM guardian_consent_events e WHERE e.minor_id = gc.minor_id)))
-          < $1::timestamptz
+      AND CASE WHEN gc.birth_month IS NOT NULL THEN
+            ((gc.birth_month + make_interval(years => $1::int, months => 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+              <= $2::timestamptz
+          ELSE
+            COALESCE(gc.last_transaction_at, gc.consented_at,
+              GREATEST(gc.updated_at, (SELECT max(e.created_at) FROM guardian_consent_events e WHERE e.minor_id = gc.minor_id)))
+              < $3::timestamptz
+          END
 ),
 events AS (DELETE FROM guardian_consent_events WHERE minor_id IN (SELECT minor_id FROM expired)),
 notices AS (DELETE FROM guardian_notices WHERE minor_id IN (SELECT minor_id FROM expired))
 DELETE FROM guardian_consents WHERE minor_id IN (SELECT minor_id FROM expired)
 `
 
-// 保管期間（cutoff より前）を過ぎた、退会した本人の保護者同意の証跡を、同意・証跡・メールの記録まとめて消す
+type DeleteExpiredGuardianRecordsParams struct {
+	KeepUntilAge int32     `json:"keep_until_age"`
+	Now          time.Time `json:"now"`
+	Cutoff       time.Time `json:"cutoff"`
+}
+
+// 保管期間を過ぎた、退会した本人の保護者同意の証跡を、同意・証跡・メールの記録まとめて消す
 // （変更・撤回用のリンクは guardian_consents と一緒に消える）。退会していない本人の分は対象にしない。
-// 起算点は最後の完了した取引、取引がなければ同意した日時、同意もなければ最後の記録（リンクの送信・同意しない・撤回など）の日時。
-func (q *Queries) DeleteExpiredGuardianRecords(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExpiredGuardianRecords, cutoff)
+// 保管期間は、本人が keep_until_age 歳になる月の終わりまで（日本時間。now がそれを過ぎたら消す）。
+// 生まれた年月を書き写す前に退会した分は、従来どおり次の起算点が cutoff より前なら消す：最後の完了した取引、
+// 取引がなければ同意した日時、同意もなければ最後の記録（リンクの送信・同意しない・撤回など）の日時。
+func (q *Queries) DeleteExpiredGuardianRecords(ctx context.Context, arg DeleteExpiredGuardianRecordsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredGuardianRecords, arg.KeepUntilAge, arg.Now, arg.Cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -270,7 +286,7 @@ func (q *Queries) DeleteExpiredGuardianRecords(ctx context.Context, cutoff time.
 }
 
 const getGuardianConsentByManageLink = `-- name: GetGuardianConsentByManageLink :one
-SELECT gc.minor_id, gc.token_hash, gc.status, gc.guardian_name, gc.relationship, gc.monthly_limit_yen, gc.allow_publish, gc.consented_at, gc.declined_at, gc.revoked_at, gc.created_at, gc.updated_at, gc.guardian_email, gc.link_sent_on, gc.link_sends, gc.link_issued_at, gc.self_pay_limit_yen, gc.consent_ip, gc.terms_version, gc.consent_token_hash, gc.limit_request_sent_at, gc.account_deleted_at, gc.last_transaction_at FROM guardian_manage_links l
+SELECT gc.minor_id, gc.token_hash, gc.status, gc.guardian_name, gc.relationship, gc.monthly_limit_yen, gc.allow_publish, gc.consented_at, gc.declined_at, gc.revoked_at, gc.created_at, gc.updated_at, gc.guardian_email, gc.link_sent_on, gc.link_sends, gc.link_issued_at, gc.self_pay_limit_yen, gc.consent_ip, gc.terms_version, gc.consent_token_hash, gc.limit_request_sent_at, gc.account_deleted_at, gc.last_transaction_at, gc.birth_month FROM guardian_manage_links l
 JOIN guardian_consents gc ON gc.minor_id = l.minor_id
 WHERE l.token_hash = $1
   AND l.expires_at > now()
@@ -305,12 +321,13 @@ func (q *Queries) GetGuardianConsentByManageLink(ctx context.Context, tokenHash 
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
 
 const getGuardianConsentByMinor = `-- name: GetGuardianConsentByMinor :one
-SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at FROM guardian_consents
+SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month FROM guardian_consents
 WHERE minor_id = $1
 `
 
@@ -341,12 +358,13 @@ func (q *Queries) GetGuardianConsentByMinor(ctx context.Context, minorID uuid.UU
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
 
 const getGuardianConsentByToken = `-- name: GetGuardianConsentByToken :one
-SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at FROM guardian_consents
+SELECT minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month FROM guardian_consents
 WHERE token_hash = $1
   AND link_issued_at > now() - interval '30 days'
   AND account_deleted_at IS NULL
@@ -379,6 +397,7 @@ func (q *Queries) GetGuardianConsentByToken(ctx context.Context, tokenHash strin
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -427,7 +446,7 @@ SET token_hash = EXCLUDED.token_hash,
     updated_at = now()
 WHERE (guardian_consents.link_sent_on IS DISTINCT FROM EXCLUDED.link_sent_on OR guardian_consents.link_sends < $4::integer)
   AND (guardian_consents.status = 'pending' OR lower(guardian_consents.guardian_email) = lower(EXCLUDED.guardian_email))
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 type IssueGuardianLinkParams struct {
@@ -472,6 +491,7 @@ func (q *Queries) IssueGuardianLink(ctx context.Context, arg IssueGuardianLinkPa
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -480,6 +500,7 @@ const keepGuardianRecordsOnWithdraw = `-- name: KeepGuardianRecordsOnWithdraw :e
 WITH marked AS (
     UPDATE guardian_consents gc
     SET account_deleted_at = now(),
+        birth_month = (SELECT pr.birth_month FROM profiles pr WHERE pr.id = gc.minor_id),
         last_transaction_at = (
             SELECT max(t) FROM (
                 SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -501,6 +522,7 @@ DELETE FROM guardian_manage_links l USING marked WHERE l.minor_id = marked.minor
 // 退会の時に、保護者同意の証跡を残すための印を付ける。退会した日時と、その時点での最後の完了した取引の日時を書き留める
 // （退会のあとは支払いの記録から本人が外れるため）。取引は、本人が払った動画添削（確定・返金）と追加相談（支払い・返金）、
 // 保護者に通知した購入。変更・撤回用のリンクは消し、同意用のリンクも使えなくする（GetGuardianConsentByToken などで見る）。
+// 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
 func (q *Queries) KeepGuardianRecordsOnWithdraw(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, keepGuardianRecordsOnWithdraw, userID)
 	return err
@@ -677,7 +699,7 @@ SET status = 'revoked',
     updated_at = now()
 WHERE minor_id = $1
   AND status = 'consented'
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 func (q *Queries) RevokeGuardian(ctx context.Context, minorID uuid.UUID) (GuardianConsent, error) {
@@ -707,6 +729,7 @@ func (q *Queries) RevokeGuardian(ctx context.Context, minorID uuid.UUID) (Guardi
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }
@@ -787,7 +810,7 @@ SET monthly_limit_yen = $2,
     updated_at = now()
 WHERE minor_id = $1
   AND status = 'consented'
-RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at
+RETURNING minor_id, token_hash, status, guardian_name, relationship, monthly_limit_yen, allow_publish, consented_at, declined_at, revoked_at, created_at, updated_at, guardian_email, link_sent_on, link_sends, link_issued_at, self_pay_limit_yen, consent_ip, terms_version, consent_token_hash, limit_request_sent_at, account_deleted_at, last_transaction_at, birth_month
 `
 
 type UpdateGuardianSettingsParams struct {
@@ -829,6 +852,7 @@ func (q *Queries) UpdateGuardianSettings(ctx context.Context, arg UpdateGuardian
 		&i.LimitRequestSentAt,
 		&i.AccountDeletedAt,
 		&i.LastTransactionAt,
+		&i.BirthMonth,
 	)
 	return i, err
 }

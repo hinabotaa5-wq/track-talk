@@ -629,6 +629,7 @@ type GuardianConsent struct {
 	LimitRequestSentAt *time.Time `json:"limit_request_sent_at"`
 	AccountDeletedAt   *time.Time `json:"account_deleted_at"`
 	LastTransactionAt  *time.Time `json:"last_transaction_at"`
+	BirthMonth         *time.Time `json:"birth_month"`
 }
 
 type GuardianConsentEvent struct {
@@ -806,6 +807,7 @@ type MinorPurchaseDeclaration struct {
 	DeclaredAt        time.Time  `json:"declared_at"`
 	AccountDeletedAt  *time.Time `json:"account_deleted_at"`
 	LastTransactionAt *time.Time `json:"last_transaction_at"`
+	BirthMonth        *time.Time `json:"birth_month"`
 }
 
 type MonthlyReminder struct {

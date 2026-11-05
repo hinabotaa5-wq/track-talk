@@ -23,7 +23,11 @@ import (
 // guardianTermsVersion は、保護者が同意した文面の版。同意ページや規約の文面を変えたら上げる。
 const guardianTermsVersion = "guardian-consent-2026-10-final"
 
-// guardianRecordRetentionYears は、退会した本人の保護者同意の証跡と購入の記録を残す年数（最後の取引から）。
+// minorRecordRetentionAge は、退会した本人の保護者同意の証跡と購入の記録、購入のたびの宣言を残す年齢。
+// 本人がこの年齢になる月の終わりまで残す。未成年者取消しの取消権は成年（18歳）になってから5年で消える（民法126条）ため、それに合わせる。
+const minorRecordRetentionAge = 23
+
+// guardianRecordRetentionYears は、生まれた年月を書き写す前（マイグレーション134より前）に退会した本人の記録を残す年数（最後の取引から）。
 const guardianRecordRetentionYears = 5
 
 // guardianManageLinkLife は、上限の変更・撤回のためのリンクが使える期間。メールを送るたびに新しく作る。
