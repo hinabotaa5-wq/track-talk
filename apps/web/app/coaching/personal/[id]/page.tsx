@@ -155,7 +155,7 @@ function CoachingContractView() {
               お支払いへ進む（{formatYen(contract.price_yen)}）
             </Button>
             <p className="text-xs text-slate-300">
-              カード・Apple Pay・Google Pay・PayPay で払えます。始まってから72時間コーチの書き込みがなければ、全額を返金します。
+              カード・Apple Pay・Google Pay で払えます。始まってから72時間コーチの書き込みがなければ、全額を返金します。
             </p>
           </div>
         )

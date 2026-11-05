@@ -215,8 +215,14 @@ func TestConsultationCashSnapshotWebhookAndRefund(t *testing.T) {
 	owner, coach, root := endedCashRoom(t, h)
 	c := consultationDraft(t, h, owner, "/v1/coaching/contracts/"+root+"/consultations", uuid.NewString(), "契約終了後の相談")
 	execSQLArgs(t, `UPDATE coaching_plans SET additional_consultation_price_yen=2400 WHERE id=(SELECT plan_id FROM coaching_contracts WHERE id=$1)`, root)
+	if rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, map[string]any{"payment_method": "paypay"}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("PayPay override must be rejected: %d", rec.Code)
+	}
 	consultationAction(t, h, owner, c.ID, "submit", nil)
 	consultationAction(t, h, owner, c.ID, "checkout", nil)
+	if form := f.lastSession(); form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" {
+		t.Fatalf("support plan consultation must only allow card: %v", form)
+	}
 	if got := f.lastSession().Get("line_items[0][price_data][unit_amount]"); got != "1200" {
 		t.Fatalf("price %s", got)
 	}

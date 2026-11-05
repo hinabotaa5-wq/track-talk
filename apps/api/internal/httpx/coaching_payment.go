@@ -116,13 +116,14 @@ func (s *Server) checkoutURLWith(ctx context.Context, q *db.Queries, ct db.Coach
 	}
 	id := uuid.New()
 	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{
-		Name:       fmt.Sprintf("パーソナル指導「%s」（%d日）", ct.PlanTitle, ct.DurationDays),
-		AmountYen:  int(ct.PriceYen),
-		SuccessURL: successURL,
-		CancelURL:  cancelURL,
-		Reference:  id.String(),
-		Metadata:   map[string]string{"contract_id": ct.ID.String(), "payment_id": id.String()},
-		ExpiresAt:  expires,
+		Name:               fmt.Sprintf("パーソナル指導「%s」（%d日）", ct.PlanTitle, ct.DurationDays),
+		AmountYen:          int(ct.PriceYen),
+		SuccessURL:         successURL,
+		CancelURL:          cancelURL,
+		Reference:          id.String(),
+		Metadata:           map[string]string{"contract_id": ct.ID.String(), "payment_id": id.String()},
+		ExpiresAt:          expires,
+		PaymentMethodTypes: []string{"card"},
 		// 同じ支払いの行で送り直しても、支払い画面は1つだけ。
 		IdempotencyKey: "checkout-" + id.String(),
 	})
