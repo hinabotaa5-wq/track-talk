@@ -18,7 +18,7 @@ import (
 const ticketFaceYen int32 = 600
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードまたはPayPayでお支払いください"
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削とその追加相談は申込み時にカードまたはPayPayで、サポートプランの追加相談はカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 

@@ -100,8 +100,12 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 	if c.Minor && c.ContractID != nil {
 		path = "/guardian/paid"
 	}
+	methods := checkoutPaymentMethods
+	if c.ContractID != nil {
+		methods = []string{"card"}
+	}
 	page := s.cfg.WebBaseURL + path
-	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: checkoutPaymentMethods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
+	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: methods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errStripe, err)
 	}
