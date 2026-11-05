@@ -129,7 +129,7 @@ export function Header() {
           </div>
         )}
       </div>
-      {/* エグ練大会の開催中だけ、ホームのヘッダーに締め切りまでの残り時間を出す。 */}
+      {/* エグ練グランプリの開催中だけ、ホームのヘッダーに締め切りまでの残り時間を出す。 */}
       {pathname === "/" ? <MenuContestBar /> : null}
     </header>
   );

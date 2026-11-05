@@ -22,7 +22,7 @@ export function useNow(intervalMs = 30_000) {
   return now;
 }
 
-// ホームのヘッダーの下段。エグ練大会の開催中だけ、いまの段階と締め切りまでの残り時間を出す。
+// ホームのヘッダーの下段。エグ練グランプリの開催中だけ、いまの段階と締め切りまでの残り時間を出す。
 export function MenuContestBar() {
   const [state, setState] = useState<MenuContestState | null>(null);
   const [reload, setReload] = useState(0);

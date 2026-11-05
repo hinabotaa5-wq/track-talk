@@ -63,7 +63,7 @@ it("shows app-only usage and account counts without Umami operation totals", asy
     const sections = Array.from(container.querySelectorAll("section"));
     const usage = sections.find((s) => s.querySelector("h2")?.textContent === "機能ごとの利用")!;
     expect(Array.from(usage.querySelectorAll("tbody tr td:first-child")).map((td) => td.textContent)).toEqual([
-      "コメント", "保存", "感覚メモ", "シューズのレビュー", "練習への参加申請", "ケガのグループに参加", "エグ練の応募", "エグ練の投票",
+      "コメント", "保存", "感覚メモ", "シューズのレビュー", "練習への参加申請", "ケガのグループに参加", "エグ練グランプリの応募", "エグ練グランプリの投票",
     ]);
     const weekly = sections.find((s) => s.querySelector("h2")?.textContent === "週ごとの動き")!;
     expect(Array.from(weekly.querySelectorAll("tbody td")).map((td) => td.textContent)).toEqual(["10/19〜", "4", "3", "1"]);
