@@ -1,5 +1,5 @@
 -- name: InsertMinorPurchaseDeclaration :exec
--- 18歳未満の本人が、購入の前に「保護者に口頭で許可をもらいました」にチェックしたことを残す。
+-- 18歳未満の本人が、購入の前に「保護者に許可をもらいました」にチェックしたことを残す。
 INSERT INTO minor_purchase_declarations (id, minor_id, ref_type, ref_id, text_version)
 VALUES ($1, $2, $3, $4, $5);
 

@@ -57,7 +57,7 @@ function button(text: string) { return [...container.querySelectorAll("button")]
 async function check() { const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]'); if (!box) throw new Error("missing checkbox"); await act(async () => box.click()); }
 it("未成年本人は、添削のあとの追加相談の支払いを開くたびに、保護者の許可のチェックが要る", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "requester", status: "awaiting_payment" }] });
- expect(container.textContent).toContain("保護者に口頭で許可をもらいました");
+ expect(container.textContent).toContain("保護者に許可をもらいました");
  expect(container.textContent).toContain("未成年の方は、購入する前に保護者の許可を得てください。");
  expect(container.textContent).not.toContain("保護者に、この契約のページから");
  expect(button("お支払いへ")?.disabled).toBe(true);

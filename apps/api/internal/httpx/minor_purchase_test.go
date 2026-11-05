@@ -50,7 +50,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 
 	// 同意の記録がなくても、チェックすれば支払い画面に進める。宣言と、支払いの未成年の印が残る。
 	first := chosenReview(t, h, tm, coach.String(), "paypay", false)
-	if n, version := declarationsFor(t, minor, "review", first); n != 1 || version != "minor-purchase-declaration-2026-11-draft" {
+	if n, version := declarationsFor(t, minor, "review", first); n != 1 || version != "minor-purchase-declaration-2026-11-05" {
 		t.Fatalf("declaration %d %q", n, version)
 	}
 	var consents, minorPayments int

@@ -12,13 +12,13 @@ import (
 )
 
 // 18歳未満が自分で払う動画添削・追加相談の、購入のたびの宣言。
-// 保護者同意と月の上限で止める代わりに、支払い画面を作る前に「保護者に口頭で許可をもらいました」へのチェックを必須にし、
+// 保護者同意と月の上限で止める代わりに、支払い画面を作る前に「保護者に許可をもらいました」へのチェックを必須にし、
 // チェックした記録を取引ごとに残す（minor_purchase_declarations）。18歳以上には求めない。
 // 年齢の判定は、これまでどおり自己申告の生まれた年月で、依頼を作る時・支払い画面を作る前のロックの中・追加相談の支払いが届いた時に行う。
 // 保護者が契約する指導（パーソナル指導・サポートプラン）には使わない。
 
 // minorPurchaseDeclarationVersion は、宣言の文案の版。画面（apps/web/lib/minor-purchase.ts）の文案を変えたら両方を上げる。
-const minorPurchaseDeclarationVersion = "minor-purchase-declaration-2026-11-draft"
+const minorPurchaseDeclarationVersion = "minor-purchase-declaration-2026-11-05"
 
 // minorDeclarationReq は、購入の操作で一緒に送る宣言。
 type minorDeclarationReq struct {
