@@ -130,7 +130,7 @@ export default function GuardianPage() {
         </p>
       </div>
 
-      {/* 文案（運営者の確認待ち）。確定したら、このコメントを外す。変えたら API の guardianTermsVersion を上げる（同意した版は terms_version で記録する）。 */}
+      {/* 運営者の確定文面。変えたら API の guardianTermsVersion を上げる（同意した版は terms_version で記録する）。 */}
       <section className="space-y-3 rounded-md border border-white/20 p-4 text-sm text-slate-200">
         <h2 className="font-bold text-white">同意いただく内容</h2>
         <ol className="list-decimal space-y-3 pl-5">
