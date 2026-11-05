@@ -712,7 +712,9 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var saved db.CoachingConsultation
+	var notice *push.Message
 	err := s.tx(r.Context(), func(q *db.Queries) error {
+		notice = nil
 		current, room, err := s.lockConsultation(r.Context(), q, c)
 		if err != nil {
 			return err
@@ -739,7 +741,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 				if e != nil {
 					return e
 				}
-				err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, consultationWorkOrderTerms(saved, name, time.Now()))
+				notice, err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, *saved.ReviewRequestID, consultationWorkOrderTerms(saved, name, time.Now()))
 			}
 		case "decline":
 			if current.Status != "offered" {
@@ -790,6 +792,9 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
+	}
+	if notice != nil && saved.CoachID != nil {
+		s.pushQuietly(r.Context(), *saved.CoachID, notifyImportant, *notice, 7*24*time.Hour)
 	}
 	if action == "answer" || action == "clarification" || action == "decline" {
 		s.notifyConsultation(r.Context(), saved, false, "追加相談が更新されました")

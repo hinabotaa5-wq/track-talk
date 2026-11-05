@@ -22,3 +22,11 @@ it("引き受けた後は、書き留めた通知として畳んで見せる", (
   expect(html).toContain("に引き受け");
   expect(html).not.toMatch(/<details[^>]* open/);
 });
+
+it("お知らせで届けた通知には、届けた日時を添え、知らせから開く場所(work-order)を持つ", () => {
+  const html = renderToStaticMarkup(
+    <WorkOrderView order={{ id: "w", terms_version: 1, terms, created_at: "2026-11-01T03:00:00Z", delivered_at: "2026-11-01T03:00:00Z" }} />,
+  );
+  expect(html).toContain('id="work-order"');
+  expect(html).toContain("にお知らせで届けました");
+});

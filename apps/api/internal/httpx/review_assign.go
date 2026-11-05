@@ -464,7 +464,8 @@ func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if err := saveWorkOrder(r.Context(), q, "review", &rr.ID, nil, p.ID, terms); err != nil {
+	notice, err := saveWorkOrder(r.Context(), q, "review", &rr.ID, nil, p.ID, rr.ID, terms)
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -472,9 +473,14 @@ func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	if notice != nil {
+		s.pushQuietly(r.Context(), p.ID, notifyImportant, *notice, 7*24*time.Hour)
+	}
 	out := s.coachRequestJSON(rr, true)
 	if wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID}); err == nil {
-		out["work_order"] = workOrderJSON(wo)
+		if order, err := workOrderWithDelivery(r.Context(), s.q, wo); err == nil {
+			out["work_order"] = order
+		}
 	}
 	JSON(w, http.StatusOK, out)
 }

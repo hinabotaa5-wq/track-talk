@@ -151,7 +151,12 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 	// 引き受けた時に書き留めた取引条件。引き受ける前の版のコードで受けた依頼には無い。
 	wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID})
 	if err == nil {
-		out["work_order"] = workOrderJSON(wo)
+		order, err := workOrderWithDelivery(r.Context(), s.q, wo)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		out["work_order"] = order
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		MapDBError(w, err)
 		return

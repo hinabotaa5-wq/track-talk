@@ -1534,6 +1534,7 @@ type noteItem struct {
 	PostTitle string `json:"post_title"`
 	Title     string `json:"title"`
 	URL       string `json:"url"`
+	Body      string `json:"body"`
 	Read      bool   `json:"read"`
 }
 

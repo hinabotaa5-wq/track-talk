@@ -53,6 +53,48 @@ func (q *Queries) CreateCoachWorkOrder(ctx context.Context, arg CreateCoachWorkO
 	return i, err
 }
 
+const createWorkOrderDelivery = `-- name: CreateWorkOrderDelivery :one
+INSERT INTO coach_work_order_deliveries (id, work_order_id, recipient_id, channel, terms_version, title, body, url)
+VALUES ($1, $2, $3, 'in_app', $4, $5, $6, $7)
+RETURNING id, work_order_id, recipient_id, channel, terms_version, title, body, url, delivered_at
+`
+
+type CreateWorkOrderDeliveryParams struct {
+	ID           uuid.UUID  `json:"id"`
+	WorkOrderID  uuid.UUID  `json:"work_order_id"`
+	RecipientID  *uuid.UUID `json:"recipient_id"`
+	TermsVersion int16      `json:"terms_version"`
+	Title        string     `json:"title"`
+	Body         string     `json:"body"`
+	Url          string     `json:"url"`
+}
+
+// 届けた記録(宛先・日時・送った文面)。同じ通知を2回届けない。
+func (q *Queries) CreateWorkOrderDelivery(ctx context.Context, arg CreateWorkOrderDeliveryParams) (CoachWorkOrderDelivery, error) {
+	row := q.db.QueryRow(ctx, createWorkOrderDelivery,
+		arg.ID,
+		arg.WorkOrderID,
+		arg.RecipientID,
+		arg.TermsVersion,
+		arg.Title,
+		arg.Body,
+		arg.Url,
+	)
+	var i CoachWorkOrderDelivery
+	err := row.Scan(
+		&i.ID,
+		&i.WorkOrderID,
+		&i.RecipientID,
+		&i.Channel,
+		&i.TermsVersion,
+		&i.Title,
+		&i.Body,
+		&i.Url,
+		&i.DeliveredAt,
+	)
+	return i, err
+}
+
 const getConsultationWorkOrder = `-- name: GetConsultationWorkOrder :one
 SELECT id, kind, review_request_id, consultation_id, coach_id, terms_version, terms, created_at FROM coach_work_orders WHERE consultation_id = $1 AND coach_id = $2
 `
@@ -118,4 +160,50 @@ func (q *Queries) GetReviewWorkOrder(ctx context.Context, arg GetReviewWorkOrder
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getWorkOrderDelivery = `-- name: GetWorkOrderDelivery :one
+SELECT id, work_order_id, recipient_id, channel, terms_version, title, body, url, delivered_at FROM coach_work_order_deliveries WHERE work_order_id = $1
+`
+
+func (q *Queries) GetWorkOrderDelivery(ctx context.Context, workOrderID uuid.UUID) (CoachWorkOrderDelivery, error) {
+	row := q.db.QueryRow(ctx, getWorkOrderDelivery, workOrderID)
+	var i CoachWorkOrderDelivery
+	err := row.Scan(
+		&i.ID,
+		&i.WorkOrderID,
+		&i.RecipientID,
+		&i.Channel,
+		&i.TermsVersion,
+		&i.Title,
+		&i.Body,
+		&i.Url,
+		&i.DeliveredAt,
+	)
+	return i, err
+}
+
+const insertWorkOrderNotification = `-- name: InsertWorkOrderNotification :exec
+INSERT INTO notifications (id, recipient_id, kind, title, body, url)
+VALUES ($1, $2, 'message', $3, $4, $5)
+`
+
+type InsertWorkOrderNotificationParams struct {
+	ID          uuid.UUID `json:"id"`
+	RecipientID uuid.UUID `json:"recipient_id"`
+	Title       *string   `json:"title"`
+	Body        *string   `json:"body"`
+	Url         *string   `json:"url"`
+}
+
+// 取引条件を届けるお知らせ。法律上の明示にあたるので、本人の通知の設定に関わらず、まとめずに必ず1件入れる。
+func (q *Queries) InsertWorkOrderNotification(ctx context.Context, arg InsertWorkOrderNotificationParams) error {
+	_, err := q.db.Exec(ctx, insertWorkOrderNotification,
+		arg.ID,
+		arg.RecipientID,
+		arg.Title,
+		arg.Body,
+		arg.Url,
+	)
+	return err
 }

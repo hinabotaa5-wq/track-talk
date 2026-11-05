@@ -210,6 +210,18 @@ type CoachWorkOrder struct {
 	CreatedAt       time.Time  `json:"created_at"`
 }
 
+type CoachWorkOrderDelivery struct {
+	ID           uuid.UUID  `json:"id"`
+	WorkOrderID  uuid.UUID  `json:"work_order_id"`
+	RecipientID  *uuid.UUID `json:"recipient_id"`
+	Channel      string     `json:"channel"`
+	TermsVersion int16      `json:"terms_version"`
+	Title        string     `json:"title"`
+	Body         string     `json:"body"`
+	Url          string     `json:"url"`
+	DeliveredAt  time.Time  `json:"delivered_at"`
+}
+
 type CoachingAccessLog struct {
 	ID         uuid.UUID `json:"id"`
 	AdminID    uuid.UUID `json:"admin_id"`
