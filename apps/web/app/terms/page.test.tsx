@@ -75,6 +75,17 @@ it("サポートプランは、当事者・債権の帰属・代理受領・債�
   expect(text).not.toContain("分別");
 });
 
+it("サポートプランの返金に伴う精算は、支払済みの報酬相当額の返還・次回以降の支払額からの控除と通知・内訳の説明を定める", () => {
+  const text = article(9);
+  expect(text).toContain("購入者への返金に伴う精算");
+  expect(text).toContain("その返金に対応する報酬相当額を返還しなければなりません");
+  expect(text).toContain("次回以降の報酬その他の支払額から控除することができます");
+  expect(text).toContain("控除の対象と金額をコーチに通知します");
+  expect(text).toContain("運営者に内訳の説明を求めることができます");
+  // 第8条の次に置き、後ろの条は1つずつ繰り下げる。
+  expect(renderToStaticMarkup(<TermsPage />)).toContain("第17条（規約の変更・準拠法・連絡）");
+});
+
 it("追加相談の購入画面は、1回限りであることと契約の相手を示す", () => {
   const review = renderToStaticMarkup(<ConsultationTermsNote kind="review" />);
   for (const word of agencyWords) expect(review).not.toContain(word);
