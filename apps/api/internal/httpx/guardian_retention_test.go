@@ -29,9 +29,10 @@ func declarationCount(t *testing.T, minor uuid.UUID) int {
 	return n
 }
 
-// 保護者同意の証跡と購入の記録は、未成年の本人が退会しても残り（プロフィールなど他の情報は消える）、
-// 最後の取引から5年たったら日次の処理で消える。取引がないときは最後の記録から数える。退会していない人の分は消さない。
-func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
+// 保護者同意の証跡と購入の記録、購入のたびの宣言は、未成年の本人が退会しても残り（プロフィールなど他の情報は消える）、
+// 本人が23歳になる月の終わりを過ぎたら日次の処理で消える（未成年者取消しの取消権の行使期間に合わせる）。
+// 生まれた年月を書き写す前に退会した分は、従来どおり最後の取引（なければ最後の記録）から5年で消す。退会していない人の分は消さない。
+func TestGuardianRecordsKeptAfterWithdrawalUntilAge23(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -71,7 +72,8 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	coach, tc := onDutyCoach(t, h, admin)
 
 	// A: 保護者が同意し、本人が動画添削を自分の PayPay で買い、返却されたあとで退会する。
-	minor, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
+	year := time.Now().Year()
+	minor, tm := demoUser(t, h, time.Date(year-14, 1, 1, 0, 0, 0, 0, time.UTC))
 	email := guardianEmail()
 	gt := issueGuardianLink(t, h, tm, email)
 	if rec := doJSON(t, h, "POST", "/v1/guardian/"+gt+"/consent", "", map[string]any{
@@ -155,7 +157,18 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	// 退会していない人の宣言（支払いはまだ）。
 	chosenReview(t, h, tActive, coach.String(), "paypay", false)
 
-	// 最後の取引（A）・最後の記録（B）から5年たつまでは残す。
+	// 退会の時に、生まれた年月を書き写す（プロフィールは消えるため）。
+	var consentBirth, declBirth *time.Time
+	queryRowArgs(t, `SELECT (SELECT birth_month FROM guardian_consents WHERE minor_id = $1), (SELECT max(birth_month) FROM minor_purchase_declarations WHERE minor_id = $1)`,
+		[]any{minor}, &consentBirth, &declBirth)
+	if consentBirth == nil || declBirth == nil || consentBirth.Year() != year-14 || consentBirth.Month() != time.January ||
+		!consentBirth.Equal(*declBirth) {
+		t.Fatalf("birth month copied consent=%v declaration=%v", consentBirth, declBirth)
+	}
+	// B は、生まれた年月を書き写す前（マイグレーション134より前）に退会した分として扱う。
+	execSQLArgs(t, `UPDATE guardian_consents SET birth_month = NULL WHERE minor_id = $1`, pendingMinor)
+
+	// 最後の取引（A）・最後の記録（B）から5年たつまでは、どちらも残す。
 	start := time.Now()
 	cleanup(start.AddDate(4, 11, 0))
 	for _, m := range []uuid.UUID{minor, pendingMinor} {
@@ -166,18 +179,32 @@ func TestGuardianRecordsKeptAfterWithdrawalForFiveYears(t *testing.T) {
 	if declarationCount(t, minor) != 1 || declarationCount(t, active) != 1 {
 		t.Fatal("declarations deleted before 5 years")
 	}
-	// 5年を過ぎたら、同意・証跡・メールの記録をまとめて消す。退会していない人の分は残る。
+	// 5年を過ぎると、生まれた年月がない B だけ、同意・証跡・メールの記録をまとめて消す。A は23歳になるまで残す。
 	cleanup(start.AddDate(5, 0, 7))
-	for _, m := range []uuid.UUID{minor, pendingMinor} {
-		if c, e, n := guardianRecordCounts(t, m); c != 0 || e != 0 || n != 0 {
-			t.Fatalf("kept after 5 years %v: %d %d %d", m, c, e, n)
-		}
+	if c, e, n := guardianRecordCounts(t, pendingMinor); c != 0 || e != 0 || n != 0 {
+		t.Fatalf("legacy record kept after 5 years: %d %d %d", c, e, n)
 	}
-	if c, _, _ := guardianRecordCounts(t, active); c != 1 {
-		t.Fatal("active minor's consent deleted")
+	if c, e, _ := guardianRecordCounts(t, minor); c != 1 || e == 0 {
+		t.Fatalf("minor's record deleted before age 23: %d %d", c, e)
 	}
-	// 購入のたびの宣言も、退会した人の分だけ5年で消える。
-	if declarationCount(t, minor) != 0 || declarationCount(t, active) != 1 {
-		t.Fatalf("declarations after 5 years minor=%d active=%d", declarationCount(t, minor), declarationCount(t, active))
+	if declarationCount(t, minor) != 1 {
+		t.Fatal("declaration deleted before age 23")
+	}
+	// A は1月生まれなので、23歳になる月（1月）の終わり（日本時間）まで残し、2月1日0時を過ぎたら消す。
+	jst := time.FixedZone("JST", 9*60*60)
+	cleanup(time.Date(year+9, time.January, 31, 23, 59, 0, 0, jst))
+	if c, _, _ := guardianRecordCounts(t, minor); c != 1 || declarationCount(t, minor) != 1 {
+		t.Fatal("deleted before the end of the month the minor turns 23")
+	}
+	cleanup(time.Date(year+9, time.February, 1, 0, 0, 0, 0, jst))
+	if c, e, n := guardianRecordCounts(t, minor); c != 0 || e != 0 || n != 0 {
+		t.Fatalf("kept after age 23: %d %d %d", c, e, n)
+	}
+	if declarationCount(t, minor) != 0 {
+		t.Fatal("declaration kept after age 23")
+	}
+	// 退会していない人の分は、年数にかかわらず残る。
+	if c, _, _ := guardianRecordCounts(t, active); c != 1 || declarationCount(t, active) != 1 {
+		t.Fatalf("active minor's records deleted: consent=%d declarations=%d", c, declarationCount(t, active))
 	}
 }

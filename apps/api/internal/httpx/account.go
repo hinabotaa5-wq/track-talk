@@ -226,9 +226,9 @@ func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		q.DeletePostsForUser,
 		// コーチの特商法の登録情報は、保持期間がたつまで退会しても残す。
 		q.EndCoachLegalIdentity,
-		// 保護者同意の証跡と購入の記録は、最後の取引から5年たつまで退会しても残す（storage cleanup が消す）。
+		// 保護者同意の証跡と購入の記録は、本人が23歳になる月の終わりまで退会しても残す（storage cleanup が消す）。
 		q.KeepGuardianRecordsOnWithdraw,
-		// 未成年の購入のたびの宣言も、同じく最後の取引から5年たつまで残す。
+		// 未成年の購入のたびの宣言も、同じく本人が23歳になる月の終わりまで残す。
 		q.KeepMinorPurchaseDeclarationsOnWithdraw,
 		q.RememberDeletedAccount,
 		q.DeleteProfile,

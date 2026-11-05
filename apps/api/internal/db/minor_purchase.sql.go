@@ -15,15 +15,27 @@ import (
 const deleteExpiredMinorPurchaseDeclarations = `-- name: DeleteExpiredMinorPurchaseDeclarations :execrows
 DELETE FROM minor_purchase_declarations d
 WHERE d.account_deleted_at IS NOT NULL
-  AND COALESCE(d.last_transaction_at,
-        (SELECT max(x.declared_at) FROM minor_purchase_declarations x WHERE x.minor_id = d.minor_id))
-      < $1::timestamptz
+  AND CASE WHEN d.birth_month IS NOT NULL THEN
+        ((d.birth_month + make_interval(years => $1::int, months => 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+          <= $2::timestamptz
+      ELSE
+        COALESCE(d.last_transaction_at,
+          (SELECT max(x.declared_at) FROM minor_purchase_declarations x WHERE x.minor_id = d.minor_id))
+          < $3::timestamptz
+      END
 `
 
-// 保管期間（cutoff より前）を過ぎた、退会した本人の宣言の記録を消す。退会していない本人の分は対象にしない。
-// 起算点は本人ごとの最後の完了した取引、取引がなければ最後の宣言の日時。
-func (q *Queries) DeleteExpiredMinorPurchaseDeclarations(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExpiredMinorPurchaseDeclarations, cutoff)
+type DeleteExpiredMinorPurchaseDeclarationsParams struct {
+	KeepUntilAge int32     `json:"keep_until_age"`
+	Now          time.Time `json:"now"`
+	Cutoff       time.Time `json:"cutoff"`
+}
+
+// 保管期間を過ぎた、退会した本人の宣言の記録を消す。退会していない本人の分は対象にしない。
+// 保管期間は、本人が keep_until_age 歳になる月の終わりまで（日本時間。now がそれを過ぎたら消す）。
+// 生まれた年月を書き写す前に退会した分は、従来どおり最後の完了した取引（なければ最後の宣言）が cutoff より前なら消す。
+func (q *Queries) DeleteExpiredMinorPurchaseDeclarations(ctx context.Context, arg DeleteExpiredMinorPurchaseDeclarationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredMinorPurchaseDeclarations, arg.KeepUntilAge, arg.Now, arg.Cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -76,6 +88,7 @@ func (q *Queries) InsertMinorPurchaseDeclaration(ctx context.Context, arg Insert
 const keepMinorPurchaseDeclarationsOnWithdraw = `-- name: KeepMinorPurchaseDeclarationsOnWithdraw :exec
 UPDATE minor_purchase_declarations d
 SET account_deleted_at = now(),
+    birth_month = (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id),
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -90,6 +103,7 @@ WHERE d.minor_id = $1 AND d.account_deleted_at IS NULL
 
 // 退会の時に、宣言の記録を残すための印を付ける。退会した日時と、その時点での最後の完了した取引の日時を書き留める
 // （KeepGuardianRecordsOnWithdraw と同じ数え方。退会のあとは支払いの記録から本人が外れるため）。
+// 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
 func (q *Queries) KeepMinorPurchaseDeclarationsOnWithdraw(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, keepMinorPurchaseDeclarationsOnWithdraw, userID)
 	return err

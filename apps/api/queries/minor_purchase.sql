@@ -11,8 +11,10 @@ SELECT EXISTS (
 -- name: KeepMinorPurchaseDeclarationsOnWithdraw :exec
 -- 退会の時に、宣言の記録を残すための印を付ける。退会した日時と、その時点での最後の完了した取引の日時を書き留める
 -- （KeepGuardianRecordsOnWithdraw と同じ数え方。退会のあとは支払いの記録から本人が外れるため）。
+-- 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
 UPDATE minor_purchase_declarations d
 SET account_deleted_at = now(),
+    birth_month = (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id),
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -25,13 +27,19 @@ SET account_deleted_at = now(),
 WHERE d.minor_id = sqlc.arg(user_id) AND d.account_deleted_at IS NULL;
 
 -- name: DeleteExpiredMinorPurchaseDeclarations :execrows
--- 保管期間（cutoff より前）を過ぎた、退会した本人の宣言の記録を消す。退会していない本人の分は対象にしない。
--- 起算点は本人ごとの最後の完了した取引、取引がなければ最後の宣言の日時。
+-- 保管期間を過ぎた、退会した本人の宣言の記録を消す。退会していない本人の分は対象にしない。
+-- 保管期間は、本人が keep_until_age 歳になる月の終わりまで（日本時間。now がそれを過ぎたら消す）。
+-- 生まれた年月を書き写す前に退会した分は、従来どおり最後の完了した取引（なければ最後の宣言）が cutoff より前なら消す。
 DELETE FROM minor_purchase_declarations d
 WHERE d.account_deleted_at IS NOT NULL
-  AND COALESCE(d.last_transaction_at,
-        (SELECT max(x.declared_at) FROM minor_purchase_declarations x WHERE x.minor_id = d.minor_id))
-      < sqlc.arg(cutoff)::timestamptz;
+  AND CASE WHEN d.birth_month IS NOT NULL THEN
+        ((d.birth_month + make_interval(years => sqlc.arg(keep_until_age)::int, months => 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+          <= sqlc.arg(now)::timestamptz
+      ELSE
+        COALESCE(d.last_transaction_at,
+          (SELECT max(x.declared_at) FROM minor_purchase_declarations x WHERE x.minor_id = d.minor_id))
+          < sqlc.arg(cutoff)::timestamptz
+      END;
 
 -- name: SummarizeMinorSelfPayRefunds :one
 -- 18歳未満の本人が自分で払った動画添削・追加相談のうち、[since, until) に返金が済んだものの件数と金額。

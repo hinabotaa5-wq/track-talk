@@ -181,9 +181,11 @@ ORDER BY created_at, id;
 -- 退会の時に、保護者同意の証跡を残すための印を付ける。退会した日時と、その時点での最後の完了した取引の日時を書き留める
 -- （退会のあとは支払いの記録から本人が外れるため）。取引は、本人が払った動画添削（確定・返金）と追加相談（支払い・返金）、
 -- 保護者に通知した購入。変更・撤回用のリンクは消し、同意用のリンクも使えなくする（GetGuardianConsentByToken などで見る）。
+-- 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
 WITH marked AS (
     UPDATE guardian_consents gc
     SET account_deleted_at = now(),
+        birth_month = (SELECT pr.birth_month FROM profiles pr WHERE pr.id = gc.minor_id),
         last_transaction_at = (
             SELECT max(t) FROM (
                 SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -202,15 +204,22 @@ WITH marked AS (
 DELETE FROM guardian_manage_links l USING marked WHERE l.minor_id = marked.minor_id;
 
 -- name: DeleteExpiredGuardianRecords :execrows
--- 保管期間（cutoff より前）を過ぎた、退会した本人の保護者同意の証跡を、同意・証跡・メールの記録まとめて消す
+-- 保管期間を過ぎた、退会した本人の保護者同意の証跡を、同意・証跡・メールの記録まとめて消す
 -- （変更・撤回用のリンクは guardian_consents と一緒に消える）。退会していない本人の分は対象にしない。
--- 起算点は最後の完了した取引、取引がなければ同意した日時、同意もなければ最後の記録（リンクの送信・同意しない・撤回など）の日時。
+-- 保管期間は、本人が keep_until_age 歳になる月の終わりまで（日本時間。now がそれを過ぎたら消す）。
+-- 生まれた年月を書き写す前に退会した分は、従来どおり次の起算点が cutoff より前なら消す：最後の完了した取引、
+-- 取引がなければ同意した日時、同意もなければ最後の記録（リンクの送信・同意しない・撤回など）の日時。
 WITH expired AS (
     SELECT gc.minor_id FROM guardian_consents gc
     WHERE gc.account_deleted_at IS NOT NULL
-      AND COALESCE(gc.last_transaction_at, gc.consented_at,
-            GREATEST(gc.updated_at, (SELECT max(e.created_at) FROM guardian_consent_events e WHERE e.minor_id = gc.minor_id)))
-          < sqlc.arg(cutoff)::timestamptz
+      AND CASE WHEN gc.birth_month IS NOT NULL THEN
+            ((gc.birth_month + make_interval(years => sqlc.arg(keep_until_age)::int, months => 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+              <= sqlc.arg(now)::timestamptz
+          ELSE
+            COALESCE(gc.last_transaction_at, gc.consented_at,
+              GREATEST(gc.updated_at, (SELECT max(e.created_at) FROM guardian_consent_events e WHERE e.minor_id = gc.minor_id)))
+              < sqlc.arg(cutoff)::timestamptz
+          END
 ),
 events AS (DELETE FROM guardian_consent_events WHERE minor_id IN (SELECT minor_id FROM expired)),
 notices AS (DELETE FROM guardian_notices WHERE minor_id IN (SELECT minor_id FROM expired))
