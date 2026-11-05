@@ -3,9 +3,10 @@ import { formatDateTime } from "@/lib/format";
 
 // 運営者がコーチにフォーム添削・その追加相談を委託するときの取引条件(フリーランス保護法3条の明示)。
 // 引き受ける前は今の条件を、引き受けた後は書き留めた通知を出す。文面は API が作る。
-export function WorkOrderTermsView({ terms, recordedAt }: { terms: WorkOrderTerms; recordedAt?: string }) {
+// 引き受けた通知は、お知らせ(ベル)にも宛先付きで届き、その知らせからこの場所(#work-order)が開く。
+export function WorkOrderTermsView({ terms, recordedAt, deliveredAt }: { terms: WorkOrderTerms; recordedAt?: string; deliveredAt?: string }) {
   return (
-    <details className="rounded-lg border border-white/20 bg-white/5 p-2 text-sm" open={!recordedAt}>
+    <details id="work-order" className="scroll-mt-20 rounded-lg border border-white/20 bg-white/5 p-2 text-sm" open={!recordedAt}>
       <summary className="cursor-pointer font-semibold text-white">
         取引条件の通知{recordedAt ? `（${formatDateTime(recordedAt)} に引き受け）` : "（引き受ける前に確認してください）"}
       </summary>
@@ -17,11 +18,12 @@ export function WorkOrderTermsView({ terms, recordedAt }: { terms: WorkOrderTerm
           </div>
         ))}
       </dl>
-      {recordedAt ? null : <p className="mt-2 text-xs text-slate-300">「引き受ける」を押すと、この条件で業務を受けたことになり、通知として記録されます。</p>}
+      {deliveredAt ? <p className="mt-2 text-xs text-slate-300">この通知は {formatDateTime(deliveredAt)} にお知らせで届けました。</p> : null}
+      {recordedAt ? null : <p className="mt-2 text-xs text-slate-300">「引き受ける」を押すと、この条件で業務を受けたことになり、通知として記録され、お知らせにも届きます。</p>}
     </details>
   );
 }
 
 export function WorkOrderView({ order }: { order: WorkOrder }) {
-  return <WorkOrderTermsView terms={order.terms} recordedAt={order.created_at} />;
+  return <WorkOrderTermsView terms={order.terms} recordedAt={order.created_at} deliveredAt={order.delivered_at} />;
 }

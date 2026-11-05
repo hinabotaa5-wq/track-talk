@@ -11,14 +11,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
 
 // 取引条件の通知(フリーランス保護法3条)。運営者がフォーム添削とその追加相談をコーチに委託するたびに、
-// その案件の9項目を、引き受ける前の打診の画面に出し、引き受けたら書き留める(coach_work_orders)。
+// その案件の9項目を、引き受ける前の打診の画面に出し、引き受けたら書き留め(coach_work_orders)、
+// 同時にコーチのお知らせへ宛先付きで届けて、届けた記録を残す(coach_work_order_deliveries)。
+// 公正取引委員会の Q&A(Q41)で認められている、受信者を特定した送信(アプリのメッセージ機能・URL の記載)に寄せるため。
 // 弁護士の回答で「利用規約への同意だけでは足りず、案件ごとの明示が要る」とされたため。
 // サポートプランはコーチが販売者なので、ここには入れない(要否は弁護士の回答 Q9 を待つ)。
-// 支払期日の書き方(繰り越しがあるときに1つの日付に決まらない点)と、画面での明示で足りるかは回答待ち(Q6・Q7)。
 
 // 通知の文面の版。文面を変えたら上げる。書き留めた通知は、そのときの版のまま残る。
 const workOrderTermsVersion = 1
@@ -127,20 +129,58 @@ func coachDisplayName(ctx context.Context, q *db.Queries, coachID uuid.UUID) (st
 	return "", nil
 }
 
-// saveWorkOrder は、引き受けた案件の通知を書き留める。すでにあれば最初のものを残す。
-func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, consultation *uuid.UUID, coachID uuid.UUID, terms workOrderTerms) error {
+// saveWorkOrder は、引き受けた案件の通知を書き留め、同じトランザクションでコーチへ宛先付きで届ける。
+// すでにあれば最初のものを残し、届け直さない(戻り値は nil)。roomID は条件の全文を見られる依頼の画面の id。
+// 戻り値のプッシュは、コミットのあとに送る(届いたことの記録はお知らせの側で、プッシュは補足)。
+func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, consultation *uuid.UUID, coachID, roomID uuid.UUID, terms workOrderTerms) (*push.Message, error) {
 	raw, err := json.Marshal(terms)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = q.CreateCoachWorkOrder(ctx, db.CreateCoachWorkOrderParams{
+	wo, err := q.CreateCoachWorkOrder(ctx, db.CreateCoachWorkOrderParams{
 		ID: uuid.New(), Kind: kind, ReviewRequestID: review, ConsultationID: consultation,
 		CoachID: &coachID, TermsVersion: workOrderTermsVersion, Terms: raw,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		return nil, nil
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return deliverWorkOrder(ctx, q, wo, coachID, roomID, terms)
+}
+
+// workOrderNotice は、取引条件を届けるお知らせの見出し・本文・開く先。
+// 本文には要点を書き、9項目の全文は開く先の依頼の画面(コーチ本人だけが見られる)に出す。
+func workOrderNotice(kind string, roomID uuid.UUID, terms workOrderTerms) (title, body, url string) {
+	what := "フォーム添削"
+	if kind == "consultation" {
+		what = "フォーム添削の追加相談"
+	}
+	title = "取引条件の通知（" + what + "）"
+	body = fmt.Sprintf("%s を、%s に委託しました。報酬 %d円（税込）、納める期日 %s まで、支払期日 %s（3,000円に満たないときは %s）。業務の内容・支払方法など9項目の全文は、この知らせから開く依頼の画面で確認できます。",
+		what, jstDateTime(terms.ConsignedAt), terms.AmountYen, jstDateTime(terms.DeliverBy), jstDate(terms.PaymentDue), jstDate(terms.CarriedDue))
+	url = "/coach/requests/" + roomID.String() + "#work-order"
+	return title, body, url
+}
+
+// deliverWorkOrder は、書き留めた通知をコーチのお知らせ(ベル)に入れ、届けた記録を残す。
+// フリーランス保護法3条の電磁的方法による明示(受信者を特定した送信)にあたるので、
+// 本人の通知の設定に関わらず届け、記録とあわせて引き受けと同じトランザクションで行う。
+func deliverWorkOrder(ctx context.Context, q *db.Queries, wo db.CoachWorkOrder, coachID, roomID uuid.UUID, terms workOrderTerms) (*push.Message, error) {
+	title, body, url := workOrderNotice(wo.Kind, roomID, terms)
+	if err := q.InsertWorkOrderNotification(ctx, db.InsertWorkOrderNotificationParams{
+		ID: uuid.New(), RecipientID: coachID, Title: &title, Body: &body, Url: &url,
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := q.CreateWorkOrderDelivery(ctx, db.CreateWorkOrderDeliveryParams{
+		ID: uuid.New(), WorkOrderID: wo.ID, RecipientID: &coachID, TermsVersion: wo.TermsVersion,
+		Title: title, Body: body, Url: url,
+	}); err != nil {
+		return nil, err
+	}
+	return &push.Message{Title: title, Body: "TrackTalk を開いて取引条件を確認してください", URL: url, Tag: "work-order-" + wo.ID.String()}, nil
 }
 
 func workOrderJSON(w db.CoachWorkOrder) map[string]any {
@@ -150,6 +190,20 @@ func workOrderJSON(w db.CoachWorkOrder) map[string]any {
 		"terms":         json.RawMessage(w.Terms),
 		"created_at":    w.CreatedAt,
 	}
+}
+
+// workOrderWithDelivery は、書き留めた通知に、お知らせで届けた日時を添える(届けた記録がなければ添えない)。
+func workOrderWithDelivery(ctx context.Context, q *db.Queries, w db.CoachWorkOrder) (map[string]any, error) {
+	out := workOrderJSON(w)
+	d, err := q.GetWorkOrderDelivery(ctx, w.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out["delivered_at"] = d.DeliveredAt
+	return out, nil
 }
 
 // attachConsultationWorkOrder は、コーチに見せる追加相談に取引条件を付ける。
@@ -170,6 +224,10 @@ func (s *Server) attachConsultationWorkOrder(ctx context.Context, out map[string
 	if err != nil {
 		return err
 	}
-	out["work_order"] = workOrderJSON(wo)
+	order, err := workOrderWithDelivery(ctx, s.q, wo)
+	if err != nil {
+		return err
+	}
+	out["work_order"] = order
 	return nil
 }

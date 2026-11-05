@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -68,6 +69,33 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 840 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "840円")
+	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
+		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
+	}
+}
+
+// assertWorkOrderDelivered は、取引条件がコーチのお知らせに宛先付きで1回だけ届き、届けた記録が残ったことを確かめる。
+func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, url, amount string) {
+	t.Helper()
+	var count int
+	var title, body, gotURL, channel string
+	queryRowArgs(t, `SELECT count(*), max(d.title), max(d.body), max(d.url), max(d.channel)
+		FROM coach_work_order_deliveries d JOIN coach_work_orders w ON w.id = d.work_order_id
+		WHERE w.`+column+`=$1 AND d.recipient_id = w.coach_id AND d.terms_version = w.terms_version`, []any{id}, &count, &title, &body, &gotURL, &channel)
+	if count != 1 || gotURL != url || channel != "in_app" || !strings.Contains(title, "取引条件の通知") || !strings.Contains(body, amount) {
+		t.Fatalf("delivery %d %q %q %q %q", count, title, body, gotURL, channel)
+	}
+	items, _ := listNotifications(t, h, coach)
+	found := 0
+	for _, n := range items {
+		if n.URL == url && n.Title == title && n.Body == body {
+			found++
+		}
+	}
+	if found != 1 {
+		t.Fatalf("notification for %s: %d in %+v", url, found, items)
+	}
 }
 
 // フォーム添削の追加相談も、引き受ける前に取引条件を見せ、引き受けたら書き留める。
@@ -105,4 +133,37 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("work orders %d", count)
 	}
+	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "420円")
+	if !strings.Contains(string(room()["work_order"]), `"delivered_at"`) {
+		t.Fatalf("room work order has no delivered_at")
+	}
+}
+
+// お知らせ(ベル)を切っているコーチにも、取引条件の通知は届ける(法律上の明示なので設定に従わない)。
+func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripeConfig(t, nil)
+	admin := adminToken(t, h)
+	_, coach := onDutyCoach(t, h, admin)
+	_, owner := demoRequester(t, h, admin)
+	for _, category := range []string{"review", "coaching"} {
+		if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/"+category, coach, map[string]any{"in_app": false, "push": false}); rec.Code != 200 && rec.Code != 204 {
+			t.Fatalf("setting %s %d %s", category, rec.Code, rec.Body.String())
+		}
+	}
+	buyFiveTickets(t, h, owner)
+	request := ticketReview(t, h, owner)
+	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
+	var list struct {
+		Offers []struct {
+			ID string `json:"id"`
+		} `json:"offers"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Offers) != 1 {
+		t.Fatalf("offers %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+list.Offers[0].ID+"/accept", coach, nil); rec.Code != 200 {
+		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
+	}
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "840円")
 }

@@ -776,7 +776,7 @@ export type WorkOrderTerms = {
   consigned_at: string;
 };
 
-export type WorkOrder = { id: string; terms_version: number; terms: WorkOrderTerms; created_at: string };
+export type WorkOrder = { id: string; terms_version: number; terms: WorkOrderTerms; created_at: string; delivered_at?: string };
 
 export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_url" | "rating"> & {
   video_url?: string;
