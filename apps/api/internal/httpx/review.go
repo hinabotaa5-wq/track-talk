@@ -416,7 +416,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.GuardianPermission)
+		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.minorDeclarationReq)
 		if err != nil {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.tx(r.Context(), func(q *db.Queries) error {

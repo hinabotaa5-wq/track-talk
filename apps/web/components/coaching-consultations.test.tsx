@@ -66,7 +66,7 @@ it("未成年本人は、添削のあとの追加相談の支払いを開くた�
  apiFetch.mockImplementation(async (_path: string, options?: { method: string }) => options?.method ? {} : room);
  await click("お支払いへ");
  const call = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/checkout");
- expect(JSON.parse(call?.[1].body)).toEqual({ guardian_permission: true });
+ expect(JSON.parse(call?.[1].body)).toEqual({ guardian_permission: true, guardian_permission_shown_at: expect.any(String), guardian_permission_checked_at: expect.any(String) });
 });
 it("未成年本人が新しい追加相談をその場で払うときは、チェックしないと送れない", async () => {
  const cashDraft = { ...draft, funding: "cash" as const, minor: true, price_yen: 600 };
@@ -76,7 +76,7 @@ it("未成年本人が新しい追加相談をその場で払うときは、チ�
  apiFetch.mockImplementation(async (path: string, options?: { method: string }) => { if (!options?.method) return room; if (path.endsWith("/submit")) return {}; return { consultation: cashDraft }; });
  await act(async () => [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("質問する（"))?.click());
  const submit = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/submit");
- expect(JSON.parse(submit?.[1].body)).toEqual({ guardian_permission: true });
+ expect(JSON.parse(submit?.[1].body)).toEqual({ guardian_permission: true, guardian_permission_shown_at: expect.any(String), guardian_permission_checked_at: expect.any(String) });
 });
 it("18歳以上には、保護者の許可のチェックを出さない", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });

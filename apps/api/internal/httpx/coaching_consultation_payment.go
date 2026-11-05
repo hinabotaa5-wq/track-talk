@@ -15,8 +15,8 @@ import (
 )
 
 // 購入操作は相談ごとに固定する。通知が先に届いても同じレコードで照合できる。
-// 18歳未満が自分で払う動画添削のあとの追加相談は、declared（購入のたびの宣言）が要り、支払い画面を作る前に同じロックの中で記録する。
-func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingConsultation, declared bool) (string, error) {
+// 18歳未満が自分で払う動画添削のあとの追加相談は、decl（購入のたびの宣言）が要り、支払い画面を作る前に同じロックの中で記録する。
+func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingConsultation, decl minorDeclarationReq) (string, error) {
 	var c db.CoachingConsultation
 	if !s.stripe.Configured() {
 		return "", &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
@@ -47,10 +47,10 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		}
 		if current.Minor && current.ContractID == nil {
 			// 添削のあとの追加相談は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
-			if err := requireMinorDeclaration(true, declared); err != nil {
+			if err := requireMinorDeclaration(true, decl.GuardianPermission); err != nil {
 				return err
 			}
-			if err := recordMinorDeclaration(ctx, q, owner.ID, "consultation", current.ID); err != nil {
+			if err := recordMinorDeclaration(ctx, q, owner, minorPurchase{refType: "consultation", refID: current.ID, amount: current.PriceYen, coachID: current.CoachID}, decl); err != nil {
 				return err
 			}
 		} else if current.Minor {

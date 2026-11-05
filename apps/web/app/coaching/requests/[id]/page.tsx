@@ -14,7 +14,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { minorDeclarationBody } from "@/lib/minor-purchase";
+import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
 import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -149,7 +149,8 @@ function paymentText(p: ReviewPayment): string {
 function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
   const [error, setError] = useState("");
   const [minor, setMinor] = useState<boolean | null>(null);
-  const [declared, setDeclared] = useState(false);
+  const declaration = useMinorDeclaration();
+  const declared = declaration.checked;
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
@@ -172,7 +173,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
       const d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/checkout`, {
         method: "POST",
         token,
-        body: JSON.stringify({ method, ...minorDeclarationBody(!!minor, declared) }),
+        body: JSON.stringify({ method, ...declaration.body(!!minor) }),
       });
       if (d.checkout_url) window.location.assign(d.checkout_url);
     } catch (err) {
@@ -184,7 +185,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
   return (
     <section className="space-y-2">
       <p className="text-sm text-slate-200">お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。</p>
-      {minor ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
+      {minor ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
       {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
         <button
           key={m}
