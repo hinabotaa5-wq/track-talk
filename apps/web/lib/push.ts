@@ -1,5 +1,4 @@
 import { apiFetch } from "./api";
-import { formatYen } from "./format";
 
 // Web Push の購読まわり。通知はブラウザが対応していて、ホーム画面のアプリかブラウザで許可したときだけ届く。
 
@@ -98,8 +97,4 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
   if (!pushSupported() || Notification.permission !== "granted") return null;
   const registration = await navigator.serviceWorker.getRegistration("/");
   return (await registration?.pushManager.getSubscription()) ?? null;
-}
-
-export function monthlyLimitLabel(value: number | null): string {
-  return value === null ? "上限なし" : `月${formatYen(value)}まで`;
 }

@@ -277,18 +277,18 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusCreated, guardianStatusJSON(consent))
 }
 
-// guardianLinkMail は、保護者に送る同意のお願い。文面は運営者の確定版。
+// guardianLinkMail は、保護者に送る同意のお願い。保護者のページ（サポートプランの同意）の確定文面に合わせている。
 func guardianLinkMail(to, child, link string) mail.Message {
 	return mail.Message{
 		To:      to,
-		Subject: "お子さまの有料サービス利用についての同意のお願い",
+		Subject: "お子さまのサポートプラン利用についての同意のお願い",
 		Text: guardianMailGreeting +
-			"お子さま（アカウント名：" + child + "）から、有料サービス（動画添削・追加相談）を利用するための同意依頼が届いています。\n\n" +
-			"未成年のお子さまが有料サービスを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
+			"お子さま（アカウント名：" + child + "）から、サポートプランを利用するための同意依頼が届いています。\n\n" +
+			"未成年のお子さまがサポートプランを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
 			"同意手続きはこちら：" + link + "\n" +
 			"（リンクの有効期限は30日です。このリンクからは1回だけ同意できます。）\n\n" +
-			"同意いただくと、お子さまは保護者の方が設定した月の上限の範囲で、ご自身のクレジットカードまたはPayPayでサービスを購入できるようになります。購入のたびに、このメールアドレスへお知らせします。\n\n" +
-			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまが有料サービスを購入することはありません。\n" +
+			"同意いただくと、コーチが引き受けたお子さまのお申し込みについて、プランごとに内容を確認し、同意とお支払いができるようになります。お支払いがあるプランは、保護者の方がクレジットカードでお支払いいただきます。\n\n" +
+			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまがサポートプランを利用することはありません。\n" +
 			guardianMailSignature,
 	}
 }
@@ -502,17 +502,10 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 func (s *Server) notifyGuardianConsented(ctx context.Context, consent db.GuardianConsent) {
 	s.notify(ctx, consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意しました",
-		Body:  "動画添削・追加相談を" + guardianLimitText(&consent.SelfPayLimitYen) + "の範囲で購入できます",
+		Body:  "サポートプランは、コーチが引き受けたあと、保護者がプランごとに同意すると始まります（お支払いがあるプランはお支払いのあと）",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)
-}
-
-func guardianLimitText(limit *int32) string {
-	if limit == nil {
-		return "上限なし"
-	}
-	return "月" + formatYenNumber(*limit) + "円まで"
 }
 
 // formatYenNumber は 3000 を "3,000" にする。
@@ -641,7 +634,7 @@ func (s *Server) declineGuardian(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, guardianPublicJSON(a))
 }
 
-// revokeGuardian は、保護者が同意を取り消す。以後の新しい購入は止まり、すでに購入した分はそのまま。
+// revokeGuardian は、保護者が同意を取り消す。以後は保護者のページからプランへの同意・お支払いができなくなる。
 func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.guardianByToken(w, r)
 	if !ok {
@@ -662,7 +655,7 @@ func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
 	})
 	s.notify(r.Context(), consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意を取り消しました",
-		Body:  "新しい動画添削・追加相談は購入できません。購入済みの分はそのまま使えます",
+		Body:  "新しいサポートプランを始めるには、もう一度保護者の同意が必要です",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)

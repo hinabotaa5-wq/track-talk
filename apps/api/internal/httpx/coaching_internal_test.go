@@ -1,9 +1,11 @@
 package httpx
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
@@ -50,19 +52,37 @@ func TestParseBirthMonth(t *testing.T) {
 	}
 }
 
-func TestGuardianLimitText(t *testing.T) {
-	three := int32(3000)
-	thousand := int32(1000)
-	if got := guardianLimitText(&three); got != "月3,000円まで" {
-		t.Fatalf("got %q", got)
-	}
-	if got := guardianLimitText(&thousand); got != "月1,000円まで" {
-		t.Fatalf("got %q", got)
-	}
-	if got := guardianLimitText(nil); got != "上限なし" {
+func TestFormatYenNumber(t *testing.T) {
+	if got := formatYenNumber(3000); got != "3,000" {
 		t.Fatalf("got %q", got)
 	}
 	if got := formatYenNumber(500); got != "500" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// 同意のお願いと同意の受付のメールは、サポートプランの同意として書く。前の仕組みの月の上限・購入の通知と、
+// サポートプランでは使わない PayPay には触れない。
+func TestGuardianMailsAreForTheSupportPlan(t *testing.T) {
+	at := time.Date(2026, time.November, 5, 12, 0, 0, 0, time.UTC)
+	mails := map[string]string{
+		"link": guardianLinkMail("parent@example.com", "たろう", "https://example.com/guardian/x").Text,
+		"consented": guardianConsentedMail("parent@example.com", "たろう",
+			db.GuardianConsent{ConsentedAt: &at, SelfPayLimitYen: 1500}, "https://example.com/guardian/y").Text,
+	}
+	for name, text := range mails {
+		for _, want := range []string{"サポートプラン", "クレジットカード", "たろう"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s mail should contain %q:\n%s", name, want, text)
+			}
+		}
+		for _, banned := range []string{"上限", "PayPay", "購入のたび", "購入するたび", "動画添削", "1,500"} {
+			if strings.Contains(text, banned) {
+				t.Errorf("%s mail should not contain %q:\n%s", name, banned, text)
+			}
+		}
+	}
+	if !strings.Contains(mails["consented"], "2026年11月5日 21:00") {
+		t.Errorf("consented mail should show the consent time in JST:\n%s", mails["consented"])
 	}
 }
