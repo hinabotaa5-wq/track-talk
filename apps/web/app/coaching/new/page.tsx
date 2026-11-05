@@ -6,12 +6,13 @@ import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
-import { GuardianAllowance } from "@/components/guardian-allowance";
+import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
+import { minorDeclarationBody } from "@/lib/minor-purchase";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
@@ -23,7 +24,7 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import type { CoachEvent, CoachingGuardian, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -51,9 +52,8 @@ export default function NewReviewRequestPage() {
   const [question, setQuestion] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
-  // 18歳未満で、保護者の同意や上限のために買えなかったとき。保護者の同意の画面への案内を出す。
-  const [guardianBlocked, setGuardianBlocked] = useState(false);
-  const [resendMessage, setResendMessage] = useState("");
+  // 18歳未満の購入のたびの宣言。毎回チェックなしから始める。
+  const [declared, setDeclared] = useState(false);
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
@@ -70,6 +70,8 @@ export default function NewReviewRequestPage() {
   // チケットの新規販売は止めた。購入済みのチケットが添削1本分（2枚）残っている人にだけ、チケットで払う選択肢を出す。
   const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 2;
   const cashPayment = !!estimate?.payments && cashPrice > 0;
+  // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
+  const needsDeclaration = !!me?.is_minor && cashPayment;
 
   useEffect(() => {
     if (!token || !me?.demo) return;
@@ -165,9 +167,12 @@ export default function NewReviewRequestPage() {
       setError("チケットが不足しています。先に購入してから動画を選んでください。");
       return;
     }
+    if (needsDeclaration && !declared) {
+      setError("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。");
+      return;
+    }
     if (!acquire()) return;
     setError("");
-    setGuardianBlocked(false);
     try {
       const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
       setUploadPhase("upload");
@@ -179,7 +184,7 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
-          method, use_tickets: method === "tickets", requested_coach_id: coach.id }),
+          method, use_tickets: method === "tickets", requested_coach_id: coach.id, ...minorDeclarationBody(needsDeclaration, declared) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -188,26 +193,10 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
-      if (err instanceof ApiRequestError && err.code.startsWith("guardian_")) setGuardianBlocked(true);
       if (err instanceof ApiRequestError && ["nomination_changed", "validation_error"].includes(err.code)) {
         try { const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setCoaches(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
       }
       setUpload(null);
-      release();
-    }
-  }
-
-  // 保護者がまだ答えていないときに、前と同じアドレスへ同意のお願いを送り直す（前のリンクは使えなくなる）。
-  async function onResendGuardianLink() {
-    if (!acquire()) return;
-    setResendMessage("");
-    try {
-      const guardian = await apiFetch<CoachingGuardian>("/v1/me/guardian-link", { method: "POST", token, body: JSON.stringify({}) });
-      setMe((prev) => (prev ? { ...prev, guardian } : prev));
-      setResendMessage("保護者の方に、同意のお願いメールを送り直しました。");
-    } catch (err) {
-      setResendMessage(apiErrorText(err, "メールを送れませんでした"));
-    } finally {
       release();
     }
   }
@@ -241,36 +230,13 @@ export default function NewReviewRequestPage() {
         />
       ) : !me.birth_month ? (
         <div className="space-y-3">
-          <p className="text-sm text-slate-200">先に生まれた年月を登録してください。18歳未満の人は保護者の同意が必要です。</p>
+          <p className="text-sm text-slate-200">先に生まれた年月を登録してください。18歳未満の方は、購入する前に保護者の許可を得てください。</p>
           <Link
             href="/me/coaching"
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
           >
             生まれた年月を登録する
           </Link>
-        </div>
-      ) : me.is_minor && me.guardian?.status !== "consented" ? (
-        // 文面は運営者の確定版。API の minorSelfPayBlock のエラー文と合わせる。
-        <div className="space-y-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm">
-          <p className="text-slate-200">
-            {me.guardian?.status === "declined"
-              ? "保護者の方の同意が得られなかったため、有料サービスは利用できません。"
-              : me.guardian?.status === "revoked"
-                ? "保護者の方の同意が取り消されたため、有料サービスは利用できません。再度利用するには、保護者の方の同意が必要です。"
-                : me.guardian?.status === "pending"
-                  ? "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送っています。同意が完了すると、ここから依頼できるようになります。"
-                  : "有料サービスの利用には、保護者の方の同意が必要です。保護者の方に同意のお願いメールを送ってください。同意が完了すると、ここから依頼できるようになります。"}
-          </p>
-          {me.guardian?.status === "pending" ? (
-            <Button type="button" className="w-full" disabled={pending} onClick={() => void onResendGuardianLink()}>
-              同意のお願いを再送する
-            </Button>
-          ) : !me.guardian ? (
-            <Link href="/me/coaching" className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white">
-              保護者にメールを送る
-            </Link>
-          ) : null}
-          {resendMessage ? <p role="status" className="text-slate-200">{resendMessage}</p> : null}
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
@@ -319,10 +285,6 @@ export default function NewReviewRequestPage() {
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          {guardianBlocked ? <Link href="/me/coaching" className="block text-sm text-blue-300 underline">保護者の同意・上限の状況を見る</Link> : null}
-          {me.is_minor && me.guardian?.status === "consented" ? (
-            <GuardianAllowance guardian={me.guardian} className="space-y-1 text-xs text-slate-300" />
-          ) : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">料金と受付状況を確認しています。表示されない場合はページを開き直してください。</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
@@ -352,7 +314,8 @@ export default function NewReviewRequestPage() {
           ) : (
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
-          <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach}>
+          {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
+          <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? "送っています" : cashPayment ? `送ってお支払いへ（${formatYen(cashPrice)}）` : method === "tickets" ? "チケット2枚を確保して送る" : "送る"}
           </Button>
         </form>

@@ -159,26 +159,6 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 	}
 }
 
-func TestReviewPaymentMinorMonthlyLimit(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
-	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 3000`)
-	paidReview(t, h, tm, "card", "pi_card_minor")
-	paidReview(t, h, tm, "card", "pi_card_minor_second")
-	body := reviewBodyFor(t, h, tm)
-	body["method"] = "paypay"
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_limit") || !strings.Contains(rec.Body.String(), "今月の上限（3,000円）に達したため") {
-		t.Fatalf("over limit %d %s", rec.Code, rec.Body.String())
-	}
-	body["tier"] = "coach"
-	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 5000`)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusCreated {
-		t.Fatalf("within limit %d %s", rec.Code, rec.Body.String())
-	}
-}
-
 // 退会すると依頼が消える。確定していない代金があるあいだは退会させず、返却済みで確定した代金は退会しても返金しない。
 func TestWithdrawKeepsSettledReviewPayment(t *testing.T) {
 	fakeCoachingCloudinary(t)
@@ -205,31 +185,6 @@ func TestWithdrawKeepsSettledReviewPayment(t *testing.T) {
 	}
 }
 
-// 保護者の同意を待っている18歳未満は、1本目から依頼を作れない（支払い画面も作らない）。
-func TestReviewPaymentMinorPendingConsentSecondRequest(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
-	tadmin := adminToken(t, h)
-	tm := token(t, uuid.New())
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/demo", tm, map[string]any{"code": newDemoCodeFor(t, h, tadmin)}); rec.Code != http.StatusOK {
-		t.Fatalf("join %d", rec.Code)
-	}
-	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
-		t.Fatalf("birth month %d", rec.Code)
-	}
-	issueGuardianLink(t, h, tm, guardianEmail())
-	body := reviewBodyFor(t, h, tm)
-	body["method"] = "card"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_required") {
-		t.Fatalf("first while pending %d %s", rec.Code, rec.Body.String())
-	}
-	var open int
-	queryRowArgs(t, `SELECT count(*)::int FROM review_requests WHERE requester_id = (SELECT minor_id FROM guardian_consents WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1)`, nil, &open)
-	if open != 0 {
-		t.Fatalf("requests created while pending %d", open)
-	}
-}
-
 // 1本の依頼に二重の支払いがあったら、返却のあとでも最初の1本だけを確定し、残りは取り消す。
 func TestReviewPaymentDuplicateAfterReturn(t *testing.T) {
 	fakeCoachingCloudinary(t)
@@ -251,36 +206,6 @@ func TestReviewPaymentDuplicateAfterReturn(t *testing.T) {
 	captured, canceled := f.calls()
 	if len(captured) != 1 || captured[0] != "pi_card_first" || len(canceled) != 1 || canceled[0] != "pi_card_second" {
 		t.Fatalf("captured %v canceled %v", captured, canceled)
-	}
-}
-
-// 同意のない18歳未満が同時に送っても、1本も作られない。
-func TestMinorConcurrentReviewRequests(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h := setup(t)
-	tadmin := adminToken(t, h)
-	tm := token(t, uuid.New())
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/demo", tm, map[string]any{"code": newDemoCodeFor(t, h, tadmin)}); rec.Code != http.StatusOK {
-		t.Fatalf("join %d", rec.Code)
-	}
-	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tm, map[string]any{"birth_month": minorBirthMonth()}); rec.Code != http.StatusOK {
-		t.Fatalf("birth month %d", rec.Code)
-	}
-	codes := make(chan int, 4)
-	for range 4 {
-		body := reviewBodyFor(t, h, tm)
-		go func() {
-			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code
-		}()
-	}
-	created := 0
-	for range 4 {
-		if <-codes == http.StatusCreated {
-			created++
-		}
-	}
-	if created != 0 {
-		t.Fatalf("created %d", created)
 	}
 }
 
@@ -316,33 +241,6 @@ func TestReviewPaymentReleaseDoesNotStallBehindFailures(t *testing.T) {
 	t.Fatal("the good payment was never released")
 }
 
-// 18歳未満が同時に依頼を送っても、今月の上限を超える支払い画面は作らない。
-func TestReviewPaymentMinorMonthlyLimitUnderConcurrency(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
-	tm, _ := guardianMinor(t, h)
-	execSQLArgs(t, `UPDATE guardian_consents SET self_pay_limit_yen = 3000`)
-	codes := make(chan int, 4)
-	for range 4 {
-		body := reviewBodyFor(t, h, tm)
-		body["method"] = "paypay"
-		go func() {
-			codes <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code
-		}()
-	}
-	created := 0
-	for range 4 {
-		if <-codes == http.StatusCreated {
-			created++
-		}
-	}
-	var open int
-	queryRowArgs(t, `SELECT count(*)::int FROM review_payments WHERE status = 'pending'`, nil, &open)
-	if created != 2 || open != 2 {
-		t.Fatalf("created %d requests with %d checkouts under a 3000 yen limit", created, open)
-	}
-}
-
 // 18歳未満の支払い画面は、ロックを持つトランザクションの接続だけで作る。
 // 別の接続を待つと、接続の数だけ同時に来たときに全員が止まる。
 func TestReviewPaymentMinorCheckoutUsesOneConnection(t *testing.T) {
@@ -350,9 +248,10 @@ func TestReviewPaymentMinorCheckoutUsesOneConnection(t *testing.T) {
 	t.Cleanup(func() { testPoolMaxConns = 0 })
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
-	tm, _ := guardianMinor(t, h)
+	_, tm := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
+	body["guardian_permission"] = true
 	done := make(chan int, 1)
 	go func() { done <- doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body).Code }()
 	select {
@@ -362,26 +261,6 @@ func TestReviewPaymentMinorCheckoutUsesOneConnection(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("minor checkout waited for a second connection while holding the lock")
-	}
-}
-
-// 保護者が同意しないと答えたあとは、前に送って支払いがまだの依頼も払えない。
-func TestReviewPaymentBlockedAfterGuardianDeclines(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
-	tm, _ := guardianMinor(t, h)
-	body := reviewBodyFor(t, h, tm)
-	body["method"] = "paypay"
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tm, body)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
-	}
-	var created reviewRequestView
-	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	execSQLArgs(t, `UPDATE guardian_consents SET status = 'declined'`)
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tm, map[string]any{"method": "card"})
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "guardian_declined") {
-		t.Fatalf("checkout after decline %d %s", rec.Code, rec.Body.String())
 	}
 }
 

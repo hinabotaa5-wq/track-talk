@@ -236,6 +236,8 @@ type reviewRequestReq struct {
 	UseTickets bool   `json:"use_tickets"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
+	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
+	minorDeclarationReq
 }
 
 func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
@@ -315,20 +317,18 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	minor := isMinor(*p.BirthMonth, time.Now())
 	if minor {
-		// 18歳未満は、保護者の有効な同意がないと頼めない。支払いがあるときは月の上限も確かめる。
-		// 動画を受け取る前に一度確かめ、支払い画面を作る時にロックの中でもう一度確かめる。
-		price := int32(0)
-		if payments {
-			price = cashPrice
-		}
-		block, err := s.minorSelfPayBlock(r.Context(), s.q, p.ID, minorPurchase{refType: "review", coachName: coachName, price: price}, uuid.Nil, uuid.Nil)
-		if err != nil {
-			MapDBError(w, err)
+		// 18歳未満が自分で払うときは、購入のたびの宣言が要る（保護者同意の有無と月の上限では止めない）。
+		// 動画を受け取る前に一度確かめ、支払い画面を作る時にロックの中でもう一度確かめて記録する。
+		if err := requireMinorDeclaration(payments, req.GuardianPermission); err != nil {
+			writeCheckoutError(w, err)
 			return
 		}
-		if block != nil {
-			s.writeMinorBlock(w, r, block)
-			return
+		// 購入済みのチケットで払うときは、これまでどおりチケットの利用条件（保護者の同意）を先に確かめる。
+		if useTickets {
+			if err := s.ticketEligibility(r.Context(), s.q, p); err != nil {
+				writeCheckoutError(w, err)
+				return
+			}
 		}
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
@@ -366,22 +366,11 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if minor || useTickets {
+	if useTickets {
 		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			MapDBError(w, err)
 			return
-		}
-		if minor {
-			block, err := s.minorSelfPayBlock(r.Context(), q, p.ID, minorPurchase{refType: "review"}, uuid.Nil, uuid.Nil)
-			if err != nil {
-				MapDBError(w, err)
-				return
-			}
-			if block != nil {
-				s.writeMinorBlock(w, r, block)
-				return
-			}
 		}
 	}
 	if err := lockUnusedCoachingVideo(r.Context(), q, &req.VideoPublicID, nil); err != nil {
@@ -427,8 +416,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, block, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method)
-		if err != nil || block != nil {
+		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.GuardianPermission)
+		if err != nil {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.tx(r.Context(), func(q *db.Queries) error {
 				if t, e := q.GetTicketReservationForReview(r.Context(), &rr.ID); e == nil {
@@ -442,11 +431,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			}); derr != nil {
 				slog.Warn("delete unpaid review request", "err", derr)
 			}
-			if err != nil {
-				writeCheckoutError(w, err)
-			} else {
-				s.writeMinorBlock(w, r, block)
-			}
+			writeCheckoutError(w, err)
 			return
 		}
 		out := s.reviewRequestJSON(rr)

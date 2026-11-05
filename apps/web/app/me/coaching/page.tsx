@@ -3,7 +3,6 @@
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
-import { GuardianAllowance } from "@/components/guardian-allowance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -169,7 +168,7 @@ export default function CoachingSetupPage() {
         ) : (
           <form onSubmit={onBirthMonth} className="space-y-2">
             <p className="text-sm text-slate-300">
-              18歳未満の人は、保護者の同意が必要です。年齢の確認のために使い、他の人には見えません。登録したあとは自分では変えられません。
+              年齢の確認のために使い、他の人には見えません。登録したあとは自分では変えられません。18歳未満の方は、有料サービスを購入する前に保護者の許可を得てください。
             </p>
             <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="生まれた年月" />
             {monthError ? <p className="text-sm text-red-400">{monthError}</p> : null}
@@ -186,13 +185,9 @@ export default function CoachingSetupPage() {
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
           </p>
-          {me.guardian?.status === "consented" ? (
-            <GuardianAllowance guardian={me.guardian} />
-          ) : (
-            <p className="text-sm text-slate-300">
-              動画添削・追加相談を買うには、保護者の同意が必要です。同意は保護者だけが、メールで届くリンクから行えます。
-            </p>
-          )}
+          <p className="text-sm text-slate-300">
+            動画添削・追加相談は、この手続きなしで購入できます。購入する前に保護者の許可を得て、購入の画面で毎回確認のチェックを入れてください。保護者の同意は、パーソナル指導など保護者の方が契約する指導に使います。同意は保護者だけが、メールで届くリンクから行えます。
+          </p>
           {me.guardian?.guardian_email ? (
             <p className="text-sm text-slate-300">送り先: {me.guardian.guardian_email}</p>
           ) : null}

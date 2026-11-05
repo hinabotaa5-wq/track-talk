@@ -14,6 +14,8 @@ export type Consultation = {
 export type ConsultationRoom = {
   consultations: Consultation[]; role: "requester" | "coach" | "guardian"; funding: "ticket" | "cash";
   price_yen: number; can_purchase: boolean; block_reason: string; requires_video: boolean;
+  // 依頼した本人が18歳未満か（購入のたびの宣言を出すかどうか）。
+  minor?: boolean;
 };
 export const consultationStatus: Record<Consultation["status"], string> = {
   draft: "下書き", awaiting_payment: "お支払い待ち", offered: "コーチの受諾待ち", in_review: "回答待ち", answered: "回答済み", declined: "辞退されました", expired: "期限切れ", cancelled: "取り下げ済み",

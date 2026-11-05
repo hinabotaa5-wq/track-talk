@@ -4,11 +4,13 @@ import { WorkOrderTermsView, WorkOrderView } from "@/components/work-order-terms
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { minorDeclarationBody } from "@/lib/minor-purchase";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -38,9 +40,9 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <h2 className="font-bold">追加相談</h2>
     <p className="text-sm text-slate-200">新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。</p>
     <p className="text-xs text-slate-300">コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。</p>
-    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} />)}
+    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.minor && c.funding === "cash"} />)}
     {!coachingMessagingEnabled ? <p className="text-xs text-slate-300">{messagingClosedNote}</p> : null}
-    {coachingMessagingEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} funding={data.funding} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
+    {coachingMessagingEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} funding={data.funding} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
     {coachingMessagingEnabled && !data.can_purchase && data.role === "requester" && !draft ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
@@ -54,9 +56,12 @@ async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (uploaded.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
   return uploaded.public_id;
 }
-function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requiresVideo, returnPath, reload }: {
-  kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
+function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price, requiresVideo, returnPath, reload }: {
+  kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; minor: boolean; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
 }) {
+  // 18歳未満が動画添削のあとの相談をその場で払うときは、購入のたびの宣言が要る。送るたびにチェックなしから始める。
+  const needsDeclaration = kind === "review" && minor && funding === "cash";
+  const [declared, setDeclared] = useState(false);
   const [body, setBody] = useState(draft?.question ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [videoID, setVideoID] = useState(draft?.video_public_id ?? "");
@@ -65,13 +70,14 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requi
   const requestKey = useRef(draft?.request_key ?? crypto.randomUUID());
   const { pending, acquire, release } = useActionLock();
   async function submit() {
+    if (needsDeclaration && !declared) { setError("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"); return; }
     if (!acquire()) return;
     setError(""); setBuy(false);
     try {
       let video = videoID;
       if (file) { video = await uploadVideo(file, token); setVideoID(video); setFile(null); }
       const saved = await apiFetch<{ consultation: Consultation }>(roomPath, { method: "POST", token, body: JSON.stringify({ request_key: requestKey.current, body, video_public_id: video }) });
-      const result = await apiFetch<{ checkout_url?: string }>(`/v1/coaching/consultations/${saved.consultation.id}/submit`, { method: "POST", token });
+      const result = await apiFetch<{ checkout_url?: string }>(`/v1/coaching/consultations/${saved.consultation.id}/submit`, { method: "POST", token, body: JSON.stringify(minorDeclarationBody(needsDeclaration, declared)) });
       if (result.checkout_url) { window.location.assign(result.checkout_url); return; }
       await reload();
     } catch (e) {
@@ -85,8 +91,9 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requi
     <Textarea aria-label="追加相談の質問" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder="新しく相談したいこと" />
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}
-    <p className="text-xs text-slate-300">購入前に下書きを7日間保存します。送信後は内容を変更できません。18歳未満の方は、保護者が同意した月の上限の範囲で自分で支払います（パーソナル指導の相談は保護者が支払います）。</p>
-    <Button type="button" disabled={pending || !body.trim() && !file && !videoID} onClick={() => void submit()}>{pending ? "保存・送信中…" : funding === "ticket" ? "質問する（チケット1枚）" : `質問する（${formatYen(price)}）`}</Button>
+    <p className="text-xs text-slate-300">購入前に下書きを7日間保存します。送信後は内容を変更できません。{kind === "review" ? "18歳未満の方は、購入する前に保護者の許可を得てください。" : "18歳未満の方のパーソナル指導の相談は、保護者が支払います。"}</p>
+    {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
+    <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? "保存・送信中…" : funding === "ticket" ? "質問する（チケット1枚）" : `質問する（${formatYen(price)}）`}</Button>
     {buy ? <Link className="block text-sm text-blue-300 underline" href={`/me/coaching/tickets?return_to=${encodeURIComponent(returnPath)}`}>チケットを購入して、この部屋へ戻る</Link> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </div>;
@@ -104,14 +111,17 @@ export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" })
     <p>代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。</p>
   </div>;
 }
-function ConsultationCard({ consultation: c, role, base, token, guardian, reload }: { consultation: Consultation; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void> }) {
+function ConsultationCard({ consultation: c, role, base, token, guardian, reload, needsDeclaration }: { consultation: Consultation; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void>; needsDeclaration: boolean }) {
+  // 支払い画面を開き直すときも、18歳未満は毎回チェックが要る。
+  const [declared, setDeclared] = useState(false);
   const [body, setBody] = useState(""); const [file, setFile] = useState<File | null>(null); const [error, setError] = useState(""); const [reported, setReported] = useState(false);
   const { pending, acquire, release } = useActionLock(); const confirmDialog = useConfirm();
   async function act(action: string) {
     if (!acquire()) return; setError("");
     try {
       const video = action === "answer" && file ? await uploadVideo(file, token) : "";
-      const result = await apiFetch<{ checkout_url?: string }>(`${base}/consultations/${c.id}/${action}`, { method: "POST", token, body: JSON.stringify({ body, video_public_id: video }) });
+      const payload = action === "checkout" ? minorDeclarationBody(needsDeclaration, declared) : { body, video_public_id: video };
+      const result = await apiFetch<{ checkout_url?: string }>(`${base}/consultations/${c.id}/${action}`, { method: "POST", token, body: JSON.stringify(payload) });
       if (result.checkout_url) { window.location.assign(result.checkout_url); return; }
       setBody(""); setFile(null); await reload();
     } catch (e) { setError(apiErrorText(e, "送信できませんでした")); } finally { release(); }
@@ -145,7 +155,10 @@ function ConsultationCard({ consultation: c, role, base, token, guardian, reload
         {reply ? <label className="block text-xs">実践動画（30秒・100MB以内、任意）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? "回答を送る" : clarify ? "回答について確認する（1回無料）" : "補足を送る"}</Button>
       </div> : null}
-      {c.status === "awaiting_payment" && role === c.payer ? <Button disabled={pending} onClick={() => void act("checkout")}>お支払いへ</Button> : null}
+      {c.status === "awaiting_payment" && role === c.payer ? <>
+        {needsDeclaration && role === "requester" ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
+        <Button disabled={pending || (needsDeclaration && role === "requester" && !declared)} onClick={() => void act("checkout")}>お支払いへ</Button>
+      </> : null}
       {c.status === "awaiting_payment" && c.payer === "guardian" && role === "requester" ? <p className="text-sm">保護者に、この契約のページからお支払いをお願いしてください。保護者リンクはマイコーチングで確認できます。</p> : null}
       {c.status === "awaiting_payment" && role === "requester" ? <Button disabled={pending} onClick={() => void act("cancel")}>支払い前の質問を取り下げる</Button> : null}
       {((role === "coach" || role === "guardian") && !["draft", "awaiting_payment"].includes(c.status) || role === "requester" && c.answered_at) ? <button disabled={pending || reported} onClick={() => void report()} className="text-xs underline">{reported ? "通報しました" : "この追加相談を通報する"}</button> : null}

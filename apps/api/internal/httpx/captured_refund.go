@@ -6,9 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
 )
@@ -431,9 +433,9 @@ func (s *Server) adminCapturedPayments(w http.ResponseWriter, r *http.Request) {
 	}
 	unpaid := r.URL.Query().Get("unapplied") == "true"
 	// Stable ID tie-breaks ensure equal timestamps do not hide older entries.
-	rows, err := s.pool.Query(r.Context(), `SELECT json_build_object('source',source,'id',id,'amount_yen',amount_yen,'status',status,'created_at',created_at) FROM (
- SELECT 'review' source,id,amount_yen,status,created_at FROM review_payments WHERE method='card' AND status IN ('captured','refund_pending','refunded')
- UNION ALL SELECT 'consultation',id,price_yen,payment_state,created_at FROM coaching_consultations WHERE funding='cash' AND payment_state IN ('paid','refund_pending','refunded')) p
+	rows, err := s.pool.Query(r.Context(), `SELECT json_build_object('source',source,'id',id,'amount_yen',amount_yen,'status',status,'created_at',created_at,'minor',minor) FROM (
+ SELECT 'review' source,id,amount_yen,status,created_at,minor FROM review_payments WHERE method='card' AND status IN ('captured','refund_pending','refunded')
+ UNION ALL SELECT 'consultation',id,price_yen,payment_state,created_at,minor AND contract_id IS NULL FROM coaching_consultations WHERE funding='cash' AND payment_state IN ('paid','refund_pending','refunded')) p
  WHERE ($1='' OR EXISTS(SELECT 1 FROM coach_earnings e WHERE e.coach_id::text=$1 AND ((p.source='consultation' AND e.consultation_id=p.id) OR (p.source='review' AND e.id IN(SELECT earning_id FROM review_payment_earning_links WHERE payment_id=p.id)))))
  AND ($2='' OR EXISTS(SELECT 1 FROM captured_payment_refunds f WHERE f.id::text=$2 AND f.source=p.source AND f.payment_id=p.id))
  ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`, coach, refund, per+1, offset)
@@ -481,7 +483,29 @@ func (s *Server) adminCapturedPayments(w http.ResponseWriter, r *http.Request) {
 	if len(adjustments) > int(per) {
 		adjustments = adjustments[:per]
 	}
-	JSON(w, 200, map[string]any{"payments": payments, "refunds": refunds, "adjustments": adjustments, "page": page, "per": per, "has_more": more})
+	minorRefunds, err := s.minorRefundSummary(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, 200, map[string]any{"payments": payments, "refunds": refunds, "adjustments": adjustments, "page": page, "per": per, "has_more": more, "minor_refunds": minorRefunds})
+}
+
+// minorRefundSummary は、18歳未満の本人が自分で払った動画添削・追加相談の返金の件数と金額を、今月（日本時間）と累計で返す。
+// 保護者からの申立てで返金したものを含めて、後から数えられるようにする（管理画面の返金 API で返金した分は admin_*）。
+func (s *Server) minorRefundSummary(ctx context.Context) (map[string]any, error) {
+	now := time.Now().In(jst.Zone)
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, jst.Zone)
+	far := now.AddDate(100, 0, 0)
+	month, err := s.q.SummarizeMinorSelfPayRefunds(ctx, db.SummarizeMinorSelfPayRefundsParams{Since: monthStart, Until: far})
+	if err != nil {
+		return nil, err
+	}
+	total, err := s.q.SummarizeMinorSelfPayRefunds(ctx, db.SummarizeMinorSelfPayRefundsParams{Since: time.Unix(0, 0), Until: far})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"month": month, "total": total, "month_start": monthStart}, nil
 }
 func jsonRows(rows pgx.Rows) ([]json.RawMessage, error) {
 	defer rows.Close()

@@ -24,7 +24,7 @@ import (
 const reviewPriceYen int32 = 1500
 
 // 保護者が同意していない18歳未満の、保護者が払う契約の上限（design-review.md「18歳未満の支払い」）。
-// 本人が自分で払う動画添削・追加相談は、保護者の同意がないと払えない（minorSelfPayBlock）。
+// 本人が自分で払う動画添削・追加相談は、この上限ではなく購入のたびの宣言で確かめる（minor_purchase.go）。
 const defaultMinorMonthlyLimit = 3000
 
 func validReviewPayMethod(m string) bool { return m == "card" || m == "paypay" }
@@ -58,7 +58,8 @@ func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id
 }
 
 // reviewCheckoutURL は、依頼の支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。
-func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.ReviewRequest, method string) (string, error) {
+// minor は、18歳未満の本人が自分で払う支払いか。支払いの行に印を付け、返金を後から集計できるようにする。
+func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.ReviewRequest, method string, minor bool) (string, error) {
 	p, err := q.GetReusableReviewPayment(ctx, db.GetReusableReviewPaymentParams{RequestID: &rr.ID, Method: method})
 	if err == nil {
 		return p.CheckoutUrl, nil
@@ -97,7 +98,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	}
 	if _, err := q.CreateReviewPayment(ctx, db.CreateReviewPaymentParams{
 		ID: id, RequestID: &rr.ID, PayerID: &rr.RequesterID, Method: method, AmountYen: price,
-		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires,
+		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires, Minor: minor,
 	}); err != nil {
 		return "", err
 	}
@@ -105,6 +106,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 }
 
 // checkoutReviewRequest は、支払いがまだの依頼の支払い画面を開き直す。
+// 18歳未満は、開き直すときも宣言（guardian_permission）が要る。
 func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	rr, ok := s.requesterReview(w, r)
 	if !ok {
@@ -112,6 +114,7 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Method string `json:"method"`
+		minorDeclarationReq
 	}
 	if err := DecodeJSON(r, &req); err != nil || !validReviewPayMethod(req.Method) {
 		FieldError(w, map[string]string{"method": "支払い方法を選んでください"})
@@ -125,52 +128,44 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.writeReviewCheckout(w, r, rr, p, req.Method, http.StatusOK)
-}
-
-// writeReviewCheckout は、月の上限を確かめてから支払い画面を作り、依頼と一緒に返す。
-func (s *Server) writeReviewCheckout(w http.ResponseWriter, r *http.Request, rr db.ReviewRequest, p db.Profile, method string, status int) {
-	url, block, err := s.reviewCheckoutFor(r.Context(), rr, p, method)
+	url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.GuardianPermission)
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
 	}
-	if block != nil {
-		s.writeMinorBlock(w, r, block)
-		return
-	}
 	out := s.reviewRequestJSON(rr)
 	out["checkout_url"] = url
-	JSON(w, status, out)
+	JSON(w, http.StatusOK, out)
 }
 
-// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、保護者の有効な同意と月の上限を確かめ、
-// 払えないときは理由を返す。同時に開かれても上限を超えないよう、確かめてから支払いの行を作るまでを
-// 本人ごとのロックの中で行う（支払い画面を開いている分も今月の合計に数える）。
-func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string) (string, *minorBlockError, error) {
-	if p.BirthMonth == nil || !isMinor(*p.BirthMonth, time.Now()) {
-		url, err := s.reviewCheckoutURL(ctx, s.q, rr, method)
-		return url, nil, err
+// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、購入のたびの宣言（declared）を確かめ、
+// 支払い画面を作るのと同じトランザクションで宣言を残す。保護者同意の有無と月の上限では止めない。
+// 年齢は、本人ごとのロックの中で確かめ直す。
+func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string, declared bool) (string, error) {
+	if !profileIsMinor(p) {
+		return s.reviewCheckoutURL(ctx, s.q, rr, method, false)
+	}
+	if err := requireMinorDeclaration(true, declared); err != nil {
+		return "", err
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	defer tx.Rollback(ctx)
 	q := s.q.WithTx(tx)
 	if err := q.LockReviewRequester(ctx, p.ID); err != nil {
-		return "", nil, err
+		return "", err
 	}
-	block, err := s.minorSelfPayBlock(ctx, q, p.ID, minorPurchase{refType: "review", coachName: rr.RequestedCoachName, price: reviewCashPrice(rr)}, rr.ID, uuid.Nil)
-	if err != nil || block != nil {
-		return "", block, err
+	if err := recordMinorDeclaration(ctx, q, p.ID, "review", rr.ID); err != nil {
+		return "", err
 	}
 	// 支払いの行もロックを持つ接続で作る。別の接続を待つと、同時に来たときに接続が尽きて止まる。
-	url, err := s.reviewCheckoutURL(ctx, q, rr, method)
+	url, err := s.reviewCheckoutURL(ctx, q, rr, method, true)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
-	return url, nil, tx.Commit(ctx)
+	return url, tx.Commit(ctx)
 }
 
 // completeReviewCheckout は、添削の支払い（カードは仮押さえ）が届いたら依頼を割り当ての待ち行列に入れる。
@@ -204,7 +199,6 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		return nil
 	}
 	var started *db.ReviewRequest
-	var notice *db.GuardianNotice
 	err = s.tx(ctx, func(q *db.Queries) error {
 		var err error
 		pay, err = q.MarkReviewPaymentPaid(ctx, db.MarkReviewPaymentPaidParams{
@@ -224,9 +218,7 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 			return err
 		}
 		started = &rr
-		// 18歳未満が自分で払ったときは、保護者への購入の通知を支払いと一緒に予約する。
-		notice, err = queueGuardianPurchaseNotice(ctx, q, rr.RequesterID, "review", rr.ID, pay.AmountYen, rr.RequestedCoachName, pay.PaymentIntentID)
-		return err
+		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -240,9 +232,6 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 			slog.Error("release unstarted review payment", "payment", pay.ID, "err", err)
 		}
 		return nil
-	}
-	if notice != nil {
-		s.sendGuardianNotice(ctx, *notice)
 	}
 	if _, err := s.offerReview(ctx, started.ID); err != nil {
 		slog.Warn("review offer after payment", "err", err)

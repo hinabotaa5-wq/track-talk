@@ -53,10 +53,35 @@ it("未成年本人には、保護者が払うパーソナル指導の個別決�
  expect(container.textContent).toContain("保護者に");
  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "お支払いへ")).toBe(false);
 });
-it("未成年本人は、添削のあとの追加相談を保護者の同意の範囲で自分で払える", async () => {
+function button(text: string) { return [...container.querySelectorAll("button")].find((b) => b.textContent === text); }
+async function check() { const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]'); if (!box) throw new Error("missing checkbox"); await act(async () => box.click()); }
+it("未成年本人は、添削のあとの追加相談の支払いを開くたびに、保護者の許可のチェックが要る", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "requester", status: "awaiting_payment" }] });
- expect([...container.querySelectorAll("button")].some((b) => b.textContent === "お支払いへ")).toBe(true);
+ expect(container.textContent).toContain("保護者に口頭で許可をもらいました");
+ expect(container.textContent).toContain("未成年の方は、購入する前に保護者の許可を得てください。");
  expect(container.textContent).not.toContain("保護者に、この契約のページから");
+ expect(button("お支払いへ")?.disabled).toBe(true);
+ await check();
+ expect(button("お支払いへ")?.disabled).toBe(false);
+ apiFetch.mockImplementation(async (_path: string, options?: { method: string }) => options?.method ? {} : room);
+ await click("お支払いへ");
+ const call = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/checkout");
+ expect(JSON.parse(call?.[1].body)).toEqual({ guardian_permission: true });
+});
+it("未成年本人が新しい追加相談をその場で払うときは、チェックしないと送れない", async () => {
+ const cashDraft = { ...draft, funding: "cash" as const, minor: true, price_yen: 600 };
+ await render({ ...room, funding: "cash", minor: true, consultations: [cashDraft] });
+ expect([...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("質問する（"))?.disabled).toBe(true);
+ await check();
+ apiFetch.mockImplementation(async (path: string, options?: { method: string }) => { if (!options?.method) return room; if (path.endsWith("/submit")) return {}; return { consultation: cashDraft }; });
+ await act(async () => [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("質問する（"))?.click());
+ const submit = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/submit");
+ expect(JSON.parse(submit?.[1].body)).toEqual({ guardian_permission: true });
+});
+it("18歳以上には、保護者の許可のチェックを出さない", async () => {
+ await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
+ expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+ expect(button("お支払いへ")?.disabled).toBe(false);
 });
 it("保護者は閲覧と支払いができ、新しい有料質問は作れない", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [{ ...draft, funding: "cash", minor: true, payer: "guardian", status: "awaiting_payment" }] }, "guardian-secret");

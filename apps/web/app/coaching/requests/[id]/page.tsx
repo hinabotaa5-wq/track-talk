@@ -9,12 +9,14 @@ import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
+import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { minorDeclarationBody } from "@/lib/minor-purchase";
 import { helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
-import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -143,18 +145,34 @@ function paymentText(p: ReviewPayment): string {
 }
 
 // お支払いがまだの依頼。支払い方法を選んで、支払い画面を開き直す。
+// 18歳未満は、開き直すときも購入のたびの宣言にチェックが要る。
 function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
   const [error, setError] = useState("");
+  const [minor, setMinor] = useState<boolean | null>(null);
+  const [declared, setDeclared] = useState(false);
   const { pending, acquire, release } = useActionLock();
 
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    apiFetch<CoachingMe>("/v1/me/coaching", { token })
+      .then((d) => { if (!cancelled) setMinor(d.is_minor); })
+      .catch(() => { if (!cancelled) setMinor(false); });
+    return () => { cancelled = true; };
+  }, [token]);
+
   async function pay(method: ReviewPayMethod) {
+    if (minor && !declared) {
+      setError("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。");
+      return;
+    }
     if (!acquire()) return;
     setError("");
     try {
       const d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/checkout`, {
         method: "POST",
         token,
-        body: JSON.stringify({ method }),
+        body: JSON.stringify({ method, ...minorDeclarationBody(!!minor, declared) }),
       });
       if (d.checkout_url) window.location.assign(d.checkout_url);
     } catch (err) {
@@ -166,11 +184,12 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
   return (
     <section className="space-y-2">
       <p className="text-sm text-slate-200">お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。</p>
+      {minor ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
       {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
         <button
           key={m}
           type="button"
-          disabled={pending}
+          disabled={pending || minor === null || (minor && !declared)}
           onClick={() => void pay(m)}
           className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
         >
