@@ -74,7 +74,7 @@ func payConsultation(t *testing.T, h http.Handler, id string, amount int) int {
 	r := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", map[string]any{"id": session, "payment_status": "paid", "payment_intent": "pi_consult_" + id, "client_reference_id": id, "amount_total": amount, "currency": "jpy", "metadata": map[string]string{"kind": "consultation", "consultation_id": id}})
 	return r.Code
 }
-func TestConsultationTicketConversationAndFreeConfirmation(t *testing.T) {
+func TestReviewConsultationTicketIsOneWay(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
@@ -101,17 +101,27 @@ func TestConsultationTicketConversationAndFreeConfirmation(t *testing.T) {
 	if count != 1 || earnings != 420 {
 		t.Fatalf("earnings %d %d", count, earnings)
 	}
-	consultationAction(t, h, owner, c.ID, "clarify", map[string]any{"body": "接地の練習方法を教えてください"})
-	consultationAction(t, h, coach, c.ID, "clarification", map[string]any{"body": "その場での腿上げで確認できます"})
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/clarify", owner, map[string]any{"body": "もう一度"}); r.Code == 200 {
-		t.Fatal("second free question")
+	// 動画添削のあとの追加相談は一方通行。回答への確認・補足はなく、回答済みの添削では新しく買えない。
+	for _, action := range []struct{ tok, name string }{{owner, "clarify"}, {coach, "clarification"}} {
+		r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/"+action.name, action.tok, map[string]any{"body": "接地の練習方法を教えてください"})
+		if r.Code != 409 || !strings.Contains(r.Body.String(), "clarify_unavailable") {
+			t.Fatalf("%s %d %s", action.name, r.Code, r.Body.String())
+		}
 	}
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 2 {
-		t.Fatalf("charged free confirmation %+v", b)
+	var clarify *string
+	queryRowArgs(t, `SELECT clarify_body FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &clarify)
+	if clarify != nil {
+		t.Fatal("clarify saved")
 	}
 	room := doJSON(t, h, "GET", path, owner, nil)
-	if room.Code != 200 || !strings.Contains(room.Body.String(), "その場での腿上げ") {
+	if room.Code != 200 || !strings.Contains(room.Body.String(), "前半の接地") || !strings.Contains(room.Body.String(), `"can_purchase":false`) || !strings.Contains(room.Body.String(), "回答済み") {
 		t.Fatal(room.Body.String())
+	}
+	if r := doJSON(t, h, "POST", path, owner, map[string]any{"request_key": uuid.NewString(), "body": "もう一度"}); r.Code != 422 || !strings.Contains(r.Body.String(), "consultation_limit") {
+		t.Fatalf("second purchase %d %s", r.Code, r.Body.String())
+	}
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 2 {
+		t.Fatalf("balance %+v", b)
 	}
 	if len(f.refunds) != 0 {
 		t.Fatal("unexpected cash refund")
@@ -122,18 +132,26 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
-	c0 := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "最初の相談")
-	consultationAction(t, h, owner, c0.ID, "submit", nil)
-	consultationAction(t, h, coach, c0.ID, "accept", nil)
-	consultationAction(t, h, coach, c0.ID, "answer", map[string]any{"body": "回答です"})
 	path := "/v1/coaching/requests/" + root + "/consultations"
 	c := consultationDraft(t, h, owner, path, uuid.NewString(), "残高が変わっても残る質問")
 	if c.Funding != "ticket" {
 		t.Fatalf("draft %+v", c)
 	}
-	// 下書きのあとで残りの2枚を別の依頼で確保し、チケットが尽きた状態で送る。チケットの新規販売は止めたので、
-	// 送信時の残高で都度払いに切り替える。同時に送っても支払いは1件分。
-	ticketReview(t, h, owner)
+	// 下書きのあとで残りの3枚を別の依頼とその追加相談で確保し、チケットが尽きた状態で送る。チケットの新規販売は
+	// 止めたので、送信時の残高で都度払いに切り替える。同時に送っても支払いは1件分。
+	other := ticketReview(t, h, owner)
+	offers := coachRequests(t, h, coach).Offers
+	if len(offers) != 1 {
+		t.Fatalf("offers %+v", offers)
+	}
+	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+other+"/response", coach, responseBody()); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	c0 := consultationDraft(t, h, owner, "/v1/coaching/requests/"+other+"/consultations", uuid.NewString(), "別の添削の相談")
+	consultationAction(t, h, owner, c0.ID, "submit", nil)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 2)
@@ -166,7 +184,7 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, c.ID, "decline", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 2 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 1 {
 		t.Fatalf("tickets touched %+v", b)
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))

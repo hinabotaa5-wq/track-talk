@@ -96,7 +96,8 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | 任意の匿名の利用状況計測。未設定なら無効。接続・無料枠の確認は [計測の説明](docs/analytics.md) |
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | オフでAPIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
 | `COACHING_NEW_ACCEPTANCE_ENABLED` | 新しい申込み・購入の受付を制御。画面の公開設定とは別に判断 |
-| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | オフで有料の1対1のやりとり（契約のやりとり欄・追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | オフで有料の1対1のやりとり（契約のやりとり欄・サポートプランの追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_CONSULTATION_ENABLED` / `NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED` | オフで動画添削のあとの追加相談（質問1回・回答1回の一方通行、1つの添削につき1回）の送信・支払い・回答を止める。下書き・閲覧・通報・返金・取り下げは止めない。既定は空（停止） |
 | `COACHING_TICKET_SALES_ENABLED` | 空（停止）のまま。チケットの新規販売は終了し、動画添削・追加相談は都度払い（カード・PayPay）。購入済みチケットの残高・履歴・返金は使える |
 | `REVIEW_RANDOM_ASSIGN_ENABLED` | 空（停止）のまま。動画添削は選手がコーチを選ぶ方式だけ。空の間はコーチ未選択の申込みを受け付けず、運営からの割り当て・別コーチへの再割り当てをしない |
 | `STRIPE_*` | 公開後の決済・返金・送金。募集だけの間は購入画面を提供しない |

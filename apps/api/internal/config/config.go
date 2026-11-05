@@ -46,6 +46,10 @@ type Config struct {
 	// 添削の「わからなかった」と補足回答）の送信を止める。読む・通報・返金は止めない。
 	// 有料の1対1メッセージは電気通信事業の届出の対象なので、届出が受理されるまで本番では立てない。
 	CoachingMessaging bool
+	// CoachingConsultation が false の間は、動画添削のあとの追加相談（1つの添削につき質問1回・回答1回の
+	// 一方通行の相談）の送信系（質問の送信・支払い・コーチの回答）を止める。下書き・閲覧・通報・返金・取消しは止めない。
+	// 契約の追加相談・やりとり欄・添削の確認質問は CoachingMessaging の側に残す。既定は停止。
+	CoachingConsultation bool
 	// CoachingTicketSales が false の間は、コーチングチケットの新規購入を止める。動画添削は都度払い
 	// （カード・PayPay）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
 	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
@@ -142,6 +146,7 @@ func Load() (Config, error) {
 		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
 		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
 		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
+		CoachingConsultation:       enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
 		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
 		CoachIdentityKey:           os.Getenv("COACH_IDENTITY_KEY"),

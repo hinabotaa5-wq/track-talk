@@ -6,8 +6,8 @@ import { ApiRequestError } from "@/lib/api";
 import { canClarify, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { CoachingConsultations } from "./coaching-consultations";
 const apiFetch = vi.fn();
-const flags = vi.hoisted(() => ({ messaging: true }));
-vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get coachingMessagingEnabled() { return flags.messaging; } }));
+const flags = vi.hoisted(() => ({ messaging: true, consultation: true }));
+vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get coachingMessagingEnabled() { return flags.messaging; }, get coachingConsultationEnabled() { return flags.consultation; } }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => vi.fn(async () => true), reportConfirmOptions: (x: unknown) => x }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
@@ -19,10 +19,10 @@ const draft: Consultation = {
 };
 const room: ConsultationRoom = { consultations: [draft], role: "requester", funding: "ticket", price_yen: 500, can_purchase: true, block_reason: "", requires_video: false };
 let root: Root; let container: HTMLDivElement;
-beforeEach(() => { (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true; container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); apiFetch.mockReset(); flags.messaging = true; });
+beforeEach(() => { (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true; container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); apiFetch.mockReset(); flags.messaging = true; flags.consultation = true; });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function click(text: string) { const b = [...container.querySelectorAll("button")].find((x) => x.textContent === text); if (!b) throw new Error(`missing ${text}`); await act(async () => b.click()); }
-async function render(data: ConsultationRoom = room, guardianToken?: string) { apiFetch.mockResolvedValue(data); await act(async () => root.render(<CoachingConsultations rootID="review-room" kind={guardianToken ? "contract" : "review"} token={guardianToken ? null : "token"} guardianToken={guardianToken} />)); }
+async function render(data: ConsultationRoom = room, guardianToken?: string, kind: "review" | "contract" = guardianToken ? "contract" : "review") { apiFetch.mockResolvedValue(data); await act(async () => root.render(<CoachingConsultations rootID="review-room" kind={kind} token={guardianToken ? null : "token"} guardianToken={guardianToken} />)); }
 it("購入前に下書きを保存し、不足時には元の部屋に戻る購入リンクを表示する", async () => {
  await render();
  apiFetch.mockImplementation(async (path: string, options?: { method: string }) => { if (!options?.method) return room; if (path.endsWith("/submit")) throw new ApiRequestError(422, { error: { code: "insufficient_tickets", message: "チケットが不足しています" } }); return { consultation: draft }; });
@@ -40,9 +40,9 @@ it("購入から戻ると保存済みの下書きと動画を復元する", asyn
  expect(container.querySelector("textarea")?.value).toBe(draft.question);
  expect(container.textContent).toContain("保存済みの動画を添付します");
 });
-it("回答への無料確認と新しい有料相談を区別する", async () => {
+it("サポートプランの相談は、回答への無料確認と新しい有料相談を区別する", async () => {
  const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString() };
- await render({ ...room, consultations: [c] });
+ await render({ ...room, consultations: [c] }, undefined, "contract");
  expect(container.textContent).toContain("回答について確認する（1回無料）");
  expect(container.textContent).toContain("質問する（チケット1枚）");
  expect(canClarify(c, new Date(c.answered_at).getTime() + 7 * 86400000)).toBe(false);
@@ -96,12 +96,39 @@ it("担当コーチには受諾と辞退を表示する", async () => {
  expect(container.textContent).toContain("辞退する");
  expect(container.querySelector("textarea")).toBeNull();
 });
-it("届出が済むまでは、新しい質問・確認・回答の欄を出さず、届いた内容だけを見せる", async () => {
+it("届出が済むまでは、サポートプランの新しい質問・確認・回答の欄を出さず、届いた内容だけを見せる", async () => {
  flags.messaging = false;
  const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString() };
- await render({ ...room, consultations: [c] });
+ await render({ ...room, consultations: [c] }, undefined, "contract");
  expect(container.textContent).toContain("コーチの回答");
  expect(container.textContent).toContain("メッセージのやりとりは準備中です");
  expect(container.textContent).not.toContain("回答について確認する（1回無料）");
  expect(container.textContent).not.toContain("質問する（チケット1枚）");
+});
+it("動画添削のあとの相談は一方通行で、回答への確認・補足の欄を出さず、過去の確認・補足は表示だけする", async () => {
+ const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString(), clarify_body: "以前の確認", clarification: "以前の補足" };
+ await render({ ...room, can_purchase: false, block_reason: "この添削の追加相談は回答済みです。", consultations: [c, { ...draft, id: "c2", status: "answered" as const, answer: "別の回答", answered_at: new Date().toISOString() }] });
+ expect(container.textContent).toContain("この添削について質問を1回送ると、担当コーチが1回回答します");
+ expect(container.textContent).not.toContain("会話はこの部屋に残ります");
+ expect(container.textContent).toContain("回答への確認：以前の確認");
+ expect(container.textContent).toContain("補足：以前の補足");
+ expect(container.textContent).not.toContain("回答について確認する（1回無料）");
+ expect(container.querySelector("textarea")).toBeNull();
+ expect(container.textContent).toContain("この添削の追加相談は回答済みです。");
+});
+it("動画添削のあとの相談には、コーチの補足の欄も出さない", async () => {
+ await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答", answered_at: new Date().toISOString(), clarify_body: "確認" }] });
+ expect(container.querySelector("textarea")).toBeNull();
+ expect(container.textContent).not.toContain("補足を送る");
+});
+it("動画添削のあとの相談は専用のゲートで出し分け、届出待ちのゲートには左右されない", async () => {
+ flags.messaging = false;
+ await render({ ...room, consultations: [] });
+ expect(container.textContent).toContain("質問する（チケット1枚）");
+ expect(container.textContent).not.toContain("メッセージのやりとりは準備中です");
+ await act(async () => root.unmount()); root = createRoot(container);
+ flags.messaging = true; flags.consultation = false;
+ await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "in_review" }] });
+ expect(container.textContent).toContain("追加相談の受付は準備中です");
+ expect(container.textContent).not.toContain("回答を送る");
 });
