@@ -61,19 +61,30 @@ func (q *Queries) HasMinorPurchaseDeclaration(ctx context.Context, arg HasMinorP
 }
 
 const insertMinorPurchaseDeclaration = `-- name: InsertMinorPurchaseDeclaration :exec
-INSERT INTO minor_purchase_declarations (id, minor_id, ref_type, ref_id, text_version)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO minor_purchase_declarations (
+    id, minor_id, ref_type, ref_id, text_version, declaration_text, notice_text,
+    amount_yen, coach_id, declared_birth_month, client_shown_at, client_checked_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 `
 
 type InsertMinorPurchaseDeclarationParams struct {
-	ID          uuid.UUID `json:"id"`
-	MinorID     uuid.UUID `json:"minor_id"`
-	RefType     string    `json:"ref_type"`
-	RefID       uuid.UUID `json:"ref_id"`
-	TextVersion string    `json:"text_version"`
+	ID                 uuid.UUID  `json:"id"`
+	MinorID            uuid.UUID  `json:"minor_id"`
+	RefType            string     `json:"ref_type"`
+	RefID              uuid.UUID  `json:"ref_id"`
+	TextVersion        string     `json:"text_version"`
+	DeclarationText    *string    `json:"declaration_text"`
+	NoticeText         *string    `json:"notice_text"`
+	AmountYen          *int32     `json:"amount_yen"`
+	CoachID            *uuid.UUID `json:"coach_id"`
+	DeclaredBirthMonth *time.Time `json:"declared_birth_month"`
+	ClientShownAt      *time.Time `json:"client_shown_at"`
+	ClientCheckedAt    *time.Time `json:"client_checked_at"`
 }
 
 // 18歳未満の本人が、購入の前に「保護者に許可をもらいました」にチェックしたことを残す。
+// 文面・金額・コーチ・その時の生まれた年月・画面での表示とチェックの時刻もあわせて残す（証跡）。
 func (q *Queries) InsertMinorPurchaseDeclaration(ctx context.Context, arg InsertMinorPurchaseDeclarationParams) error {
 	_, err := q.db.Exec(ctx, insertMinorPurchaseDeclaration,
 		arg.ID,
@@ -81,6 +92,13 @@ func (q *Queries) InsertMinorPurchaseDeclaration(ctx context.Context, arg Insert
 		arg.RefType,
 		arg.RefID,
 		arg.TextVersion,
+		arg.DeclarationText,
+		arg.NoticeText,
+		arg.AmountYen,
+		arg.CoachID,
+		arg.DeclaredBirthMonth,
+		arg.ClientShownAt,
+		arg.ClientCheckedAt,
 	)
 	return err
 }

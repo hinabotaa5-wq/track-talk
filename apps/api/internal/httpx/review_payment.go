@@ -128,7 +128,7 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.GuardianPermission)
+	url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.minorDeclarationReq)
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
@@ -138,14 +138,14 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
-// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、購入のたびの宣言（declared）を確かめ、
+// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、購入のたびの宣言（decl）を確かめ、
 // 支払い画面を作るのと同じトランザクションで宣言を残す。保護者同意の有無と月の上限では止めない。
 // 年齢は、本人ごとのロックの中で確かめ直す。
-func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string, declared bool) (string, error) {
+func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string, decl minorDeclarationReq) (string, error) {
 	if !profileIsMinor(p) {
 		return s.reviewCheckoutURL(ctx, s.q, rr, method, false)
 	}
-	if err := requireMinorDeclaration(true, declared); err != nil {
+	if err := requireMinorDeclaration(true, decl.GuardianPermission); err != nil {
 		return "", err
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -157,7 +157,11 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	if err := q.LockReviewRequester(ctx, p.ID); err != nil {
 		return "", err
 	}
-	if err := recordMinorDeclaration(ctx, q, p.ID, "review", rr.ID); err != nil {
+	coach := rr.RequestedCoachID
+	if coach == nil {
+		coach = rr.CoachID
+	}
+	if err := recordMinorDeclaration(ctx, q, p, minorPurchase{refType: "review", refID: rr.ID, amount: reviewCashPrice(rr), coachID: coach}, decl); err != nil {
 		return "", err
 	}
 	// 支払いの行もロックを持つ接続で作る。別の接続を待つと、同時に来たときに接続が尽きて止まる。

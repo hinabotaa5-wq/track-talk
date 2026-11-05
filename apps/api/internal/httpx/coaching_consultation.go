@@ -594,7 +594,7 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		}
 		if current.Minor && current.ContractID == nil {
 			// 18歳未満が自分で払う動画添削のあとの追加相談は、毎回の宣言が要る。記録は支払い画面を作る時に残す。
-			if err := requireMinorDeclaration(true, declared); err != nil {
+			if err := requireMinorDeclaration(true, declared.GuardianPermission); err != nil {
 				return err
 			}
 		} else if current.Minor {

@@ -1,7 +1,11 @@
 -- name: InsertMinorPurchaseDeclaration :exec
 -- 18歳未満の本人が、購入の前に「保護者に許可をもらいました」にチェックしたことを残す。
-INSERT INTO minor_purchase_declarations (id, minor_id, ref_type, ref_id, text_version)
-VALUES ($1, $2, $3, $4, $5);
+-- 文面・金額・コーチ・その時の生まれた年月・画面での表示とチェックの時刻もあわせて残す（証跡）。
+INSERT INTO minor_purchase_declarations (
+    id, minor_id, ref_type, ref_id, text_version, declaration_text, notice_text,
+    amount_yen, coach_id, declared_birth_month, client_shown_at, client_checked_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
 -- name: HasMinorPurchaseDeclaration :one
 SELECT EXISTS (

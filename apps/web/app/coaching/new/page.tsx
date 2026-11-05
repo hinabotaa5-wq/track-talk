@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
-import { minorDeclarationBody } from "@/lib/minor-purchase";
+import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
@@ -53,7 +53,8 @@ export default function NewReviewRequestPage() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   // 18歳未満の購入のたびの宣言。毎回チェックなしから始める。
-  const [declared, setDeclared] = useState(false);
+  const declaration = useMinorDeclaration();
+  const declared = declaration.checked;
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
@@ -184,7 +185,7 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
-          method, use_tickets: method === "tickets", requested_coach_id: coach.id, ...minorDeclarationBody(needsDeclaration, declared) }),
+          method, use_tickets: method === "tickets", requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -314,7 +315,7 @@ export default function NewReviewRequestPage() {
           ) : (
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>
           )}
-          {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={setDeclared} disabled={pending} /> : null}
+          {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? "送っています" : cashPayment ? `送ってお支払いへ（${formatYen(cashPrice)}）` : method === "tickets" ? "チケット2枚を確保して送る" : "送る"}
           </Button>
