@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { monthlyLimitLabel } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useEffect, useState, type FormEvent } from "react";
@@ -66,7 +65,6 @@ export function GuardianLinkForm({ token }: { token: string | null }) {
       <h2 className="font-bold text-white">保護者に知らせる</h2>
       <p className="text-slate-200">
         {guardian ? guardianLabels[guardian.status] : "まだ保護者にメールを送っていません"}
-        {guardian?.status === "consented" ? `（${monthlyLimitLabel(guardian.monthly_limit_yen)}）` : null}
       </p>
       {guardian?.guardian_email ? <p className="text-slate-300">送り先: {guardian.guardian_email}</p> : null}
       {guardian?.status === "consented" ? null : (

@@ -121,7 +121,7 @@ func (s *Server) retryGuardianNotices(ctx context.Context) (int, error) {
 	return sent, nil
 }
 
-// sendGuardianConsentedMail は、同意を受け付けたことと、上限の変更・撤回のリンクを保護者に送る。
+// sendGuardianConsentedMail は、同意を受け付けたことと、保護者のページのリンク（同意用とは別に作る）を保護者に送る。
 func (s *Server) sendGuardianConsentedMail(ctx context.Context, consent db.GuardianConsent) {
 	ctx = context.WithoutCancel(ctx)
 	if consent.GuardianEmail == nil || !s.mail.Configured() {
@@ -183,13 +183,15 @@ func guardianMailTime(t time.Time) string {
 	return t.In(jst.Zone).Format("2006年1月2日 15:04")
 }
 
-// 以下のメールの文面は、前の版（guardian-consent-2026-10-final）の運営者の確定版のまま。
+// 同意のお願いと同意の受付のメールは、保護者のページ（guardian-consent-2026-11-support-plan）に合わせて、
+// サポートプランの同意として書く。月の上限・購入の通知・PayPay には触れない（サポートプランの支払いはクレジットカードのみ）。
+// 購入の通知（guardianPurchaseMail）は、前の仕組みで予約済みの分を送り直すときだけ使うので、前の版の確定文面のまま。
 
 const guardianMailGreeting = "TrackTalkをご利用いただきありがとうございます。\n"
 
 const guardianMailSignature = "\nTrackTalk 運営者\n"
 
-// guardianConsentedMail は、同意を受け付けたことの確認。
+// guardianConsentedMail は、同意を受け付けたことの確認。link は保護者のページ（プランごとの同意・お支払いと、同意の取り消し）。
 func guardianConsentedMail(to, child string, c db.GuardianConsent, link string) mail.Message {
 	when := ""
 	if c.ConsentedAt != nil {
@@ -199,12 +201,11 @@ func guardianConsentedMail(to, child string, c db.GuardianConsent, link string) 
 		To:      to,
 		Subject: "保護者同意を受け付けました",
 		Text: guardianMailGreeting +
-			"お子さま（アカウント名：" + child + "）の有料サービス利用について、保護者の方の同意を受け付けました。\n\n" +
-			"・同意日時：" + when + "\n" +
-			"・お子さまが自分で支払える月の上限：" + formatYenNumber(c.SelfPayLimitYen) + "円\n\n" +
-			"お子さまが購入するたびに、このメールアドレスへ購入内容をお知らせします。\n" +
-			"上限の変更、または同意の取り消しは、下記のリンクからいつでも行えます。\n\n" +
-			"上限の変更・同意の取り消しはこちら：" + link + "\n" +
+			"お子さま（アカウント名：" + child + "）のサポートプラン利用について、保護者の方の同意を受け付けました。\n\n" +
+			"・同意日時：" + when + "\n\n" +
+			"コーチがお子さまのお申し込みを引き受けると、下記のリンクのページの「パーソナル指導」に表示されます。プランごとに内容を確認して、同意とお支払いをしてください。お支払いがあるプランは、クレジットカードでお支払いいただきます。\n" +
+			"同意の取り消しも、下記のリンクからいつでも行えます。\n\n" +
+			"プランへの同意・お支払い、同意の取り消しはこちら：" + link + "\n" +
 			guardianMailSignature,
 	}
 }
