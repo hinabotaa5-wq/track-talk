@@ -40,6 +40,9 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 		t.Fatalf("offers %d %s", rec.Code, rec.Body.String())
 	}
 	offer := list.Offers[0]
+	if got := offer.Terms.Items[7]; got.Label != "支払期日" || !strings.HasPrefix(got.Value, "毎月末日締切、翌月15日支払い。ただし、支払対象額が3,000円未満の場合は翌月に繰り越し（繰り越しは1回まで）、翌々月15日に金額にかかわらず支払います。") {
+		t.Fatalf("payment due terms: %+v", got)
+	}
 	// チケット2枚(割引前1,200円)の70%。
 	if offer.Terms.AmountYen != 840 || len(offer.Terms.Items) != 9 || offer.Terms.PaymentDue == "" || offer.Terms.DeliverBy == "" {
 		t.Fatalf("terms before accept: %+v", offer.Terms)
@@ -55,7 +58,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 1 || accepted.WorkOrder.Terms.AmountYen != 840 || len(accepted.WorkOrder.Terms.Items) != 9 {
+	if accepted.WorkOrder.TermsVersion != 2 || accepted.WorkOrder.Terms.AmountYen != 840 || len(accepted.WorkOrder.Terms.Items) != 9 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -72,6 +75,13 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "840円")
 	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
 		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
+	}
+
+	// 交付済みの旧版は、現在の文面から作り直さず、保存時の版と内容を返す。
+	execSQLArgs(t, `UPDATE coach_work_orders SET terms_version=1, terms=jsonb_set(terms, '{items,7,value}', to_jsonb('旧版の支払期日'::text)) WHERE review_request_id=$1`, request)
+	rec = doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+request, coach, nil)
+	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 || accepted.WorkOrder.TermsVersion != 1 || accepted.WorkOrder.Terms.Items[7].Value != "旧版の支払期日" {
+		t.Fatalf("stored version 1 must remain unchanged: %d %s", rec.Code, rec.Body.String())
 	}
 }
 
