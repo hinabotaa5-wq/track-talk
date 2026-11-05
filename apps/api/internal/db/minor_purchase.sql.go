@@ -61,7 +61,7 @@ type InsertMinorPurchaseDeclarationParams struct {
 	TextVersion string    `json:"text_version"`
 }
 
-// 18歳未満の本人が、購入の前に「保護者に口頭で許可をもらいました」にチェックしたことを残す。
+// 18歳未満の本人が、購入の前に「保護者に許可をもらいました」にチェックしたことを残す。
 func (q *Queries) InsertMinorPurchaseDeclaration(ctx context.Context, arg InsertMinorPurchaseDeclarationParams) error {
 	_, err := q.db.Exec(ctx, insertMinorPurchaseDeclaration,
 		arg.ID,

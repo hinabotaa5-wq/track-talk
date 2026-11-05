@@ -40,7 +40,7 @@ it("18歳未満は保護者の同意がなくても依頼の画面を開け、�
   expect(container.textContent).toContain("未成年の方は、購入する前に保護者の許可を得てください。");
   const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
   expect(box?.checked).toBe(false);
-  expect(box?.closest("label")?.textContent).toBe("保護者に口頭で許可をもらいました");
+  expect(box?.closest("label")?.textContent).toBe("保護者に許可をもらいました");
 });
 
 it("18歳以上には、保護者の許可のチェックを出さない", async () => {
@@ -48,5 +48,5 @@ it("18歳以上には、保護者の許可のチェックを出さない", async
   await render();
   expect(container.querySelector("form")).not.toBeNull();
   expect(container.querySelector('input[type="checkbox"]')).toBeNull();
-  expect(container.textContent).not.toContain("保護者に口頭で許可をもらいました");
+  expect(container.textContent).not.toContain("保護者に許可をもらいました");
 });
