@@ -58,6 +58,45 @@ test("詳細文を動画より上に大きく太字で表示し、枠を付け�
   expect(style).toEqual({ font: "18px", weight: "700", border: "0px" });
   await page.screenshot({ path: test.info().outputPath("post-detail.png") });
 });
+test("投稿動画を通常どおり再生できる", async ({ page }) => {
+  await page.goto(`/posts/${post.id}?from=me`);
+  const video = page.locator("main video");
+  await expect(video).toHaveJSProperty("controls", true);
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThan(0);
+  await video.press("Space");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+});
+test("動画の読み込みに失敗しても投稿詳細を開き直さずに再試行できる", async ({ page }) => {
+  let offline = true;
+  await page.route("**/samples/vertical.mp4", (route) => offline ? route.abort("internetdisconnected") : route.continue());
+  await page.goto(`/posts/${post.id}?from=me`);
+  const video = page.locator("main video");
+  const error = page.getByRole("alert").filter({ hasText: "動画を再生できませんでした。" });
+  const retry = page.getByRole("button", { name: "再試行", exact: true });
+  await expect(error).toBeVisible();
+  const mediaFailed = page.waitForEvent("requestfailed", {
+    predicate: (request) => request.url().endsWith("/samples/vertical.mp4"),
+  });
+  await retry.click();
+  await mediaFailed;
+  await expect(error).toBeVisible();
+
+  offline = false;
+  await video.evaluate((element: HTMLVideoElement) => {
+    // メディアの error イベントがなくても、再生開始の拒否を表示する。
+    element.play = () => {
+      element.play = HTMLMediaElement.prototype.play;
+      return Promise.reject(new DOMException("Playback blocked", "NotAllowedError"));
+    };
+  });
+  await retry.click();
+  await expect(error).toBeVisible();
+
+  await retry.click();
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+  await expect(error).toHaveCount(0);
+  await expect(video).toHaveJSProperty("controls", true);
+});
 test("320pxのチャットで長文を小さく折り返し、横にはみ出さない", async ({ page }) => {
   await page.goto(`/posts/${post.id}?room=long-comment`);
   const bubble = page.locator("#comment-long-comment p");
@@ -84,13 +123,13 @@ test(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠�
   await expect.poll(() => card.locator("img").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await expect(card.locator(".feed-card-caption")).toHaveText(post.body);
   await expect(card.locator(".feed-card-title")).toHaveCount(0);
+  await expect(card.locator(".feed-card-caption-background")).toHaveCSS("backdrop-filter", "blur(8px)");
   const placement = await card.evaluate((element) => {
     const image = element.querySelector(".feed-card-thumbnail")!.getBoundingClientRect();
     const caption = element.querySelector(".feed-card-caption")!.getBoundingClientRect();
-    return { imageBottom: image.bottom, captionBottom: caption.bottom, blur: getComputedStyle(element.querySelector(".feed-card-caption-background")!).backdropFilter };
+    return { imageBottom: image.bottom, captionBottom: caption.bottom };
   });
   expect(Math.abs(placement.imageBottom - placement.captionBottom)).toBeLessThan(2);
-  expect(placement.blur).toBe("blur(8px)");
   await page.screenshot({ path: test.info().outputPath("feed.png") });
 });
 

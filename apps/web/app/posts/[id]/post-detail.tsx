@@ -536,6 +536,7 @@ export function PostDetail({
         </>
       ) : post.kind === "video" && post.playback_url ? (
         <ZoomableVideo
+          key={post.playback_url}
           className="mx-auto h-auto max-h-[50dvh] w-auto max-w-full bg-black"
           src={post.playback_url}
           poster={post.thumbnail_url}

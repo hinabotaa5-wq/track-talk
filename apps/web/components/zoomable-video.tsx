@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   src: string;
@@ -15,9 +15,17 @@ export function ZoomableVideo({ src, poster, className }: Props) {
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const pendingPlay = useRef<Promise<void> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [failed, setFailed] = useState(false);
   const zoomed = view.scale > 1;
+
+  const attachVideo = useCallback((video: HTMLVideoElement | null) => {
+    videoRef.current = video;
+    // メタデータの取得はハイドレーション前に失敗することもある。
+    if (video?.error) setFailed(true);
+  }, []);
 
   useEffect(() => {
     viewRef.current = view;
@@ -78,10 +86,31 @@ export function ZoomableVideo({ src, poster, className }: Props) {
     };
   }, []);
 
+  const showPlaybackError = () => {
+    setPlaying(false);
+    setFailed(true);
+  };
+  const play = (video: HTMLVideoElement) => {
+    const request = video.play();
+    pendingPlay.current = request;
+    void request.catch((error: unknown) => {
+      if (videoRef.current !== video || pendingPlay.current !== request) return;
+      // 読み込み中に一時停止すると play() は AbortError で終わる。
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      showPlaybackError();
+    });
+  };
+  const retry = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    setFailed(false);
+    video.load();
+    play(video);
+  };
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) void v.play();
+    if (v.paused) play(v);
     else v.pause();
   };
   const skip = (sec: number) => {
@@ -93,7 +122,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
   return (
     <div ref={wrapRef} className="relative overflow-hidden rounded-xl bg-black">
       <video
-        ref={videoRef}
+        ref={attachVideo}
         className={className}
         style={{
           transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
@@ -102,14 +131,23 @@ export function ZoomableVideo({ src, poster, className }: Props) {
         }}
         src={src}
         poster={poster ?? undefined}
-        controls={!zoomed}
+        controls={!zoomed && !failed}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onClick={zoomed ? () => setShowControls((v) => !v) : undefined}
+        onError={showPlaybackError}
+        onClick={zoomed && !failed ? () => setShowControls((v) => !v) : undefined}
         playsInline
         preload="metadata"
       />
-      {zoomed && showControls ? (
+      {failed ? (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/85 p-3 text-center text-sm text-pure-white">
+          <p role="alert">動画を再生できませんでした。</p>
+          <button type="button" onClick={retry} className="rounded-full bg-white/20 px-4 py-2 font-semibold">
+            再試行
+          </button>
+        </div>
+      ) : null}
+      {zoomed && showControls && !failed ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-6">
           <button
             type="button"
@@ -137,7 +175,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
           </button>
         </div>
       ) : null}
-      {zoomed ? (
+      {zoomed && !failed ? (
         <button
           type="button"
           onClick={() => setView({ scale: 1, x: 0, y: 0 })}
