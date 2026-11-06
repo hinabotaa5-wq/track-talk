@@ -7,6 +7,8 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 const userID = "11111111-1111-4111-8111-111111111111";
 const uploadDelayMs = 3000;
 const video = readFileSync(join(process.cwd(), "public/samples/vertical.mp4"));
+// 投稿の request_key（#382）。フォームごとの UUID なので形だけ確かめる。
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function signIn(context: BrowserContext, page: Page, baseURL: string) {
   const user = { id: userID, aud: "authenticated", role: "authenticated", email: "preview@example.com", app_metadata: {}, user_metadata: {}, identities: [], created_at: new Date().toISOString() };
@@ -89,7 +91,7 @@ test("動画を選んだらすぐ送り始め、送信中も詳細を書け、�
   await expect(page).toHaveURL(/\/\?sort=new$/);
   const saveMs = Date.now() - started;
   test.info().annotations.push({ type: "保存ボタンを押してからホームまで", description: `${saveMs}ms` });
-  expect(mocks.posted).toEqual([{ body: "スタートの確認", kind: "video", video_public_id: "tracktalk/videos/v2" }]);
+  expect(mocks.posted).toEqual([{ body: "スタートの確認", kind: "video", video_public_id: "tracktalk/videos/v2", request_key: expect.stringMatching(uuidPattern) }]);
 });
 
 test("署名の取得中にもう一度求めても、取得は1回にまとめ、同じ署名を2本で使わない", async ({ page, context, baseURL }) => {
@@ -121,6 +123,6 @@ test("署名の取得中にもう一度求めても、取得は1回にまとめ�
   await expect(button).toHaveText("投稿する", { timeout: uploadDelayMs + 5000 });
   await button.click();
   await expect(page).toHaveURL(/\/\?sort=new$/);
-  expect(mocks.posted).toEqual([{ body: "", kind: "video", video_public_id: "tracktalk/videos/v2" }]);
+  expect(mocks.posted).toEqual([{ body: "", kind: "video", video_public_id: "tracktalk/videos/v2", request_key: expect.stringMatching(uuidPattern) }]);
   expect(mocks.signs()).toBe(2);
 });
