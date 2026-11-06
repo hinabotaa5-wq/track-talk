@@ -106,22 +106,26 @@ SET nickname = $2,
     event = COALESCE($4::text, event),
     updated_at = now()
 WHERE id = $1
+  AND (NOT $5::boolean OR is_admin OR nickname = $2)
 RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
 `
 
 type UpdateProfileParams struct {
-	ID             uuid.UUID `json:"id"`
-	Nickname       *string   `json:"nickname"`
-	NicknamePublic bool      `json:"nickname_public"`
-	Event          *string   `json:"event"`
+	ID               uuid.UUID `json:"id"`
+	Nickname         *string   `json:"nickname"`
+	NicknamePublic   bool      `json:"nickname_public"`
+	Event            *string   `json:"event"`
+	ReservedNickname bool      `json:"reserved_nickname"`
 }
 
+// 予約語の例外は書き込み時点の管理者権限と保存値で判定する。
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
 	row := q.db.QueryRow(ctx, updateProfile,
 		arg.ID,
 		arg.Nickname,
 		arg.NicknamePublic,
 		arg.Event,
+		arg.ReservedNickname,
 	)
 	var i Profile
 	err := row.Scan(

@@ -12,12 +12,14 @@ SET updated_at = profiles.updated_at
 RETURNING *;
 
 -- name: UpdateProfile :one
+-- 予約語の例外は書き込み時点の管理者権限と保存値で判定する。
 UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
     event = COALESCE(sqlc.narg(event)::text, event),
     updated_at = now()
 WHERE id = $1
+  AND (NOT sqlc.arg(reserved_nickname)::boolean OR is_admin OR nickname = $2)
 RETURNING *;
 
 -- name: UpdatePostMasterBadge :one
