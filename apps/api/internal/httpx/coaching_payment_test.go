@@ -467,7 +467,8 @@ func TestCoachingPaymentByGuardian(t *testing.T) {
 	}
 	// 保護者のリンクは Stripe に渡さない。
 	form := f.lastSession()
-	if form.Get("success_url") != "https://web.test/guardian/paid" || strings.Contains(form.Encode(), gt) {
+	if form.Get("success_url") != "https://web.test/guardian/paid" || strings.Contains(form.Encode(), gt) ||
+		form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" {
 		t.Fatalf("guardian session %v", form)
 	}
 	// もう一度同意しても、開き直しても、同じ支払い画面。
