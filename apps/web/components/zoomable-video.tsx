@@ -93,8 +93,11 @@ export function ZoomableVideo({ src, poster, className }: Props) {
   const play = (video: HTMLVideoElement) => {
     const request = video.play();
     pendingPlay.current = request;
-    void request.catch(() => {
-      if (videoRef.current === video && pendingPlay.current === request) showPlaybackError();
+    void request.catch((error: unknown) => {
+      if (videoRef.current !== video || pendingPlay.current !== request) return;
+      // 読み込み中に一時停止すると play() は AbortError で終わる。
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      showPlaybackError();
     });
   };
   const retry = () => {

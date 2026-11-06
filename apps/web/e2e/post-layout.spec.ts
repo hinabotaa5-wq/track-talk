@@ -82,6 +82,16 @@ test("動画の読み込みに失敗しても投稿詳細を開き直さずに�
   await expect(error).toBeVisible();
 
   offline = false;
+  await video.evaluate((element: HTMLVideoElement) => {
+    // メディアの error イベントがなくても、再生開始の拒否を表示する。
+    element.play = () => {
+      element.play = HTMLMediaElement.prototype.play;
+      return Promise.reject(new DOMException("Playback blocked", "NotAllowedError"));
+    };
+  });
+  await retry.click();
+  await expect(error).toBeVisible();
+
   await retry.click();
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
   await expect(error).toHaveCount(0);
@@ -113,13 +123,13 @@ test(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠�
   await expect.poll(() => card.locator("img").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await expect(card.locator(".feed-card-caption")).toHaveText(post.body);
   await expect(card.locator(".feed-card-title")).toHaveCount(0);
+  await expect(card.locator(".feed-card-caption-background")).toHaveCSS("backdrop-filter", "blur(8px)");
   const placement = await card.evaluate((element) => {
     const image = element.querySelector(".feed-card-thumbnail")!.getBoundingClientRect();
     const caption = element.querySelector(".feed-card-caption")!.getBoundingClientRect();
-    return { imageBottom: image.bottom, captionBottom: caption.bottom, blur: getComputedStyle(element.querySelector(".feed-card-caption-background")!).backdropFilter };
+    return { imageBottom: image.bottom, captionBottom: caption.bottom };
   });
   expect(Math.abs(placement.imageBottom - placement.captionBottom)).toBeLessThan(2);
-  expect(placement.blur).toBe("blur(8px)");
   await page.screenshot({ path: test.info().outputPath("feed.png") });
 });
 
