@@ -259,7 +259,7 @@ export default function OwnVideoPage() {
   const buttonLabel = !file
     ? "動画を選んでください"
     : uploadState === "uploading"
-      ? `動画を送っています ${percent}%`
+      ? `動画を読み込んでいます ${percent}%`
       : uploadState === "failed"
         ? "動画を送り直す"
         : submitting
@@ -307,7 +307,7 @@ export default function OwnVideoPage() {
               <p className="truncate text-sm text-slate-200">{file.name}</p>
               <p className="text-xs tabular-nums text-slate-400">
                 {formatSize(file.size)}
-                {uploadState === "uploading" ? ` ・ 送っています ${percent}%` : null}
+                {uploadState === "uploading" ? ` ・ 読み込んでいます ${percent}%` : null}
                 {uploadState === "done" ? " ・ 送信済み" : null}
                 {uploadState === "failed" ? " ・ 送れませんでした" : null}
               </p>
@@ -319,7 +319,7 @@ export default function OwnVideoPage() {
                   aria-valuemax={100}
                   aria-valuenow={percent}
                   aria-valuetext={`${percent}パーセント`}
-                  aria-label="動画の送信"
+                  aria-label="動画の読み込み"
                 >
                   <div
                     className="h-full rounded-full bg-blue-600 transition-[width] duration-150 ease-out"
