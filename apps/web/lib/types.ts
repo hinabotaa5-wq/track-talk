@@ -439,6 +439,8 @@ export type CoachEarnings = {
   min_payout_yen: number;
   this_month_yen: number;
   unpaid_yen: number;
+  next_payout_date: string | null;
+  next_payout_yen: number | null;
   payouts: CoachPayout[];
   earnings: CoachEarning[];
 };
