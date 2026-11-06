@@ -128,7 +128,7 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 	for _, e := range earnings {
 		outEarnings = append(outEarnings, map[string]any{
 			"id": e.ID, "source": e.Source, "gross_yen": e.GrossYen, "share_percent": e.SharePercent,
-			"amount_yen": e.AmountYen, "paid": e.PayoutID != nil, "created_at": e.CreatedAt,
+			"amount_yen": e.AmountYen, "paid": e.PayoutID != nil, "created_at": e.CreatedAt, "confirmed_at": e.ConfirmedAt,
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{

@@ -35,7 +35,7 @@ func newCapturedFixture(t *testing.T) capturedFixture {
 	execSQLArgs(t, `UPDATE review_payments SET status='captured',captured_at=now() WHERE request_id=$1`, request)
 	var payment string
 	queryRowArgs(t, `SELECT id FROM review_payments WHERE request_id=$1`, []any{request}, &payment)
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen) VALUES(gen_random_uuid(),$1,'review',$2,1500,70,1050)`, coach, request)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'review',$2,1500,70,1050, now())`, coach, request)
 	return capturedFixture{h, f, admin, user, coach, payment, request, intent}
 }
 func (x capturedFixture) refund(t *testing.T) {
@@ -65,7 +65,7 @@ func (x capturedFixture) paid(t *testing.T) {
 }
 func (x capturedFixture) addEarning(t *testing.T, n int) {
 	t.Helper()
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,created_at) VALUES(gen_random_uuid(),$1,'review',$2,70,$2,`+lastMonthJST+`)`, x.coach, n)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,confirmed_at) VALUES(gen_random_uuid(),$1,'review',$2,70,$2,`+lastMonthJST+`)`, x.coach, n)
 }
 
 func TestCapturedRefundPendingSuccessAndAuthorization(t *testing.T) {
@@ -90,7 +90,7 @@ func TestCapturedRefundPendingSuccessAndAuthorization(t *testing.T) {
 		t.Fatal("pending / duplicate refund")
 	}
 	// Pending refund must never be paid even before Stripe confirms success.
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at=now()-interval '3 months' WHERE coach_id=$1`, x.coach)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at=now()-interval '3 months' WHERE coach_id=$1`, x.coach)
 	x.run(t)
 	if len(x.f.transferList()) != 0 {
 		t.Fatal("pending refund paid")
@@ -219,7 +219,7 @@ func TestCapturedRefundFailureRestoresAndCanRetry(t *testing.T) {
 }
 func TestCapturedRefundConcurrentWithPayout(t *testing.T) {
 	x := newCapturedFixture(t)
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at=now()-interval '3 months' WHERE coach_id=$1`, x.coach)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at=now()-interval '3 months' WHERE coach_id=$1`, x.coach)
 	x.addEarning(t, 4000)
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
@@ -256,7 +256,7 @@ func TestCapturedRefundConsultationSixHundred(t *testing.T) {
 	x := newCapturedFixture(t)
 	id := uuid.New()
 	execSQLArgs(t, `INSERT INTO coaching_consultations(id,requester_id,coach_id,request_key,review_request_id,minor,funding,price_yen,share_percent,status,payment_state,payment_intent_id,paid_at,answered_at) SELECT $1,payer_id,$2,gen_random_uuid(),request_id,false,'cash',600,70,'answered','paid','pi_extra_600',now(),now() FROM review_payments WHERE id=$3`, id, x.coach, x.payment)
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,consultation_id,gross_yen,share_percent,amount_yen) VALUES(gen_random_uuid(),$1,'consultation',$2,600,70,420)`, x.coach, id)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,consultation_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'consultation',$2,600,70,420, now())`, x.coach, id)
 	rec := doJSON(t, x.h, "POST", "/v1/admin/coaching/payments/"+id.String()+"/refund", x.admin, map[string]any{"source": "consultation", "reason": "追加相談の返金"})
 	if rec.Code != 202 {
 		t.Fatal(rec.Body.String())
@@ -326,7 +326,7 @@ func TestCapturedRefundRestoresDebtWhenPersonalEarningIsRefunded(t *testing.T) {
 	x.paid(t)
 	x.refund(t)
 	contract := uuid.New()
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,contract_id,gross_yen,share_percent,amount_yen,created_at) VALUES(gen_random_uuid(),$1,'personal',$2,500,80,400,`+lastMonthJST+`)`, x.coach, contract)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,contract_id,gross_yen,share_percent,amount_yen,confirmed_at) VALUES(gen_random_uuid(),$1,'personal',$2,500,80,400,`+lastMonthJST+`)`, x.coach, contract)
 	x.run(t)
 	if scalar(t, `SELECT applied_yen FROM coach_refund_adjustments`) != 400 {
 		t.Fatal("personal offset missing")

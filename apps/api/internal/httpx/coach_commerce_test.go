@@ -198,7 +198,7 @@ func TestCoachIdentityDeletedFiveYearsAfterCoachingEnds(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody()); rec.Code != http.StatusOK {
 		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
 	}
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,created_at) VALUES(gen_random_uuid(),$1,'review',1200,70,840,now()+interval '1 year')`, coach)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,created_at,confirmed_at) VALUES(gen_random_uuid(),$1,'review',1200,70,840,now()+interval '1 year',now()+interval '1 year')`, coach)
 	cleanup(start.AddDate(5, 0, 7))
 	if identities(coach) != 1 {
 		t.Fatal("deleted before 5 years from the last transaction")

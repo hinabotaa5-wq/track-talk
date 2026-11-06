@@ -546,7 +546,7 @@ func applyCoachRefundOffsets(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	for _, d := range debts {
-		rows, err := tx.Query(ctx, `SELECT e.id,e.amount_yen-COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)::int FROM coach_earnings e WHERE e.coach_id=$1 AND e.payout_id IS NULL AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id))) AND e.created_at<date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo' AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded) ORDER BY e.created_at,e.id FOR UPDATE`, d.coach)
+		rows, err := tx.Query(ctx, `SELECT e.id,e.amount_yen-COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)::int FROM coach_earnings e WHERE e.coach_id=$1 AND e.payout_id IS NULL AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id))) AND e.confirmed_at<date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo' AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded) ORDER BY e.created_at,e.id FOR UPDATE`, d.coach)
 		if err != nil {
 			return err
 		}
@@ -632,7 +632,7 @@ func compensateFailedRefund(ctx context.Context, tx pgx.Tx, f capturedRefund) er
 				continue
 			}
 			earning := uuid.New()
-			if _, err := tx.Exec(ctx, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen) VALUES($1,$2,'refund_compensation',$3,100,$3)`, earning, d.coach, d.applied); err != nil {
+			if _, err := tx.Exec(ctx, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen, confirmed_at) VALUES($1,$2,'refund_compensation',$3,100,$3, now())`, earning, d.coach, d.applied); err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO coach_refund_compensations(id,adjustment_id,refund_id,earning_id,amount_yen) VALUES($1,$2,$3,$4,$5)`, uuid.New(), d.id, f.ID, earning, d.applied); err != nil {

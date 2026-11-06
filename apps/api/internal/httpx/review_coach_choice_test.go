@@ -319,7 +319,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 	if len(f.transferList()) != 0 {
 		t.Fatal("transferred per sale")
 	}
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at = `+lastMonthJST)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at = `+lastMonthJST)
 	if r := doJSON(t, h, "POST", "/v1/admin/coaching/payouts/run", admin, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
