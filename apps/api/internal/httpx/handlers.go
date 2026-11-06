@@ -56,13 +56,13 @@ func (s *Server) requireProfile(w http.ResponseWriter, r *http.Request) (db.Prof
 		Error(w, http.StatusUnauthorized, "unauthorized", "ログインが必要です")
 		return db.Profile{}, false
 	}
-	var nickname *string
-	if value := strings.TrimSpace(identity.Nickname); value != "" && Nickname(value) == "" {
-		nickname = &value
-	}
 	// ほとんどは作成済みなので、まず読むだけで済ませ、無いときだけ作る。
 	p, err := s.q.GetProfileByID(r.Context(), identity.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		var nickname *string
+		if value := strings.TrimSpace(identity.Nickname); Nickname(value) == "" && !isReservedNickname(value) {
+			nickname = &value
+		}
 		p, err = s.q.EnsureProfile(r.Context(), db.EnsureProfileParams{
 			ID:             identity.UserID,
 			Nickname:       nickname,
@@ -163,12 +163,18 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		event = &req.Event
 	}
+	reserved := isReservedNickname(nickname)
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
-		ID:             p.ID,
-		Nickname:       &nickname,
-		NicknamePublic: req.NicknamePublic,
-		Event:          event,
+		ID:               p.ID,
+		Nickname:         &nickname,
+		NicknamePublic:   req.NicknamePublic,
+		Event:            event,
+		ReservedNickname: reserved,
 	})
+	if reserved && errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusUnprocessableEntity, "nickname_reserved", reservedNicknameMessage)
+		return
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return

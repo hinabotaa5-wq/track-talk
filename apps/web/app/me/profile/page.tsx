@@ -9,6 +9,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { appEvents } from "@/lib/practice-events";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { trackEvent } from "@/lib/analytics";
+import { isReservedNickname, reservedNicknameMessage } from "@/lib/reserved-nickname";
 import { nicknameSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -45,6 +46,10 @@ export default function ProfilePage() {
     if (!token) return;
     setMessage("");
     setError("");
+    if (!profile?.is_admin && values.nickname !== profile?.nickname && isReservedNickname(values.nickname)) {
+      form.setError("nickname", { type: "reserved", message: reservedNicknameMessage });
+      return;
+    }
     // ニックネームか種目がまだの人が決め終えたら、ほかの画面へ進めるのでホームへ送る。
     const firstTime = profileIncomplete(profile);
     try {
@@ -61,6 +66,10 @@ export default function ProfilePage() {
       }
       setMessage("プロフィールを更新しました。");
     } catch (e) {
+      if (e instanceof ApiRequestError && e.code === "nickname_reserved") {
+        form.setError("nickname", { type: "reserved", message: e.message });
+        return;
+      }
       setError(e instanceof ApiRequestError ? e.message : "更新に失敗しました。");
     }
   }
@@ -80,7 +89,7 @@ export default function ProfilePage() {
         {overLimit ? (
           <p className="text-sm text-red-400">10文字以内で入力してください</p>
         ) : form.formState.errors.nickname ? (
-          <p className="text-sm text-red-400">{form.formState.errors.nickname.message}</p>
+          <p role="alert" className="text-sm text-red-400">{form.formState.errors.nickname.message}</p>
         ) : null}
         <label className="block text-sm font-medium">
           種目

@@ -3,6 +3,8 @@ import { createElement } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiRequestError } from "@/lib/api";
+import { reservedNicknameMessage } from "@/lib/reserved-nickname";
 import ProfilePage from "./page";
 
 const analytics = vi.hoisted(() => ({ track: vi.fn(), save: vi.fn() }));
@@ -17,6 +19,7 @@ const { state } = vi.hoisted(() => ({
       nickname: string | null;
       nickname_public: boolean;
       event?: string;
+      is_admin?: boolean;
     } | null,
     loading: false,
   },
@@ -98,6 +101,52 @@ describe("ProfilePage", () => {
       expect(analytics.save).toHaveBeenCalledTimes(1);
       if (failure) expect(analytics.track).not.toHaveBeenCalled();
       else expect(analytics.track).toHaveBeenCalledExactlyOnceWith("onboarding_completed");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it.each([
+    { current: null, nickname: "ａｄｍｉｎ", admin: false, blocked: true },
+    { current: "ランナー", nickname: "公式戦運営", admin: false, blocked: true },
+    { current: "ランナー", nickname: "公式戦がんばる", admin: false, blocked: false },
+    { current: "運営", nickname: "運営", admin: false, blocked: false },
+    { current: "ランナー", nickname: "運営", admin: true, blocked: false },
+  ])("validates a nickname from $current to $nickname (admin=$admin)", async ({ current, nickname, admin, blocked }) => {
+    state.profile = { nickname: current, nickname_public: false, event: "100m", is_admin: admin };
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div.querySelector("input[placeholder='ニックネーム']")!, nickname);
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+      if (blocked) {
+        expect(analytics.save).not.toHaveBeenCalled();
+        expect(view.div.querySelector('[role="alert"]')?.textContent).toBe(reservedNicknameMessage);
+      } else {
+        expect(analytics.save).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("shows the API's reserved nickname error when the displayed role is stale", async () => {
+    state.profile = { nickname: "ランナー", nickname_public: false, event: "100m", is_admin: true };
+    analytics.save.mockRejectedValue(new ApiRequestError(422, {
+      error: { code: "nickname_reserved", message: reservedNicknameMessage },
+    }));
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div.querySelector("input[placeholder='ニックネーム']")!, "運営");
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+      expect(view.div.querySelector('[role="alert"]')?.textContent).toBe(reservedNicknameMessage);
     } finally {
       await view.unmount();
     }
