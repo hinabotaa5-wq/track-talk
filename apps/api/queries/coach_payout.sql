@@ -23,9 +23,9 @@ RETURNING *;
 
 -- name: InsertReviewEarnings :many
 -- 返却して代金が確定した添削の、コーチの取り分を記録する。チケットで払った添削は RecordTicketReviewEarnings で記録する。
-INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen)
+INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen, confirmed_at)
 SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen, sqlc.arg(share_percent)::smallint,
-       pay.amount_yen * sqlc.arg(share_percent)::int / 100
+       pay.amount_yen * sqlc.arg(share_percent)::int / 100, r.returned_at
 FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
@@ -37,11 +37,12 @@ RETURNING *;
 
 -- name: InsertPersonalEarnings :many
 -- 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
-INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen)
-SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100
+INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen, confirmed_at)
+SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100, x.confirmed_at
 FROM (
     SELECT DISTINCT ON (ct.id)
         ct.id AS contract_id, ct.coach_id,
+        CASE WHEN ct.status = 'refunded' THEN pay.refunded_at ELSE ct.ends_at END AS confirmed_at,
         pay.amount_yen - pay.refunded_yen AS gross,
         100 - sqlc.arg(fee_percent)::int AS share
     FROM coaching_contracts ct
@@ -68,19 +69,35 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 -- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
 -- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
 -- 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。戻さずに登録を終えた（ended）コーチには、ここで残りを送る（最終精算）。
-SELECT e.coach_id::uuid AS coach_id, sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0))::int AS amount_yen
-FROM coach_earnings e
-JOIN coach_profiles cp ON cp.profile_id = e.coach_id
-WHERE e.payout_id IS NULL
-  AND e.amount_yen > COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)
-  AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
-  AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
-  AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-  AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
-  AND cp.status <> 'suspended'
-GROUP BY e.coach_id, cp.status
-HAVING sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)) >= sqlc.arg(min_yen)::int OR cp.status <> 'approved'
-    OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo';
+WITH candidates AS (
+    SELECT e.coach_id::uuid AS coach_id, cp.status, e.confirmed_at,
+           e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)
+           - COALESCE((sqlc.narg(projected_offsets)::jsonb ->> e.id::text)::int, 0) AS net_yen
+    FROM coach_earnings e
+    JOIN coach_profiles cp ON cp.profile_id = e.coach_id
+    WHERE e.payout_id IS NULL
+      AND (sqlc.narg(coach_id)::uuid IS NULL OR e.coach_id = sqlc.narg(coach_id))
+      AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
+      AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
+      AND e.confirmed_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
+      AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
+      AND cp.status <> 'suspended'
+), batches AS (
+    SELECT coach_id, sum(net_yen)::int AS amount_yen,
+           (sum(net_yen) >= sqlc.arg(min_yen)::int OR status <> 'approved'
+            OR min(confirmed_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo') AS payable_now
+    FROM candidates
+    WHERE net_yen > 0
+    GROUP BY coach_id, status
+)
+SELECT b.coach_id, b.amount_yen, b.payable_now::boolean AS payable_now, now()::timestamptz AS evaluated_at,
+       (sqlc.arg(include_deferred)::boolean AND EXISTS (
+           SELECT 1 FROM coach_payouts p
+           WHERE p.coach_id = b.coach_id AND p.status = 'paid'
+             AND p.month = (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month')::date
+       ))::boolean AS batch_already_paid
+FROM batches b
+WHERE sqlc.arg(include_deferred)::boolean OR b.payable_now;
 
 -- name: UpsertCoachPayout :one
 -- 前の月の分の送金。同じ月の送金がまだ済んでいなければ、そこに足す。
@@ -100,7 +117,7 @@ SET payout_id = sqlc.arg(payout_id)
 WHERE coach_id = sqlc.arg(coach_id) AND payout_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
   AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
-  AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo';
+  AND confirmed_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo';
 
 -- name: ListUnpaidCoachPayouts :many
 -- まだ送金していない（前に失敗した）送金と、送り先のアカウント。運営が止めているコーチの分は、戻すまで送らない。
@@ -132,12 +149,12 @@ LIMIT 24;
 -- name: ListRecentCoachEarnings :many
 SELECT * FROM coach_earnings
 WHERE coach_id = $1
-ORDER BY created_at DESC
+ORDER BY confirmed_at DESC
 LIMIT 30;
 
 -- name: GetCoachEarningsSummary :one
 SELECT
- COALESCE(sum(e.amount_yen) FILTER (WHERE e.created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
+ COALESCE(sum(e.amount_yen) FILTER (WHERE e.confirmed_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
  COALESCE(sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)) FILTER (WHERE e.payout_id IS NULL),0)::int AS unpaid_yen
 FROM coach_earnings e WHERE e.coach_id=$1 AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded);
 

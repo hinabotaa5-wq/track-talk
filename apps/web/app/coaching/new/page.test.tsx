@@ -50,3 +50,12 @@ it("18歳以上には、保護者の許可のチェックを出さない", async
   expect(container.querySelector('input[type="checkbox"]')).toBeNull();
   expect(container.textContent).not.toContain("保護者に許可をもらいました");
 });
+
+it("支払い方法はカードだけを出し、PayPay は対応予定の案内だけを出す", async () => {
+  mocks.me = { demo: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  await render();
+  const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
+  const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
+  expect(choices).toEqual(["カード・Apple Pay・Google Pay"]);
+  expect(container.textContent).toContain("現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。");
+});

@@ -51,7 +51,7 @@ type Config struct {
 	// 契約の追加相談・やりとり欄・添削の確認質問は CoachingMessaging の側に残す。既定は停止。
 	CoachingConsultation bool
 	// CoachingTicketSales が false の間は、コーチングチケットの新規購入を止める。動画添削は都度払い
-	// （カード・PayPay）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
+	// （今はカードのみ）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
 	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
 	CoachingTicketSales bool
 	// ReviewRandomAssign が false の間は、動画添削の「おまかせ」(運営が受付中のコーチへ順番に割り当てる)を止め、

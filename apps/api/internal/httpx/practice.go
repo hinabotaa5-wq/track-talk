@@ -139,7 +139,9 @@ func (s *Server) createPractice(w http.ResponseWriter, r *http.Request, author d
 	params.AuthorID = author.ID
 	row, err := q.CreatePost(r.Context(), params)
 	if err != nil {
-		MapDBError(w, err)
+		// 同じキーの投稿を探す前に接続を返す(取引を持ったまま別の接続を待つと詰まる)。
+		_ = tx.Rollback(r.Context())
+		s.writeCreatePostError(w, r, err, params)
 		return
 	}
 	if err := savePractice(r.Context(), q, row.ID, in); err != nil {

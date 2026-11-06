@@ -11,6 +11,7 @@ import (
 // 購入ごとの宣言の記録には、証跡として、その時の宣言文と注意書きの文面・取引の金額とコーチ・
 // その時の生まれた年月・画面での表示とチェックの時刻が残る。端末の時刻が狂っていれば時刻だけ残さない。
 func TestMinorDeclarationRecordsEvidence(t *testing.T) {
+	allowPayPayForTest(t)
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)

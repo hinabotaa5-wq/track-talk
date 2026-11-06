@@ -55,10 +55,11 @@ func TestDeletingAPostRemovesItsPhotoFromCloudinary(t *testing.T) {
 		return created.ID
 	}
 	first := create(ta)
-	// 他人の写真の ID を付けた投稿を消しても、元の投稿の写真は消えない。
-	copied := create(tb)
-	if rec := doJSON(t, h, http.MethodDelete, "/v1/posts/"+copied, tb, nil); rec.Code != 204 {
-		t.Fatalf("delete copied %d", rec.Code)
+	// 他人の写真の ID を付けた投稿は作れず(#382)、断ったときも元の投稿の写真は消えない。
+	grantUpload(t, h, tb, photo)
+	rec := doJSON(t, h, http.MethodPost, "/v1/posts", tb, map[string]any{"title": "写真の投稿", "body": "", "image_public_id": photo})
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "この写真はすでに投稿されています") {
+		t.Fatalf("copied create %d %s", rec.Code, rec.Body.String())
 	}
 	select {
 	case ids := <-deleted:

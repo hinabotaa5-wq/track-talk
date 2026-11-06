@@ -24,7 +24,15 @@ it("公開文面に開発中の注記や販売終了したチケットを表示�
   expect(html).not.toMatch(/たたき台|下書き|未確定|要確認|TODO|確定していません|確定後|チケット/);
   expect(html).toContain("1,500円（税込）");
   expect(html).toContain("600円（税込）");
-  expect(html).toContain("クレジットカード・PayPay ともに申込みの時に決済が済みます");
+  // 支払方法の欄は今使える方法だけ（PayPay は載せず、対応予定の案内も入れない）。
+  expect(html).toContain("<p>クレジットカード（Apple Pay・Google Pay を含む）。1回ごとのお支払いです。</p>");
+  expect(html).not.toContain("、PayPay。");
+  expect(html).not.toContain("対応予定");
+  // 支払時期・キャンセル・返金の欄にも PayPay の条件文を残さない（支払方法がカードのみのため）。
+  expect(html).not.toContain("PayPay");
+  expect(html).toContain("フォーム添削の追加相談は、申込みの時に決済が済みます。");
+  expect(html).toContain("クレジットカードは代金の確保を取り消します。");
+  expect(html).toContain("申込みを終了し、全額を返金します。");
   expect(html).toContain("決済完了後48時間以内に受諾しなかった場合");
   expect(html).toContain("受諾後72時間以内に回答しなかった場合");
   expect(html).not.toContain("添削・追加相談が返却された時に確定");

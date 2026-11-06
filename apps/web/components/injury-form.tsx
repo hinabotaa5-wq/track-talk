@@ -11,6 +11,7 @@ import { SubmittingProgress } from "./submitting-progress";
 import type { Post } from "@/lib/types";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
 
@@ -26,6 +27,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -47,7 +49,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
       const payload = { kind: "injury", title: title.trim(), body: body.trim(), body_part: part };
       const post = initial
         ? await apiFetch<Post>(`/v1/posts/${initial.id}`, { method: "PATCH", token, body: JSON.stringify(payload) })
-        : await apiFetch<Post>(groupPart ? `/v1/injury/groups/${groupPart}/posts` : "/v1/posts", { method: "POST", token, body: JSON.stringify(payload) });
+        : await apiFetch<Post>(groupPart ? `/v1/injury/groups/${groupPart}/posts` : "/v1/posts", { method: "POST", token, body: JSON.stringify({ ...payload, request_key: postRequestKey() }) });
       clearHomeFeeds();
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
       (initial ? router.replace : router.push)(

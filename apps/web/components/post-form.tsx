@@ -14,6 +14,7 @@ import { apiFetch, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { shrinkImage } from "@/lib/shrink-image";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 import { useAuth } from "./auth-provider";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [photo, setPhoto] = useState<File | null>(null);
   const { pending, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
   const form = useForm<Values>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -97,7 +99,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         : await apiFetch<Post>("/v1/posts", {
             method: "POST",
             token,
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ ...payload, request_key: postRequestKey() }),
           });
       clearHomeFeeds();
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。

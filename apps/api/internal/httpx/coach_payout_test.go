@@ -14,23 +14,30 @@ import (
 // lastMonthJST は、日本時間の前の月の2日。
 const lastMonthJST = `(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month' + interval '1 day') AT TIME ZONE 'Asia/Tokyo'`
 
+// The last minute of the previous month in Japan, independent of the DB session time zone.
+const previousMonthEndJST = `(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 minute') AT TIME ZONE 'Asia/Tokyo'`
+
 type earningsView struct {
-	Payments       bool `json:"payments"`
-	StripeLinked   bool `json:"stripe_linked"`
-	PayoutsEnabled bool `json:"payouts_enabled"`
-	ThisMonthYen   int  `json:"this_month_yen"`
-	UnpaidYen      int  `json:"unpaid_yen"`
+	Payments       bool    `json:"payments"`
+	StripeLinked   bool    `json:"stripe_linked"`
+	NextPayoutDate *string `json:"next_payout_date"`
+	NextPayoutYen  *int    `json:"next_payout_yen"`
+	PayoutsEnabled bool    `json:"payouts_enabled"`
+	ThisMonthYen   int     `json:"this_month_yen"`
+	UnpaidYen      int     `json:"unpaid_yen"`
 	Payouts        []struct {
 		Month     string `json:"month"`
 		AmountYen int    `json:"amount_yen"`
 		Status    string `json:"status"`
 	} `json:"payouts"`
 	Earnings []struct {
-		Source       string `json:"source"`
-		GrossYen     int    `json:"gross_yen"`
-		SharePercent int    `json:"share_percent"`
-		AmountYen    int    `json:"amount_yen"`
-		Paid         bool   `json:"paid"`
+		Source       string    `json:"source"`
+		GrossYen     int       `json:"gross_yen"`
+		SharePercent int       `json:"share_percent"`
+		AmountYen    int       `json:"amount_yen"`
+		Paid         bool      `json:"paid"`
+		ConfirmedAt  time.Time `json:"confirmed_at"`
+		CreatedAt    time.Time `json:"created_at"`
 	} `json:"earnings"`
 }
 
@@ -161,7 +168,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	}
 
 	// 前の月の分になったら送る。3,000円に届かない添削の1,050円は繰り越す。
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at = `+lastMonthJST)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at = `+lastMonthJST)
 	f.failNextTransfers(1)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":0,"failed":1`) {
@@ -171,8 +178,8 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		t.Fatalf("carried over %+v", e)
 	}
 	// 1回目は Stripe が断り、次に押したときにやり直す。繰り越した分が3,000円に届いたら一緒に送る。
-	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
-		SELECT gen_random_uuid(), coach_id, source, gross_yen, share_percent, amount_yen, created_at FROM coach_earnings, generate_series(1, 3) WHERE coach_id = $1`, reviewCoach)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
+		SELECT gen_random_uuid(), coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at FROM coach_earnings, generate_series(1, 3) WHERE coach_id = $1`, reviewCoach)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1`) || !strings.Contains(rec.Body.String(), `"paid":2`) {
 		t.Fatalf("run retry %d %s", rec.Code, rec.Body.String())
@@ -343,7 +350,7 @@ func TestCoachPayoutCarriesOverOnce(t *testing.T) {
 	tadmin := adminToken(t, h)
 	coach, _ := onDutyCoach(t, h, tadmin)
 	earn := func(when string) {
-		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
 			VALUES (gen_random_uuid(), $1, 'review', 1200, 70, 840, `+when+`)`, coach)
 	}
 	run := func() string {
@@ -364,5 +371,109 @@ func TestCoachPayoutCarriesOverOnce(t *testing.T) {
 	}
 	if got := f.transferList(); len(got) != 1 || got[0].Get("amount") != "1680" {
 		t.Fatalf("transfers %v", got)
+	}
+}
+
+func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	admin := adminToken(t, h)
+	_, coach := onDutyCoach(t, h, admin)
+	_, owner := demoRequester(t, h, admin)
+	for range 3 {
+		id := paidReview(t, h, owner, "card", "pi_month_boundary_"+uuid.NewString())
+		offers := coachRequests(t, h, coach).Offers
+		if len(offers) != 1 {
+			t.Fatalf("offers %+v", offers)
+		}
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); rec.Code != http.StatusOK {
+			t.Fatalf("accept: %d %s", rec.Code, rec.Body.String())
+		}
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", coach, responseBody()); rec.Code != http.StatusOK {
+			t.Fatalf("response: %d %s", rec.Code, rec.Body.String())
+		}
+		execSQLArgs(t, `UPDATE review_requests SET returned_at = `+previousMonthEndJST+` WHERE id=$1`, id)
+	}
+	buyer, personalCoach, contract := adultAccepted(t, h)
+	checkout(t, h, buyer, contract)
+	paidSession(t, h, sessionIDFor(t, contract), "pi_personal_month_boundary", 8000)
+	execSQLArgs(t, `UPDATE coaching_contracts SET ends_at = `+previousMonthEndJST+` WHERE id=$1`, contract)
+
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"earnings_recorded":4`) {
+		t.Fatalf("tick: %d %s", rec.Code, rec.Body.String())
+	}
+	for _, tc := range []struct {
+		token string
+		total int
+	}{{coach, 3150}, {personalCoach, 6400}} {
+		view := coachEarnings(t, h, tc.token)
+		if view.ThisMonthYen != 0 || view.UnpaidYen != tc.total || len(view.Earnings) == 0 {
+			t.Fatalf("earnings %+v", view)
+		}
+		for _, earning := range view.Earnings {
+			jst := time.FixedZone("JST", 9*60*60)
+			confirmed, created := earning.ConfirmedAt.In(jst), earning.CreatedAt.In(jst)
+			if confirmed.IsZero() || created.IsZero() || confirmed.Hour() != 23 || confirmed.Minute() != 59 || !confirmed.Before(created) || confirmed.Month() == created.Month() {
+				t.Fatalf("timestamps: confirmed %v, created %v", confirmed, created)
+			}
+		}
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", admin, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":2,"paid":2`) {
+		t.Fatalf("run: %d %s", rec.Code, rec.Body.String())
+	}
+	if transfers := f.transferList(); len(transfers) != 2 {
+		t.Fatalf("transfers: %d", len(transfers))
+	}
+}
+
+func assertPayoutPreview(t *testing.T, view earningsView, amount int, deferred bool) {
+	t.Helper()
+	if amount == 0 {
+		if view.NextPayoutDate != nil || view.NextPayoutYen != nil {
+			t.Fatalf("expected null payout preview: %+v", view)
+		}
+		return
+	}
+	var date string
+	queryRowArgs(t, `SELECT to_char(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') + interval '14 days' +
+		CASE WHEN $1::boolean OR extract(day FROM now() AT TIME ZONE 'Asia/Tokyo') > 15
+		THEN interval '1 month' ELSE interval '0' END, 'YYYY-MM-DD')`, []any{deferred}, &date)
+	if view.NextPayoutDate == nil || *view.NextPayoutDate != date || view.NextPayoutYen == nil || *view.NextPayoutYen != amount {
+		t.Fatalf("preview date=%v yen=%v, want %s / %d", view.NextPayoutDate, view.NextPayoutYen, date, amount)
+	}
+}
+
+func TestCoachPayoutPreviewCases(t *testing.T) {
+	for _, tc := range []struct {
+		name, confirmedAt, status string
+		amount, expected          int
+		deferred, unlinked        bool
+	}{
+		{name: "A", confirmedAt: lastMonthJST, amount: 3150, expected: 3150},
+		{name: "B", confirmedAt: lastMonthJST, amount: 1050, expected: 1050, deferred: true},
+		{name: "C", confirmedAt: lastMonthJST + ` - interval '1 month'`, amount: 1050, expected: 1050},
+		{name: "D", confirmedAt: previousMonthEndJST, amount: 3150, expected: 3150},
+		{name: "open month", confirmedAt: "now()", amount: 3150},
+		{name: "no account", confirmedAt: lastMonthJST, amount: 3150, unlinked: true},
+		{name: "suspended", confirmedAt: lastMonthJST, amount: 3150, status: "suspended"},
+		{name: "final settlement", confirmedAt: lastMonthJST, amount: 1050, expected: 1050, status: "ended"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, _ := setupStripe(t)
+			coach, tok := onDutyCoach(t, h, adminToken(t, h))
+			execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
+				VALUES (gen_random_uuid(), $1, 'review', $2, 70, $2, `+tc.confirmedAt+`)`, coach, tc.amount)
+			if tc.unlinked {
+				execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id=NULL, payouts_enabled=false WHERE profile_id=$1`, coach)
+			}
+			if tc.status != "" {
+				execSQLArgs(t, `UPDATE coach_profiles SET status=$2, on_duty=false WHERE profile_id=$1`, coach, tc.status)
+			}
+			view := coachEarnings(t, h, tok)
+			assertPayoutPreview(t, view, tc.expected, tc.deferred)
+			if tc.name == "D" && view.ThisMonthYen != 0 {
+				t.Fatalf("previous month's earning in current total: %d", view.ThisMonthYen)
+			}
+		})
 	}
 }

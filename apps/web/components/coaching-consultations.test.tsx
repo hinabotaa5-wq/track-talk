@@ -83,6 +83,18 @@ it("18歳以上には、保護者の許可のチェックを出さない", async
  expect(container.querySelector('input[type="checkbox"]')).toBeNull();
  expect(button("お支払いへ")?.disabled).toBe(false);
 });
+const payNotice = "現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。";
+it("動画添削のあとの追加相談をその場で払うときは、カードのみの案内を出す", async () => {
+ await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
+ expect(container.textContent?.split(payNotice).length).toBe(3);
+});
+it("チケットで払う追加相談とサポートプランの追加相談には、カードのみの案内を出さない", async () => {
+ await render();
+ expect(container.textContent).not.toContain(payNotice);
+ await act(async () => root.unmount()); root = createRoot(container);
+ await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] }, undefined, "contract");
+ expect(container.textContent).not.toContain(payNotice);
+});
 it("保護者は閲覧と支払いができ、新しい有料質問は作れない", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [{ ...draft, funding: "cash", minor: true, payer: "guardian", status: "awaiting_payment" }] }, "guardian-secret");
  expect(container.querySelector("textarea")).toBeNull();

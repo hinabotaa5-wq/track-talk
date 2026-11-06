@@ -49,7 +49,8 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   expect(text).toContain("業務委託の報酬");
   expect(text).toContain("1,050円");
   expect(text).toContain("420円");
-  expect(text).toContain("前の月の末日までに確定した報酬をまとめて、その月の15日ごろ");
+  expect(text).toContain("報酬の支払期日：報酬は、毎月末日をもって締め切り、翌月15日に支払います。支払対象額（各締切日時点で確定している報酬の合計額をいい、繰り越された額を含みます）が3,000円未満の場合は、その額を翌月に1回に限り繰り越し、翌々月15日に、金額にかかわらず支払います。");
+  expect(text).not.toContain("15日ごろ");
   expect(text).toContain("3,000円に満たない場合");
   expect(text).toContain("繰り越しは1回まで");
   expect(text).toContain("金額にかかわらず次の支払日に支払います");
@@ -65,7 +66,7 @@ it("サポートプランは、当事者・債権の帰属・代理受領・債�
   expect(text).toContain("支払義務は消滅します");
   expect(text).toContain("重ねて請求することはできません");
   expect(text).toContain("手数料20%を差し引いた残り");
-  expect(text).toContain("前の月の末日までに確定した分をまとめて、その月の15日ごろ");
+  expect(text).toContain("前の月の末日までに確定した分をまとめて、その月の15日");
   expect(text).toContain("費用と事務の負担を抑えて");
   expect(text).toContain("まだ支払っていない額を記録して管理");
   expect(text).toContain("返金とキャンセル");
@@ -73,6 +74,17 @@ it("サポートプランは、当事者・債権の帰属・代理受領・債�
   expect(text).toContain("コーチをやめる場合の精算");
   // 現行の運用で分けて管理していないので、分別管理は約束しない。
   expect(text).not.toContain("分別");
+});
+
+it("サポートプランの返金に伴う精算は、支払済みの報酬相当額の返還・次回以降の支払額からの控除と通知・内訳の説明を定める", () => {
+  const text = article(9);
+  expect(text).toContain("購入者への返金に伴う精算");
+  expect(text).toContain("その返金に対応する報酬相当額を返還しなければなりません");
+  expect(text).toContain("次回以降の報酬その他の支払額から控除することができます");
+  expect(text).toContain("控除の対象と金額をコーチに通知します");
+  expect(text).toContain("運営者に内訳の説明を求めることができます");
+  // 第8条の次に置き、後ろの条は1つずつ繰り下げる。
+  expect(renderToStaticMarkup(<TermsPage />)).toContain("第17条（規約の変更・準拠法・連絡）");
 });
 
 it("追加相談の購入画面は、1回限りであることと契約の相手を示す", () => {

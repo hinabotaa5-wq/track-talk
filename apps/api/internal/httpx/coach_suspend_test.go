@@ -153,7 +153,7 @@ func TestAdminSuspendCoachHoldsPayouts(t *testing.T) {
 	coach, _ := onDutyCoach(t, h, tadmin)
 	other, _ := onDutyCoach(t, h, tadmin)
 	for _, id := range []uuid.UUID{coach, other} {
-		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
 			VALUES (gen_random_uuid(), $1, 'review', 6000, 70, 4200, `+lastMonthJST+`)`, id)
 	}
 	run := func() string {
@@ -193,7 +193,7 @@ func TestAdminEndSuspendedCoachSettlesPayouts(t *testing.T) {
 	held, _ := onDutyCoach(t, h, tadmin)
 	// どちらも最低額（3,000円）に届かない報酬。
 	for _, id := range []uuid.UUID{ended, held} {
-		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+		execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
 			VALUES (gen_random_uuid(), $1, 'review', 1500, 70, 1050, `+lastMonthJST+`)`, id)
 		if rec := doJSON(t, h, http.MethodPost, coachSuspendPath(id, "suspend"), tadmin, nil); rec.Code != http.StatusOK {
 			t.Fatalf("suspend %d %s", rec.Code, rec.Body.String())
@@ -330,7 +330,7 @@ func TestAdminEndCoachNeedsPayoutAccount(t *testing.T) {
 	tadmin := adminToken(t, h)
 	other, _ := onDutyCoach(t, h, tadmin)
 	execSQLArgs(t, `UPDATE coach_profiles SET payouts_enabled = false, stripe_account_id = NULL WHERE profile_id = $1`, other)
-	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen) VALUES (gen_random_uuid(), $1, 'review', 1000, 70, 700)`, other)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at) VALUES (gen_random_uuid(), $1, 'review', 1000, 70, 700, now())`, other)
 	if rec := doJSON(t, h, http.MethodPost, coachSuspendPath(other, "suspend"), tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("suspend other %d %s", rec.Code, rec.Body.String())
 	}

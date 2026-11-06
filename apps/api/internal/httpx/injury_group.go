@@ -333,6 +333,9 @@ func (s *Server) createInjuryGroupPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if s.replayPost(w, r, p.ID, params.RequestKey) {
+		return
+	}
 	if in.BodyPart != part {
 		FieldError(w, map[string]string{"body_part": "グループのケガと投稿のケガが合っていません"})
 		return

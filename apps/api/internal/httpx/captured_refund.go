@@ -520,69 +520,82 @@ func jsonRows(rows pgx.Rows) ([]json.RawMessage, error) {
 	return out, rows.Err()
 }
 
-// Apply oldest debt to oldest eligible earnings under LockCoachPayouts.
-// Applications without a payout represent a zero/carry month; link on the next positive payout.
-func applyCoachRefundOffsets(ctx context.Context, tx pgx.Tx) error {
-	rows, err := tx.Query(ctx, `SELECT id,coach_id,amount_yen-applied_yen-COALESCE((SELECT sum(c.amount_yen) FROM coach_refund_cancellations c WHERE c.adjustment_id=coach_refund_adjustments.id),0)::int FROM coach_refund_adjustments WHERE applied_yen<amount_yen AND NOT EXISTS(SELECT 1 FROM coach_refund_cancellations c WHERE c.adjustment_id=coach_refund_adjustments.id) AND coach_id IS NOT NULL ORDER BY created_at,id FOR UPDATE`)
+type coachRefundOffset struct {
+	adjustmentID, earningID uuid.UUID
+	amount                  int
+}
+
+// planCoachRefundOffsets allocates oldest debt to oldest eligible earnings.
+// The send path holds the payout lock and locks the rows it will update.
+func planCoachRefundOffsets(ctx context.Context, tx pgx.Tx, coachID *uuid.UUID, lock bool) ([]coachRefundOffset, error) {
+	lockClause := ""
+	if lock {
+		lockClause = " FOR UPDATE"
+	}
+	rows, err := tx.Query(ctx, `SELECT id,coach_id,amount_yen-applied_yen-COALESCE((SELECT sum(c.amount_yen) FROM coach_refund_cancellations c WHERE c.adjustment_id=coach_refund_adjustments.id),0)::int FROM coach_refund_adjustments WHERE applied_yen<amount_yen AND NOT EXISTS(SELECT 1 FROM coach_refund_cancellations c WHERE c.adjustment_id=coach_refund_adjustments.id) AND coach_id IS NOT NULL AND ($1::uuid IS NULL OR coach_id=$1) ORDER BY created_at,id`+lockClause, coachID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	type debt struct {
 		id, coach uuid.UUID
 		remaining int
 	}
-	var debts []debt
-	for rows.Next() {
+	debts, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (debt, error) {
 		var d debt
-		if err := rows.Scan(&d.id, &d.coach, &d.remaining); err != nil {
-			rows.Close()
-			return err
-		}
-		debts = append(debts, d)
-	}
-	err = rows.Err()
-	rows.Close()
+		err := row.Scan(&d.id, &d.coach, &d.remaining)
+		return d, err
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	var plan []coachRefundOffset
+	allocated := make(map[uuid.UUID]int)
 	for _, d := range debts {
-		rows, err := tx.Query(ctx, `SELECT e.id,e.amount_yen-COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)::int FROM coach_earnings e WHERE e.coach_id=$1 AND e.payout_id IS NULL AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id))) AND e.created_at<date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo' AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded) ORDER BY e.created_at,e.id FOR UPDATE`, d.coach)
+		rows, err := tx.Query(ctx, `SELECT e.id,e.amount_yen-COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)::int FROM coach_earnings e WHERE e.coach_id=$1 AND e.payout_id IS NULL AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id))) AND e.confirmed_at<date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo' AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded) ORDER BY e.created_at,e.id`+lockClause, d.coach)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		type available struct {
 			id     uuid.UUID
 			amount int
 		}
-		var earns []available
-		for rows.Next() {
+		earnings, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (available, error) {
 			var e available
-			if err := rows.Scan(&e.id, &e.amount); err != nil {
-				rows.Close()
-				return err
-			}
-			earns = append(earns, e)
-		}
-		err = rows.Err()
-		rows.Close()
+			err := row.Scan(&e.id, &e.amount)
+			return e, err
+		})
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, e := range earns {
-			n := min(d.remaining, e.amount)
+		for _, e := range earnings {
+			n := min(d.remaining, e.amount-allocated[e.id])
 			if n <= 0 {
 				continue
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO coach_refund_applications(id,adjustment_id,earning_id,amount_yen) VALUES($1,$2,$3,$4)`, uuid.New(), d.id, e.id, n); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `UPDATE coach_refund_adjustments SET applied_yen=applied_yen+$2 WHERE id=$1`, d.id, n); err != nil {
-				return err
-			}
+			plan = append(plan, coachRefundOffset{d.id, e.id, n})
+			allocated[e.id] += n
 			d.remaining -= n
 			if d.remaining == 0 {
 				break
 			}
+		}
+	}
+	return plan, nil
+}
+
+// Applications without a payout represent a zero/carry month; link on the next positive payout.
+func applyCoachRefundOffsets(ctx context.Context, tx pgx.Tx) error {
+	plan, err := planCoachRefundOffsets(ctx, tx, nil, true)
+	if err != nil {
+		return err
+	}
+	for _, offset := range plan {
+		if _, err := tx.Exec(ctx, `INSERT INTO coach_refund_applications(id,adjustment_id,earning_id,amount_yen) VALUES($1,$2,$3,$4)`, uuid.New(), offset.adjustmentID, offset.earningID, offset.amount); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE coach_refund_adjustments SET applied_yen=applied_yen+$2 WHERE id=$1`, offset.adjustmentID, offset.amount); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -632,7 +645,7 @@ func compensateFailedRefund(ctx context.Context, tx pgx.Tx, f capturedRefund) er
 				continue
 			}
 			earning := uuid.New()
-			if _, err := tx.Exec(ctx, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen) VALUES($1,$2,'refund_compensation',$3,100,$3)`, earning, d.coach, d.applied); err != nil {
+			if _, err := tx.Exec(ctx, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen, confirmed_at) VALUES($1,$2,'refund_compensation',$3,100,$3, now())`, earning, d.coach, d.applied); err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO coach_refund_compensations(id,adjustment_id,refund_id,earning_id,amount_yen) VALUES($1,$2,$3,$4,$5)`, uuid.New(), d.id, f.ID, earning, d.applied); err != nil {

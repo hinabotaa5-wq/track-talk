@@ -16,6 +16,7 @@ func setupCoachChoice(t *testing.T) (http.Handler, *fakeStripe) {
 	return setupStripeConfig(t, func(c *config.Config) { c.ReviewRandomAssign = false })
 }
 
+// PayPay を選んだときは、この申込みの間だけ PayPay を受け付ける（createReviewWith）。
 func chosenReview(t *testing.T, h http.Handler, tu, coach, method string, tickets bool) string {
 	t.Helper()
 	b := reviewBodyFor(t, h, tu)
@@ -24,7 +25,7 @@ func chosenReview(t *testing.T, h http.Handler, tu, coach, method string, ticket
 	b["requested_coach_id"] = coach
 	// 18歳未満の購入のたびの宣言。18歳以上には使われない。
 	b["guardian_permission"] = true
-	r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, b)
+	r := createReviewWith(t, h, tu, method, b)
 	if r.Code != 201 {
 		t.Fatalf("create %d %s", r.Code, r.Body.String())
 	}
@@ -319,7 +320,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 	if len(f.transferList()) != 0 {
 		t.Fatal("transferred per sale")
 	}
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at = `+lastMonthJST)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at = `+lastMonthJST)
 	if r := doJSON(t, h, "POST", "/v1/admin/coaching/payouts/run", admin, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}

@@ -14,6 +14,7 @@ import type { Post } from "@/lib/types";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { fromJstInput, toJstInput } from "@/lib/format";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
 
@@ -33,6 +34,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
   const [body, setBody] = useState(initial?.body ?? "");
   const [error, setError] = useState("");
   const { pending: submitting, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
 
   async function onSubmit(formEvent: FormEvent) {
     formEvent.preventDefault();
@@ -83,7 +85,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
         : await apiFetch<Post>("/v1/posts", {
             method: "POST",
             token,
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ ...payload, request_key: postRequestKey() }),
           });
       clearHomeFeeds();
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。

@@ -1,0 +1,1 @@
+DROP INDEX posts_cloudinary_public_id_active_idx;

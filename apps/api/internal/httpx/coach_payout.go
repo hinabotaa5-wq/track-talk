@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/hinata/track-talk/apps/api/internal/stripe"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -100,11 +103,28 @@ func payoutJSON(p db.CoachPayout) map[string]any {
 
 // coachEarnings は、コーチの画面の「報酬」。口座登録の状態、今月と未送金の報酬、送金の記録。
 func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
-	coach, ok := s.approvedCoach(w, r)
+	profile, ok := s.requireProfile(w, r)
 	if !ok {
 		return
 	}
-	coach = s.refreshPayoutsEnabled(r.Context(), coach)
+	ctx := r.Context()
+	coach, err := s.q.GetCoachProfile(ctx, profile.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && coach.Status != "approved" && coach.Status != "suspended" && coach.Status != "ended") {
+		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけが使えます")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if coach.Status == "approved" {
+		coach = s.refreshPayoutsEnabled(ctx, coach)
+	}
+	date, yen, err := s.previewCoachPayout(ctx, coach)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	summary, err := s.q.GetCoachEarningsSummary(r.Context(), &coach.ProfileID)
 	if err != nil {
 		MapDBError(w, err)
@@ -128,22 +148,67 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 	for _, e := range earnings {
 		outEarnings = append(outEarnings, map[string]any{
 			"id": e.ID, "source": e.Source, "gross_yen": e.GrossYen, "share_percent": e.SharePercent,
-			"amount_yen": e.AmountYen, "paid": e.PayoutID != nil, "created_at": e.CreatedAt,
+			"amount_yen": e.AmountYen, "paid": e.PayoutID != nil, "created_at": e.CreatedAt, "confirmed_at": e.ConfirmedAt,
 		})
 	}
 	JSON(w, http.StatusOK, map[string]any{
 		// payments が false のあいだは支払いなしのデモ版。
-		"payments":        s.stripe.Configured(),
-		"stripe_linked":   coach.StripeAccountID != nil,
-		"payouts_enabled": coach.PayoutsEnabled,
-		"review_share":    reviewSharePercent,
-		"personal_fee":    personalFeePercent,
-		"min_payout_yen":  minPayoutYen,
-		"this_month_yen":  summary.ThisMonthYen,
-		"unpaid_yen":      summary.UnpaidYen,
-		"payouts":         outPayouts,
-		"earnings":        outEarnings,
+		"payments":         s.stripe.Configured(),
+		"stripe_linked":    coach.StripeAccountID != nil,
+		"payouts_enabled":  coach.PayoutsEnabled,
+		"review_share":     reviewSharePercent,
+		"personal_fee":     personalFeePercent,
+		"min_payout_yen":   minPayoutYen,
+		"this_month_yen":   summary.ThisMonthYen,
+		"unpaid_yen":       summary.UnpaidYen,
+		"next_payout_date": date,
+		"next_payout_yen":  yen,
+		"payouts":          outPayouts,
+		"earnings":         outEarnings,
 	})
+}
+
+// previewCoachPayout uses a consistent snapshot for the offset plan and payout query.
+func (s *Server) previewCoachPayout(ctx context.Context, coach db.CoachProfile) (*string, *int32, error) {
+	if !s.stripe.Configured() || coach.Status == "suspended" || !coach.PayoutsEnabled || coach.StripeAccountID == nil {
+		return nil, nil, nil
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback(context.Background())
+
+	plan, err := planCoachRefundOffsets(ctx, tx, &coach.ProfileID, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	offsets := make(map[string]int)
+	for _, offset := range plan {
+		offsets[offset.earningID.String()] += offset.amount
+	}
+	projected, err := json.Marshal(offsets)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows, err := db.New(tx).ListPayableCoachEarnings(ctx, db.ListPayableCoachEarningsParams{
+		CoachID: &coach.ProfileID, MinYen: minPayoutYen, IncludeDeferred: true, ProjectedOffsets: projected,
+	})
+	if err != nil || len(rows) == 0 {
+		return nil, nil, err
+	}
+	row := rows[0]
+	date := nextCoachPayoutDate(row.EvaluatedAt, row.PayableNow && !row.BatchAlreadyPaid)
+	return &date, &row.AmountYen, nil
+}
+
+func nextCoachPayoutDate(now time.Time, payableThisMonth bool) string {
+	now = now.In(jst.Zone)
+	month := now.Month()
+	if !payableThisMonth || now.Day() > stripe.PayoutMonthlyAnchor {
+		month++
+	}
+	return time.Date(now.Year(), month, stripe.PayoutMonthlyAnchor, 0, 0, 0, 0, jst.Zone).Format(time.DateOnly)
 }
 
 // recordCoachEarnings は、返却した添削と、終わったパーソナル指導の報酬を記録する（tick から）。
@@ -189,7 +254,7 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 		if err := applyCoachRefundOffsets(ctx, tx); err != nil {
 			return err
 		}
-		rows, err := q.ListPayableCoachEarnings(ctx, minPayoutYen)
+		rows, err := q.ListPayableCoachEarnings(ctx, db.ListPayableCoachEarningsParams{MinYen: minPayoutYen})
 		if err != nil {
 			return err
 		}

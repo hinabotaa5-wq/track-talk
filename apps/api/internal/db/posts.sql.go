@@ -177,25 +177,26 @@ const createPost = `-- name: CreatePost :one
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id,
-    instagram_type, instagram_shortcode, x_post_id, source_title
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    instagram_type, instagram_shortcode, x_post_id, source_title, request_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, x_post_id, source_title, like_count, comment_count, created_at, updated_at
 `
 
 type CreatePostParams struct {
-	ID                  uuid.UUID `json:"id"`
-	AuthorID            uuid.UUID `json:"author_id"`
-	Title               string    `json:"title"`
-	Body                string    `json:"body"`
-	Kind                string    `json:"kind"`
-	YoutubeVideoID      *string   `json:"youtube_video_id"`
-	YoutubeThumbnailUrl *string   `json:"youtube_thumbnail_url"`
-	YoutubeShorts       bool      `json:"youtube_shorts"`
-	CloudinaryPublicID  *string   `json:"cloudinary_public_id"`
-	InstagramType       *string   `json:"instagram_type"`
-	InstagramShortcode  *string   `json:"instagram_shortcode"`
-	XPostID             *string   `json:"x_post_id"`
-	SourceTitle         *string   `json:"source_title"`
+	ID                  uuid.UUID  `json:"id"`
+	AuthorID            uuid.UUID  `json:"author_id"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Kind                string     `json:"kind"`
+	YoutubeVideoID      *string    `json:"youtube_video_id"`
+	YoutubeThumbnailUrl *string    `json:"youtube_thumbnail_url"`
+	YoutubeShorts       bool       `json:"youtube_shorts"`
+	CloudinaryPublicID  *string    `json:"cloudinary_public_id"`
+	InstagramType       *string    `json:"instagram_type"`
+	InstagramShortcode  *string    `json:"instagram_shortcode"`
+	XPostID             *string    `json:"x_post_id"`
+	SourceTitle         *string    `json:"source_title"`
+	RequestKey          *uuid.UUID `json:"request_key"`
 }
 
 type CreatePostRow struct {
@@ -233,6 +234,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.InstagramShortcode,
 		arg.XPostID,
 		arg.SourceTitle,
+		arg.RequestKey,
 	)
 	var i CreatePostRow
 	err := row.Scan(
@@ -436,6 +438,28 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getPostByRequestKey = `-- name: GetPostByRequestKey :one
+SELECT id, deleted_at FROM posts WHERE author_id = $1 AND request_key = $2
+`
+
+type GetPostByRequestKeyParams struct {
+	AuthorID   uuid.UUID  `json:"author_id"`
+	RequestKey *uuid.UUID `json:"request_key"`
+}
+
+type GetPostByRequestKeyRow struct {
+	ID        uuid.UUID  `json:"id"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
+
+// 同じ request_key で既に作った投稿を探す(#382)。削除済みでも返し、呼び出し側で扱いを決める。
+func (q *Queries) GetPostByRequestKey(ctx context.Context, arg GetPostByRequestKeyParams) (GetPostByRequestKeyRow, error) {
+	row := q.db.QueryRow(ctx, getPostByRequestKey, arg.AuthorID, arg.RequestKey)
+	var i GetPostByRequestKeyRow
+	err := row.Scan(&i.ID, &i.DeletedAt)
 	return i, err
 }
 

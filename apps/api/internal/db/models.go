@@ -88,6 +88,7 @@ type CoachEarning struct {
 	PayoutID        *uuid.UUID `json:"payout_id"`
 	CreatedAt       time.Time  `json:"created_at"`
 	ConsultationID  *uuid.UUID `json:"consultation_id"`
+	ConfirmedAt     time.Time  `json:"confirmed_at"`
 }
 
 type CoachIdentityAccessLog struct {
@@ -880,6 +881,7 @@ type Post struct {
 	SourceTitle         *string    `json:"source_title"`
 	YoutubeShorts       bool       `json:"youtube_shorts"`
 	XPostID             *string    `json:"x_post_id"`
+	RequestKey          *uuid.UUID `json:"request_key"`
 }
 
 type PostLike struct {

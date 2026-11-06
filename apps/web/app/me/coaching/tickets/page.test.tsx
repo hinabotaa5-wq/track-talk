@@ -87,7 +87,7 @@ it("利用設定の案内を表示せず、購入できない場合は購入を�
 it("販売を止めている間は商品と購入ボタンを出さず、終了の案内と残高だけを出す", async () => {
   mocks.api.mockResolvedValue({
     ...initial, products: [], can_purchase: false, sales_open: false, balance: { available: 3, reserved: 0 },
-    purchase_block_reason: "チケットの新規販売は終了しました。動画添削とそのあとの追加相談は申込み時にカードまたはPayPayで、サポートプランの追加相談は申込み時にカードでお支払いください",
+    purchase_block_reason: "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください",
   });
   await render();
   expect(container.textContent).toContain("新規販売は終了しました");

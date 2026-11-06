@@ -33,7 +33,6 @@ func sameMethods(got []string, want ...string) bool {
 }
 
 // サポートプランの契約とその追加相談の支払い画面はカードだけ。PayPay を有効にしても出ない。
-// 動画添削のあとの追加相談は、これまでどおりカードと PayPay。
 func TestSupportPlanPaymentIsCardOnly(t *testing.T) {
 	h, f, reviewOwner, _, reviewRoot := answeredCashReviewRoom(t, nil)
 
@@ -56,14 +55,14 @@ func TestSupportPlanPaymentIsCardOnly(t *testing.T) {
 		t.Fatalf("contract consultation methods %v", got)
 	}
 
-	// 動画添削のあとの追加相談は変えない。
+	// 動画添削のあとの追加相談も現在はカードのみ。
 	rc := consultationDraft(t, h, reviewOwner, "/v1/coaching/requests/"+reviewRoot+"/consultations", uuid.NewString(), "添削の相談")
 	consultationAction(t, h, reviewOwner, rc.ID, "submit", nil)
 	form = f.lastSession()
 	if form.Get("metadata[consultation_id]") != rc.ID {
 		t.Fatalf("review consultation session %v", form)
 	}
-	if got := paymentMethodTypes(form); !sameMethods(got, "card", "paypay") {
+	if got := paymentMethodTypes(form); !sameMethods(got, "card") {
 		t.Fatalf("review consultation methods %v", got)
 	}
 }

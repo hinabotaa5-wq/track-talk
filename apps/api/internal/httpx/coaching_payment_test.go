@@ -300,6 +300,13 @@ func TestCoachingPaymentStartsTheContract(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/checkout", other, nil); rec.Code != http.StatusNotFound {
 		t.Fatalf("other checkout %d", rec.Code)
 	}
+	// API に PayPay を指定しても、サポートプランの Stripe セッションはカードのみ。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/checkout", tu, map[string]any{"payment_method": "paypay"}); rec.Code != http.StatusOK {
+		t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
+	}
+	if form := f.lastSession(); form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" {
+		t.Fatalf("support plan must only allow card: %v", form)
+	}
 	first := checkout(t, h, tu, id)
 	if again := checkout(t, h, tu, id); again != first || len(f.sessions) != 1 {
 		t.Fatalf("reuse %q %q %d", first, again, len(f.sessions))
