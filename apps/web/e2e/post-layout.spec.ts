@@ -58,6 +58,35 @@ test("詳細文を動画より上に大きく太字で表示し、枠を付け�
   expect(style).toEqual({ font: "18px", weight: "700", border: "0px" });
   await page.screenshot({ path: test.info().outputPath("post-detail.png") });
 });
+test("投稿動画を通常どおり再生できる", async ({ page }) => {
+  await page.goto(`/posts/${post.id}?from=me`);
+  const video = page.locator("main video");
+  await expect(video).toHaveJSProperty("controls", true);
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThan(0);
+  await video.press("Space");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+});
+test("動画の読み込みに失敗しても投稿詳細を開き直さずに再試行できる", async ({ page }) => {
+  let offline = true;
+  await page.route("**/samples/vertical.mp4", (route) => offline ? route.abort("internetdisconnected") : route.continue());
+  await page.goto(`/posts/${post.id}?from=me`);
+  const video = page.locator("main video");
+  const error = page.getByRole("alert").filter({ hasText: "動画を再生できませんでした。" });
+  const retry = page.getByRole("button", { name: "再試行", exact: true });
+  await expect(error).toBeVisible();
+  const mediaFailed = page.waitForEvent("requestfailed", {
+    predicate: (request) => request.url().endsWith("/samples/vertical.mp4"),
+  });
+  await retry.click();
+  await mediaFailed;
+  await expect(error).toBeVisible();
+
+  offline = false;
+  await retry.click();
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+  await expect(error).toHaveCount(0);
+  await expect(video).toHaveJSProperty("controls", true);
+});
 test("320pxのチャットで長文を小さく折り返し、横にはみ出さない", async ({ page }) => {
   await page.goto(`/posts/${post.id}?room=long-comment`);
   const bubble = page.locator("#comment-long-comment p");
