@@ -231,7 +231,11 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await expect(page).toHaveURL(/posts\/horizontal-12$/);
   await page.getByRole("button", { name: "戻る", exact: true }).click();
   await expect(canvas).toHaveAttribute("data-count", "12");
-  await expect.poll(async () => Math.abs((await opened.boundingBox())!.x - openedX)).toBeLessThan(3);
+  // 件数の復元後、横位置が戻って対象カードが描画されるまで待つ。
+  await expect.poll(async () => {
+    const bounds = await opened.boundingBox();
+    return bounds ? Math.abs(bounds.x - openedX) : Infinity;
+  }).toBeLessThan(3);
 });
 
 test("レビューは商品を縦スクロールで見られる", async ({ page }) => {
