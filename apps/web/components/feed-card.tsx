@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Link from "next/link";
 import type { Post } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -22,17 +23,19 @@ export function feedTitle(title: string) {
   return title.trim();
 }
 
-function CardCaption({ text }: { text: string }) {
+// 横長サムネイルは高さが低く、詳細文の帯が画像の大半を覆ってしまうため、
+// 帯の上余白を小さくして画像の下端に寄せ、横長のときは1行に収める。
+function CardCaption({ text, landscape }: { text: string; landscape: boolean }) {
   return (
-    <div className="feed-card-caption absolute inset-x-0 bottom-0 isolate px-3.5 pb-3 pt-8">
+    <div className="feed-card-caption absolute inset-x-0 bottom-0 isolate px-3 pb-1.5 pt-2">
       <span aria-hidden="true" className="feed-card-caption-background pointer-events-none absolute inset-0 -z-10"
         style={{
-          background: "linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.5) 65%, transparent)",
+          background: "rgb(0 0 0 / 0.6)",
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-          maskImage: "linear-gradient(to top, black 65%, transparent)",
-          WebkitMaskImage: "linear-gradient(to top, black 65%, transparent)",
+          maskImage: "linear-gradient(to top, black calc(100% - 0.5rem), transparent)",
+          WebkitMaskImage: "linear-gradient(to top, black calc(100% - 0.5rem), transparent)",
         }} />
-      <p className="relative line-clamp-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm font-medium leading-snug text-pure-white">{text}</p>
+      <p className={`relative ${landscape ? "line-clamp-1" : "line-clamp-3"} whitespace-pre-wrap [overflow-wrap:anywhere] text-sm font-medium leading-snug text-pure-white`}>{text}</p>
     </div>
   );
 }
@@ -46,6 +49,7 @@ function KindBadge({ children }: { children: string }) {
 }
 
 export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
+  const [landscapeSrc, setLandscapeSrc] = useState("");
   const title = feedTitle(post.title);
   const description = feedTitle(post.body ?? "") || feedTitle(post.excerpt ?? "") || title;
   const thumbnail = post.thumbnail_url || (post.kind === "youtube" && post.youtube_video_id
@@ -126,17 +130,25 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         ) : null}
         {thumbnail ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbnail} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
+          <img src={thumbnail} alt="" loading="lazy" decoding="async" className="block h-auto w-full"
+            ref={(image) => { if (image?.complete) markOrientation(image, setLandscapeSrc); }}
+            onLoad={(event) => markOrientation(event.currentTarget, setLandscapeSrc)} />
         ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
           <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={description || "Instagram"} />
         ) : (
           <PosterFallback title={description} />
         )}
-        {hasThumbnail && description ? <CardCaption text={description} /> : null}
+        {hasThumbnail && description ? <CardCaption text={description} landscape={Boolean(thumbnail) && landscapeSrc === thumbnail} /> : null}
       </div>
       <CardPending />
     </Link>
   );
+}
+
+// 読み込んだ画像が横長なら、その URL を覚えておく(サムネイルが差し替わったら縦長扱いに戻る)。
+function markOrientation(image: HTMLImageElement, setLandscapeSrc: (src: string) => void) {
+  if (image.naturalWidth === 0) return;
+  setLandscapeSrc(image.naturalWidth > image.naturalHeight ? image.getAttribute("src") ?? "" : "");
 }
 
 function formatPracticeTime(iso: string) {
