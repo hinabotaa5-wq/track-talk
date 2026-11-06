@@ -881,6 +881,7 @@ type Post struct {
 	SourceTitle         *string    `json:"source_title"`
 	YoutubeShorts       bool       `json:"youtube_shorts"`
 	XPostID             *string    `json:"x_post_id"`
+	RequestKey          *uuid.UUID `json:"request_key"`
 }
 
 type PostLike struct {

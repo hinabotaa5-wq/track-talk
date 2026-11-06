@@ -15,6 +15,7 @@ import { apiFetch, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { shrinkImage } from "@/lib/shrink-image";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useAuth } from "./auth-provider";
 
@@ -52,6 +53,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const { pending: submitting, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
   const filesRef = useRef(files);
 
   useEffect(() => {
@@ -150,7 +152,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         : await apiFetch<Post>("/v1/posts", {
             method: "POST",
             token,
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ ...payload, request_key: postRequestKey() }),
           });
       clearHomeFeeds();
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。

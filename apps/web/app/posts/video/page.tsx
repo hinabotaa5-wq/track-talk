@@ -16,6 +16,7 @@ import {
 import type { Post } from "@/lib/types";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -52,6 +53,7 @@ export default function OwnVideoPage() {
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const { pending: submitting, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
 
   // 署名の取得（POST /v1/uploads/video）は発行のたびに1日の上限に数えられるので、同時に2回は取りにいかない。
   // pendingSign: 取得中の1件。owner はその署名を使う予定のアップロード（null は先読みで、まだ誰のものでもない）。
@@ -236,6 +238,7 @@ export default function OwnVideoPage() {
           body,
           kind: "video",
           video_public_id: uploaded.current.id,
+          request_key: postRequestKey(),
         }),
       });
       clearHomeFeeds();
