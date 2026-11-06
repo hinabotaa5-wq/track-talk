@@ -14,6 +14,7 @@ import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProg
 import type { Post } from "@/lib/types";
 import { clearHomeFeeds } from "@/lib/home-feed-cache";
 import { useActionLock } from "@/lib/use-action-lock";
+import { usePostRequestKey } from "@/lib/use-post-request-key";
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -28,6 +29,7 @@ export default function OwnVideoPage() {
   const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const { pending: submitting, acquire, release } = useActionLock();
+  const postRequestKey = usePostRequestKey();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,6 +76,7 @@ export default function OwnVideoPage() {
           body,
           kind: "video",
           video_public_id: publicId,
+          request_key: postRequestKey(),
         }),
       });
       clearHomeFeeds();

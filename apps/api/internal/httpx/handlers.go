@@ -507,6 +507,9 @@ type postReq struct {
 	Capacity            int      `json:"capacity"`
 	Prefecture          string   `json:"prefecture"`
 	BodyPart            string   `json:"body_part"`
+	// RequestKey は投稿の意図ごとに Web が作る UUID(#382)。再試行では同じ値を送る。
+	// 送られなければ従来どおり毎回新しく作る。
+	RequestKey *uuid.UUID `json:"request_key"`
 }
 
 func (s *Server) parsePostReq(w http.ResponseWriter, r *http.Request, forceKind string) (db.CreatePostParams, recruitmentInput, practiceInput, injuryInput, bool) {
@@ -651,6 +654,10 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 		FieldError(w, fields)
 		return db.CreatePostParams{}, recruitmentInput{}, practiceInput{}, injuryInput{}, false
 	}
+	var requestKey *uuid.UUID
+	if req.RequestKey != nil && *req.RequestKey != uuid.Nil {
+		requestKey = req.RequestKey
+	}
 	title := strings.TrimSpace(req.Title)
 	if kind == "practice" {
 		title = practiceTitle(practice.Event, practice.EventOther, practice.StartsAt)
@@ -662,6 +669,7 @@ func (s *Server) parsePostReqTitle(w http.ResponseWriter, r *http.Request, force
 		YoutubeVideoID:      youtubeID,
 		YoutubeThumbnailUrl: youtubeThumb,
 		CloudinaryPublicID:  publicID,
+		RequestKey:          requestKey,
 	}, recruitment, practice, injury, true
 }
 
@@ -672,6 +680,9 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	params, recruitment, practice, injury, ok := s.parsePostReq(w, r, "")
 	if !ok {
+		return
+	}
+	if s.replayPost(w, r, p.ID, params.RequestKey) {
 		return
 	}
 	if params.Kind == "recruitment" {
@@ -716,7 +727,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := s.q.CreatePost(r.Context(), params)
 	if err != nil {
-		MapDBError(w, err)
+		s.writeCreatePostError(w, r, err, params)
 		return
 	}
 	full, err := s.q.GetPost(r.Context(), row.ID)

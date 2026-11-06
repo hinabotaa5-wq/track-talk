@@ -64,6 +64,9 @@ func MapDBError(w http.ResponseWriter, err error) bool {
 			if pgErr.ConstraintName == "posts_instagram_shortcode_active_idx" {
 				msg = "この投稿のスレはすでにあります"
 			}
+			if pgErr.ConstraintName == "posts_cloudinary_public_id_active_idx" {
+				msg = "この写真・動画はすでに投稿されています"
+			}
 			Error(w, http.StatusConflict, "conflict", msg)
 			return true
 		}

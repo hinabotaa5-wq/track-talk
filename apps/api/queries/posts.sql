@@ -312,9 +312,13 @@ WHERE p.id = $1
 INSERT INTO posts (
     id, author_id, title, body,
     kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id,
-    instagram_type, instagram_shortcode, x_post_id, source_title
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    instagram_type, instagram_shortcode, x_post_id, source_title, request_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, sqlc.narg('request_key'))
 RETURNING id, author_id, title, body, kind, youtube_video_id, youtube_thumbnail_url, youtube_shorts, cloudinary_public_id, instagram_type, instagram_shortcode, x_post_id, source_title, like_count, comment_count, created_at, updated_at;
+
+-- name: GetPostByRequestKey :one
+-- 同じ request_key で既に作った投稿を探す(#382)。削除済みでも返し、呼び出し側で扱いを決める。
+SELECT id, deleted_at FROM posts WHERE author_id = $1 AND request_key = $2;
 
 -- name: UpdatePost :one
 UPDATE posts
