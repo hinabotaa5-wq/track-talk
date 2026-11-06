@@ -23,6 +23,7 @@ const maxBytes = 100 * 1024 * 1024;
 const signatureMaxAgeMs = 50 * 60 * 1000;
 
 type SignatureEntry = { signed: CloudinarySignature; at: number };
+type PendingSignature = { promise: Promise<SignatureEntry>; owner: AbortSignal | null };
 type UploadState = "idle" | "uploading" | "done" | "failed";
 
 function isAbort(err: unknown) {
@@ -37,7 +38,8 @@ function formatSize(bytes: number) {
 // 待ち時間を「消す」のではなく「重ねる」画面。
 // - 署名は、ファイル選択ボタンを押した時点で取りにいく（写真ピッカーを開いている間に並行して終わる）。
 //   画面を開いただけで取ると、投稿しない訪問でも1日30回の署名の上限に数えられてしまうため、タップ時にしている。
-//   使わなかった先読みの署名はこの画面にいる間は取っておき、次の選択で使い回す（上限を余計に使わない）。
+//   使わなかった先読みの署名はこの画面にいる間は取っておき、次の選択で使い回す。取得中の署名は共有し、
+//   同時に2回は取りにいかない（上限を余計に使わない）。
 // - 動画を選んだらすぐに送り始め、送っている間も詳細は書ける。投稿ボタンは保存（POST /v1/posts）だけにする。
 export default function OwnVideoPage() {
   const { token } = useAuth();
@@ -51,8 +53,13 @@ export default function OwnVideoPage() {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const { pending: submitting, acquire, release } = useActionLock();
 
-  // 先読みした署名（取得中の Promise ごと持つ）。使ったら空にする。
-  const spare = useRef<Promise<SignatureEntry> | null>(null);
+  // 署名の取得（POST /v1/uploads/video）は発行のたびに1日の上限に数えられるので、同時に2回は取りにいかない。
+  // pendingSign: 取得中の1件。owner はその署名を使う予定のアップロード（null は先読みで、まだ誰のものでもない）。
+  //   取得中に別のアップロードが署名を求めたら、新しく取らずにこれを共有する（先読みを引き取るか、選び直しで止まった
+  //   アップロードから引き継ぐ）。同じ署名を2本のアップロードで使わないよう、使うのは常に owner の1件だけ。
+  // spare: 取得済みでまだ誰も使っていない署名。次のアップロードで使い回す。
+  const pendingSign = useRef<PendingSignature | null>(null);
+  const spare = useRef<SignatureEntry | null>(null);
   // 進行中のアップロード。選び直したら止める。
   const inflight = useRef<AbortController | null>(null);
   // 選び直したあとに古いアップロードの結果が届いても、画面に反映しないための番号。
@@ -66,35 +73,69 @@ export default function OwnVideoPage() {
     };
   }, []);
 
-  function fetchSignature(): Promise<SignatureEntry> {
-    return apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token }).then((signed) => ({
+  function keepSpare(entry: SignatureEntry) {
+    if (!spare.current) spare.current = entry;
+  }
+
+  function requestSignature(owner: AbortSignal | null): PendingSignature {
+    const promise = apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token }).then((signed) => ({
       signed,
       at: Date.now(),
     }));
+    const pending: PendingSignature = { promise, owner };
+    pendingSign.current = pending;
+    promise.then(
+      (entry) => {
+        if (pendingSign.current === pending) pendingSign.current = null;
+        // 誰も引き取らなかった先読みは、次のアップロード用に取っておく。
+        if (pending.owner === null) keepSpare(entry);
+      },
+      () => {
+        // 失敗した取得は掴み続けない（次のタップや選択で取り直せるようにする）。先読みの失敗は見せない。
+        if (pendingSign.current === pending) pendingSign.current = null;
+      },
+    );
+    return pending;
   }
 
   function prefetchSignature() {
-    if (spare.current || !token) return;
-    const pending = fetchSignature();
-    spare.current = pending;
-    // 先読みの失敗は見せない。送り始めるときに取り直し、そこで失敗したら伝える。
-    pending.catch(() => {
-      if (spare.current === pending) spare.current = null;
-    });
+    if (spare.current || pendingSign.current || !token) return;
+    requestSignature(null);
   }
 
-  async function takeSignature(): Promise<SignatureEntry & { prefetched: boolean }> {
-    const pending = spare.current;
-    spare.current = null;
-    if (pending) {
-      try {
-        const entry = await pending;
-        if (Date.now() - entry.at < signatureMaxAgeMs) return { ...entry, prefetched: true };
-      } catch {
-        // 取り直す
-      }
+  // 署名を1件、このアップロード（signal）のものとして受け取る。選び直しで止められたら null を返す。
+  async function takeSignature(
+    signal: AbortSignal,
+    { useSpare = true } = {},
+  ): Promise<(SignatureEntry & { prefetched: boolean }) | null> {
+    if (useSpare && spare.current) {
+      const entry = spare.current;
+      spare.current = null;
+      if (Date.now() - entry.at < signatureMaxAgeMs) return { ...entry, prefetched: true };
     }
-    return { ...(await fetchSignature()), prefetched: false };
+    let pending = pendingSign.current;
+    let prefetched = true;
+    if (pending && (pending.owner === null || pending.owner.aborted)) {
+      // 取得中の先読み、または選び直しで止まったアップロードの取得を引き取る（新しく取らない）。
+      pending.owner = signal;
+    } else {
+      pending = requestSignature(signal);
+      prefetched = false;
+    }
+    let entry: SignatureEntry;
+    try {
+      entry = await pending.promise;
+    } catch (err) {
+      if (!prefetched || signal.aborted || pending.owner !== signal) throw err;
+      // 引き取った取得が失敗していたら、自分で1回取り直す。
+      return takeSignature(signal, { useSpare: false });
+    }
+    if (pending.owner !== signal) return null; // 後から選んだアップロードに引き継がれた
+    if (signal.aborted) {
+      keepSpare(entry);
+      return null;
+    }
+    return { ...entry, prefetched };
   }
 
   async function startUpload(target: File) {
@@ -123,20 +164,18 @@ export default function OwnVideoPage() {
       if (seq === uploadSeq.current) setUpload(progress);
     };
     try {
-      let entry = await takeSignature();
-      if (controller.signal.aborted) {
-        // 選び直しで使わなくなった署名は、次のアップロード用に取っておく。
-        if (!spare.current) spare.current = Promise.resolve(entry);
-        return;
-      }
+      let entry = await takeSignature(controller.signal);
+      // 選び直しで止められた（使わなくなった署名は takeSignature が次のアップロード用に取っておく）。
+      if (!entry) return;
       let payload;
       try {
         payload = await uploadToCloudinary("video", target, entry.signed, onProgress, controller.signal);
       } catch (err) {
         // 先読みした署名が期限切れで断られたときは、取り直して1回だけやり直す（失敗は見せない）。
         if (!(entry.prefetched && err instanceof Error && err.message === staleUploadMessage)) throw err;
-        entry = { ...(await fetchSignature()), prefetched: false };
-        if (controller.signal.aborted) return;
+        const fresh = await takeSignature(controller.signal, { useSpare: false });
+        if (!fresh) return;
+        entry = fresh;
         onProgress({ loaded: 0, total: target.size, percent: 0 });
         payload = await uploadToCloudinary("video", target, entry.signed, onProgress, controller.signal);
       }
