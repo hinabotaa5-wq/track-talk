@@ -72,7 +72,7 @@ func (s *Server) consultationRoot(ctx context.Context, q *db.Queries, id uuid.UU
 }
 
 // reviewConsultationFunding は、フォーム添削の追加相談の払い方を決める。購入済みのチケットが残っていれば
-// チケット1枚、なければ申込み時の都度払い（カード・PayPay）。チケットの新規販売は止めた。
+// チケット1枚、なければ申込み時の都度払い（reviewPaymentMethods。今はカードのみ）。チケットの新規販売は止めた。
 // 18歳未満の都度払いは本人が自分で払い、送る時と支払い画面を作る時に購入のたびの宣言を確かめる（minor_purchase.go）。
 func reviewConsultationFunding(ctx context.Context, q *db.Queries, room consultationRoom) (string, error) {
 	balance, err := q.TicketBalance(ctx, &room.owner)

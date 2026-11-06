@@ -5,6 +5,7 @@ import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
+import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
@@ -96,6 +97,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}
     <p className="text-xs text-slate-300">購入前に下書きを7日間保存します。送信後は内容を変更できません。{kind === "review" ? "18歳未満の方は、購入する前に保護者の許可を得てください。" : "18歳未満の方のパーソナル指導の相談は、保護者が支払います。"}</p>
+    {kind === "review" && funding === "cash" ? <ReviewPayNotice /> : null}
     {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
     <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? "保存・送信中…" : funding === "ticket" ? "質問する（チケット1枚）" : `質問する（${formatYen(price)}）`}</Button>
     {buy ? <Link className="block text-sm text-blue-300 underline" href={`/me/coaching/tickets?return_to=${encodeURIComponent(returnPath)}`}>チケットを購入して、この部屋へ戻る</Link> : null}
@@ -162,6 +164,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? "回答を送る" : clarify ? "回答について確認する（1回無料）" : "補足を送る"}</Button>
       </div> : null}
       {c.status === "awaiting_payment" && role === c.payer ? <>
+        {kind === "review" && c.funding === "cash" ? <ReviewPayNotice /> : null}
         {needsDeclaration && role === "requester" ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         <Button disabled={pending || (needsDeclaration && role === "requester" && !declared)} onClick={() => void act("checkout")}>お支払いへ</Button>
       </> : null}

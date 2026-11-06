@@ -29,9 +29,12 @@ const (
 	checkoutMaxLife = 24 * time.Hour
 )
 
-// checkoutPaymentMethods は、支払い方法をコードで指定する支払い画面に出す方法。カード（Apple Pay・Google Pay を含む）と
-// PayPay だけにする。コンビニ払い・銀行振込は出さない。PayPay は Stripe のダッシュボードで有効にしてから使う。
-var checkoutPaymentMethods = []string{"card", "paypay"}
+// reviewPaymentMethods は、動画添削とその追加相談（運営者が受け付ける都度払い）で今使える支払い方法。
+// 当面はカード（Apple Pay・Google Pay を含む）のみ。コンビニ払い・銀行振込は出さない。
+// PayPay を使えるようにするときは、Stripe のダッシュボードで有効にしてから、ここに "paypay" を足し、
+// Web の availableReviewPayMethods（apps/web/lib/review.ts）・購入画面の案内・特商法の支払方法も合わせて直す。
+// サポートプラン（契約・その追加相談）はこの定義を使わず、常にカードのみ。
+var reviewPaymentMethods = []string{"card"}
 
 // errStripe は、Stripe とのやりとりがうまくいかなかったこと（つながらない、断られた）。
 var errStripe = errors.New("stripe request failed")

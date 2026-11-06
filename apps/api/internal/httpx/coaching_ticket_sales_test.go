@@ -68,9 +68,15 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "insufficient_tickets") {
 		t.Fatalf("tickets %d %s", rec.Code, rec.Body.String())
 	}
-	// PayPay は申込み時にその場で払う。支払いが届くまでコーチには回らない。
+	// 今は PayPay を受け付けない（カードのみ）。申込みは断り、支払い画面も作らない。
 	body = reviewBodyFor(t, h, tu)
 	body["method"] = "paypay"
+	sessions := len(f.sessions)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) || len(f.sessions) != sessions {
+		t.Fatalf("paypay must be rejected %d %s", rec.Code, rec.Body.String())
+	}
+	// 以下は PayPay を再び使えるようにした時のふるまい。申込み時にその場で払い、支払いが届くまでコーチには回らない。
+	allowPayPayForTest(t)
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
@@ -151,12 +157,16 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	if c.Funding != "cash" || c.Price != 600 {
 		t.Fatalf("draft %+v", c)
 	}
+	// 支払い方法は選べない（カードのみ）。PayPay を指定して送っても受け付けない。
+	if rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, map[string]any{"payment_method": "paypay"}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("PayPay override must be rejected: %d", rec.Code)
+	}
 	rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, nil)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "checkout_url") {
 		t.Fatalf("submit %d %s", rec.Code, rec.Body.String())
 	}
 	form := f.lastSession()
-	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "paypay" || form.Get("payment_method_types[2]") != "" ||
+	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" ||
 		form.Get("line_items[0][price_data][unit_amount]") != "600" || form.Get("success_url") != "https://web.test/coaching/requests/"+root+"?consultation="+c.ID {
 		t.Fatalf("session %v", form)
 	}

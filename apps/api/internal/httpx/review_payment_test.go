@@ -4,20 +4,41 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/httpx"
 )
 
+// allowPayPayForTest は、このテストの間だけ、動画添削とその追加相談の支払い方法に PayPay を戻す。
+// 今は PayPay を受け付けていないが、その場で払い・目安を過ぎたら返金する経路は残しているので、
+// 再び使えるようにした時に備えてテストで確かめ続ける。
+func allowPayPayForTest(t *testing.T) {
+	t.Helper()
+	t.Cleanup(httpx.SetReviewPaymentMethodsForTest([]string{"card", "paypay"}))
+}
+
+// createReviewWith は、依頼を送る。PayPay を選んだときは、この1回の申込みの間だけ PayPay を受け付ける。
+// 後の支払い画面の作り直しなどでも PayPay を使うテストは、allowPayPayForTest でテスト全体を通して受け付ける。
+func createReviewWith(t *testing.T, h http.Handler, tu, method string, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	if method == "paypay" {
+		defer httpx.SetReviewPaymentMethodsForTest([]string{"card", "paypay"})()
+	}
+	return doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
+}
+
 // paidReview は、支払い方法を選んで依頼を送り、Stripe から支払いが届いたところまで進める。
+// PayPay を選んだときは、この申込みの間だけ PayPay を受け付ける（PayPay を受け付けていた時の経路を確かめるため）。
 func paidReview(t *testing.T, h http.Handler, tu, method, intent string) string {
 	t.Helper()
 	body := reviewBodyFor(t, h, tu)
 	body["method"] = method
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
+	rec := createReviewWith(t, h, tu, method, body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
@@ -118,6 +139,12 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
 	var unpaid reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &unpaid)
+	// 今は PayPay を受け付けないので、支払い画面の作り直しでも PayPay は断る。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
+		t.Fatalf("paypay checkout must be rejected %d %s", rec.Code, rec.Body.String())
+	}
+	// 以下は PayPay を再び使えるようにした時のふるまい。
+	allowPayPayForTest(t)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusOK {
 		t.Fatalf("checkout again %d %s", rec.Code, rec.Body.String())
 	}
@@ -244,6 +271,7 @@ func TestReviewPaymentReleaseDoesNotStallBehindFailures(t *testing.T) {
 // 18歳未満の支払い画面は、ロックを持つトランザクションの接続だけで作る。
 // 別の接続を待つと、接続の数だけ同時に来たときに全員が止まる。
 func TestReviewPaymentMinorCheckoutUsesOneConnection(t *testing.T) {
+	allowPayPayForTest(t)
 	testPoolMaxConns = 1
 	t.Cleanup(func() { testPoolMaxConns = 0 })
 	fakeCoachingCloudinary(t)

@@ -57,6 +57,7 @@ func TestStripePaymentWebhooksCompleteExistingOrdersWhileClosed(t *testing.T) {
 				_, user := demoRequester(t, before, admin)
 				method := "paypay"
 				expected = "captured"
+				allowPayPayForTest(t)
 				if kind == "review-card" {
 					method, expected = "card", "authorized"
 					object["payment_status"] = "unpaid"

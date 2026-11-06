@@ -35,6 +35,17 @@ export const reviewPayMethodLabels: Record<ReviewPayMethod, string> = {
   paypay: "PayPay",
 };
 
+// 動画添削とその追加相談で今使える支払い方法。API の reviewPaymentMethods（apps/api/internal/httpx/coaching_payment.go）と揃える。
+// 当面はカード（Apple Pay・Google Pay を含む）のみ。PayPay を使えるようにするときは、ここに "paypay" を足すと
+// 購入画面の案内（reviewPayNotice）が消える。特商法の支払方法（app/legal/commerce）も合わせて直す。
+// reviewPayMethodLabels は、過去の支払いの表示に使うので PayPay も残す。
+export const availableReviewPayMethods: ReviewPayMethod[] = ["card"];
+
+// PayPay が使えるようになるまで、動画添削・追加相談の購入画面に出す案内。
+export const reviewPayNotice: string | null = availableReviewPayMethods.includes("paypay")
+  ? null
+  : "現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。";
+
 // 「ここがわからなかった」の選択肢。自由記述は置かない（やりとりは一方通行のまま）。
 export const clarifyReasonLabels: Record<ClarifyReason, string> = {
   term: "用語がわからない",

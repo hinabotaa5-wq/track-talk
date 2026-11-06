@@ -179,7 +179,7 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 	if funding != "cash" || status != "awaiting_payment" || reservations != 0 {
 		t.Fatalf("switched %s %s %d", funding, status, reservations)
 	}
-	if form := f.lastSession(); form.Get("metadata[consultation_id]") != c.ID || form.Get("payment_method_types[1]") != "paypay" {
+	if form := f.lastSession(); form.Get("metadata[consultation_id]") != c.ID || form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" {
 		t.Fatalf("session %v", form)
 	}
 	if code := payConsultation(t, h, c.ID, 600); code != 200 {
