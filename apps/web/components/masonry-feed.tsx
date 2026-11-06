@@ -6,31 +6,8 @@ import { BoundedCache } from "@/lib/bounded-cache";
 
 type FeedPosition = { left: number; key?: string; offset: number };
 const positions = new BoundedCache<FeedPosition>(20, 30 * 60_000);
-const heights = new BoundedCache<number>(40, 30 * 60_000);
 const measuredRatios = new BoundedCache<number>(6000, 30 * 60_000);
 const imageRatios = new BoundedCache<number>(512, 24 * 60 * 60_000);
-
-let heightsLoaded = false;
-function readHeight(key: string) {
-  if (!heightsLoaded) {
-    heightsLoaded = true;
-    try {
-      const saved = JSON.parse(sessionStorage.getItem("masonry-heights-v1") ?? "null");
-      if (saved && Date.now() - saved.at < 30 * 60_000 && Array.isArray(saved.entries)) {
-        for (const [name, value] of saved.entries.slice(-40)) {
-          if (typeof name === "string" && typeof value === "number" && Number.isFinite(value) && value >= 280) heights.set(name, value);
-        }
-      }
-    } catch { /* 保存できない環境ではメモリ上で固定する。 */ }
-  }
-  return heights.get(key);
-}
-function saveHeight(key: string, height: number) {
-  heights.set(key, height);
-  try {
-    sessionStorage.setItem("masonry-heights-v1", JSON.stringify({ at: Date.now(), entries: [...heights.keys()].map((name) => [name, heights.get(name)]) }));
-  } catch { /* メモリ上の高さを使う。 */ }
-}
 
 // 画像比率は一つの保存領域にまとめ、画像ごとにsessionStorageの項目を増やさない。
 let ratiosLoaded = false;
@@ -84,8 +61,10 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     if (!track) return;
     pendingPosition.current = storageKey ? positions.get(storageKey) : undefined;
     let frame = 0, scrollFrame = 0, persistTimer: ReturnType<typeof setTimeout> | undefined;
-    let fixedAvailable = 0, measuredWidth = 0, measuredTop = Number.NaN;
     const canvas = track.firstElementChild as HTMLElement;
+    const header = document.querySelector("header");
+    const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
+    const navs = Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="メイン"]'));
     function savePosition(event?: Event) {
       if (!storageKey || pendingPosition.current) return;
       const nodes = Array.from(canvas.children) as HTMLElement[];
@@ -96,21 +75,11 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     function layoutNow() {
       const width = Math.round(track!.clientWidth);
       if (width <= 0) return;
-      // ヘッダー下段(エグ練グランプリの帯)は一覧より後から出るので、一覧の上端が動いたら高さを測り直す。
-      // 測り直さないと一覧が帯の分だけ下へずれ、最下段が下のメニューの裏に隠れる。
-      const top = track!.getBoundingClientRect().top + window.scrollY;
-      if (!fixedAvailable || Math.abs(width - measuredWidth) > 1 || Math.abs(top - measuredTop) > 1) {
-        const bottomNav = Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="メイン"]')).find((nav) => getComputedStyle(nav).position === "fixed" && nav.getBoundingClientRect().height > 0);
-        const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
-        const header = document.querySelector("header");
-        if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
-        // 保存する高さは一覧の上端の位置ごとに分け、帯がない状態で測った高さを帯がある画面で使わない。
-        const heightKey = `${storageKey}:${width}:${Math.round(top)}`;
-        fixedAvailable = readHeight(heightKey) ?? Math.max(280, window.innerHeight - top - (bottomNav?.getBoundingClientRect().height ?? 0) - 8);
-        saveHeight(heightKey, fixedAvailable);
-        measuredWidth = width;
-        measuredTop = top;
-      }
+      const bottomNav = navs.find((nav) => getComputedStyle(nav).position === "fixed" && nav.getBoundingClientRect().height > 0);
+      if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
+      // 帯の表示などで一覧の開始位置が変わったら、下部メニューまでの高さを測り直す。
+      const bottom = bottomNav?.getBoundingClientRect().top ?? window.innerHeight;
+      const available = Math.max(3, Math.floor(bottom - (track!.getBoundingClientRect().top + window.scrollY) - 8));
       // 描画中の画像だけ測る。画面外の座標はDOMに依存しない。
       for (const node of Array.from(canvas.children) as HTMLElement[]) {
         const image = node.querySelector<HTMLImageElement>("img");
@@ -125,7 +94,7 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
         }
       }
       const { ratios: hints, compact: small, keys: ids } = descriptors.current;
-      const result = pack(ids.map((id, i) => ({ ratio: measuredRatios.get(`${storageKey}:${id}`) ?? hints[i] ?? 4 / 3, footer: 0, compact: small[i] })), width, fixedAvailable);
+      const result = pack(ids.map((id, i) => ({ ratio: measuredRatios.get(`${storageKey}:${id}`) ?? hints[i] ?? 4 / 3, footer: 0, compact: small[i] })), width, available);
       // 計算後のReact描画で横幅を反映してから、保存位置を復元する。
       if (!pendingPosition.current && layoutRef.current && track!.scrollLeft > 0) {
         const old = layoutRef.current;
@@ -161,9 +130,9 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     }
     const observer = new ResizeObserver(schedule);
     observer.observe(track);
-    // ヘッダーの高さが変わる(帯が後から出る・消える)と一覧の上端が動くので、そのときも並べ直す。
-    const pageHeader = document.querySelector("header");
-    if (pageHeader) observer.observe(pageHeader);
+    if (header) observer.observe(header);
+    if (filters) observer.observe(filters);
+    for (const nav of navs) observer.observe(nav, { box: "border-box" });
     canvas.addEventListener("load", schedule, true);
     canvas.addEventListener("error", schedule, true);
     track.addEventListener("scroll", onScroll, { passive: true });

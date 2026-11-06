@@ -7,12 +7,18 @@ import { MasonryFeed } from "./masonry-feed";
 let container: HTMLDivElement;
 let root: Root;
 let frames: FrameRequestCallback[];
+let resizeObservers: Map<Element, () => void>;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   frames = [];
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
-  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  resizeObservers = new Map();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: () => void) {}
+    observe(element: Element) { resizeObservers.set(element, this.callback); }
+    disconnect() { resizeObservers.clear(); }
+  });
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
   vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(1200);
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
@@ -56,19 +62,43 @@ it("詳細を開いて一覧を作り直しても横位置を復元する", asyn
   expect((container.querySelector('[role="region"]') as HTMLDivElement).scrollLeft).toBe(400);
 });
 
-it("同じフィードの高さを保存し、更新後もカードの形を保つ", async () => {
-  sessionStorage.clear();
-  const content = <MasonryFeed storageKey="fixed-layout" ratios={[1]}><a href="/fixed">投稿</a></MasonryFeed>;
-  await act(async () => root.render(content));
-  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
-  const height = container.querySelector<HTMLElement>(".masonry-feed-canvas")!.style.height;
-  const width = container.querySelector<HTMLElement>(".masonry-feed-tile")!.style.width;
-  await act(async () => root.render(null));
-  vi.stubGlobal("innerHeight", 400);
-  await act(async () => root.render(content));
-  await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
-  expect(container.querySelector<HTMLElement>(".masonry-feed-canvas")!.style.height).toBe(height);
-  expect(container.querySelector<HTMLElement>(".masonry-feed-tile")!.style.width).toBe(width);
+it("ヘッダーに帯が後から出ても、一覧を下部メニューの手前に収める", async () => {
+  let headerHeight = 64;
+  let navTop = 700;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.tagName === "HEADER") return new DOMRect(0, 0, 300, headerHeight);
+    if (this.tagName === "NAV") return new DOMRect(0, navTop, 300, 56);
+    if (this.classList.contains("masonry-feed-strip")) return new DOMRect(0, headerHeight + 60, 300, 0);
+    return new DOMRect();
+  });
+  const header = document.createElement("header");
+  const nav = document.createElement("nav");
+  nav.setAttribute("aria-label", "メイン");
+  nav.style.position = "fixed";
+  container.before(header);
+  container.after(nav);
+  try {
+    await render(vi.fn());
+    const canvas = container.querySelector<HTMLElement>(".masonry-feed-canvas")!;
+    expect(canvas.style.height).toBe("568px");
+
+    headerHeight += 44;
+    await act(async () => {
+      resizeObservers.get(header)?.();
+      frames.splice(0).forEach((callback) => callback(0));
+    });
+    expect(canvas.style.height).toBe("524px");
+
+    navTop -= 60;
+    await act(async () => {
+      window.dispatchEvent(new Event("resize"));
+      frames.splice(0).forEach((callback) => callback(0));
+    });
+    expect(canvas.style.height).toBe("464px");
+  } finally {
+    header.remove();
+    nav.remove();
+  }
 });
 
 it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復元する", async () => {
