@@ -22,6 +22,9 @@ type CloudinaryUploadResult = {
   error?: { message?: string };
 };
 
+// 署名の期限切れ（Cloudinary は発行から1時間を過ぎた署名を断る）のときの文言。
+export const staleUploadMessage = "アップロードの期限が切れました。もう一度試してください";
+
 export function cloudinaryErrorMessage(message?: string): string {
   const text = message?.toLowerCase() ?? "";
   if (text.includes("file size") || text.includes("too large")) {
@@ -30,7 +33,7 @@ export function cloudinaryErrorMessage(message?: string): string {
   if (text.includes("image")) return "写真ファイルを確認してください";
   if (text.includes("video") || text.includes("format")) return "対応していないファイル形式です";
   if (text.includes("stale") || text.includes("signature") || text.includes("timestamp")) {
-    return "アップロードの期限が切れました。もう一度試してください";
+    return staleUploadMessage;
   }
   return "アップロードに失敗しました";
 }
@@ -40,6 +43,7 @@ export function uploadToCloudinary(
   file: File,
   signed: CloudinarySignature,
   onProgress: (progress: CloudinaryUploadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<CloudinaryUploadResult> {
   if (signed.resource_type !== resource) {
     return Promise.reject(new Error("アップロードに失敗しました"));
@@ -66,7 +70,9 @@ export function uploadToCloudinary(
       });
     };
     xhr.onerror = () => reject(new Error("アップロードに失敗しました"));
-    xhr.onabort = () => reject(new Error("アップロードに失敗しました"));
+    // 選び直しなどで呼び出し側が止めたときは、失敗ではないことが分かるよう AbortError で返す。
+    xhr.onabort = () =>
+      reject(signal?.aborted ? new DOMException("Aborted", "AbortError") : new Error("アップロードに失敗しました"));
     xhr.onload = () => {
       let payload: CloudinaryUploadResult = {};
       try {
@@ -81,6 +87,13 @@ export function uploadToCloudinary(
       }
       resolve(payload);
     };
+    if (signal) {
+      if (signal.aborted) {
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
     xhr.send(body);
   });
 }
