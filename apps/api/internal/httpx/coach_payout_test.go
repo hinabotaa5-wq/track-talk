@@ -18,11 +18,13 @@ const lastMonthJST = `(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - in
 const previousMonthEndJST = `(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 minute') AT TIME ZONE 'Asia/Tokyo'`
 
 type earningsView struct {
-	Payments       bool `json:"payments"`
-	StripeLinked   bool `json:"stripe_linked"`
-	PayoutsEnabled bool `json:"payouts_enabled"`
-	ThisMonthYen   int  `json:"this_month_yen"`
-	UnpaidYen      int  `json:"unpaid_yen"`
+	Payments       bool    `json:"payments"`
+	StripeLinked   bool    `json:"stripe_linked"`
+	NextPayoutDate *string `json:"next_payout_date"`
+	NextPayoutYen  *int    `json:"next_payout_yen"`
+	PayoutsEnabled bool    `json:"payouts_enabled"`
+	ThisMonthYen   int     `json:"this_month_yen"`
+	UnpaidYen      int     `json:"unpaid_yen"`
 	Payouts        []struct {
 		Month     string `json:"month"`
 		AmountYen int    `json:"amount_yen"`
@@ -421,5 +423,57 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 	}
 	if transfers := f.transferList(); len(transfers) != 2 {
 		t.Fatalf("transfers: %d", len(transfers))
+	}
+}
+
+func assertPayoutPreview(t *testing.T, view earningsView, amount int, deferred bool) {
+	t.Helper()
+	if amount == 0 {
+		if view.NextPayoutDate != nil || view.NextPayoutYen != nil {
+			t.Fatalf("expected null payout preview: %+v", view)
+		}
+		return
+	}
+	var date string
+	queryRowArgs(t, `SELECT to_char(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') + interval '14 days' +
+		CASE WHEN $1::boolean OR extract(day FROM now() AT TIME ZONE 'Asia/Tokyo') > 15
+		THEN interval '1 month' ELSE interval '0' END, 'YYYY-MM-DD')`, []any{deferred}, &date)
+	if view.NextPayoutDate == nil || *view.NextPayoutDate != date || view.NextPayoutYen == nil || *view.NextPayoutYen != amount {
+		t.Fatalf("preview date=%v yen=%v, want %s / %d", view.NextPayoutDate, view.NextPayoutYen, date, amount)
+	}
+}
+
+func TestCoachPayoutPreviewCases(t *testing.T) {
+	for _, tc := range []struct {
+		name, confirmedAt, status string
+		amount, expected          int
+		deferred, unlinked        bool
+	}{
+		{name: "A", confirmedAt: lastMonthJST, amount: 3150, expected: 3150},
+		{name: "B", confirmedAt: lastMonthJST, amount: 1050, expected: 1050, deferred: true},
+		{name: "C", confirmedAt: lastMonthJST + ` - interval '1 month'`, amount: 1050, expected: 1050},
+		{name: "D", confirmedAt: previousMonthEndJST, amount: 3150, expected: 3150},
+		{name: "open month", confirmedAt: "now()", amount: 3150},
+		{name: "no account", confirmedAt: lastMonthJST, amount: 3150, unlinked: true},
+		{name: "suspended", confirmedAt: lastMonthJST, amount: 3150, status: "suspended"},
+		{name: "final settlement", confirmedAt: lastMonthJST, amount: 1050, expected: 1050, status: "ended"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, _ := setupStripe(t)
+			coach, tok := onDutyCoach(t, h, adminToken(t, h))
+			execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
+				VALUES (gen_random_uuid(), $1, 'review', $2, 70, $2, `+tc.confirmedAt+`)`, coach, tc.amount)
+			if tc.unlinked {
+				execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id=NULL, payouts_enabled=false WHERE profile_id=$1`, coach)
+			}
+			if tc.status != "" {
+				execSQLArgs(t, `UPDATE coach_profiles SET status=$2, on_duty=false WHERE profile_id=$1`, coach, tc.status)
+			}
+			view := coachEarnings(t, h, tok)
+			assertPayoutPreview(t, view, tc.expected, tc.deferred)
+			if tc.name == "D" && view.ThisMonthYen != 0 {
+				t.Fatalf("previous month's earning in current total: %d", view.ThisMonthYen)
+			}
+		})
 	}
 }

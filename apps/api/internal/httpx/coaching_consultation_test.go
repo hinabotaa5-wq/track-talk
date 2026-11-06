@@ -316,7 +316,7 @@ func TestConsultationPayoutUsesAnswerMonth(t *testing.T) {
 	}
 
 	// Query at the earning amount to isolate the cutoff from the 3,000 yen threshold.
-	payable, err := q.ListPayableCoachEarnings(ctx, 960)
+	payable, err := q.ListPayableCoachEarnings(ctx, db.ListPayableCoachEarningsParams{MinYen: 960})
 	if err != nil || len(payable) != 1 || payable[0].AmountYen != 960 {
 		t.Fatalf("payable %+v: %v", payable, err)
 	}

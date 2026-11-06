@@ -138,6 +138,10 @@ func TestCapturedRefundDebtCarryAndNetThreshold(t *testing.T) {
 		t.Fatal("partial carry")
 	}
 	x.addEarning(t, 3650)
+	assertPayoutPreview(t, coachEarnings(t, x.h, token(t, x.coach)), 3000, false)
+	if scalar(t, `SELECT sum(amount_yen-applied_yen) FROM coach_refund_adjustments`) != 650 {
+		t.Fatal("preview applied debt")
+	}
 	x.run(t)
 	// Net 3000 after clearing the remaining 650 debt, not gross 3650.
 	transfers := x.f.transferList()
@@ -165,6 +169,14 @@ func TestCapturedRefundNetBelowMinimumAndZero(t *testing.T) {
 			x.paid(t)
 			x.refund(t)
 			x.addEarning(t, n)
+			expected := 0
+			if n == 4000 {
+				expected = 2950
+			}
+			assertPayoutPreview(t, coachEarnings(t, x.h, token(t, x.coach)), expected, true)
+			if scalar(t, `SELECT applied_yen FROM coach_refund_adjustments`) != 0 {
+				t.Fatal("preview applied debt")
+			}
 			x.run(t)
 			if len(x.f.transferList()) != 0 {
 				t.Fatal("zero or net below 3000 paid")
