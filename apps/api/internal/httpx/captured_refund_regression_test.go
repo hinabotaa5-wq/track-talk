@@ -40,7 +40,7 @@ func TestCapturedLateFailureCompensation(t *testing.T) {
 				queryRowArgs(t, `SELECT id FROM coach_refund_adjustments`, nil, &adjustment)
 				payout := uuid.New()
 				execSQLArgs(t, `INSERT INTO coach_payouts(id,coach_id,month,amount_yen,status,stripe_transfer_id,paid_at) VALUES($1,$2,date '2020-02-01',3000,'paid','tr_offset_historical',now())`, payout, x.coach)
-				execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,payout_id) VALUES($1,$2,'review',4050,70,4050,$3)`, id, x.coach, payout)
+				execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,payout_id, confirmed_at) VALUES($1,$2,'review',4050,70,4050,$3, now())`, id, x.coach, payout)
 				execSQLArgs(t, `INSERT INTO coach_refund_applications(id,adjustment_id,earning_id,amount_yen,payout_id) VALUES(gen_random_uuid(),$1,$2,1050,$3)`, adjustment, id, payout)
 				execSQLArgs(t, `UPDATE coach_refund_adjustments SET applied_yen=1050 WHERE id=$1`, adjustment)
 			}
@@ -73,7 +73,7 @@ func TestCapturedLateFailureCompensation(t *testing.T) {
 				if scalar(t, `SELECT amount_yen FROM coach_payouts WHERE stripe_transfer_id='tr_offset_historical'`) != 3000 {
 					t.Fatal("historical payout changed")
 				}
-				execSQLArgs(t, `UPDATE coach_earnings SET created_at=now()-interval '3 months' WHERE source='refund_compensation'`)
+				execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at=now()-interval '3 months' WHERE source='refund_compensation'`)
 				x.run(t)
 				if len(x.f.transferList()) != 1 || x.f.transferList()[0].Get("amount") != "1050" {
 					t.Fatal("compensation not paid monthly")
@@ -223,9 +223,9 @@ func fmtPagination(page int) string { return "/v1/admin/coaching/payments?page="
 func TestCapturedMultipleCoachesDatabaseFailureAndRestart(t *testing.T) {
 	x := newCapturedFixture(t)
 	second, _ := onDutyCoach(t, x.h, x.admin)
-	execSQLArgs(t, `UPDATE coach_earnings SET created_at=now()-interval '3 months'`)
+	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at=now()-interval '3 months'`)
 	x.addEarning(t, 4000)
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,created_at) VALUES(gen_random_uuid(),$1,'review',4000,70,4000,now()-interval '3 months')`, second)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,gross_yen,share_percent,amount_yen,confirmed_at) VALUES(gen_random_uuid(),$1,'review',4000,70,4000,now()-interval '3 months')`, second)
 	execSQLArgs(t, `CREATE OR REPLACE FUNCTION test_second_payout_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF (SELECT count(*) FROM coach_payouts WHERE status='paid')>=1 THEN RAISE EXCEPTION 'second payout update failed'; END IF; RETURN NEW; END $$`)
 	execSQLArgs(t, `CREATE TRIGGER test_second_payout_failure BEFORE UPDATE ON coach_payouts FOR EACH ROW WHEN (NEW.status='paid') EXECUTE FUNCTION test_second_payout_failure()`)
 	t.Cleanup(func() {

@@ -118,7 +118,7 @@ SET payout_id = $1
 WHERE coach_id = $2 AND payout_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
   AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
-  AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
+  AND confirmed_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
 `
 
 type AttachEarningsToPayoutParams struct {
@@ -157,7 +157,7 @@ func (q *Queries) DeleteUnpaidContractEarning(ctx context.Context, contractID *u
 
 const getCoachEarningsSummary = `-- name: GetCoachEarningsSummary :one
 SELECT
- COALESCE(sum(e.amount_yen) FILTER (WHERE e.created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
+ COALESCE(sum(e.amount_yen) FILTER (WHERE e.confirmed_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'),0)::int AS this_month_yen,
  COALESCE(sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)) FILTER (WHERE e.payout_id IS NULL),0)::int AS unpaid_yen
 FROM coach_earnings e WHERE e.coach_id=$1 AND NOT EXISTS(SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
 `
@@ -175,7 +175,7 @@ func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUI
 }
 
 const getContractEarning = `-- name: GetContractEarning :one
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id FROM coach_earnings WHERE contract_id = $1
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at FROM coach_earnings WHERE contract_id = $1
 `
 
 func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID) (CoachEarning, error) {
@@ -193,16 +193,18 @@ func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID)
 		&i.PayoutID,
 		&i.CreatedAt,
 		&i.ConsultationID,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
 
 const insertPersonalEarnings = `-- name: InsertPersonalEarnings :many
-INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen)
-SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100
+INSERT INTO coach_earnings (id, coach_id, source, contract_id, gross_yen, share_percent, amount_yen, confirmed_at)
+SELECT gen_random_uuid(), x.coach_id, 'personal', x.contract_id, x.gross, x.share, x.gross * x.share / 100, x.confirmed_at
 FROM (
     SELECT DISTINCT ON (ct.id)
         ct.id AS contract_id, ct.coach_id,
+        CASE WHEN ct.status = 'refunded' THEN pay.refunded_at ELSE ct.ends_at END AS confirmed_at,
         pay.amount_yen - pay.refunded_yen AS gross,
         100 - $1::int AS share
     FROM coaching_contracts ct
@@ -216,7 +218,7 @@ FROM (
 WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at
 `
 
 // 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
@@ -242,6 +244,7 @@ func (q *Queries) InsertPersonalEarnings(ctx context.Context, feePercent int32) 
 			&i.PayoutID,
 			&i.CreatedAt,
 			&i.ConsultationID,
+			&i.ConfirmedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -254,9 +257,9 @@ func (q *Queries) InsertPersonalEarnings(ctx context.Context, feePercent int32) 
 }
 
 const insertReviewEarnings = `-- name: InsertReviewEarnings :many
-INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen)
+INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen, confirmed_at)
 SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen, $1::smallint,
-       pay.amount_yen * $1::int / 100
+       pay.amount_yen * $1::int / 100, r.returned_at
 FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
@@ -264,7 +267,7 @@ WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NO
   AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at
 `
 
 // 返却して代金が確定した添削の、コーチの取り分を記録する。チケットで払った添削は RecordTicketReviewEarnings で記録する。
@@ -289,6 +292,7 @@ func (q *Queries) InsertReviewEarnings(ctx context.Context, sharePercent int16) 
 			&i.PayoutID,
 			&i.CreatedAt,
 			&i.ConsultationID,
+			&i.ConfirmedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -345,12 +349,12 @@ WHERE e.payout_id IS NULL
   AND e.amount_yen > COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)
   AND NOT EXISTS (SELECT 1 FROM captured_payment_refunds rf WHERE rf.status='pending' AND ((rf.source='review' AND e.source='review' AND rf.payment_id IN (SELECT payment_id FROM review_payment_earning_links WHERE earning_id=e.id)) OR (rf.source='consultation' AND rf.payment_id=e.consultation_id)))
   AND NOT EXISTS (SELECT 1 FROM captured_refund_earnings f WHERE f.earning_id=e.id AND f.excluded)
-  AND e.created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
+  AND e.confirmed_at < date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
   AND cp.payouts_enabled AND cp.stripe_account_id IS NOT NULL
   AND cp.status <> 'suspended'
 GROUP BY e.coach_id, cp.status
 HAVING sum(e.amount_yen - COALESCE((SELECT sum(a.amount_yen) FROM coach_refund_applications a WHERE a.earning_id=e.id AND NOT EXISTS(SELECT 1 FROM coach_refund_application_reversals v WHERE v.application_id=a.id)),0)) >= $1::int OR cp.status <> 'approved'
-    OR min(e.created_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo'
+    OR min(e.confirmed_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo'
 `
 
 type ListPayableCoachEarningsRow struct {
@@ -384,9 +388,9 @@ func (q *Queries) ListPayableCoachEarnings(ctx context.Context, minYen int32) ([
 }
 
 const listRecentCoachEarnings = `-- name: ListRecentCoachEarnings :many
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id FROM coach_earnings
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at FROM coach_earnings
 WHERE coach_id = $1
-ORDER BY created_at DESC
+ORDER BY confirmed_at DESC
 LIMIT 30
 `
 
@@ -411,6 +415,7 @@ func (q *Queries) ListRecentCoachEarnings(ctx context.Context, coachID *uuid.UUI
 			&i.PayoutID,
 			&i.CreatedAt,
 			&i.ConsultationID,
+			&i.ConfirmedAt,
 		); err != nil {
 			return nil, err
 		}

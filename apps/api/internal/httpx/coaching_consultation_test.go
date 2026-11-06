@@ -1,6 +1,7 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
 type consultationView struct {
@@ -288,6 +290,38 @@ func TestConsultationCashAnswerRecordsEarningsAndClarificationDeadline(t *testin
 		t.Fatal("late free confirmation")
 	}
 }
+func TestConsultationPayoutUsesAnswerMonth(t *testing.T) {
+	h, _ := setupStripe(t)
+	owner, coach, root := endedCashRoom(t, h)
+	c := consultationDraft(t, h, owner, "/v1/coaching/contracts/"+root+"/consultations", uuid.NewString(), "指名の質問")
+	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 1200); code != 200 {
+		t.Fatal(code)
+	}
+	consultationAction(t, h, coach, c.ID, "accept", nil)
+	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "指名の回答"})
+
+	// Recreate the earning as if recording happened after the month of the answer.
+	execSQLArgs(t, `UPDATE coaching_consultations SET answered_at=`+previousMonthEndJST+` WHERE id=$1`, c.ID)
+	execSQLArgs(t, `DELETE FROM coach_earnings WHERE consultation_id=$1`, c.ID)
+	q := db.New(openPool(t))
+	ctx := context.Background()
+	id := uuid.MustParse(c.ID)
+	if err := q.RecordConsultationEarnings(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	view := coachEarnings(t, h, coach)
+	if view.ThisMonthYen != 0 || len(view.Earnings) != 1 || view.Earnings[0].AmountYen != 960 {
+		t.Fatalf("earnings %+v", view)
+	}
+
+	// Query at the earning amount to isolate the cutoff from the 3,000 yen threshold.
+	payable, err := q.ListPayableCoachEarnings(ctx, 960)
+	if err != nil || len(payable) != 1 || payable[0].AmountYen != 960 {
+		t.Fatalf("payable %+v: %v", payable, err)
+	}
+}
+
 func TestConsultationPrivateReportsAndRetention(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)

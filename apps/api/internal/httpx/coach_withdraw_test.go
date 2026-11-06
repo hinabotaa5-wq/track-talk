@@ -144,7 +144,7 @@ func TestCoachWithdrawNeedsPayoutAccountForUnpaidEarnings(t *testing.T) {
 	tadmin := adminToken(t, h)
 	id, tc := onDutyCoach(t, h, tadmin)
 	execSQLArgs(t, `UPDATE coach_profiles SET payouts_enabled = false, stripe_account_id = NULL WHERE profile_id = $1`, id)
-	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen) VALUES (gen_random_uuid(), $1, 'review', 1000, 70, 700)`, id)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at) VALUES (gen_random_uuid(), $1, 'review', 1000, 70, 700, now())`, id)
 	rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody())
 	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "payouts_not_ready") {
 		t.Fatalf("withdraw without payout account %d %s", rec.Code, rec.Body.String())
@@ -158,7 +158,7 @@ func TestCoachWithdrawPaysSmallBalanceOnceBeforeAccountDelete(t *testing.T) {
 	h, f := setupStripe(t)
 	tadmin := adminToken(t, h)
 	id, tc := onDutyCoach(t, h, tadmin)
-	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, created_at)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
 		VALUES (gen_random_uuid(), $1, 'review', 1500, 70, 1050, `+lastMonthJST+`)`, id)
 	run := func() string {
 		rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
