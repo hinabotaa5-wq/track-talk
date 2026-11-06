@@ -60,14 +60,14 @@ test("動画を選んだらすぐ送り始め、送信中も詳細を書け、�
   const mocks = await mockApis(page);
 
   await page.goto("/posts/video");
-  const button = page.getByRole("button", { name: /動画を選んでください|動画を送っています|投稿する/ });
+  const button = page.getByRole("button", { name: /動画を選んでください|動画を読み込んでいます|投稿する/ });
   await expect(button).toHaveText("動画を選んでください");
   await expect(button).toBeDisabled();
   await expect(page.getByText("iPhoneの準備で少し時間がかかることがあります")).toBeVisible();
 
   const input = page.locator('input[type="file"]');
   await input.setInputFiles({ name: "first.mp4", mimeType: "video/mp4", buffer: video });
-  await expect(button).toHaveText(/動画を送っています \d+%/);
+  await expect(button).toHaveText(/動画を読み込んでいます \d+%/);
   await expect(button).toBeDisabled();
 
   // 選び直すと、前の送信を止めて新しい動画で送り直す。
@@ -78,7 +78,7 @@ test("動画を選んだらすぐ送り始め、送信中も詳細を書け、�
   const details = page.getByLabel("詳細");
   await details.fill("スタートの確認");
   await expect(details).toBeEditable();
-  await expect(button).toHaveText(/動画を送っています/);
+  await expect(button).toHaveText(/動画を読み込んでいます/);
 
   await expect(button).toHaveText("投稿する", { timeout: uploadDelayMs + 5000 });
   await expect(page.getByText("送信済み")).toBeVisible();
@@ -100,7 +100,7 @@ test("署名の取得中にもう一度求めても、取得は1回にまとめ�
   await signIn(context, page, baseURL!);
   const mocks = await mockApis(page, { signDelayMs: 1500 });
   await page.goto("/posts/video");
-  const button = page.getByRole("button", { name: /動画を選んでください|動画を送っています|投稿する/ });
+  const button = page.getByRole("button", { name: /動画を選んでください|動画を読み込んでいます|投稿する/ });
   await expect(button).toHaveText("動画を選んでください");
   const input = page.locator('input[type="file"]');
 
