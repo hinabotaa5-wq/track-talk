@@ -84,7 +84,7 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     if (!track) return;
     pendingPosition.current = storageKey ? positions.get(storageKey) : undefined;
     let frame = 0, scrollFrame = 0, persistTimer: ReturnType<typeof setTimeout> | undefined;
-    let fixedAvailable = 0, measuredWidth = 0;
+    let fixedAvailable = 0, measuredWidth = 0, measuredTop = Number.NaN;
     const canvas = track.firstElementChild as HTMLElement;
     function savePosition(event?: Event) {
       if (!storageKey || pendingPosition.current) return;
@@ -96,15 +96,20 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     function layoutNow() {
       const width = Math.round(track!.clientWidth);
       if (width <= 0) return;
-      if (!fixedAvailable || Math.abs(width - measuredWidth) > 1) {
+      // ヘッダー下段(エグ練グランプリの帯)は一覧より後から出るので、一覧の上端が動いたら高さを測り直す。
+      // 測り直さないと一覧が帯の分だけ下へずれ、最下段が下のメニューの裏に隠れる。
+      const top = track!.getBoundingClientRect().top + window.scrollY;
+      if (!fixedAvailable || Math.abs(width - measuredWidth) > 1 || Math.abs(top - measuredTop) > 1) {
         const bottomNav = Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="メイン"]')).find((nav) => getComputedStyle(nav).position === "fixed" && nav.getBoundingClientRect().height > 0);
         const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
         const header = document.querySelector("header");
         if (header) filters?.style.setProperty("--home-header-height", `${header.getBoundingClientRect().height}px`);
-        const heightKey = `${storageKey}:${width}`;
-        fixedAvailable = readHeight(heightKey) ?? Math.max(280, window.innerHeight - (track!.getBoundingClientRect().top + window.scrollY) - (bottomNav?.getBoundingClientRect().height ?? 0) - 8);
+        // 保存する高さは一覧の上端の位置ごとに分け、帯がない状態で測った高さを帯がある画面で使わない。
+        const heightKey = `${storageKey}:${width}:${Math.round(top)}`;
+        fixedAvailable = readHeight(heightKey) ?? Math.max(280, window.innerHeight - top - (bottomNav?.getBoundingClientRect().height ?? 0) - 8);
         saveHeight(heightKey, fixedAvailable);
         measuredWidth = width;
+        measuredTop = top;
       }
       // 描画中の画像だけ測る。画面外の座標はDOMに依存しない。
       for (const node of Array.from(canvas.children) as HTMLElement[]) {
@@ -156,6 +161,9 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     }
     const observer = new ResizeObserver(schedule);
     observer.observe(track);
+    // ヘッダーの高さが変わる(帯が後から出る・消える)と一覧の上端が動くので、そのときも並べ直す。
+    const pageHeader = document.querySelector("header");
+    if (pageHeader) observer.observe(pageHeader);
     canvas.addEventListener("load", schedule, true);
     canvas.addEventListener("error", schedule, true);
     track.addEventListener("scroll", onScroll, { passive: true });
