@@ -34,13 +34,14 @@ func TestReservedProfileNicknames(t *testing.T) {
 	} {
 		patch(t, tok, name, http.StatusUnprocessableEntity, `"code":"nickname_reserved"`)
 	}
+	other := token(t, uuid.New())
 	for _, name := range []string{
 		"たなかたろう", "陸上たろう", "管理栄養士たろう", "モデラーのたろう", "runnerたろう",
 		"サポーターたろう", "公式戦がんばる", "サポーターズ", "supporter", "supporters",
 	} {
-		patch(t, tok, name, http.StatusOK, `"nickname":"`+name+`"`)
+		patch(t, other, name, http.StatusOK, `"nickname":"`+name+`"`)
 	}
-	patch(t, tok, "管理者", http.StatusUnprocessableEntity, `"code":"nickname_reserved"`)
+	patch(t, other, "管理者", http.StatusUnprocessableEntity, `"code":"nickname_reserved"`)
 
 	execSQLArgs(t, `UPDATE profiles SET nickname = '運営', nickname_public = false WHERE id = $1`, id)
 	patch(t, tok, "運営", http.StatusOK, `"nickname_public":true`)
