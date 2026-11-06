@@ -57,7 +57,7 @@ export default function CommercePage() {
         </Row>
         <Row term="商品代金以外の必要料金">インターネットの通信料は利用者の負担です。</Row>
         <Row term="支払方法">
-          <p>クレジットカード（Apple Pay・Google Pay を含む）、PayPay。1回ごとのお支払いです。</p>
+          <p>クレジットカード（Apple Pay・Google Pay を含む）。1回ごとのお支払いです。</p>
         </Row>
         <Row term="支払時期">
           <p>フォーム添削は、PayPay の場合は申込みの時に決済が済みます。</p>

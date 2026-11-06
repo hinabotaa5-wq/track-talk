@@ -7,6 +7,7 @@ import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
+import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProg
 import {
   maxReviewSeconds,
   reviewEvents,
+  availableReviewPayMethods,
   reviewPayMethodLabels,
   tooLong,
   videoDuration,
@@ -300,7 +302,7 @@ export default function NewReviewRequestPage() {
               <legend className="text-sm font-semibold">お支払い（合計 {formatYen(totalPrice)}）</legend>
               <div className="flex flex-wrap gap-2">
                 {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>チケット（2枚）</button> : null}
-                {(estimate?.payments ? Object.keys(reviewPayMethodLabels) as ReviewPayMethod[] : []).map((m) => (
+                {(estimate?.payments ? availableReviewPayMethods : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}
                   </button>
@@ -311,6 +313,7 @@ export default function NewReviewRequestPage() {
                   ? "送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。"
                   : "送るとお支払いの画面に進み、その場でお支払いが済みます。目安までに返ってこなければ全額を返金します。"}
               </p>
+              {estimate?.payments ? <ReviewPayNotice /> : null}
             </fieldset>
           ) : (
             <p className="text-xs text-slate-300">デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。</p>

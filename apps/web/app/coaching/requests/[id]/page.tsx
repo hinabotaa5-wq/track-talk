@@ -10,12 +10,13 @@ import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-reques
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
+import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
-import { helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
+import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
 import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -186,7 +187,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
     <section className="space-y-2">
       <p className="text-sm text-slate-200">お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。</p>
       {minor ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-      {(Object.keys(reviewPayMethodLabels) as ReviewPayMethod[]).map((m) => (
+      {availableReviewPayMethods.map((m) => (
         <button
           key={m}
           type="button"
@@ -197,6 +198,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
           {reviewPayMethodLabels[m]}で払う
         </button>
       ))}
+      <ReviewPayNotice />
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </section>
   );

@@ -100,7 +100,7 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 	if c.Minor && c.ContractID != nil {
 		path = "/guardian/paid"
 	}
-	methods := checkoutPaymentMethods
+	methods := reviewPaymentMethods
 	if c.ContractID != nil {
 		methods = []string{"card"}
 	}

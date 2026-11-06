@@ -231,7 +231,7 @@ type reviewRequestReq struct {
 	Focus         []string `json:"focus"`
 	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
-	// 支払い方法（card か paypay）。Stripe の鍵があるときだけ使う。
+	// 支払い方法（reviewPaymentMethods のどれか。今は card のみ）。Stripe の鍵があるときだけ使う。
 	Method     string `json:"method"`
 	UseTickets bool   `json:"use_tickets"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。

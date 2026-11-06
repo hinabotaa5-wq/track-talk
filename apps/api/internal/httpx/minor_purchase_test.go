@@ -23,6 +23,7 @@ func declarationsFor(t *testing.T, minor uuid.UUID, refType, refID string) (int,
 // 18歳未満は、保護者の同意の記録がなくても、購入のたびに宣言にチェックすれば動画添削・追加相談を買える。
 // チェックがなければ支払い画面を作らない。宣言は取引ごとに残り、月の上限では止めず、保護者への購入の通知も送らない。
 func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
+	allowPayPayForTest(t)
 	fakeCoachingCloudinary(t)
 	h, f := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -137,6 +138,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 
 // 18歳以上は宣言を求めず、記録も残さない。支払いに未成年の印も付かない。
 func TestAdultPurchaseNeedsNoDeclaration(t *testing.T) {
+	allowPayPayForTest(t)
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)

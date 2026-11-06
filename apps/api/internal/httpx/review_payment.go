@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,7 +19,7 @@ import (
 // フォーム添削の支払い（Stripe Checkout）。Stripe の鍵があるときだけ使い、なければ支払いなしのデモ版。
 // 送ると支払い画面に進み、支払いが届いたら選んだコーチに依頼が届く。
 // カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
-// PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する。
+// PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する（今は受け付けていない。reviewPaymentMethods）。
 
 // 動画添削の料金。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。報酬はこの70%。
 const reviewPriceYen int32 = 1500
@@ -27,7 +28,8 @@ const reviewPriceYen int32 = 1500
 // 本人が自分で払う動画添削・追加相談は、この上限ではなく購入のたびの宣言で確かめる（minor_purchase.go）。
 const defaultMinorMonthlyLimit = 3000
 
-func validReviewPayMethod(m string) bool { return m == "card" || m == "paypay" }
+// validReviewPayMethod は、動画添削の申込みで受け付ける支払い方法か。今使えない方法（PayPay）は断る。
+func validReviewPayMethod(m string) bool { return slices.Contains(reviewPaymentMethods, m) }
 
 func reviewPaymentJSON(p db.ReviewPayment) map[string]any {
 	return map[string]any{
