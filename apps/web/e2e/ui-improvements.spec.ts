@@ -171,7 +171,7 @@ test("今日の大会アイコンをホーム以外の通常ページにも表�
 });
 
 test("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 390, height: 640 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   // CIのAPIに投稿がある場合も、古いSSRデータをブラウザの固定テストデータで更新させる。
   await page.clock.setFixedTime(Date.now() + 120_000);
@@ -192,7 +192,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await expect(track).toBeVisible();
   // 画面の空き具合によっては、最初の操作より前に2ページ目まで補う。
   await expect(track.locator('a[href="/posts/horizontal-1"]')).toBeVisible();
-  await expect.poll(async () => Number(await track.locator(".masonry-feed-canvas").getAttribute("data-count"))).toBeGreaterThanOrEqual(6);
+  await expect.poll(async () => Number(await track.locator(".home-feed-grid-canvas").getAttribute("data-count"))).toBeGreaterThanOrEqual(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   await expect.poll(() => track.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   const first = track.getByRole("link").first();
@@ -203,7 +203,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   const originalY = await page.evaluate(() => window.scrollY);
   await expect(page.getByRole("button", { name: "次の投稿へ", exact: true })).toHaveCount(0);
   await track.hover();
-  await page.mouse.wheel(0, 240);
+  await page.mouse.wheel(0, 100);
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   await expect(track.getByRole("link")).toHaveCount(12);
   expect((await first.boundingBox())!.x).toBeLessThan(before!.x);
@@ -216,7 +216,8 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(beforeKey);
   await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; el.dispatchEvent(new Event("scroll")); });
   await expect(page).not.toHaveURL(/page=2/);
-  await expect(track.getByRole("link").first()).toHaveAttribute("href", "/posts/horizontal-1");
+  const canvas = track.locator(".home-feed-grid-canvas");
+  await expect(canvas).toHaveAttribute("data-count", "12");
   await expect(track.getByRole("button", { name: "続きを読み込む" })).toHaveCount(0);
   await page.route("**/api/v1/posts/horizontal-12**", (route) => route.fulfill({ json: {
     id: "horizontal-12", title: "戻り位置の確認", body: "本文", kind: "text",
@@ -229,7 +230,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   await opened.click();
   await expect(page).toHaveURL(/posts\/horizontal-12$/);
   await page.getByRole("button", { name: "戻る", exact: true }).click();
-  await expect(track.getByRole("link")).toHaveCount(12);
+  await expect(canvas).toHaveAttribute("data-count", "12");
   await expect.poll(async () => Math.abs((await opened.boundingBox())!.x - openedX)).toBeLessThan(3);
 });
 
@@ -252,31 +253,46 @@ test("レビューは商品を縦スクロールで見られる", async ({ page 
   expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
 });
 
-test("サムネイルの縦横比と異なる高さを保ち、右側の投稿を左へ送れる", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test("縦長・横長・写真・YouTubeを同じ4:3の枠で切り抜いて横送りする", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 640 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   await page.route("**/api/v1/posts?**", (route) => route.fulfill({ json: {
     posts: Array.from({ length: 8 }, (_, index) => index % 2 ? "vertical" : "horizontal").map((name, index) => ({
-      id: `ratio-${index}`, title: `${name}動画${index}`, body: "サムネイルの表示確認", kind: "video",
+      id: `ratio-${index}`, title: `${name}動画${index}`, body: "サムネイルの表示確認", kind: (["video", "video", "text", "youtube"] as const)[index % 4],
+      youtube_video_id: index % 4 === 3 ? "sample-video" : undefined,
       playback_url: `/samples/${name}.mp4`, thumbnail_url: `/samples/${name}.jpg`,
       mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
       created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
     })), meta: { page: 1, per_page: 20, total: 8 },
   } }));
+  let showBanner!: () => void;
+  const bannerReady = new Promise<void>((resolve) => { showBanner = resolve; });
+  await page.route("**/api/v1/menu-contest", async (route) => {
+    await bannerReady;
+    await route.fulfill({ json: { round: { phase: "entry", entry_ends_at: new Date(Date.now() + 86_400_000).toISOString() } } });
+  });
   await page.goto("/");
+
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track.locator("img")).toHaveCount(8);
   await expect(track.locator("video, iframe")).toHaveCount(0);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
-  const sizes = await track.locator("img").evaluateAll((images) => images.map((image) => {
-    const img = image as HTMLImageElement;
-    const bounds = img.getBoundingClientRect();
-    return { width: bounds.width, height: bounds.height, ratio: img.naturalWidth / img.naturalHeight };
+  const cards = track.locator(".home-feed-grid-tile > a");
+  const sizes = await cards.evaluateAll((links) => links.map((link) => {
+    const { width, height } = link.getBoundingClientRect();
+    const image = link.querySelector("img")!;
+    return { width, height, fit: getComputedStyle(image).objectFit, sourceRatio: image.naturalWidth / image.naturalHeight };
   }));
-  for (const image of sizes) expect(image.width / image.height).toBeCloseTo(image.ratio, 2);
-  expect(sizes[0].width).toBeGreaterThan(sizes[0].height);
-  expect(sizes[1].height).toBeGreaterThan(sizes[1].width);
-  expect(Math.abs(sizes[0].height - sizes[1].height)).toBeGreaterThan(50);
+  expect(sizes[0].sourceRatio).toBeGreaterThan(1);
+  expect(sizes[1].sourceRatio).toBeLessThan(1);
+  for (const size of sizes) {
+    expect(size.width).toBe(sizes[0].width);
+    expect(size.height).toBe(sizes[0].height);
+    expect(size.width / size.height).toBeCloseTo(4 / 3, 2);
+    expect(size.fit).toBe("cover");
+  }
+  await expect(cards.nth(0).locator(".feed-card-caption p")).toHaveClass(/line-clamp-1/);
+  await expect(cards.nth(1).locator(".feed-card-caption p")).toHaveClass(/line-clamp-3/);
   const first = track.locator("img").first();
   const before = (await first.boundingBox())!.x;
   await track.focus();
@@ -284,6 +300,18 @@ test("サムネイルの縦横比と異なる高さを保ち、右側の投稿�
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   expect((await first.boundingBox())!.x).toBeLessThan(before);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  const canvas = track.locator(".home-feed-grid-canvas");
+  const initialHeight = (await canvas.boundingBox())!.height;
+  showBanner();
+  await expect(page.getByRole("link", { name: /エグ練グランプリ/ })).toBeVisible();
+  await expect.poll(async () => (await canvas.boundingBox())!.height).toBeLessThan(initialHeight);
+  const bottomNav = page.getByRole("navigation", { name: "メイン", exact: true });
+  await expect.poll(async () => {
+    const nav = (await bottomNav.boundingBox())!;
+    const bottom = await cards.evaluateAll((links) => Math.max(...links.map((link) => link.getBoundingClientRect().bottom)));
+    return bottom - nav.y;
+  }).toBeLessThanOrEqual(0);
 });
 
 test("フィードを更新しても投稿の大きさと配置を保つ", async ({ page }) => {
@@ -297,7 +325,7 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
       created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
     })), meta: { page: 1, per_page: 20, total: 6 },
   } }));
-  const layout = () => page.getByRole("region", { name: "投稿一覧", exact: true }).locator(".masonry-feed-tile").evaluateAll((tiles) => tiles.map((tile) => {
+  const layout = () => page.getByRole("region", { name: "投稿一覧", exact: true }).locator(".home-feed-grid-tile").evaluateAll((tiles) => tiles.map((tile) => {
     const rect = tile.getBoundingClientRect();
     return [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)];
   }));
@@ -305,25 +333,26 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track.locator("img")).toHaveCount(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
-  await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
-  // 画像のloadで予約された配置計算とReactの描画を待ってから、更新前の配置を記録する。
-  await track.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(track.locator(".home-feed-grid-canvas[data-ready=\"true\"]")).toBeVisible();
   const before = await layout();
   await page.reload();
   await expect(track.locator("img")).toHaveCount(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
-  await expect(track.locator(".masonry-feed-canvas[data-ready=\"true\"]")).toBeVisible();
+  await expect(track.locator(".home-feed-grid-canvas[data-ready=\"true\"]")).toBeVisible();
   await expect.poll(layout).toEqual(before);
 });
 
-test("空きに組み合わせても新しい順・人気順と固定タブを保つ", async ({ page }) => {
+test("均一グリッドでも新しい順・人気順・募集と固定タブを保つ", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 640 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   const newOrder = ["newest", "middle", "oldest", "fourth", "fifth", "sixth", "seventh", "eighth"];
   const popularOrder = ["oldest", "fourth", "newest", "middle", "fifth", "sixth", "seventh", "eighth"];
   await page.route("**/api/v1/posts?**", (route) => {
-    const order = new URL(route.request().url()).searchParams.get("sort") === "popular" ? popularOrder : newOrder;
+    const params = new URL(route.request().url()).searchParams;
+    const recruitment = params.get("kind") === "recruitment";
+    const order = recruitment ? ["募集投稿"] : params.get("sort") === "popular" ? popularOrder : newOrder;
     return route.fulfill({ json: { posts: order.map((id, index) => ({
-      id, title: id, body: id, kind: "video", playback_url: "/samples/vertical.mp4",
+      id, title: id, body: id, kind: recruitment ? "recruitment" : "video", playback_url: "/samples/vertical.mp4",
       thumbnail_url: `/samples/${index % 3 === 0 ? "vertical" : "horizontal"}.jpg`,
       mine: false, liked_by_me: false, saved_by_me: false, like_count: 0, comment_count: 0,
       created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
@@ -332,7 +361,7 @@ test("空きに組み合わせても新しい順・人気順と固定タブを�
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
-  await expect(track.locator('.masonry-feed-canvas[data-ready="true"]')).toBeVisible();
+  await expect(track.locator('.home-feed-grid-canvas[data-ready="true"]')).toBeVisible();
   await expect(track.getByRole("link")).toHaveText(newOrder);
   const before = await nav.boundingBox();
   const originalY = await page.evaluate(() => window.scrollY);
@@ -345,6 +374,8 @@ test("空きに組み合わせても新しい順・人気順と固定タブを�
   await nav.getByRole("link", { name: "人気", exact: true }).click();
   await expect(track.getByRole("link")).toHaveText(popularOrder);
   await expect(nav.getByRole("link", { name: "人気", exact: true })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("link", { name: "募集", exact: true }).click();
+  await expect(track.getByRole("link")).toHaveText([/募集投稿/]);
   await nav.getByRole("link", { name: "新しい", exact: true }).click();
   await expect(track.getByRole("link")).toHaveText(newOrder);
 });

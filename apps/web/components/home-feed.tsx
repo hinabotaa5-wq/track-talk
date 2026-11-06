@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { retainHomeFeedWindow, type PostsPage } from "@/lib/fetch-posts";
 import { homeFeedPath, nextHomeFeedPath, isFeedFresh, loadHomeFeed, prefetchHomeFeeds, readHomeFeedChunks, saveHomeFeedChunks, homeFeedGeneration } from "@/lib/home-feed-cache";
 import { FeedCard } from "@/components/feed-card";
-import { MasonryFeed } from "@/components/masonry-feed";
+import { HomeFeedGrid } from "@/components/home-feed-grid";
 import { FeedLoadingFrame } from "@/components/loading-frame";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { ApiRequestError } from "@/lib/api";
@@ -155,7 +155,7 @@ export function HomeFeed({
       {cursorExpired ? <button type="button" className="text-sm text-slate-300" onClick={() => window.location.reload()}>一覧の有効期限が切れました。更新する</button> : null}
       {reloadError ? <button type="button" className="text-sm text-slate-300" onClick={() => { reloading.current.clear(); setReloadError(false); onVisibleIndices(posts.map((post, i) => visibleIDs.current.has(post.id) ? i : -1).filter((i) => i >= 0)); }}>投稿の再取得に失敗しました。再試行</button> : null}
       {posts.length > 0 ? (
-        <MasonryFeed onVisibleIndices={onVisibleIndices} compact={posts.map((post) => post.kind === "text" && !post.thumbnail_url)} storageKey={path} onEndReached={hasNext && !moreError ? loadMore : undefined} ratios={[...posts.map((post) => post.youtube_shorts || post.instagram_type === "reel" ? 9 / 16 : 4 / 3), ...(hasNext ? [4 / 3] : [])]}>
+        <HomeFeedGrid onVisibleIndices={onVisibleIndices} storageKey={path} onEndReached={hasNext && !moreError ? loadMore : undefined}>
           {posts.map((post) => unloadedIDs.has(post.id)
             ? <div key={post.id} aria-busy="true" className="aspect-[4/3] rounded-2xl glass bg-white/10 animate-pulse" />
             : unavailableIDs.has(post.id) ? <div key={post.id} className="flex aspect-[4/3] items-center justify-center rounded-2xl glass p-4 text-sm text-slate-300">この投稿は現在表示できません</div>
@@ -167,12 +167,12 @@ export function HomeFeed({
               onClick={() => void loadMore(true)}
               disabled={loadingMore}
               aria-live="polite"
-              className="masonry-feed-next flex aspect-[4/3] w-full items-center justify-center rounded-2xl border border-white/20 glass bg-white/10 px-4 text-center text-sm font-semibold text-slate-200 transition hover:bg-white/16 disabled:opacity-60"
+              className="flex h-full w-full items-center justify-center rounded-2xl border border-white/20 glass bg-white/10 px-4 text-center text-sm font-semibold text-slate-200 transition hover:bg-white/16 disabled:opacity-60"
             >
               {loadingMore ? "読み込み中…" : moreError ? "読み込みに失敗しました。再試行" : "続きを読み込む"}
             </button>
           ) : null}
-        </MasonryFeed>
+        </HomeFeedGrid>
       ) : null}
     </>
   );

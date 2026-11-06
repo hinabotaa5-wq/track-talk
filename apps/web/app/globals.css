@@ -808,41 +808,51 @@ select:-webkit-autofill {
 }
 
 /* タブを含むページではなく、この投稿領域だけを横へ送る。 */
-.masonry-feed-strip {
+.home-feed-grid-strip {
+  --home-feed-columns: 2;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   padding: 4px 0;
 }
-.masonry-feed-strip::-webkit-scrollbar {
+@media (width >= 48rem) {
+  .home-feed-grid-strip { --home-feed-columns: 3; }
+}
+@media (width >= 80rem) {
+  .home-feed-grid-strip { --home-feed-columns: 4; }
+}
+.home-feed-grid-strip::-webkit-scrollbar {
   display: none;
 }
-.masonry-feed-canvas {
+.home-feed-grid-canvas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(var(--home-feed-columns), minmax(0, 1fr));
   align-items: start;
   gap: 12px;
 }
-.masonry-feed-canvas[data-ready="true"] {
+.home-feed-grid-canvas[data-ready="true"] {
   display: block;
   position: relative;
 }
-.masonry-feed-canvas[data-ready="true"] > .masonry-feed-tile {
+.home-feed-grid-canvas[data-ready="true"] > .home-feed-grid-tile {
   position: absolute;
 }
-.masonry-feed-tile {
+.home-feed-grid-tile {
   min-width: 0;
+  aspect-ratio: 4 / 3;
 }
-.masonry-feed-tile > a {
-  display: block;
+.home-feed-grid-tile > a,
+.home-feed-grid-tile > a > div:first-child {
   width: 100%;
+  height: 100%;
+}
+.home-feed-grid-tile > a {
   margin-bottom: 0;
 }
-.masonry-feed-tile .feed-card-thumbnail img {
+.home-feed-grid-tile .feed-card-thumbnail img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
 }
-
-.masonry-feed-tile > .masonry-feed-next { display: flex; }

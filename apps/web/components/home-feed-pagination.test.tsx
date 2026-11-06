@@ -18,7 +18,7 @@ vi.mock("@/lib/home-feed-cache", () => ({
   homeFeedGeneration: () => 0,
 }));
 vi.mock("./feed-card", () => ({ FeedCard: ({ post }: { post: Post }) => <a href={`/posts/${post.id}`}>{post.title}</a> }));
-vi.mock("./masonry-feed", () => ({ MasonryFeed: ({ children, onEndReached }: { children: ReactNode; onEndReached?: () => void }) => <div><button data-end onClick={() => onEndReached?.()}>末尾付近へ</button>{children}</div> }));
+vi.mock("./home-feed-grid", () => ({ HomeFeedGrid: ({ children, onEndReached }: { children: ReactNode; onEndReached?: () => void }) => <div><button data-end onClick={() => onEndReached?.()}>末尾付近へ</button>{children}</div> }));
 const request = vi.mocked(loadHomeFeed);
 const post = (id: string) => ({ id, title: id, kind: "text" }) as Post;
 const chunk = (page: number, ids: string[], total = 36): PostsPage => ({ posts: ids.map(post), meta: { page, per_page: 12, total } });
