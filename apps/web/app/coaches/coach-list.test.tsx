@@ -17,7 +17,7 @@ vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { pl
 
 const coach: PublicCoach = {
   id: "coach-1", nickname: "テストコーチ", photo_url: "", tier: "coach", events: ["100m"],
-  best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/"], rating_count: 0, rating_average: 0,
+  best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/", "@tracktalk.office", "javascript:alert(1)"], rating_count: 0, rating_average: 0,
   service_types: ["video_review"],
   plans: [{ id: "plan-1", title: "公開中の動画添削", kind: "single", description: "説明", duration_days: 7,
     price_yen: 2000, capacity: 3, published: true, service_type: "video_review",
@@ -55,6 +55,10 @@ it("詳細URLを直接開いても対象コーチのプロフィールと公開�
   expect(container.textContent).not.toContain("公開中の動画添削");
   const sns = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "https://www.instagram.com/testcoach/");
   expect(sns?.getAttribute("target")).toBe("_blank");
+  for (const entry of ["@tracktalk.office", "javascript:alert(1)"]) {
+    expect(container.textContent).toContain(entry);
+    expect([...container.querySelectorAll("a")].some((a) => a.textContent === entry)).toBe(false);
+  }
 });
 
 it("詳細内には戻るボタンを重複表示せず、ヘッダーに任せる", async () => {

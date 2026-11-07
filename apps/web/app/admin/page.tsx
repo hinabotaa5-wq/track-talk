@@ -5,6 +5,7 @@ import { PageLoading } from "@/components/page-loading";
 import { AdminStatsView } from "@/components/admin-stats";
 import { AnnouncementsAdmin } from "@/components/announcements-admin";
 import { CoachAvatar } from "@/components/coach-photo";
+import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { CoachingContractsAdmin } from "@/components/coaching-admin";
 import { PayoutsAdmin } from "@/components/coach-payouts";
 import { useAuth } from "@/components/auth-provider";
@@ -515,11 +516,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {(a.sns_urls ?? []).length ? (
               <p className="space-y-1">
                 <span className="block">SNS・ホームページ:</span>
-                {a.sns_urls.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">
-                    {url}
-                  </a>
-                ))}
+                {a.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </p>
             ) : null}
             {a.status === "approved" ? (
