@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/empty-state";
@@ -122,9 +121,6 @@ export function PracticeListView() {
           ) : null}
         </>
       )}
-      <Link href="/posts/practice" className="inline-flex min-h-11 items-center text-sm font-medium text-sky-200 underline underline-offset-4">
-        練習相手を募集する
-      </Link>
     </div>
   );
 }

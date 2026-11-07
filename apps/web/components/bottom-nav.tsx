@@ -87,7 +87,7 @@ function isMeSubPage(pathname: string) {
 
 // タブから開いた先の画面は共通ヘッダーで戻る。
 function isDetailPage(pathname: string) {
-  return pathname === "/coaches" || pathname === "/coach" || pathname === "/admin" ||
+  return pathname === "/coaches" || pathname === "/coach" || pathname === "/admin" || pathname === "/practice" ||
     ["/coaches/", "/coaching/", "/coach/", "/competitions/", "/prefectures/", "/guardian/", "/admin/"].some((prefix) => pathname.startsWith(prefix));
 }
 
