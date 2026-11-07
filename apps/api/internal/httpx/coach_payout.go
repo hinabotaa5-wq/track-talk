@@ -37,6 +37,8 @@ func (s *Server) payoutsReady(c db.CoachProfile) bool {
 
 const payoutsNotReadyMessage = "報酬の受け取り口座を登録してから使えます（コーチの画面の「報酬」から登録できます）"
 
+var errCoachStripeAttemptExpired = errors.New("unresolved Stripe account creation is outside the retry window")
+
 // startCoachOnboarding は、コーチの受け取り用のアカウントを作り（まだなければ）、口座登録の画面の URL を返す。
 func (s *Server) startCoachOnboarding(w http.ResponseWriter, r *http.Request) {
 	coach, ok := s.approvedCoach(w, r)
@@ -51,18 +53,17 @@ func (s *Server) startCoachOnboarding(w http.ResponseWriter, r *http.Request) {
 	if coach.StripeAccountID != nil {
 		account = *coach.StripeAccountID
 	} else {
-		// 2回押しても、Stripe は同じアカウントを返す。
-		a, err := s.stripe.CreateAccount(r.Context(), map[string]string{"profile_id": coach.ProfileID.String()}, "account-"+coach.ProfileID.String())
-		if err != nil {
-			writeCheckoutError(w, fmt.Errorf("%w: %w", errStripe, err))
+		var err error
+		account, err = s.createCoachStripeAccount(r.Context(), coach.ProfileID)
+		if errors.Is(err, errCoachStripeAttemptExpired) {
+			slog.Warn("stripe account creation needs reconciliation", "profile_id", coach.ProfileID)
+			Error(w, http.StatusConflict, "stripe_account_pending", "以前の口座登録の結果を確認する必要があります。運営にお問い合わせください")
 			return
 		}
-		c, err := s.q.SetCoachStripeAccount(r.Context(), db.SetCoachStripeAccountParams{StripeAccountID: &a.ID, ProfileID: coach.ProfileID})
 		if err != nil {
-			MapDBError(w, err)
+			writeCheckoutError(w, err)
 			return
 		}
-		account = *c.StripeAccountID
 	}
 	page := s.cfg.WebBaseURL + "/coach"
 	link, err := s.stripe.CreateAccountLink(r.Context(), account, page+"?stripe=refresh", page+"?stripe=return")
@@ -71,6 +72,69 @@ func (s *Server) startCoachOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"url": link})
+}
+
+func (s *Server) createCoachStripeAccount(ctx context.Context, profileID uuid.UUID) (string, error) {
+	// Stripe に送る前に試行を確定する。デプロイ前の試行も同じキーで再送できる。
+	err := s.q.StartCoachStripeAccountAttempt(ctx, db.StartCoachStripeAccountAttemptParams{
+		ProfileID: profileID, IdempotencyKey: "account-" + profileID.String(),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(context.WithoutCancel(ctx))
+	q := s.q.WithTx(tx)
+	// 口座の保存とキーの更新を直列化し、同時リクエストによる二重作成を防ぐ。
+	attempt, err := q.LockCoachStripeAccountAttempt(ctx, profileID)
+	if err != nil {
+		return "", err
+	}
+	if attempt.StripeAccountID != nil {
+		return *attempt.StripeAccountID, nil
+	}
+	if attempt.StartedAt == nil {
+		// ロックを待つ間に別のリクエストが失敗し、次のキーに切り替えた。
+		return "", fmt.Errorf("%w: Stripe account creation was rejected by a concurrent request", errStripe)
+	}
+	// Stripe がキーを削除できる24時間までに、HTTP の再送を含めて終わらせる。
+	if time.Since(*attempt.StartedAt) >= 23*time.Hour+58*time.Minute {
+		return "", errCoachStripeAttemptExpired
+	}
+
+	a, err := s.stripe.CreateAccount(ctx, map[string]string{"profile_id": profileID.String()}, attempt.IdempotencyKey)
+	if err != nil {
+		// Stripe が口座作成を明示的に拒否した場合だけ、次の試行に新しいキーを割り当てる。
+		// 通信断・5xx・べき等キーの競合では、すでに作成された可能性がある。
+		var apiErr *stripe.APIError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusBadRequest &&
+			apiErr.Type == "invalid_request_error" && apiErr.Code != "idempotency_key_in_use" {
+			if rotateErr := q.RotateCoachStripeAccountAttempt(ctx, db.RotateCoachStripeAccountAttemptParams{
+				ProfileID: profileID, IdempotencyKey: "account-" + uuid.NewString(),
+			}); rotateErr != nil {
+				return "", rotateErr
+			}
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", commitErr
+			}
+		}
+		return "", fmt.Errorf("%w: %w", errStripe, err)
+	}
+	if a.ID == "" {
+		return "", fmt.Errorf("%w: missing Stripe account ID", errStripe)
+	}
+	coach, err := q.SetCoachStripeAccount(ctx, db.SetCoachStripeAccountParams{StripeAccountID: &a.ID, ProfileID: profileID})
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return *coach.StripeAccountID, nil
 }
 
 // refreshPayoutsEnabled は、口座登録が済んだかを Stripe に聞いて記録する。

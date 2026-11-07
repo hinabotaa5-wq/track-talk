@@ -2,8 +2,11 @@ package httpx_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -98,6 +101,121 @@ func TestCoachOnboardingGatesDutyAndContracts(t *testing.T) {
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/stripe/onboarding", tu, nil); rec.Code != http.StatusForbidden {
 		t.Fatalf("not coach %d", rec.Code)
+	}
+}
+
+func TestCoachOnboardingRetriesAccountCreation(t *testing.T) {
+	const path = "/v1/coach/stripe/onboarding"
+	const link = "https://connect.stripe.test/acct_1"
+	for _, tc := range []struct {
+		name     string
+		rejected bool
+		expired  bool
+	}{
+		{name: "cached rejection gets a new key", rejected: true},
+		{name: "lost response reuses the created account"},
+		{name: "expired unresolved attempt stops sending requests", expired: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var keys []string
+			rejectedKey := ""
+			accounts := map[string]string{}
+			blockResponse := true
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = r.ParseForm()
+				mu.Lock()
+				defer mu.Unlock()
+				switch r.URL.Path {
+				case "/v1/accounts":
+					key := r.Header.Get("Idempotency-Key")
+					keys = append(keys, key)
+					if tc.rejected && blockResponse {
+						rejectedKey = key
+					}
+					if tc.rejected && key == rejectedKey {
+						w.WriteHeader(http.StatusBadRequest)
+						fmt.Fprint(w, `{"error":{"type":"invalid_request_error","message":"platform profile incomplete"}}`)
+						return
+					}
+					if _, exists := accounts[key]; !exists {
+						accounts[key] = fmt.Sprintf("acct_%d", len(accounts)+1)
+					}
+					if blockResponse {
+						// Stripe が作成したあと、レスポンスがこちらに届く前に切断する。
+						conn, _, err := http.NewResponseController(w).Hijack()
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						_ = conn.Close()
+						return
+					}
+					_ = json.NewEncoder(w).Encode(map[string]string{"id": accounts[key]})
+				case "/v1/account_links":
+					_ = json.NewEncoder(w).Encode(map[string]string{"url": "https://connect.stripe.test/" + r.PostForm.Get("account")})
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			t.Cleanup(srv.Close)
+			h := setupConfig(t, func(cfg *config.Config) {
+				cfg.StripeSecretKey = "sk_test_x"
+				cfg.StripeAPIBase = srv.URL
+				cfg.WebBaseURL = "https://web.test"
+			})
+			id, token, _ := planCoach(t, h, 3)
+			execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = NULL, payouts_enabled = false WHERE profile_id = $1`, id)
+			if rec := doJSON(t, h, http.MethodPost, path, token, nil); rec.Code != http.StatusBadGateway {
+				t.Fatalf("first attempt %d %s", rec.Code, rec.Body.String())
+			}
+
+			mu.Lock()
+			blockResponse = false
+			firstAttemptCalls := len(keys)
+			mu.Unlock()
+			if tc.expired {
+				execSQLArgs(t, `UPDATE coach_stripe_account_attempts SET started_at = now() - interval '24 hours' WHERE profile_id = $1`, id)
+				rec := doJSON(t, h, http.MethodPost, path, token, nil)
+				if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "stripe_account_pending") {
+					t.Fatalf("expired attempt %d %s", rec.Code, rec.Body.String())
+				}
+			} else {
+				// 同時に再試行しても、片方だけが Stripe に口座作成を送る。
+				retries := make(chan *httptest.ResponseRecorder, 2)
+				for range 2 {
+					go func() {
+						retries <- doJSON(t, h, http.MethodPost, path, token, nil)
+					}()
+				}
+				for range 2 {
+					if rec := <-retries; rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), link) {
+						t.Fatalf("retry %d %s", rec.Code, rec.Body.String())
+					}
+				}
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if firstAttemptCalls == 0 || len(accounts) != 1 || keys[0] != "account-"+id.String() {
+				t.Fatalf("account creations %v, keys %v", accounts, keys)
+			}
+			for _, key := range keys[:firstAttemptCalls] {
+				if key != keys[0] {
+					t.Fatalf("automatic retries used different keys: %v", keys)
+				}
+			}
+			if tc.expired {
+				if len(keys) != firstAttemptCalls {
+					t.Fatalf("sent another create after expiry: %v", keys)
+				}
+				return
+			}
+			if len(keys) != firstAttemptCalls+1 || keys[firstAttemptCalls] == "" ||
+				(keys[firstAttemptCalls] != keys[0]) != tc.rejected {
+				t.Fatalf("unexpected keys after retry and link refresh: %v", keys)
+			}
+		})
 	}
 }
 
