@@ -10,6 +10,8 @@ import (
 	"github.com/hinata/track-talk/apps/api/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -262,5 +264,119 @@ func TestCapturedCreatedFailureReasonAndFailedTerminal(t *testing.T) {
 	lateRefundEvent(t, x, "refund.updated", "succeeded")
 	if reviewPaymentStatus(t, x.request) != "captured" || scalar(t, `SELECT count(*) FROM captured_payment_refunds WHERE status='failed' AND failure LIKE '%declined%'`) != 1 {
 		t.Fatal("failed created event or terminal ordering lost")
+	}
+}
+
+func refundFailureNull(t *testing.T, id uuid.UUID) bool {
+	t.Helper()
+	var isNull bool
+	queryRowArgs(t, `SELECT failure IS NULL FROM captured_payment_refunds WHERE id=$1`, []any{id}, &isNull)
+	return isNull
+}
+
+func refundFailureText(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var s string
+	queryRowArgs(t, `SELECT COALESCE(failure,'') FROM captured_payment_refunds WHERE id=$1`, []any{id}, &s)
+	return s
+}
+
+func refundStatus(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var s string
+	queryRowArgs(t, `SELECT status FROM captured_payment_refunds WHERE id=$1`, []any{id}, &s)
+	return s
+}
+
+func adminRefundFailure(t *testing.T, x capturedFixture, id uuid.UUID) *string {
+	t.Helper()
+	rec := doJSON(t, x.h, http.MethodGet, "/v1/admin/coaching/payments?refund_id="+id.String(), x.admin, nil)
+	if rec.Code != 200 {
+		t.Fatalf("admin payments %d %s", rec.Code, rec.Body.String())
+	}
+	var d struct {
+		Refunds []struct {
+			ID      string  `json:"id"`
+			Failure *string `json:"failure"`
+		} `json:"refunds"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &d); err != nil || len(d.Refunds) != 1 || d.Refunds[0].ID != id.String() {
+		t.Fatalf("admin audit %s", rec.Body.String())
+	}
+	return d.Refunds[0].Failure
+}
+
+// TestCapturedTransientWarningClearsAfterRecovery は N1 の回帰試験である。
+// 成功済み返金の再照合が一時的に失敗すると tick が一時警告を載せ、復旧後の
+// 同一 ID・金額の succeeded 取得で警告が消え、未復旧のままでは残る。
+func TestCapturedTransientWarningClearsAfterRecovery(t *testing.T) {
+	x := newCapturedFixture(t)
+	x.paid(t)
+	x.refund(t)
+	var id uuid.UUID
+	queryRowArgs(t, `SELECT id FROM captured_payment_refunds`, nil, &id)
+	var remote string
+	queryRowArgs(t, `SELECT COALESCE(stripe_refund_id,'') FROM captured_payment_refunds WHERE id=$1`, []any{id}, &remote)
+	if remote == "" || !refundFailureNull(t, id) {
+		t.Fatal("succeeded refund missing remote identity or unexpectedly warned")
+	}
+	var succeededAt time.Time
+	queryRowArgs(t, `SELECT succeeded_at FROM captured_payment_refunds WHERE id=$1`, []any{id}, &succeededAt)
+
+	// 一時的な照合失敗に見せかける。成功済みの既知返金が Stripe 側に見えないと
+	// process は照合要求エラーを返し、tick が一時警告を載せる。
+	x.f.mu.Lock()
+	saved := append([]url.Values(nil), x.f.refunds...)
+	x.f.refunds = nil
+	x.f.mu.Unlock()
+	if rec := tick(t, x.h, "tick-secret"); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	if refundStatus(t, id) != "succeeded" || refundFailureText(t, id) != "Stripe reconciliation required" || reviewPaymentStatus(t, x.request) != "refunded" {
+		t.Fatal("transient failure did not warn without changing ledger state")
+	}
+	if got := adminRefundFailure(t, x, id); got == nil || *got != "Stripe reconciliation required" {
+		t.Fatal("admin display missing transient warning")
+	}
+
+	// (c) 復旧していないまま tick しても警告は残る。
+	if rec := tick(t, x.h, "tick-secret"); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	if refundFailureNull(t, id) {
+		t.Fatal("unrecovered warning disappeared")
+	}
+
+	// (b) Stripe 側が復旧し、同一 ID・金額の succeeded 取得できたら警告が消える。
+	x.f.mu.Lock()
+	x.f.refunds = saved
+	x.f.mu.Unlock()
+	if rec := tick(t, x.h, "tick-secret"); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	if !refundFailureNull(t, id) || refundStatus(t, id) != "succeeded" || reviewPaymentStatus(t, x.request) != "refunded" {
+		t.Fatal("recovered warning remained or ledger state changed")
+	}
+	var after string
+	queryRowArgs(t, `SELECT COALESCE(stripe_refund_id,'') FROM captured_payment_refunds WHERE id=$1`, []any{id}, &after)
+	if after != remote {
+		t.Fatal("remote identity changed on recovery")
+	}
+	var recoveredAt time.Time
+	queryRowArgs(t, `SELECT succeeded_at FROM captured_payment_refunds WHERE id=$1`, []any{id}, &recoveredAt)
+	if !recoveredAt.Equal(succeededAt) {
+		t.Fatal("success timestamp moved on recovery")
+	}
+	if got := adminRefundFailure(t, x, id); got != nil {
+		t.Fatal("admin display kept recovered warning")
+	}
+
+	// 銀行由来の失敗理由は一時警告と区別し、復旧成功でも消さない。
+	execSQLArgs(t, `UPDATE captured_payment_refunds SET failure='Stripe refund failed: card_declined' WHERE id=$1`, id)
+	if rec := tick(t, x.h, "tick-secret"); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	if refundFailureText(t, id) != "Stripe refund failed: card_declined" {
+		t.Fatal("permanent failure reason cleared as transient")
 	}
 }
