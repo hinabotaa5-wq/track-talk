@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
 )
@@ -247,7 +246,8 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 
 // releaseReviewPayment は、仮押さえを取り消すか、確定済み（PayPay）なら全額を返金する。
 func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment) error {
-	return s.refundTx(ctx, func(tx pgx.Tx) error {
+	var notify bool
+	err := s.refundTx(ctx, func(tx pgx.Tx) error {
 		q := db.New(tx)
 		var err error
 		pay, err = q.GetReviewPaymentForRefund(ctx, pay.ID)
@@ -260,10 +260,25 @@ func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment)
 		if pay.PaymentIntentID == nil {
 			return errors.New("payment has no payment intent")
 		}
+		kind := ""
+		var pendingRefundID *string
 		if pay.Status == "authorized" {
-			_, err = s.stripe.CancelPaymentIntent(ctx, *pay.PaymentIntentID, "cancel-"+pay.ID.String())
+			var canceled stripe.PaymentIntent
+			canceled, err = s.stripe.CancelPaymentIntent(ctx, *pay.PaymentIntentID, "cancel-"+pay.ID.String())
+			if canceled.Status == "canceled" && canceled.ID == *pay.PaymentIntentID {
+				kind = "review_cancel"
+			}
 		} else {
-			_, err = s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(pay.AmountYen), "refund-"+pay.ID.String())
+			var refund stripe.Refund
+			refund, err = s.stripe.CreateRefund(ctx, *pay.PaymentIntentID, int(pay.AmountYen), "refund-"+pay.ID.String())
+			if refund.ID != "" && refund.Amount == int(pay.AmountYen) {
+				switch refund.Status {
+				case "succeeded":
+					kind = "review_refund"
+				case "pending", "requires_action":
+					kind, pendingRefundID = "review_refund", &refund.ID
+				}
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("%w: %w", errStripe, err)
@@ -272,8 +287,18 @@ func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return err
+		if err != nil || kind == "" || pay.PayerID == nil {
+			return err
+		}
+		notify = pendingRefundID == nil
+		return q.EnqueueReviewRefundNotice(ctx, db.EnqueueReviewRefundNoticeParams{
+			OperationID: pay.ID, PaymentID: pay.ID, Kind: kind, PendingStripeRefundID: pendingRefundID,
+		})
 	})
+	if err == nil && notify {
+		s.deliverRefundCompletionNotice(ctx, pay.ID)
+	}
+	return err
 }
 
 // captureReviewPayment は、返却された依頼の仮押さえを確定する。
@@ -343,14 +368,6 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 			continue
 		}
 		released++
-		if pay.PayerID != nil && pay.Status == "captured" {
-			s.notify(ctx, *pay.PayerID, notifyImportant, push.Message{
-				Title: "フォーム添削の代金を返金しました",
-				Body:  "添削が成立しなかったため、お支払い額を全額返金しました",
-				URL:   "/me/coaching/requests",
-				Tag:   "review-refund-" + pay.ID.String(),
-			}, 24*time.Hour)
-		}
 	}
 	if _, err := s.q.DeleteUnpaidReviewRequests(ctx); err != nil {
 		return released, err

@@ -246,6 +246,7 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.ConsultationRefunds, err = s.settleConsultationRefunds(ctx); err != nil {
 		return out, err
 	}
+	s.retryRefundCompletionNotices(ctx)
 	if out.ConsultationsPurged, err = s.purgeConsultations(ctx); err != nil {
 		return out, err
 	}

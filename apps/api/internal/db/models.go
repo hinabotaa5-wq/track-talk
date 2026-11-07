@@ -1033,6 +1033,15 @@ type RecruitmentPrefecture struct {
 	Prefecture string    `json:"prefecture"`
 }
 
+type RefundCompletionNotice struct {
+	ID                    uuid.UUID `json:"id"`
+	RecipientID           uuid.UUID `json:"recipient_id"`
+	Kind                  string    `json:"kind"`
+	Url                   string    `json:"url"`
+	PendingStripeRefundID *string   `json:"pending_stripe_refund_id"`
+	NextAttemptAt         time.Time `json:"next_attempt_at"`
+}
+
 type Report struct {
 	ID         uuid.UUID `json:"id"`
 	ReporterID uuid.UUID `json:"reporter_id"`
