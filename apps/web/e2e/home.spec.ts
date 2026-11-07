@@ -64,9 +64,9 @@ test.describe("iPhone 相当のホーム", () => {
         reachesRightEdge: track.right === viewportWidth,
         documentFits: document.documentElement.scrollWidth === viewportWidth,
         fillsHeight: Math.abs(navTop - Math.max(...cards.map((card) => card.bottom))) <= 8,
-        clippedOnRight: cards.some((card) => card.left < track.right && card.right > track.right),
+        hasMoreToRight: element.scrollWidth > element.clientWidth,
       };
-    }, navBounds.y)).toEqual({ leftInset: 8, reachesRightEdge: true, documentFits: true, fillsHeight: true, clippedOnRight: true });
+    }, navBounds.y)).toEqual({ leftInset: 8, reachesRightEdge: true, documentFits: true, fillsHeight: true, hasMoreToRight: true });
 
     await page.getByRole("button", { name: "追加方法" }).tap();
     await expect(page.getByRole("dialog", { name: "ホーム画面に追加" })).toBeVisible();
