@@ -1,46 +1,20 @@
 "use client";
 
-import { Children, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createMosaicPacker, visibleMosaicIndices, type MosaicLayout } from "@/lib/masonry-feed";
+import { Children, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createGridLayout, gridTilePosition, visibleGridIndices, type GridLayout } from "@/lib/home-feed-grid";
 import { BoundedCache } from "@/lib/bounded-cache";
 
 type FeedPosition = { left: number; key?: string; offset: number };
 const positions = new BoundedCache<FeedPosition>(20, 30 * 60_000);
-const measuredRatios = new BoundedCache<number>(6000, 30 * 60_000);
-const imageRatios = new BoundedCache<number>(512, 24 * 60 * 60_000);
 
-// 画像比率は一つの保存領域にまとめ、画像ごとにsessionStorageの項目を増やさない。
-let ratiosLoaded = false;
-function readRatio(key: string) {
-  if (!ratiosLoaded && typeof window !== "undefined") {
-    ratiosLoaded = true;
-    try {
-      const saved = JSON.parse(sessionStorage.getItem("masonry-ratios-v2") ?? "null");
-      if (saved && Date.now() - saved.at < 24 * 60 * 60_000 && Array.isArray(saved.entries)) {
-        for (const [src, ratio] of saved.entries.slice(-512)) {
-          if (typeof src === "string" && typeof ratio === "number" && ratio > 0 && Number.isFinite(ratio)) imageRatios.set(src, ratio);
-        }
-      }
-    } catch { /* 保存できない環境でも現在の一覧を表示する。 */ }
-  }
-  return imageRatios.get(key);
-}
-function persistRatios() {
-  try {
-    const entries = [...imageRatios.keys()].map((src) => [src, imageRatios.get(src)]);
-    sessionStorage.setItem("masonry-ratios-v2", JSON.stringify({ at: Date.now(), entries }));
-  } catch { /* メモリ上の比率を使う。 */ }
-}
-
-export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVisibleIndices, storageKey }: {
-  children: ReactNode; ratios: number[]; compact?: boolean[]; onEndReached?: () => void; onVisibleIndices?: (indices: number[]) => void; storageKey?: string;
+export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storageKey }: {
+  children: ReactNode; onEndReached?: () => void; onVisibleIndices?: (indices: number[]) => void; storageKey?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const items = Children.toArray(children);
   const keys = items.map((item, i) => item && typeof item === "object" && "key" in item ? String(item.key) : String(i));
-  const descriptors = useRef({ ratios, compact, keys });
-  const pack = useMemo(() => createMosaicPacker(), []);
-  const [layout, setLayout] = useState<MosaicLayout | null>(null);
+  const keysRef = useRef(keys);
+  const [layout, setLayout] = useState<GridLayout | null>(null);
   const layoutRef = useRef(layout);
   const [viewport, setViewport] = useState({ left: 0, width: 0 });
   const pendingPosition = useRef<FeedPosition | undefined>(undefined);
@@ -48,19 +22,19 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
   const nextRef = useRef(onEndReached);
   const [focusedIndex, setFocusedIndex] = useState<number>(NaN);
   useLayoutEffect(() => {
-    descriptors.current = { ratios, compact, keys };
+    keysRef.current = keys;
     layoutRef.current = layout;
     visibleRef.current = onVisibleIndices;
     nextRef.current = onEndReached;
   });
   const scheduleRef = useRef<() => void>(() => {});
-  const signature = keys.join("|") + ":" + ratios.join(",") + ":" + compact.join(",");
+  const count = items.length;
 
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
     pendingPosition.current = storageKey ? positions.get(storageKey) : undefined;
-    let frame = 0, scrollFrame = 0, persistTimer: ReturnType<typeof setTimeout> | undefined;
+    let frame = 0, scrollFrame = 0;
     const canvas = track.firstElementChild as HTMLElement;
     const header = document.querySelector("header");
     const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
@@ -68,7 +42,7 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     function savePosition(event?: Event) {
       if (!storageKey || pendingPosition.current) return;
       const nodes = Array.from(canvas.children) as HTMLElement[];
-      const clicked = event?.target instanceof Element ? event.target.closest(".masonry-feed-tile") as HTMLElement | null : null;
+      const clicked = event?.target instanceof Element ? event.target.closest(".home-feed-grid-tile") as HTMLElement | null : null;
       const anchor = clicked ?? nodes.find((node) => node.offsetLeft + node.offsetWidth > track!.scrollLeft);
       positions.set(storageKey, { left: track!.scrollLeft, key: anchor?.dataset.key, offset: (anchor?.offsetLeft ?? 0) - track!.scrollLeft });
     }
@@ -80,26 +54,17 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
       // 帯の表示などで一覧の開始位置が変わったら、下部メニューまでの高さを測り直す。
       const bottom = bottomNav?.getBoundingClientRect().top ?? window.innerHeight;
       const available = Math.max(3, Math.floor(bottom - (track!.getBoundingClientRect().top + window.scrollY) - 8));
-      // 描画中の画像だけ測る。画面外の座標はDOMに依存しない。
-      for (const node of Array.from(canvas.children) as HTMLElement[]) {
-        const image = node.querySelector<HTMLImageElement>("img");
-        const src = image?.currentSrc || image?.src;
-        const ratio = image?.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : undefined;
-        const known = src ? readRatio(src) : undefined;
-        if (node.dataset.key && (ratio || known)) measuredRatios.set(`${storageKey}:${node.dataset.key}`, (ratio || known)!);
-        if (ratio && src && ratio !== known) {
-          imageRatios.set(src, ratio);
-          clearTimeout(persistTimer);
-          persistTimer = setTimeout(persistRatios, 200);
+      const columns = Number(getComputedStyle(track!).getPropertyValue("--home-feed-columns")) || 2;
+      const ids = keysRef.current;
+      const result = createGridLayout(ids.length, width, available, columns);
+      const old = layoutRef.current;
+      // 高さや幅が変わったら、表示中の列を基準に横位置を保つ。
+      if (!pendingPosition.current && old && track!.scrollLeft > 0
+        && (old.rows !== result.rows || old.tileWidth !== result.tileWidth)) {
+        const index = visibleGridIndices(old, track!.scrollLeft, 1, 0)[0];
+        if (index !== undefined) {
+          pendingPosition.current = { left: track!.scrollLeft, key: ids[index], offset: gridTilePosition(old, index).left - track!.scrollLeft };
         }
-      }
-      const { ratios: hints, compact: small, keys: ids } = descriptors.current;
-      const result = pack(ids.map((id, i) => ({ ratio: measuredRatios.get(`${storageKey}:${id}`) ?? hints[i] ?? 4 / 3, footer: 0, compact: small[i] })), width, available);
-      // 計算後のReact描画で横幅を反映してから、保存位置を復元する。
-      if (!pendingPosition.current && layoutRef.current && track!.scrollLeft > 0) {
-        const old = layoutRef.current;
-        const index = visibleMosaicIndices(old, track!.scrollLeft, 1, 0)[0];
-        if (index !== undefined) pendingPosition.current = { left: track!.scrollLeft, key: ids[index], offset: old.tiles[index].x - track!.scrollLeft };
       }
       setLayout(result);
     }
@@ -133,8 +98,6 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     if (header) observer.observe(header);
     if (filters) observer.observe(filters);
     for (const nav of navs) observer.observe(nav, { box: "border-box" });
-    canvas.addEventListener("load", schedule, true);
-    canvas.addEventListener("error", schedule, true);
     track.addEventListener("scroll", onScroll, { passive: true });
     track.addEventListener("wheel", wheel, { passive: false });
     track.addEventListener("keydown", keyDown);
@@ -142,23 +105,22 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
     window.addEventListener("resize", schedule);
     schedule();
     return () => {
-      cancelAnimationFrame(frame); cancelAnimationFrame(scrollFrame); clearTimeout(persistTimer);
-      persistRatios(); observer.disconnect();
-      canvas.removeEventListener("load", schedule, true); canvas.removeEventListener("error", schedule, true);
+      cancelAnimationFrame(frame); cancelAnimationFrame(scrollFrame);
+      observer.disconnect();
       track.removeEventListener("scroll", onScroll); track.removeEventListener("wheel", wheel); track.removeEventListener("keydown", keyDown);
       canvas.removeEventListener("click", savePosition, true); window.removeEventListener("resize", schedule);
       scheduleRef.current = () => {};
     };
-  }, [pack, storageKey]);
+  }, [storageKey]);
 
-  useEffect(() => { scheduleRef.current(); }, [signature]);
+  useEffect(() => { scheduleRef.current(); }, [count]);
   useLayoutEffect(() => {
     const track = trackRef.current;
     if (!track || !layout) return;
     const saved = pendingPosition.current;
     if (saved) {
-      const index = descriptors.current.keys.indexOf(saved.key ?? "");
-      track.scrollLeft = index >= 0 ? layout.tiles[index].x - saved.offset : saved.key ? 0 : saved.left;
+      const index = keysRef.current.indexOf(saved.key ?? "");
+      track.scrollLeft = index >= 0 ? gridTilePosition(layout, index).left - saved.offset : saved.key ? 0 : saved.left;
       pendingPosition.current = undefined;
     }
     setViewport({ left: track.scrollLeft, width: track.clientWidth });
@@ -166,20 +128,22 @@ export function MasonryFeed({ children, ratios, compact = [], onEndReached, onVi
   }, [layout]);
 
   // サーバーでは最初の12件を表示し、端末のサイズが分かったら表示範囲に絞る。
-  const indices = layout ? visibleMosaicIndices(layout, viewport.left, viewport.width || 390) : items.slice(0, 12).map((_, i) => i);
+  const indices = layout
+    ? visibleGridIndices(layout, viewport.left, viewport.width, viewport.width / 2).filter((index) => index < count)
+    : items.slice(0, 12).map((_, i) => i);
   // フォーカス中のカードは、スクロールしても外さない。
   if (Number.isInteger(focusedIndex) && focusedIndex >= 0 && focusedIndex < items.length && !indices.includes(focusedIndex)) indices.push(focusedIndex);
   const visibleKey = indices.join(",");
   useEffect(() => {
     if (layout) visibleRef.current?.(visibleKey.split(",").filter(Boolean).map(Number));
   }, [visibleKey, layout]);
-  return <div ref={trackRef} onFocusCapture={(event) => setFocusedIndex(Number((event.target.closest(".masonry-feed-tile") as HTMLElement | null)?.dataset.index))}
-    onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusedIndex(NaN); }} role="region" aria-label="投稿一覧" tabIndex={0} className="masonry-feed-strip rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
-    <div className="masonry-feed-canvas" data-count={items.length} data-ready={layout ? "true" : undefined} style={layout ? { width: layout.width, height: layout.height } : undefined}>
+  return <div ref={trackRef} onFocusCapture={(event) => setFocusedIndex(Number((event.target.closest(".home-feed-grid-tile") as HTMLElement | null)?.dataset.index))}
+    onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusedIndex(NaN); }} role="region" aria-label="投稿一覧" tabIndex={0} className="home-feed-grid-strip rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+    <div className="home-feed-grid-canvas" data-count={items.length} data-ready={layout ? "true" : undefined} style={layout ? { width: layout.width, height: layout.height } : undefined}>
       {indices.sort((a, b) => a - b).map((index) => {
-        const tile = layout?.tiles[index];
-        return <div key={keys[index]} data-key={keys[index]} data-index={index} data-position={index + 1} className="masonry-feed-tile"
-          style={tile ? { left: tile.x, top: tile.y, width: tile.width } : undefined}>{items[index]}</div>;
+        const position = layout ? gridTilePosition(layout, index) : undefined;
+        return <div key={keys[index]} data-key={keys[index]} data-index={index} data-position={index + 1} className="home-feed-grid-tile"
+          style={position ? { ...position, width: layout?.tileWidth } : undefined}>{items[index]}</div>;
       })}
     </div>
   </div>;
