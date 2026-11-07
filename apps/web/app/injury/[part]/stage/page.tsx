@@ -39,8 +39,8 @@ export default function InjuryStagePage({ params }: { params: Promise<{ part: st
           part={part}
           token={token}
           member={group.me}
-          onChanged={(_member, celebrate) => router.push(celebrate ? `${back}?celebrate=1` : back)}
-          onCancel={() => router.push(back)}
+          onChanged={(_member, celebrate) => router.replace(celebrate ? `${back}?celebrate=1` : back)}
+          onCancel={() => router.replace(back)}
         />
       ) : (
         <div className="h-11" aria-hidden />
