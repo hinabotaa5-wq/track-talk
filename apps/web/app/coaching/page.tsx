@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Shuffle, UserRound, Users } from "lucide-react";
 import { coachingCoachListEnabled, coachingEnabled } from "@/lib/features";
+import { videoReviewStartNotice } from "@/lib/video-review-start";
+
+// 開始予定日の案内は、ビルド時ではなくアクセス時の日時で出し分ける。
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "コーチング",
@@ -30,6 +34,7 @@ const choices = [
 ] as const;
 
 export default function CoachingPage() {
+  const startNotice = coachingEnabled ? null : videoReviewStartNotice();
   return (
     <div className="mx-auto flex min-h-[calc(100svh-10.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-4">
       {/* コーチ一覧はタブの一番上に置く。一覧を閉じている間は中身を見せず、押しても先へ進まない準備中の枠だけを出す。
@@ -54,6 +59,7 @@ export default function CoachingPage() {
       </section>}
       {!coachingEnabled ? <div className="space-y-1">
         <h1 className="text-xl font-bold">コーチングは準備中です</h1>
+        {startNotice && <p className="text-sm text-slate-300">{startNotice}</p>}
         <p className="text-sm text-slate-300">現在はコーチを募集しています。応募は「コーチ専用画面」から。</p>
       </div> : null}
       <nav aria-label="コーチングのプランを選ぶ" className="grid flex-1 auto-rows-fr gap-3">
