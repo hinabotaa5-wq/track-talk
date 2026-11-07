@@ -47,7 +47,7 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   await track.evaluate((el) => { el.scrollLeft = 0; el.dispatchEvent(new Event("scroll")); });
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBe(0);
   await expect(track.locator('a[href="/posts/perf-0"]')).toBeVisible();
-  expect(requests.filter((n) => n === 1).length).toBeGreaterThan(firstPageReads);
+  await expect.poll(() => requests.filter((n) => n === 1).length).toBeGreaterThan(firstPageReads);
   await track.evaluate((el) => { el.scrollLeft = el.scrollWidth / 2; el.dispatchEvent(new Event("scroll")); });
   const findTarget = () => track.evaluate((el) => {
     const bounds = el.getBoundingClientRect();

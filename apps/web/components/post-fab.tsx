@@ -26,10 +26,5 @@ export function PostFab() {
 export function HomePostFab() {
   const sp = useSearchParams();
   if (parseHomeSort(sp.get("sort")) === "review") return null;
-  return (
-    <>
-      <PostFab />
-      <div className="home-post-fab-space" aria-hidden />
-    </>
-  );
+  return <PostFab />;
 }

@@ -74,7 +74,7 @@ export function HomeView({
   return (
     <>
       {sort === "recruitment" ? (
-        <Link href="/practice" className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-sky-200 underline underline-offset-4">
+        <Link href="/practice" className="mb-3 inline-flex min-h-11 items-center justify-self-start text-sm font-medium text-sky-200 underline underline-offset-4">
           練習相手を都道府県と種目で探す
         </Link>
       ) : null}

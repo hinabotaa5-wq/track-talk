@@ -6,14 +6,14 @@ import { HomePostFab } from "@/components/post-fab";
 // (home) のルートグループで、その loading.tsx がほかのすべてのルートにかからないようにする。
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-4 -mt-6 -mb-6 md:mx-0 md:mt-0">
+    <div className="home-layout -mx-4 -mt-6 -mb-6 md:mt-0">
       <h1 className="sr-only">ホーム</h1>
-      <div className="home-filter-anchor sticky z-30" style={{ top: "var(--home-header-height, calc(3.8125rem + env(safe-area-inset-top)))" }}>
+      <div className="home-filter-anchor sticky z-30 mx-auto max-w-5xl md:px-4" style={{ top: "var(--home-header-height, calc(3.8125rem + env(safe-area-inset-top)))" }}>
         <Suspense>
           <HomeFilters />
         </Suspense>
       </div>
-      <div className="space-y-4 px-4 md:px-0">{children}</div>
+      <div className="home-feed-content space-y-4">{children}</div>
       <Suspense>
         <HomePostFab />
       </Suspense>

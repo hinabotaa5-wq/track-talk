@@ -1,11 +1,13 @@
 const gap = 12;
 const aspectRatio = 4 / 3;
+const contentGutters = 32;
 
-// masonry 導入前と同じ 4:3、12px 間隔、画面幅別の列数でカード幅を決める。
+// 画面幅から段数の目安を決め、使える高さを均等に使う。右端は横スクロールで表示する。
 export function createGridLayout(count: number, viewportWidth: number, height: number, columns: number) {
-  const tileWidth = Math.min(Math.max(1, (viewportWidth - gap * (columns - 1)) / columns), height * aspectRatio);
-  const tileHeight = tileWidth / aspectRatio;
-  const rows = Math.max(1, Math.floor((height + gap) / (tileHeight + gap)));
+  const targetWidth = Math.max(1, (viewportWidth - contentGutters - gap * (columns - 1)) / columns);
+  const rows = Math.max(1, Math.floor((height + gap) / (targetWidth / aspectRatio + gap)));
+  const tileHeight = (height - gap * (rows - 1)) / rows;
+  const tileWidth = tileHeight * aspectRatio;
   const pitch = tileWidth + gap;
   const width = Math.max(viewportWidth, Math.ceil(count / rows) * pitch - gap);
   return { count, width, height, tileWidth, tileHeight, rows, pitch };

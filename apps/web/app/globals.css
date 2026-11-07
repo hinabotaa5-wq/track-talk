@@ -807,6 +807,18 @@ select:-webkit-autofill {
   }
 }
 
+/* 投稿だけを画面の端まで広げ、ほかのホーム要素は内側に揃える。 */
+.home-feed-content {
+  display: grid;
+  grid-template-columns: [full-start] minmax(1rem, 1fr) [content-start] minmax(0, 62rem) [content-end] minmax(1rem, 1fr) [full-end];
+}
+.home-feed-content > * {
+  grid-column: content;
+}
+.home-feed-content > .home-feed-grid-strip {
+  grid-column: full;
+}
+
 /* タブを含むページではなく、この投稿領域だけを横へ送る。 */
 .home-feed-grid-strip {
   --home-feed-columns: 2;
@@ -861,11 +873,6 @@ select:-webkit-autofill {
   bottom: 2rem;
 }
 
-/* 一覧の高さはそのままに、末尾を固定ボタンより上までスクロールできるようにする。 */
-.home-post-fab-space {
-  height: 6rem;
-}
-
 @media (width < 48rem) {
   body:has(.home-post-fab) .install-guide-banner {
     /* 下部メニューの 3.5rem と上の境界線。 */
@@ -874,9 +881,5 @@ select:-webkit-autofill {
 
   .home-post-fab {
     bottom: calc(4.5rem + 1px + env(safe-area-inset-bottom) + var(--home-install-banner-height, 0px));
-  }
-
-  .home-post-fab-space {
-    height: calc(6rem + var(--home-install-banner-height, 0px));
   }
 }
