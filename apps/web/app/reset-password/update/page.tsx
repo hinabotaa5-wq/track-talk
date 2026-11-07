@@ -5,6 +5,7 @@ import { PageLoading } from "@/components/page-loading";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
+import { isPwnedPassword, pwnedPasswordMessage } from "@/lib/pwned-password";
 import { isRecentRecoverySession } from "@/lib/password-recovery";
 import { newPasswordSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -52,6 +53,12 @@ export default function UpdatePasswordPage() {
   async function onSubmit(values: z.infer<typeof newPasswordSchema>) {
     const supabase = createClient();
     if (!supabase || !acquire()) return;
+    // 漏洩済みパスワードは Supabase に送らずここで止める（本体 #429）。HIBP に届かなくても通す。
+    if (await isPwnedPassword(values.password)) {
+      release();
+      setMessage(pwnedPasswordMessage);
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: values.password }).finally(release);
     if (error) {
       setMessage(authErrorMessage(error));

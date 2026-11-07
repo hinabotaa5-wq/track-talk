@@ -2,15 +2,21 @@
 import { createElement } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const signUp = vi.hoisted(() => vi.fn());
+const isPwnedPassword = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
 }));
 vi.mock("@/lib/supabase", () => ({
   createClient: () => ({ auth: { signUp } }),
+}));
+// HIBP の実通信をしない。既定は通過、必要なテストだけ漏洩ありにする。
+vi.mock("@/lib/pwned-password", () => ({
+  pwnedPasswordMessage: "このパスワードは漏洩情報に含まれているため使えません。別のパスワードを設定してください。",
+  isPwnedPassword,
 }));
 
 import RegisterPage from "./page";
@@ -39,6 +45,13 @@ function buttons(div: HTMLElement) {
 }
 
 describe("RegisterPage", () => {
+  beforeEach(() => {
+    isPwnedPassword.mockResolvedValue(false);
+    signUp.mockReset();
+    router.push.mockClear();
+    router.replace.mockClear();
+  });
+
   it("同意するまで登録・Google登録を押せない", async () => {
     const view = await renderPage();
     try {
@@ -91,6 +104,32 @@ describe("RegisterPage", () => {
       expect(signUp.mock.calls[0][0].options.data).toEqual({ overseas_consent_version: "overseas-2026-10" });
       expect(router.push).toHaveBeenCalledWith("/register/sent");
       expect(sessionStorage.getItem("tracktalk-signup-sent-email")).toBe("runner@example.com");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("漏洩済みパスワードでは登録せず案内を出す", async () => {
+    isPwnedPassword.mockResolvedValue(true);
+    const view = await renderPage();
+    try {
+      const setValue = (el: HTMLInputElement, value: string) => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      await act(async () => {
+        setValue(view.div.querySelector('input[type="email"]') as HTMLInputElement, "leaked@example.com");
+        setValue(view.div.querySelector('input[type="password"]') as HTMLInputElement, "password");
+        const checkbox = view.div.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (!checkbox.checked) checkbox.click();
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+
+      await vi.waitFor(() => expect(view.div.textContent).toContain("漏洩情報"));
+      expect(signUp).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
     } finally {
       await view.unmount();
     }

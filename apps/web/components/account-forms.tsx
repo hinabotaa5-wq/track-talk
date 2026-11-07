@@ -9,6 +9,7 @@ import { authErrorMessage } from "@/lib/auth-errors";
 import { rememberNextPath } from "@/lib/safe-next";
 import { confirmCurrentPassword } from "@/lib/confirm-password";
 import { createClient } from "@/lib/supabase";
+import { isPwnedPassword, pwnedPasswordMessage } from "@/lib/pwned-password";
 import { useCaptcha } from "./auth-captcha";
 import { useActionLock } from "@/lib/use-action-lock";
 import { changeEmailSchema, changePasswordSchema } from "@/lib/validators";
@@ -116,6 +117,11 @@ export function PasswordSection({ email }: { email: string }) {
         return;
       }
       // Supabase の「Require current password when updating」が有効なときは、サーバーもいまのパスワードを確かめる。
+      // 漏洩済みパスワードは Supabase に送らずここで止める（本体 #429）。HIBP に届かなくても通す。
+      if (await isPwnedPassword(values.password)) {
+        setError(pwnedPasswordMessage);
+        return;
+      }
       const { error: err } = await supabase.auth.updateUser({ password: values.password, current_password: values.current });
       if (err) {
         setError(authErrorMessage(err));
