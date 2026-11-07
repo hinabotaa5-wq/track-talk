@@ -44,7 +44,7 @@ export function HomeView({
   });
 
   const pushGuide = !loading && userId && token && !profileGateRedirecting("/", profile) ? (
-    <PushPermissionGuide key={userId} userId={userId} token={token} home />
+    <PushPermissionGuide key={userId} userId={userId} home />
   ) : null;
 
   if (sort === "review") {

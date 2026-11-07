@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
-import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
+import { signOutOnThisDevice } from "@/lib/sign-out";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -58,21 +58,19 @@ export default function MePage() {
   const leaving = useRef(false);
 
   async function logout() {
+    if (!userId) return;
     if (!(await confirmDialog({ title: "ログアウトしますか？", confirmLabel: "ログアウト" }))) return;
     if (!logoutLock.acquire()) return;
     leaving.current = true;
     setLogoutError("");
     try {
-      // 通知解除が応答しない場合でもログアウトへ進む。
-      await unsubscribePushOnThisDevice(token);
       const supabase = createClient();
       if (!supabase) throw new Error("認証を読み込めませんでした");
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      // SDK は通信エラーでも端末のセッションを削除する。残っている場合だけ再試行を案内する。
-      if (error) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) throw error;
-      }
+      await signOutOnThisDevice(userId, async () => {
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        // SDK は通信エラーでも端末のセッションを削除する。残っている場合だけ再試行を案内する。
+        if (error && (await supabase.auth.getSession()).data.session) throw error;
+      });
       router.replace("/");
       router.refresh();
     } catch {
@@ -111,7 +109,6 @@ export default function MePage() {
           <PushPermissionGuide
             key={userId}
             userId={userId}
-            token={token}
             renderControl={(status, activate, busy) => {
               if (status === "granted" || status === "unsupported" || status === null) {
                 return <MenuLink href="/me/push" label="通知" icon={Bell} />;
