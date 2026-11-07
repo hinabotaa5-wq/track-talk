@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
@@ -91,19 +92,20 @@ func (s *Server) withdrawReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	body := "担当のコーチの都合で、この依頼は終了しました"
-	if s.stripe.Configured() {
-		body += "。お支払いは取り消します（PayPay は返金します）"
-	}
-	if rr.WithdrawReason != nil {
-		body += "。コーチからのひとこと：" + *rr.WithdrawReason
-	}
-	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_withdrawn", push.Message{
-		Title: "コーチが依頼を辞退しました",
-		Body:  body,
-		URL:   "/coaching/requests/" + rr.ID.String(),
-		Tag:   "review-" + rr.ID.String(),
-	})
+	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_withdrawn", reviewWithdrawalPush(rr.ID, s.stripe.Configured()))
 	out := s.coachRequestJSON(rr, false)
 	JSON(w, http.StatusOK, out)
+}
+
+func reviewWithdrawalPush(requestID uuid.UUID, paymentConfigured bool) push.Message {
+	body := "担当のコーチの都合で、この依頼は終了しました"
+	if paymentConfigured {
+		body += "。お支払いは取り消します（PayPay は返金します）"
+	}
+	return push.Message{
+		Title: "コーチが依頼を辞退しました",
+		Body:  body,
+		URL:   "/coaching/requests/" + requestID.String(),
+		Tag:   "review-" + requestID.String(),
+	}
 }

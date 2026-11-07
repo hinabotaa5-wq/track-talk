@@ -57,13 +57,18 @@ func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubs
 	return result.RowsAffected(), nil
 }
 
-const deletePushSubscriptionByEndpoint = `-- name: DeletePushSubscriptionByEndpoint :exec
+const deletePushSubscriptionGeneration = `-- name: DeletePushSubscriptionGeneration :exec
 DELETE FROM push_subscriptions
-WHERE endpoint = $1
+WHERE id = $1 AND profile_id = $2
 `
 
-func (q *Queries) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
-	_, err := q.db.Exec(ctx, deletePushSubscriptionByEndpoint, endpoint)
+type DeletePushSubscriptionGenerationParams struct {
+	ID        uuid.UUID `json:"id"`
+	ProfileID uuid.UUID `json:"profile_id"`
+}
+
+func (q *Queries) DeletePushSubscriptionGeneration(ctx context.Context, arg DeletePushSubscriptionGenerationParams) error {
+	_, err := q.db.Exec(ctx, deletePushSubscriptionGeneration, arg.ID, arg.ProfileID)
 	return err
 }
 
@@ -116,6 +121,22 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, profileID uuid.UUID
 	return items, nil
 }
 
+const pushSubscriptionIsCurrent = `-- name: PushSubscriptionIsCurrent :one
+SELECT EXISTS (SELECT 1 FROM push_subscriptions WHERE id = $1 AND profile_id = $2)
+`
+
+type PushSubscriptionIsCurrentParams struct {
+	ID        uuid.UUID `json:"id"`
+	ProfileID uuid.UUID `json:"profile_id"`
+}
+
+func (q *Queries) PushSubscriptionIsCurrent(ctx context.Context, arg PushSubscriptionIsCurrentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, pushSubscriptionIsCurrent, arg.ID, arg.ProfileID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const releaseMonthlyReminder = `-- name: ReleaseMonthlyReminder :exec
 DELETE FROM monthly_reminders
 WHERE month = $1::date
@@ -154,7 +175,8 @@ const upsertPushSubscription = `-- name: UpsertPushSubscription :one
 INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (endpoint) DO UPDATE
-SET profile_id = EXCLUDED.profile_id,
+SET id = EXCLUDED.id,
+    profile_id = EXCLUDED.profile_id,
     p256dh = EXCLUDED.p256dh,
     auth = EXCLUDED.auth,
     created_at = now()
