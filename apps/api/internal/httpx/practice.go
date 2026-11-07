@@ -150,10 +150,8 @@ func (s *Server) createPractice(w http.ResponseWriter, r *http.Request, author d
 	}
 	// 利用者が少ないうちは募集を広く知らせるため、仲間募集と同じく本人以外の全員に知らせる。
 	// 受け取り方は「新しい募集」の設定に従う(ベルは既定でオン、プッシュは自分でオンにした人だけ)。
-	if err := q.InsertRecruitmentPostNotifications(r.Context(), db.InsertRecruitmentPostNotificationsParams{
-		PostID:   row.ID,
-		AuthorID: author.ID,
-	}); err != nil {
+	var jobs []uuid.UUID
+	if err := enqueuePostNotification(r.Context(), q, &jobs, author.ID, "recruitment_post", row.ID, nil, nil); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -161,6 +159,7 @@ func (s *Server) createPractice(w http.ResponseWriter, r *http.Request, author d
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
 	s.pushToMany(r.Context(), notifyRecruitment, []uuid.UUID{author.ID}, postPushMessage("新しい練習相手の募集", row.ID), 24*time.Hour)
 	s.writePost(w, r, row.ID, http.StatusCreated)
 }
@@ -548,7 +547,8 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if err := insertNotification(r.Context(), q, post.AuthorID, "practice_application", post.ID, nil, &applicationID); err != nil {
+	var jobs []uuid.UUID
+	if err := enqueuePostNotification(r.Context(), q, &jobs, post.AuthorID, "practice_application", post.ID, nil, &applicationID); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -556,6 +556,7 @@ func (s *Server) applyPractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
 	s.pushQuietly(r.Context(), post.AuthorID, notifyPractice, postPushMessage("参加申請がありました", post.ID), 24*time.Hour)
 	s.writePost(w, r, post.ID, http.StatusCreated)
 }
@@ -638,8 +639,9 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		Error(w, http.StatusConflict, "conflict", "この申請は処理済みです")
 		return
 	}
+	var jobs []uuid.UUID
 	if status == "accepted" {
-		if err := insertNotification(r.Context(), q, application.UserID, "practice_accepted", post.ID, nil, &application.ID); err != nil {
+		if err := enqueuePostNotification(r.Context(), q, &jobs, application.UserID, "practice_accepted", post.ID, nil, &application.ID); err != nil {
 			MapDBError(w, err)
 			return
 		}
@@ -648,6 +650,7 @@ func (s *Server) decidePractice(w http.ResponseWriter, r *http.Request, status s
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
 	if status == "accepted" {
 		s.pushQuietly(r.Context(), application.UserID, notifyPractice, postPushMessage("参加が承認されました", post.ID), 24*time.Hour)
 	}
@@ -694,16 +697,17 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 練習の日時より前の解散は中止なので、評価のお願いは送らない。
+	var jobs []uuid.UUID
 	var pushes []postPush
 	if len(accepted) > 0 && !time.Now().Before(detail.StartsAt) {
 		msg := postPushMessage("解散しました。評価しあってください", post.ID)
-		if err := insertNotification(r.Context(), q, post.AuthorID, "practice_rate", post.ID, nil, nil); err != nil {
+		if err := enqueuePostNotification(r.Context(), q, &jobs, post.AuthorID, "practice_rate", post.ID, nil, nil); err != nil {
 			MapDBError(w, err)
 			return
 		}
 		pushes = append(pushes, postPush{post.AuthorID, notifyPractice, msg})
 		for _, application := range accepted {
-			if err := insertNotification(r.Context(), q, application.UserID, "practice_rate", post.ID, nil, &application.ID); err != nil {
+			if err := enqueuePostNotification(r.Context(), q, &jobs, application.UserID, "practice_rate", post.ID, nil, &application.ID); err != nil {
 				MapDBError(w, err)
 				return
 			}
@@ -714,6 +718,7 @@ func (s *Server) dissolvePractice(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
 	s.sendPostPushes(r.Context(), pushes)
 	s.writePost(w, r, post.ID, http.StatusOK)
 }

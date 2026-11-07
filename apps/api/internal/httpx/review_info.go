@@ -332,11 +332,8 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 
 // notifyResubmitted は、差し戻した依頼が再提出されたことをコーチに知らせる。
 func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, offerExpires time.Time) {
-	if err := insertReviewNotification(ctx, s.q, *rr.CoachID, "review_resubmitted", rr.ID); err != nil {
-		slog.Warn("review resubmitted notification", "err", err)
-	}
 	if rr.Status == "offered" {
-		s.pushQuietly(ctx, *rr.CoachID, notifyImportant, push.Message{
+		s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted", push.Message{
 			Title: "差し戻した依頼が再提出されました",
 			Body:  offerDeadlineText(offerExpires) + "までに、引き受けるかどうか決めてください",
 			URL:   "/coach",
@@ -344,12 +341,19 @@ func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, off
 		}, time.Until(offerExpires))
 		return
 	}
-	s.pushQuietly(ctx, *rr.CoachID, notifyReview, push.Message{
+	s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted_after_accept", push.Message{
 		Title: "差し戻した依頼が再提出されました",
 		Body:  "返却期限は" + offerDeadlineText(rr.DueAt) + "です",
 		URL:   "/coach/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
+}
+
+func (s *Server) sendReviewResubmissionNotice(ctx context.Context, rr db.ReviewRequest, kind string, msg push.Message, ttl time.Duration) {
+	if err := insertReviewNotificationWithURL(ctx, s.q, *rr.CoachID, kind, rr.ID, &msg.URL); err != nil {
+		slog.Warn("review resubmitted notification", "err", err)
+	}
+	s.pushQuietly(ctx, *rr.CoachID, kindCategory(kind), msg, ttl)
 }
 
 // expireUnresubmittedReviews は、再提出期限を過ぎた差し戻しを終える。支払いの取り消し・返金は tick の既存の処理が行う。

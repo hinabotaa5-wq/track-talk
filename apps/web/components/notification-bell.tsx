@@ -26,6 +26,7 @@ const labels: Record<NotificationKind, string> = {
   review_clarified: "添削の補足が届きました",
   review_info_request: "コーチから依頼内容の確認が届きました",
   review_resubmitted: "差し戻した依頼が再提出されました",
+  review_resubmitted_after_accept: "差し戻した依頼が再提出されました",
   review_withdrawn: "コーチが依頼を辞退しました",
   review_helpful_ask: "アドバイスは役に立ちましたか",
   message: "お知らせ",

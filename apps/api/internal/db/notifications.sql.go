@@ -213,8 +213,8 @@ func (q *Queries) InsertRecruitmentPostNotifications(ctx context.Context, arg In
 }
 
 const insertReviewNotification = `-- name: InsertReviewNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, review_request_id)
-VALUES ($1, $2, $3, $4)
+INSERT INTO notifications (id, recipient_id, kind, review_request_id, url)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertReviewNotificationParams struct {
@@ -222,6 +222,7 @@ type InsertReviewNotificationParams struct {
 	RecipientID     uuid.UUID  `json:"recipient_id"`
 	Kind            string     `json:"kind"`
 	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	Url             *string    `json:"url"`
 }
 
 func (q *Queries) InsertReviewNotification(ctx context.Context, arg InsertReviewNotificationParams) error {
@@ -230,6 +231,7 @@ func (q *Queries) InsertReviewNotification(ctx context.Context, arg InsertReview
 		arg.RecipientID,
 		arg.Kind,
 		arg.ReviewRequestID,
+		arg.Url,
 	)
 	return err
 }
