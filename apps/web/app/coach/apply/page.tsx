@@ -188,7 +188,7 @@ export default function CoachApplyPage() {
           {application.status === "pending" && coachingEnabled ? (
             <p className="text-xs text-slate-300">
               結果を通知で受け取るには、
-              <Link href="/me/coaching" className="text-blue-300 underline">
+              <Link href="/me/push" className="text-blue-300 underline">
                 通知の設定
               </Link>
               をしてください。
