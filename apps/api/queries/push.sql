@@ -3,7 +3,8 @@
 INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (endpoint) DO UPDATE
-SET profile_id = EXCLUDED.profile_id,
+SET id = EXCLUDED.id,
+    profile_id = EXCLUDED.profile_id,
     p256dh = EXCLUDED.p256dh,
     auth = EXCLUDED.auth,
     created_at = now()
@@ -14,9 +15,12 @@ DELETE FROM push_subscriptions
 WHERE profile_id = $1
   AND endpoint = $2;
 
--- name: DeletePushSubscriptionByEndpoint :exec
+-- name: DeletePushSubscriptionGeneration :exec
 DELETE FROM push_subscriptions
-WHERE endpoint = $1;
+WHERE id = $1 AND profile_id = $2;
+
+-- name: PushSubscriptionIsCurrent :one
+SELECT EXISTS (SELECT 1 FROM push_subscriptions WHERE id = $1 AND profile_id = $2);
 
 -- name: ListPushSubscriptions :many
 SELECT * FROM push_subscriptions

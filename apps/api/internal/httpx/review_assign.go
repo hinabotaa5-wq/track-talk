@@ -24,8 +24,9 @@ const (
 	maxActiveReviews = 2
 	// 評価が低いコーチを順番から外す基準。★の評価が lowRatingMinCount 件以上たまり、
 	// 平均が lowRatingStars 未満なら打診しない。
-	lowRatingMinCount = 5
-	lowRatingStars    = 3.0
+	lowRatingMinCount       = 5
+	lowRatingStars          = 3.0
+	reviewOfferReminderLead = 30 * time.Minute
 )
 
 // dayStart は日本時間の今日の0時。1日の上限本数はこの時刻から数える。
@@ -117,9 +118,31 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 		Title: "フォーム添削の依頼が届きました",
 		Body:  offerDeadlineText(expires) + "までに、引き受けるかどうか決めてください",
 		URL:   "/coach",
-		Tag:   "review-offer",
+		Tag:   reviewOfferTag(offer.ID),
 	}, time.Until(expires), expires, "review_offer:"+offer.ID.String())
 	return true, nil
+}
+
+func reviewOfferTag(offerID uuid.UUID) string {
+	return "review-offer-" + offerID.String()
+}
+
+func (s *Server) remindReviewOffers(ctx context.Context, now time.Time) error {
+	offers, err := s.q.ClaimReviewOfferReminders(ctx, db.ClaimReviewOfferRemindersParams{
+		CheckedAt: now, RemindThrough: offerExpiresAt(now, reviewOfferReminderLead),
+	})
+	if err != nil {
+		return err
+	}
+	for _, offer := range offers {
+		s.pushQuietly(ctx, offer.CoachID, notifyImportant, push.Message{
+			Title: "フォーム添削の引受期限が近づいています",
+			Body:  offerDeadlineText(offer.ExpiresAt) + "までに、引き受けるかどうか決めてください",
+			URL:   "/coach",
+			Tag:   reviewOfferTag(offer.ID),
+		}, time.Until(offer.ExpiresAt))
+	}
+	return nil
 }
 
 // dispatchQueuedReviews は、待ちの依頼を古い順に打診する。打診できなかった依頼は次の機会に回す。
@@ -214,9 +237,12 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	}
 	out.Requeued = len(requeued)
 	for _, id := range requeued {
-		s.notifyNominationEnded(ctx, id)
+		s.notifyNominationEnded(ctx, id, true)
 	}
 	out.Offered = s.dispatchQueuedReviews(ctx)
+	if err := s.remindReviewOffers(ctx, time.Now()); err != nil {
+		slog.Warn("review offer reminder", "err", err)
+	}
 	// 送れなかった Push を送り直す（本体 #421 F04）。期限切れの待ちは送らない。
 	out.PushResent = s.sendPendingOutbox(ctx, pushOutboxBatch)
 	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
@@ -289,11 +315,26 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 			Tag:   "review-" + rr.ID.String(),
 		}, 24*time.Hour)
 	}
+	if rr.OldStatus != "in_review" && rr.RequestedCoachID != nil {
+		s.notifyCoachNominationEnded(ctx, *rr.RequestedCoachID, rr.ID)
+	}
+}
+
+func (s *Server) notifyCoachNominationEnded(ctx context.Context, coachID, requestID uuid.UUID) {
+	if err := insertReviewNotification(ctx, s.q, coachID, "review_nomination_ended", requestID); err != nil {
+		slog.Warn("coach nomination ended notification", "err", err)
+	}
+	s.pushQuietly(ctx, coachID, notifyReview, push.Message{
+		Title: "指名されたフォーム添削の依頼が終了しました",
+		Body:  "この依頼の引受受付は終了しました",
+		URL:   "/coach",
+		Tag:   "review-ended-" + requestID.String(),
+	}, 24*time.Hour)
 }
 
 // notifyNominationEnded は、コーチを選んだ依頼が辞退・打診の時間切れで終わったら依頼した人に知らせる。
 // 選んだコーチの依頼は別のコーチへ回さないので、ここで終わる。代金とチケットは tick が戻す。
-func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID) {
+func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID, notifyCoach bool) {
 	rr, err := s.q.GetReviewRequest(ctx, id)
 	if err != nil || rr.RequestedCoachID == nil || rr.Status != "expired" {
 		return
@@ -307,6 +348,9 @@ func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID) {
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
+	if notifyCoach {
+		s.notifyCoachNominationEnded(ctx, *rr.RequestedCoachID, rr.ID)
+	}
 }
 
 // coachingTick は Cloud Scheduler から1分ごとに呼ばれる。共有の秘密のヘッダーがないと受け付けない。
@@ -482,6 +526,12 @@ func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
 	if notice != nil {
 		s.pushQuietly(r.Context(), p.ID, notifyImportant, *notice, 7*24*time.Hour)
 	}
+	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_accepted", push.Message{
+		Title: "コーチがフォーム添削の依頼を引き受けました",
+		Body:  "返答が届くまでお待ちください",
+		URL:   "/coaching/requests/" + rr.ID.String(),
+		Tag:   "review-" + rr.ID.String(),
+	})
 	out := s.coachRequestJSON(rr, true)
 	if wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID}); err == nil {
 		if order, err := workOrderWithDelivery(r.Context(), s.q, wo); err == nil {
@@ -539,6 +589,6 @@ func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.offerReview(r.Context(), offer.RequestID); err != nil {
 		slog.Warn("review offer after decline", "err", err)
 	}
-	s.notifyNominationEnded(r.Context(), offer.RequestID)
+	s.notifyNominationEnded(r.Context(), offer.RequestID, false)
 	w.WriteHeader(http.StatusNoContent)
 }

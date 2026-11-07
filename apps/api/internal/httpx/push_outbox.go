@@ -154,13 +154,28 @@ func (s *Server) sendToSubscriptions(ctx context.Context, profileID uuid.UUID, m
 	if err != nil {
 		return 0, 0, 0, err
 	}
+	eventID := uuid.New()
 	for _, sub := range subscriptions {
 		// 宛先を限る前に登録されたものも、プッシュサービス以外には送らない。
 		if !s.validPushEndpoint(sub.Endpoint) {
 			continue
 		}
+		// アカウントを切り替えた端末に残った古い購読には送らない（端末ごとの購読・世代）。
+		current, err := s.q.PushSubscriptionIsCurrent(ctx, db.PushSubscriptionIsCurrentParams{ID: sub.ID, ProfileID: sub.ProfileID})
+		if err != nil {
+			return sent, subs, gone, err
+		}
+		if !current {
+			continue
+		}
 		subs++
+		msg.SubscriptionID = sub.ID.String()
 		sendErr := s.push.Send(ctx, push.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, msg, ttl)
+		kind, status := sendErr, 0
+		var delivery *push.DeliveryError
+		if errors.As(sendErr, &delivery) {
+			kind, status = delivery.Kind, delivery.Status
+		}
 		switch {
 		case sendErr == nil:
 			sent++
@@ -170,11 +185,11 @@ func (s *Server) sendToSubscriptions(ctx context.Context, profileID uuid.UUID, m
 				// 401・403 で拒否された宛先を消すときは、理由を残す。設定の誤りで消えていないかを確かめられるように。
 				slog.Warn("push: remove rejected subscription", "err", sendErr)
 			}
-			if err := s.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
-				slog.Warn("push: delete gone subscription", "err", err)
+			if err := s.q.DeletePushSubscriptionGeneration(ctx, db.DeletePushSubscriptionGenerationParams{ID: sub.ID, ProfileID: sub.ProfileID}); err != nil {
+				slog.Warn("push: subscription cleanup failed", "event_id", eventID)
 			}
 		default:
-			slog.Warn("push: send failed", "err", sendErr)
+			slog.Warn("push: send failed", "classification", kind.Error(), "status", status, "event_id", eventID)
 		}
 	}
 	return sent, subs, gone, nil

@@ -15,7 +15,7 @@ vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: {
 } }) }));
 vi.mock("@/lib/api", () => ({ apiFetch: mock.apiFetch }));
 vi.mock("@/lib/sign-out", () => ({
-  unsubscribePushOnThisDevice: mock.unsubscribe,
+  signOutOnThisDevice: mock.unsubscribe,
   clearPersonalStorage: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: mock.replace, refresh: mock.refresh }) }));
@@ -28,7 +28,7 @@ beforeEach(() => {
   mock.apiFetch.mockResolvedValue({ id: "user-1", is_admin: false });
   mock.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   mock.signOut.mockResolvedValue({ error: null });
-  mock.unsubscribe.mockResolvedValue(undefined);
+  mock.unsubscribe.mockImplementation(async (_userId, signOut) => signOut());
   mock.getSession.mockResolvedValue({ data: { session: null } });
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
@@ -91,7 +91,7 @@ it("別のアカウントへ切り替えたときに前の管理者の入口を�
 });
 it("アプリ内の確認からこの端末をログアウトしてホームへ戻る", async () => {
   await renderSignedIn(); await logout();
-  expect(mock.unsubscribe).toHaveBeenCalledWith("token");
+  expect(mock.unsubscribe).toHaveBeenCalledWith("user-1", expect.any(Function));
   expect(mock.signOut).toHaveBeenCalledWith({ scope: "local" });
   expect(mock.replace).toHaveBeenCalledWith("/");
 });

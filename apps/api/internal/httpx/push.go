@@ -87,13 +87,14 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "通知の登録内容が不正です")
 		return
 	}
-	if _, err := s.q.UpsertPushSubscription(r.Context(), db.UpsertPushSubscriptionParams{
+	sub, err := s.q.UpsertPushSubscription(r.Context(), db.UpsertPushSubscriptionParams{
 		ID:        uuid.New(),
 		ProfileID: p.ID,
 		Endpoint:  req.Endpoint,
 		P256dh:    p256dh,
 		Auth:      auth,
-	}); err != nil {
+	})
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -104,6 +105,10 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 	// 購読の登録が1回でも成功したことを残す。許可が残ったまま購読だけが消えた端末の自動再購読に使う。
 	if err := s.q.MarkPushEverSubscribed(r.Context(), p.ID); err != nil {
 		slog.Warn("push: ever subscribed", "err", err)
+	}
+	if r.URL.Query().Get("return_subscription_id") == "1" {
+		JSON(w, http.StatusOK, map[string]any{"subscription_id": sub.ID})
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

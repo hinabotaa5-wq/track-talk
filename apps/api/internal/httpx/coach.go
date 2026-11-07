@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -202,30 +201,31 @@ type coachApplicationReq struct {
 	SnsUrls      []string `json:"sns_urls"`
 }
 
-// normalizeSnsUrls は、チームや個人の SNS の URL を整える。空行は除き、重複は1つにする。
-// http/https の公開ページ URL だけを通し、それ以外が混ざれば false。
-func normalizeSnsUrls(urls []string) ([]string, bool) {
-	out := make([]string, 0, len(urls))
+// normalizeCoachSnsEntries は、SNS・ホームページ欄の空行と重複を除く。
+func normalizeCoachSnsEntries(entries []string) ([]string, string) {
+	out := make([]string, 0, len(entries))
 	seen := map[string]bool{}
-	for _, raw := range urls {
+	for _, raw := range entries {
 		v := strings.TrimSpace(raw)
-		if v == "" {
+		if v == "" || seen[v] {
 			continue
 		}
-		if len(v) > 300 || len(out) >= 3 || seen[v] {
-			if seen[v] {
-				continue
-			}
-			return nil, false
+		if len(out) >= 3 {
+			return nil, "SNS・ホームページは3件まで入力できます"
 		}
-		u, err := url.Parse(v)
-		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
-			return nil, false
+		if e := coachTextError("SNS・ホームページの各項目", v, 300); e != "" {
+			return nil, e
+		}
+		if strings.ContainsRune(v, 0) {
+			return nil, "SNS・ホームページに使用できない文字が含まれています"
 		}
 		seen[v] = true
 		out = append(out, v)
 	}
-	return out, true
+	if len(out) == 0 {
+		return nil, "SNS・ホームページを1件以上入力してください"
+	}
+	return out, ""
 }
 
 func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) {
@@ -261,11 +261,9 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if e := coachPublicTextError("成績や指導経験", req.Achievements, 500); e != "" {
 		fields["achievements"] = e
 	}
-	snsUrls, snsOK := normalizeSnsUrls(req.SnsUrls)
-	if !snsOK {
-		fields["sns_urls"] = "SNS・ホームページのURLは3件までで、http://またはhttps://から始まるURLを入力してください"
-	} else if len(snsUrls) == 0 {
-		fields["sns_urls"] = "SNSまたはホームページのURLを1件以上入力してください"
+	snsEntries, snsError := normalizeCoachSnsEntries(req.SnsUrls)
+	if snsError != "" {
+		fields["sns_urls"] = snsError
 	}
 	if req.Years == nil {
 		years := 0
@@ -286,7 +284,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		BestRecord:   req.BestRecord,
 		Achievements: req.Achievements,
 		Years:        int16(*req.Years),
-		SnsUrls:      snsUrls,
+		SnsUrls:      snsEntries,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "審査が済んでいるため、応募内容は変えられません")
@@ -443,7 +441,7 @@ func (s *Server) setCoachSuspended(w http.ResponseWriter, r *http.Request, suspe
 		if _, err := s.offerReview(r.Context(), rid); err != nil {
 			slog.Warn("review offer after coach suspend", "err", err)
 		}
-		s.notifyNominationEnded(r.Context(), rid)
+		s.notifyNominationEnded(r.Context(), rid, true)
 	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }

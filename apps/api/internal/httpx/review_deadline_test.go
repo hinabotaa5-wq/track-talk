@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
@@ -70,5 +71,27 @@ func TestOfferExpiresAtUsesJSTWallClock(t *testing.T) {
 func TestOfferDeadlineText(t *testing.T) {
 	if got := offerDeadlineText(jstAt(3, 7, 30).UTC()); got != "11月3日 7:30" {
 		t.Fatal(got)
+	}
+}
+
+func TestOfferReminderWindowPausesOvernight(t *testing.T) {
+	// 22:10 の打診は23時まで50分を数え、翌朝の7:40に期限を迎える。
+	expires := offerExpiresAt(jstAt(2, 22, 10), offerWindow)
+	before := offerExpiresAt(jstAt(3, 7, 9), reviewOfferReminderLead)
+	due := offerExpiresAt(jstAt(3, 7, 10), reviewOfferReminderLead)
+	if !before.Before(expires) || !due.Equal(expires) {
+		t.Fatalf("before=%v, due=%v, expires=%v", before, due, expires)
+	}
+	// 翌朝7:20の期限には、前夜の22:50で残り30分になる。
+	expires = offerExpiresAt(jstAt(2, 21, 50), offerWindow)
+	if got := offerExpiresAt(jstAt(2, 22, 50), reviewOfferReminderLead); !got.Equal(expires) {
+		t.Fatalf("overnight threshold: %v, want %v", got, expires)
+	}
+}
+
+func TestReviewOfferTagsArePerOffer(t *testing.T) {
+	first, second := uuid.New(), uuid.New()
+	if reviewOfferTag(first) == reviewOfferTag(second) {
+		t.Fatal("different offers shared a notification tag")
 	}
 }

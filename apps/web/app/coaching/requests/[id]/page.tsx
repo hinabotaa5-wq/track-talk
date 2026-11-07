@@ -11,6 +11,7 @@ import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { ReviewPayNotice } from "@/components/review-pay-notice";
+import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
@@ -204,6 +205,27 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
   );
 }
 
+function ReviewCompletionPushGuide({ id, userId, token }: { id: string; userId: string; token: string }) {
+  const [available, setAvailable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      apiFetch<{ settings: { category: string; push: boolean }[] }>("/v1/me/notification-settings", { token }),
+      apiFetch<{ public_key: string }>("/v1/push/public-key"),
+    ]).then(([settings, key]) => {
+      if (active && key.public_key && settings.settings.some((setting) => setting.category === "review" && setting.push)) {
+        setAvailable(true);
+      }
+    }).catch(() => {
+      // 返却通知を使えることが確認できたときだけ案内する。
+    });
+    return () => { active = false; };
+  }, [token]);
+
+  return available ? <PushPermissionGuide userId={userId} token={token} completedReviewId={id} /> : null;
+}
+
 // 送った添削の依頼と、届いた返答。
 function ReviewRequestView() {
   const { session, token, loading } = useAuth();
@@ -246,9 +268,12 @@ function ReviewRequestView() {
   if (loading || !session || !request) return <PageLoading screen label="読み込み中..." />;
 
   const waiting = request.status === "queued" || request.status === "offered" || request.status === "in_review";
+  const completedPayment = request.payment?.status === "authorized" || request.payment?.status === "captured";
+  const offerPushGuide = paid && request.id === id && completedPayment && (waiting || request.status === "needs_info");
 
   return (
     <div className="mx-auto max-w-md space-y-5">
+      {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">フォーム添削</h1>
         <p className="text-sm text-slate-300">送った日時 {formatDateTime(request.created_at)}</p>

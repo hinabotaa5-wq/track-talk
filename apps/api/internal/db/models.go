@@ -200,6 +200,12 @@ type CoachRegistrationEnding struct {
 	EndedAt time.Time  `json:"ended_at"`
 }
 
+type CoachStripeAccountAttempt struct {
+	ProfileID      uuid.UUID  `json:"profile_id"`
+	IdempotencyKey string     `json:"idempotency_key"`
+	StartedAt      *time.Time `json:"started_at"`
+}
+
 type CoachWorkOrder struct {
 	ID              uuid.UUID  `json:"id"`
 	Kind            string     `json:"kind"`
@@ -1062,13 +1068,14 @@ type Report struct {
 }
 
 type ReviewOffer struct {
-	ID         uuid.UUID  `json:"id"`
-	RequestID  uuid.UUID  `json:"request_id"`
-	CoachID    uuid.UUID  `json:"coach_id"`
-	OfferedAt  time.Time  `json:"offered_at"`
-	ExpiresAt  time.Time  `json:"expires_at"`
-	Result     *string    `json:"result"`
-	AnsweredAt *time.Time `json:"answered_at"`
+	ID             uuid.UUID  `json:"id"`
+	RequestID      uuid.UUID  `json:"request_id"`
+	CoachID        uuid.UUID  `json:"coach_id"`
+	OfferedAt      time.Time  `json:"offered_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	Result         *string    `json:"result"`
+	AnsweredAt     *time.Time `json:"answered_at"`
+	ReminderSentAt *time.Time `json:"reminder_sent_at"`
 }
 
 type ReviewPayment struct {

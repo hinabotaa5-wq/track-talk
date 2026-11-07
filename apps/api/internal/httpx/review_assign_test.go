@@ -20,8 +20,8 @@ type coachRequestsView struct {
 	Reviewing []reviewRequestView `json:"reviewing"`
 }
 
-// onDutyCoach は、承認済みで受付中のコーチ（枠はコーチ、種目は110mハードルを含む）を作る。
-func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string) {
+// approvedReviewCoach は、動画添削に必要な承認と振込先を設定する。
+func approvedReviewCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string) {
 	t.Helper()
 	id := uuid.New()
 	tc := token(t, id)
@@ -34,10 +34,17 @@ func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+id.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("approve %d", rec.Code)
 	}
-	execSQLArgs(t, `INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, 'key', 'auth')`,
-		uuid.New(), id, "https://push.example.com/"+uuid.NewString())
 	// 支払いのあるテストでも受付を始められるように、受け取り口座の登録を済ませておく。
 	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, id, "acct_"+id.String())
+	return id, tc
+}
+
+// onDutyCoach は、承認済みで受付中のコーチ（枠はコーチ、種目は110mハードルを含む）を作る。
+func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string) {
+	t.Helper()
+	id, tc := approvedReviewCoach(t, h, tadmin)
+	execSQLArgs(t, `INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, 'key', 'auth')`,
+		uuid.New(), id, "https://push.example.com/"+uuid.NewString())
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
 		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
 	}
