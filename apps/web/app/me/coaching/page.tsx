@@ -6,7 +6,6 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { pushSupported, subscribePush } from "@/lib/push";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -97,35 +96,6 @@ export default function CoachingSetupPage() {
       } else {
         setLinkMessage(errorMessage(err, "メールを送れませんでした"));
       }
-    } finally {
-      release();
-    }
-  }
-
-  async function onEnablePush() {
-    if (!acquire()) return;
-    setPushMessage("");
-    try {
-      if (!pushSupported()) {
-        setPushMessage("この端末のブラウザは通知に対応していません。iPhone はホーム画面に追加したアプリから設定してください。");
-        return;
-      }
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setPushMessage("通知が許可されませんでした。端末の設定から TrackTalk の通知を許可してください。");
-        return;
-      }
-      const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
-      const subscription = await subscribePush(public_key);
-      await apiFetch<void>("/v1/me/push-subscriptions", {
-        method: "POST",
-        token,
-        body: JSON.stringify(subscription),
-      });
-      setMe(await apiFetch<CoachingMe>("/v1/me/coaching", { token }));
-      setPushMessage("この端末で通知を受け取れるようになりました");
-    } catch (err) {
-      setPushMessage(errorMessage(err, "通知を設定できませんでした"));
     } finally {
       release();
     }
@@ -233,9 +203,9 @@ export default function CoachingSetupPage() {
         <p className="text-sm text-slate-300">
           添削が返ってきたときや、パーソナル指導の申し込みに返事が来たときに、この端末へ通知します。通知を受け取れる端末: {me.push_devices}台
         </p>
-        <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={() => void onEnablePush()}>
-          この端末で通知を受け取る
-        </Button>
+        <Link href="/me/push" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-200 underline underline-offset-4">
+          通知設定を開く
+        </Link>
         {me.push_devices > 0 ? (
           <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void onTestPush()}>
             テストの通知を送る
