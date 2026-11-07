@@ -36,12 +36,12 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   });
   await page.goto("/?sort=new");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
-  const canvas = track.locator(".masonry-feed-canvas");
+  const canvas = track.locator(".home-feed-grid-canvas");
   await expect(canvas).toHaveAttribute("data-ready", "true");
   for (let number = 2; number <= 60; number++) {
     await track.evaluate((el) => { el.scrollLeft = el.scrollWidth; el.dispatchEvent(new Event("scroll")); });
     await expect.poll(async () => Number(await canvas.getAttribute("data-count"))).toBeGreaterThanOrEqual(number * 12);
-    expect(await track.locator(".masonry-feed-tile").count()).toBeLessThan(50);
+    expect(await track.locator(".home-feed-grid-tile").count()).toBeLessThan(50);
   }
   const firstPageReads = requests.filter((n) => n === 1).length;
   await track.evaluate((el) => { el.scrollLeft = 0; el.dispatchEvent(new Event("scroll")); });
@@ -59,7 +59,7 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   await expect(link).toBeVisible();
   const before = await track.evaluate((el) => el.scrollLeft);
   const href = await link.getAttribute("href");
-  // 再取得と画像の測定中でも、フォーカス保持したカードから確実に詳細へ進む。
+  // 再取得中でも、フォーカス保持したカードから確実に詳細へ進む。
   await link.focus();
   await page.keyboard.press("Enter");
   // CIの開発サーバーで初めて詳細ルートをコンパイルする時間も待つ。
@@ -67,5 +67,5 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   await page.goBack();
   await expect(canvas).toHaveAttribute("data-count", "720");
   await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeCloseTo(before, 0);
-  expect(await track.locator(".masonry-feed-tile").count()).toBeLessThan(50);
+  expect(await track.locator(".home-feed-grid-tile").count()).toBeLessThan(50);
 });

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MasonryFeed } from "./masonry-feed";
+import { HomeFeedGrid } from "./home-feed-grid";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -27,7 +27,7 @@ afterEach(async () => {
   await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 async function render(onEndReached: () => void) {
-  await act(async () => root.render(<MasonryFeed ratios={[1]} onEndReached={onEndReached}><a href="/post">投稿</a></MasonryFeed>));
+  await act(async () => root.render(<HomeFeedGrid onEndReached={onEndReached}><a href="/post">投稿</a></HomeFeedGrid>));
   await act(async () => { const pending = frames.splice(0); pending.forEach((callback) => callback(0)); });
   return container.querySelector('[role="region"]') as HTMLDivElement;
 }
@@ -50,7 +50,7 @@ it("最初の投稿だけで画面が埋まらない場合は、続きを補う"
 it("詳細を開いて一覧を作り直しても横位置を復元する", async () => {
   vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) { return Number.parseFloat(this.style.left) || 0; });
   vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) { return Number.parseFloat(this.style.width) || 0; });
-  const content = <MasonryFeed storageKey="restore-test" ratios={[1, 1, 1, 1, 1, 1]}>{Array.from({ length: 6 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  const content = <HomeFeedGrid storageKey="restore-test">{Array.from({ length: 6 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</HomeFeedGrid>;
   await act(async () => root.render(content));
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   const track = container.querySelector('[role="region"]') as HTMLDivElement;
@@ -68,7 +68,7 @@ it("ヘッダーに帯が後から出ても、一覧を下部メニューの手�
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     if (this.tagName === "HEADER") return new DOMRect(0, 0, 300, headerHeight);
     if (this.tagName === "NAV") return new DOMRect(0, navTop, 300, 56);
-    if (this.classList.contains("masonry-feed-strip")) return new DOMRect(0, headerHeight + 60, 300, 0);
+    if (this.classList.contains("home-feed-grid-strip")) return new DOMRect(0, headerHeight + 60, 300, 0);
     return new DOMRect();
   });
   const header = document.createElement("header");
@@ -79,7 +79,7 @@ it("ヘッダーに帯が後から出ても、一覧を下部メニューの手�
   container.after(nav);
   try {
     await render(vi.fn());
-    const canvas = container.querySelector<HTMLElement>(".masonry-feed-canvas")!;
+    const canvas = container.querySelector<HTMLElement>(".home-feed-grid-canvas")!;
     expect(canvas.style.height).toBe("568px");
 
     headerHeight += 44;
@@ -102,7 +102,7 @@ it("ヘッダーに帯が後から出ても、一覧を下部メニューの手�
 });
 
 it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復元する", async () => {
-  const content = <MasonryFeed storageKey="large-feed" ratios={Array(600).fill(4 / 3)}>{Array.from({ length: 600 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  const content = <HomeFeedGrid storageKey="large-feed">{Array.from({ length: 600 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</HomeFeedGrid>;
   await act(async () => root.render(content));
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   const track = container.querySelector('[role="region"]') as HTMLDivElement;
@@ -118,7 +118,7 @@ it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復�
 });
 
 it("配置の計算後に先頭へ戻す操作を、古い復元位置で上書きしない", async () => {
-  const content = <MasonryFeed storageKey="scroll-interruption" ratios={Array(12).fill(1)}>{Array.from({ length: 12 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</MasonryFeed>;
+  const content = <HomeFeedGrid storageKey="scroll-interruption">{Array.from({ length: 12 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</HomeFeedGrid>;
   await act(async () => root.render(content));
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   const track = container.querySelector('[role="region"]') as HTMLDivElement;

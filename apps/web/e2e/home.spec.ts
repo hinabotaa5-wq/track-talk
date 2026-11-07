@@ -51,7 +51,7 @@ test.describe("iPhone 相当のホーム", () => {
     const nav = page.getByRole("navigation", { name: "メイン" });
     await expect(banner).toBeVisible();
     const feed = page.getByRole("region", { name: "投稿一覧", exact: true });
-    await expect(feed.locator(".masonry-feed-canvas")).toHaveAttribute("data-ready", "true");
+    await expect(feed.locator(".home-feed-grid-canvas")).toHaveAttribute("data-ready", "true");
     await expect.poll(async () => {
       const [button, guide, menu] = await Promise.all([fab.boundingBox(), banner.boundingBox(), nav.boundingBox()]);
       if (!button || !guide || !menu) return 0;
