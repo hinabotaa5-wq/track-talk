@@ -1,0 +1,16 @@
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /identityvault ./cmd/identityvault
+
+FROM alpine:3.24
+RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 identity
+COPY --from=build /identityvault /usr/local/bin/identityvault
+EXPOSE 8080
+ENV ALLOW_REMOTE_DB=1
+USER identity
+CMD ["/usr/local/bin/identityvault"]

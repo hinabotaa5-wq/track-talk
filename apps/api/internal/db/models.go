@@ -691,6 +691,40 @@ type GuardianNotice struct {
 	PaymentIntentID *string    `json:"payment_intent_id"`
 }
 
+type IdentityBoundaryApprovedCoach struct {
+	ProfileID uuid.UUID `json:"profile_id"`
+}
+
+type IdentityBoundaryCoachEpoch struct {
+	ID    uuid.UUID `json:"id"`
+	Epoch uuid.UUID `json:"epoch"`
+}
+
+type IdentityBoundaryPlanEpoch struct {
+	ID    uuid.UUID `json:"id"`
+	Epoch uuid.UUID `json:"epoch"`
+}
+
+type IdentityBoundaryPublishedPlan struct {
+	ID         uuid.UUID `json:"id"`
+	CoachID    uuid.UUID `json:"coach_id"`
+	Title      string    `json:"title"`
+	PlanEpoch  uuid.UUID `json:"plan_epoch"`
+	CoachEpoch uuid.UUID `json:"coach_epoch"`
+}
+
+type IdentityBoundaryRetention struct {
+	CoachID           uuid.UUID  `json:"coach_id"`
+	EndedAt           time.Time  `json:"ended_at"`
+	LastTransactionAt *time.Time `json:"last_transaction_at"`
+}
+
+type IdentityBoundaryRetirement struct {
+	CoachID           uuid.UUID  `json:"coach_id"`
+	EndedAt           time.Time  `json:"ended_at"`
+	LastTransactionAt *time.Time `json:"last_transaction_at"`
+}
+
 type InjuryDetail struct {
 	PostID     uuid.UUID `json:"post_id"`
 	BodyPart   string    `json:"body_part"`

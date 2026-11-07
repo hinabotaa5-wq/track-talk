@@ -42,6 +42,7 @@ func (c contractConsentReq) fields() map[string]string {
 
 // getPublicCoachingPlan は、申し込む前に見るプランとコーチ。ログインしなくても見られる。
 func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
 		return
@@ -64,12 +65,13 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 	})
 	plan["full"] = p.ActiveCount >= int32(p.Capacity)
-	// サポートプランはコーチが販売者なので、コーチの特商法の表記を一緒に出す(表記不要のコーチは要否だけ)。
-	commerce, err := s.publicCommerceJSON(r.Context(), s.q, p.CoachID)
+	commerce, approved, err := s.identity.disclosure(r.Context(), p.ID)
 	if err != nil {
-		if !s.writeIdentityKeyError(w, err) {
-			MapDBError(w, err)
-		}
+		identityServiceError(w)
+		return
+	}
+	if !approved {
+		Error(w, http.StatusNotFound, "not_found", "このプランはいま申し込めません")
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{
@@ -124,11 +126,10 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "自分のプランには申し込めません")
 		return
 	}
-	// 販売者であるコーチが特商法の登録を済ませていないプランには申し込めない(公開前の登録が必須になる前のプラン向け)。
-	if registered, err := s.q.HasCoachLegalIdentity(r.Context(), plan.CoachID); err != nil {
-		MapDBError(w, err)
+	if _, approved, err := s.identity.disclosure(r.Context(), plan.ID); err != nil {
+		identityServiceError(w)
 		return
-	} else if !registered {
+	} else if !approved {
 		Error(w, http.StatusConflict, "commerce_unregistered", "このプランはいま申し込めません")
 		return
 	}
