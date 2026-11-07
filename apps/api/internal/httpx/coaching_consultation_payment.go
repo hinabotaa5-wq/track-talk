@@ -257,7 +257,8 @@ func (s *Server) releaseConsultationFunding(ctx context.Context, q *db.Queries, 
 	return q.SetConsultationPaymentState(ctx, db.SetConsultationPaymentStateParams{ID: c.ID, PaymentState: "refund_pending"})
 }
 func (s *Server) processConsultationRefund(ctx context.Context, id uuid.UUID) error {
-	return s.tx(ctx, func(q *db.Queries) error {
+	var notify bool
+	err := s.tx(ctx, func(q *db.Queries) error {
 		refund, err := q.LockConsultationRefund(ctx, id)
 		if err != nil {
 			return err
@@ -297,8 +298,19 @@ func (s *Server) processConsultationRefund(ctx context.Context, id uuid.UUID) er
 		case "failed", "canceled":
 			status = "failed"
 		}
-		return q.SaveConsultationRefund(ctx, db.SaveConsultationRefundParams{ID: id, Status: status, StripeRefundID: &remote.ID})
+		if err := q.SaveConsultationRefund(ctx, db.SaveConsultationRefundParams{ID: id, Status: status, StripeRefundID: &remote.ID}); err != nil {
+			return err
+		}
+		if status != "succeeded" || c.RequesterID == nil {
+			return nil
+		}
+		notify = true
+		return enqueueConsultationRefundNotice(ctx, q, id, c)
 	})
+	if err == nil && notify {
+		s.deliverRefundCompletionNotice(ctx, id)
+	}
+	return err
 }
 func (s *Server) settleConsultationRefunds(ctx context.Context) (int, error) {
 	if !s.stripe.Configured() {

@@ -135,6 +135,10 @@ export async function currentPushSession(userId: string | null) {
   return session;
 }
 
+// VAPID の鍵を入れ替えたあと、前の鍵の購読を今の鍵で作り直して API に登録し直す。
+// 鍵が変わっていなくても登録し直す。API は届かなかった宛先を消すので、消されたままにしない。
+// OS の許可が granted のまま端末の購読だけが消えたとき、以前に有効化した端末だけ自動で再購読する。
+// 許可はあるので OS ダイアログは出ない。未決定・拒否の人には出さず、既存の案内導線に任せる。
 export async function refreshPushSubscription(userId: string | null): Promise<boolean> {
   if (!pushSupported()) return false;
   return withPushDeviceLock(async () => {
@@ -145,10 +149,25 @@ export async function refreshPushSubscription(userId: string | null): Promise<bo
     }
     if ((await readPushBinding())?.userId !== session.user.id) await clearPushBinding();
     const existing = await currentPushSubscription();
-    if (!existing) return false;
+    if (!existing) {
+      return resubscribeIfPreviouslyEnabled(session.access_token);
+    }
     await registerCurrentPushSubscription(session.access_token, session.user.id);
     return true;
   });
+}
+
+// OS の許可が granted のまま端末の購読だけが消えたとき、以前に有効化した端末だけ自動で再購読する。
+// 許可はあるので OS ダイアログは出ない。未決定・拒否の人には出さず、既存の案内導線に任せる。
+async function resubscribeIfPreviouslyEnabled(token: string): Promise<boolean> {
+  if (!pushSupported() || Notification.permission !== "granted") return false;
+  const { ever_subscribed } = await apiFetch<{ ever_subscribed: boolean }>("/v1/me/push-subscriptions/status", { token });
+  if (!ever_subscribed) return false;
+  const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
+  if (!public_key) return false;
+  const subscription = await subscribePush(public_key);
+  await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
+  return true;
 }
 
 async function registerCurrentPushSubscription(token: string, userId: string) {

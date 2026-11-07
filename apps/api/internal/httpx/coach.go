@@ -613,15 +613,41 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 	if !ok {
 		return
 	}
-	c, err := s.q.ReviewCoachApplication(r.Context(), db.ReviewCoachApplicationParams{Status: status, ProfileID: id})
+	ctx := r.Context()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	q := s.q.WithTx(tx)
+	c, err := q.ReviewCoachApplication(ctx, db.ReviewCoachApplicationParams{Status: status, ProfileID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
-		current, getErr := s.q.GetCoachProfile(r.Context(), id)
+		_ = tx.Rollback(ctx)
+		current, getErr := s.q.GetCoachProfile(ctx, id)
 		if errors.Is(getErr, pgx.ErrNoRows) {
 			Error(w, http.StatusNotFound, "not_found", "応募が見つかりません")
 			return
 		}
-		if getErr == nil && current.Status == "pending" && current.PhotoPublicID == nil {
+		if getErr != nil {
+			MapDBError(w, getErr)
+			return
+		}
+		if current.Status == "pending" && current.PhotoPublicID == nil {
 			Error(w, http.StatusConflict, "conflict", "顔写真がまだ登録されていないため、承認できません")
+			return
+		}
+		if status == "rejected" && current.Status == "rejected" {
+			jobID, err := s.q.GetRejectionNotificationJob(ctx, db.GetRejectionNotificationJobParams{
+				RecipientID: id, ReviewedAt: current.ReviewedAt,
+			})
+			if err == nil {
+				s.runNotificationJobs(ctx, []uuid.UUID{jobID})
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				MapDBError(w, err)
+				return
+			}
+			JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(current)})
 			return
 		}
 		Error(w, http.StatusConflict, "conflict", "この応募は審査済みです")
@@ -631,16 +657,37 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 		MapDBError(w, err)
 		return
 	}
-	s.notifyCoachReviewed(r.Context(), c)
+	var jobs []uuid.UUID
+	if c.Status == "rejected" {
+		for _, kind := range []string{coachRejectedJob, coachIdentityEndJob} {
+			jobID := uuid.New()
+			if err := q.EnqueueNotificationJob(ctx, db.EnqueueNotificationJobParams{
+				ID: jobID, Kind: kind, RecipientID: id, ReviewedAt: c.ReviewedAt,
+			}); err != nil {
+				MapDBError(w, err)
+				return
+			}
+			jobs = append(jobs, jobID)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if c.Status == "rejected" {
+		s.runNotificationJobs(ctx, jobs)
+	} else {
+		s.notifyCoachApproved(ctx, id)
+	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
-// notifyCoachReviewed は、審査の結果を応募した人に知らせる。
-// 届かなくても結果は応募の画面で見られるので、失敗は記録だけする。
-func (s *Server) notifyCoachReviewed(ctx context.Context, c db.CoachProfile) {
-	msg := push.Message{Title: "コーチの応募が承認されました", Body: "応募の画面から次の準備に進めます", URL: "/coach/apply", Tag: "coach-review"}
-	if c.Status == "rejected" {
-		msg = push.Message{Title: "コーチの応募の審査が終わりました", Body: "結果を応募の画面で確認してください", URL: "/coach/apply", Tag: "coach-review"}
-	}
-	s.notify(ctx, c.ProfileID, notifyCoaching, msg, 24*time.Hour)
+// notifyCoachApproved は、審査に通ったことを応募者に知らせる。
+func (s *Server) notifyCoachApproved(ctx context.Context, id uuid.UUID) {
+	s.notify(ctx, id, notifyCoaching, push.Message{
+		Title: "コーチの応募が承認されました",
+		Body:  "応募の画面から次の準備に進めます",
+		URL:   "/coach/apply",
+		Tag:   "coach-review",
+	}, 24*time.Hour)
 }

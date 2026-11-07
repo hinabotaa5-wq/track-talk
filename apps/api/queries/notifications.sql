@@ -3,8 +3,8 @@ INSERT INTO notifications (id, recipient_id, kind, post_id, comment_id, applicat
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: InsertReviewNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, review_request_id)
-VALUES ($1, $2, $3, $4);
+INSERT INTO notifications (id, recipient_id, kind, review_request_id, url)
+VALUES ($1, $2, $3, $4, $5);
 
 -- name: InsertRecruitmentPostNotifications :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id)

@@ -205,6 +205,7 @@ export type NotificationKind =
   | "review_clarified"
   | "review_info_request"
   | "review_resubmitted"
+  | "review_resubmitted_after_accept"
   | "review_withdrawn"
   | "review_helpful_ask"
   | "message";

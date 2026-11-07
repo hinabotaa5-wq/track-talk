@@ -106,7 +106,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_like_count();
 	}
 }
 
-func TestCommentRollsBackWhenNotifyFails(t *testing.T) {
+func TestCommentAndCountCommitWhenNotifyFails(t *testing.T) {
 	h := setup(t)
 	authorID := uuid.New()
 	author := token(t, authorID)
@@ -127,13 +127,13 @@ BEFORE INSERT ON notifications
 FOR EACH ROW EXECUTE FUNCTION fail_comment_notify();
 `, `DROP TRIGGER IF EXISTS fail_comment_notify ON notifications; DROP FUNCTION IF EXISTS fail_comment_notify();`)
 
-	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+postID+"/comments", commenter, map[string]string{"body": "残らない"}); rec.Code != http.StatusInternalServerError {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/posts/"+postID+"/comments", commenter, map[string]string{"body": "投稿は確定する"}); rec.Code != http.StatusCreated {
 		t.Fatalf("comment %d %s", rec.Code, rec.Body.String())
 	}
-	if _, comments := postCounts(t, h, postID); comments != 0 {
+	if _, comments := postCounts(t, h, postID); comments != 1 {
 		t.Fatalf("count after failed notify %d", comments)
 	}
-	if total := commentTotal(t, h, postID); total != 0 {
+	if total := commentTotal(t, h, postID); total != 1 {
 		t.Fatalf("comments after failed notify %d", total)
 	}
 	notes, _ := listNotifications(t, h, author)

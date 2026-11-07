@@ -136,16 +136,16 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	}
 	if onDuty && !current.OnDuty {
 		// 登録の件数だけでは、届かない宛先でも受付中になれてしまう。通知を使えるときは、
-		// 受付を始めた知らせを実際に送って、1台以上に届いたことを確かめる。
+		// 接続テストを送り、1台以上のプッシュサービスが受理したことを確かめる。
 		var devices int64
 		var err error
 		if s.push.Configured() {
 			var sent int
 			sent, err = s.sendPush(r.Context(), p.ID, push.Message{
-				Title: "依頼の受付を始めました",
-				Body:  "フォーム添削の依頼が届くと、この端末に通知します",
+				Title: "フォーム添削の通知テスト",
+				Body:  "依頼の受付を始める前の接続テストです",
 				URL:   "/coach",
-				Tag:   "coach-duty",
+				Tag:   "coach-duty-test",
 			}, 10*time.Minute)
 			devices = int64(sent)
 		} else {
@@ -168,6 +168,14 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if c.OnDuty && !current.OnDuty {
+		s.pushQuietly(r.Context(), p.ID, notifyImportant, push.Message{
+			Title: "依頼の受付を始めました",
+			Body:  "フォーム添削の依頼が届くと、この端末に通知します",
+			URL:   "/coach",
+			Tag:   "coach-duty",
+		}, 10*time.Minute)
 	}
 	// 受付を始めたり上限を上げたりしたら、待っている依頼をすぐ回す。
 	if c.OnDuty && (!current.OnDuty || c.DailyCap > current.DailyCap) {

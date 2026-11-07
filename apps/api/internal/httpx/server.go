@@ -165,6 +165,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/race-records/pb-stats", s.pbStats)
 			r.Post("/me/push-subscriptions", s.savePushSubscription)
 			r.Delete("/me/push-subscriptions", s.deletePushSubscription)
+			r.Get("/me/push-subscriptions/status", s.pushSubscriptionStatus)
 			r.Post("/me/push-subscriptions/test", s.testPush)
 			r.Post("/me/race-records", s.createRaceRecord)
 			r.Patch("/me/race-records/{id}", s.updateRaceRecord)

@@ -53,6 +53,8 @@ func (s *Server) securityCheck(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
+	// コーチング停止中にも投稿の通知を再処理できるよう、既存の定期実行を使う。
+	s.retryNotificationJobs(r.Context())
 	unknown, alerted, err := s.checkDBConnections(r.Context())
 	if err != nil {
 		slog.Error("security check", "err", err)
@@ -64,6 +66,8 @@ func (s *Server) securityCheck(w http.ResponseWriter, r *http.Request) {
 		// 照合の失敗で DB の見回りの結果まで落とさない。
 		slog.Warn("stripe reconcile", "err", err)
 	}
+	// コーチングの公開停止中も、Webhook で確定した通知は再試行する。
+	s.retryRefundCompletionNotices(r.Context())
 	JSON(w, http.StatusOK, map[string]any{"unknown_connections": unknown, "alerted": alerted})
 }
 

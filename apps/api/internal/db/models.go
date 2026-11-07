@@ -871,10 +871,11 @@ type MinorPurchaseDeclaration struct {
 }
 
 type MonthlyReminder struct {
-	Month      time.Time  `json:"month"`
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at"`
-	Recipients int32      `json:"recipients"`
+	Month       time.Time  `json:"month"`
+	StartedAt   time.Time  `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at"`
+	Recipients  int32      `json:"recipients"`
+	InAppDoneAt *time.Time `json:"in_app_done_at"`
 }
 
 type Notification struct {
@@ -891,6 +892,18 @@ type Notification struct {
 	Body            *string    `json:"body"`
 	Url             *string    `json:"url"`
 	AnnouncementID  *uuid.UUID `json:"announcement_id"`
+}
+
+type NotificationJob struct {
+	ID              uuid.UUID  `json:"id"`
+	Kind            string     `json:"kind"`
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	PostID          *uuid.UUID `json:"post_id"`
+	CommentID       *uuid.UUID `json:"comment_id"`
+	ApplicationID   *uuid.UUID `json:"application_id"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	NextAttemptAt   time.Time  `json:"next_attempt_at"`
 }
 
 type NotificationSetting struct {
@@ -1015,6 +1028,27 @@ type Profile struct {
 	CoachingDemo          bool       `json:"coaching_demo"`
 	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
 	Event                 *string    `json:"event"`
+	PushEverSubscribed    bool       `json:"push_ever_subscribed"`
+}
+
+type PushOutbox struct {
+	ID            uuid.UUID  `json:"id"`
+	ProfileID     uuid.UUID  `json:"profile_id"`
+	Title         string     `json:"title"`
+	Body          string     `json:"body"`
+	Url           string     `json:"url"`
+	Tag           string     `json:"tag"`
+	Category      string     `json:"category"`
+	TtlSeconds    int32      `json:"ttl_seconds"`
+	DedupKey      string     `json:"dedup_key"`
+	Status        string     `json:"status"`
+	Attempts      int32      `json:"attempts"`
+	NextAttemptAt time.Time  `json:"next_attempt_at"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	LastResult    *string    `json:"last_result"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	SentAt        *time.Time `json:"sent_at"`
 }
 
 type PushSubscription struct {
@@ -1065,6 +1099,15 @@ type RecruitmentPrefecture struct {
 	PostID     uuid.UUID `json:"post_id"`
 	Position   int32     `json:"position"`
 	Prefecture string    `json:"prefecture"`
+}
+
+type RefundCompletionNotice struct {
+	ID                    uuid.UUID `json:"id"`
+	RecipientID           uuid.UUID `json:"recipient_id"`
+	Kind                  string    `json:"kind"`
+	Url                   string    `json:"url"`
+	PendingStripeRefundID *string   `json:"pending_stripe_refund_id"`
+	NextAttemptAt         time.Time `json:"next_attempt_at"`
 }
 
 type Report struct {
