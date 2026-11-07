@@ -2,6 +2,8 @@ name: Configure Coaching Availability
 
 # 募集のみ／コーチング公開を明示的に切り替える。Web側のフラグも合わせること。
 # 既定の公開切替では新規の申し込み・購入を停止する。受付開始は専用操作と確認入力で分ける。
+# コーチ一覧(COACHING_COACH_LIST_ENABLED)は専用操作 configure_coach_list だけで開閉する。
+# ほかの操作は一覧フラグに触れず、一覧の操作はほかのフラグに触れない。Web側は NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED。
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +13,7 @@ on:
         options:
           - configure_availability
           - open_new_acceptance
+          - configure_coach_list
         default: configure_availability
         required: true
       enabled:
@@ -20,6 +23,16 @@ on:
         required: true
       confirm_open_new_acceptance:
         description: PayPay承認済み・同日の手順書C成功を確認し、新規受付だけを開ける
+        type: boolean
+        default: false
+        required: false
+      coach_list_enabled:
+        description: （configure_coach_list のみ）コーチ一覧を公開する（falseは一覧を準備中に戻す）
+        type: boolean
+        default: false
+        required: false
+      confirm_open_coach_list:
+        description: （configure_coach_list で公開するときのみ）運営者が一覧の公開を決めたことを確認し、一覧フラグだけを開ける
         type: boolean
         default: false
         required: false
@@ -44,6 +57,8 @@ jobs:
       # operationを省略した既存の呼び出しも、従来の公開切替として扱う。
       COACHING_OPERATION: ${{ inputs.operation || 'configure_availability' }}
       CONFIRM_OPEN_NEW_ACCEPTANCE: ${{ inputs.confirm_open_new_acceptance && '1' || '0' }}
+      COACH_LIST_FLAG: ${{ inputs.coach_list_enabled && '1' || '0' }}
+      CONFIRM_OPEN_COACH_LIST: ${{ inputs.confirm_open_coach_list && '1' || '0' }}
     steps:
       - name: Validate operation
         shell: bash
@@ -53,6 +68,13 @@ jobs:
             open_new_acceptance)
               if [ "$CONFIRM_OPEN_NEW_ACCEPTANCE" != "1" ]; then
                 echo "::error::新規受付を開けるには、PayPay承認と同日の手順書C成功の確認入力が必要です。"
+                exit 1
+              fi
+              ;;
+            configure_coach_list)
+              # 閉じる方向(false)は確認入力なしで実行できる。開ける方向だけ確認入力を必須にする。
+              if [ "$COACH_LIST_FLAG" = "1" ] && [ "$CONFIRM_OPEN_COACH_LIST" != "1" ]; then
+                echo "::error::コーチ一覧を公開するには、一覧の公開を確認する入力が必要です。"
                 exit 1
               fi
               ;;
@@ -77,7 +99,18 @@ jobs:
             open_new_acceptance)
               COACHING_UPDATES="COACHING_NEW_ACCEPTANCE_ENABLED=1"
               ;;
+            configure_coach_list)
+              # enabled は使わない。COACHING_ENABLED などほかのフラグは現在値を維持する。
+              COACHING_UPDATES="COACHING_COACH_LIST_ENABLED=$COACH_LIST_FLAG"
+              ;;
+            *)
+              echo "::error::未対応の操作です。"
+              exit 1
+              ;;
           esac
+          # 値はフラグの 0/1 だけなので、更新対象をログに残す。
+          echo "更新する環境変数（これ以外は現在値のまま）:"
+          echo "$COACHING_UPDATES" | tr ',' '\n'
           gcloud run services update track-talk-api \
             --region "$REGION" \
             --project "$GCP_PROJECT_ID" \

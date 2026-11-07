@@ -26,8 +26,40 @@ describe("コーチタブ", () => {
     expect(section).not.toContain("<a");
   });
 
+  // 一番上の「コーチ一覧」の枠（準備中の section か、/coaches へのリンク）を取り出す。
+  const topListBox = (html: string) => {
+    const listAt = html.indexOf("コーチ一覧");
+    const start = Math.max(html.lastIndexOf("<section", listAt), html.lastIndexOf("<a", listAt));
+    const end = html.indexOf(html.startsWith("<a", start) ? "</a>" : "</section>", listAt);
+    return html.slice(start, end);
+  };
+  for (const coaching of [false, true]) {
+    it(`一覧を閉じている間は、コーチング${coaching ? "を開けていても" : "が閉じていても"}上の枠は準備中のままでリンクにしない`, () => {
+      flags.coaching = coaching;
+      const html = renderToStaticMarkup(createElement(CoachingPage));
+      const box = topListBox(html);
+      expect(box.startsWith("<section")).toBe(true);
+      expect(box).toContain("準備中です");
+      expect(box).not.toContain("<a");
+      expect(box).not.toContain("登録しているコーチを見る");
+    });
+    it(`一覧を開けると、コーチング${coaching ? "を開けていても" : "が閉じていても"}上の枠は /coaches へのリンクになり、準備中と出さない`, () => {
+      flags.coaching = coaching;
+      flags.list = true;
+      const html = renderToStaticMarkup(createElement(CoachingPage));
+      const box = topListBox(html);
+      expect(html.indexOf("コーチ一覧")).toBeLessThan(html.indexOf("<nav"));
+      expect(box.startsWith('<a href="/coaches"')).toBe(true);
+      expect(box).toContain("登録しているコーチを見る");
+      expect(box).not.toContain("準備中");
+    });
+  }
+
   // サポートプランの入口はコーチ一覧（/coaches）。一覧を閉じている間は、開いているように見せない。
-  const supportCard = (html: string) => html.slice(html.indexOf('href="/coaches"'), html.indexOf("</a>", html.indexOf('href="/coaches"')));
+  const supportCard = (html: string) => {
+    const at = html.indexOf('href="/coaches"', html.indexOf("<nav"));
+    return html.slice(at, html.indexOf("</a>", at));
+  };
   it("コーチングを開けて一覧を閉じている間は、サポートプランを準備中と案内し、動画添削は案内どおり出す", () => {
     flags.coaching = true;
     const html = renderToStaticMarkup(createElement(CoachingPage));

@@ -32,8 +32,18 @@ const choices = [
 export default function CoachingPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100svh-10.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-4">
-      {/* コーチ一覧はタブの一番上に置く。今は中身を見せず、押しても先へ進まない準備中の枠だけを出す。 */}
-      <section aria-labelledby="coach-list-heading" className="flex min-w-0 items-center gap-4 rounded-2xl border border-dashed border-white/25 bg-white/5 px-5 py-4">
+      {/* コーチ一覧はタブの一番上に置く。一覧を閉じている間は中身を見せず、押しても先へ進まない準備中の枠だけを出す。
+          一覧フラグを開けたときだけ /coaches へのリンクにする(コーチング本体のフラグでは変えない)。 */}
+      {coachingCoachListEnabled ? <Link href="/coaches" aria-labelledby="coach-list-heading" className="group flex min-w-0 items-center gap-4 rounded-2xl border border-white/20 glass bg-white/10 px-5 py-4 transition hover:border-blue-400/50 hover:bg-blue-500/15 active:scale-[0.98]">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
+          <Users className="size-6" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="coach-list-heading" className="text-base font-bold leading-tight text-white">コーチ一覧</h2>
+          <p className="mt-2 text-sm leading-snug text-slate-300">登録しているコーチを見る</p>
+        </div>
+        <ArrowRight className="size-4 shrink-0 text-blue-300" aria-hidden />
+      </Link> : <section aria-labelledby="coach-list-heading" className="flex min-w-0 items-center gap-4 rounded-2xl border border-dashed border-white/25 bg-white/5 px-5 py-4">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-slate-300">
           <Users className="size-6" aria-hidden />
         </span>
@@ -41,7 +51,7 @@ export default function CoachingPage() {
           <h2 id="coach-list-heading" className="text-base font-bold leading-tight text-slate-100">コーチ一覧</h2>
           <p className="mt-2 text-sm leading-snug text-slate-300">準備中です</p>
         </div>
-      </section>
+      </section>}
       {!coachingEnabled ? <div className="space-y-1">
         <h1 className="text-xl font-bold">コーチングは準備中です</h1>
         <p className="text-sm text-slate-300">現在はコーチを募集しています。応募は「コーチ専用画面」から。</p>
