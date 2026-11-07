@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -102,6 +101,10 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 購読の登録が1回でも成功したことを残す。許可が残ったまま購読だけが消えた端末の自動再購読に使う。
+	if err := s.q.MarkPushEverSubscribed(r.Context(), p.ID); err != nil {
+		slog.Warn("push: ever subscribed", "err", err)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -127,6 +130,16 @@ func (s *Server) deletePushSubscription(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// pushSubscriptionStatus は、このアカウントで購読の登録が成功したことがあるかを返す。
+// 許可が granted のまま端末の購読だけが消えたとき、ログイン時に自動で再購読してよいか確かめる。
+func (s *Server) pushSubscriptionStatus(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"ever_subscribed": p.PushEverSubscribed})
 }
 
 // testPush は、自分の端末に試しの通知を送る。通知が届くかを本人が確かめるためのもの。
@@ -159,31 +172,6 @@ func (s *Server) testPush(w http.ResponseWriter, r *http.Request) {
 // sendPush は、その人が登録したすべての端末に送る。使えなくなった宛先は消す。
 // 送れた端末の数を返す。送信の失敗は記録だけして、呼び出し元の処理は止めない。
 func (s *Server) sendPush(ctx context.Context, profileID uuid.UUID, msg push.Message, ttl time.Duration) (int, error) {
-	subs, err := s.q.ListPushSubscriptions(ctx, profileID)
-	if err != nil {
-		return 0, err
-	}
-	sent := 0
-	for _, sub := range subs {
-		// 宛先を限る前に登録されたものも、プッシュサービス以外には送らない。
-		if !s.validPushEndpoint(sub.Endpoint) {
-			continue
-		}
-		err := s.push.Send(ctx, push.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, msg, ttl)
-		switch {
-		case err == nil:
-			sent++
-		case errors.Is(err, push.ErrGone):
-			if err != push.ErrGone {
-				// 401・403 で拒否された宛先を消すときは、理由を残す。設定の誤りで消えていないかを確かめられるように。
-				slog.Warn("push: remove rejected subscription", "err", err)
-			}
-			if err := s.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
-				slog.Warn("push: delete gone subscription", "err", err)
-			}
-		default:
-			slog.Warn("push: send failed", "err", err)
-		}
-	}
-	return sent, nil
+	sent, _, _, err := s.sendToSubscriptions(ctx, profileID, msg, ttl)
+	return sent, err
 }

@@ -17,7 +17,7 @@ SELECT $1::uuid, $2::text, $3::boolean
 WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
 `
 
 type EnsureProfileParams struct {
@@ -41,12 +41,13 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
 		&i.Event,
+		&i.PushEverSubscribed,
 	)
 	return i, err
 }
 
 const getProfileByID = `-- name: GetProfileByID :one
-SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event FROM profiles WHERE id = $1
+SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed FROM profiles WHERE id = $1
 `
 
 // ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
@@ -64,6 +65,7 @@ func (q *Queries) GetProfileByID(ctx context.Context, id uuid.UUID) (Profile, er
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
 		&i.Event,
+		&i.PushEverSubscribed,
 	)
 	return i, err
 }
@@ -73,7 +75,7 @@ UPDATE profiles
 SET post_master_badge_public = $2,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
 `
 
 type UpdatePostMasterBadgeParams struct {
@@ -95,6 +97,7 @@ func (q *Queries) UpdatePostMasterBadge(ctx context.Context, arg UpdatePostMaste
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
 		&i.Event,
+		&i.PushEverSubscribed,
 	)
 	return i, err
 }
@@ -107,7 +110,7 @@ SET nickname = $2,
     updated_at = now()
 WHERE id = $1
   AND (NOT $5::boolean OR is_admin OR nickname = $2)
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
 `
 
 type UpdateProfileParams struct {
@@ -139,6 +142,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.CoachingDemo,
 		&i.PostMasterBadgePublic,
 		&i.Event,
+		&i.PushEverSubscribed,
 	)
 	return i, err
 }

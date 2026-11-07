@@ -76,7 +76,10 @@ export function subscriptionMatchesKey(
 // 通知をオンにしていない端末では何もしない。
 export async function refreshPushSubscription(token: string): Promise<void> {
   const existing = await currentPushSubscription();
-  if (!existing) return;
+  if (!existing) {
+    await resubscribeIfPreviouslyEnabled(token);
+    return;
+  }
   const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
   if (!public_key) return;
   if (subscriptionMatchesKey(existing, public_key, rememberedPushKey())) {
@@ -88,6 +91,18 @@ export async function refreshPushSubscription(token: string): Promise<void> {
     token,
     body: JSON.stringify({ endpoint: existing.endpoint }),
   }).catch(() => undefined);
+  const subscription = await subscribePush(public_key);
+  await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
+}
+
+// OS の許可が granted のまま端末の購読だけが消えたとき、以前に有効化した端末だけ自動で再購読する。
+// 許可はあるので OS ダイアログは出ない。未決定・拒否の人には出さず、既存の案内導線に任せる。
+async function resubscribeIfPreviouslyEnabled(token: string): Promise<void> {
+  if (!pushSupported() || Notification.permission !== "granted") return;
+  const { ever_subscribed } = await apiFetch<{ ever_subscribed: boolean }>("/v1/me/push-subscriptions/status", { token });
+  if (!ever_subscribed) return;
+  const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
+  if (!public_key) return;
   const subscription = await subscribePush(public_key);
   await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
 }
