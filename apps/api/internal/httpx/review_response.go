@@ -292,12 +292,16 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	// 返却したので、仮押さえしていた代金を確定する。
 	s.captureReturnedReview(r.Context(), rr.ID)
-	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_returned", push.Message{
+	if err := insertReviewNotification(r.Context(), s.q, rr.RequesterID, "review_returned", rr.ID); err != nil {
+		slog.Warn("review notification", "kind", "review_returned", "err", err)
+	}
+	// 返却の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は24時間。
+	s.queuePush(r.Context(), rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の返答が届きました",
 		Body:  "コーチからのアドバイスを見てみましょう",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
-	})
+	}, 24*time.Hour, time.Now().Add(24*time.Hour), "review_returned:"+rr.ID.String())
 	out := s.coachRequestJSON(rr, true)
 	out["response"] = s.reviewResponseJSON(rs)
 	JSON(w, http.StatusOK, out)

@@ -113,12 +113,13 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
-	s.pushQuietly(ctx, coachID, notifyImportant, push.Message{
+	// 新規打診の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は引受期限。
+	s.queuePush(ctx, coachID, notifyImportant, push.Message{
 		Title: "フォーム添削の依頼が届きました",
 		Body:  offerDeadlineText(expires) + "までに、引き受けるかどうか決めてください",
 		URL:   "/coach",
 		Tag:   reviewOfferTag(offer.ID),
-	}, time.Until(expires))
+	}, time.Until(expires), expires, "review_offer:"+offer.ID.String())
 	return true, nil
 }
 
@@ -211,6 +212,8 @@ type coachingTickResult struct {
 	MessagesPurged int `json:"messages_purged"`
 	// 送り直した、保護者への購入の通知。
 	GuardianNoticesSent int `json:"guardian_notices_sent"`
+	// 待ちに入れていた Push のうち、送り直して届いたもの（本体 #421 F04）。
+	PushResent int `json:"push_resent"`
 }
 
 // runCoachingTick は、返却目安を過ぎた依頼と、引受期限（90分、夜間は数えない）を過ぎた打診を片付け、待ちの依頼を打診する。
@@ -240,6 +243,8 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if err := s.remindReviewOffers(ctx, time.Now()); err != nil {
 		slog.Warn("review offer reminder", "err", err)
 	}
+	// 送れなかった Push を送り直す（本体 #421 F04）。期限切れの待ちは送らない。
+	out.PushResent = s.sendPendingOutbox(ctx, pushOutboxBatch)
 	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
 		return out, err
 	}

@@ -25,6 +25,19 @@ func (q *Queries) CancelAnnouncement(ctx context.Context, id uuid.UUID) (uuid.UU
 	return id_2, err
 }
 
+const countAnnouncementNotifications = `-- name: CountAnnouncementNotifications :one
+SELECT count(*) FROM notifications
+WHERE announcement_id = $1
+`
+
+// 入れたベルの数。送り直しの再開で、すでに入っているか確かめる。
+func (q *Queries) CountAnnouncementNotifications(ctx context.Context, announcementID *uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAnnouncementNotifications, announcementID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAnnouncementRecipients = `-- name: CountAnnouncementRecipients :one
 SELECT
     (SELECT count(*) FROM profiles p
@@ -117,6 +130,31 @@ func (q *Queries) FinishAnnouncement(ctx context.Context, arg FinishAnnouncement
 	return err
 }
 
+const getAnnouncement = `-- name: GetAnnouncement :one
+SELECT id, sender_id, title, body, url, created_at, in_app_count, finished_at, push_recipients, canceled_at
+FROM announcements
+WHERE id = $1
+`
+
+// 送り直し（再開）のとき、同じ id のお知らせの中身を確かめる。
+func (q *Queries) GetAnnouncement(ctx context.Context, id uuid.UUID) (Announcement, error) {
+	row := q.db.QueryRow(ctx, getAnnouncement, id)
+	var i Announcement
+	err := row.Scan(
+		&i.ID,
+		&i.SenderID,
+		&i.Title,
+		&i.Body,
+		&i.Url,
+		&i.CreatedAt,
+		&i.InAppCount,
+		&i.FinishedAt,
+		&i.PushRecipients,
+		&i.CanceledAt,
+	)
+	return i, err
+}
+
 const insertAnnouncementNotifications = `-- name: InsertAnnouncementNotifications :execrows
 INSERT INTO notifications (id, recipient_id, kind, title, body, url, announcement_id)
 SELECT gen_random_uuid(), profiles.id, 'message', a.title, a.body, a.url, a.id
@@ -126,9 +164,14 @@ WHERE a.id = $1
     SELECT 1 FROM notification_settings ns
     WHERE ns.profile_id = profiles.id AND ns.category = 'announcement' AND NOT ns.in_app
   )
+  AND NOT EXISTS (
+    SELECT 1 FROM notifications n
+    WHERE n.announcement_id = a.id
+  )
 `
 
 // 運営からのお知らせを、ベルで受け取る人全員に入れる。
+// 同じお知らせのベルがすでに入っていれば足さない（送り直しの再開で二重に入れない）。
 func (q *Queries) InsertAnnouncementNotifications(ctx context.Context, announcementID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, insertAnnouncementNotifications, announcementID)
 	if err != nil {

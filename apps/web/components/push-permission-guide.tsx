@@ -119,7 +119,7 @@ function PushGuideSheet({
 }
 
 export function PushPermissionGuide({
-  userId, token, home = false, completedReviewId, onEnabled, renderControl,
+  userId, home = false, completedReviewId, onEnabled, renderControl,
 }: {
   userId: string;
   token?: string;
