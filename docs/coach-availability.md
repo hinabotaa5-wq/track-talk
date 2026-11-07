@@ -29,6 +29,7 @@ make test-web
 ```sh
 cd apps/web
 NEXT_PUBLIC_COACHING_ENABLED=true \
+NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED=true \
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
 NEXT_PUBLIC_SUPABASE_ANON_KEY=availability-preview npm run dev
 # 別のターミナルで実行します。

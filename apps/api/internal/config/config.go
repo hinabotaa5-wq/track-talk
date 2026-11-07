@@ -50,6 +50,10 @@ type Config struct {
 	// 一方通行の相談）の送信系（質問の送信・支払い・コーチの回答）を止める。下書き・閲覧・通報・返金・取消しは止めない。
 	// 契約の追加相談・やりとり欄・添削の確認質問は CoachingMessaging の側に残す。既定は停止。
 	CoachingConsultation bool
+	// CoachingCoachList が false の間は、コーチ一覧 API（GET /v1/coaches）をフラグ OFF のときと同じ 404 にし、
+	// コーチの公開プロフィールを一覧から取れないようにする。CoachingEnabled が false なら値によらず閉じる。
+	// 動画添削の指名候補（GET /v1/coaching/nominees）と申込みは止めない。既定は停止。
+	CoachingCoachList bool
 	// CoachingTicketSales が false の間は、コーチングチケットの新規購入を止める。動画添削は都度払い
 	// （今はカードのみ）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
 	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
@@ -147,6 +151,7 @@ func Load() (Config, error) {
 		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
 		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
 		CoachingConsultation:       enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
+		CoachingCoachList:          enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
 		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
 		CoachIdentityKey:           os.Getenv("COACH_IDENTITY_KEY"),

@@ -14,6 +14,8 @@
   NEXT_PUBLIC_COACHING_MESSAGING_ENABLED = "0"
   # 動画添削のあとの追加相談（一方通行・1つの添削につき1回）の送信。開けるのは運営者の指示があってから
   NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED = "0"
+  # コーチ一覧（/coaches とコーチの詳細）の公開。コーチングを開けても "0" の間は一覧だけ準備中にする。開けるのは運営者の指示があってから
+  NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED = "0"
 
 [context.production.environment]
   # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。
