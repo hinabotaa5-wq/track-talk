@@ -10,6 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
@@ -176,10 +177,7 @@ func (s *Server) requestReviewInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rr.InfoFromStatus != nil && *rr.InfoFromStatus == "offered" {
-		n, err := q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: resubmitBy, RequestID: id, CoachID: p.ID})
-		if err == nil && n != 1 {
-			err = pgx.ErrNoRows
-		}
+		_, err := q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: resubmitBy, RequestID: id, CoachID: p.ID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			Error(w, http.StatusConflict, "offer_expired", "引き受けの期限が過ぎました")
 			return
@@ -294,6 +292,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	// 引受前に差し戻していたら、引受期限90分（夜間は数えない）を新しく数える。返却期限は越えない。
 	var offerExpires time.Time
+	var offerID uuid.UUID
 	if updated.Status == "offered" {
 		if updated.CoachID == nil {
 			Error(w, http.StatusConflict, "conflict", "この依頼はいま再提出できません")
@@ -303,10 +302,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		if offerExpires.After(due) {
 			offerExpires = due
 		}
-		n, err := q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: offerExpires, RequestID: rr.ID, CoachID: *updated.CoachID})
-		if err == nil && n != 1 {
-			err = pgx.ErrNoRows
-		}
+		offerID, err = q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: offerExpires, RequestID: rr.ID, CoachID: *updated.CoachID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			Error(w, http.StatusConflict, "resubmit_expired", "再提出の期限が過ぎました")
 			return
@@ -325,31 +321,35 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		s.purgeCoachingVideos([]string{rr.VideoPublicID})
 	}
 	if updated.CoachID != nil {
-		s.notifyResubmitted(r.Context(), updated, offerExpires)
+		s.notifyResubmitted(r.Context(), updated, offerID, offerExpires)
 	}
 	s.writeRequesterReview(w, r, updated)
 }
 
 // notifyResubmitted は、差し戻した依頼が再提出されたことをコーチに知らせる。
-func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, offerExpires time.Time) {
-	if err := insertReviewNotification(ctx, s.q, *rr.CoachID, "review_resubmitted", rr.ID); err != nil {
-		slog.Warn("review resubmitted notification", "err", err)
-	}
+func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, offerID uuid.UUID, offerExpires time.Time) {
 	if rr.Status == "offered" {
-		s.pushQuietly(ctx, *rr.CoachID, notifyImportant, push.Message{
+		s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted", push.Message{
 			Title: "差し戻した依頼が再提出されました",
 			Body:  offerDeadlineText(offerExpires) + "までに、引き受けるかどうか決めてください",
 			URL:   "/coach",
-			Tag:   "review-offer",
+			Tag:   reviewOfferTag(offerID),
 		}, time.Until(offerExpires))
 		return
 	}
-	s.pushQuietly(ctx, *rr.CoachID, notifyReview, push.Message{
+	s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted_after_accept", push.Message{
 		Title: "差し戻した依頼が再提出されました",
 		Body:  "返却期限は" + offerDeadlineText(rr.DueAt) + "です",
 		URL:   "/coach/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
+}
+
+func (s *Server) sendReviewResubmissionNotice(ctx context.Context, rr db.ReviewRequest, kind string, msg push.Message, ttl time.Duration) {
+	if err := insertReviewNotificationWithURL(ctx, s.q, *rr.CoachID, kind, rr.ID, &msg.URL); err != nil {
+		slog.Warn("review resubmitted notification", "err", err)
+	}
+	s.pushQuietly(ctx, *rr.CoachID, kindCategory(kind), msg, ttl)
 }
 
 // expireUnresubmittedReviews は、再提出期限を過ぎた差し戻しを終える。支払いの取り消し・返金は tick の既存の処理が行う。

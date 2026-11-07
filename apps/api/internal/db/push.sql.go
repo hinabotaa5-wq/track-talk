@@ -14,11 +14,15 @@ import (
 
 const claimMonthlyReminder = `-- name: ClaimMonthlyReminder :one
 INSERT INTO monthly_reminders (month) VALUES ($1::date)
-ON CONFLICT (month) DO NOTHING
+ON CONFLICT (month) DO UPDATE
+SET started_at = now()
+WHERE monthly_reminders.finished_at IS NULL
+  AND monthly_reminders.started_at < now() - interval '35 minutes'
 RETURNING month
 `
 
-// その月のお知らせを送る権利を取る。すでに送った(送っている)月は行が返らない。
+// その月のお知らせを送る権利を取る。すでに送った月と、いま送っている最中の月は行が返らない。
+// 送り始めてから締め切り（30分＋余裕）を過ぎても終わっていない月は、止まったものとして取り直す。
 func (q *Queries) ClaimMonthlyReminder(ctx context.Context, month time.Time) (time.Time, error) {
 	row := q.db.QueryRow(ctx, claimMonthlyReminder, month)
 	var month_2 time.Time
@@ -57,13 +61,18 @@ func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubs
 	return result.RowsAffected(), nil
 }
 
-const deletePushSubscriptionByEndpoint = `-- name: DeletePushSubscriptionByEndpoint :exec
+const deletePushSubscriptionGeneration = `-- name: DeletePushSubscriptionGeneration :exec
 DELETE FROM push_subscriptions
-WHERE endpoint = $1
+WHERE id = $1 AND profile_id = $2
 `
 
-func (q *Queries) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
-	_, err := q.db.Exec(ctx, deletePushSubscriptionByEndpoint, endpoint)
+type DeletePushSubscriptionGenerationParams struct {
+	ID        uuid.UUID `json:"id"`
+	ProfileID uuid.UUID `json:"profile_id"`
+}
+
+func (q *Queries) DeletePushSubscriptionGeneration(ctx context.Context, arg DeletePushSubscriptionGenerationParams) error {
+	_, err := q.db.Exec(ctx, deletePushSubscriptionGeneration, arg.ID, arg.ProfileID)
 	return err
 }
 
@@ -81,6 +90,24 @@ type FinishMonthlyReminderParams struct {
 func (q *Queries) FinishMonthlyReminder(ctx context.Context, arg FinishMonthlyReminderParams) error {
 	_, err := q.db.Exec(ctx, finishMonthlyReminder, arg.Recipients, arg.Month)
 	return err
+}
+
+const getMonthlyReminder = `-- name: GetMonthlyReminder :one
+SELECT month, started_at, finished_at, recipients, in_app_done_at FROM monthly_reminders
+WHERE month = $1::date
+`
+
+func (q *Queries) GetMonthlyReminder(ctx context.Context, month time.Time) (MonthlyReminder, error) {
+	row := q.db.QueryRow(ctx, getMonthlyReminder, month)
+	var i MonthlyReminder
+	err := row.Scan(
+		&i.Month,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Recipients,
+		&i.InAppDoneAt,
+	)
+	return i, err
 }
 
 const listPushSubscriptions = `-- name: ListPushSubscriptions :many
@@ -114,6 +141,76 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, profileID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStaleMonthlyReminders = `-- name: ListStaleMonthlyReminders :many
+SELECT month FROM monthly_reminders
+WHERE finished_at IS NULL
+  AND started_at < now() - interval '35 minutes'
+ORDER BY month
+`
+
+// 送り始めたまま止まっている月。次の実行で未送信分を送り直す。
+func (q *Queries) ListStaleMonthlyReminders(ctx context.Context) ([]time.Time, error) {
+	rows, err := q.db.Query(ctx, listStaleMonthlyReminders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []time.Time
+	for rows.Next() {
+		var month time.Time
+		if err := rows.Scan(&month); err != nil {
+			return nil, err
+		}
+		items = append(items, month)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markMonthlyReminderInAppDone = `-- name: MarkMonthlyReminderInAppDone :exec
+UPDATE monthly_reminders
+SET in_app_done_at = now()
+WHERE month = $1::date
+  AND in_app_done_at IS NULL
+`
+
+// ベルに入れ終えたことを残す。呼び直したときにベルを二重に入れない。
+func (q *Queries) MarkMonthlyReminderInAppDone(ctx context.Context, month time.Time) error {
+	_, err := q.db.Exec(ctx, markMonthlyReminderInAppDone, month)
+	return err
+}
+
+const markPushEverSubscribed = `-- name: MarkPushEverSubscribed :exec
+UPDATE profiles
+SET push_ever_subscribed = true, updated_at = now()
+WHERE id = $1
+  AND NOT push_ever_subscribed
+`
+
+// このアカウントで購読の登録が成功したことを残す。許可が残ったまま購読だけが消えた端末の自動再購読に使う。
+func (q *Queries) MarkPushEverSubscribed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markPushEverSubscribed, id)
+	return err
+}
+
+const pushSubscriptionIsCurrent = `-- name: PushSubscriptionIsCurrent :one
+SELECT EXISTS (SELECT 1 FROM push_subscriptions WHERE id = $1 AND profile_id = $2)
+`
+
+type PushSubscriptionIsCurrentParams struct {
+	ID        uuid.UUID `json:"id"`
+	ProfileID uuid.UUID `json:"profile_id"`
+}
+
+func (q *Queries) PushSubscriptionIsCurrent(ctx context.Context, arg PushSubscriptionIsCurrentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, pushSubscriptionIsCurrent, arg.ID, arg.ProfileID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const releaseMonthlyReminder = `-- name: ReleaseMonthlyReminder :exec
@@ -154,7 +251,8 @@ const upsertPushSubscription = `-- name: UpsertPushSubscription :one
 INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (endpoint) DO UPDATE
-SET profile_id = EXCLUDED.profile_id,
+SET id = EXCLUDED.id,
+    profile_id = EXCLUDED.profile_id,
     p256dh = EXCLUDED.p256dh,
     auth = EXCLUDED.auth,
     created_at = now()

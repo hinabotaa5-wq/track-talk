@@ -135,7 +135,7 @@ func TestReviewInfoRequestAfterAccept(t *testing.T) {
 		t.Fatalf("resubmitted %+v", resubmitted)
 	}
 	queryRowArgs(t, `SELECT kind FROM notifications WHERE review_request_id=$1 ORDER BY created_at DESC LIMIT 1`, []any{id}, &kind)
-	if kind != "review_resubmitted" {
+	if kind != "review_resubmitted_after_accept" {
 		t.Fatalf("coach notification %s", kind)
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+id+"/resubmit", tu, map[string]any{"question": "もう一度"}); r.Code != http.StatusConflict {

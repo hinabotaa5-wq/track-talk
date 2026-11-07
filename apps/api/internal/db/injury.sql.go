@@ -914,13 +914,6 @@ WITH followers AS (
         JOIN injury_details d ON d.body_part = gm.body_part
         WHERE gm.user_id = f.user_id AND d.post_id = $1::uuid
       )
-      AND NOT EXISTS (
-        SELECT 1 FROM notifications n
-        WHERE n.recipient_id = f.user_id
-          AND n.post_id = $1::uuid
-          AND n.kind = 'injury_update'
-          AND n.read_at IS NULL
-      )
 ),
 inserted AS (
     INSERT INTO notifications (id, recipient_id, kind, post_id)
@@ -930,6 +923,13 @@ inserted AS (
         SELECT 1 FROM notification_settings ns
         WHERE ns.profile_id = f.user_id AND ns.category = 'injury' AND NOT ns.in_app
     )
+      AND NOT EXISTS (
+        SELECT 1 FROM notifications n
+        WHERE n.recipient_id = f.user_id
+          AND n.post_id = $1::uuid
+          AND n.kind = 'injury_update'
+          AND n.read_at IS NULL
+      )
     RETURNING recipient_id
 )
 SELECT f.user_id
@@ -947,7 +947,8 @@ type NotifyInjuryFollowersParams struct {
 
 // 経過報告があったとき、その投稿に「わかる」か保存をした人(投稿者を除く)へ通知する。
 // ケガの投稿は部位のグループのメンバーしか読めないので、いまそのグループに入っている人だけに送る。
-// 同じ投稿の未読の通知がすでにある人には重ねて送らない。
+// 同じ投稿の未読の通知がすでにある人には、ベルは重ねて入れない。プッシュは新しい経過報告ごとに送る
+// （未読のベルがある人を以降ずっと送らないと、取りこぼしになる。本体 #421 F04）。
 // ベルを受け取る人には通知を入れ、プッシュを受け取る人を返す(返すのは入れる前の状態で選んだ人)。
 func (q *Queries) NotifyInjuryFollowers(ctx context.Context, arg NotifyInjuryFollowersParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, notifyInjuryFollowers, arg.PostID, arg.AuthorID)

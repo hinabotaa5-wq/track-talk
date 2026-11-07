@@ -68,7 +68,7 @@ func kindCategory(kind string) string {
 		return notifyRecruitment
 	case "injury_update":
 		return notifyInjury
-	case "review_offer", "review_resubmitted":
+	case "review_offer", "review_offer_reminder", "review_resubmitted":
 		return notifyImportant
 	default:
 		return notifyReview
@@ -112,10 +112,14 @@ func insertNotification(ctx context.Context, q *db.Queries, recipient uuid.UUID,
 }
 
 func insertReviewNotification(ctx context.Context, q *db.Queries, recipient uuid.UUID, kind string, requestID uuid.UUID) error {
+	return insertReviewNotificationWithURL(ctx, q, recipient, kind, requestID, nil)
+}
+
+func insertReviewNotificationWithURL(ctx context.Context, q *db.Queries, recipient uuid.UUID, kind string, requestID uuid.UUID, url *string) error {
 	if ok, err := notificationWanted(ctx, q, recipient, kindCategory(kind), true); err != nil || !ok {
 		return err
 	}
-	return q.InsertReviewNotification(ctx, db.InsertReviewNotificationParams{ID: uuid.New(), RecipientID: recipient, Kind: kind, ReviewRequestID: &requestID})
+	return q.InsertReviewNotification(ctx, db.InsertReviewNotificationParams{ID: uuid.New(), RecipientID: recipient, Kind: kind, ReviewRequestID: &requestID, Url: url})
 }
 
 // notify は、投稿や依頼にひもづかない知らせを、ベルとプッシュの両方で送る(本人の設定に従う)。

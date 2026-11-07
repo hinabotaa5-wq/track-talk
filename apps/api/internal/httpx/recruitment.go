@@ -252,10 +252,8 @@ func (s *Server) createRecruitment(w http.ResponseWriter, r *http.Request, autho
 		MapDBError(w, err)
 		return
 	}
-	if err := q.InsertRecruitmentPostNotifications(r.Context(), db.InsertRecruitmentPostNotificationsParams{
-		PostID:   row.ID,
-		AuthorID: author.ID,
-	}); err != nil {
+	var jobs []uuid.UUID
+	if err := enqueuePostNotification(r.Context(), q, &jobs, author.ID, "recruitment_post", row.ID, nil, nil); err != nil {
 		MapDBError(w, err)
 		return
 	}
@@ -263,6 +261,7 @@ func (s *Server) createRecruitment(w http.ResponseWriter, r *http.Request, autho
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
 	s.pushToMany(r.Context(), notifyRecruitment, []uuid.UUID{author.ID}, postPushMessage("新しい募集", row.ID), 24*time.Hour)
 	s.writePost(w, r, row.ID, http.StatusCreated)
 }

@@ -3,7 +3,8 @@
 INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (endpoint) DO UPDATE
-SET profile_id = EXCLUDED.profile_id,
+SET id = EXCLUDED.id,
+    profile_id = EXCLUDED.profile_id,
     p256dh = EXCLUDED.p256dh,
     auth = EXCLUDED.auth,
     created_at = now()
@@ -14,9 +15,12 @@ DELETE FROM push_subscriptions
 WHERE profile_id = $1
   AND endpoint = $2;
 
--- name: DeletePushSubscriptionByEndpoint :exec
+-- name: DeletePushSubscriptionGeneration :exec
 DELETE FROM push_subscriptions
-WHERE endpoint = $1;
+WHERE id = $1 AND profile_id = $2;
+
+-- name: PushSubscriptionIsCurrent :one
+SELECT EXISTS (SELECT 1 FROM push_subscriptions WHERE id = $1 AND profile_id = $2);
 
 -- name: ListPushSubscriptions :many
 SELECT * FROM push_subscriptions
@@ -28,9 +32,13 @@ SELECT count(*) FROM push_subscriptions
 WHERE profile_id = $1;
 
 -- name: ClaimMonthlyReminder :one
--- その月のお知らせを送る権利を取る。すでに送った(送っている)月は行が返らない。
+-- その月のお知らせを送る権利を取る。すでに送った月と、いま送っている最中の月は行が返らない。
+-- 送り始めてから締め切り（30分＋余裕）を過ぎても終わっていない月は、止まったものとして取り直す。
 INSERT INTO monthly_reminders (month) VALUES (sqlc.arg(month)::date)
-ON CONFLICT (month) DO NOTHING
+ON CONFLICT (month) DO UPDATE
+SET started_at = now()
+WHERE monthly_reminders.finished_at IS NULL
+  AND monthly_reminders.started_at < now() - interval '35 minutes'
 RETURNING month;
 
 -- name: FinishMonthlyReminder :exec
@@ -54,3 +62,28 @@ WHERE profile_id = sqlc.arg(profile_id)::uuid
 DELETE FROM monthly_reminders
 WHERE month = sqlc.arg(month)::date
   AND finished_at IS NULL;
+
+-- name: MarkMonthlyReminderInAppDone :exec
+-- ベルに入れ終えたことを残す。呼び直したときにベルを二重に入れない。
+UPDATE monthly_reminders
+SET in_app_done_at = now()
+WHERE month = sqlc.arg(month)::date
+  AND in_app_done_at IS NULL;
+
+-- name: GetMonthlyReminder :one
+SELECT month, started_at, finished_at, recipients, in_app_done_at FROM monthly_reminders
+WHERE month = sqlc.arg(month)::date;
+
+-- name: ListStaleMonthlyReminders :many
+-- 送り始めたまま止まっている月。次の実行で未送信分を送り直す。
+SELECT month FROM monthly_reminders
+WHERE finished_at IS NULL
+  AND started_at < now() - interval '35 minutes'
+ORDER BY month;
+
+-- name: MarkPushEverSubscribed :exec
+-- このアカウントで購読の登録が成功したことを残す。許可が残ったまま購読だけが消えた端末の自動再購読に使う。
+UPDATE profiles
+SET push_ever_subscribed = true, updated_at = now()
+WHERE id = $1
+  AND NOT push_ever_subscribed;

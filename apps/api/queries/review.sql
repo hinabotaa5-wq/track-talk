@@ -167,6 +167,26 @@ SET status = CASE WHEN requested_coach_id IS NULL THEN 'queued' ELSE 'expired' E
 WHERE id = $1
   AND status = 'offered';
 
+-- name: ClaimReviewOfferReminders :many
+-- Persist the one-time claim and its in-app notification together.
+WITH claimed AS (
+    UPDATE review_offers o
+    SET reminder_sent_at = sqlc.arg(checked_at)::timestamptz
+    FROM review_requests r
+    WHERE r.id = o.request_id
+      AND r.status = 'offered'
+      AND r.requested_coach_id = o.coach_id
+      AND o.result IS NULL
+      AND o.reminder_sent_at IS NULL
+      AND o.expires_at > sqlc.arg(checked_at)::timestamptz
+      AND o.expires_at <= sqlc.arg(remind_through)::timestamptz
+    RETURNING o.id, o.request_id, o.coach_id, o.expires_at
+), notices AS (
+    INSERT INTO notifications (id, recipient_id, kind, review_request_id)
+    SELECT gen_random_uuid(), coach_id, 'review_offer_reminder', request_id FROM claimed
+)
+SELECT id, coach_id, expires_at FROM claimed;
+
 -- name: ExpireStaleReviewOffers :many
 -- 引受期限（90分、夜間は数えない）までに返事がなかった打診を閉じ、依頼を待ちに戻す。
 WITH stale AS (
@@ -201,7 +221,7 @@ WITH target AS (
         updated_at = now()
     FROM target
     WHERE r.id = target.id
-    RETURNING r.id, r.requester_id, r.coach_id, target.old_status
+    RETURNING r.id, r.requester_id, r.coach_id, r.requested_coach_id, target.old_status
 ), closed AS (
     UPDATE review_offers o
     SET result = 'expired',
@@ -210,7 +230,7 @@ WITH target AS (
     WHERE o.request_id = overdue.id
       AND o.result IS NULL
 )
-SELECT id, requester_id, coach_id, old_status FROM overdue;
+SELECT id, requester_id, coach_id, requested_coach_id, old_status FROM overdue;
 
 -- name: CountOnDutyCoaches :one
 SELECT count(*) FROM coach_profiles c
@@ -312,13 +332,14 @@ WHERE request_id = $1
   AND result IS NULL
 FOR UPDATE;
 
--- name: SetReviewOfferExpiry :execrows
+-- name: SetReviewOfferExpiry :one
 -- 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
 UPDATE review_offers
 SET expires_at = sqlc.arg(expires_at)::timestamptz
 WHERE request_id = sqlc.arg(request_id)
   AND coach_id = sqlc.arg(coach_id)
-  AND result IS NULL;
+  AND result IS NULL
+RETURNING id;
 
 -- name: ResubmitReviewRequest :one
 -- 依頼者が、差し戻された依頼の相談内容を直して（動画は差し替えてもよい）再提出する。再提出期限までに1回だけ。

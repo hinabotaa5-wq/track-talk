@@ -53,6 +53,8 @@ func (s *Server) securityCheck(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
+	// コーチング停止中にも投稿の通知を再処理できるよう、既存の定期実行を使う。
+	s.retryNotificationJobs(r.Context())
 	unknown, alerted, err := s.checkDBConnections(r.Context())
 	if err != nil {
 		slog.Error("security check", "err", err)

@@ -126,7 +126,7 @@ func (s *Server) withdrawCoach(w http.ResponseWriter, r *http.Request) {
 		if _, err := s.offerReview(r.Context(), id); err != nil {
 			slog.Warn("review offer after coach withdraw", "err", err)
 		}
-		s.notifyNominationEnded(r.Context(), id)
+		s.notifyNominationEnded(r.Context(), id, true)
 	}
 	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
 	if err != nil {

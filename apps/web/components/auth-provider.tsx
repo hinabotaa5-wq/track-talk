@@ -19,6 +19,8 @@ type AuthState = {
   sessionLoading: boolean;
   token: string | null;
   refreshProfile: () => Promise<void>;
+  pushStatus: "checking" | "on" | "off" | "failed";
+  setPushEnabled: (enabled: boolean) => void;
 };
 
 const AuthContext = createContext<AuthState>({
@@ -29,6 +31,8 @@ const AuthContext = createContext<AuthState>({
   sessionLoading: true,
   token: null,
   refreshProfile: async () => {},
+  pushStatus: "checking",
+  setPushEnabled: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -40,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ));
 
   const [sessionLoading, setSessionLoading] = useState(loading);
+  const [pushStatus, setPushStatus] = useState<AuthState["pushStatus"]>("checking");
 
   // 読み込みが重なったら(ログアウト直後に前のトークンの応答が遅れて届くなど)、最後に始めたものの結果だけを使う。
   const profileSeq = useRef(0);
@@ -63,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let pushSyncTimer: ReturnType<typeof setTimeout> | undefined;
+    let pushSyncSeq = 0;
     let unsubscribe: (() => void) | undefined;
     const invalidateProfile = () => { profileSeq.current++; };
     // 認証 SDK のダウンロードを、タブや検索の操作準備の前提にしない。
@@ -80,8 +87,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(next);
         setSessionLoading(false);
         // 通知の鍵を入れ替えたあとも届くよう、アプリを開いたときとログインしたときに購読を確かめる。
-        if (next && (event === "INITIAL_SESSION" || event === "SIGNED_IN")) {
-          void refreshPushSubscription(next.access_token).catch(() => undefined);
+        if (!next || event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+          clearTimeout(pushSyncTimer);
+          const seq = ++pushSyncSeq;
+          const userId = next?.user.id ?? null;
+          setPushStatus("checking");
+          // 認証 SDK のコールバックを抜けてから、現在のセッションを読み直す。
+          pushSyncTimer = setTimeout(() => {
+            void refreshPushSubscription(userId).then(
+              (enabled) => { if (active && seq === pushSyncSeq) setPushStatus(enabled ? "on" : "off"); },
+              () => { if (active && seq === pushSyncSeq) setPushStatus("failed"); },
+            );
+          }, 0);
         }
         if (!next) {
           clearCompetitions();
@@ -110,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => {
       active = false;
+      clearTimeout(pushSyncTimer);
       invalidateProfile();
       unsubscribe?.();
     };
@@ -123,6 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileLoading,
         loading,
         sessionLoading,
+        pushStatus,
+        setPushEnabled: (enabled) => setPushStatus(enabled ? "on" : "off"),
         token: session?.access_token ?? null,
         refreshProfile: () => loadProfile(session?.access_token ?? null),
       }}
