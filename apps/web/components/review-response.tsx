@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CoachAvatar } from "@/components/coach-photo";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachingCoachListEnabled } from "@/lib/features";
 import { clarifyReasonLabels } from "@/lib/review";
 import type { ReviewCoach, ReviewResponse } from "@/lib/types";
 
@@ -30,7 +31,8 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
           <dd className="whitespace-pre-wrap text-slate-100">{coach.achievements}</dd>
         </div>
       </dl>
-      {coach.id ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">このコーチのプロフィールを見る</Link> : null}
+      {/* コーチの詳細はコーチ一覧と一緒に公開する。一覧を閉じている間は準備中の画面へ案内しない。 */}
+      {coach.id && coachingCoachListEnabled ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">このコーチのプロフィールを見る</Link> : null}
     </section>
   );
 }

@@ -271,7 +271,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		// 購入・手動の送金・返金APIは閉じる。既存決済へのWebhookはこのグループの外で受け付ける。
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireCoaching)
-			r.Get("/coaches", s.listCoaches)
+			// コーチ一覧は COACHING_COACH_LIST_ENABLED でも別に閉じる（閉じている間は 404）。
+			r.With(s.requireCoachList).Get("/coaches", s.listCoaches)
 			r.Get("/coaches/{id}/availability", s.getPublicCoachAvailability)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
@@ -422,6 +423,18 @@ func (s *Server) requireMessaging(next http.Handler) http.Handler {
 func (s *Server) requireCoaching(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.cfg.CoachingEnabled {
+			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireCoachList は、コーチ一覧を公開していない間、一覧 API を無いものとして扱う。
+// コーチングを開けていても、一覧だけを後から開けられるようにする。応答は requireCoaching と同じ 404。
+func (s *Server) requireCoachList(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.CoachingCoachList {
 			Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 			return
 		}

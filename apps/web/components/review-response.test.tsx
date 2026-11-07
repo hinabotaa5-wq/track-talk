@@ -5,6 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReviewCoach } from "@/lib/types";
 import { ReviewCoachCard } from "./review-response";
 
+const flags = { list: true };
+vi.mock("@/lib/features", async (original) => ({
+  ...await original<typeof import("@/lib/features")>(),
+  get coachingCoachListEnabled() { return flags.list; },
+}));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("@/components/coach-photo", () => ({ CoachAvatar: ({ name }: { name: string }) => <span>{name}の顔写真</span> }));
 
@@ -16,6 +21,7 @@ let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  flags.list = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -25,4 +31,12 @@ it("添削のコーチからコーチ詳細へ直接進み、成績や指導経�
   const link = [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("このコーチのプロフィールを見る"));
   expect(link?.getAttribute("href")).toBe("/coaches/coach-1");
   expect(container.textContent).toContain("成績や指導経験");
+});
+
+it("コーチ一覧を閉じている間は、準備中のコーチ詳細へ案内しない", async () => {
+  flags.list = false;
+  await act(async () => root.render(<ReviewCoachCard coach={coach} />));
+  expect(container.textContent).not.toContain("このコーチのプロフィールを見る");
+  expect(container.querySelector('a[href^="/coaches"]')).toBeNull();
+  expect(container.textContent).toContain("テストコーチ");
 });

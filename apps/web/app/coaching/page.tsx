@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Shuffle, UserRound, Users } from "lucide-react";
-import { coachingEnabled } from "@/lib/features";
+import { coachingCoachListEnabled, coachingEnabled } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "コーチング",
@@ -54,7 +54,7 @@ export default function CoachingPage() {
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-base font-bold leading-tight text-white">{title}</h2>
-              <p className="mt-2 text-sm leading-snug text-slate-300">{!coachingEnabled ? href === "/coach" ? "コーチ募集・応募状況の確認" : "準備中・公開までお待ちください" : description}</p>
+              <p className="mt-2 text-sm leading-snug text-slate-300">{!coachingEnabled ? href === "/coach" ? "コーチ募集・応募状況の確認" : "準備中・公開までお待ちください" : href === "/coaches" && !coachingCoachListEnabled ? "準備中・公開までお待ちください" : description}</p>
             </div>
             <ArrowRight className="size-4 shrink-0 text-blue-300" aria-hidden />
           </Link>
