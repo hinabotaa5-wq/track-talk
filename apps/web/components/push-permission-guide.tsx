@@ -122,7 +122,7 @@ export function PushPermissionGuide({
   userId, token, home = false, completedReviewId, onEnabled, renderControl,
 }: {
   userId: string;
-  token: string;
+  token?: string;
   home?: boolean;
   onEnabled?: () => void;
   renderControl?: (status: Status | null, activate: () => void, busy: boolean) => ReactNode;
@@ -216,7 +216,7 @@ export function PushPermissionGuide({
           return;
         }
       }
-      await registerPushSubscription(token);
+      await registerPushSubscription(userId);
       setSheet(null);
       onEnabled?.();
       setMessage("この端末で通知を受け取れるようになりました");

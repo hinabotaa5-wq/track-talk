@@ -16,15 +16,24 @@ self.addEventListener("push", (event) => {
   } catch {
     data = {};
   }
-  const title = typeof data.title === "string" && data.title ? data.title : "TrackTalk";
-  const options = {
-    body: typeof data.body === "string" ? data.body : "",
-    icon: "/icon",
-    badge: "/icon",
-    tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,
-    data: { url: typeof data.url === "string" ? data.url : "/" },
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
+  const locks = self.navigator.locks;
+  if (!locks || typeof data?.subscription_id !== "string") return;
+  event.waitUntil(locks.request("tracktalk-push", async () => {
+    const cache = await caches.open("tracktalk-push");
+    const entry = await cache.match("/.tracktalk-push-binding");
+    const binding = await entry?.json();
+    if (binding?.subscriptionId !== data.subscription_id) return;
+
+    const title = typeof data.title === "string" && data.title ? data.title : "TrackTalk";
+    const options = {
+      body: typeof data.body === "string" ? data.body : "",
+      icon: "/icon",
+      badge: "/icon",
+      tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,
+      data: { url: typeof data.url === "string" ? data.url : "/" },
+    };
+    await self.registration.showNotification(title, options);
+  }));
 });
 
 self.addEventListener("notificationclick", (event) => {

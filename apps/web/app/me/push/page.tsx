@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { currentPushSubscription } from "@/lib/push";
+import { disablePushSubscription } from "@/lib/push";
 import type { NotificationCategory, NotificationSetting } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
@@ -127,34 +127,25 @@ function NotificationSettings({ token }: { token: string | null }) {
 
 // 通知の設定。プッシュは端末ごとにオン・オフし、届く種類はアカウントで選ぶ。
 export default function PushSettingsPage() {
-  const { session, token, loading } = useAuth();
+  const { session, token, loading, pushStatus, setPushEnabled } = useAuth();
   const router = useRouter();
   const userId = session?.user?.id;
   const { acquire, release, pending } = useActionLock();
   // null は確かめている途中。
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const enabled = pushStatus === "checking" ? null : pushStatus === "on";
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login?next=/me/push");
   }, [loading, session, router]);
 
-  useEffect(() => {
-    currentPushSubscription()
-      .then((sub) => setEnabled(sub !== null))
-      .catch(() => setEnabled(false));
-  }, []);
-
   async function disable() {
     if (!acquire()) return;
     setMessage("");
     try {
-      const sub = await currentPushSubscription();
-      if (sub) {
-        await apiFetch<void>("/v1/me/push-subscriptions", { method: "DELETE", token, body: JSON.stringify({ endpoint: sub.endpoint }) });
-        await sub.unsubscribe();
-      }
-      setEnabled(false);
+      if (!userId) return;
+      await disablePushSubscription(userId);
+      setPushEnabled(false);
       setMessage("この端末では通知を受け取りません");
     } catch (err) {
       setMessage(errorMessage(err, "通知をオフにできませんでした"));
@@ -204,9 +195,8 @@ export default function PushSettingsPage() {
           <PushPermissionGuide
             key={userId}
             userId={userId}
-            token={token}
             onEnabled={() => {
-              setEnabled(true);
+              setPushEnabled(true);
               setMessage("この端末で通知を受け取れるようになりました");
             }}
             renderControl={(status, activate, busy) => (
@@ -227,7 +217,9 @@ export default function PushSettingsPage() {
             )}
           />
         )}
-        {message ? <p className="text-sm text-slate-300">{message}</p> : null}
+        {message ? <p className="text-sm text-slate-300">{message}</p>
+          : pushStatus === "failed" && !enabled ? <p className="text-sm text-slate-300">通知を登録できませんでした。この端末で通知をもう一度オンにしてください。</p>
+          : null}
       </div>
       <NotificationSettings token={token} />
     </div>

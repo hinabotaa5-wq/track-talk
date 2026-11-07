@@ -88,18 +88,23 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "通知の登録内容が不正です")
 		return
 	}
-	if _, err := s.q.UpsertPushSubscription(r.Context(), db.UpsertPushSubscriptionParams{
+	sub, err := s.q.UpsertPushSubscription(r.Context(), db.UpsertPushSubscriptionParams{
 		ID:        uuid.New(),
 		ProfileID: p.ID,
 		Endpoint:  req.Endpoint,
 		P256dh:    p256dh,
 		Auth:      auth,
-	}); err != nil {
+	})
+	if err != nil {
 		MapDBError(w, err)
 		return
 	}
 	if err := s.q.TrimPushSubscriptions(r.Context(), db.TrimPushSubscriptionsParams{ProfileID: p.ID, MaxDevices: maxPushDevices}); err != nil {
 		MapDBError(w, err)
+		return
+	}
+	if r.URL.Query().Get("return_subscription_id") == "1" {
+		JSON(w, http.StatusOK, map[string]any{"subscription_id": sub.ID})
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -164,26 +169,37 @@ func (s *Server) sendPush(ctx context.Context, profileID uuid.UUID, msg push.Mes
 		return 0, err
 	}
 	sent := 0
+	eventID := uuid.New()
 	for _, sub := range subs {
 		// 宛先を限る前に登録されたものも、プッシュサービス以外には送らない。
 		if !s.validPushEndpoint(sub.Endpoint) {
 			continue
 		}
-		err := s.push.Send(ctx, push.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, msg, ttl)
-		switch {
-		case err == nil:
-			sent++
-		case errors.Is(err, push.ErrGone):
-			if err != push.ErrGone {
-				// 401・403 で拒否された宛先を消すときは、理由を残す。設定の誤りで消えていないかを確かめられるように。
-				slog.Warn("push: remove rejected subscription", "err", err)
-			}
-			if err := s.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
-				slog.Warn("push: delete gone subscription", "err", err)
-			}
-		default:
-			slog.Warn("push: send failed", "err", err)
+		current, err := s.q.PushSubscriptionIsCurrent(ctx, db.PushSubscriptionIsCurrentParams{ID: sub.ID, ProfileID: sub.ProfileID})
+		if err != nil {
+			return sent, err
 		}
+		if !current {
+			continue
+		}
+		msg.SubscriptionID = sub.ID.String()
+		err = s.push.Send(ctx, push.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, msg, ttl)
+		if err == nil {
+			sent++
+			continue
+		}
+		kind, status := err, 0
+		var delivery *push.DeliveryError
+		if errors.As(err, &delivery) {
+			kind, status = delivery.Kind, delivery.Status
+		}
+		slog.Warn("push: delivery failed", "classification", kind.Error(), "status", status, "event_id", eventID)
+		if errors.Is(err, push.ErrGone) {
+			if err := s.q.DeletePushSubscriptionGeneration(ctx, db.DeletePushSubscriptionGenerationParams{ID: sub.ID, ProfileID: sub.ProfileID}); err != nil {
+				slog.Warn("push: subscription cleanup failed", "event_id", eventID)
+			}
+		}
+
 	}
 	return sent, nil
 }

@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,10 +15,22 @@ import (
 
 var (
 	ErrNotConfigured = errors.New("web push not configured")
-	// ErrGone は宛先がもう使えない（購読が解除された、ブラウザのデータが消えた）ことを表す。宛先は消してよい。
-	ErrGone   = errors.New("push subscription gone")
-	ErrFailed = errors.New("push failed")
+	ErrGone          = errors.New("push subscription gone")
+	ErrRejected      = errors.New("push authorization rejected")
+	ErrFailed        = errors.New("push failed")
 )
+
+// DeliveryError contains only a fixed classification and the HTTP status.
+type DeliveryError struct {
+	Kind   error
+	Status int
+}
+
+func (e *DeliveryError) Error() string {
+	return fmt.Sprintf("%s: status %d", e.Kind, e.Status)
+}
+
+func (e *DeliveryError) Unwrap() error { return e.Kind }
 
 type Sender struct {
 	PublicKey  string
@@ -47,7 +57,8 @@ type Message struct {
 	// URL は通知をタップしたときに開くサイト内のパス。
 	URL string `json:"url"`
 	// Tag が同じ通知は、端末上で1つにまとまる。
-	Tag string `json:"tag,omitempty"`
+	Tag            string `json:"tag,omitempty"`
+	SubscriptionID string `json:"subscription_id,omitempty"`
 }
 
 // Send は1つの宛先に送る。宛先が使えなくなっていたら ErrGone を返す。
@@ -57,7 +68,7 @@ func (s Sender) Send(ctx context.Context, sub Subscription, msg Message, ttl tim
 	}
 	payload, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		return ErrFailed
 	}
 	client := s.HTTP
 	if client == nil {
@@ -77,35 +88,17 @@ func (s Sender) Send(ctx context.Context, sub Subscription, msg Message, ttl tim
 		VAPIDPrivateKey: s.PrivateKey,
 	})
 	if err != nil {
-		// url.Error は宛先の URL を含む。宛先は知っていれば送れてしまうので、ログに残さない。
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
-			err = urlErr.Err
-		}
-		return fmt.Errorf("%w: %v", ErrFailed, err)
+		return ErrFailed
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	status := resp.StatusCode
 	switch {
-	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
-		return ErrGone
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		// VAPID の鍵を入れ替えたあと、前の鍵で作った購読はずっと拒否される（Apple の BadJwtToken、
-		// Chrome の「credentials do not correspond」）。残しても届かないので、宛先を消す。端末は次に
-		// アプリを開いたとき、いまの鍵で購読を作り直して登録し直す。
-		return fmt.Errorf("%w: status %d: %s", ErrGone, resp.StatusCode, failureReason(body))
-	case resp.StatusCode < 200 || resp.StatusCode >= 300:
-		// 失敗の理由（Apple の BadJwtToken など）を、原因を調べられるように残す。
-		return fmt.Errorf("%w: status %d: %s", ErrFailed, resp.StatusCode, failureReason(body))
+	case status == http.StatusNotFound || status == http.StatusGone:
+		return &DeliveryError{Kind: ErrGone, Status: status}
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return &DeliveryError{Kind: ErrRejected, Status: status}
+	case status < 200 || status >= 300:
+		return &DeliveryError{Kind: ErrFailed, Status: status}
 	}
 	return nil
-}
-
-// failureReason は、プッシュサービスが返した失敗の理由を、ログに残せる短さにする。
-func failureReason(body []byte) string {
-	reason := strings.Join(strings.Fields(string(body)), " ")
-	if len(reason) > 200 {
-		reason = reason[:200]
-	}
-	return reason
 }

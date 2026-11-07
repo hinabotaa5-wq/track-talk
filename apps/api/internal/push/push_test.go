@@ -45,6 +45,9 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth = r.Header.Get("Authorization")
 		w.WriteHeader(status)
+		if status >= 400 {
+			_, _ = w.Write([]byte("provider-response-with-fixture-endpoint"))
+		}
 	}))
 	defer srv.Close()
 	s := testSender(t)
@@ -68,20 +71,20 @@ func TestSendReportsGoneSubscriptions(t *testing.T) {
 		t.Fatalf("claims %s", claims)
 	}
 	status = http.StatusGone
-	if err := s.Send(ctx, sub, msg, time.Minute); err != ErrGone {
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrGone) {
 		t.Fatalf("gone: %v", err)
 	}
 	status = http.StatusNotFound
-	if err := s.Send(ctx, sub, msg, time.Minute); err != ErrGone {
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrGone) {
 		t.Fatalf("not found: %v", err)
 	}
-	// 前の鍵で作った購読は、鍵を入れ替えたあと 403 で拒否され続けるので、使えない宛先として扱う。
+	// 認証の拒否と宛先の失効は区別する。
 	status = http.StatusForbidden
-	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrGone) || !strings.Contains(err.Error(), "status 403") {
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrRejected) || err.Error() != "push authorization rejected: status 403" {
 		t.Fatalf("forbidden: %v", err)
 	}
 	status = http.StatusInternalServerError
-	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrFailed) || !strings.Contains(err.Error(), "status 500") {
+	if err := s.Send(ctx, sub, msg, time.Minute); !errors.Is(err, ErrFailed) || err.Error() != "push failed: status 500" {
 		t.Fatalf("server error: %v", err)
 	}
 	if err := (Sender{}).Send(ctx, sub, msg, time.Minute); err != ErrNotConfigured {

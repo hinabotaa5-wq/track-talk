@@ -53,7 +53,6 @@ function render(home = false, completedReviewId?: string) {
       home={home}
       completedReviewId={completedReviewId}
       userId="fixture"
-      token="fixture-token"
       renderControl={home ? undefined : (_, open) => <button onClick={open}>通知設定</button>}
     />,
   ));
@@ -77,7 +76,7 @@ it("waits for the active modal and only requests permission from the sheet", asy
 
   await click("通知を受け取る");
   expect(requestPermission).toHaveBeenCalledTimes(1);
-  expect(push.registerPushSubscription).toHaveBeenCalledExactlyOnceWith("fixture-token");
+  expect(push.registerPushSubscription).toHaveBeenCalledExactlyOnceWith("fixture");
   expect(container.querySelector("dialog")).toBeNull();
 });
 
