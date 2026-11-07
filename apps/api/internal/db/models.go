@@ -200,6 +200,12 @@ type CoachRegistrationEnding struct {
 	EndedAt time.Time  `json:"ended_at"`
 }
 
+type CoachStripeAccountAttempt struct {
+	ProfileID      uuid.UUID  `json:"profile_id"`
+	IdempotencyKey string     `json:"idempotency_key"`
+	StartedAt      *time.Time `json:"started_at"`
+}
+
 type CoachWorkOrder struct {
 	ID              uuid.UUID  `json:"id"`
 	Kind            string     `json:"kind"`
