@@ -83,17 +83,32 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		// 本番は動画添削のおまかせ(割り当て)を止めている（空が既定）。打診・辞退・期限切れの仕組みは残しているので、
 		// それを確かめるテストのために開けておき、止めたときの動きは review_coach_choice_test.go で確かめる。
 		ReviewRandomAssign: true,
-		// テスト用の鍵(32バイトの 0x01)。本番の鍵は Secret Manager に置く。
-		CoachIdentityKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
-		CloudName:        os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:      os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:   os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:     os.Getenv("CLOUDINARY_API_BASE"),
+		CloudName:          os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:        os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:     os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:       os.Getenv("CLOUDINARY_API_BASE"),
 		// 保護者の同意のリンクは、Resend の代わりのサーバーに送る（mail_helper_test.go）。
 		ResendAPIKey: "re_test",
 		MailFrom:     "TrackTalk <no-reply@example.com>",
 		MailAPIBase:  mailServerURL(),
 	}
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/internal/registration/"):
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/internal/disclosures":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(strings.Split(r.URL.Query().Get("ids"), ","))
+		case strings.HasPrefix(r.URL.Path, "/internal/disclosures/"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"required":false}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(stub.Close)
+	cfg.IdentityReaderURL = stub.URL
+	cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
 	if mutate != nil {
 		mutate(&cfg)
 	}

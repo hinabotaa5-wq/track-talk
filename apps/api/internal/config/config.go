@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -61,9 +62,10 @@ type Config struct {
 	// ReviewRandomAssign が false の間は、動画添削の「おまかせ」(運営が受付中のコーチへ順番に割り当てる)を止め、
 	// 選手が選んだコーチにだけ依頼を届ける。既定は停止。割り当てのコードと過去の打診・割り当ての記録は残す。
 	ReviewRandomAssign bool
-	// CoachIdentityKey は、コーチの本名・住所・電話番号を暗号化する鍵(32バイトを base64 にしたもの)。
-	// DB とは別に Secret Manager などで持つ。空なら、コーチの特商法の登録情報は保存も表示もできない。
-	CoachIdentityKey string
+	// IdentityReaderURL and IdentityReaderToken authorize only publication reads.
+	IdentityReaderURL          string
+	IdentityReaderToken        string
+	DatabaseMigrationsExternal bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
 	// StorageCleanupSecret は日次の保存期限処理に使う。空なら呼び出せない。
@@ -154,7 +156,9 @@ func Load() (Config, error) {
 		CoachingCoachList:          enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
 		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
-		CoachIdentityKey:           os.Getenv("COACH_IDENTITY_KEY"),
+		IdentityReaderURL:          os.Getenv("IDENTITY_READER_URL"),
+		IdentityReaderToken:        os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
+		DatabaseMigrationsExternal: enabled(os.Getenv("DATABASE_MIGRATIONS_EXTERNAL")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
 		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
@@ -194,6 +198,16 @@ func Load() (Config, error) {
 				return Config{}, fmt.Errorf("%s は0以上の整数にしてください: %q", name, raw)
 			}
 			*target = n
+		}
+	}
+	if cfg.IdentityReaderURL != "" {
+		if _, legacy := os.LookupEnv("COACH_IDENTITY_KEY"); legacy {
+			return Config{}, fmt.Errorf("remove the legacy identity key from the API environment")
+		}
+		u, err := url.Parse(cfg.IdentityReaderURL)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" ||
+			len(cfg.IdentityReaderToken) < 32 || !cfg.DatabaseMigrationsExternal {
+			return Config{}, fmt.Errorf("identity reader requires an HTTPS origin, read token and separately managed migrations")
 		}
 	}
 	if cfg.DatabaseURL == "" {

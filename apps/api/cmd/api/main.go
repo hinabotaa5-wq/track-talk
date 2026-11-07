@@ -29,9 +29,11 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
-	if err := migrate.Up(cfg.DatabaseURL); err != nil {
-		slog.Error("migrate", "err", err)
-		os.Exit(1)
+	if !cfg.DatabaseMigrationsExternal {
+		if err := migrate.Up(cfg.DatabaseURL); err != nil {
+			slog.Error("migrate", "err", err)
+			os.Exit(1)
+		}
 	}
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL, db.AppNameAPI)
@@ -45,6 +47,25 @@ func main() {
 	if err := pool.Ping(pingCtx); err != nil {
 		slog.Error("db ping", "err", err)
 		os.Exit(1)
+	}
+	if cfg.IdentityReaderURL != "" {
+		var isolated bool
+		err := pool.QueryRow(pingCtx, `SELECT NOT (r.rolsuper OR r.rolcreaterole)
+			AND NOT pg_has_role(c.relowner, 'MEMBER')
+			AND NOT pg_has_role(p.relowner, 'MEMBER')
+			AND NOT pg_has_role(b.nspowner, 'MEMBER')
+			AND NOT has_schema_privilege(b.oid, 'CREATE')
+			AND NOT has_table_privilege(c.oid, 'TRUNCATE')
+			AND NOT has_table_privilege(p.oid, 'TRUNCATE')
+			AND NOT has_parameter_privilege('session_replication_role', 'SET')
+			AND NOT COALESCE(has_table_privilege(to_regclass('public.coach_legal_identities'), 'SELECT'), false)
+			FROM pg_class c, pg_class p, pg_namespace b, pg_roles r
+			WHERE c.oid='public.coach_profiles'::regclass AND p.oid='public.coaching_plans'::regclass
+			AND b.nspname='identity_boundary' AND r.rolname=current_user`).Scan(&isolated)
+		if err != nil || !isolated {
+			slog.Error("identity boundary database privileges")
+			os.Exit(1)
+		}
 	}
 	removed, err := db.New(pool).DeletePastCompetitionSeasons(ctx, int32(competitions.SeasonYear(time.Now())))
 	if err != nil {
