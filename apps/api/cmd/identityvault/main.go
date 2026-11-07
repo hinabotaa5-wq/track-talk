@@ -70,7 +70,7 @@ func main() {
 	}
 	authClient := auth.Admin{BaseURL: issuer, APIKey: os.Getenv("IDENTITY_AUTH_PUBLIC_KEY")}
 	svc, err := identityvault.New(mainDB, vaultDB, verifier, authClient, os.Getenv("COACH_IDENTITY_KEY"),
-		os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"), os.Getenv("IDENTITY_CLEANUP_TOKEN"), origin)
+		os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"), os.Getenv("IDENTITY_CLEANUP_TOKEN"), os.Getenv("IDENTITY_END_TOKEN"), origin)
 	if err != nil {
 		fail("service configuration")
 	}

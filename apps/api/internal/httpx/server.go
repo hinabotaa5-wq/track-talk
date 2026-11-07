@@ -47,7 +47,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		pool:     pool,
 		q:        db.New(pool),
 		auth:     v,
-		identity: newIdentityReader(cfg.IdentityReaderURL, cfg.IdentityReaderToken),
+		identity: newIdentityReader(cfg.IdentityReaderURL, cfg.IdentityReaderToken, cfg.IdentityEndToken),
 		authAdmin: auth.Admin{
 			BaseURL: cfg.SupabaseURL,
 			APIKey:  cfg.SupabaseServiceRoleKey,

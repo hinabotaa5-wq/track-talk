@@ -63,8 +63,11 @@ type Config struct {
 	// 選手が選んだコーチにだけ依頼を届ける。既定は停止。割り当てのコードと過去の打診・割り当ての記録は残す。
 	ReviewRandomAssign bool
 	// IdentityReaderURL and IdentityReaderToken authorize only publication reads.
-	IdentityReaderURL          string
-	IdentityReaderToken        string
+	IdentityReaderURL   string
+	IdentityReaderToken string
+	// IdentityEndToken authorizes only end-of-coaching recording on the
+	// dedicated identity service. It never grants identity reads or publication writes.
+	IdentityEndToken           string
 	DatabaseMigrationsExternal bool
 	// CoachingTickSecret は Cloud Scheduler が添削の tick を呼ぶときのヘッダーの値。空なら tick は使えない。
 	CoachingTickSecret string
@@ -158,6 +161,7 @@ func Load() (Config, error) {
 		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
 		IdentityReaderURL:          os.Getenv("IDENTITY_READER_URL"),
 		IdentityReaderToken:        os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
+		IdentityEndToken:           os.Getenv("IDENTITY_END_TOKEN"),
 		DatabaseMigrationsExternal: enabled(os.Getenv("DATABASE_MIGRATIONS_EXTERNAL")),
 		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
 		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
@@ -206,8 +210,8 @@ func Load() (Config, error) {
 		}
 		u, err := url.Parse(cfg.IdentityReaderURL)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" ||
-			len(cfg.IdentityReaderToken) < 32 || !cfg.DatabaseMigrationsExternal {
-			return Config{}, fmt.Errorf("identity reader requires an HTTPS origin, read token and separately managed migrations")
+			len(cfg.IdentityReaderToken) < 32 || len(cfg.IdentityEndToken) < 32 || !cfg.DatabaseMigrationsExternal {
+			return Config{}, fmt.Errorf("identity reader requires an HTTPS origin, read token, end token and separately managed migrations")
 		}
 	}
 	if cfg.DatabaseURL == "" {

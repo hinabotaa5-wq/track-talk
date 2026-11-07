@@ -10,6 +10,37 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// recordEnd は、見送り確定の終了だけを vault 側に記録する狭い経路。
+// 承認済みのコーチには何もしない。身元データの読み取り・復号や
+// 公開可否の判定には一切触れない。
+func (s *Service) recordEnd(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		CoachID uuid.UUID `json:"coach_id"`
+	}
+	if !decode(w, r, &input) {
+		return
+	}
+	if input.CoachID == uuid.Nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	var approved bool
+	if err := s.main.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM identity_boundary.approved_coaches WHERE profile_id=$1)", input.CoachID).Scan(&approved); err != nil {
+		unavailable(w)
+		return
+	}
+	if approved {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	if _, err := s.main.Exec(ctx, "SELECT identity_boundary.mark_retired($1)", input.CoachID); err != nil {
+		unavailable(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Service) cleanup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rows, err := s.vault.Query(ctx, "SELECT coach_id FROM identity_vault.identities ORDER BY coach_id")

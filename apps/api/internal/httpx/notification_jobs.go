@@ -82,7 +82,7 @@ func (s *Server) finishNotificationJob(ctx context.Context, id uuid.UUID) (db.No
 	if err != nil {
 		return job, err
 	}
-	if err := writeNotificationJob(ctx, q, job); err != nil {
+	if err := s.writeNotificationJob(ctx, q, job); err != nil {
 		return job, err
 	}
 	if err := q.DeleteNotificationJob(ctx, id); err != nil {
@@ -91,7 +91,7 @@ func (s *Server) finishNotificationJob(ctx context.Context, id uuid.UUID) (db.No
 	return job, tx.Commit(ctx)
 }
 
-func writeNotificationJob(ctx context.Context, q *db.Queries, job db.NotificationJob) error {
+func (s *Server) writeNotificationJob(ctx context.Context, q *db.Queries, job db.NotificationJob) error {
 	switch job.Kind {
 	case "recruitment_post":
 		return q.InsertRecruitmentPostNotifications(ctx, db.InsertRecruitmentPostNotificationsParams{
@@ -113,13 +113,15 @@ func writeNotificationJob(ctx context.Context, q *db.Queries, job db.Notificatio
 			ProfileID: job.RecipientID, ReviewedAt: job.ReviewedAt,
 		})
 		// 再応募した場合は新しい応募の本人情報を終了扱いにしない。
+		// 終了の記録自体は審査確定時の退役トリガも担うが、ここでは
+		// 見送り通知とは独立した予定として専用サービスへ知らせる。
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		return q.EndCoachLegalIdentity(ctx, job.RecipientID)
+		return s.identity.notifyEnd(ctx, job.RecipientID)
 	default:
 		return insertNotification(ctx, q, job.RecipientID, job.Kind, *job.PostID, job.CommentID, job.ApplicationID)
 	}

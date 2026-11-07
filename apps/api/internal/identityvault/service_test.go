@@ -47,6 +47,9 @@ func TestIdentityIsolation(t *testing.T) {
 	execTest(t, main, "GRANT USAGE ON SCHEMA identity_boundary TO "+readerRole)
 	execTest(t, main, "GRANT SELECT ON identity_boundary.published_plans,identity_boundary.approved_coaches,identity_boundary.retention TO "+readerRole)
 	execTest(t, main, "GRANT EXECUTE ON FUNCTION identity_boundary.last_transaction(uuid) TO "+readerRole)
+	// 終了記録の実行権限だけは、配備時に vault 用ロールへ個別に付与する想定で、
+	// 試験の読取ロールにも同じ付与を再現する（公開 API の実行ロールには付与しない）。
+	execTest(t, main, "GRANT EXECUTE ON FUNCTION identity_boundary.mark_retired(uuid) TO "+readerRole)
 	readConfig := main.Config()
 	readConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		_, err := conn.Exec(ctx, "SET ROLE "+readerRole)
@@ -88,6 +91,8 @@ func TestIdentityIsolation(t *testing.T) {
 		"TRUNCATE coaching_plans CASCADE",
 		"SET session_replication_role = replica",
 		"SELECT * FROM identity_vault.identities",
+		"SELECT identity_boundary.mark_retired(gen_random_uuid())",
+		"SELECT * FROM identity_boundary.retirement",
 	} {
 		if _, err := publicDB.Exec(ctx, forbidden); err == nil {
 			t.Fatalf("public runtime accepted forbidden statement: %s", forbidden)
@@ -135,7 +140,8 @@ func TestIdentityIsolation(t *testing.T) {
 	staffToken := makeToken(staff, "aal2", issuer)
 	machine := strings.Repeat("r", 32)
 	cleanup := strings.Repeat("c", 32)
-	svc, err := New(readDB, vault, verifier, auth.Admin{BaseURL: authServer.URL, APIKey: "synthetic-publishable"}, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{5}, 32)), machine, cleanup, "https://example.test")
+	end := strings.Repeat("e", 32)
+	svc, err := New(readDB, vault, verifier, auth.Admin{BaseURL: authServer.URL, APIKey: "synthetic-publishable"}, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{5}, 32)), machine, cleanup, end, "https://example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,6 +172,41 @@ func TestIdentityIsolation(t *testing.T) {
 	request("PUT", publish, machine, `{"confirm":true}`, 401)
 	request("POST", "/internal/cleanup", machine, "", 401)
 	request("GET", public, machine, "", 404)
+	endPath := "/internal/coach-end"
+	request("POST", endPath, machine, `{"coach_id":"`+coach.String()+`"}`, 401)
+	request("GET", public, end, "", 401)
+	request("POST", "/internal/cleanup", end, "", 401)
+	ended := uuid.New()
+	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", ended)
+	execTest(t, main, `INSERT INTO coach_profiles
+		(profile_id,tier,events,best_record,achievements,years,status,reviewed_at,pledged_at,pledge_version)
+		VALUES ($1,'coach',ARRAY['100m'],'test','test',1,'rejected',now(),now(),1)`, ended)
+	retired := func() int {
+		t.Helper()
+		var n int
+		if err := main.QueryRow(ctx, "SELECT count(*) FROM identity_boundary.retirement WHERE coach_id=$1", ended).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	request("POST", endPath, end, "", 400)
+	request("POST", endPath, end, `{"coach_id":"not-a-uuid"}`, 400)
+	request("POST", endPath, end, `{"coach_id":"`+ended.String()+`"}`, 204)
+	if retired() != 1 {
+		t.Fatal("rejected coach end was not recorded")
+	}
+	request("POST", endPath, end, `{"coach_id":"`+ended.String()+`"}`, 204)
+	if retired() != 1 {
+		t.Fatal("end recording was applied twice")
+	}
+	execTest(t, main, "UPDATE coach_profiles SET status='approved' WHERE profile_id=$1", ended)
+	request("POST", endPath, end, `{"coach_id":"`+ended.String()+`"}`, 409)
+	if retired() != 0 {
+		t.Fatal("approved coach end was recorded")
+	}
+	unknown := uuid.New()
+	request("POST", endPath, end, `{"coach_id":"`+unknown.String()+`"}`, 204)
+	execTest(t, main, "DELETE FROM identity_boundary.retirement WHERE coach_id=$1", unknown)
 	request("PUT", save, coachToken, `{"legal_name":"test","address":"test","phone":"0000000000"}`, 400)
 	request("PUT", save, coachToken, syntheticIdentity, 204)
 

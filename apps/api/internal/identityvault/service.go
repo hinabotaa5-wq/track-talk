@@ -29,12 +29,13 @@ type Service struct {
 	checkSession func(context.Context, string) error
 	machineToken string
 	cleanupToken string
+	endToken     string
 	origin       string
 }
 
-func New(main, vault *pgxpool.Pool, verifier *auth.Verifier, authClient auth.Admin, key, machineToken, cleanupToken, origin string) (*Service, error) {
+func New(main, vault *pgxpool.Pool, verifier *auth.Verifier, authClient auth.Admin, key, machineToken, cleanupToken, endToken, origin string) (*Service, error) {
 	raw, err := base64.StdEncoding.DecodeString(key)
-	if err != nil || len(raw) != 32 || len(machineToken) < 32 || len(cleanupToken) < 32 || machineToken == cleanupToken || origin == "" || !authClient.Enabled() || verifier == nil {
+	if err != nil || len(raw) != 32 || len(machineToken) < 32 || len(cleanupToken) < 32 || len(endToken) < 32 || machineToken == cleanupToken || machineToken == endToken || cleanupToken == endToken || origin == "" || !authClient.Enabled() || verifier == nil {
 		return nil, errors.New("invalid identity service configuration")
 	}
 	block, err := aes.NewCipher(raw)
@@ -45,7 +46,7 @@ func New(main, vault *pgxpool.Pool, verifier *auth.Verifier, authClient auth.Adm
 	if err != nil {
 		return nil, err
 	}
-	return &Service{main: main, vault: vault, key: aead, verifier: verifier, checkSession: authClient.CheckSession, machineToken: machineToken, cleanupToken: cleanupToken, origin: origin}, nil
+	return &Service{main: main, vault: vault, key: aead, verifier: verifier, checkSession: authClient.CheckSession, machineToken: machineToken, cleanupToken: cleanupToken, endToken: endToken, origin: origin}, nil
 }
 
 func (s *Service) Handler() http.Handler {
@@ -62,6 +63,7 @@ func (s *Service) Handler() http.Handler {
 	r.HandleFunc("GET /internal/registration/{id}", s.machine(s.machineToken, s.registration))
 	r.HandleFunc("GET /internal/disclosures", s.machine(s.machineToken, s.approvedPlans))
 	r.HandleFunc("GET /internal/disclosures/{id}", s.machine(s.machineToken, s.disclosure))
+	r.HandleFunc("POST /internal/coach-end", s.machine(s.endToken, s.recordEnd))
 	r.HandleFunc("POST /internal/cleanup", s.machine(s.cleanupToken, s.cleanup))
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")

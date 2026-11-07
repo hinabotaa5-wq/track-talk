@@ -2,6 +2,7 @@ package httpx_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -148,12 +149,52 @@ func subscribeNotificationTest(t *testing.T, h http.Handler, token, endpoint str
 	}
 }
 
+func fakeIdentityEnd(t *testing.T, status *atomic.Int32, calls *atomic.Int32, seenAuth *atomic.Value, seenBody *atomic.Value) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/coach-end" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		calls.Add(1)
+		seenAuth.Store(r.Header.Get("Authorization"))
+		raw, _ := io.ReadAll(r.Body)
+		seenBody.Store(string(raw))
+		w.WriteHeader(int(status.Load()))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func endJobCount(t *testing.T, applicant uuid.UUID) int {
+	t.Helper()
+	var pending int
+	queryRowArgs(t, "SELECT count(*) FROM notification_jobs WHERE kind = 'coach_identity_end' AND recipient_id = $1", []any{applicant}, &pending)
+	return pending
+}
+
+func retiredCount(t *testing.T, applicant uuid.UUID) int {
+	t.Helper()
+	var retired int
+	queryRowArgs(t, "SELECT count(*) FROM identity_boundary.retirement WHERE coach_id = $1", []any{applicant}, &retired)
+	return retired
+}
+
 func TestCoachRejectionNotificationRecoversIndependentlyOfIdentity(t *testing.T) {
 	var pushes atomic.Int32
 	configurePush, endpoint := notificationPushRecorder(t, func() { pushes.Add(1) })
+	endToken := strings.Repeat("e", 32)
+	var endCalls atomic.Int32
+	var endAuth atomic.Value
+	var endBody atomic.Value
+	endStatus := atomic.Int32{}
+	endStatus.Store(500)
+	fakeVault := fakeIdentityEnd(t, &endStatus, &endCalls, &endAuth, &endBody)
 	h := setupConfig(t, func(cfg *config.Config) {
 		configurePush(cfg)
 		cfg.CoachingTickSecret = "tick-secret"
+		cfg.IdentityReaderURL = fakeVault.URL
+		cfg.IdentityEndToken = endToken
 	})
 	applicant := uuid.New()
 	applicantToken := token(t, applicant)
@@ -161,9 +202,6 @@ func TestCoachRejectionNotificationRecoversIndependentlyOfIdentity(t *testing.T)
 		t.Fatal(rec.Body.String())
 	}
 	subscribeNotificationTest(t, h, applicantToken, endpoint)
-	execSQLArgs(t, `INSERT INTO coach_legal_identities (coach_id, key_id, legal_name_enc, address_enc, phone_enc)
-		VALUES ($1, 'test', ''::bytea, ''::bytea, ''::bytea)`, applicant)
-	removeIdentityFailure := injectNotificationFailure(t, "coach_legal_identities", "UPDATE")
 	removeBellFailure := injectNotificationFailure(t, "notifications", "INSERT")
 	admin := adminToken(t, h)
 	path := "/v1/admin/coach-applications/" + applicant.String() + "/reject"
@@ -181,17 +219,176 @@ func TestCoachRejectionNotificationRecoversIndependentlyOfIdentity(t *testing.T)
 	reject()
 	reject()
 	retryAllNotificationJobs(t, h)
-	var ended bool
-	queryRowArgs(t, "SELECT coaching_ended_at IS NOT NULL FROM coach_legal_identities WHERE coach_id = $1", []any{applicant}, &ended)
 	notes, _ := listNotifications(t, h, applicantToken)
-	if ended || pushes.Load() != 1 || len(notes) != 1 || notes[0].Kind != "message" {
-		t.Fatalf("identity ended = %t, pushes = %d, bell count = %d", ended, pushes.Load(), len(notes))
+	if pushes.Load() != 1 || len(notes) != 1 || notes[0].Kind != "message" {
+		t.Fatalf("pushes = %d, bell count = %d", pushes.Load(), len(notes))
 	}
-	removeIdentityFailure()
+	if got := endJobCount(t, applicant); got != 1 {
+		t.Fatalf("pending end jobs = %d", got)
+	}
+	if got := retiredCount(t, applicant); got != 1 {
+		t.Fatalf("trigger did not record synchronously: retired = %d", got)
+	}
+	if endCalls.Load() == 0 {
+		t.Fatal("vault end was never contacted")
+	}
+	if got, _ := endAuth.Load().(string); got != "Bearer "+endToken {
+		t.Fatalf("vault end auth = %q", got)
+	}
+	endStatus.Store(204)
 	retryAllNotificationJobs(t, h)
-	queryRowArgs(t, "SELECT coaching_ended_at IS NOT NULL FROM coach_legal_identities WHERE coach_id = $1", []any{applicant}, &ended)
-	if !ended || pushes.Load() != 1 {
-		t.Fatalf("identity ended = %t, pushes = %d", ended, pushes.Load())
+	if got := endJobCount(t, applicant); got != 0 {
+		t.Fatalf("pending end jobs after recovery = %d", got)
+	}
+	if got := retiredCount(t, applicant); got != 1 {
+		t.Fatalf("retired rows after recovery = %d", got)
+	}
+	if got, _ := endBody.Load().(string); got != `{"coach_id":"`+applicant.String()+`"}` {
+		t.Fatalf("vault end body = %s", got)
+	}
+	retryAllNotificationJobs(t, h)
+	if got := retiredCount(t, applicant); got != 1 || pushes.Load() != 1 {
+		t.Fatalf("duplicate effect: retired = %d, pushes = %d", got, pushes.Load())
+	}
+}
+
+func TestCoachIdentityEndDuplicateJobsRecordOnce(t *testing.T) {
+	endToken := strings.Repeat("e", 32)
+	var endCalls atomic.Int32
+	var endAuth atomic.Value
+	var endBody atomic.Value
+	endStatus := atomic.Int32{}
+	endStatus.Store(204)
+	fakeVault := fakeIdentityEnd(t, &endStatus, &endCalls, &endAuth, &endBody)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingTickSecret = "tick-secret"
+		cfg.IdentityReaderURL = fakeVault.URL
+		cfg.IdentityEndToken = endToken
+	})
+	applicant := uuid.New()
+	applicantToken := token(t, applicant)
+	if rec := doJSON(t, h, "POST", "/v1/coach/applications", applicantToken, coachApplicationBody()); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	admin := adminToken(t, h)
+	path := "/v1/admin/coach-applications/" + applicant.String() + "/reject"
+	if rec := doJSON(t, h, "POST", path, admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("reject %d %s", rec.Code, rec.Body.String())
+	}
+	var reviewedAt time.Time
+	queryRowArgs(t, "SELECT reviewed_at FROM coach_profiles WHERE profile_id = $1", []any{applicant}, &reviewedAt)
+	for range 2 {
+		execSQLArgs(t, `INSERT INTO notification_jobs (id, kind, recipient_id, reviewed_at) VALUES ($1, 'coach_identity_end', $2, $3)`,
+			uuid.New(), applicant, reviewedAt)
+	}
+	retryAllNotificationJobs(t, h)
+	if got := endCalls.Load(); got != 3 {
+		t.Fatalf("vault end calls = %d", got)
+	}
+	if got := retiredCount(t, applicant); got != 1 {
+		t.Fatalf("retired rows = %d", got)
+	}
+	if got := endJobCount(t, applicant); got != 0 {
+		t.Fatalf("pending end jobs = %d", got)
+	}
+}
+
+func TestCoachIdentityEndConflictFinishesWithoutRetry(t *testing.T) {
+	endToken := strings.Repeat("e", 32)
+	var endCalls atomic.Int32
+	var endAuth atomic.Value
+	var endBody atomic.Value
+	endStatus := atomic.Int32{}
+	endStatus.Store(409)
+	fakeVault := fakeIdentityEnd(t, &endStatus, &endCalls, &endAuth, &endBody)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingTickSecret = "tick-secret"
+		cfg.IdentityReaderURL = fakeVault.URL
+		cfg.IdentityEndToken = endToken
+	})
+	applicant := uuid.New()
+	applicantToken := token(t, applicant)
+	if rec := doJSON(t, h, "POST", "/v1/coach/applications", applicantToken, coachApplicationBody()); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	admin := adminToken(t, h)
+	path := "/v1/admin/coach-applications/" + applicant.String() + "/reject"
+	if rec := doJSON(t, h, "POST", path, admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("reject %d %s", rec.Code, rec.Body.String())
+	}
+	retryAllNotificationJobs(t, h)
+	if got := endJobCount(t, applicant); got != 0 {
+		t.Fatalf("pending end jobs after conflict = %d", got)
+	}
+	if got := retiredCount(t, applicant); got != 1 {
+		t.Fatalf("retired rows changed by conflict = %d", got)
+	}
+	if got := endCalls.Load(); got != 1 {
+		t.Fatalf("vault end calls = %d", got)
+	}
+}
+
+func TestCoachIdentityEndGuardSkipsReapprovedCoach(t *testing.T) {
+	endToken := strings.Repeat("e", 32)
+	var endCalls atomic.Int32
+	var endAuth atomic.Value
+	var endBody atomic.Value
+	endStatus := atomic.Int32{}
+	endStatus.Store(204)
+	fakeVault := fakeIdentityEnd(t, &endStatus, &endCalls, &endAuth, &endBody)
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingTickSecret = "tick-secret"
+		cfg.IdentityReaderURL = fakeVault.URL
+		cfg.IdentityEndToken = endToken
+	})
+	applicant := uuid.New()
+	applicantToken := token(t, applicant)
+	if rec := doJSON(t, h, "POST", "/v1/coach/applications", applicantToken, coachApplicationBody()); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	admin := adminToken(t, h)
+	path := "/v1/admin/coach-applications/" + applicant.String() + "/reject"
+	if rec := doJSON(t, h, "POST", path, admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("reject %d %s", rec.Code, rec.Body.String())
+	}
+	var reviewedAt time.Time
+	queryRowArgs(t, "SELECT reviewed_at FROM coach_profiles WHERE profile_id = $1", []any{applicant}, &reviewedAt)
+	execSQLArgs(t, "UPDATE coach_profiles SET status = 'approved', reviewed_at = now() WHERE profile_id = $1", applicant)
+	execSQLArgs(t, `INSERT INTO notification_jobs (id, kind, recipient_id, reviewed_at) VALUES ($1, 'coach_identity_end', $2, $3)`,
+		uuid.New(), applicant, reviewedAt)
+	before := endCalls.Load()
+	retryAllNotificationJobs(t, h)
+	if got := endJobCount(t, applicant); got != 0 {
+		t.Fatalf("pending end jobs after reapproval = %d", got)
+	}
+	if got := endCalls.Load(); got != before {
+		t.Fatalf("vault contacted for reapproved coach: calls = %d", got)
+	}
+	if got := retiredCount(t, applicant); got != 0 {
+		t.Fatalf("retired rows for reapproved coach = %d", got)
+	}
+}
+
+func TestCoachIdentityEndSkippedWhenVaultUnconfigured(t *testing.T) {
+	h := setupConfig(t, func(cfg *config.Config) {
+		cfg.CoachingTickSecret = "tick-secret"
+		cfg.IdentityReaderURL = ""
+		cfg.IdentityEndToken = ""
+	})
+	applicant := uuid.New()
+	applicantToken := token(t, applicant)
+	if rec := doJSON(t, h, "POST", "/v1/coach/applications", applicantToken, coachApplicationBody()); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	admin := adminToken(t, h)
+	path := "/v1/admin/coach-applications/" + applicant.String() + "/reject"
+	if rec := doJSON(t, h, "POST", path, admin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("reject %d %s", rec.Code, rec.Body.String())
+	}
+	retryAllNotificationJobs(t, h)
+	retryAllNotificationJobs(t, h)
+	if got := endJobCount(t, applicant); got != 0 {
+		t.Fatalf("pending end jobs without vault = %d", got)
 	}
 }
 

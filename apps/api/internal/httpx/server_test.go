@@ -22,6 +22,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -1957,5 +1958,75 @@ func TestInquiryAcceptsCommerceDisclosureRequest(t *testing.T) {
 	})
 	if rec.Code != 201 || !strings.Contains(rec.Body.String(), `"category":"disclosure"`) {
 		t.Fatalf("disclosure %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 起動時検査の SQL は cmd/api/main.go と同じ文にする。変えたら両方直す。
+const identityBoundaryStartupCheckSQL = `SELECT NOT (r.rolsuper OR r.rolcreaterole)
+	AND NOT pg_has_role(c.relowner, 'MEMBER')
+	AND NOT pg_has_role(p.relowner, 'MEMBER')
+	AND NOT pg_has_role(b.nspowner, 'MEMBER')
+	AND NOT has_schema_privilege(b.oid, 'USAGE,CREATE')
+	AND NOT has_table_privilege(c.oid, 'TRUNCATE')
+	AND NOT has_table_privilege(p.oid, 'TRUNCATE')
+	AND NOT has_parameter_privilege('session_replication_role', 'SET')
+	AND NOT COALESCE(has_table_privilege(to_regclass('public.coach_legal_identities'), 'SELECT'), false)
+	FROM pg_class c, pg_class p, pg_namespace b, pg_roles r
+	WHERE c.oid='public.coach_profiles'::regclass AND p.oid='public.coaching_plans'::regclass
+	AND b.nspname='identity_boundary' AND r.rolname=current_user`
+
+// 最終形の権限（旧身元テーブルを読めない実行ロール）で起動時検査が通り、
+// 旧テーブルを読めるロールでは落ちることを確かめる。
+func TestIdentityBoundaryStartupCheck(t *testing.T) {
+	setup(t)
+	ctx := context.Background()
+	admin, err := pgxpool.New(ctx, testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(admin.Close)
+	role := "startup_check_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	if _, err := admin.Exec(ctx, "CREATE ROLE "+role); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = admin.Exec(ctx, "DROP OWNED BY "+role)
+		_, _ = admin.Exec(ctx, "DROP ROLE "+role)
+	})
+	check := func() bool {
+		t.Helper()
+		poolCfg, err := pgxpool.ParseConfig(testDSN(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+			_, err := conn.Exec(ctx, "SET ROLE "+role)
+			return err
+		}
+		pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		var isolated bool
+		if err := pool.QueryRow(ctx, identityBoundaryStartupCheckSQL).Scan(&isolated); err != nil {
+			t.Fatal(err)
+		}
+		return isolated
+	}
+	if !check() {
+		t.Fatal("restricted runtime role did not pass the startup check")
+	}
+	if _, err := admin.Exec(ctx, "GRANT SELECT ON coach_legal_identities TO "+role); err != nil {
+		t.Fatal(err)
+	}
+	if check() {
+		t.Fatal("legacy-readable role passed the startup check")
+	}
+	if _, err := admin.Exec(ctx, "REVOKE SELECT ON coach_legal_identities FROM "+role); err != nil {
+		t.Fatal(err)
+	}
+	if !check() {
+		t.Fatal("restricted runtime role did not pass the startup check after revoke")
 	}
 }

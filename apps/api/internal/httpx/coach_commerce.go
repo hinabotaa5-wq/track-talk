@@ -1,10 +1,12 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,16 +20,49 @@ var errIdentityUnavailable = errors.New("identity service unavailable")
 type identityReader struct {
 	url   string
 	token string
+	end   string
 	http  *http.Client
 }
 
-func newIdentityReader(base, token string) identityReader {
-	return identityReader{url: strings.TrimRight(base, "/"), token: token, http: &http.Client{
+func newIdentityReader(base, token, endToken string) identityReader {
+	return identityReader{url: strings.TrimRight(base, "/"), token: token, end: endToken, http: &http.Client{
 		Timeout: 5 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}}
+}
+
+// notifyEnd は、見送り確定のコーチの終了だけを専用サービスへ知らせる。
+// 409（承認済みで終了対象外）は再試行しても変わらないので完了扱いにする。
+// 未設定（専用サービスを置かない開発時）は警告だけ残し、終了の記録自体は
+// 審査確定時の退役トリガが担う。
+func (c identityReader) notifyEnd(ctx context.Context, coachID uuid.UUID) error {
+	if c.url == "" || c.end == "" {
+		slog.Warn("identity end notifier is not configured")
+		return nil
+	}
+	body, err := json.Marshal(map[string]string{"coach_id": coachID.String()})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/internal/coach-end", bytes.NewReader(body))
+	if err != nil {
+		return errIdentityUnavailable
+	}
+	req.Header.Set("Authorization", "Bearer "+c.end)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.http.Do(req)
+	if err != nil {
+		return errIdentityUnavailable
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusNoContent, http.StatusConflict:
+		return nil
+	default:
+		return errIdentityUnavailable
+	}
 }
 
 func (c identityReader) get(ctx context.Context, path string, dst any) (bool, error) {
