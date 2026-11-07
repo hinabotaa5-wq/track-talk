@@ -173,14 +173,11 @@ func (s *Server) adminSendAnnouncement(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	if n, err := s.q.RecentSameAnnouncement(r.Context(), db.RecentSameAnnouncementParams{Title: in.title, Body: in.body}); err != nil {
-		MapDBError(w, err)
-		return
-	} else if n > 0 {
-		Error(w, http.StatusConflict, "conflict", "同じ内容のお知らせを1時間以内に送っています")
-		return
-	}
 
+	// 同じ id が送り済み・送信中なら、終わっていない同じ内容は未送信分だけ送り直す（本体 #421 F11）。
+	// 取り消したもの・内容が違うもの・送り終えたものは、従来どおり送らない。
+	var inApp int64
+	resumePush := int32(0)
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
@@ -195,29 +192,53 @@ func (s *Server) adminSendAnnouncement(w http.ResponseWriter, r *http.Request) {
 		Body:     in.body,
 		Url:      in.url,
 	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			MapDBError(w, err)
+			return
+		}
+		existing, gerr := s.q.GetAnnouncement(r.Context(), id)
+		if gerr != nil {
+			MapDBError(w, gerr)
+			return
+		}
+		if existing.CanceledAt != nil || existing.Title != in.title || existing.Body != in.body || existing.Url != in.url || existing.FinishedAt != nil {
 			Error(w, http.StatusConflict, "conflict", "このお知らせはもう送りました")
 			return
 		}
-		MapDBError(w, err)
-		return
-	}
-	inApp, err := q.InsertAnnouncementNotifications(r.Context(), id)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := q.SetAnnouncementInAppCount(r.Context(), db.SetAnnouncementInAppCountParams{ID: id, InAppCount: int32(inApp)}); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		MapDBError(w, err)
-		return
+		resumePush = existing.PushRecipients
+		if n, err := s.q.CountAnnouncementNotifications(r.Context(), &id); err != nil {
+			MapDBError(w, err)
+			return
+		} else {
+			inApp = n
+		}
+	} else {
+		if n, err := s.q.RecentSameAnnouncement(r.Context(), db.RecentSameAnnouncementParams{Title: in.title, Body: in.body}); err != nil {
+			MapDBError(w, err)
+			return
+		} else if n > 0 {
+			Error(w, http.StatusConflict, "conflict", "同じ内容のお知らせを1時間以内に送っています")
+			return
+		}
+		var err error
+		inApp, err = q.InsertAnnouncementNotifications(r.Context(), id)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if err := q.SetAnnouncementInAppCount(r.Context(), db.SetAnnouncementInAppCountParams{ID: id, InAppCount: int32(inApp)}); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 
 	// ベルに入れたあとは、管理者画面の接続が切れても最後まで送る。Cloud Run は返事のあとに CPU を絞るので、
-	// 裏ではなく、このリクエストの中で送り切る。
+	// 裏ではなく、このリクエストの中で送り切る。プッシュは待ちに入れて送り、
+	// 途中で止まっても同じ id の送り直しで未送信分だけ送る。
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), announcementSendTimeout)
 	defer cancel()
 	recipients := 0
@@ -227,11 +248,29 @@ func (s *Server) adminSendAnnouncement(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Warn("announcement: push recipients", "err", err)
 		} else {
-			recipients = s.sendPushToAll(ctx, ids, announcementMessage(id.String(), in), announcementTTL)
+			msg := announcementMessage(id.String(), in)
+			prefix := "announcement:" + id.String() + ":"
+			expiresAt := s.now().Add(announcementTTL)
+			for _, rid := range ids {
+				s.enqueuePushOutbox(ctx, rid, notifyAnnouncement, msg, announcementTTL, expiresAt, prefix+rid.String())
+			}
+			s.drainPushOutbox(ctx)
+			if counts, err := s.q.CountPushOutboxByPrefix(ctx, prefix+"%"); err != nil {
+				slog.Warn("announcement: count", "err", err)
+			} else {
+				recipients = int(counts.Sent)
+				if counts.Pending == 0 {
+					if err := s.q.FinishAnnouncement(ctx, db.FinishAnnouncementParams{ID: id, PushRecipients: int32(counts.Sent)}); err != nil {
+						slog.Warn("announcement: finish", "err", err)
+					}
+				}
+			}
 		}
-	}
-	if err := s.q.FinishAnnouncement(ctx, db.FinishAnnouncementParams{ID: id, PushRecipients: int32(recipients)}); err != nil {
-		slog.Warn("announcement: finish", "err", err)
+	} else {
+		// プッシュ未設定のまま送ったお知らせは、ベルだけ入って終わり。再開時は何も足さない。
+		if err := s.q.FinishAnnouncement(ctx, db.FinishAnnouncementParams{ID: id, PushRecipients: resumePush}); err != nil {
+			slog.Warn("announcement: finish", "err", err)
+		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"id": id, "in_app": inApp, "push_recipients": recipients})
 }
