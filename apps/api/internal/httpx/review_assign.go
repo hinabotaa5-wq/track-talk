@@ -107,12 +107,14 @@ func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, er
 	if err := q.TouchCoachOffered(ctx, coachID); err != nil {
 		return false, err
 	}
-	if err := q.InsertReviewNotification(ctx, db.InsertReviewNotificationParams{ID: uuid.New(), RecipientID: coachID, Kind: "review_offer", ReviewRequestID: &rr.ID}); err != nil {
+	jobID := uuid.New()
+	if err := q.EnqueueNotificationJob(ctx, db.EnqueueNotificationJobParams{ID: jobID, RecipientID: coachID, Kind: "review_offer", ReviewRequestID: &rr.ID}); err != nil {
 		return false, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
+	s.runNotificationJobs(ctx, []uuid.UUID{jobID})
 	// 新規打診の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は引受期限。
 	s.queuePush(ctx, coachID, notifyImportant, push.Message{
 		Title: "フォーム添削の依頼が届きました",
@@ -361,6 +363,7 @@ func (s *Server) coachingTick(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
+	s.retryNotificationJobs(r.Context())
 	out, err := s.runCoachingTick(r.Context())
 	if err != nil {
 		MapDBError(w, err)

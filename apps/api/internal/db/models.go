@@ -860,6 +860,18 @@ type Notification struct {
 	AnnouncementID  *uuid.UUID `json:"announcement_id"`
 }
 
+type NotificationJob struct {
+	ID              uuid.UUID  `json:"id"`
+	Kind            string     `json:"kind"`
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	PostID          *uuid.UUID `json:"post_id"`
+	CommentID       *uuid.UUID `json:"comment_id"`
+	ApplicationID   *uuid.UUID `json:"application_id"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+	ReviewedAt      *time.Time `json:"reviewed_at"`
+	NextAttemptAt   time.Time  `json:"next_attempt_at"`
+}
+
 type NotificationSetting struct {
 	ProfileID uuid.UUID `json:"profile_id"`
 	Category  string    `json:"category"`
