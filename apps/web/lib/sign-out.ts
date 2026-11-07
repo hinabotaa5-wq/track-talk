@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import { clearPushBinding, currentPushSession, deletePushBinding, ensurePushWorker, withPushDeviceLock } from "./push";
 
 // ログアウト・退会のときに、この端末に残る前の人のものを片付ける。共有の端末で次の人に見えないようにする。
 
@@ -12,6 +13,23 @@ export function clearPersonalStorage(storage: Pick<Storage, "length" | "key" | "
     if (key && personalKeyPrefixes.some((prefix) => key.startsWith(prefix))) keys.push(key);
   }
   for (const key of keys) storage.removeItem(key);
+}
+
+// ブラウザの購読は次のログインで使えるように残し、アカウントとの紐付けを外す。
+export async function signOutOnThisDevice(userId: string, signOut: () => Promise<void>) {
+  await withPushDeviceLock(async () => {
+    const session = await currentPushSession(userId);
+    const registration = await navigator.serviceWorker?.getRegistration("/");
+    const subscription = await registration?.pushManager.getSubscription();
+    if (subscription && session) {
+      await ensurePushWorker();
+      await clearPushBinding();
+      await deletePushBinding(session.access_token, subscription.endpoint);
+    } else {
+      await clearPushBinding();
+    }
+    await signOut();
+  });
 }
 
 // この端末の通知の購読を外す。API に知らせないと、ログアウトしたあとも前の人あての通知(保護者の同意や
@@ -31,6 +49,7 @@ export async function unsubscribePushOnThisDevice(token: string | null) {
 async function removePushSubscription(token: string | null) {
   if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
   try {
+    await clearPushBinding();
     const registration = await navigator.serviceWorker.getRegistration();
     const subscription = await registration?.pushManager.getSubscription();
     if (!subscription) return;

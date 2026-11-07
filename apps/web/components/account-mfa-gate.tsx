@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isTotpCode, mfaErrorMessage, mfaGateState, normalizeTotpCode, type AssuranceLevel } from "@/lib/account-security";
 import { useActionLock } from "@/lib/use-action-lock";
+import { signOutOnThisDevice } from "@/lib/sign-out";
 import { useAuth } from "./auth-provider";
 
 type Levels = { current: AssuranceLevel; next: AssuranceLevel; token: string | null };
@@ -47,7 +48,7 @@ export function AccountMfaGate({ children }: { children: ReactNode }) {
 
 function MfaVerify() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, session } = useAuth();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
@@ -87,8 +88,18 @@ function MfaVerify() {
   async function signOut() {
     const { createClient } = await import("@/lib/supabase");
     const supabase = createClient();
-    await supabase?.auth.signOut({ scope: "local" });
-    router.replace("/login");
+    if (!supabase || !session || !acquire()) return;
+    try {
+      await signOutOnThisDevice(session.user.id, async () => {
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error && (await supabase.auth.getSession()).data.session) throw error;
+      });
+      router.replace("/login");
+    } catch {
+      setError("ログアウトできませんでした。もう一度お試しください。");
+    } finally {
+      release();
+    }
   }
 
   return (

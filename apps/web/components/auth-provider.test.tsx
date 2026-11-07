@@ -35,7 +35,7 @@ it("keeps the page usable during auth startup, loads the initial profile once, a
     expect(container.querySelector("button")?.disabled).toBe(false);
     expect(container.textContent).toContain("loading");
     expect(state.callback).toBeTypeOf("function");
-    await act(async () => state.callback?.("INITIAL_SESSION", { access_token: "token-1" }));
+    await act(async () => state.callback?.("INITIAL_SESSION", { user: { id: "fixture" }, access_token: "token-1" }));
     expect(state.fetch).toHaveBeenCalledExactlyOnceWith("/v1/me", { token: "token-1" });
     expect(container.textContent).toContain("token-1:runner");
     await act(async () => state.callback?.("SIGNED_OUT", null));
@@ -60,7 +60,7 @@ it("プロフィールが遅くてもセッションを先に使え、ログア�
   }
   try {
     await act(async () => root.render(<AuthProvider><Page /></AuthProvider>));
-    await act(async () => state.callback?.("INITIAL_SESSION", { access_token: "token-1" }));
+    await act(async () => state.callback?.("INITIAL_SESSION", { user: { id: "fixture" }, access_token: "token-1" }));
     expect(container.textContent).toBe("false:true:token-1:none");
     await act(async () => state.callback?.("SIGNED_OUT", null));
     await act(async () => finish({ nickname: "previous-user" }));
