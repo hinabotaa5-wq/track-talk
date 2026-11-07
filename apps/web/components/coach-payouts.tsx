@@ -102,9 +102,17 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
           <p className="text-xs text-slate-300">金額と日付は予定です。返金の精算や口座の状態によって変わることがあります。</p>
         </div>
       ) : null}
-      <p className="text-xs text-slate-300">
-        取り分は、動画添削が料金の{data.review_share}%、パーソナル指導が手数料{data.personal_fee}%を引いた分です。チケットのまとめ買い割引で添削の報酬が減ることはありません。添削と追加相談は回答した時、パーソナル指導は期間が終わった時に記録し、前の月までの分を毎月まとめて送金します。前の月までの分が{formatYen(data.min_payout_yen)}に届かないときは翌月に繰り越し、翌月は届かなくても送金します（繰り越しは1回まで）。銀行口座への入金は毎月15日です。
-      </p>
+      <div className="space-y-2 text-xs text-slate-300">
+        <p>
+          動画添削の報酬は1本1,050円、添削後の追加相談は1件420円です（いずれも税込）。動画添削は返却時、追加相談は回答時に報酬が確定します。
+        </p>
+        <p>
+          サポートプランの受取額は、代金から手数料{data.personal_fee}%を差し引いた額です。プランの期間が終了した時に確定します。途中で返金して終了した場合は、その時点で確定します。
+        </p>
+        <p>
+          確定した報酬は月末で締め、翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。繰り越し分を含む支払対象額が{formatYen(data.min_payout_yen)}未満の場合は1回だけ繰り越し、翌々月15日に金額にかかわらず支払います。
+        </p>
+      </div>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">
           {data.payouts.map((p) => (
