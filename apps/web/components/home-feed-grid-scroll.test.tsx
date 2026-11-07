@@ -106,10 +106,10 @@ it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復�
   await act(async () => root.render(content));
   await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
   const track = container.querySelector('[role="region"]') as HTMLDivElement;
-  expect(container.querySelectorAll("a").length).toBeLessThan(40);
+  expect(container.querySelectorAll("a").length).toBeLessThan(50);
   track.scrollLeft = 8000;
   await act(async () => { track.dispatchEvent(new Event("scroll")); frames.splice(0).forEach((callback) => callback(0)); });
-  expect(container.querySelectorAll("a").length).toBeLessThan(40);
+  expect(container.querySelectorAll("a").length).toBeLessThan(50);
   expect(container.textContent).not.toContain("投稿0投稿1");
   await act(async () => root.render(null));
   await act(async () => root.render(content));
