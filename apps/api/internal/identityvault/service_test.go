@@ -64,6 +64,36 @@ func TestIdentityIsolation(t *testing.T) {
 		t.Fatal("main database can read vault records")
 	}
 
+	publicRole := "public_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	execTest(t, main, "CREATE ROLE "+publicRole+" BYPASSRLS")
+	t.Cleanup(func() {
+		execTest(t, main, "DROP OWNED BY "+publicRole)
+		execTest(t, main, "DROP ROLE "+publicRole)
+	})
+	execTest(t, main, "GRANT SELECT,UPDATE(published) ON coaching_plans TO "+publicRole)
+	execTest(t, main, "GRANT SELECT,UPDATE(status) ON coach_profiles TO "+publicRole)
+	publicConfig := main.Config()
+	publicConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET ROLE "+publicRole)
+		return err
+	}
+	publicDB, err := pgxpool.NewWithConfig(ctx, publicConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(publicDB.Close)
+	for _, forbidden := range []string{
+		"UPDATE identity_boundary.plan_epochs SET epoch=gen_random_uuid()",
+		"ALTER TABLE coaching_plans DISABLE TRIGGER identity_plan_change",
+		"TRUNCATE coaching_plans CASCADE",
+		"SET session_replication_role = replica",
+		"SELECT * FROM identity_vault.identities",
+	} {
+		if _, err := publicDB.Exec(ctx, forbidden); err == nil {
+			t.Fatalf("public runtime accepted forbidden statement: %s", forbidden)
+		}
+	}
+
 	signing, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -172,14 +202,14 @@ func TestIdentityIsolation(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "合成テスト住所") || !strings.Contains(res.Body.String(), "000-0000-0000") || res.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("public disclosure did not match the approved data")
 	}
-	execTest(t, main, "UPDATE coaching_plans SET published=false WHERE id=$1", plan)
+	execTest(t, publicDB, "UPDATE coaching_plans SET published=false WHERE id=$1", plan)
 	request("GET", public, machine, "", 404)
-	execTest(t, main, "UPDATE coaching_plans SET published=true WHERE id=$1", plan)
+	execTest(t, publicDB, "UPDATE coaching_plans SET published=true WHERE id=$1", plan)
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, consent, 204)
-	execTest(t, main, "UPDATE coach_profiles SET status='suspended' WHERE profile_id=$1", coach)
+	execTest(t, publicDB, "UPDATE coach_profiles SET status='suspended' WHERE profile_id=$1", coach)
 	request("GET", public, machine, "", 404)
-	execTest(t, main, "UPDATE coach_profiles SET status='approved' WHERE profile_id=$1", coach)
+	execTest(t, publicDB, "UPDATE coach_profiles SET status='approved' WHERE profile_id=$1", coach)
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, consent, 204)
 	request("PUT", "/v1/coach/exemption", coachToken, `{"exempt":true,"checklist_version":1,"checked":[true,true,true]}`, 204)
@@ -193,7 +223,7 @@ func TestIdentityIsolation(t *testing.T) {
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+own.Revision.String()+`"}`, 409)
 
-	execTest(t, main, "UPDATE coach_profiles SET status='withdrawn' WHERE profile_id=$1", coach)
+	execTest(t, publicDB, "UPDATE coach_profiles SET status='withdrawn' WHERE profile_id=$1", coach)
 	request("POST", "/internal/cleanup", cleanup, "", 204)
 	request("POST", adminView, staffToken, `{"purpose":"retention test"}`, 200)
 	execTest(t, main, "UPDATE identity_boundary.retirement SET ended_at=now()-interval '6 years',last_transaction_at=now()-interval '4 years' WHERE coach_id=$1", coach)

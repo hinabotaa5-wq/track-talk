@@ -54,7 +54,7 @@ func main() {
 			AND NOT pg_has_role(c.relowner, 'MEMBER')
 			AND NOT pg_has_role(p.relowner, 'MEMBER')
 			AND NOT pg_has_role(b.nspowner, 'MEMBER')
-			AND NOT has_schema_privilege(b.oid, 'CREATE')
+			AND NOT has_schema_privilege(b.oid, 'USAGE,CREATE')
 			AND NOT has_table_privilege(c.oid, 'TRUNCATE')
 			AND NOT has_table_privilege(p.oid, 'TRUNCATE')
 			AND NOT has_parameter_privilege('session_replication_role', 'SET')
