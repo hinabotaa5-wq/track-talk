@@ -47,10 +47,11 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-function render(home = false) {
+function render(home = false, completedReviewId?: string) {
   return act(async () => root.render(
     <PushPermissionGuide
       home={home}
+      completedReviewId={completedReviewId}
       userId="fixture"
       token="fixture-token"
       renderControl={home ? undefined : (_, open) => <button onClick={open}>通知設定</button>}
@@ -105,4 +106,28 @@ it("honors the seven-day deferral when the user opens notification settings", as
   } finally {
     clock.mockRestore();
   }
+});
+
+it("offers the review-specific sheet once per completed checkout and restarts the deferral on dismissal", async () => {
+  const key = "tracktalk:push-guide:default:fixture:snoozed-until";
+  localStorage.setItem(key, String(Date.now() + 1000));
+
+  await render(false, "first-review");
+  expect(container.querySelector("dialog[open]")?.textContent).toContain("コーチが添削を返したら通知します。");
+  expect(requestPermission).not.toHaveBeenCalled();
+  await click("あとで");
+  expect(Number(localStorage.getItem(key))).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+
+  await render();
+  await render(false, "first-review");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  await render(false, "second-review");
+  expect(container.querySelector("dialog[open]")).not.toBeNull();
+});
+
+it.each(["granted", "denied"])("does not prompt on review completion when permission is %s", async (permission) => {
+  vi.stubGlobal("Notification", { permission, requestPermission });
+  await render(false, "first-review");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  expect(requestPermission).not.toHaveBeenCalled();
 });

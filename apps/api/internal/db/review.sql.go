@@ -83,6 +83,58 @@ func (q *Queries) AnswerReviewOffer(ctx context.Context, arg AnswerReviewOfferPa
 	return err
 }
 
+const claimReviewOfferReminders = `-- name: ClaimReviewOfferReminders :many
+WITH claimed AS (
+    UPDATE review_offers o
+    SET reminder_sent_at = $1::timestamptz
+    FROM review_requests r
+    WHERE r.id = o.request_id
+      AND r.status = 'offered'
+      AND r.requested_coach_id = o.coach_id
+      AND o.result IS NULL
+      AND o.reminder_sent_at IS NULL
+      AND o.expires_at > $1::timestamptz
+      AND o.expires_at <= $2::timestamptz
+    RETURNING o.id, o.request_id, o.coach_id, o.expires_at
+), notices AS (
+    INSERT INTO notifications (id, recipient_id, kind, review_request_id)
+    SELECT gen_random_uuid(), coach_id, 'review_offer_reminder', request_id FROM claimed
+)
+SELECT id, coach_id, expires_at FROM claimed
+`
+
+type ClaimReviewOfferRemindersParams struct {
+	CheckedAt     time.Time `json:"checked_at"`
+	RemindThrough time.Time `json:"remind_through"`
+}
+
+type ClaimReviewOfferRemindersRow struct {
+	ID        uuid.UUID `json:"id"`
+	CoachID   uuid.UUID `json:"coach_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// Persist the one-time claim and its in-app notification together.
+func (q *Queries) ClaimReviewOfferReminders(ctx context.Context, arg ClaimReviewOfferRemindersParams) ([]ClaimReviewOfferRemindersRow, error) {
+	rows, err := q.db.Query(ctx, claimReviewOfferReminders, arg.CheckedAt, arg.RemindThrough)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ClaimReviewOfferRemindersRow
+	for rows.Next() {
+		var i ClaimReviewOfferRemindersRow
+		if err := rows.Scan(&i.ID, &i.CoachID, &i.ExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countMyReviewRequests = `-- name: CountMyReviewRequests :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1
@@ -169,7 +221,7 @@ func (q *Queries) CreateDemoCode(ctx context.Context, code string) (CoachingDemo
 const createReviewOffer = `-- name: CreateReviewOffer :one
 INSERT INTO review_offers (id, request_id, coach_id, expires_at)
 VALUES ($1, $2, $3, $4)
-RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at
+RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at
 `
 
 type CreateReviewOfferParams struct {
@@ -195,6 +247,7 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.ReminderSentAt,
 	)
 	return i, err
 }
@@ -287,7 +340,7 @@ WITH target AS (
         updated_at = now()
     FROM target
     WHERE r.id = target.id
-    RETURNING r.id, r.requester_id, r.coach_id, target.old_status
+    RETURNING r.id, r.requester_id, r.coach_id, r.requested_coach_id, target.old_status
 ), closed AS (
     UPDATE review_offers o
     SET result = 'expired',
@@ -296,14 +349,15 @@ WITH target AS (
     WHERE o.request_id = overdue.id
       AND o.result IS NULL
 )
-SELECT id, requester_id, coach_id, old_status FROM overdue
+SELECT id, requester_id, coach_id, requested_coach_id, old_status FROM overdue
 `
 
 type ExpireOverdueReviewRequestsRow struct {
-	ID          uuid.UUID  `json:"id"`
-	RequesterID uuid.UUID  `json:"requester_id"`
-	CoachID     *uuid.UUID `json:"coach_id"`
-	OldStatus   string     `json:"old_status"`
+	ID               uuid.UUID  `json:"id"`
+	RequesterID      uuid.UUID  `json:"requester_id"`
+	CoachID          *uuid.UUID `json:"coach_id"`
+	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
+	OldStatus        string     `json:"old_status"`
 }
 
 // 返却の目安を過ぎた依頼を expired にする。添削中だった依頼はコーチを残し、遵守率に使う。
@@ -320,6 +374,7 @@ func (q *Queries) ExpireOverdueReviewRequests(ctx context.Context) ([]ExpireOver
 			&i.ID,
 			&i.RequesterID,
 			&i.CoachID,
+			&i.RequestedCoachID,
 			&i.OldStatus,
 		); err != nil {
 			return nil, err
@@ -829,7 +884,7 @@ func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNominees
 }
 
 const lockCoachOpenOfferForRequest = `-- name: LockCoachOpenOfferForRequest :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at FROM review_offers
+SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at FROM review_offers
 WHERE request_id = $1
   AND coach_id = $2
   AND result IS NULL
@@ -853,12 +908,13 @@ func (q *Queries) LockCoachOpenOfferForRequest(ctx context.Context, arg LockCoac
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.ReminderSentAt,
 	)
 	return i, err
 }
 
 const lockOpenReviewOffer = `-- name: LockOpenReviewOffer :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at FROM review_offers
+SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at FROM review_offers
 WHERE id = $1
   AND coach_id = $2
   AND result IS NULL
@@ -881,6 +937,7 @@ func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOff
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.ReminderSentAt,
 	)
 	return i, err
 }
@@ -1203,12 +1260,13 @@ func (q *Queries) SetCoachingDemo(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const setReviewOfferExpiry = `-- name: SetReviewOfferExpiry :execrows
+const setReviewOfferExpiry = `-- name: SetReviewOfferExpiry :one
 UPDATE review_offers
 SET expires_at = $1::timestamptz
 WHERE request_id = $2
   AND coach_id = $3
   AND result IS NULL
+RETURNING id
 `
 
 type SetReviewOfferExpiryParams struct {
@@ -1218,12 +1276,11 @@ type SetReviewOfferExpiryParams struct {
 }
 
 // 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
-func (q *Queries) SetReviewOfferExpiry(ctx context.Context, arg SetReviewOfferExpiryParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setReviewOfferExpiry, arg.ExpiresAt, arg.RequestID, arg.CoachID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) SetReviewOfferExpiry(ctx context.Context, arg SetReviewOfferExpiryParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, setReviewOfferExpiry, arg.ExpiresAt, arg.RequestID, arg.CoachID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const touchCoachOffered = `-- name: TouchCoachOffered :exec
