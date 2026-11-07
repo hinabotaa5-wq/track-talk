@@ -68,42 +68,29 @@ test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({
   }
 });
 
-test("検索アイコンと4つのタブを1行に並べ、検索中はタブを隠す", async ({ page }) => {
+test("投稿ボタンと4つのタブを幅320pxで1行に並べる", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
-  const search = nav.getByRole("button", { name: "キーワード検索を開く" });
-  await expect(nav.getByRole("link")).toHaveText(["新しい", "人気", "募集", "レビュー"]);
+  const nav = page.getByRole("navigation", { name: "投稿の並び替え" });
+  const post = nav.getByRole("link", { name: "投稿する", exact: true });
+  await expect(nav.getByRole("link")).toHaveCount(5);
+  await expect(nav.getByRole("link").first()).toHaveAccessibleName("投稿する");
+  await expect(page.getByRole("link", { name: "投稿する", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("search")).toHaveCount(0);
   // フォントやヘッダーの読み込みで測定の途中に位置が変わらないよう、同じフレームで比較する。
   const boxes = await nav.locator("button, a").evaluateAll((items) => items.map((item) => {
     const rect = item.getBoundingClientRect();
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   }));
-  const searchBox = boxes[0];
+  const postBox = boxes[0];
   for (const box of boxes.slice(1)) {
-    expect(Math.abs((box.y + box.height / 2) - (searchBox.y + searchBox.height / 2))).toBeLessThan(2);
+    expect(Math.abs((box.y + box.height / 2) - (postBox.y + postBox.height / 2))).toBeLessThan(2);
     expect(box.x + box.width).toBeLessThanOrEqual(320);
   }
   await nav.getByRole("link", { name: "人気", exact: true }).click();
   await expect(page).toHaveURL(/sort=popular/);
-  await search.click();
-  await expect(nav).toHaveCount(0);
-  const keyword = page.getByRole("searchbox", { name: "キーワード" });
-  await expect(keyword).toBeFocused();
-  await keyword.fill("朝練");
-  await keyword.press("Enter");
-  await expect(page).toHaveURL(/sort=popular/);
-  await expect(page).toHaveURL(/q=/);
-  await expect(keyword).toHaveValue("朝練");
-  await page.getByRole("button", { name: "検索を閉じる" }).click();
-  await expect(nav).toBeVisible();
-  await expect(page).not.toHaveURL(/q=/);
-  await page.goBack();
-  await expect(keyword).toBeVisible();
-  await expect(keyword).toHaveValue("朝練");
-  await keyword.press("Escape");
-  await expect(nav).toBeVisible();
-  await expect(search).toBeFocused();
+  await nav.getByRole("link", { name: "レビュー", exact: true }).click();
+  await expect(post).toBeVisible();
 });
 
 test("リールの詳細は中央に小さく表示する", async ({ page }) => {
@@ -364,7 +351,7 @@ test("均一グリッドでも新しい順・人気順・募集と固定タブ�
   });
   await page.goto("/");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
-  const nav = page.getByRole("navigation", { name: "投稿の並び替えと検索" });
+  const nav = page.getByRole("navigation", { name: "投稿の並び替え" });
   await expect(track.locator('.home-feed-grid-canvas[data-ready="true"]')).toBeVisible();
   await expect(track.getByRole("link")).toHaveText(newOrder);
   const before = await nav.boundingBox();

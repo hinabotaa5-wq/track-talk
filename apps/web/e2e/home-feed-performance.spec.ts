@@ -7,6 +7,8 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
   // サーバーの初期一覧を古いものとして扱い、固定したブラウザ用データを取得する。
   await page.clock.setFixedTime(Date.now() + 120_000);
   await page.addInitScript(() => {
+    // 起動時の先読みと、スクロールで発生する再取得を混同しない。
+    Object.defineProperty(navigator, "connection", { value: { saveData: true } });
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     sessionStorage.setItem("today-meet-balloon:closed", today);
   });
@@ -22,7 +24,7 @@ test("720件を読んでも描画を絞り、過去ページの再取得と戻�
     let json: unknown = {};
     if (url.pathname.endsWith("/posts")) {
       const number = Number(url.searchParams.get("cursor")?.replace("page-", "") ?? "1");
-      requests.push(number);
+      if (url.searchParams.get("sort") === "new" && !url.searchParams.has("kind")) requests.push(number);
       json = { posts: Array.from({ length: 12 }, (_, j) => post((number - 1) * 12 + j)), meta: {
         page: number, per_page: 12, total: 0, has_more: number < 60, next_cursor: number < 60 ? `page-${number+1}` : "",
       } };

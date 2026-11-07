@@ -25,12 +25,12 @@ test.describe("iPhone 相当のホーム", () => {
     hasTouch: true,
   });
 
-  test("投稿を画面の端まで表示し、右端から横に送れる", async ({ page }) => {
+  test("投稿の左端に少し余白を取り、右端から横に送れる", async ({ page }) => {
     await page.clock.setFixedTime(Date.now() + 120_000);
     await page.route("**/api/v1/posts?*", (route) => route.fulfill({
       json: {
         posts: Array.from({ length: 12 }, (_, index) => ({
-          id: `fab-sample-${index}`,
+          id: `home-sample-${index}`,
           kind: "video",
           title: `練習サンプル ${index + 1}`,
           excerpt: "テスト投稿",
@@ -46,49 +46,38 @@ test.describe("iPhone 相当のホーム", () => {
     await page.route("**/api/v1/meet-threads/today*", (route) => route.fulfill({ json: { meets: [] } }));
     await page.goto("/?sort=new");
 
-    const fab = page.getByRole("link", { name: "投稿する" });
+    const tabs = page.getByRole("navigation", { name: "投稿の並び替え", exact: true });
+    const post = tabs.getByRole("link", { name: "投稿する", exact: true });
     const banner = page.locator(".install-guide-banner");
     const nav = page.getByRole("navigation", { name: "メイン" });
     await expect(banner).toBeVisible();
     const feed = page.getByRole("region", { name: "投稿一覧", exact: true });
     await expect(feed.locator(".home-feed-grid-canvas")).toHaveAttribute("data-ready", "true");
-    await expect.poll(async () => {
-      const [button, guide, menu] = await Promise.all([fab.boundingBox(), banner.boundingBox(), nav.boundingBox()]);
-      if (!button || !guide || !menu) return 0;
-      return Math.min(guide.y, menu.y) - button.y - button.height;
-    }).toBeGreaterThanOrEqual(16);
-    expect(await fab.boundingBox()).toMatchObject({ x: 16, width: 56, height: 56 });
-    await fab.tap({ trial: true });
+    await post.tap({ trial: true });
     const navBounds = (await nav.boundingBox())!;
     await expect.poll(() => feed.evaluate((element, navTop) => {
       const viewportWidth = document.documentElement.clientWidth;
       const track = element.getBoundingClientRect();
       const cards = [...element.querySelectorAll('a[href^="/posts/"]')].map((card) => card.getBoundingClientRect());
-      const button = document.querySelector(".home-post-fab")!.getBoundingClientRect();
       return {
-        fillsWidth: track.left === 0 && track.right === viewportWidth,
+        leftInset: Math.min(...cards.map((card) => card.left)),
+        reachesRightEdge: track.right === viewportWidth,
         documentFits: document.documentElement.scrollWidth === viewportWidth,
         fillsHeight: Math.abs(navTop - Math.max(...cards.map((card) => card.bottom))) <= 8,
         clippedOnRight: cards.some((card) => card.left < track.right && card.right > track.right),
-        fabOverPost: cards.some((card) => card.left < button.right && card.right > button.left
-          && card.top < button.bottom && card.bottom > button.top),
       };
-    }, navBounds.y)).toEqual({ fillsWidth: true, documentFits: true, fillsHeight: true, clippedOnRight: true, fabOverPost: true });
+    }, navBounds.y)).toEqual({ leftInset: 8, reachesRightEdge: true, documentFits: true, fillsHeight: true, clippedOnRight: true });
 
     await page.getByRole("button", { name: "追加方法" }).tap();
     await expect(page.getByRole("dialog", { name: "ホーム画面に追加" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(banner).toBeHidden();
-    await expect.poll(async () => {
-      const [button, menu] = await Promise.all([fab.boundingBox(), nav.boundingBox()]);
-      return button && menu ? menu.y - button.y - button.height : 0;
-    }).toBeGreaterThanOrEqual(16);
     await feed.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
-    const lastPost = feed.locator('a[href="/posts/fab-sample-11"]');
+    const lastPost = feed.locator('a[href="/posts/home-sample-11"]');
     await expect(lastPost).toBeInViewport({ ratio: 0.98 });
     await lastPost.tap({ trial: true });
 
-    await fab.tap();
+    await post.tap();
     await expect(page).toHaveURL(/\/login\?next=(?:\/|%2F)upload/, { timeout: 20_000 });
   });
 });

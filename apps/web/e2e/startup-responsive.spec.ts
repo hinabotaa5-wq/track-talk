@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("起動直後の通信が終わらなくても検索とホームの切替を操作できる", async ({ page }) => {
+test("起動直後の通信が終わらなくても投稿ボタンが表示され、ホームのタブを切り替えられる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pending: (() => void)[] = [];
   await page.route("**/v1/**", async (route) => {
@@ -13,9 +13,7 @@ test("起動直後の通信が終わらなくても検索とホームの切替�
   });
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "キーワード検索を開く" }).click();
-    await expect(page.getByRole("searchbox", { name: "キーワード" })).toBeFocused();
-    await page.getByRole("button", { name: "検索を閉じる" }).click();
+    await expect(page.getByRole("link", { name: "投稿する", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "人気", exact: true }).click();
     await expect(page.getByRole("link", { name: "人気", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page).toHaveURL(/sort=popular/);
@@ -37,7 +35,7 @@ test("タブの移動に時間がかかるあいだは画面に読み込み表�
   });
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
+    await expect(page.getByRole("link", { name: "投稿する", exact: true })).toBeVisible();
     const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
     const competitions = nav.getByRole("link", { name: "大会", exact: true });
     // 起動準備が終わった後でも、遅い移動だけを表示する。
@@ -56,18 +54,18 @@ test("タブの移動に時間がかかるあいだは画面に読み込み表�
   }
 });
 
-test("投稿画面の通信が遅くても、押した直後に待機表示が出る", async ({ page }) => {
+test("投稿ボタンからの移動が遅くても、押した直後に待機表示が出る", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pending: (() => void)[] = [];
-  await page.route("**/upload?*", async (route) => {
+  await page.route("**/login?*", async (route) => {
     if (!route.request().headers().rsc) return route.continue();
     await new Promise<void>((resolve) => pending.push(resolve));
     await route.abort().catch(() => {});
   });
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("button", { name: "キーワード検索を開く" })).toBeEnabled();
     const post = page.getByRole("link", { name: "投稿する", exact: true });
+    await expect(post).toHaveAttribute("href", "/login?next=/upload");
     await post.click();
     await expect(page.locator(".screen-loader")).toBeVisible();
     await expect(post.locator('[aria-busy="true"]')).toHaveCount(1);
