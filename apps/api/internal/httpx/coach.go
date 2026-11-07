@@ -441,7 +441,7 @@ func (s *Server) setCoachSuspended(w http.ResponseWriter, r *http.Request, suspe
 		if _, err := s.offerReview(r.Context(), rid); err != nil {
 			slog.Warn("review offer after coach suspend", "err", err)
 		}
-		s.notifyNominationEnded(r.Context(), rid)
+		s.notifyNominationEnded(r.Context(), rid, true)
 	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }

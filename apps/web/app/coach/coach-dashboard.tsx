@@ -323,7 +323,7 @@ export function CoachDashboard() {
       <section className="space-y-2">
         <h2 className="font-bold">通知</h2>
         <p className="text-sm text-slate-300">
-          依頼は通知で届きます。届いてから90分以内（日本時間の23時から翌7時までは数えません）に引き受けないと、依頼は終了します。通知を受け取れる端末: {devices}台
+          依頼は通知で届きます。新しい依頼が入ってから90分以内（23:00–07:00 はカウントが止まります）に引き受けないと、依頼は終了します。通知を受け取れる端末: {devices}台
         </p>
         <Link href="/me/coaching" className="text-sm text-blue-300 underline">
           通知の設定

@@ -36,9 +36,10 @@ function snoozed(key: string) {
 }
 
 function PushGuideSheet({
-  kind, busy, message, onAccept, onClose,
+  kind, reviewCompletion, busy, message, onAccept, onClose,
 }: {
   kind: Sheet;
+  reviewCompletion: boolean;
   busy: boolean;
   message: string;
   onAccept: () => void;
@@ -80,7 +81,7 @@ function PushGuideSheet({
           <Bell aria-hidden className="size-5" />
         </span>
         <h2 id={titleId} className="text-lg font-bold">
-          {denied ? "通知がオフになっています" : install ? "ホーム画面に追加して通知を受け取る" : "返信やお知らせを、すぐ受け取れます"}
+          {denied ? "通知がオフになっています" : install ? "ホーム画面に追加して通知を受け取る" : reviewCompletion ? "返信が届いたら、すぐお知らせします" : "返信やお知らせを、すぐ受け取れます"}
         </h2>
         <div id={bodyId} className="space-y-2 text-sm leading-relaxed text-slate-300">
           {denied ? (
@@ -95,6 +96,8 @@ function PushGuideSheet({
               <li>「ホーム画面に追加」を選び、「追加」をタップ</li>
               <li>ホーム画面の TrackTalk を開く</li>
             </ol>
+          ) : reviewCompletion ? (
+            <p>コーチが添削を返したら通知します。あとから設定でいつでも切れます。</p>
           ) : (
             <p>あなたの投稿へのコメントやコメントへの返信、運営からのお知らせがこの端末に届きます。あとからマイページで変更できます。</p>
           )}
@@ -116,12 +119,14 @@ function PushGuideSheet({
 }
 
 export function PushPermissionGuide({
-  userId, home = false, onEnabled, renderControl,
+  userId, token, home = false, completedReviewId, onEnabled, renderControl,
 }: {
   userId: string;
+  token?: string;
   home?: boolean;
   onEnabled?: () => void;
   renderControl?: (status: Status | null, activate: () => void, busy: boolean) => ReactNode;
+  completedReviewId?: string;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
@@ -142,7 +147,7 @@ export function PushPermissionGuide({
   }, []);
 
   useEffect(() => {
-    if (!home || (status !== "default" && status !== "install")) return;
+    if ((!home && !completedReviewId) || (status !== "default" && status !== "install")) return;
     const kind = status;
     const key = storageKey(userId, kind);
     let active = true;
@@ -152,8 +157,9 @@ export function PushPermissionGuide({
       observer.disconnect();
       document.removeEventListener("visibilitychange", tryOpen);
       try {
-        if (permissionStatus() !== status || localStorage.getItem(`${key}:home-seen`) || snoozed(key)) return;
-        localStorage.setItem(`${key}:home-seen`, "1");
+        const seenKey = completedReviewId ? `${key}:review:${completedReviewId}` : `${key}:home-seen`;
+        if (permissionStatus() !== status || localStorage.getItem(seenKey) || (!completedReviewId && snoozed(key))) return;
+        localStorage.setItem(seenKey, "1");
         setSheet(kind);
       } catch {
         // 保存できない環境で毎回自動表示しない。
@@ -174,7 +180,7 @@ export function PushPermissionGuide({
       observer.disconnect();
       document.removeEventListener("visibilitychange", tryOpen);
     };
-  }, [home, status, userId]);
+  }, [completedReviewId, home, status, userId]);
 
   function later() {
     if (sheet === "default" || sheet === "install") {
@@ -193,7 +199,7 @@ export function PushPermissionGuide({
     const current = permissionStatus();
     if (current !== "granted" && !(fromSheet && current === "default")) {
       setStatus(current);
-      setSheet(current === "denied" && !home ? "denied" : null);
+      setSheet(current === "denied" && !home && !completedReviewId ? "denied" : null);
       return;
     }
     if (!acquire()) return;
@@ -255,7 +261,7 @@ export function PushPermissionGuide({
     <>
       {renderControl?.(status, () => void activate(), pending)}
       {sheet ? (
-        <PushGuideSheet kind={sheet} busy={pending} message={message} onAccept={() => void enable(true)} onClose={later} />
+        <PushGuideSheet kind={sheet} reviewCompletion={Boolean(completedReviewId)} busy={pending} message={message} onAccept={() => void enable(true)} onClose={later} />
       ) : message && !home ? (
         <p role="status" className="px-4 py-2 text-sm text-slate-300">{message}</p>
       ) : null}
