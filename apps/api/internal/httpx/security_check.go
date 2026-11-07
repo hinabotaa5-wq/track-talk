@@ -66,6 +66,8 @@ func (s *Server) securityCheck(w http.ResponseWriter, r *http.Request) {
 		// 照合の失敗で DB の見回りの結果まで落とさない。
 		slog.Warn("stripe reconcile", "err", err)
 	}
+	// コーチングの公開停止中も、Webhook で確定した通知は再試行する。
+	s.retryRefundCompletionNotices(r.Context())
 	JSON(w, http.StatusOK, map[string]any{"unknown_connections": unknown, "alerted": alerted})
 }
 

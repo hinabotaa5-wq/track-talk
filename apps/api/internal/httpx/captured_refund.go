@@ -174,6 +174,9 @@ func finalizeCapturedRefund(ctx context.Context, tx pgx.Tx, f capturedRefund, re
 	}
 	if status == "failed" {
 		if f.Status == "succeeded" {
+			if err := db.New(tx).DeleteRefundCompletionNotice(ctx, f.ID); err != nil {
+				return err
+			}
 			if err := compensateFailedRefund(ctx, tx, f); err != nil {
 				return err
 			}
@@ -228,10 +231,25 @@ func finalizeCapturedRefund(ctx context.Context, tx pgx.Tx, f capturedRefund, re
 			}
 		}
 	}
-	return nil
+	q := db.New(tx)
+	if f.Source == "review" {
+		return q.EnqueueReviewRefundNotice(ctx, db.EnqueueReviewRefundNoticeParams{
+			OperationID: f.ID, PaymentID: f.PaymentID, Kind: "review_refund",
+		})
+	}
+	consultation, err := q.GetConsultation(ctx, f.PaymentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return enqueueConsultationRefundNotice(ctx, q, f.ID, consultation)
 }
+
 func (s *Server) processCapturedRefund(ctx context.Context, id uuid.UUID) error {
-	return s.refundTx(ctx, func(tx pgx.Tx) error {
+	var notify bool
+	err := s.refundTx(ctx, func(tx pgx.Tx) error {
 		f, err := loadCapturedRefund(ctx, tx, id)
 		if err != nil {
 			return err
@@ -273,8 +291,13 @@ func (s *Server) processCapturedRefund(ctx context.Context, id uuid.UUID) error 
 		if _, err := tx.Exec(ctx, `UPDATE captured_payment_refunds SET reconciled_at=now() WHERE id=$1`, f.ID); err != nil {
 			return err
 		}
+		notify = f.Status != "succeeded" && remote.Status == "succeeded"
 		return finalizeCapturedRefund(ctx, tx, f, *remote)
 	})
+	if err == nil && notify {
+		s.deliverRefundCompletionNotice(ctx, id)
+	}
+	return err
 }
 func (s *Server) adminCapturedRefund(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requireAdmin(w, r)
@@ -346,10 +369,16 @@ func (s *Server) syncCapturedRefund(ctx context.Context, ev stripe.Event) error 
 		if remote.PaymentIntent == "" || remote.ID == "" || obj.Currency != "jpy" {
 			continue
 		}
+		var noticeID uuid.UUID
 		err := s.refundTx(ctx, func(tx pgx.Tx) error {
+			var err error
+			noticeID, err = resolvePendingReviewRefundNotice(ctx, db.New(tx), remote)
+			if err != nil || noticeID != uuid.Nil {
+				return err
+			}
 			var source string
 			var id uuid.UUID
-			err := tx.QueryRow(ctx, `SELECT source,id FROM (SELECT 'review' source,id FROM review_payments WHERE payment_intent_id=$1 AND method='card' UNION ALL SELECT 'consultation',id FROM coaching_consultations WHERE payment_intent_id=$1 AND funding='cash') x LIMIT 1`, remote.PaymentIntent).Scan(&source, &id)
+			err = tx.QueryRow(ctx, `SELECT source,id FROM (SELECT 'review' source,id FROM review_payments WHERE payment_intent_id=$1 AND method='card' UNION ALL SELECT 'consultation',id FROM coaching_consultations WHERE payment_intent_id=$1 AND funding='cash') x LIMIT 1`, remote.PaymentIntent).Scan(&source, &id)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil
 			}
@@ -386,10 +415,16 @@ func (s *Server) syncCapturedRefund(ctx context.Context, ev stripe.Event) error 
 			if err != nil {
 				return err
 			}
+			if f.Status != "succeeded" && f.Status != "failed" && remote.Status == "succeeded" {
+				noticeID = f.ID
+			}
 			return finalizeCapturedRefund(ctx, tx, f, remote)
 		})
 		if err != nil {
 			return err
+		}
+		if noticeID != uuid.Nil {
+			s.deliverRefundCompletionNotice(ctx, noticeID)
 		}
 	}
 	return nil

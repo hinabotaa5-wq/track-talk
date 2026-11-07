@@ -650,12 +650,16 @@ func (s *Server) reserveConsultationTickets(ctx context.Context, q *db.Queries, 
 	}
 	return moveTickets(ctx, q, lot.ID, "reserve-"+reservation.ID.String()+"-"+lot.ID.String(), "reserve", -1, 1, 0, 0)
 }
-func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultation, toCoach bool, title string) {
+func consultationNoticePath(c db.CoachingConsultation, toCoach bool) string {
 	parent, review := consultationParent(c)
 	room := consultationRoom{id: parent}
 	if !review {
 		room.contract = &db.CoachingContract{}
 	}
+	return room.path(toCoach)
+}
+
+func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultation, toCoach bool, title string) {
 	target := c.RequesterID
 	if toCoach {
 		target = c.CoachID
@@ -663,7 +667,7 @@ func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultati
 	if target == nil {
 		return
 	}
-	s.notify(ctx, *target, notifyCoaching, push.Message{Title: title, Body: "追加相談の部屋を開いて確認してください", URL: room.path(toCoach), Tag: "consultation-" + c.ID.String()}, 24*time.Hour)
+	s.notify(ctx, *target, notifyCoaching, push.Message{Title: title, Body: "追加相談の部屋を開いて確認してください", URL: consultationNoticePath(c, toCoach), Tag: "consultation-" + c.ID.String()}, 24*time.Hour)
 }
 func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	action := chi.URLParam(r, "action")
