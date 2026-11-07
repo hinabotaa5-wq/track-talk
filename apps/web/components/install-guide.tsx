@@ -74,6 +74,20 @@ function isStandalone() {
   return nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
 }
 
+// ホームの投稿ボタンと末尾の余白を、案内の折り返しを含めた高さに合わせる。
+function measureHomeBanner(banner: HTMLDivElement | null) {
+  if (!banner) return;
+  const property = "--home-install-banner-height";
+  const update = () => document.body.style.setProperty(property, `${banner.getBoundingClientRect().height}px`);
+  update();
+  const observer = new ResizeObserver(update);
+  observer.observe(banner, { box: "border-box" });
+  return () => {
+    observer.disconnect();
+    document.body.style.removeProperty(property);
+  };
+}
+
 export function InstallGuide() {
   const pathname = usePathname();
   const [platform, setPlatform] = useState<InstallPlatform | null>(null);
@@ -149,12 +163,10 @@ export function InstallGuide() {
     <>
       {showBanner ? (
         <div
-          className="fixed inset-x-0 z-40 px-3 md:hidden [body[data-comment-typing]_&]:hidden"
-          style={{
-            bottom: navHidden
-              ? "calc(0.75rem + env(safe-area-inset-bottom))"
-              : "calc(3.5rem + 0.5rem + env(safe-area-inset-bottom))",
-          }}
+          ref={pathname === "/" ? measureHomeBanner : undefined}
+          className={`install-guide-banner fixed inset-x-0 z-40 px-3 md:hidden [body[data-comment-typing]_&]:hidden ${navHidden
+            ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
+            : "bottom-[calc(4rem+env(safe-area-inset-bottom))]"}`}
         >
           <div className="mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/25 glass bg-slate-900/80 p-3 shadow-lg backdrop-blur-xl">
             <AppIconMark className="size-10" />
