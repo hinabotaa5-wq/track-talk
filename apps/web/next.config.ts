@@ -9,7 +9,7 @@ function origin(raw: string | undefined) {
   }
 }
 
-function contentSecurityPolicy() {
+export function contentSecurityPolicy() {
   const api = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
   const connect = [
     "'self'",
@@ -26,6 +26,8 @@ function contentSecurityPolicy() {
     ...origin(process.env.NEXT_PUBLIC_POSTHOG_HOST),
     // 登録・ログインの自動操作対策(Cloudflare Turnstile)
     "https://challenges.cloudflare.com",
+    // 漏洩済みパスワードの照合(HIBP range API、先頭5文字だけを送る。本体 #429・#436)
+    "https://api.pwnedpasswords.com",
   ];
   const script = ["'self'", "'unsafe-inline'", "https://cloud.umami.is", "https://challenges.cloudflare.com"];
   if (process.env.NODE_ENV !== "production") script.push("'unsafe-eval'");
