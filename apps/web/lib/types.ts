@@ -196,6 +196,8 @@ export type NotificationKind =
   | "practice_rate"
   | "injury_update"
   | "review_offer"
+  | "review_offer_reminder"
+  | "review_accepted"
   | "review_expired"
   | "review_returned"
   | "review_clarify"

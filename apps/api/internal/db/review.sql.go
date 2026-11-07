@@ -169,7 +169,7 @@ func (q *Queries) CreateDemoCode(ctx context.Context, code string) (CoachingDemo
 const createReviewOffer = `-- name: CreateReviewOffer :one
 INSERT INTO review_offers (id, request_id, coach_id, expires_at)
 VALUES ($1, $2, $3, $4)
-RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at
+RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminded_at
 `
 
 type CreateReviewOfferParams struct {
@@ -195,6 +195,7 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }
@@ -275,7 +276,7 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 
 const expireOverdueReviewRequests = `-- name: ExpireOverdueReviewRequests :many
 WITH target AS (
-    SELECT id, status AS old_status
+    SELECT id, status AS old_status, coach_id AS old_coach_id
     FROM review_requests
     WHERE status IN ('queued', 'offered', 'in_review')
       AND due_at <= now()
@@ -287,7 +288,7 @@ WITH target AS (
         updated_at = now()
     FROM target
     WHERE r.id = target.id
-    RETURNING r.id, r.requester_id, r.coach_id, target.old_status
+    RETURNING r.id, r.requester_id, target.old_coach_id, target.old_status
 ), closed AS (
     UPDATE review_offers o
     SET result = 'expired',
@@ -296,7 +297,7 @@ WITH target AS (
     WHERE o.request_id = overdue.id
       AND o.result IS NULL
 )
-SELECT id, requester_id, coach_id, old_status FROM overdue
+SELECT id, requester_id, old_coach_id AS coach_id, old_status FROM overdue
 `
 
 type ExpireOverdueReviewRequestsRow struct {
@@ -828,8 +829,51 @@ func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNominees
 	return items, nil
 }
 
+const listUnremindedOpenOffers = `-- name: ListUnremindedOpenOffers :many
+SELECT o.id AS offer_id, o.request_id, o.coach_id, o.expires_at
+FROM review_offers o
+JOIN review_requests r ON r.id = o.request_id
+WHERE o.result IS NULL
+  AND o.reminded_at IS NULL
+  AND o.expires_at > now()
+  AND r.status = 'offered'
+`
+
+type ListUnremindedOpenOffersRow struct {
+	OfferID   uuid.UUID `json:"offer_id"`
+	RequestID uuid.UUID `json:"request_id"`
+	CoachID   uuid.UUID `json:"coach_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// リマインドをまだ送っていない、返事待ちの打診。リマインドの要否（残り時間）は呼び出し側で数える。
+func (q *Queries) ListUnremindedOpenOffers(ctx context.Context) ([]ListUnremindedOpenOffersRow, error) {
+	rows, err := q.db.Query(ctx, listUnremindedOpenOffers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUnremindedOpenOffersRow
+	for rows.Next() {
+		var i ListUnremindedOpenOffersRow
+		if err := rows.Scan(
+			&i.OfferID,
+			&i.RequestID,
+			&i.CoachID,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockCoachOpenOfferForRequest = `-- name: LockCoachOpenOfferForRequest :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at FROM review_offers
+SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminded_at FROM review_offers
 WHERE request_id = $1
   AND coach_id = $2
   AND result IS NULL
@@ -853,12 +897,13 @@ func (q *Queries) LockCoachOpenOfferForRequest(ctx context.Context, arg LockCoac
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }
 
 const lockOpenReviewOffer = `-- name: LockOpenReviewOffer :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at FROM review_offers
+SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminded_at FROM review_offers
 WHERE id = $1
   AND coach_id = $2
   AND result IS NULL
@@ -881,6 +926,7 @@ func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOff
 		&i.ExpiresAt,
 		&i.Result,
 		&i.AnsweredAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }
@@ -962,6 +1008,22 @@ WHERE id = $1
 type MarkReviewRequestOfferedParams struct {
 	ID      uuid.UUID  `json:"id"`
 	CoachID *uuid.UUID `json:"coach_id"`
+}
+
+const markReviewOfferReminded = `-- name: MarkReviewOfferReminded :execrows
+UPDATE review_offers
+SET reminded_at = now()
+WHERE id = $1
+  AND reminded_at IS NULL
+`
+
+// リマインドを送ったことを残す。二重に送らないよう、まだの行だけを1件変える。
+func (q *Queries) MarkReviewOfferReminded(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markReviewOfferReminded, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 func (q *Queries) MarkReviewRequestOffered(ctx context.Context, arg MarkReviewRequestOfferedParams) error {
@@ -1205,7 +1267,8 @@ func (q *Queries) SetCoachingDemo(ctx context.Context, id uuid.UUID) error {
 
 const setReviewOfferExpiry = `-- name: SetReviewOfferExpiry :execrows
 UPDATE review_offers
-SET expires_at = $1::timestamptz
+SET expires_at = $1::timestamptz,
+    reminded_at = NULL
 WHERE request_id = $2
   AND coach_id = $3
   AND result IS NULL

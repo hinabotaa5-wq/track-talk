@@ -36,11 +36,12 @@ function snoozed(key: string) {
 }
 
 function PushGuideSheet({
-  kind, busy, message, onAccept, onClose,
+  kind, busy, message, copy, onAccept, onClose,
 }: {
   kind: Sheet;
   busy: boolean;
   message: string;
+  copy: "home" | "reviewPaid";
   onAccept: () => void;
   onClose: () => void;
 }) {
@@ -80,7 +81,7 @@ function PushGuideSheet({
           <Bell aria-hidden className="size-5" />
         </span>
         <h2 id={titleId} className="text-lg font-bold">
-          {denied ? "通知がオフになっています" : install ? "ホーム画面に追加して通知を受け取る" : "返信やお知らせを、すぐ受け取れます"}
+          {denied ? "通知がオフになっています" : install ? "ホーム画面に追加して通知を受け取る" : copy === "reviewPaid" ? "返信が届いたら、すぐお知らせします" : "返信やお知らせを、すぐ受け取れます"}
         </h2>
         <div id={bodyId} className="space-y-2 text-sm leading-relaxed text-slate-300">
           {denied ? (
@@ -95,6 +96,8 @@ function PushGuideSheet({
               <li>「ホーム画面に追加」を選び、「追加」をタップ</li>
               <li>ホーム画面の TrackTalk を開く</li>
             </ol>
+          ) : copy === "reviewPaid" ? (
+            <p>コーチが添削を返したら通知します。あとから設定でいつでも切れます。</p>
           ) : (
             <p>あなたの投稿へのコメントやコメントへの返信、運営からのお知らせがこの端末に届きます。あとからマイページで変更できます。</p>
           )}
@@ -116,11 +119,14 @@ function PushGuideSheet({
 }
 
 export function PushPermissionGuide({
-  userId, token, home = false, onEnabled, renderControl,
+  userId, token, home = false, breakthroughKey, copy = "home", onEnabled, renderControl,
 }: {
   userId: string;
   token: string;
   home?: boolean;
+  // 申込完了時などの一度だけのきっかけ。home とは別に、7日の抑制中でも1回だけ出す。
+  breakthroughKey?: string;
+  copy?: "home" | "reviewPaid";
   onEnabled?: () => void;
   renderControl?: (status: Status | null, activate: () => void, busy: boolean) => ReactNode;
 }) {
@@ -176,6 +182,41 @@ export function PushPermissionGuide({
       document.removeEventListener("visibilitychange", tryOpen);
     };
   }, [home, status, userId]);
+
+  // 申込完了時などの一度だけのきっかけ。7日の抑制中でも1回だけ出し、閉じたらそこから7日数え直す（later が記録する）。
+  useEffect(() => {
+    if (!breakthroughKey || home) return;
+    const key = breakthroughKey;
+    let active = true;
+    const observer = new MutationObserver(tryOpen);
+    function tryOpen() {
+      if (!active || document.visibilityState === "hidden" || document.querySelector(modalSelector)) return;
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", tryOpen);
+      try {
+        const current = permissionStatus();
+        if ((current !== "default" && current !== "install") || localStorage.getItem(`tracktalk:push-guide:once:${key}`)) return;
+        localStorage.setItem(`tracktalk:push-guide:once:${key}`, "1");
+        setSheet(current);
+      } catch {
+        // 保存できない環境で自動表示しない。
+      }
+    }
+    const cancel = afterStartup(() => {
+      void readPushSubscription().then((subscription) => {
+        if (!active || subscription) return;
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-modal"] });
+        document.addEventListener("visibilitychange", tryOpen);
+        tryOpen();
+      }).catch(() => {});
+    });
+    return () => {
+      active = false;
+      cancel();
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", tryOpen);
+    };
+  }, [breakthroughKey, home]);
 
   function later() {
     if (sheet === "default" || sheet === "install") {
@@ -256,7 +297,7 @@ export function PushPermissionGuide({
     <>
       {renderControl?.(status, () => void activate(), pending)}
       {sheet ? (
-        <PushGuideSheet kind={sheet} busy={pending} message={message} onAccept={() => void enable(true)} onClose={later} />
+        <PushGuideSheet kind={sheet} busy={pending} message={message} copy={copy} onAccept={() => void enable(true)} onClose={later} />
       ) : message && !home ? (
         <p role="status" className="px-4 py-2 text-sm text-slate-300">{message}</p>
       ) : null}

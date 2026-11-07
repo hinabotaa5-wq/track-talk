@@ -340,7 +340,7 @@ func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, off
 			Title: "差し戻した依頼が再提出されました",
 			Body:  offerDeadlineText(offerExpires) + "までに、引き受けるかどうか決めてください",
 			URL:   "/coach",
-			Tag:   "review-offer",
+			Tag:   offerPushTag(rr.ID),
 		}, time.Until(offerExpires))
 		return
 	}

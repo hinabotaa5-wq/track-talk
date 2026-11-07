@@ -188,8 +188,9 @@ RETURNING r.id;
 
 -- name: ExpireOverdueReviewRequests :many
 -- 返却の目安を過ぎた依頼を expired にする。添削中だった依頼はコーチを残し、遵守率に使う。
+-- 返す coach_id は期限切れ前の担当（打診中だった依頼は打診されていたコーチ）で、更新で消える前の値。
 WITH target AS (
-    SELECT id, status AS old_status
+    SELECT id, status AS old_status, coach_id AS old_coach_id
     FROM review_requests
     WHERE status IN ('queued', 'offered', 'in_review')
       AND due_at <= now()
@@ -201,7 +202,7 @@ WITH target AS (
         updated_at = now()
     FROM target
     WHERE r.id = target.id
-    RETURNING r.id, r.requester_id, r.coach_id, target.old_status
+    RETURNING r.id, r.requester_id, target.old_coach_id, target.old_status
 ), closed AS (
     UPDATE review_offers o
     SET result = 'expired',
@@ -210,7 +211,7 @@ WITH target AS (
     WHERE o.request_id = overdue.id
       AND o.result IS NULL
 )
-SELECT id, requester_id, coach_id, old_status FROM overdue;
+SELECT id, requester_id, old_coach_id AS coach_id, old_status FROM overdue;
 
 -- name: CountOnDutyCoaches :one
 SELECT count(*) FROM coach_profiles c
@@ -314,11 +315,30 @@ FOR UPDATE;
 
 -- name: SetReviewOfferExpiry :execrows
 -- 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
+-- 期限を数え直すので、リマインドの送った記録も消す（新しい期限で送り直す）。
 UPDATE review_offers
-SET expires_at = sqlc.arg(expires_at)::timestamptz
+SET expires_at = sqlc.arg(expires_at)::timestamptz,
+    reminded_at = NULL
 WHERE request_id = sqlc.arg(request_id)
   AND coach_id = sqlc.arg(coach_id)
   AND result IS NULL;
+
+-- name: ListUnremindedOpenOffers :many
+-- リマインドをまだ送っていない、返事待ちの打診。リマインドの要否（残り時間）は呼び出し側で数える。
+SELECT o.id AS offer_id, o.request_id, o.coach_id, o.expires_at
+FROM review_offers o
+JOIN review_requests r ON r.id = o.request_id
+WHERE o.result IS NULL
+  AND o.reminded_at IS NULL
+  AND o.expires_at > now()
+  AND r.status = 'offered';
+
+-- name: MarkReviewOfferReminded :execrows
+-- リマインドを送ったことを残す。二重に送らないよう、まだの行だけを1件変える。
+UPDATE review_offers
+SET reminded_at = now()
+WHERE id = $1
+  AND reminded_at IS NULL;
 
 -- name: ResubmitReviewRequest :one
 -- 依頼者が、差し戻された依頼の相談内容を直して（動画は差し替えてもよい）再提出する。再提出期限までに1回だけ。

@@ -87,6 +87,47 @@ it("does not show an automatic sheet when this browser already has a subscriptio
   expect(requestPermission).not.toHaveBeenCalled();
 });
 
+function renderBreakthrough(key = "review-paid:req1") {
+  return act(async () => root.render(
+    <PushPermissionGuide userId="fixture" token="fixture-token" breakthroughKey={key} copy="reviewPaid" />,
+  ));
+}
+
+it("shows the申込完了 sheet once even during the seven-day deferral", async () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+  try {
+    localStorage.setItem("tracktalk:push-guide:default:fixture:snoozed-until", String(1_000_000 + 1000));
+    await renderBreakthrough();
+    await act(async () => {});
+    const dialog = container.querySelector("dialog[open]");
+    expect(dialog).not.toBeNull();
+    expect(dialog!.textContent).toContain("返信が届いたら、すぐお知らせします");
+    expect(dialog!.textContent).toContain("コーチが添削を返したら通知します");
+    expect(requestPermission).not.toHaveBeenCalled();
+
+    await click("あとで");
+    expect(container.querySelector("dialog")).toBeNull();
+    // 閉じたらそこから7日数え直す。
+    expect(Number(localStorage.getItem("tracktalk:push-guide:default:fixture:snoozed-until"))).toBe(
+      1_000_000 + 7 * 24 * 60 * 60 * 1000,
+    );
+
+    // 同じ申込ではもう出ない。
+    await renderBreakthrough();
+    await act(async () => {});
+    expect(container.querySelector("dialog")).toBeNull();
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it("does not show the申込完了 sheet when this browser already has a subscription", async () => {
+  push.readPushSubscription.mockResolvedValue({ endpoint: "fixture" });
+  await renderBreakthrough();
+  await act(async () => {});
+  expect(container.querySelector("dialog")).toBeNull();
+});
+
 it("honors the seven-day deferral when the user opens notification settings", async () => {
   const clock = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
   try {

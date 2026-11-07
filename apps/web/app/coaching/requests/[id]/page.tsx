@@ -5,6 +5,7 @@ import { PageLoading } from "@/components/page-loading";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
+import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
@@ -246,9 +247,15 @@ function ReviewRequestView() {
   if (loading || !session || !request) return <PageLoading screen label="読み込み中..." />;
 
   const waiting = request.status === "queued" || request.status === "offered" || request.status === "in_review";
+  const userId = session?.user?.id;
+  // 支払い後の戻りでは、7日の抑制中でも通知設定の案内を1回だけ出す（本体 #398 の残件・#420）。
+  const paidGuide = paid && userId && token ? (
+    <PushPermissionGuide key={userId} userId={userId} token={token} breakthroughKey={`review-paid:${request.id}`} copy="reviewPaid" />
+  ) : null;
 
   return (
     <div className="mx-auto max-w-md space-y-5">
+      {paidGuide}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">フォーム添削</h1>
         <p className="text-sm text-slate-300">送った日時 {formatDateTime(request.created_at)}</p>

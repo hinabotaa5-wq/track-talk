@@ -68,8 +68,10 @@ func kindCategory(kind string) string {
 		return notifyRecruitment
 	case "injury_update":
 		return notifyInjury
-	case "review_offer", "review_resubmitted":
+	case "review_offer", "review_offer_reminder", "review_resubmitted":
 		return notifyImportant
+	case "review_accepted":
+		return notifyReview
 	default:
 		return notifyReview
 	}
@@ -255,6 +257,11 @@ func (s *Server) updateNotificationSetting(w http.ResponseWriter, r *http.Reques
 }
 
 func notificationJSON(row db.ListMyNotificationsRow) map[string]any {
+	// 変更前に保存された承認通知からもコーチ画面を開けるようにする。
+	if row.Kind == "message" && row.Title != nil && *row.Title == coachApprovalTitle && row.Url != nil && *row.Url == "/coach/apply" {
+		url, body := "/coach", coachApprovalBody
+		row.Url, row.Body = &url, &body
+	}
 	return map[string]any{
 		"id":                row.ID,
 		"kind":              row.Kind,
