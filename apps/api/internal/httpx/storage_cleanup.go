@@ -19,7 +19,6 @@ type storageCleanupResult struct {
 	Competitions   int64 `json:"competitions_deleted"`
 	DomesticMajors int64 `json:"domestic_majors_deleted"`
 	MajorHosts     int64 `json:"major_hosts_deleted"`
-	CoachIdentity  int64 `json:"coach_identities_deleted"`
 	GuardianRecord int64 `json:"guardian_records_deleted"`
 	// 退会した未成年の、購入のたびの宣言の記録（保護者同意の記録と同じく、本人が23歳になる月の終わりまで）。
 	MinorDeclaration int64 `json:"minor_purchase_declarations_deleted"`
@@ -69,10 +68,6 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 			return out, err
 		}
 		*target.count = tag.RowsAffected()
-	}
-	// コーチの特商法の登録情報は、最後の取引とコーチをやめた時の遅いほうから5年で消す。
-	if out.CoachIdentity, err = s.q.DeleteExpiredCoachLegalIdentities(ctx, now.AddDate(-coachIdentityRetentionYears, 0, 0)); err != nil {
-		return out, err
 	}
 	// 退会した未成年の保護者同意の証跡と購入の記録、購入のたびの宣言は、本人が23歳になる月の終わりまで残してから消す
 	// （未成年者取消しの取消権の行使期間に合わせる）。生まれた年月を書き写す前に退会した分は、最後の取引から5年で消す。

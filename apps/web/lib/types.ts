@@ -634,7 +634,7 @@ export type PublicCommerce =
   | { required: true; registered: false }
   | { required: true; registered: true; legal_name: string; address: string; phone: string };
 
-export type CoachIdentity = { legal_name: string; address: string; phone: string };
+export type CoachIdentity = { legal_name: string; address: string };
 
 export type CoachCommerce = {
   required: boolean;
@@ -643,6 +643,8 @@ export type CoachCommerce = {
   checklist_version: number;
   checklist: string[];
   identity: CoachIdentity | null;
+  identity_revision: string | null;
+  plans: { id: string; title: string; authorized: boolean }[];
 };
 
 export type PublicCoachingPlan = {

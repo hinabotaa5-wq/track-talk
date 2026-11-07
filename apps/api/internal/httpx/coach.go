@@ -294,10 +294,6 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	if err := s.q.ReopenCoachLegalIdentity(r.Context(), p.ID); err != nil {
-		MapDBError(w, err)
-		return
-	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
@@ -545,8 +541,21 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	ids := make([]uuid.UUID, 0, len(plans))
+	for _, p := range plans {
+		ids = append(ids, p.ID)
+	}
+	approved, err := s.identity.approvedPlans(r.Context(), ids)
+	if err != nil {
+		// Support plan availability is optional here. Keep the coach and
+		// video-review list available while the identity service recovers.
+		slog.Warn("coaching plan disclosures unavailable")
+	}
 	plansByCoach := map[uuid.UUID][]map[string]any{}
 	for _, p := range plans {
+		if !approved[p.ID] {
+			continue
+		}
 		plan := coachingPlanJSON(db.CoachingPlan{
 			ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 			DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,

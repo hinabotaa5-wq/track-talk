@@ -14,6 +14,8 @@ function contentSecurityPolicy() {
   const connect = [
     "'self'",
     ...origin(api),
+    ...origin(process.env.NEXT_PUBLIC_IDENTITY_API_URL),
+    ...origin(process.env.NEXT_PUBLIC_IDENTITY_AUTH_URL),
     ...origin(process.env.NEXT_PUBLIC_SUPABASE_URL),
     "https://*.supabase.co",
     "wss://*.supabase.co",

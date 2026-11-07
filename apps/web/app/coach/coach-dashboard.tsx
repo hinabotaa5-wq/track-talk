@@ -316,7 +316,7 @@ export function CoachDashboard() {
 
       <CoachAvailabilityEditor token={token} />
 
-      <CoachCommerceSection token={token} />
+      <CoachCommerceSection />
 
       <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
 

@@ -22,6 +22,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/httpx"
 	"github.com/hinata/track-talk/apps/api/internal/migrate"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -83,17 +84,32 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		// 本番は動画添削のおまかせ(割り当て)を止めている（空が既定）。打診・辞退・期限切れの仕組みは残しているので、
 		// それを確かめるテストのために開けておき、止めたときの動きは review_coach_choice_test.go で確かめる。
 		ReviewRandomAssign: true,
-		// テスト用の鍵(32バイトの 0x01)。本番の鍵は Secret Manager に置く。
-		CoachIdentityKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
-		CloudName:        os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:      os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:   os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:     os.Getenv("CLOUDINARY_API_BASE"),
+		CloudName:          os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:        os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:     os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:       os.Getenv("CLOUDINARY_API_BASE"),
 		// 保護者の同意のリンクは、Resend の代わりのサーバーに送る（mail_helper_test.go）。
 		ResendAPIKey: "re_test",
 		MailFrom:     "TrackTalk <no-reply@example.com>",
 		MailAPIBase:  mailServerURL(),
 	}
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/internal/registration/"):
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/internal/disclosures":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(strings.Split(r.URL.Query().Get("ids"), ","))
+		case strings.HasPrefix(r.URL.Path, "/internal/disclosures/"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"required":false}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(stub.Close)
+	cfg.IdentityReaderURL = stub.URL
+	cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
 	if mutate != nil {
 		mutate(&cfg)
 	}
@@ -1942,5 +1958,75 @@ func TestInquiryAcceptsCommerceDisclosureRequest(t *testing.T) {
 	})
 	if rec.Code != 201 || !strings.Contains(rec.Body.String(), `"category":"disclosure"`) {
 		t.Fatalf("disclosure %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// 起動時検査の SQL は cmd/api/main.go と同じ文にする。変えたら両方直す。
+const identityBoundaryStartupCheckSQL = `SELECT NOT (r.rolsuper OR r.rolcreaterole)
+	AND NOT pg_has_role(c.relowner, 'MEMBER')
+	AND NOT pg_has_role(p.relowner, 'MEMBER')
+	AND NOT pg_has_role(b.nspowner, 'MEMBER')
+	AND NOT has_schema_privilege(b.oid, 'USAGE,CREATE')
+	AND NOT has_table_privilege(c.oid, 'TRUNCATE')
+	AND NOT has_table_privilege(p.oid, 'TRUNCATE')
+	AND NOT has_parameter_privilege('session_replication_role', 'SET')
+	AND NOT COALESCE(has_table_privilege(to_regclass('public.coach_legal_identities'), 'SELECT'), false)
+	FROM pg_class c, pg_class p, pg_namespace b, pg_roles r
+	WHERE c.oid='public.coach_profiles'::regclass AND p.oid='public.coaching_plans'::regclass
+	AND b.nspname='identity_boundary' AND r.rolname=current_user`
+
+// 最終形の権限（旧身元テーブルを読めない実行ロール）で起動時検査が通り、
+// 旧テーブルを読めるロールでは落ちることを確かめる。
+func TestIdentityBoundaryStartupCheck(t *testing.T) {
+	setup(t)
+	ctx := context.Background()
+	admin, err := pgxpool.New(ctx, testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(admin.Close)
+	role := "startup_check_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	if _, err := admin.Exec(ctx, "CREATE ROLE "+role); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = admin.Exec(ctx, "DROP OWNED BY "+role)
+		_, _ = admin.Exec(ctx, "DROP ROLE "+role)
+	})
+	check := func() bool {
+		t.Helper()
+		poolCfg, err := pgxpool.ParseConfig(testDSN(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+			_, err := conn.Exec(ctx, "SET ROLE "+role)
+			return err
+		}
+		pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		var isolated bool
+		if err := pool.QueryRow(ctx, identityBoundaryStartupCheckSQL).Scan(&isolated); err != nil {
+			t.Fatal(err)
+		}
+		return isolated
+	}
+	if !check() {
+		t.Fatal("restricted runtime role did not pass the startup check")
+	}
+	if _, err := admin.Exec(ctx, "GRANT SELECT ON coach_legal_identities TO "+role); err != nil {
+		t.Fatal(err)
+	}
+	if check() {
+		t.Fatal("legacy-readable role passed the startup check")
+	}
+	if _, err := admin.Exec(ctx, "REVOKE SELECT ON coach_legal_identities FROM "+role); err != nil {
+		t.Fatal(err)
+	}
+	if !check() {
+		t.Fatal("restricted runtime role did not pass the startup check after revoke")
 	}
 }

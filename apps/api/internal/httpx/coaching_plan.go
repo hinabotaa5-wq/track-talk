@@ -302,7 +302,7 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	if !s.planServiceAllowed(w, r, q, c.ProfileID, req.ServiceType, req.Published == nil || *req.Published) {
 		return
 	}
-	if (req.Published == nil || *req.Published) && !s.commerceReadyToPublish(w, r, q, c.ProfileID) {
+	if (req.Published == nil || *req.Published) && !s.commerceReadyToPublish(w, r, c.ProfileID) {
 		return
 	}
 	n, err := q.CountCoachingPlans(r.Context(), c.ProfileID)
@@ -421,7 +421,7 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "pledge_required", "先にパーソナル指導の誓約をしてください")
 		return
 	}
-	if published && !s.commerceReadyToPublish(w, r, q, c.ProfileID) {
+	if published && !s.commerceReadyToPublish(w, r, c.ProfileID) {
 		return
 	}
 	if !s.planServiceAllowed(w, r, q, c.ProfileID, req.ServiceType, published) {
