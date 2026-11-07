@@ -92,9 +92,20 @@ export async function refreshPushSubscription(token: string): Promise<void> {
   await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
 }
 
-// この端末でいま通知を受け取る設定になっているか。service worker を新しく登録はしない。
-export async function currentPushSubscription(): Promise<PushSubscription | null> {
-  if (!pushSupported() || Notification.permission !== "granted") return null;
+export async function registerPushSubscription(token: string): Promise<void> {
+  const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
+  const subscription = await subscribePush(public_key);
+  await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
+}
+
+// service worker を新しく登録せず、この端末の購読を確かめる。
+export async function readPushSubscription(): Promise<PushSubscription | null> {
+  if (!pushSupported()) return null;
   const registration = await navigator.serviceWorker.getRegistration("/");
   return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
+export async function currentPushSubscription(): Promise<PushSubscription | null> {
+  if (!pushSupported() || Notification.permission !== "granted") return null;
+  return readPushSubscription();
 }

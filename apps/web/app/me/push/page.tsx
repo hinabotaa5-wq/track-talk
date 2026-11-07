@@ -3,9 +3,10 @@
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
+import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { currentPushSubscription, pushSupported, subscribePush } from "@/lib/push";
+import { currentPushSubscription } from "@/lib/push";
 import type { NotificationCategory, NotificationSetting } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter } from "next/navigation";
@@ -128,6 +129,7 @@ function NotificationSettings({ token }: { token: string | null }) {
 export default function PushSettingsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
+  const userId = session?.user?.id;
   const { acquire, release, pending } = useActionLock();
   // null は確かめている途中。
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -142,31 +144,6 @@ export default function PushSettingsPage() {
       .then((sub) => setEnabled(sub !== null))
       .catch(() => setEnabled(false));
   }, []);
-
-  async function enable() {
-    if (!acquire()) return;
-    setMessage("");
-    try {
-      if (!pushSupported()) {
-        setMessage("この端末のブラウザは通知に対応していません。iPhone はホーム画面に追加したアプリから設定してください。");
-        return;
-      }
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setMessage("通知が許可されませんでした。端末の設定から TrackTalk の通知を許可してください。");
-        return;
-      }
-      const { public_key } = await apiFetch<{ public_key: string }>("/v1/push/public-key");
-      const subscription = await subscribePush(public_key);
-      await apiFetch<void>("/v1/me/push-subscriptions", { method: "POST", token, body: JSON.stringify(subscription) });
-      setEnabled(true);
-      setMessage("この端末で通知を受け取れるようになりました");
-    } catch (err) {
-      setMessage(errorMessage(err, "通知を設定できませんでした"));
-    } finally {
-      release();
-    }
-  }
 
   async function disable() {
     if (!acquire()) return;
@@ -199,7 +176,7 @@ export default function PushSettingsPage() {
     }
   }
 
-  if (loading || !session) {
+  if (loading || !userId || !token) {
     return <PageLoading screen label="読み込み中..." />;
   }
 
@@ -224,9 +201,31 @@ export default function PushSettingsPage() {
             </Button>
           </>
         ) : (
-          <Button type="button" className="w-full" disabled={pending || enabled === null} onClick={() => void enable()}>
-            この端末で通知をオンにする
-          </Button>
+          <PushPermissionGuide
+            key={userId}
+            userId={userId}
+            token={token}
+            onEnabled={() => {
+              setEnabled(true);
+              setMessage("この端末で通知を受け取れるようになりました");
+            }}
+            renderControl={(status, activate, busy) => (
+              <Button
+                type="button"
+                className="w-full"
+                disabled={pending || busy || enabled === null || status === null || status === "unsupported"}
+                onClick={() => {
+                  setMessage("");
+                  activate();
+                }}
+              >
+                {status === "denied" ? "通知がオフになっています"
+                  : status === "unsupported" ? "このブラウザは通知に対応していません"
+                  : status === "granted" ? "この端末で通知をオンにする"
+                  : "通知を受け取る"}
+              </Button>
+            )}
+          />
         )}
         {message ? <p className="text-sm text-slate-300">{message}</p> : null}
       </div>

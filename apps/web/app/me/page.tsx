@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { unsubscribePushOnThisDevice } from "@/lib/sign-out";
 import { useConfirm } from "@/components/confirm-dialog";
+import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { ThemeSwitch } from "@/components/theme-switch";
 
 const accountLinks = [
@@ -22,7 +23,6 @@ const accountLinks = [
   { href: "/me/password", label: "パスワードの変更", icon: KeyRound },
   { href: "/me/security", label: "二段階認証", icon: ShieldCheck },
   { href: "/me/badge", label: "バッジ", icon: Award },
-  { href: "/me/push", label: "通知", icon: Bell },
 ] as const;
 
 const infoLinks = [
@@ -49,6 +49,7 @@ function MenuLink({ href, label, icon: Icon }: { href: string; label: string; ic
 export default function MePage() {
   const { session, profile, token, sessionLoading: loading } = useAuth();
   const router = useRouter();
+  const userId = session?.user?.id;
   const logoutLock = useActionLock();
   const confirmDialog = useConfirm();
   const [logoutError, setLogoutError] = useState("");
@@ -97,6 +98,30 @@ export default function MePage() {
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
+        {token && userId ? (
+          <PushPermissionGuide
+            key={userId}
+            userId={userId}
+            token={token}
+            renderControl={(status, activate, busy) => {
+              if (status === "granted" || status === "unsupported" || status === null) {
+                return <MenuLink href="/me/push" label="通知" icon={Bell} />;
+              }
+              return (
+                <button type="button" className={menuRowClass} disabled={busy} onClick={activate}>
+                  <Bell className="size-4 shrink-0 text-blue-300" aria-hidden />
+                  <span className="flex-1">
+                    <span className="block">通知設定</span>
+                    <span className="text-xs text-slate-300">
+                      {status === "denied" ? "通知がオフになっています" : "通知を受け取る"}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+                </button>
+              );
+            }}
+          />
+        ) : <MenuLink href="/me/push" label="通知" icon={Bell} />}
         <MenuLink href="/me/install" label="ホーム画面に追加して使う" icon={Smartphone} />
         {infoLinks.map((item) => (
           <MenuLink key={item.href} {...item} />

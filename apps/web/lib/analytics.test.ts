@@ -3,7 +3,7 @@ import { trackEvent, trackSuccessfulMutation, umamiBeforeSendName, umamiBeforeSe
 
 afterEach(() => vi.unstubAllGlobals());
 
-type BeforeSend = (type: string, payload: { url?: string; referrer?: string }) => { url?: string; referrer?: string };
+type BeforeSend = (type: string, payload: Record<string, unknown>) => Record<string, unknown>;
 
 function load(): BeforeSend {
   const win: Record<string, unknown> = {};
@@ -27,6 +27,16 @@ describe("umamiBeforeSend", () => {
     const send = load();
     expect(send("event", { url: "/guardian/paid" }).url).toBe("/guardian/paid");
     expect(send("event", { url: "/posts/123" }).url).toBe("/posts/123");
+  });
+
+  it("strips identifiers and device details from push guide events", () => {
+    expect(load()("event", {
+      name: "push_guide_shown", website: "site", hostname: "track-talk.netlify.app",
+      url: "/me/push?private=value", id: "user", screen: "390x844", language: "ja",
+      referrer: "/private", data: { account: "user" },
+    })).toEqual({
+      name: "push_guide_shown", website: "site", hostname: "track-talk.netlify.app", url: "/me/push",
+    });
   });
 
   it("removes search terms and authentication query/hash values", () => {

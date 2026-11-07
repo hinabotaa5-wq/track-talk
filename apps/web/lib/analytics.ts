@@ -7,6 +7,9 @@ export const umamiBeforeSendName = "umamiBeforeSend";
 
 export const umamiBeforeSendScript = `window.${umamiBeforeSendName}=function(type,payload){
   var hide=function(v){return typeof v==="string"?v.split(/[?#]/)[0].replace(/\\/guardian\\/(?!paid(?:[/?#]|$))[^/?#]+/g,"/guardian/:token"):v;};
+  if(payload&&typeof payload.name==="string"&&payload.name.startsWith("push_")){
+    return {website:payload.website,hostname:payload.hostname,url:hide(payload.url),name:payload.name};
+  }
   if(payload){payload.url=hide(payload.url);payload.referrer=hide(payload.referrer);}
   return payload;
 };`;
@@ -17,14 +20,20 @@ export type AnalyticsEvent =
   | "post_liked"
   | "search_submitted"
   | "race_record_created"
-  | "race_record_updated";
+  | "race_record_updated"
+  | "push_guide_shown"
+  | "push_guide_accept"
+  | "push_guide_later"
+  | "push_permission_granted"
+  | "push_permission_denied";
 
 // 本文・検索語・アカウントIDを受け取らず、操作名だけを送る。
 // 計測が拒否・遮断されても、保存や画面遷移を失敗させない。
 export function trackEvent(event: AnalyticsEvent): void {
   if (typeof window === "undefined") return;
   if (!["track-talk.netlify.app"].includes(window.location.hostname)) return;
-  capturePosthog(event);
+  // 通知案内は Umami の件数だけに残し、端末 ID を付ける PostHog には送らない。
+  if (!event.startsWith("push_")) capturePosthog(event);
   const tracker = (window as Window & {
     umami?: { track: (name: string) => unknown };
   }).umami;
