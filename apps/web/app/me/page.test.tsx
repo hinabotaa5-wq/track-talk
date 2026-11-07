@@ -2,49 +2,108 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { AuthProvider } from "@/components/auth-provider";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import MePage from "./page";
-const mock = vi.hoisted(() => ({ signOut: vi.fn(), getSession: vi.fn(), unsubscribe: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ session: { access_token: "token" }, token: "token", profile: null, loading: true, sessionLoading: false }) }));
-vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: { signOut: mock.signOut, getSession: mock.getSession } }) }));
-vi.mock("@/lib/sign-out", () => ({ unsubscribePushOnThisDevice: mock.unsubscribe }));
+const mock = vi.hoisted(() => ({
+  signOut: vi.fn(), getSession: vi.fn(), unsubscribe: vi.fn(), replace: vi.fn(), refresh: vi.fn(),
+  apiFetch: vi.fn(),
+  onAuthStateChange: vi.fn(),
+}));
+vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: {
+  signOut: mock.signOut, getSession: mock.getSession, onAuthStateChange: mock.onAuthStateChange,
+} }) }));
+vi.mock("@/lib/api", () => ({ apiFetch: mock.apiFetch }));
+vi.mock("@/lib/sign-out", () => ({
+  unsubscribePushOnThisDevice: mock.unsubscribe,
+  clearPersonalStorage: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: mock.replace, refresh: mock.refresh }) }));
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
+  mock.apiFetch.mockResolvedValue({ id: "user-1", is_admin: false });
+  mock.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   mock.signOut.mockResolvedValue({ error: null });
   mock.unsubscribe.mockResolvedValue(undefined);
   mock.getSession.mockResolvedValue({ data: { session: null } });
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-async function render() { await act(async () => root.render(<ConfirmProvider><MePage /></ConfirmProvider>)); }
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllEnvs();
+});
+async function render() {
+  await act(async () => root.render(<AuthProvider><ConfirmProvider><MePage /></ConfirmProvider></AuthProvider>));
+  await vi.waitFor(() => expect(mock.onAuthStateChange).toHaveBeenCalledOnce());
+}
+async function signIn(event = "INITIAL_SESSION", id = "user-1") {
+  await act(async () => mock.onAuthStateChange.mock.calls[0][0](event, { access_token: "token", user: { id } }));
+}
+async function renderSignedIn() {
+  await render();
+  await signIn();
+}
 async function logout() {
   await act(async () => [...container.querySelectorAll("button")].find((b) => b.textContent === "ログアウト")!.click());
   await act(async () => container.querySelector<HTMLButtonElement>('[role="alertdialog"] button')!.click());
 }
-it("プロフィールの取得待ちでもメニューを表示し、追加ガイドは独立ページに移動する", async () => {
-  await render();
+const adminLink = () => container.querySelector('a[href="/admin"]');
+const profileStatus = () => container.querySelector('nav [role="status"][aria-busy="true"]');
+
+it.each([true, false])("プロフィールの応答が遅い間は確認中と表示し、完了後は管理者だけに入口を表示する (is_admin=%s)", async (isAdmin) => {
+  let finish!: (profile: unknown) => void;
+  mock.apiFetch.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  await renderSignedIn();
+  expect(mock.apiFetch).toHaveBeenCalledExactlyOnceWith("/v1/me", { token: "token" });
   expect(container.textContent).toContain("自分の投稿");
   expect(container.querySelector('a[href="/me/install"]')?.textContent).toContain("ホーム画面に追加して使う");
-  expect(container.textContent).not.toContain("読み込み中");
+  expect(adminLink()).toBeNull();
+  expect(profileStatus()?.textContent).toBe("プロフィールを確認中");
+  await act(async () => finish({ id: "user-1", is_admin: isAdmin }));
+  expect(profileStatus()).toBeNull();
+  expect(adminLink()?.textContent ?? null).toBe(isAdmin ? "アプリ管理" : null);
+});
+it("プロフィールの応答がすぐ届いても一般ユーザーに管理画面の入口を表示しない", async () => {
+  await renderSignedIn();
+  expect(container.textContent).toContain("自分の投稿");
+  expect(profileStatus()).toBeNull();
+  expect(adminLink()).toBeNull();
+});
+it("別のアカウントへ切り替えたときに前の管理者の入口を表示しない", async () => {
+  mock.apiFetch.mockResolvedValue({ id: "user-1", is_admin: true });
+  await renderSignedIn();
+  expect(adminLink()).not.toBeNull();
+
+  let finish!: (profile: unknown) => void;
+  mock.apiFetch.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  await signIn("SIGNED_IN", "user-2");
+  expect(adminLink()).toBeNull();
+  expect(profileStatus()?.textContent).toBe("プロフィールを確認中");
+
+  await act(async () => finish({ id: "user-2", is_admin: false }));
+  expect(profileStatus()).toBeNull();
+  expect(adminLink()).toBeNull();
 });
 it("アプリ内の確認からこの端末をログアウトしてホームへ戻る", async () => {
-  await render(); await logout();
+  await renderSignedIn(); await logout();
   expect(mock.unsubscribe).toHaveBeenCalledWith("token");
   expect(mock.signOut).toHaveBeenCalledWith({ scope: "local" });
   expect(mock.replace).toHaveBeenCalledWith("/");
 });
 it("認証サーバーがエラーでも端末のセッションが消えていればホームへ戻る", async () => {
   mock.signOut.mockResolvedValue({ error: new Error("offline") });
-  await render(); await logout();
+  await renderSignedIn(); await logout();
   expect(mock.replace).toHaveBeenCalledWith("/");
 });
 it("セッションが残る失敗ではエラーを表示し、再試行できる", async () => {
   mock.signOut.mockResolvedValue({ error: new Error("failed") });
   mock.getSession.mockResolvedValue({ data: { session: { access_token: "token" } } });
-  await render(); await logout();
+  await renderSignedIn(); await logout();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("ログアウトできませんでした");
   expect([...container.querySelectorAll("button")].find((b) => b.textContent === "ログアウト")!.disabled).toBe(false);
   expect(mock.replace).not.toHaveBeenCalled();
