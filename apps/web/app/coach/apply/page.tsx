@@ -4,6 +4,7 @@ import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm, uploadCoachPhoto } from "@/components/coach-photo";
+import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,7 +117,7 @@ export default function CoachApplyPage() {
       if (draft.events.length === 0) missing.events = "担当種目を1つ以上選んでください";
       if (!draft.best_record.trim()) missing.best_record = "記録を入力してください";
       if (!draft.achievements.trim()) missing.achievements = "成績や指導経験を入力してください";
-      if (sns_urls.length === 0) missing.sns_urls = "SNSまたはホームページのURLを1件以上入力してください";
+      if (sns_urls.length === 0) missing.sns_urls = "SNS・ホームページを1件以上入力してください";
       if (!photo && !application?.photo_url) missing.photo = "顔写真を選んでください";
       if (Object.keys(missing).length > 0) {
         setFieldErrors(missing);
@@ -267,10 +268,10 @@ export default function CoachApplyPage() {
               rows={3}
               required
               value={draft.sns_urls}
-              placeholder={"例:\nhttps://www.instagram.com/example/\nhttps://example-club.jp/"}
+              placeholder={"@example\nhttps://example-club.jp/"}
               onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
             />
-            <span className="block text-xs text-slate-300">InstagramなどのSNS、または所属するクラブチームのホームページを1件以上入力してください。1行に1つずつ、最大3件まで。公開後はコーチの紹介に表示されます。</span>
+            <span className="block text-xs text-slate-300">SNSのアカウント名やホームページのURLなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。</span>
             {fieldError("sns_urls")}
           </label>
 
@@ -328,11 +329,7 @@ export default function CoachApplyPage() {
             <div>
               <dt className="text-xs text-slate-300">SNS・ホームページ</dt>
               <dd className="space-y-1">
-                {application.sns_urls.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline">
-                    {url}
-                  </a>
-                ))}
+                {application.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
             </div>
           ) : null}

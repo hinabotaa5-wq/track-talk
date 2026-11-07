@@ -5,6 +5,7 @@ import { hasAvailability } from "@/lib/coach-availability";
 import { PageLoading } from "@/components/page-loading";
 
 import { CoachAvatar } from "@/components/coach-photo";
+import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { CoachServicePlans } from "@/components/coach-service-plans";
 import { apiFetch } from "@/lib/api";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
@@ -59,7 +60,7 @@ export default function CoachDetailPage() {
             {(coach.sns_urls ?? []).length ? <div>
               <dt className="text-xs text-slate-300">SNS・ホームページ</dt>
               <dd className="space-y-1">
-                {coach.sns_urls.map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-blue-300 underline underline-offset-4">{url}</a>)}
+                {coach.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
             </div> : null}
           </dl>

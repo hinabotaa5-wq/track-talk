@@ -275,10 +275,9 @@ func TestCoachApplicationSnsUrls(t *testing.T) {
 	applicant := uuid.New()
 	ta := token(t, applicant)
 
-	// URL でないもの、http/https 以外、4件は受け付けない。
+	// 4件以上や300文字を超える項目は受け付けない。
 	for _, urls := range [][]string{
-		{"instagram.com/testcoach"},
-		{"ftp://example.com/testcoach"},
+		{strings.Repeat("あ", 301)},
 		{"https://example.com/1", "https://example.com/2", "https://example.com/3", "https://example.com/4"},
 	} {
 		body := coachApplicationBody()
@@ -289,16 +288,16 @@ func TestCoachApplicationSnsUrls(t *testing.T) {
 		}
 	}
 
-	// 空行と重複は除いて保存し、自分の応募に返る。
+	// アカウント名や任意のテキストも、空行と重複を除いて保存する。
 	body := coachApplicationBody()
-	body["sns_urls"] = []string{" https://www.instagram.com/testcoach/ ", "", "https://www.instagram.com/testcoach/", "https://x.com/testcoach"}
+	body["sns_urls"] = []string{" @tracktalk.office ", "", "https://www.instagram.com/testcoach/", "所属クラブの公式アカウント", "@tracktalk.office"}
 	rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("apply with sns %d %s", rec.Code, rec.Body.String())
 	}
 	var me coachMeView
 	_ = json.Unmarshal(rec.Body.Bytes(), &me)
-	if me.Application == nil || strings.Join(me.Application.SnsUrls, ",") != "https://www.instagram.com/testcoach/,https://x.com/testcoach" {
+	if me.Application == nil || strings.Join(me.Application.SnsUrls, ",") != "@tracktalk.office,https://www.instagram.com/testcoach/,所属クラブの公式アカウント" {
 		t.Fatalf("sns saved %+v", me.Application)
 	}
 
