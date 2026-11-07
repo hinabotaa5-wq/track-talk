@@ -3,6 +3,7 @@
 import { authErrorMessage } from "@/lib/auth-errors";
 import { rememberNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase";
+import { isPwnedPassword, pwnedPasswordMessage } from "@/lib/pwned-password";
 import { useActionLock } from "@/lib/use-action-lock";
 import { loginSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +64,13 @@ export default function RegisterPage() {
     }
     if (!acquire()) return;
     setError("");
+    // 漏洩済みパスワードは Supabase に送らずここで止める（本体 #429）。HIBP に届かなくても通す。
+    if (await isPwnedPassword(values.password)) {
+      captcha.reset();
+      release();
+      setError(pwnedPasswordMessage);
+      return;
+    }
     rememberNextPath("/me/profile?onboarding=1", 86400);
     rememberOverseasConsent();
     const { data, error: err } = await supabase.auth
