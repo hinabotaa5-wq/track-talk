@@ -105,7 +105,8 @@ func (s *Server) attemptOutboxRow(ctx context.Context, row db.ClaimPendingPushOu
 			return false
 		}
 		// 待ちに入れたあとで設定を切った人。送り直さず終わりにする。
-		if err := s.q.MarkPushOutboxDiscarded(ctx, db.MarkPushOutboxDiscardedParams{Result: pushOutboxOptedOut, ID: row.ID}); err != nil {
+		discarded := pushOutboxOptedOut
+		if err := s.q.MarkPushOutboxDiscarded(ctx, db.MarkPushOutboxDiscardedParams{Result: &discarded, ID: row.ID}); err != nil {
 			slog.Warn("push outbox: discard", "err", err)
 			s.failOutboxRow(ctx, row.ID, pushOutboxOptedOut)
 			return false
@@ -141,7 +142,7 @@ func (s *Server) attemptOutboxRow(ctx context.Context, row db.ClaimPendingPushOu
 }
 
 func (s *Server) failOutboxRow(ctx context.Context, id uuid.UUID, result string) {
-	if err := s.q.MarkPushOutboxFailed(ctx, db.MarkPushOutboxFailedParams{Result: result, ID: id}); err != nil {
+	if err := s.q.MarkPushOutboxFailed(ctx, db.MarkPushOutboxFailedParams{Result: &result, ID: id}); err != nil {
 		slog.Warn("push outbox: retry", "err", err)
 	}
 }

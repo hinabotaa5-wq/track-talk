@@ -22,6 +22,7 @@ RETURNING month
 `
 
 // その月のお知らせを送る権利を取る。すでに送った月と、いま送っている最中の月は行が返らない。
+// 送り始めてから締め切り（30分＋余裕）を過ぎても終わっていない月は、止まったものとして取り直す。
 func (q *Queries) ClaimMonthlyReminder(ctx context.Context, month time.Time) (time.Time, error) {
 	row := q.db.QueryRow(ctx, claimMonthlyReminder, month)
 	var month_2 time.Time
@@ -91,17 +92,9 @@ SELECT month, started_at, finished_at, recipients, in_app_done_at FROM monthly_r
 WHERE month = $1::date
 `
 
-type GetMonthlyReminderRow struct {
-	Month       time.Time  `json:"month"`
-	StartedAt   time.Time  `json:"started_at"`
-	FinishedAt  *time.Time `json:"finished_at"`
-	Recipients  int32      `json:"recipients"`
-	InAppDoneAt *time.Time `json:"in_app_done_at"`
-}
-
-func (q *Queries) GetMonthlyReminder(ctx context.Context, month time.Time) (GetMonthlyReminderRow, error) {
+func (q *Queries) GetMonthlyReminder(ctx context.Context, month time.Time) (MonthlyReminder, error) {
 	row := q.db.QueryRow(ctx, getMonthlyReminder, month)
-	var i GetMonthlyReminderRow
+	var i MonthlyReminder
 	err := row.Scan(
 		&i.Month,
 		&i.StartedAt,
@@ -110,34 +103,6 @@ func (q *Queries) GetMonthlyReminder(ctx context.Context, month time.Time) (GetM
 		&i.InAppDoneAt,
 	)
 	return i, err
-}
-
-const listStaleMonthlyReminders = `-- name: ListStaleMonthlyReminders :many
-SELECT month FROM monthly_reminders
-WHERE finished_at IS NULL
-  AND started_at < now() - interval '35 minutes'
-ORDER BY month
-`
-
-// 送り始めたまま止まっている月。次の実行で未送信分を送り直す。
-func (q *Queries) ListStaleMonthlyReminders(ctx context.Context) ([]time.Time, error) {
-	rows, err := q.db.Query(ctx, listStaleMonthlyReminders)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []time.Time
-	for rows.Next() {
-		var month time.Time
-		if err := rows.Scan(&month); err != nil {
-			return nil, err
-		}
-		items = append(items, month)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listPushSubscriptions = `-- name: ListPushSubscriptions :many
@@ -166,6 +131,34 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, profileID uuid.UUID
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaleMonthlyReminders = `-- name: ListStaleMonthlyReminders :many
+SELECT month FROM monthly_reminders
+WHERE finished_at IS NULL
+  AND started_at < now() - interval '35 minutes'
+ORDER BY month
+`
+
+// 送り始めたまま止まっている月。次の実行で未送信分を送り直す。
+func (q *Queries) ListStaleMonthlyReminders(ctx context.Context) ([]time.Time, error) {
+	rows, err := q.db.Query(ctx, listStaleMonthlyReminders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []time.Time
+	for rows.Next() {
+		var month time.Time
+		if err := rows.Scan(&month); err != nil {
+			return nil, err
+		}
+		items = append(items, month)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

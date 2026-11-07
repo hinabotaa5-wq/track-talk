@@ -69,5 +69,5 @@ WHERE status = 'pending';
 -- name: CountPushOutboxByPrefix :one
 -- 一斉配信の進み具合。送り待ちと送り済みを数え、再開の要否と送った人数に使う。
 SELECT
-    (SELECT count(*) FROM push_outbox WHERE status = 'pending' AND dedup_key LIKE $1) AS pending,
-    (SELECT count(*) FROM push_outbox WHERE status = 'sent' AND dedup_key LIKE $1) AS sent;
+    (SELECT count(*) FROM push_outbox WHERE status = 'pending' AND push_outbox.dedup_key LIKE $1) AS pending,
+    (SELECT count(*) FROM push_outbox WHERE status = 'sent' AND push_outbox.dedup_key LIKE $1) AS sent;

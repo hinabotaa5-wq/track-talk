@@ -130,31 +130,6 @@ func (q *Queries) FinishAnnouncement(ctx context.Context, arg FinishAnnouncement
 	return err
 }
 
-const insertAnnouncementNotifications = `-- name: InsertAnnouncementNotifications :execrows
-INSERT INTO notifications (id, recipient_id, kind, title, body, url, announcement_id)
-SELECT gen_random_uuid(), profiles.id, 'message', a.title, a.body, a.url, a.id
-FROM profiles, announcements a
-WHERE a.id = $1
-  AND NOT EXISTS (
-    SELECT 1 FROM notification_settings ns
-    WHERE ns.profile_id = profiles.id AND ns.category = 'announcement' AND NOT ns.in_app
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM notifications n
-    WHERE n.announcement_id = a.id
-  )
-`
-
-// 運営からのお知らせを、ベルで受け取る人全員に入れる。
-// 同じお知らせのベルがすでに入っていれば足さない（送り直しの再開で二重に入れない）。
-func (q *Queries) InsertAnnouncementNotifications(ctx context.Context, announcementID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, insertAnnouncementNotifications, announcementID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getAnnouncement = `-- name: GetAnnouncement :one
 SELECT id, sender_id, title, body, url, created_at, in_app_count, finished_at, push_recipients, canceled_at
 FROM announcements
@@ -178,6 +153,31 @@ func (q *Queries) GetAnnouncement(ctx context.Context, id uuid.UUID) (Announceme
 		&i.CanceledAt,
 	)
 	return i, err
+}
+
+const insertAnnouncementNotifications = `-- name: InsertAnnouncementNotifications :execrows
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, announcement_id)
+SELECT gen_random_uuid(), profiles.id, 'message', a.title, a.body, a.url, a.id
+FROM profiles, announcements a
+WHERE a.id = $1
+  AND NOT EXISTS (
+    SELECT 1 FROM notification_settings ns
+    WHERE ns.profile_id = profiles.id AND ns.category = 'announcement' AND NOT ns.in_app
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM notifications n
+    WHERE n.announcement_id = a.id
+  )
+`
+
+// 運営からのお知らせを、ベルで受け取る人全員に入れる。
+// 同じお知らせのベルがすでに入っていれば足さない（送り直しの再開で二重に入れない）。
+func (q *Queries) InsertAnnouncementNotifications(ctx context.Context, announcementID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, insertAnnouncementNotifications, announcementID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listAnnouncements = `-- name: ListAnnouncements :many

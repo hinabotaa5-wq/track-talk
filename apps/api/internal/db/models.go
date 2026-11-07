@@ -980,23 +980,23 @@ type Profile struct {
 }
 
 type PushOutbox struct {
-	ID          uuid.UUID  `json:"id"`
-	ProfileID   uuid.UUID  `json:"profile_id"`
-	Title       string     `json:"title"`
-	Body        string     `json:"body"`
-	Url         string     `json:"url"`
-	Tag         string     `json:"tag"`
-	Category    string     `json:"category"`
-	TtlSeconds  int32      `json:"ttl_seconds"`
-	DedupKey    string     `json:"dedup_key"`
-	Status      string     `json:"status"`
-	Attempts    int32      `json:"attempts"`
-	NextAttempt time.Time  `json:"next_attempt_at"`
-	ExpiresAt   time.Time  `json:"expires_at"`
-	LastResult  *string    `json:"last_result"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	SentAt      *time.Time `json:"sent_at"`
+	ID            uuid.UUID  `json:"id"`
+	ProfileID     uuid.UUID  `json:"profile_id"`
+	Title         string     `json:"title"`
+	Body          string     `json:"body"`
+	Url           string     `json:"url"`
+	Tag           string     `json:"tag"`
+	Category      string     `json:"category"`
+	TtlSeconds    int32      `json:"ttl_seconds"`
+	DedupKey      string     `json:"dedup_key"`
+	Status        string     `json:"status"`
+	Attempts      int32      `json:"attempts"`
+	NextAttemptAt time.Time  `json:"next_attempt_at"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	LastResult    *string    `json:"last_result"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	SentAt        *time.Time `json:"sent_at"`
 }
 
 type PushSubscription struct {

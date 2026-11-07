@@ -70,10 +70,22 @@ func (q *Queries) ClaimPendingPushOutbox(ctx context.Context, limit int32) ([]Cl
 	return items, nil
 }
 
+const countPendingPushOutbox = `-- name: CountPendingPushOutbox :one
+SELECT count(*) FROM push_outbox
+WHERE status = 'pending'
+`
+
+func (q *Queries) CountPendingPushOutbox(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingPushOutbox)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countPushOutboxByPrefix = `-- name: CountPushOutboxByPrefix :one
 SELECT
-    (SELECT count(*) FROM push_outbox WHERE status = 'pending' AND dedup_key LIKE $1) AS pending,
-    (SELECT count(*) FROM push_outbox WHERE status = 'sent' AND dedup_key LIKE $1) AS sent
+    (SELECT count(*) FROM push_outbox WHERE status = 'pending' AND push_outbox.dedup_key LIKE $1) AS pending,
+    (SELECT count(*) FROM push_outbox WHERE status = 'sent' AND push_outbox.dedup_key LIKE $1) AS sent
 `
 
 type CountPushOutboxByPrefixRow struct {
@@ -89,19 +101,8 @@ func (q *Queries) CountPushOutboxByPrefix(ctx context.Context, dedupKey string) 
 	return i, err
 }
 
-const countPendingPushOutbox = `-- name: CountPendingPushOutbox :one
-SELECT count(*) FROM push_outbox
-WHERE status = 'pending'
-`
-
-func (q *Queries) CountPendingPushOutbox(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countPendingPushOutbox)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const enqueuePushOutbox = `-- name: EnqueuePushOutbox :exec
+
 INSERT INTO push_outbox (id, profile_id, title, body, url, tag, category, ttl_seconds, dedup_key, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (dedup_key) DO NOTHING
@@ -120,6 +121,8 @@ type EnqueuePushOutboxParams struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
+// 送るべき Push の待ち行列（本体 #421 F04・F11）。一時障害のあとに送り直す。
+// 宛先単位ではなく依頼・配信単位で1行作り、送るたびにいまの購読と設定を確かめる。
 // 同じ出来事は1行だけ。二重に入れても増えない。
 func (q *Queries) EnqueuePushOutbox(ctx context.Context, arg EnqueuePushOutboxParams) error {
 	_, err := q.db.Exec(ctx, enqueuePushOutbox,
@@ -165,7 +168,7 @@ WHERE id = $2
 `
 
 type MarkPushOutboxDiscardedParams struct {
-	Result string    `json:"result"`
+	Result *string   `json:"result"`
 	ID     uuid.UUID `json:"id"`
 }
 
@@ -186,7 +189,7 @@ WHERE id = $2
 `
 
 type MarkPushOutboxFailedParams struct {
-	Result string    `json:"result"`
+	Result *string   `json:"result"`
 	ID     uuid.UUID `json:"id"`
 }
 
