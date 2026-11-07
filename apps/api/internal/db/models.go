@@ -878,6 +878,13 @@ type MonthlyReminder struct {
 	InAppDoneAt *time.Time `json:"in_app_done_at"`
 }
 
+type NewCoachAnnouncement struct {
+	CoachID        uuid.UUID  `json:"coach_id"`
+	FiredAt        time.Time  `json:"fired_at"`
+	Notified       bool       `json:"notified"`
+	AnnouncementID *uuid.UUID `json:"announcement_id"`
+}
+
 type Notification struct {
 	ID              uuid.UUID  `json:"id"`
 	RecipientID     uuid.UUID  `json:"recipient_id"`
