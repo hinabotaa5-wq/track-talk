@@ -74,7 +74,7 @@ function isStandalone() {
   return nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
 }
 
-// ホームの投稿ボタンと末尾の余白を、案内の折り返しを含めた高さに合わせる。
+// ホームの投稿ボタンの位置を、案内の折り返しを含めた高さに合わせる。
 function measureHomeBanner(banner: HTMLDivElement | null) {
   if (!banner) return;
   const property = "--home-install-banner-height";

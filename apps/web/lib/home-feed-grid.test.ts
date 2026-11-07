@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
 import { createGridLayout, gridTilePosition, visibleGridIndices } from "./home-feed-grid";
 
-it.each([[390, 2], [768, 3], [1280, 4]])("幅 %ipx では %i 列分の 4:3 カード幅に揃える", (width, columns) => {
+it.each([[390, 2], [768, 3], [1280, 4]])("幅 %ipx では %i 列を目安に 4:3 のカードで高さを使い切る", (width, columns) => {
   const layout = createGridLayout(720, width, 520, columns);
-  expect(layout.tileWidth * columns + 12 * (columns - 1)).toBeCloseTo(width);
+  expect(layout.tileHeight * layout.rows + 12 * (layout.rows - 1)).toBeCloseTo(layout.height);
   expect(layout.tileWidth / layout.tileHeight).toBeCloseTo(4 / 3);
   expect(gridTilePosition(layout, layout.rows)).toEqual({ left: layout.tileWidth + 12, top: 0 });
 });
