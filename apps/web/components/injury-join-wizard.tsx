@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { InjuryChoices as Choices } from "./injury-choices";
+import { PrivacyPolicy } from "./privacy-policy";
 import { apiFetch, apiErrorText } from "@/lib/api";
 import { LeaveGuardArea, useLeaveGuard } from "./leave-guard";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -44,8 +44,8 @@ const questions: Record<InjuryJoinStep, string> = {
 const hints: Partial<Record<InjuryJoinStep, string>> = {
   diagnosis: "診断名がわからなければ「わからない」と書いてください。",
   injuredOn: "覚えているいちばん近い日でも大丈夫です。",
-  preChanges: "当てはまるものをいくつでも選べます。",
-  hindsight: "これから同じケガをしないための、ほかの人へのヒントとして集計します。いくつでも選べます。",
+  preChanges: "当てはまるものをいくつでも選べます。「とくになし」は単独で選んでください。",
+  hindsight: "これから同じケガをしないための、ほかの人へのヒントとして集計します。当てはまるものをいくつでも選べます。「わからない・とくにない」は単独で選んでください。",
 };
 
 export function InjuryJoinWizard({
@@ -62,6 +62,7 @@ export function InjuryJoinWizard({
   const [answers, setAnswers] = useState<InjuryJoinAnswers>(emptyInjuryJoinAnswers);
   const [error, setError] = useState("");
   const [consent, setConsent] = useState(false);
+  const privacyDialog = useRef<HTMLDialogElement>(null);
   const { pending, acquire, release } = useActionLock();
   const { setDirty } = useLeaveGuard();
   const step = steps[index];
@@ -69,8 +70,8 @@ export function InjuryJoinWizard({
   const now = new Date();
   const today = jstToday(now);
 
-  function change(patch: Partial<InjuryJoinAnswers>) {
-    setAnswers((current) => ({ ...current, ...patch }));
+  function change(patch: Partial<InjuryJoinAnswers> | ((current: InjuryJoinAnswers) => Partial<InjuryJoinAnswers>)) {
+    setAnswers((current) => ({ ...current, ...(typeof patch === "function" ? patch(current) : patch) }));
     setError("");
   }
 
@@ -193,7 +194,7 @@ export function InjuryJoinWizard({
             label="ケガの前に変わったこと"
             options={injuryPreChanges}
             selected={(value) => answers.preChanges.includes(value)}
-            onSelect={(value) => change({ preChanges: togglePreChange(answers.preChanges, value) })}
+            onSelect={(value) => change((current) => ({ preChanges: togglePreChange(current.preChanges, value) }))}
           />
         ) : null}
 
@@ -202,7 +203,7 @@ export function InjuryJoinWizard({
             label="どうすればよかったか"
             options={injuryHindsights}
             selected={(value) => answers.hindsight.includes(value)}
-            onSelect={(value) => change({ hindsight: toggleHindsight(answers.hindsight, value) })}
+            onSelect={(value) => change((current) => ({ hindsight: toggleHindsight(current.hindsight, value) }))}
           />
         ) : null}
 
@@ -222,9 +223,11 @@ export function InjuryJoinWizard({
             <p>
               回答と段階の記録は、名前を出さずに人数の割合や日数に集計し、誰でも見られるページに表示します(5人に満たない項目は出しません)。
             </p>
-            <label className="flex items-start gap-2 text-sm text-slate-100">
+            <div className="flex items-start gap-2 text-sm text-slate-100">
               <input
                 type="checkbox"
+                id="injury-privacy-consent"
+                aria-labelledby="injury-privacy-consent-label"
                 checked={consent}
                 onChange={(e) => {
                   setConsent(e.target.checked);
@@ -232,14 +235,19 @@ export function InjuryJoinWizard({
                 }}
                 className="mt-1 h-4 w-4 shrink-0"
               />
-              <span>
-                ケガの情報を健康に関する情報として、
-                <Link href="/privacy" target="_blank" className="text-blue-400 underline">
+              <span id="injury-privacy-consent-label">
+                <label htmlFor="injury-privacy-consent">ケガの情報を健康に関する情報として、</label>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  className="text-left text-blue-400 underline"
+                  onClick={() => privacyDialog.current?.showModal()}
+                >
                   プライバシーポリシー
-                </Link>
-                第4条のとおり扱うことに同意します。15歳以下の人は、保護者も同意しています。
+                </button>
+                <label htmlFor="injury-privacy-consent">第4条のとおり扱うことに同意します。15歳以下の人は、保護者も同意しています。</label>
               </span>
-            </label>
+            </div>
           </div>
         ) : null}
 
@@ -263,6 +271,20 @@ export function InjuryJoinWizard({
           </Button>
         </div>
       </form>
+      {last ? (
+        <dialog
+          ref={privacyDialog}
+          aria-labelledby="injury-privacy-title"
+          className="fixed inset-0 m-auto max-h-[85dvh] w-11/12 max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-white/20 bg-slate-900 text-slate-100 backdrop:bg-black/60"
+        >
+          <div className="sticky top-0 flex justify-end border-b border-white/15 bg-slate-900 px-4 py-2">
+            <Button type="button" variant="secondary" onClick={() => privacyDialog.current?.close()}>
+              回答に戻る
+            </Button>
+          </div>
+          <div className="p-4"><PrivacyPolicy titleId="injury-privacy-title" /></div>
+        </dialog>
+      ) : null}
     </LeaveGuardArea>
   );
 }

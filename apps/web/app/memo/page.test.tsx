@@ -24,6 +24,32 @@ beforeEach(()=>{
  container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);
 });
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
+
+it.each([
+  { tab: null, path: "/v1/me/sense-notes" },
+  { tab: "records", path: "/v1/me/race-records" },
+])("$path の初回取得中は画面中央のローダーを1つ表示する", async ({ tab, path }) => {
+  search.tab = tab;
+  const respond = fetch.getMockImplementation()!;
+  const pending = Promise.withResolvers<void>();
+  fetch.mockImplementation(async (requestPath: string) => {
+    if (requestPath === path) await pending.promise;
+    if (requestPath !== path && ["/v1/me/sense-notes", "/v1/me/race-records"].includes(requestPath)) {
+      await new Promise(() => {});
+    }
+    return respond(requestPath);
+  });
+
+  await act(async () => root.render(<Page />));
+  expect(container.querySelectorAll(".screen-loader-watch")).toHaveLength(1);
+  expect(container.querySelector('.page-loading-screen[role="status"]')).not.toBeNull();
+
+  await act(async () => pending.resolve());
+  expect(container.querySelector(".screen-loader-watch")).toBeNull();
+  expect(container.querySelector("nav")).not.toBeNull();
+  expect(Boolean(container.querySelector('input[type="date"]'))).toBe(tab === "records");
+});
+
 it("感覚と記録のタブで同じ日・月とメモ・記録を共有し、選んだ日で記録を追加できる",async()=>{
  await act(async()=>root.render(<Page/>));
  await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="2026年10月24日、感覚メモあり、記録あり"]')!.click());

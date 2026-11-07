@@ -49,7 +49,7 @@ function MySenseNotes() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dropped, setDropped] = useState(false);
   // 感覚メモと、競技会の記録(グラフ)を切り替える。
-  const [tab, setTab] = useState<"sense" | "records">("sense");
+  const [tab, setTab] = useState<"sense" | "records">(() => requestedTab === "records" ? "records" : "sense");
 
   // ログインしていなくても中身は見られる。書こうとしたり、ボタンを押したりしたらログインへ案内する。
   const guest = !loading && !session;
@@ -110,9 +110,14 @@ function MySenseNotes() {
     return () => controller.abort();
   }, [token, cursor, notes, month, historyFailed]);
 
-  if (loading) return <PageLoading screen label="読み込み中..." />;
   const shownNotes = guest ? [] : notes;
   const shownStats = guest ? guestStats : stats;
+  const notesLoading = !failed && (shownNotes === null || shownStats === null);
+  const recordsLoading = !guest && !raceData && !raceFailed;
+  if (loading || (tab === "records" ? recordsLoading : notesLoading)) {
+    return <PageLoading screen label="読み込み中..." />;
+  }
+
   const needsOlderNotes = Boolean(cursor && shownNotes?.length && shownNotes[shownNotes.length - 1].day >= `${month}-01`);
 
   return (
@@ -145,9 +150,7 @@ function MySenseNotes() {
           <RaceRecordsPanel token={guest ? null : token} data={raceData} onRecordsChanged={setRaceData} selectedDay={selectedDay} />
         ) : failed ? (
           <ErrorState message="感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。" />
-        ) : shownNotes === null || shownStats === null ? (
-          <PageLoading label="読み込み中..." />
-        ) : (
+        ) : shownStats && (
           <>
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
               <div className="flex items-center gap-4">
@@ -183,7 +186,7 @@ function MySenseNotes() {
               selectedDay={selectedDay}
               onDayChange={setSelectedDay}
               onRecordsChanged={setRaceData}
-              recordsLoading={!guest && !raceData && !raceFailed}
+              recordsLoading={recordsLoading}
               recordsFailed={!guest && raceFailed}
               onRecordsRetry={() => { setRaceFailed(false); setRaceRetry((value) => value + 1); }}
               month={month}
