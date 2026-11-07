@@ -14,6 +14,7 @@ import { clearPersonalStorage } from "@/lib/sign-out";
 type AuthState = {
   session: Session | null;
   profile: Profile | null;
+  profileLoading: boolean;
   loading: boolean;
   sessionLoading: boolean;
   token: string | null;
@@ -23,6 +24,7 @@ type AuthState = {
 const AuthContext = createContext<AuthState>({
   session: null,
   profile: null,
+  profileLoading: false,
   loading: true,
   sessionLoading: true,
   token: null,
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthState>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [loading, setLoading] = useState(Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   ));
@@ -44,13 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const seq = ++profileSeq.current;
     if (!token) {
       setProfile(null);
+      setProfileLoading(false);
       return;
     }
+    setProfileLoading(true);
     try {
       const me = await apiFetch<Profile>("/v1/me", { token });
       if (seq === profileSeq.current) setProfile(me);
     } catch {
       if (seq === profileSeq.current) setProfile(null);
+    } finally {
+      if (seq === profileSeq.current) setProfileLoading(false);
     }
   }
 
@@ -113,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         profile,
+        profileLoading,
         loading,
         sessionLoading,
         token: session?.access_token ?? null,

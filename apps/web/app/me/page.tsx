@@ -47,9 +47,10 @@ function MenuLink({ href, label, icon: Icon }: { href: string; label: string; ic
 }
 
 export default function MePage() {
-  const { session, profile, token, sessionLoading: loading } = useAuth();
+  const { session, profile, profileLoading, token, sessionLoading: loading } = useAuth();
   const router = useRouter();
   const userId = session?.user?.id;
+  const currentProfile = profile?.id === userId ? profile : null;
   const logoutLock = useActionLock();
   const confirmDialog = useConfirm();
   const [logoutError, setLogoutError] = useState("");
@@ -94,7 +95,15 @@ export default function MePage() {
       <h1 className="text-xl font-bold text-slate-100">マイページ</h1>
       <ThemeSwitch />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
-        {profile?.is_admin ? <MenuLink href="/admin" label="アプリ管理" icon={Shield} /> : null}
+        {currentProfile?.is_admin ? (
+          <MenuLink href="/admin" label="アプリ管理" icon={Shield} />
+        ) : !currentProfile && profileLoading ? (
+          <div role="status" aria-busy="true" className="flex min-h-12 items-center gap-3 px-4">
+            <span className="size-4 rounded bg-white/15 motion-safe:animate-pulse" aria-hidden="true" />
+            <span className="h-3 w-24 rounded bg-white/15 motion-safe:animate-pulse" aria-hidden="true" />
+            <span className="sr-only">プロフィールを確認中</span>
+          </div>
+        ) : null}
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
