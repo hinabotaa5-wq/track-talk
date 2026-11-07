@@ -4,12 +4,12 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { HomeFilters } from "./home-filters";
 
-const track = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/analytics", () => ({ trackEvent: track }));
-const search = vi.hoisted(() => ({ query: "q=private-search" }));
+vi.mock("./home-post-button", () => ({ HomePostButton: () => <a href="/upload" aria-label="投稿する">＋</a> }));
+const search = vi.hoisted(() => ({ query: "" }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search.query) }));
 
-it("tracks a submitted search without its text and ignores clearing the search", async () => {
+it("以前の検索URLを開いても、選択中のタブから通常の一覧に戻れる", async () => {
+  search.query = "q=old-search&page=2";
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -17,12 +17,11 @@ it("tracks a submitted search without its text and ignores clearing the search",
   const pushState = vi.spyOn(window.history, "pushState").mockImplementation(() => {});
   try {
     await act(async () => root.render(<HomeFilters />));
-    const form = container.querySelector("form")!;
-    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
-    expect(track).toHaveBeenCalledExactlyOnceWith("search_submitted");
-    await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="キーワードを消す"]')!.click(); });
-    expect(track).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="search"]')).toBeNull();
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[aria-current="page"]')!.click(); });
+    expect(pushState).toHaveBeenCalledExactlyOnceWith(null, "", "/");
   } finally {
+    search.query = "";
     pushState.mockRestore();
     await act(async () => root.unmount());
     container.remove();
@@ -52,7 +51,7 @@ it.each([["recruitment", true], ["review", true], ["new", false], ["popular", fa
     await scrollTo(300);
     expect(bar().hasAttribute("data-hidden")).toBe(false);
   } finally {
-    search.query = "q=private-search";
+    search.query = "";
     await scrollTo(0);
     await act(async () => root.unmount());
     container.remove();
