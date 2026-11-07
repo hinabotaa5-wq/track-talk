@@ -149,6 +149,16 @@ func finalizeCapturedRefund(ctx context.Context, tx pgx.Tx, f capturedRefund, re
 		status = "failed"
 	}
 	if f.Status == "succeeded" && status != "failed" {
+		if status == "succeeded" {
+			// Recovery confirmed: the same Stripe refund ID and full amount were
+			// read back as succeeded. Clear only the transient reconciliation
+			// warning so the admin display stops alerting. Bank failure reasons
+			// are kept, and success identity, amount, and timestamps are untouched.
+			// A later confirmed failure still falls through to failure handling.
+			if _, err := tx.Exec(ctx, `UPDATE captured_payment_refunds SET failure=NULL,updated_at=now() WHERE id=$1 AND failure='Stripe reconciliation required'`, f.ID); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	if _, err := tx.Exec(ctx, `UPDATE captured_payment_refunds SET status=$2,stripe_refund_id=$3,failure=$4,succeeded_at=CASE WHEN $2='succeeded' THEN COALESCE(succeeded_at,now()) ELSE succeeded_at END,updated_at=now() WHERE id=$1`, f.ID, status, remote.ID, func() any {
