@@ -846,3 +846,27 @@ select:-webkit-autofill {
 }
 
 .masonry-feed-tile > .masonry-feed-next { display: flex; }
+
+.home-post-fab {
+  bottom: 2rem;
+}
+
+/* 一覧の高さはそのままに、末尾を固定ボタンより上までスクロールできるようにする。 */
+.home-post-fab-space {
+  height: 6rem;
+}
+
+@media (width < 48rem) {
+  body:has(.home-post-fab) .install-guide-banner {
+    /* 下部メニューの 3.5rem と上の境界線。 */
+    bottom: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+  }
+
+  .home-post-fab {
+    bottom: calc(4.5rem + 1px + env(safe-area-inset-bottom) + var(--home-install-banner-height, 0px));
+  }
+
+  .home-post-fab-space {
+    height: calc(6rem + var(--home-install-banner-height, 0px));
+  }
+}
