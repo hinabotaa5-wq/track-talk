@@ -14,7 +14,7 @@ import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { ReportHideActions, hideTargets } from "@/components/report-hide-actions";
 import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
-import { deleteConfirmOptions, useConfirm } from "@/components/confirm-dialog";
+import { useConfirm } from "@/components/confirm-dialog";
 import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -424,7 +424,13 @@ function CoachesAdmin({ token }: { token: string | null }) {
   }
 
   async function removePhoto(a: AdminCoachApplication) {
-    if (!(await confirmDialog({ ...deleteConfirmOptions("この顔写真"), body: "コーチはまた別の写真を登録できます。" }))) return;
+    const confirmed = await confirmDialog({
+      title: "本当に写真を外しますか？",
+      body: "この操作は取り消せません。コーチ本人は写真を再登録できます。",
+      confirmLabel: "写真を外す",
+      cancelLabel: "キャンセル",
+    });
+    if (!confirmed) return;
     try {
       await apiFetch(`/v1/admin/coaching/coaches/${a.profile_id}/photo`, { method: "DELETE", token });
       setMessage("写真を外しました");
