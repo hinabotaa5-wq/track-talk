@@ -380,3 +380,60 @@ func TestCoachApplicationRequiresNameOnCreateAndUpdate(t *testing.T) {
 		t.Fatalf("missing name on update %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 管理のコーチ一覧では、承認済みのコーチの受け取り口座の登録状態がわかる。
+func TestAdminCoachApplicationIncludesPayoutStatus(t *testing.T) {
+	h := setup(t)
+	tadmin := adminToken(t, h)
+
+	newApprovedCoach := func() uuid.UUID {
+		t.Helper()
+		id := uuid.New()
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", token(t, id), coachApplicationBody()); rec.Code != http.StatusOK {
+			t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+		}
+		withCoachPhoto(t, id)
+		if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+id.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
+			t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+		}
+		return id
+	}
+
+	plain := newApprovedCoach()
+	linking := newApprovedCoach()
+	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2 WHERE profile_id = $1`, linking, "acct_"+linking.String())
+	ready := newApprovedCoach()
+	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, ready, "acct_"+ready.String())
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved&per_page=100", tadmin, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin list %d %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Applications []struct {
+			ProfileID      string `json:"profile_id"`
+			StripeLinked   bool   `json:"stripe_linked"`
+			PayoutsEnabled bool   `json:"payouts_enabled"`
+		} `json:"applications"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]struct{ linked, enabled bool }{}
+	for _, a := range body.Applications {
+		got[a.ProfileID] = struct{ linked, enabled bool }{a.StripeLinked, a.PayoutsEnabled}
+	}
+	for id, want := range map[uuid.UUID]struct{ linked, enabled bool }{
+		plain:   {false, false},
+		linking: {true, false},
+		ready:   {true, true},
+	} {
+		s, ok := got[id.String()]
+		if !ok {
+			t.Fatalf("coach %s missing from admin list", id)
+		}
+		if s.linked != want.linked || s.enabled != want.enabled {
+			t.Fatalf("coach %s payout status = %+v, want %+v", id, s, want)
+		}
+	}
+}

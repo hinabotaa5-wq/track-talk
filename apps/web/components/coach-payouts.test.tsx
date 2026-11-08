@@ -7,6 +7,50 @@ import { CoachEarningsSection } from "./coach-payouts";
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ apiFetch }));
 
+async function renderEarnings(payouts_enabled: boolean, stripe_linked: boolean) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  apiFetch.mockResolvedValue({
+    payments: true,
+    payouts_enabled,
+    stripe_linked,
+    this_month_yen: 0,
+    unpaid_yen: 0,
+    review_share: 70,
+    personal_fee: 20,
+    min_payout_yen: 3000,
+    payouts: [],
+    next_payout_date: null,
+    next_payout_yen: null,
+  });
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<CoachEarningsSection token="test" onReady={() => {}} />));
+    return container.textContent ?? "";
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+}
+
+it.each([
+  { payouts_enabled: false, stripe_linked: false, label: "受け取り口座: 未登録", button: "受け取り口座を登録する" },
+  { payouts_enabled: false, stripe_linked: true, label: "受け取り口座: 登録の途中・確認中", button: "登録を続ける" },
+  { payouts_enabled: true, stripe_linked: true, label: "受け取り口座: 登録済み", button: null },
+])("shows the payout account status clearly ($label)", async ({ payouts_enabled, stripe_linked, label, button }) => {
+  const text = await renderEarnings(payouts_enabled, stripe_linked);
+  expect(text).toContain(label);
+  if (button) {
+    expect(text).toContain(button);
+  } else {
+    expect(text).not.toContain("受け取り口座を登録する");
+    expect(text).not.toContain("登録を続ける");
+  }
+});
+
 it.each([
   { date: "2026-12-15", yen: 1050 },
   { date: null, yen: null },
