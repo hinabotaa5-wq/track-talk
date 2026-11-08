@@ -829,6 +829,9 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
   profile_id: string;
   status: CoachStatus;
   nickname: string | null;
+  // 受け取り口座の登録状態。承認済みカードで表示する。
+  stripe_linked: boolean;
+  payouts_enabled: boolean;
   // 打診の順番から外す判定に使う★（運営が戻したあとのものだけ）。
   rating_count: number;
   rating_average: number;

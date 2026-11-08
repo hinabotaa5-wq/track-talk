@@ -212,6 +212,8 @@ SELECT
     c.reviewed_at,
     COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
+    (c.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
+    c.payouts_enabled,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -236,20 +238,22 @@ type ListCoachApplicationsParams struct {
 }
 
 type ListCoachApplicationsRow struct {
-	ProfileID     uuid.UUID  `json:"profile_id"`
-	Tier          string     `json:"tier"`
-	Events        []string   `json:"events"`
-	BestRecord    string     `json:"best_record"`
-	Achievements  string     `json:"achievements"`
-	Years         int16      `json:"years"`
-	SnsUrls       []string   `json:"sns_urls"`
-	Status        string     `json:"status"`
-	AppliedAt     time.Time  `json:"applied_at"`
-	ReviewedAt    *time.Time `json:"reviewed_at"`
-	Nickname      string     `json:"nickname"`
-	PhotoPublicID *string    `json:"photo_public_id"`
-	RatingCount   int32      `json:"rating_count"`
-	RatingAverage float64    `json:"rating_average"`
+	ProfileID      uuid.UUID  `json:"profile_id"`
+	Tier           string     `json:"tier"`
+	Events         []string   `json:"events"`
+	BestRecord     string     `json:"best_record"`
+	Achievements   string     `json:"achievements"`
+	Years          int16      `json:"years"`
+	SnsUrls        []string   `json:"sns_urls"`
+	Status         string     `json:"status"`
+	AppliedAt      time.Time  `json:"applied_at"`
+	ReviewedAt     *time.Time `json:"reviewed_at"`
+	Nickname       string     `json:"nickname"`
+	PhotoPublicID  *string    `json:"photo_public_id"`
+	StripeLinked   bool       `json:"stripe_linked"`
+	PayoutsEnabled bool       `json:"payouts_enabled"`
+	RatingCount    int32      `json:"rating_count"`
+	RatingAverage  float64    `json:"rating_average"`
 }
 
 func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplicationsParams) ([]ListCoachApplicationsRow, error) {
@@ -274,6 +278,8 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.ReviewedAt,
 			&i.Nickname,
 			&i.PhotoPublicID,
+			&i.StripeLinked,
+			&i.PayoutsEnabled,
 			&i.RatingCount,
 			&i.RatingAverage,
 		); err != nil {

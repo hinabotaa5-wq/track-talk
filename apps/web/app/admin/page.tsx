@@ -19,6 +19,7 @@ import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
+import { payoutAccountStatus, payoutAccountStatusLabels } from "@/lib/payout-account-status";
 import { productKindLabels } from "@/lib/product";
 import type {
   AdminCoachApplication,
@@ -528,6 +529,11 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {a.status === "approved" ? (
               <p className="text-xs text-slate-200">
                 評価: {a.rating_count > 0 ? `★${a.rating_average.toFixed(1)}（${a.rating_count}件）` : "まだありません"}
+              </p>
+            ) : null}
+            {a.status === "approved" ? (
+              <p className="text-xs text-slate-200">
+                受け取り口座: {payoutAccountStatusLabels[payoutAccountStatus(a)]}
               </p>
             ) : null}
             {a.status === "approved" && a.rating_paused ? (

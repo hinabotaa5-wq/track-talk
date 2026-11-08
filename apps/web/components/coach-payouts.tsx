@@ -2,6 +2,7 @@
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatYen } from "@/lib/format";
+import { payoutAccountStatus, payoutAccountStatusLabels } from "@/lib/payout-account-status";
 import type { AdminCoachPayout, AdminPayoutCoach, CoachEarnings, CoachPayoutStatus } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useState } from "react";
@@ -64,10 +65,22 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <h2 className="font-bold">報酬</h2>
-      {data.payouts_enabled ? (
-        <p className="text-sm text-slate-200">受け取り口座: 登録済み</p>
+      {payoutAccountStatus(data) === "registered" ? (
+        <div className="space-y-2 rounded-xl border border-emerald-400/40 bg-emerald-500/15 p-3">
+          <p>
+            <span className="inline-block rounded-full border border-emerald-300/50 bg-emerald-500/25 px-3 py-1 text-sm font-bold text-white">
+              ● 受け取り口座: {payoutAccountStatusLabels.registered}
+            </span>
+          </p>
+          <p className="text-sm text-white">報酬は登録済みの口座に振り込まれます。</p>
+        </div>
       ) : (
         <div className="space-y-2 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
+          <p>
+            <span className="inline-block rounded-full border border-amber-300/50 bg-amber-500/25 px-3 py-1 text-sm font-bold text-white">
+              ● 受け取り口座: {payoutAccountStatusLabels[payoutAccountStatus(data)]}
+            </span>
+          </p>
           <p className="text-sm text-white">
             報酬は Stripe を通して銀行口座に振り込みます。受付を始めたり、パーソナル指導の申し込みを承諾したりする前に、本人確認と口座を登録してください。
           </p>
@@ -194,7 +207,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
             <li key={c.profile_id} className="space-y-1 rounded-xl border border-white/20 bg-white/10 p-3 text-sm">
               <p className="font-semibold text-white">{c.nickname ?? "名前なし"}</p>
               <p className="text-xs text-slate-300">
-                口座: {c.payouts_enabled ? "登録済み" : c.stripe_linked ? "登録の途中" : "未登録"} · まだ送金していない分: {formatYen(c.unpaid_yen)}
+                口座: {payoutAccountStatusLabels[payoutAccountStatus(c)]} · まだ送金していない分: {formatYen(c.unpaid_yen)}
               </p>
             </li>
           ))}

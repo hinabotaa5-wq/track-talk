@@ -40,6 +40,8 @@ SELECT
     c.reviewed_at,
     COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
     c.photo_public_id,
+    (c.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
+    c.payouts_enabled,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
