@@ -616,11 +616,18 @@ export default function AdminPage() {
   const { session, profile, token, loading } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("reports");
+  // 初期表示では開いているタブだけ読み、隠れているタブは開いたときに読む。
+  // 4件を並列に読むと初回の表示が遅くなるため。
+  const [visited, setVisited] = useState<Record<string, boolean>>({ reports: true });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVisited((current) => (current[tab] ? current : { ...current, [tab]: true }));
+  }, [tab]);
   const isAdmin = Boolean(profile?.is_admin);
-  const reports = useAdminList<AdminReport>("/v1/admin/reports", "reports", isAdmin, token);
-  const feedback = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=feedback", "inquiries", isAdmin, token);
-  const contact = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=contact", "inquiries", isAdmin, token);
-  const requests = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=product_request", "inquiries", isAdmin, token);
+  const reports = useAdminList<AdminReport>("/v1/admin/reports", "reports", isAdmin && Boolean(visited.reports), token);
+  const feedback = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=feedback", "inquiries", isAdmin && Boolean(visited.feedback), token);
+  const contact = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=contact", "inquiries", isAdmin && Boolean(visited.contact), token);
+  const requests = useAdminList<AdminInquiry>("/v1/admin/inquiries?source=product_request", "inquiries", isAdmin && Boolean(visited.requests), token);
 
   useEffect(() => {
     if (loading) return;
@@ -636,10 +643,10 @@ export default function AdminPage() {
   const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats" || tab === "announce";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
-    { id: "reports", label: "通報", total: reports.total },
-    { id: "feedback", label: "なんでも書いてね", total: feedback.total },
-    { id: "contact", label: "お問い合わせ", total: contact.total },
-    { id: "requests", label: "商品リクエスト", total: requests.total },
+    { id: "reports", label: "通報", total: visited.reports ? reports.total : -1 },
+    { id: "feedback", label: "なんでも書いてね", total: visited.feedback ? feedback.total : -1 },
+    { id: "contact", label: "お問い合わせ", total: visited.contact ? contact.total : -1 },
+    { id: "requests", label: "商品リクエスト", total: visited.requests ? requests.total : -1 },
     { id: "products", label: "商品", total: -1 },
     { id: "coaches", label: "コーチ", total: -1 },
     { id: "personal", label: "パーソナル", total: -1 },
