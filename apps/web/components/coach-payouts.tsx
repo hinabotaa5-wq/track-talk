@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatYen } from "@/lib/format";
 import { payoutAccountStatus, payoutAccountStatusLabels } from "@/lib/payout-account-status";
@@ -95,6 +96,9 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
           >
             {data.stripe_linked ? "登録を続ける" : "受け取り口座を登録する"}
           </button>
+          <Link href="/coach/payout-guide" className="block text-center text-sm text-blue-300 underline">
+            登録の手順を見る（模式図付き・10分ほど）
+          </Link>
         </div>
       )}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
