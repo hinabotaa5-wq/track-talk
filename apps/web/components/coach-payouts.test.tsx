@@ -29,7 +29,7 @@ it("links to the payout guide from the unregistered notice", async () => {
   const root = createRoot(container);
   try {
     await act(async () => root.render(<CoachEarningsSection token="test" onReady={() => {}} />));
-    expect(container.querySelector('a[href="/coach/payout-guide"]')?.textContent).toBe("登録の手順を見る（図付き）");
+    expect(container.querySelector('a[href="/coach/payout-guide"]')?.textContent).toBe("登録の手順を見る（模式図付き・10分ほど）");
   } finally {
     await act(async () => root.unmount());
     container.remove();

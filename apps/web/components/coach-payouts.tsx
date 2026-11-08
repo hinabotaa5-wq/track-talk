@@ -84,7 +84,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
             {data.stripe_linked ? "登録を続ける" : "受け取り口座を登録する"}
           </button>
           <Link href="/coach/payout-guide" className="block text-center text-sm text-blue-300 underline">
-            登録の手順を見る（図付き）
+            登録の手順を見る（模式図付き・10分ほど）
           </Link>
         </div>
       )}
