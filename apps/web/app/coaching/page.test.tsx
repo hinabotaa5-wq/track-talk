@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CoachingPage from "./page";
 
 const flags = { coaching: false, list: false };
@@ -9,13 +9,28 @@ vi.mock("@/lib/features", async (original) => ({
   get coachingEnabled() { return flags.coaching; },
   get coachingCoachListEnabled() { return flags.list; },
 }));
-beforeEach(() => { flags.coaching = false; flags.list = false; });
+beforeEach(() => {
+  flags.coaching = false;
+  flags.list = false;
+  vi.setSystemTime(new Date("2026-11-14T00:00:00+09:00"));
+});
+afterEach(() => vi.useRealTimers());
 
 vi.mock("next/link", () => ({
   default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
 }));
 
 describe("コーチタブ", () => {
+  it.each([false, true])("開始直前は一覧フラグが %s でも、上部には開始案内だけを出す", (list) => {
+    flags.coaching = true;
+    flags.list = list;
+    vi.setSystemTime(new Date("2026-11-13T23:59:59+09:00"));
+    const html = renderToStaticMarkup(createElement(CoachingPage));
+    expect(html.slice(0, html.indexOf("<nav"))).toContain("11/14(土)に開始します！");
+    expect(html).not.toContain('id="coach-list-heading"');
+    expect(html).not.toContain("登録しているコーチを見る");
+  });
+
   it("一番上にコーチ一覧を準備中として出し、押しても先へ進まない", () => {
     const html = renderToStaticMarkup(createElement(CoachingPage));
     const listAt = html.indexOf("コーチ一覧");
@@ -48,6 +63,7 @@ describe("コーチタブ", () => {
       flags.list = true;
       const html = renderToStaticMarkup(createElement(CoachingPage));
       const box = topListBox(html);
+      expect(html).not.toContain("11/14(土)に開始します！");
       expect(html.indexOf("コーチ一覧")).toBeLessThan(html.indexOf("<nav"));
       expect(box.startsWith('<a href="/coaches"')).toBe(true);
       expect(box).toContain("登録しているコーチを見る");

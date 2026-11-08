@@ -34,12 +34,16 @@ const choices = [
 ] as const;
 
 export default function CoachingPage() {
-  const startNotice = coachingEnabled ? null : videoReviewStartNotice();
+  const startNotice = videoReviewStartNotice();
   return (
     <div className="mx-auto flex min-h-[calc(100svh-10.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-4">
       {/* コーチ一覧はタブの一番上に置く。一覧を閉じている間は中身を見せず、押しても先へ進まない準備中の枠だけを出す。
           一覧フラグを開けたときだけ /coaches へのリンクにする(コーチング本体のフラグでは変えない)。 */}
-      {coachingCoachListEnabled ? <Link href="/coaches" aria-labelledby="coach-list-heading" className="group flex min-w-0 items-center gap-4 rounded-2xl border border-white/20 glass bg-white/10 px-5 py-4 transition hover:border-blue-400/50 hover:bg-blue-500/15 active:scale-[0.98]">
+      {startNotice ? (
+        <p className="flex min-h-20 items-center justify-center rounded-2xl border border-blue-400/40 bg-blue-500/10 px-5 py-4 text-center text-lg font-bold text-slate-100">
+          11/14(土)に開始します！
+        </p>
+      ) : coachingCoachListEnabled ? <Link href="/coaches" aria-labelledby="coach-list-heading" className="group flex min-w-0 items-center gap-4 rounded-2xl border border-white/20 glass bg-white/10 px-5 py-4 transition hover:border-blue-400/50 hover:bg-blue-500/15 active:scale-[0.98]">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
           <Users className="size-6" aria-hidden />
         </span>
