@@ -53,11 +53,24 @@ export function StartupSplash() {
       data-state={phase}
       style={{
         position: "fixed", inset: 0, zIndex: 2147483647,
-        display: "grid", placeItems: "center", background: `var(--background, ${startupSplashBackground})`, pointerEvents: "none",
+        // 容器は全面を覆うだけにし、中央寄せはしない。容器の高さはモバイルの
+        // ツールバーの出入りで変わり、grid 中央のロゴが上下に動いてしまうため。
+        display: "block", background: `var(--background, ${startupSplashBackground})`, pointerEvents: "none",
         animation: "startup-splash-release 400ms 10s forwards",
       }}
     >
-      <TrackLanesMark width="192" height="192" />
+      {/* ロゴの位置は容器の高さではなく小さい側の画面高さ(50svh)を基準にする。
+          ツールバーが隠れて容器が伸びても、最初の表示位置から動かない。
+          svh 未対応の古い端末では globals.css の 50vh が替わりに効く。 */}
+      <div
+        id="startup-splash-logo"
+        style={{
+          position: "absolute", top: "50svh", left: "50%",
+          transform: "translate(-50%, -50%)",
+        }}
+      >
+        <TrackLanesMark width="192" height="192" />
+      </div>
       <noscript><style>{"#startup-splash{display:none!important}"}</style></noscript>
     </div>
   );

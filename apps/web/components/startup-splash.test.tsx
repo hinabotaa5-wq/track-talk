@@ -33,9 +33,21 @@ it("JavaScriptの実行前から画面の背景色(既定は白)の中央にイ�
   const splash = container.querySelector<HTMLElement>("#startup-splash")!;
   expect(splash.style.position).toBe("fixed");
   expect(splash.style.background).toBe("var(--background, #ffffff)");
-  expect(splash.style.placeItems).toBe("center");
-  expect(splash.querySelectorAll("svg path")).toHaveLength(3);
+  const logo = splash.querySelector<HTMLElement>("#startup-splash-logo")!;
+  expect(logo.querySelectorAll("svg path")).toHaveLength(3);
   expect(splash.querySelector("img")).toBeNull();
+});
+
+it("ロゴは容器の高さではなく小さい側の画面高さを基準に中央に置く(ツールバーの出入りで動かない)", () => {
+  const html = renderToStaticMarkup(<StartupSplash />);
+  container.innerHTML = html;
+  const splash = container.querySelector<HTMLElement>("#startup-splash")!;
+  // 容器側の中央寄せは使わない。容器の高さはツールバーの出入りで変わるため。
+  expect(splash.style.placeItems).toBe("");
+  const logo = splash.querySelector<HTMLElement>("#startup-splash-logo")!;
+  expect(logo.style.position).toBe("absolute");
+  expect(logo.style.top).toBe("50svh");
+  expect(logo.style.left).toBe("50%");
 });
 
 it("準備が済んだらフェードしてから閉じ、その後の再読み込み状態では再表示しない", async () => {

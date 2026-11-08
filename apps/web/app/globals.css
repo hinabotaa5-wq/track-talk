@@ -196,6 +196,12 @@ body {
   to { opacity: 0; visibility: hidden; }
 }
 
+/* 起動ロゴは小さい側の画面高さ(50svh)を基準に中央へ置く。svh が使えない古い端末では
+   こちらが替わりに効く(対応端末では startup-splash.tsx の 50svh が勝つ)。 */
+#startup-splash-logo {
+  top: 50vh;
+}
+
 /* 読み込みが済んだら、急に消さずにふわっと消す。長さは startup-splash.tsx の fadeMs と合わせる。 */
 #startup-splash[data-state="leaving"] {
   opacity: 0;
