@@ -93,13 +93,13 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 		linked, err := readNews(ctx, client, source, int(season), known, byKey, q, dryRun)
 		if err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
-			results.record(err)
+			results.recordSource(source.Prefecture, err, 0)
 			if errors.Is(err, competitions.ErrRateLimited) || errors.Is(err, competitions.ErrAuthentication) {
 				return true
 			}
 			continue
 		}
-		results.record(nil)
+		results.recordSource(source.Prefecture, nil, 0)
 		if !dryRun {
 			if err := q.MarkNewsChecked(ctx, source.Prefecture); err != nil {
 				log.Printf("%s: %v", source.Prefecture, err)
@@ -108,6 +108,8 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 		}
 		fmt.Fprintf(os.Stdout, "news %s: %d meets got guidelines\n", source.Prefecture, linked)
 	}
+	// ニュースの読み取りは県ごとに Gemini を1回使う。FetchNewsList で終わった分だけ多めになる。
+	results.geminiCalls += requests
 	return results.failed() || ctx.Err() != nil
 }
 

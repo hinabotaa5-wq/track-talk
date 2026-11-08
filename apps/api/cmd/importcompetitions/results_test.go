@@ -39,7 +39,7 @@ func TestImportResults(t *testing.T) {
 func TestKyotoForbiddenSkippedBeforeGemini(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusForbidden) }))
 	defer srv.Close()
-	_, err := readMeets(context.Background(), competitions.Client{}, competitions.Source{Prefecture: "26", PageURL: srv.URL, PDFLinks: []string{"競技会日程"}})
+	_, err := readMeets(context.Background(), competitions.Client{}, competitions.Source{Prefecture: "26", PageURL: srv.URL, PDFLinks: []string{"競技会日程"}}, nil)
 	if !errors.Is(err, competitions.ErrSourceSkipped) {
 		t.Fatalf("%v", err)
 	}

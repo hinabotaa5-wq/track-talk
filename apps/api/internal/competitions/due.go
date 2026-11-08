@@ -35,38 +35,162 @@ func (s Source) Requests() int {
 	return len(s.URLs())
 }
 
+// 試行の結果。今の期間の記録だけを DueSourcesWithAttempts が見る。
+const (
+	AttemptSuccess   = "success"
+	AttemptPartial   = "partial"
+	AttemptTransient = "transient"
+	AttemptPermanent = "permanent"
+	AttemptSkipped   = "skipped"
+)
+
+// Attempt は、今の期間のある県の取り込み試行の記録。失敗しても残るので、
+// 翌日も同じ県が先頭に固定されて後続の県に予算が届かない、という詰まりを避けられる。
+type Attempt struct {
+	Outcome             string
+	AttemptedAt         time.Time
+	ConsecutiveFailures int
+	FailedURLs          []string
+	RequestsMade        int
+}
+
+// inWindow は、今の期間の試行だけを有効にする。期間が変われば試行の記録は仕切り直しになる。
+func (a Attempt) inWindow(windowStart time.Time) bool {
+	return !a.AttemptedAt.Before(windowStart)
+}
+
+// EffectiveCost は、その県の取り込みに使う Gemini のリクエスト数の見積もり。
+// 直近の部分成功で残りの URL が分かっていれば、その分だけを見る。表がなくて Gemini を
+// 呼ばなかった URL は、試行のたびに数え直さない（一部成功の残り見積もりにだけ反映する）。
+func (s Source) EffectiveCost(attempt *Attempt, windowStart time.Time) int {
+	base := s.Requests()
+	if attempt == nil || !attempt.inWindow(windowStart) || attempt.Outcome != AttemptPartial {
+		return base
+	}
+	if n := len(attempt.FailedURLs); n > 0 && n < base {
+		return n
+	}
+	return base
+}
+
+// maxSingleSourceRequests は、1つの県が1日に使ってよい Gemini のリクエスト数の上限。
+// 予算の過半を超える県（いまは福井の12回だけ）は後回しにして、後続の未試行の県を先に通す。
+// 既存の小さな予算のテストの動きを変えないよう、8回が下限。
+func maxSingleSourceRequests(limit int) int {
+	if half := limit / 2; half > 8 {
+		return half
+	}
+	return 8
+}
+
 // DueSources は、今の期間が始まってからまだ取り込んでいないソースを、古い順に、Gemini のリクエストが limit に収まるだけ返す。
 // 収まらないソースは後日に回し、その日にはいちばん先に並ぶ。
 func DueSources(sources []Source, updated map[string]time.Time, now time.Time, limit int) []Source {
-	sorted := append([]Source(nil), sources...)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		left, leftOK := freshTime(updated, sorted[i].Prefecture)
-		right, rightOK := freshTime(updated, sorted[j].Prefecture)
-		if leftOK != rightOK {
-			return !leftOK
-		}
-		if !leftOK {
-			return sorted[i].Prefecture < sorted[j].Prefecture
-		}
-		if !left.Equal(right) {
-			return left.Before(right)
-		}
-		return sorted[i].Prefecture < sorted[j].Prefecture
-	})
+	return DueSourcesWithAttempts(sources, updated, nil, now, limit)
+}
+
+// DueSourcesWithAttempts は、DueSources に今の期間の試行の記録を足したもの。
+// 並びは「未試行→部分成功の残り→失敗の後回し」の順で、各段の中では DueSources と同じく古い順・コード順を保つ。
+// 1県で予算の大半を使う県は、安い県を詰めたあとで1日1県だけ足す。期間判定の前提（4/1・10/1 ごとに1回）は変えない。
+func DueSourcesWithAttempts(sources []Source, updated map[string]time.Time, attempts map[string]Attempt, now time.Time, limit int) []Source {
 	windowStart := ImportWindowStart(now)
-	var due []Source
-	remaining := limit
-	for _, source := range sorted {
-		imported, ok := freshTime(updated, source.Prefecture)
-		if ok && !imported.Before(windowStart) {
-			continue
+	type candidate struct {
+		source Source
+		tier   int
+		cost   int
+		// tier 内の並びのための鍵
+		fresh  time.Time
+		hasNew bool
+		retry  time.Time
+		fails  int
+	}
+	var cands []candidate
+	for _, source := range sources {
+		imported, fresh := freshTime(updated, source.Prefecture)
+		att, ok := attempts[source.Prefecture]
+		if !ok || !att.inWindow(windowStart) {
+			ok = false
+		}
+		if fresh && !imported.Before(windowStart) {
+			// 今の期間に取り込み済み。部分成功・失敗の記録がある県だけ、残りの分を取り直す。
+			if !ok || (att.Outcome != AttemptPartial && att.Outcome != AttemptTransient && att.Outcome != AttemptPermanent) {
+				continue
+			}
+		} else {
+			// まだ取り込んでいない。成功・スキップ済みは今の期間は終わり。
+			if ok && (att.Outcome == AttemptSuccess || att.Outcome == AttemptSkipped) {
+				continue
+			}
 		}
 		cost := source.Requests()
-		if cost == 0 || cost > remaining {
+		if ok {
+			cost = source.EffectiveCost(&att, windowStart)
+		}
+		if cost == 0 {
 			continue
 		}
-		due = append(due, source)
-		remaining -= cost
+		c := candidate{source: source, cost: cost}
+		switch {
+		case !ok:
+			c.tier = 0
+			c.fresh = imported
+			c.hasNew = fresh
+		case att.Outcome == AttemptPartial:
+			c.tier = 1
+		default:
+			c.tier = 2
+			c.retry = att.AttemptedAt
+			c.fails = att.ConsecutiveFailures
+		}
+		cands = append(cands, c)
+	}
+	sort.SliceStable(cands, func(i, j int) bool {
+		if cands[i].tier != cands[j].tier {
+			return cands[i].tier < cands[j].tier
+		}
+		switch cands[i].tier {
+		case 0:
+			// DueSources と同じく、未取り込みを先に、取り込み済みは古い順に。どちらもコード順で公平に。
+			if cands[i].hasNew != cands[j].hasNew {
+				return !cands[i].hasNew
+			}
+			if cands[i].hasNew && !cands[i].fresh.Equal(cands[j].fresh) {
+				return cands[i].fresh.Before(cands[j].fresh)
+			}
+			return cands[i].source.Prefecture < cands[j].source.Prefecture
+		case 1:
+			return cands[i].source.Prefecture < cands[j].source.Prefecture
+		default:
+			if cands[i].fails != cands[j].fails {
+				return cands[i].fails < cands[j].fails
+			}
+			if !cands[i].retry.Equal(cands[j].retry) {
+				return cands[i].retry.Before(cands[j].retry)
+			}
+			return cands[i].source.Prefecture < cands[j].source.Prefecture
+		}
+	})
+	maxSingle := maxSingleSourceRequests(limit)
+	var due []Source
+	remaining := limit
+	// 安い県から詰めて、後続の未試行の県に予算を届ける。
+	for _, c := range cands {
+		if c.cost > maxSingle {
+			continue
+		}
+		if c.cost > remaining {
+			continue
+		}
+		due = append(due, c.source)
+		remaining -= c.cost
+	}
+	// 高い県は1日1県まで。残りの予算に収まるいちばん優先度の高い県だけ足す。
+	for _, c := range cands {
+		if c.cost <= maxSingle || c.cost > remaining {
+			continue
+		}
+		due = append(due, c.source)
+		break
 	}
 	return due
 }
