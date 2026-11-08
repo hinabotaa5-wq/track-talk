@@ -395,19 +395,6 @@ export function injuryStageChangePayload(answers: InjuryStageChangeAnswers) {
   return { stage: answers.stage, actions: answers.actions, note, note_public: note !== "" && answers.notePublic };
 }
 
-// マイページに出す「ケガから約◯か月」。月だけ答えた以前の人もいるので、月の差で言う。
-export function injuryElapsedText(injuredOn: string, now: Date) {
-  const match = /^(\d{4})-(\d{2})/.exec(injuredOn);
-  if (!match) return "";
-  const [year, month] = jstToday(now).split("-").map(Number);
-  const months = (year - Number(match[1])) * 12 + month - Number(match[2]);
-  if (months <= 0) return "今月ケガ";
-  if (months < 12) return `ケガから約${months}か月`;
-  const years = Math.floor(months / 12);
-  const rest = months % 12;
-  return rest === 0 ? `ケガから約${years}年` : `ケガから約${years}年${rest}か月`;
-}
-
 export function injuryGroupPath(part: string) {
   return `/injury/${part}`;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canPostInStage, injuryCelebrationKey, injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, shouldCelebrate, isCurrentInjuryStage, emptyInjuryJoinAnswers, injuryGroupPath, injuryJoinPayload, injuryJoinStepError, injuryJoinStepsFor, jstToday, togglePreChange,
-  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryElapsedText, injuryStageChangeError, injuryStageChangeStepError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts, injuryPartFigures, injuryPartFigure, injuryGroupsByRegion, defaultInjuryRegion, type InjuryGroupMember } from "./injury";
+  toggleHindsight, sortInjuryGroups, injuryHistoryStageText, injuryRepeatedParts, injuryStageStatText, injuryTypicalStages, isInjuryBodyPart, isInjuryStage, emptyInjuryStageChangeAnswers, injuryStageChangeError, injuryStageChangeStepError, injuryStageChangePayload, toggleInjuryAction, injuryGroupDescriptions, injuryGroupTitle, injuryPercent, injuryRecoveryRangeText, injuryBodyParts, injuryPartFigures, injuryPartFigure, injuryGroupsByRegion, defaultInjuryRegion, type InjuryGroupMember } from "./injury";
 
 describe("injury", () => {
   it("validates body part codes", () => {
@@ -202,15 +202,6 @@ describe("injury stage change", () => {
       note_public: true,
     });
     expect(injuryStageChangePayload({ ...answers, note: "  ", notePublic: true }).note_public).toBe(false);
-  });
-
-  it("says roughly how long ago the injury was, by month", () => {
-    const now = new Date(2026, 9, 15);
-    expect(injuryElapsedText("2026-10", now)).toBe("今月ケガ");
-    expect(injuryElapsedText("2026-08", now)).toBe("ケガから約2か月");
-    expect(injuryElapsedText("2025-10", now)).toBe("ケガから約1年");
-    expect(injuryElapsedText("2024-07", now)).toBe("ケガから約2年3か月");
-    expect(injuryElapsedText("", now)).toBe("");
   });
 });
 

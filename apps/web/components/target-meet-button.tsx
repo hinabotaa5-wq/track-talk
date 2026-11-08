@@ -74,7 +74,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
         ? createPortal(
             <p
               role="status"
-              className="pointer-events-none fixed left-1/2 top-1/2 z-40 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900/90 px-4 py-2 text-sm font-semibold text-slate-100 shadow-lg"
+              className="pointer-events-none fixed left-1/2 top-1/2 z-40 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900/90 px-5 py-3 text-base font-semibold text-slate-100 shadow-lg"
             >
               目標の大会にセットしました
             </p>,

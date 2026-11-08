@@ -221,8 +221,7 @@ export default function NewReviewRequestPage() {
         )}
         <h1 className="text-2xl font-bold">動画添削を頼む</h1>
         <p className="text-sm text-slate-300">コーチを選んで、動画を送ります。料金はどのコーチでも同じです。</p>
-        <SellerNote />
-
+        {me.demo ? <SellerNote /> : null}
       </div>
 
       {!me.demo ? (
