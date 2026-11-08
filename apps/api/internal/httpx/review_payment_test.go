@@ -90,6 +90,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	id := paidReview(t, h, tu, "card", "pi_card_1")
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_intent_data[capture_method]") != "manual" ||
+		form.Get("managed_payments[enabled]") != "false" ||
 		form.Get("line_items[0][price_data][unit_amount]") != "1500" || form.Get("metadata[kind]") != "review" ||
 		form.Get("success_url") != "https://web.test/coaching/requests/"+id+"?paid=1" {
 		t.Fatalf("session %v", form)

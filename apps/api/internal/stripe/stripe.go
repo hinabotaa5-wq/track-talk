@@ -186,9 +186,15 @@ type CheckoutSession struct {
 
 // CreateCheckoutSession は、1回払いの支払い画面を作る。PaymentMethodTypes を指定すればその方法だけ、空なら
 // Stripe のダッシュボードで有効にしたもの（カード・Apple Pay・Google Pay・PayPay など）が出る。
+// Managed Payments は Connect と併用できないため、セッションごとに明示的に無効化する
+// （managed_payments[enabled]=false は旧版でも受付可のため、ピン留めの有無にかかわらず送る）。
+// payment_method_types は API 版 2026-09-30.endive で削除されたため、
+// STRIPE_API_VERSION に Dahlia 世代（例：2026-08-26.dahlia）を設定する運用が前提。
 func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (CheckoutSession, error) {
 	form := url.Values{}
 	form.Set("mode", "payment")
+	// Managed Payments が既定で有効なアカウントでも Connect の代行処理にならないように外す。
+	form.Set("managed_payments[enabled]", "false")
 	form.Set("locale", "ja")
 	form.Set("line_items[0][quantity]", "1")
 	form.Set("line_items[0][price_data][currency]", "jpy")
