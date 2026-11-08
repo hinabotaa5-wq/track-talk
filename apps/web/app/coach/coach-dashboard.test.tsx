@@ -1,0 +1,214 @@
+/** @vitest-environment jsdom */
+import { act, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { CoachDashboard } from "./coach-dashboard";
+
+const apiFetch = vi.fn();
+const flags = vi.hoisted(() => ({ enabled: true }));
+vi.mock("@/lib/api", async (original) => ({
+  ...await original<typeof import("@/lib/api")>(),
+  apiFetch: (...args: unknown[]) => apiFetch(...args),
+}));
+vi.mock("@/lib/features", async (original) => ({
+  ...await original<typeof import("@/lib/features")>(),
+  get coachingEnabled() {
+    return flags.enabled;
+  },
+}));
+vi.mock("@/components/auth-provider", () => ({
+  useAuth: () => ({ session: {}, profile: { nickname: "テスト" }, token: "test", loading: false }),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
+const application = {
+  name: "テストコーチ",
+  service_types: ["video_review"],
+  tier: "coach",
+  events: ["100m"],
+  status: "approved",
+  applied_at: "2026-01-01T00:00:00Z",
+  reviewed_at: null,
+  on_duty: true,
+  daily_cap: 5,
+  photo_url: "",
+  pledged: true,
+  payouts_ready: false,
+};
+
+function reviewRequest(id: string) {
+  return {
+    id,
+    event: "100m",
+    tier: "coach",
+    question: "フォームを見てください",
+    focus: [],
+    status: "in_review",
+    due_at: "2026-12-01T00:00:00Z",
+    requested_coach_id: "coach-1",
+    coach_reward_yen: 1050,
+  };
+}
+
+function mockAll(overrides: Record<string, unknown> = {}) {
+  apiFetch.mockImplementation((path: string) => {
+    if (path === "/v1/coach/me") {
+      return Promise.resolve({ application, rating: { count: 3, average: 4.5, paused: false } });
+    }
+    if (path === "/v1/coach/requests") {
+      return Promise.resolve({
+        offers: [
+          { id: "o1", expires_at: new Date(Date.now() + 50 * 60000).toISOString(), request: reviewRequest("r0") },
+          { id: "o2", expires_at: new Date(Date.now() + 80 * 60000).toISOString(), request: reviewRequest("r0b") },
+        ],
+        reviewing: [reviewRequest("r1")],
+      });
+    }
+    if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [{ id: "c1" }] });
+    if (path === "/v1/coach/contracts") {
+      return Promise.resolve({ contracts: [{ id: "k1", status: "applied" }, { id: "k2", status: "active" }] });
+    }
+    if (path === "/v1/coach/me/earnings") {
+      return Promise.resolve({ unpaid_yen: 1050, next_payout_date: "2026-12-15", next_payout_yen: 1050 });
+    }
+    if (path === "/v1/coach/me/identity-status") return Promise.resolve({ registered: false, applies: true });
+    if (path in overrides) return Promise.resolve(overrides[path]);
+    return Promise.reject(new Error(`unexpected ${path}`));
+  });
+}
+
+let root: Root;
+let container: HTMLDivElement;
+beforeEach(() => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  apiFetch.mockReset();
+  flags.enabled = true;
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+});
+
+function tileHrefs() {
+  return [...container.querySelectorAll('nav[aria-label="コーチのメニュー"] a')].map((a) =>
+    a.getAttribute("href"),
+  );
+}
+
+function tileLabels() {
+  return [...container.querySelectorAll('nav[aria-label="コーチのメニュー"] a')].map((a) =>
+    a.getAttribute("aria-label"),
+  );
+}
+
+// 取得はマウント時に走るので、条件を変える時は掛け直す。
+async function renderFresh() {
+  await act(async () => root.unmount());
+  container.remove();
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CoachDashboard />));
+}
+
+it("ランチャーは10タイルの入口だけで、中身のセクションを出さない", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  expect(tileHrefs()).toEqual([
+    "/coach/requests#offers",
+    "/coach/requests#reviewing",
+    "/coach/consultations",
+    "/coach/contracts",
+    "/coach/plans",
+    "/coach/availability",
+    "/coach/commerce",
+    "/coach/payouts",
+    "/coach/profile",
+    "/me/push",
+  ]);
+  // 中身は個別画面に切り出したので、ランチャーには出さない。
+  expect(container.textContent).not.toContain("引き受ける");
+  expect(container.textContent).not.toContain("見送る");
+  expect(container.textContent).not.toContain("対応待ちの追加相談");
+  expect(container.textContent).not.toContain("受け取り口座を登録する");
+  expect(container.querySelector('a[href="/me/coaching"]')).toBeNull();
+  // ステータスバーは従来どおり操作できる。
+  expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
+  expect(container.querySelector("select")?.value).toBe("5");
+  expect(container.textContent).toContain("★4.5（3件）");
+  // フッターは要約1行とやめる導線だけ。
+  expect(container.textContent).toContain("未払い1,050円");
+  expect(container.querySelector('a[href="/coach/withdraw"]')).not.toBeNull();
+});
+
+it("期限アラートは依頼がある時だけ出て、件数と最短の残り分を示す", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const band = container.querySelector('a[href="/coach/requests#offers"]');
+  expect(band?.textContent).toContain("新しい依頼が2件あります");
+  expect(band?.textContent).toContain("あと");
+  expect(band?.textContent).toContain("分で終了");
+
+  apiFetch.mockImplementation((path: string) => {
+    if (path === "/v1/coach/me") return Promise.resolve({ application });
+    if (path === "/v1/coach/requests") return Promise.resolve({ offers: [], reviewing: [] });
+    if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [] });
+    if (path === "/v1/coach/contracts") return Promise.resolve({ contracts: [] });
+    if (path === "/v1/coach/me/earnings") return Promise.resolve({ unpaid_yen: 0 });
+    if (path === "/v1/coach/me/identity-status") return Promise.resolve({ registered: true, applies: true });
+    return Promise.reject(new Error(`unexpected ${path}`));
+  });
+  await renderFresh();
+  expect(container.textContent).not.toContain("新しい依頼が");
+});
+
+it("バッジは実件数と一致し、未登録の点は条件の時だけ出す", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  expect(tileLabels()).toContain("届いた依頼（2件）");
+  expect(tileLabels()).toContain("添削中（1件）");
+  expect(tileLabels()).toContain("追加相談（1件）");
+  expect(tileLabels()).toContain("契約・申込み（1件）");
+  expect(tileLabels()).toContain("特商法・身元（要確認）");
+  expect(tileLabels()).toContain("報酬・口座（要確認）");
+
+  // 身元が不明（null）や取得失敗のときは点を出さない。
+  for (const status of [{ registered: null, applies: true }, { registered: false, applies: false }]) {
+    apiFetch.mockImplementation((path: string) => {
+      if (path === "/v1/coach/me") return Promise.resolve({ application: { ...application, payouts_ready: true } });
+      if (path === "/v1/coach/requests") return Promise.resolve({ offers: [], reviewing: [] });
+      if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [] });
+      if (path === "/v1/coach/contracts") return Promise.resolve({ contracts: [] });
+      if (path === "/v1/coach/me/earnings") return Promise.resolve({ unpaid_yen: 0 });
+      if (path === "/v1/coach/me/identity-status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    await renderFresh();
+    expect(tileLabels()).toContain("特商法・身元");
+    expect(tileLabels()).not.toContain("特商法・身元（要確認）");
+    expect(tileLabels()).not.toContain("報酬・口座（要確認）");
+  }
+
+  // 取得失敗でも入口は壊れない。
+  apiFetch.mockImplementation((path: string) => {
+    if (path === "/v1/coach/me") return Promise.resolve({ application });
+    return Promise.reject(new Error("down"));
+  });
+  await renderFresh();
+  expect(tileHrefs()).toHaveLength(10);
+});
+
+it("未承認の表示は現行のまま変えない", async () => {
+  apiFetch.mockResolvedValue({ application: { ...application, status: "pending" } });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).toContain("コーチングは準備中です");
+  expect(container.querySelector('nav[aria-label="コーチのメニュー"]')).toBeNull();
+});

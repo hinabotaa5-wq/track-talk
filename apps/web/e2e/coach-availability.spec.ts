@@ -55,7 +55,7 @@ test.beforeEach(async ({ page, context, baseURL }) => {
 });
 
 test("コーチが21日分を入力して保存でき、スマホで横にはみ出さない", async ({ page }) => {
-  await page.goto("/coach");
+  await page.goto("/coach/availability");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
   const editor = page.getByRole("region", { name: "空き状況の入力" });
   await expect(editor.getByRole("button", { name: "○ 空きあり", exact: true })).toBeVisible();
