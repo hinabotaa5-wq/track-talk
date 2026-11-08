@@ -4,8 +4,8 @@ import { InjuryBodyFigure } from "@/components/injury-body-figure";
 import { injuryRegionSpots, type InjuryFigureSide, type InjuryRegion } from "@/lib/injury";
 
 const sides: { side: InjuryFigureSide; label: string }[] = [
-  { side: "front", label: "まえ" },
-  { side: "back", label: "うしろ" },
+  { side: "front", label: "まえ（前面）" },
+  { side: "back", label: "うしろ（背面）" },
 ];
 
 // まえ・うしろの人型に、まとまりごとの人数の丸を置く。丸を押すとそのまとまりを選ぶ。
@@ -22,7 +22,8 @@ export function InjuryBodyMap({
   return (
     <div className="flex justify-center gap-6">
       {sides.map(({ side, label }) => (
-        <figure key={side} className="flex flex-col items-center gap-0.5">
+        <figure key={side} className="flex flex-col items-center gap-2">
+          <figcaption className="rounded-full bg-blue-500/10 px-3 py-1 text-base font-bold text-slate-100">{label}</figcaption>
           <InjuryBodyFigure side={side} className="h-56 w-28">
             {injuryRegionSpots
               .filter((spot) => spot.side === side)
@@ -44,7 +45,6 @@ export function InjuryBodyMap({
                 );
               })}
           </InjuryBodyFigure>
-          <figcaption className="text-xs text-slate-400">{label}</figcaption>
         </figure>
       ))}
     </div>

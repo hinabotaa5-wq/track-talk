@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// エグ練大会。冬(11月〜3月)は大会が少ないので、その回で一番エグかった練習を書いてもらい、
+// エグ練大会。冬(12月〜3月)は大会が少ないので、その回で一番エグかった練習を書いてもらい、
 // 運営が選んだトップ3をみんなで投票して1位を決める。
 //
 // 回は2週間ごとで、開始日(月曜)から日程が決まる。
@@ -22,7 +22,7 @@ import (
 //   - 金〜日: 投票。1人1票で、締め切りまでは入れ直せる。
 //   - 翌週の月曜: 結果を出し、次の回の応募が始まる。
 //
-// シーズンは11月の最初の月曜に始まり、応募の締め切りが3月31日の終わりを過ぎない回までを開く。
+// シーズンは12月の最初の月曜に始まり、応募の締め切りが3月31日の終わりを過ぎない回までを開く。
 const (
 	maxMenuContestBody   = 100
 	maxMenuContestPicks  = 3
@@ -48,9 +48,9 @@ func (r menuContestRound) key() time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// menuContestSeason は year 年11月に始まるシーズンの回を古い順に返す。
+// menuContestSeason は year 年12月に始まるシーズンの回を古い順に返す。
 func menuContestSeason(year int) []menuContestRound {
-	start := time.Date(year, time.November, 1, 0, 0, 0, 0, jst.Zone)
+	start := time.Date(year, time.December, 1, 0, 0, 0, 0, jst.Zone)
 	for start.Weekday() != time.Monday {
 		start = start.AddDate(0, 0, 1)
 	}

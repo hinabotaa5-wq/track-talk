@@ -121,7 +121,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
                 <span className="flex h-1.5 items-center justify-center gap-1" aria-hidden>
                   {written ? <span className="size-1.5 rounded-full bg-sky-300" /> : null}
                   {shared && hasRecord ? <span className="size-1.5 rounded-full bg-amber-300" /> : null}
-                  {hasSummary ? <span className="size-1.5 rounded-full bg-violet-300" /> : null}
+                  {hasSummary ? <span className="size-1.5 rounded-full bg-[#a855f7]" /> : null}
                 </span>
               </button>
             );
@@ -129,7 +129,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
         </div>
         {shared || summaries.length ? <p className="flex flex-nowrap items-center gap-3 whitespace-nowrap text-xs text-slate-300 sm:gap-4">
           {shared ? <><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-300" />記録</span></> : null}
-          <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-violet-300" />AI要約</span>
+          <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#a855f7]" />AI要約</span>
         </p> : null}
         {summariesLoading ? <p role="status" className="sr-only">AI要約を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">AI要約を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
         {recordsLoading ? <p role="status" className="sr-only">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}

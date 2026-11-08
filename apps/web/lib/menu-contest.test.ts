@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { formatRemaining, remainingParts } from "./menu-contest";
 
 describe("remainingParts", () => {
-  const now = Date.parse("2026-11-03T07:00:00+09:00");
+  const now = Date.parse("2026-12-08T07:00:00+09:00");
 
   it("splits the time into days, hours and minutes", () => {
-    const until = Date.parse("2026-11-12T00:00:00+09:00");
+    const until = Date.parse("2026-12-17T00:00:00+09:00");
     const parts = remainingParts(until, now);
     expect(parts).toMatchObject({ days: 8, hours: 17, minutes: 0, urgent: false });
     expect(formatRemaining(parts!)).toBe("8日 17時間 0分");

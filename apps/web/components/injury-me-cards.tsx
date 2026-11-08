@@ -8,7 +8,6 @@ import { InjuryGoalCelebration } from "./injury-goal-celebration";
 import { InjuryStageChange } from "./injury-stage-change";
 import { apiFetch } from "@/lib/api";
 import {
-  injuryElapsedText,
   injuryGroupPath,
   isCurrentInjuryStage,
   sortInjuryGroups,
@@ -18,7 +17,7 @@ import {
 
 type Joined = { part: string; label: string; me: InjuryGroupMember };
 
-// マイページの一番上に出す、いまのケガと段階。入っているグループごとに1枚。どこにも入っていなければ何も出さない。
+// ケガタブに出す、いまのケガと段階。入っているグループごとに1枚。どこにも入っていなければ何も出さない。
 // 大会に復帰したケガはもう「いまのケガ」ではないので出さない。段階の記録はグループにそのまま残る。
 export function InjuryMeCards({ token }: { token: string | null }) {
   const [joined, setJoined] = useState<Joined[]>([]);
@@ -42,7 +41,6 @@ export function InjuryMeCards({ token }: { token: string | null }) {
 
   const current = joined.filter((item) => isCurrentInjuryStage(item.me.stage));
   if (current.length === 0 && celebrating === null) return null;
-  const now = new Date();
 
   return (
     <section aria-label="いまのケガ" className="space-y-3 md:col-span-2">
@@ -50,7 +48,6 @@ export function InjuryMeCards({ token }: { token: string | null }) {
       {celebrating !== null ? <InjuryGoalCelebration onClose={() => setCelebrating(null)} /> : null}
       {current.map((item) => {
         const label = item.me.diagnosis ? `${item.label}(${item.me.diagnosis})` : item.label;
-        const elapsed = injuryElapsedText(item.me.injured_on, now);
         return (
           <div key={item.part} className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
@@ -59,7 +56,6 @@ export function InjuryMeCards({ token }: { token: string | null }) {
                 <p className="text-xs text-slate-300">いまのケガ</p>
                 <p className="font-bold">
                   {label}・{item.me.stage_label}
-                  {elapsed ? <span className="font-normal text-slate-200">({elapsed})</span> : null}
                 </p>
               </Link>
               <Button

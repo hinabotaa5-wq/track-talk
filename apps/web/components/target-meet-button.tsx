@@ -43,7 +43,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
     }
   }
 
-  // セットしたことを画面の下に少しだけ出す。カードの glass は fixed の基準になってしまうので body に出す。
+  // セットしたことを画面の中央に少しだけ出す。カードの glass は fixed の基準になってしまうので body に出す。
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(false), 2500);
@@ -74,7 +74,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
         ? createPortal(
             <p
               role="status"
-              className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-fit rounded-full bg-slate-900/90 px-4 py-2 text-sm font-semibold text-slate-100 shadow-lg md:bottom-6"
+              className="pointer-events-none fixed left-1/2 top-1/2 z-40 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900/90 px-5 py-3 text-base font-semibold text-slate-100 shadow-lg"
             >
               目標の大会にセットしました
             </p>,
