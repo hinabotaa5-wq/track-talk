@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -67,6 +68,36 @@ func TestPostRetriesTransientFailuresOnlyWithIdempotencyKey(t *testing.T) {
 	calls = 0
 	if _, err := c.CreateRefund(context.Background(), "pi_1", 500, ""); err == nil || calls != 1 {
 		t.Fatalf("no key: %v calls=%d", err, calls)
+	}
+}
+
+func TestCreateCheckoutSessionDisablesManagedPayments(t *testing.T) {
+	var form string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		form = string(body)
+		_, _ = w.Write([]byte(`{"id":"cs_1","url":"https://checkout.stripe.com/pay/cs_1","expires_at":1700000000,"payment_status":"unpaid","payment_intent":"pi_1"}`))
+	}))
+	defer srv.Close()
+	c := Client{Secret: "sk_test_x", APIBase: srv.URL, APIVersion: "2026-08-26.dahlia", RetryDelay: time.Millisecond}
+
+	s, err := c.CreateCheckoutSession(context.Background(), CheckoutParams{
+		Name: "動画添削", AmountYen: 1500, SuccessURL: "https://web.test/ok", CancelURL: "https://web.test/cancel",
+		Reference: "ref-1", Metadata: map[string]string{"kind": "review"},
+		ExpiresAt: time.Unix(1700000000, 0), IdempotencyKey: "key-1",
+		PaymentMethodTypes: []string{"card"}, CaptureManual: true,
+	})
+	if err != nil || s.ID != "cs_1" {
+		t.Fatalf("session: %+v %v", s, err)
+	}
+	for _, want := range []string{
+		"managed_payments%5Benabled%5D=false",
+		"payment_method_types%5B0%5D=card",
+		"payment_intent_data%5Bcapture_method%5D=manual",
+	} {
+		if !strings.Contains(form, want) {
+			t.Fatalf("missing %s in %s", want, form)
+		}
 	}
 }
 
