@@ -3,11 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { InjuryJoinWizard } from "./injury-join-wizard";
-
-vi.mock("./leave-guard", () => ({
-  LeaveGuardArea: ({ children }: { children: React.ReactNode }) => children,
-  useLeaveGuard: () => ({ setDirty: vi.fn() }),
-}));
+import { LeaveGuardProvider } from "./leave-guard";
 
 it.each([
   ["違和感の段階で休む", "ウォームアップを念入りにする"],
@@ -24,10 +20,16 @@ it.each([
   };
 
   try {
-    act(() => root.render(<InjuryJoinWizard part="hamstring-strain" token={null} onJoined={vi.fn()} />));
+    act(() => root.render(
+      <LeaveGuardProvider>
+        <InjuryJoinWizard part="hamstring-strain" token={null} onJoined={vi.fn()} />
+      </LeaveGuardProvider>,
+    ));
+    expect(window.dispatchEvent(new Event("beforeunload", { cancelable: true }))).toBe(true);
     for (const label of ["ケガの重さ", "病院でみてもらったか"]) {
       const choice = container.querySelector<HTMLButtonElement>(`[aria-label="${label}"] button`)!;
       act(() => choice.click());
+      expect(window.dispatchEvent(new Event("beforeunload", { cancelable: true }))).toBe(false);
       act(() => button("次へ").click());
     }
     act(() => {

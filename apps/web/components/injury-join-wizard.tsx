@@ -71,6 +71,7 @@ export function InjuryJoinWizard({
   const today = jstToday(now);
 
   function change(patch: Partial<InjuryJoinAnswers> | ((current: InjuryJoinAnswers) => Partial<InjuryJoinAnswers>)) {
+    setDirty(true);
     setAnswers((current) => ({ ...current, ...(typeof patch === "function" ? patch(current) : patch) }));
     setError("");
   }

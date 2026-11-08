@@ -42,7 +42,7 @@ export function InjuryStageChange({
   const [answers, setAnswers] = useState<InjuryStageChangeAnswers>(emptyInjuryStageChangeAnswers);
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
-  const { setDirty } = useLeaveGuard();
+  const { setDirty, confirmLeave } = useLeaveGuard();
   const noteLength = [...answers.note.trim()].length;
   const step = injuryStageChangeSteps[index];
   const last = index === injuryStageChangeSteps.length - 1;
@@ -53,6 +53,7 @@ export function InjuryStageChange({
   } as const;
 
   function change(patch: Partial<InjuryStageChangeAnswers>) {
+    setDirty(true);
     setAnswers((current) => ({ ...current, ...patch }));
     setError("");
   }
@@ -169,7 +170,7 @@ export function InjuryStageChange({
             variant="secondary"
             onClick={() => {
               if (index === 0) {
-                onCancel();
+                if (!confirmLeave(onCancel)) onCancel();
                 return;
               }
               setIndex(index - 1);
