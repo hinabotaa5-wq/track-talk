@@ -1,0 +1,155 @@
+"use client";
+
+import { WorkOrderTermsView } from "@/components/work-order-terms";
+
+import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
+import { Button } from "@/components/ui/button";
+import { apiFetch, ApiRequestError } from "@/lib/api";
+import { coachingMessagingEnabled } from "@/lib/features";
+import { formatDateTime, formatYen } from "@/lib/format";
+import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { reviewQuestionText } from "@/lib/review";
+import type { CoachRequests, CoachReviewRequest } from "@/lib/types";
+import { useActionLock } from "@/lib/use-action-lock";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+// 打診の残り分数。expires_at はサーバーが打診の作成時刻から決めた値（23:00–07:00 は停止）で、
+// ここでは表示のためだけに現在時刻との差を出す。起点の再計算はしない。
+export function minutesLeft(iso: string, now: number) {
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 60000));
+}
+
+function RequestSummary({ request }: { request: CoachReviewRequest }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="font-semibold text-white">
+        {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
+      </p>
+      {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">あなたを選んだ依頼 · 報酬{formatYen(request.coach_reward_yen ?? 0)}</p> : null}
+      <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
+      {request.status === "needs_info" ? null : <p className="text-xs text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>}
+    </div>
+  );
+}
+
+// 届いた打診の引き受け・見送りと、添削中の依頼の一覧。/coach/requests で使う。
+export function CoachRequestsSection({ token }: { token: string | null }) {
+  const [data, setData] = useState<CoachRequests | null>(null);
+  const [error, setError] = useState("");
+  // 読み込みの失敗は、引き受け・見送りの失敗と分ける（読み込めたら消える）。
+  const [loadError, setLoadError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const [reload, setReload] = useState(0);
+  const { pending, acquire, release } = useActionLock();
+
+  const fetchRequests = useCallback(() => apiFetch<CoachRequests>("/v1/coach/requests", { token }), [token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchRequests()
+        .then((d) => {
+          if (cancelled) return;
+          setData(d);
+          setNow(Date.now());
+          setLoadError("");
+        })
+        .catch(() => {
+          if (!cancelled) setLoadError("依頼を読み込めませんでした");
+        });
+    };
+    load();
+    // 打診の残り時間を出し直し、期限が過ぎた打診を消すため、30秒ごとに読み直す。
+    const timer = window.setInterval(load, 30000);
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [fetchRequests, reload]);
+
+  async function answer(offerID: string, action: "accept" | "decline") {
+    if (!acquire()) return;
+    setError("");
+    try {
+      await apiFetch(`/v1/coach/offers/${offerID}/${action}`, { method: "POST", token });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+    } finally {
+      release();
+      setReload((n) => n + 1);
+    }
+  }
+
+  const shownError = error || loadError;
+  if (!data) return shownError ? <p className="text-sm text-red-400">{shownError}</p> : null;
+
+  return (
+    <>
+      <section className="space-y-2 scroll-mt-20" id="offers">
+        <h2 className="font-bold">届いている依頼</h2>
+        {data.offers.length === 0 ? <p className="text-sm text-slate-300">いま届いている依頼はありません</p> : null}
+        <ul className="space-y-2">
+          {data.offers.map((offer) => (
+            <li key={offer.id} className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
+              <RequestSummary request={offer.request} />
+              <p className="text-sm font-semibold text-white">{formatDateTime(offer.expires_at)}までに引き受けてください（あと{minutesLeft(offer.expires_at, now)}分）。過ぎると依頼は終了します</p>
+              {offer.terms ? <WorkOrderTermsView terms={offer.terms} /> : null}
+              {coachingMessagingEnabled && !offer.request.info_request ? (
+                <CoachInfoRequestForm requestID={offer.request.id} token={token} onSent={() => setReload((n) => n + 1)} />
+              ) : null}
+              <div className="flex gap-2">
+                <Button type="button" className="flex-1" disabled={pending} onClick={() => void answer(offer.id, "accept")}>
+                  引き受ける
+                </Button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void answer(offer.id, "decline")}
+                  className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
+                >
+                  見送る
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {shownError ? <p className="text-sm text-red-400">{shownError}</p> : null}
+      </section>
+
+      <section className="space-y-2 scroll-mt-20" id="reviewing">
+        <h2 className="font-bold">添削中</h2>
+        {data.reviewing.length === 0 ? <p className="text-sm text-slate-300">添削中の依頼はありません</p> : null}
+        <ul className="space-y-3">
+          {data.reviewing.map((request) => (
+            <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
+              <RequestSummary request={request} />
+              {request.info_request && request.status === "needs_info" ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
+              {request.video_url ? (
+                <video
+                  src={request.video_url}
+                  poster={request.thumbnail_url || undefined}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full rounded-lg bg-black"
+                />
+              ) : null}
+              <Link
+                href={`/coach/requests/${request.id}`}
+                className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
+              >
+                {request.status === "clarifying" ? "補足を書く" : request.status === "needs_info" ? "依頼を開く" : "返答を書く"}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}

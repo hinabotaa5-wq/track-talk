@@ -415,6 +415,12 @@ export type CoachApplication = {
   payouts_ready: boolean;
 };
 
+// コーチ本人の身元登録の有無（中身は含まない）。registered が null は不明（未設定・障害時）。
+export type CoachIdentityStatus = {
+  registered: boolean | null;
+  applies: boolean;
+};
+
 // コーチへの報酬と、月ごとの送金。
 export type CoachPayoutStatus = "pending" | "paid" | "failed";
 export type CoachPayout = {
