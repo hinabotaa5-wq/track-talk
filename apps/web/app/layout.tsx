@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import { ScrollTopOnTabChange } from "@/components/scroll-top-on-tab-change";
 import { LastTabRestorer } from "@/components/last-tab-restorer";
+import { ResumeRecovery } from "@/components/resume-recovery";
 import { lastTabStartupScript } from "@/lib/last-tab";
 import { pendingLinkStartupScript } from "@/lib/pending-link-startup";
 import { themeColors, themeStartupScript } from "@/lib/theme";
@@ -112,6 +113,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ProfileGate />
           <Suspense fallback={null}>
             <LastTabRestorer />
+          </Suspense>
+          <Suspense fallback={null}>
+            <ResumeRecovery />
           </Suspense>
           <Suspense fallback={null}>
             <PendingLinkReset />
