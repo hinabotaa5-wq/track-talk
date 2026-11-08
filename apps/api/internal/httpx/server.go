@@ -361,6 +361,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coach/me/pledge", s.pledgeCoach)
 				r.Patch("/coach/me/services", s.updateCoachServices)
 				r.Get("/coach/me/earnings", s.coachEarnings)
+				r.Get("/coach/me/identity-status", s.coachIdentityStatus)
 				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
 				r.Get("/coach/me/availability", s.getMyCoachAvailability)
 				r.Put("/coach/me/availability", s.saveCoachAvailability)
