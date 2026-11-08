@@ -30,19 +30,19 @@ async function buy() {
   await act(async () => button.click());
 }
 
-it("決済から戻っただけでは残高を増やさず、サーバー確定後に元の相談画面へ戻る", async () => {
+it("決済確認中は購入を止め、サーバー確定後に元の相談画面へ戻る", async () => {
   vi.useFakeTimers(); mocks.query = "purchase=payment-id";
   let paid = false;
   mocks.api.mockImplementation(async (path: string) => path.includes("/purchases/")
     ? { status: paid ? "paid" : "pending", return_path: "/coaching/new" }
     : { ...initial, balance: { available: paid ? 5 : 0, reserved: 0 } });
   await render();
-  expect(container.textContent).toContain("利用できるチケット：0枚");
+  expect([...container.querySelectorAll("button")].find((b) => b.textContent === "購入する")?.disabled).toBe(true);
   expect(container.textContent).toContain("お支払いの確認中");
   expect(mocks.router.replace).not.toHaveBeenCalled();
   paid = true;
   await act(async () => vi.advanceTimersByTimeAsync(2000));
-  expect(container.textContent).toContain("利用できるチケット：5枚");
+  expect(container.textContent).toContain("購入内容を反映しました");
   expect(mocks.router.replace).toHaveBeenCalledWith("/coaching/new");
 });
 
@@ -84,13 +84,13 @@ it("利用設定の案内を表示せず、購入できない場合は購入を�
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
-it("販売を止めている間は商品と購入ボタンを出さず、終了の案内と残高だけを出す", async () => {
+it("販売を止めている間は終了を案内し、購入ボタンや残高・履歴を出さない", async () => {
   mocks.api.mockResolvedValue({
     ...initial, products: [], can_purchase: false, sales_open: false, balance: { available: 3, reserved: 0 },
     purchase_block_reason: "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください",
   });
   await render();
   expect(container.textContent).toContain("新規販売は終了しました");
-  expect(container.textContent).toContain("利用できるチケット：3枚");
+  expect(container.textContent).not.toMatch(/利用できるチケット|確保中|購入履歴|チケットの動き/);
   expect([...container.querySelectorAll("button")].some((b) => b.textContent === "購入する")).toBe(false);
 });

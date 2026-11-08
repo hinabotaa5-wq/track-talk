@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
+import { InjuryGroupLeave } from "./injury-group-leave";
 import { InjuryChoices } from "./injury-choices";
 import { LeaveGuardArea, useLeaveGuard } from "./leave-guard";
 import { apiFetch, apiErrorText } from "@/lib/api";
@@ -31,17 +32,21 @@ export function InjuryStageChange({
   member,
   onChanged,
   onCancel,
+  onLeft,
 }: {
   part: string;
   token: string | null;
   member: InjuryGroupMember;
   onChanged: (member: InjuryGroupMember, celebrate: boolean) => void;
   onCancel: () => void;
+  onLeft?: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<InjuryStageChangeAnswers>(emptyInjuryStageChangeAnswers);
   const [error, setError] = useState("");
-  const { pending, acquire, release } = useActionLock();
+  const [saving, setSaving] = useState(false);
+  const lock = useActionLock();
+  const { pending, acquire, release } = lock;
   const { setDirty, confirmLeave } = useLeaveGuard();
   const nextStageLabel = injuryStages.find(({ value }) => value === answers.stage)?.label;
   const noteLength = [...answers.note.trim()].length;
@@ -61,6 +66,7 @@ export function InjuryStageChange({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (pending) return;
     const stepProblem = injuryStageChangeStepError(step, answers, member.stage);
     if (stepProblem) {
       setError(stepProblem);
@@ -76,6 +82,7 @@ export function InjuryStageChange({
       return;
     }
     if (!acquire()) return;
+    setSaving(true);
     setError("");
     try {
       const next = await apiFetch<InjuryGroupMember>(`/v1/injury/groups/${part}/me`, {
@@ -88,6 +95,7 @@ export function InjuryStageChange({
       onChanged(next, claimCelebration(part, next.stage));
     } catch (e) {
       setError(apiErrorText(e, "段階を変えられませんでした"));
+      setSaving(false);
       release();
     }
   }
@@ -108,11 +116,24 @@ export function InjuryStageChange({
               <span key={item} className={`h-1 flex-1 rounded-full ${i <= index ? "bg-blue-400" : "bg-white/20"}`} />
             ))}
           </div>
-          <h3 className="mt-4 text-base font-bold">{questions[step]}</h3>
-          {step === "actions" ? <p className="mt-1 text-sm text-slate-300">いくつでも</p> : null}
-          <p className="mt-1 text-xs text-slate-300">
-            {index + 1} / {injuryStageChangeSteps.length}
-          </p>
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+            <div>
+              <h3 className="text-base font-bold">{questions[step]}</h3>
+              {step === "actions" ? <p className="mt-1 text-sm text-slate-300">いくつでも</p> : null}
+              <p className="mt-1 text-xs text-slate-300">
+                {index + 1} / {injuryStageChangeSteps.length}
+              </p>
+            </div>
+            {onLeft ? (
+              <InjuryGroupLeave
+                part={part}
+                token={token}
+                lock={lock}
+                onLeft={() => { setDirty(false); onLeft(); }}
+                inStageForm
+              />
+            ) : null}
+          </div>
         </div>
 
         {step === "stage" ? (
@@ -121,7 +142,7 @@ export function InjuryStageChange({
             options={injuryStages}
             selected={(value) => answers.stage === value}
             onSelect={(stage) => change({ stage })}
-            disabled={(value) => value === member.stage}
+            disabled={(value) => pending || value === member.stage}
             note={(value) => (value === member.stage ? "(いま)" : "")}
           />
         ) : null}
@@ -132,6 +153,7 @@ export function InjuryStageChange({
             options={injuryActions}
             selected={(value) => answers.actions.includes(value)}
             onSelect={(value) => change({ actions: toggleInjuryAction(answers.actions, value) })}
+            disabled={() => pending}
           />
         ) : null}
 
@@ -166,8 +188,8 @@ export function InjuryStageChange({
         ) : null}
 
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <p role="status" className={pending ? "text-sm text-slate-200" : "sr-only"}>
-          {pending ? "段階を変えています" : ""}
+        <p role="status" className={saving ? "text-sm text-slate-200" : "sr-only"}>
+          {saving ? "段階を変えています" : ""}
         </p>
 
         <div className="flex gap-2">
@@ -187,7 +209,7 @@ export function InjuryStageChange({
             {index === 0 ? "やめる" : "戻る"}
           </Button>
           <Button type="submit" className="flex-1" disabled={pending}>
-            {pending ? `${nextStageLabel}に変更しています…` : last ? "段階を変える" : "次へ"}
+            {saving ? `${nextStageLabel}に変更しています…` : last ? "段階を変える" : "次へ"}
           </Button>
         </div>
       </form>

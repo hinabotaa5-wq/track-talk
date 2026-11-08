@@ -13,9 +13,9 @@ export function HomePostButton() {
       prefetch={true}
       href={!sessionLoading && !session ? "/login?next=/upload" : "/upload"}
       aria-label="投稿する"
-      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border-2 border-[#082554] bg-[#0759c7] text-pure-white shadow-lg shadow-[#020617]/50 transition hover:bg-[#0866df] active:scale-[0.98]"
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border-2 border-blue-400/40 bg-blue-700 text-pure-white shadow-lg shadow-blue-700/25 transition hover:bg-blue-600 active:scale-[0.98]"
     >
-      <Plus className="size-6" strokeWidth={3} aria-hidden />
+      <Plus className="size-6" strokeWidth={2.5} aria-hidden />
     </MainTabLink>
   );
 }

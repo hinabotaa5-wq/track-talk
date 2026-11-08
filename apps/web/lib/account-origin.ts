@@ -3,7 +3,7 @@ const key = "account-origin";
 export function readAccountOrigin() {
   try {
     const path = sessionStorage.getItem(key) ?? "/";
-    return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/me") && !path.startsWith("/login") ? path : "/";
+    return path.startsWith("/") && !path.startsWith("//") && !/^\/(me|login)([/?]|$)/.test(path) ? path : "/";
   } catch { return "/"; }
 }
 

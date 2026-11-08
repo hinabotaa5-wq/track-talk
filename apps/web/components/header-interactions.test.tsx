@@ -95,11 +95,17 @@ describe("ヘッダーの開閉", () => {
     expect(button?.className).toContain("bg-white/20");
   });
 
-  it("マイページでも元の下部タブの選択を保持する", async () => {
+  it.each([
+    ["/memo", "memo"],
+    ["/injury?tab=data", "injury"],
+    ["/competitions", "competitions"],
+    ["/coaching", "coaching"],
+    ["/", "home"],
+  ])("マイページでも %s の下部タブの選択を保持する", async (origin, tab) => {
     function Selection() { return <span>{useCurrentMainTab("/me")}</span>; }
-    sessionStorage.setItem("account-origin", "/injury?tab=data");
+    sessionStorage.setItem("account-origin", origin);
     await act(async () => root.render(<Selection />));
-    expect(container.textContent).toBe("injury");
+    expect(container.textContent).toBe(tab);
   });
 
   it("ケガタブから開いた投稿の詳細でも選択色を保つ", async () => {

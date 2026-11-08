@@ -84,7 +84,7 @@ func TestMenuContestRound(t *testing.T) {
 	voter := token(t, uuid.New())
 
 	// シーズン前は回がなく、次の開始日だけ返す。応募もできない。
-	clock.Set("2026-10-20 12:00:00")
+	clock.Set("2026-11-20 12:00:00")
 	if v := menuContest(t, h, ""); v.Round != nil || v.NextStartsAt == nil {
 		t.Fatalf("off season = %+v", v)
 	}
@@ -93,7 +93,7 @@ func TestMenuContestRound(t *testing.T) {
 	}
 
 	// 応募期間。1人1件で、書き直すと上書きになる。
-	clock.Set("2026-11-03 07:00:00")
+	clock.Set("2026-12-08 07:00:00")
 	if rec := doJSON(t, h, http.MethodPut, "/v1/menu-contest/entry", "", map[string]any{"body": "x"}); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous entry = %d", rec.Code)
 	}
@@ -118,7 +118,7 @@ func TestMenuContestRound(t *testing.T) {
 	}
 
 	// 締め切り後(木曜)。応募は閉じ、運営が一覧を読んでトップ3を選ぶ。
-	clock.Set("2026-11-12 09:00:00")
+	clock.Set("2026-12-17 09:00:00")
 	if rec := doJSON(t, h, http.MethodPut, "/v1/menu-contest/entry", alice, map[string]any{"body": "x"}); rec.Code != http.StatusConflict {
 		t.Fatalf("late entry = %d", rec.Code)
 	}
@@ -158,7 +158,7 @@ func TestMenuContestRound(t *testing.T) {
 	}
 
 	// 金曜から投票。ニックネームは公開している人だけ出る。自分には投票できない。
-	clock.Set("2026-11-13 20:00:00")
+	clock.Set("2026-12-18 20:00:00")
 	v = menuContest(t, h, alice)
 	if v.Round.Phase != "voting" || len(v.Round.Finalists) != 2 {
 		t.Fatalf("voting = %+v", v.Round)
@@ -198,7 +198,7 @@ func TestMenuContestRound(t *testing.T) {
 	}
 
 	// 翌週の月曜。次の回の応募が始まり、前の回の結果が出る。
-	clock.Set("2026-11-16 08:00:00")
+	clock.Set("2026-12-21 08:00:00")
 	v = menuContest(t, h, "")
 	if v.Round == nil || v.Round.Number != 2 || v.Round.Phase != "entry" || v.LastResult == nil || v.LastResult.Number != 1 {
 		t.Fatalf("next round = %+v %+v", v.Round, v.LastResult)

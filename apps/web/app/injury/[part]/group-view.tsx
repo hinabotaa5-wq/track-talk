@@ -10,14 +10,14 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { InjuryGoalCelebration } from "@/components/injury-goal-celebration";
 import { InjuryJoinWizard } from "@/components/injury-join-wizard";
 import { InjuryRoadmap } from "@/components/injury-roadmap";
-import { Button } from "@/components/ui/button";
+import { InjuryGroupLeave } from "@/components/injury-group-leave";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { LoadMore } from "@/components/load-more";
+import { useActionLock } from "@/lib/use-action-lock";
 import { useCursorPosts } from "@/lib/use-cursor-posts";
 import {
   canPostInStage,
-  injuryBodyPartLabel,
   injuryGroupDescriptions,
   injuryGroupTitle,
   injuryStages,
@@ -32,8 +32,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
   const router = useRouter();
-  const [leaving, setLeaving] = useState<"idle" | "confirm" | "busy">("idle");
-  const [leaveError, setLeaveError] = useState("");
+  const leaveLock = useActionLock();
   // 段階を変えるページから、初めて大会に復帰して戻ってきたときだけ祝う。
   const [celebrate, setCelebrate] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("celebrate"));
   const [joining, setJoining] = useState(false);
@@ -71,18 +70,6 @@ export function GroupView({ part, members, summary }: { part: string; members: n
   const myStage = joined ? load.group.me.stage : null;
   // 最初の1ページだけ読み、続きは末尾に近づいたら足す。自分の段階が変わったら読み直す。
   const feed = useCursorPosts(joined && selected ? `/v1/injury/groups/${part}/posts?stage=${selected}` : null, token, myStage);
-
-  async function leaveGroup() {
-    setLeaving("busy");
-    setLeaveError("");
-    try {
-      await apiFetch(`/v1/injury/groups/${part}/me`, { method: "DELETE", token });
-      router.push("/injury");
-    } catch (e) {
-      setLeaveError(e instanceof ApiRequestError ? e.message : "グループを抜けられませんでした");
-      setLeaving("confirm");
-    }
-  }
 
   // 入っていない人(ログインしていない人や検索から来た人も)には、グループの紹介と入るボタンだけを見せる。
   // サーバーで描くときはまだログインがわからないので、最初はこの形で描く。
@@ -212,30 +199,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       </div>
 
       <div className="space-y-2 border-t border-white/15 pt-4">
-        {leaving === "idle" ? (
-          <button
-            type="button"
-            onClick={() => setLeaving("confirm")}
-            className="text-sm font-semibold text-slate-300 underline-offset-2 hover:underline"
-          >
-            このグループを抜ける
-          </button>
-        ) : (
-          <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/8 p-3 text-sm text-slate-200">
-            <p>
-              {injuryBodyPartLabel(group.body_part)}のグループを抜けますか?段階の記録は消えます。投稿は残ります。
-            </p>
-            <div className="flex gap-2">
-              <Button type="button" variant="danger" disabled={leaving === "busy"} onClick={() => void leaveGroup()}>
-                {leaving === "busy" ? "抜けています…" : "抜ける"}
-              </Button>
-              <Button type="button" variant="secondary" disabled={leaving === "busy"} onClick={() => setLeaving("idle")}>
-                やめる
-              </Button>
-            </div>
-            {leaveError ? <p className="text-red-400">{leaveError}</p> : null}
-          </div>
-        )}
+        <InjuryGroupLeave part={part} token={token} lock={leaveLock} onLeft={() => router.push("/injury")} />
       </div>
     </div>
   );
