@@ -43,6 +43,7 @@ export function InjuryStageChange({
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
   const { setDirty, confirmLeave } = useLeaveGuard();
+  const nextStageLabel = injuryStages.find(({ value }) => value === answers.stage)?.label;
   const noteLength = [...answers.note.trim()].length;
   const step = injuryStageChangeSteps[index];
   const last = index === injuryStageChangeSteps.length - 1;
@@ -75,6 +76,7 @@ export function InjuryStageChange({
       return;
     }
     if (!acquire()) return;
+    setError("");
     try {
       const next = await apiFetch<InjuryGroupMember>(`/v1/injury/groups/${part}/me`, {
         method: "PATCH",
@@ -82,10 +84,10 @@ export function InjuryStageChange({
         body: JSON.stringify(injuryStageChangePayload(answers)),
       });
       setDirty(false);
+      // 変更後の画面に切り替わるまで、処理中の表示と二重送信防止を保つ。
       onChanged(next, claimCelebration(part, next.stage));
     } catch (e) {
       setError(apiErrorText(e, "段階を変えられませんでした"));
-    } finally {
       release();
     }
   }
@@ -141,6 +143,7 @@ export function InjuryStageChange({
               maxLength={injuryStageNoteMaxLength}
               placeholder="例: 痛みがなくても、ジョグは1日おきにした"
               value={answers.note}
+              disabled={pending}
               onChange={(e) => change({ note: e.target.value })}
             />
             <p className="text-right text-xs text-slate-300">
@@ -151,7 +154,7 @@ export function InjuryStageChange({
                 type="checkbox"
                 className="mt-0.5 size-4 accent-blue-500"
                 checked={noteLength > 0 && answers.notePublic}
-                disabled={noteLength === 0}
+                disabled={pending || noteLength === 0}
                 onChange={(e) => change({ notePublic: e.target.checked })}
               />
               <span>
@@ -163,6 +166,9 @@ export function InjuryStageChange({
         ) : null}
 
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        <p role="status" className={pending ? "text-sm text-slate-200" : "sr-only"}>
+          {pending ? "段階を変えています" : ""}
+        </p>
 
         <div className="flex gap-2">
           <Button
@@ -181,7 +187,7 @@ export function InjuryStageChange({
             {index === 0 ? "やめる" : "戻る"}
           </Button>
           <Button type="submit" className="flex-1" disabled={pending}>
-            {last ? (pending ? "変えています" : "段階を変える") : "次へ"}
+            {pending ? `${nextStageLabel}に変更しています…` : last ? "段階を変える" : "次へ"}
           </Button>
         </div>
       </form>
