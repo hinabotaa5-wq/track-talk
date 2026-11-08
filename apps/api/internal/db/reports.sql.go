@@ -156,6 +156,11 @@ func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (Cre
 }
 
 const listAdminReports = `-- name: ListAdminReports :many
+WITH recent AS (
+    SELECT id, reporter_id, target_type, target_id, reason, detail, status, created_at, by_guardian FROM reports
+    ORDER BY created_at DESC
+    LIMIT $1 OFFSET $2
+)
 SELECT
     r.id,
     r.target_type,
@@ -173,7 +178,7 @@ SELECT
     COALESCE(p.body, c.body, n.note, rr.good_point, pr.comment, ''::text)::text AS target_body,
     (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at, rr.hidden_at, pr.hidden_at) IS NOT NULL)::boolean AS target_hidden,
     COALESCE(n.body_part, ''::text)::text AS injury_part
-FROM reports r
+FROM recent r
 JOIN profiles rp ON rp.id = r.reporter_id
 LEFT JOIN posts p ON r.target_type = 'post' AND p.id = r.target_id
 LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
@@ -182,7 +187,6 @@ LEFT JOIN review_responses rr ON r.target_type = 'review_response' AND rr.reques
 LEFT JOIN coaching_messages cm ON r.target_type = 'coaching_message' AND cm.id = r.target_id
 LEFT JOIN practice_ratings pr ON r.target_type = 'practice_rating' AND pr.id = r.target_id
 ORDER BY r.created_at DESC
-LIMIT $1 OFFSET $2
 `
 
 type ListAdminReportsParams struct {
@@ -208,6 +212,7 @@ type ListAdminReportsRow struct {
 	InjuryPart         string    `json:"injury_part"`
 }
 
+// 先に新しい順で20件台に絞ってから表引きする。全件に6つの LEFT JOIN を当てて並べ替えると遅くなるため。
 func (q *Queries) ListAdminReports(ctx context.Context, arg ListAdminReportsParams) ([]ListAdminReportsRow, error) {
 	rows, err := q.db.Query(ctx, listAdminReports, arg.Limit, arg.Offset)
 	if err != nil {

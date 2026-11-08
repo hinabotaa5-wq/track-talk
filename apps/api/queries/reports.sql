@@ -13,6 +13,12 @@ RETURNING id, reporter_id, target_type, target_id, reason, detail, status, creat
 SELECT count(*) FROM reports;
 
 -- name: ListAdminReports :many
+-- 先に新しい順で20件台に絞ってから表引きする。全件に6つの LEFT JOIN を当てて並べ替えると遅くなるため。
+WITH recent AS (
+    SELECT * FROM reports
+    ORDER BY created_at DESC
+    LIMIT $1 OFFSET $2
+)
 SELECT
     r.id,
     r.target_type,
@@ -30,7 +36,7 @@ SELECT
     COALESCE(p.body, c.body, n.note, rr.good_point, pr.comment, ''::text)::text AS target_body,
     (COALESCE(p.hidden_at, c.hidden_at, n.hidden_at, rr.hidden_at, pr.hidden_at) IS NOT NULL)::boolean AS target_hidden,
     COALESCE(n.body_part, ''::text)::text AS injury_part
-FROM reports r
+FROM recent r
 JOIN profiles rp ON rp.id = r.reporter_id
 LEFT JOIN posts p ON r.target_type = 'post' AND p.id = r.target_id
 LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
@@ -38,8 +44,7 @@ LEFT JOIN injury_group_stage_log n ON r.target_type = 'injury_note' AND n.note_i
 LEFT JOIN review_responses rr ON r.target_type = 'review_response' AND rr.request_id = r.target_id
 LEFT JOIN coaching_messages cm ON r.target_type = 'coaching_message' AND cm.id = r.target_id
 LEFT JOIN practice_ratings pr ON r.target_type = 'practice_rating' AND pr.id = r.target_id
-ORDER BY r.created_at DESC
-LIMIT $1 OFFSET $2;
+ORDER BY r.created_at DESC;
 
 -- name: ListMyReportedTargets :many
 SELECT target_type, target_id
