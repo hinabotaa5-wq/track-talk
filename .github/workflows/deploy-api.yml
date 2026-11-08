@@ -42,3 +42,7 @@ jobs:
           STOPPER_URL=$(gcloud run services describe track-talk-budget-stop --region "$REGION" --project "$GCP_PROJECT_ID" --format='value(status.url)')
           test -n "$STOPPER_URL"
           gcloud run deploy track-talk-budget-stop --invoker-iam-check --no-allow-unauthenticated --update-env-vars "PUSH_AUDIENCE=$STOPPER_URL,PUSH_SERVICE_ACCOUNT=budget-stop@$GCP_PROJECT_ID.iam.gserviceaccount.com" --image "$IMAGE" --command /app/budgetstop --region "$REGION" --project "$GCP_PROJECT_ID" --quiet
+      # トラフィック配分が特定リビジョンに固定されていると deploy だけでは新リビジョンへ移らないため、track-talk-api のみ最新へ 100% 寄せる（本体 #446）。budget-stop 側は変えない。
+      - name: Route traffic to latest
+        run: |
+          gcloud run services update-traffic track-talk-api --to-latest --region "$REGION" --project "$GCP_PROJECT_ID" --quiet
