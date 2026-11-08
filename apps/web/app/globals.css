@@ -821,19 +821,14 @@ select:-webkit-autofill {
 }
 
 /* タブを含むページではなく、この投稿領域だけを横へ送る。 */
+/* 描画前の仮配置の列数も常に3。幅による切り替えはしない（帯の有無で段数が動かないようにする）。 */
 .home-feed-grid-strip {
-  --home-feed-columns: 2;
+  --home-feed-columns: 3;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   padding: 4px 0;
-}
-@media (width >= 48rem) {
-  .home-feed-grid-strip { --home-feed-columns: 3; }
-}
-@media (width >= 80rem) {
-  .home-feed-grid-strip { --home-feed-columns: 4; }
 }
 .home-feed-grid-strip::-webkit-scrollbar {
   display: none;

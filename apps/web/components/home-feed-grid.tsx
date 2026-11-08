@@ -54,9 +54,8 @@ export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storage
       // 帯の表示などで一覧の開始位置が変わったら、下部メニューまでの高さを測り直す。
       const bottom = bottomNav?.getBoundingClientRect().top ?? window.innerHeight;
       const available = Math.max(3, Math.floor(bottom - (track!.getBoundingClientRect().top + window.scrollY) - 8));
-      const columns = Number(getComputedStyle(track!).getPropertyValue("--home-feed-columns")) || 2;
       const ids = keysRef.current;
-      const result = createGridLayout(ids.length, width, available, columns);
+      const result = createGridLayout(ids.length, width, available);
       const old = layoutRef.current;
       // 高さや幅が変わったら、表示中の列を基準に横位置を保つ。
       if (!pendingPosition.current && old && track!.scrollLeft > 0

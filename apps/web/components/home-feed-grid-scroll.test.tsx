@@ -101,6 +101,40 @@ it("ヘッダーに帯が後から出ても、一覧を下部メニューの手�
   }
 });
 
+it("ヘッダーに帯が後から出ても段数は3のまま変わらない", async () => {
+  let headerHeight = 64;
+  const navTop = 700;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.tagName === "HEADER") return new DOMRect(0, 0, 300, headerHeight);
+    if (this.tagName === "NAV") return new DOMRect(0, navTop, 300, 56);
+    if (this.classList.contains("home-feed-grid-strip")) return new DOMRect(0, headerHeight + 60, 300, 0);
+    return new DOMRect();
+  });
+  const header = document.createElement("header");
+  const nav = document.createElement("nav");
+  nav.setAttribute("aria-label", "メイン");
+  nav.style.position = "fixed";
+  container.before(header);
+  container.after(nav);
+  try {
+    const content = <HomeFeedGrid>{Array.from({ length: 6 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</HomeFeedGrid>;
+    await act(async () => root.render(content));
+    await act(async () => { frames.splice(0).forEach((callback) => callback(0)); });
+    const tops = () => new Set(Array.from(container.querySelectorAll<HTMLElement>(".home-feed-grid-tile")).map((tile) => tile.style.top));
+    expect(tops().size).toBe(3);
+
+    headerHeight += 44;
+    await act(async () => {
+      resizeObservers.get(header)?.();
+      frames.splice(0).forEach((callback) => callback(0));
+    });
+    expect(tops().size).toBe(3);
+  } finally {
+    header.remove();
+    nav.remove();
+  }
+});
+
 it("600件でもDOMを表示範囲に絞り、深い位置から戻っても復元する", async () => {
   const content = <HomeFeedGrid storageKey="large-feed">{Array.from({ length: 600 }, (_, i) => <a key={i} href={`/posts/${i}`}>投稿{i}</a>)}</HomeFeedGrid>;
   await act(async () => root.render(content));

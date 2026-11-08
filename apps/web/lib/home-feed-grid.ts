@@ -1,12 +1,13 @@
 const gap = 12;
 const aspectRatio = 4 / 3;
-const contentGutters = 32;
+// ホーム投稿一覧の段数は常に3に固定する。帯の有無などで表示領域の高さが変わっても、
+// 段数の決め方を変えない（帯への分岐で直さない）。高さが変わったら札の大きさで吸収する。
+const fixedRows = 3;
 
-// 画面幅から段数の目安を決め、使える高さを均等に使う。右端は横スクロールで表示する。
-export function createGridLayout(count: number, viewportWidth: number, height: number, columns: number) {
-  const targetWidth = Math.max(1, (viewportWidth - contentGutters - gap * (columns - 1)) / columns);
-  const rows = Math.max(1, Math.floor((height + gap) / (targetWidth / aspectRatio + gap)));
-  const tileHeight = (height - gap * (rows - 1)) / rows;
+// 使える高さを3段で均等に使い、右端は横スクロールで表示する。
+export function createGridLayout(count: number, viewportWidth: number, height: number) {
+  const rows = fixedRows;
+  const tileHeight = Math.max(1, (height - gap * (rows - 1)) / rows);
   const tileWidth = tileHeight * aspectRatio;
   const pitch = tileWidth + gap;
   const width = Math.max(viewportWidth, Math.ceil(count / rows) * pitch - gap);
