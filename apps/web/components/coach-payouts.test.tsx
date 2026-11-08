@@ -1,11 +1,41 @@
 /** @vitest-environment jsdom */
 import { act } from "react";
+import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { CoachEarningsSection } from "./coach-payouts";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ apiFetch }));
+vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
+
+it("links to the payout guide from the unregistered notice", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  apiFetch.mockResolvedValue({
+    payments: true,
+    payouts_enabled: false,
+    stripe_linked: false,
+    this_month_yen: 0,
+    unpaid_yen: 0,
+    review_share: 70,
+    personal_fee: 20,
+    min_payout_yen: 3000,
+    payouts: [],
+    next_payout_date: null,
+    next_payout_yen: null,
+  });
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<CoachEarningsSection token="test" onReady={() => {}} />));
+    expect(container.querySelector('a[href="/coach/payout-guide"]')?.textContent).toBe("登録の手順を見る（図付き）");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
 
 it.each([
   { date: "2026-12-15", yen: 1050 },
