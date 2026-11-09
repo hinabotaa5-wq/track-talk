@@ -83,7 +83,7 @@ REQUIRED_COLUMNS = sorted({*STATUS_COLUMNS, ("review_payments", "request_id"), (
                            ("coaching_ticket_purchases", "owner_id"), ("coaching_ticket_purchases", "session_expires_at"),
                            ("coaching_ticket_reservations", "request_id"), ("captured_payment_refunds", "source"),
                            ("captured_payment_refunds", "payment_id")} | {(t, "earning_id" if t in ("review_payment_earning_links", "captured_refund_earnings") else "id") for t in ROW_COUNT_TABLES})
-EXPECTED_MIGRATION = 148
+EXPECTED_MIGRATION = 149
 
 # row_security=off makes RLS raise an error instead of silently hiding rows from the count.
 BEGIN = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL row_security = off;\n"
