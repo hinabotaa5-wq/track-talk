@@ -121,9 +121,9 @@ func TestOperatorRequiredFlipNeedsCoachConfirmation(t *testing.T) {
 	}
 
 	// 前提: 身元を登録し、一度は表記要で電話つき承認をしたあと、「表記しない」を自己申告して公開中。
-	request("PUT", "/v1/coach/identity", coachToken, `{"legal_name":"`+name+`","address":"`+address+`"}`, 204)
+	request("PUT", "/v1/coach/identity", coachToken, `{"legal_name":"`+name+`","address":"`+address+`","phone":"`+phone+`"}`, 204)
 	rev := view().Revision
-	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+phone+`","identity_revision":"`+rev.String()+`"}`, 204)
+	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+rev.String()+`"}`, 204)
 	if !leaks(request("GET", public, machine, "", 200)) {
 		t.Fatal("required approval did not publish confirmed fields")
 	}
@@ -150,15 +150,14 @@ func TestOperatorRequiredFlipNeedsCoachConfirmation(t *testing.T) {
 		t.Fatalf("coach view after flip: %+v", v)
 	}
 
-	// 本人の確認なしでは戻らない: 再申告・電話なし・古い版の承認はすべて拒否。
+	// 本人の確認なしでは戻らない: 再申告・古い版・confirm なしの承認はすべて拒否。
 	request("PUT", "/v1/coach/exemption", coachToken, `{"exempt":true,"checklist_version":1,"checked":[true,true,true]}`, 409)
-	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+v.Revision.String()+`"}`, 409)
-	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+phone+`","identity_revision":"`+uuid.NewString()+`"}`, 409)
-	request("PUT", publish, coachToken, `{"confirm":false,"phone":"`+phone+`","identity_revision":"`+v.Revision.String()+`"}`, 422)
+	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+uuid.NewString()+`"}`, 409)
+	request("PUT", publish, coachToken, `{"confirm":false,"identity_revision":"`+v.Revision.String()+`"}`, 422)
 	request("GET", public, machine, "", 404)
 
-	// 本人が掲載内容（現在の版の氏名・住所＋この時点で入れた電話）を確認・承認すると再公開。
-	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+phone+`","identity_revision":"`+v.Revision.String()+`"}`, 204)
+	// 本人が掲載内容（現在の版の氏名・住所・電話）を確認・承認すると再公開。
+	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+v.Revision.String()+`"}`, 204)
 	if body := request("GET", public, machine, "", 200); !leaks(body) || !listed() {
 		t.Fatalf("confirmed fields were not published: %s", body)
 	}
@@ -166,12 +165,12 @@ func TestOperatorRequiredFlipNeedsCoachConfirmation(t *testing.T) {
 	// 表記要のまま運営者が再度切り替えても、承認はやり直しになる。
 	request("POST", force, staffToken, "", 204)
 	request("GET", public, machine, "", 404)
-	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+phone+`","identity_revision":"`+v.Revision.String()+`"}`, 204)
+	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+v.Revision.String()+`"}`, 204)
 
 	// 登録情報の更新・退会でも、確認済みの承認は効かなくなる。
-	request("PUT", "/v1/coach/identity", coachToken, `{"legal_name":"`+name+`","address":"`+address+`"}`, 204)
+	request("PUT", "/v1/coach/identity", coachToken, `{"legal_name":"`+name+`","address":"`+address+`","phone":"`+phone+`"}`, 204)
 	request("GET", public, machine, "", 404)
-	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+phone+`","identity_revision":"`+view().Revision.String()+`"}`, 204)
+	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+view().Revision.String()+`"}`, 204)
 	request("GET", public, machine, "", 200)
 	execTest(t, main, "UPDATE coach_profiles SET status='withdrawn' WHERE profile_id=$1", coach)
 	request("GET", public, machine, "", 404)
