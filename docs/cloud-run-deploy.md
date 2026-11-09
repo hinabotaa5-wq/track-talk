@@ -147,6 +147,24 @@ gcloud run jobs execute track-talk-db-backup --region asia-northeast1 --update-e
 
 `database_backup_completed` と `media_backup_completed` の両方が出れば成功です。手元のテストは `cd deploy/cloud-run/db-backup && python3 -m unittest test_backup` です。
 
+## 金庫 DB の輸出
+
+Cloud Run Job `track-talk-identity-export` が毎日3時45分（日本時間、Cloud Scheduler）に、身元専用サービスの金庫 DB（`identity_vault` スキーマ）を読み取り専用でダンプし、本体バックアップと同じバケットの `identity-vault/YYYY-MM-DD/<時刻>-<uuid>/` に `database.dump`・`roles.sql`・`manifest.json` の順で置きます。manifest が完了の目印で、置き場・照合（テーブルごとの件数と行ダイジェスト、アップロード後の md5）は本体バックアップと同じです。コードは `deploy/identity-vault/export/` にあり、本体の `backup.py` を共用します。
+
+輸出は保存されたままの値を写すだけで、氏名・住所は暗号文のまま出ます。復号はせず、鍵は持ちません（`COACH_IDENTITY_KEY` がある環境では起動を拒みます）。接続は `export-role.sql` の読み取り専用ロールの URL を、秘密 `track-talk-identity-export-url` への参照で `DATABASE_URL` に渡します。本体 DB を指していると止まります。失敗ログ（`identity_export_failed`）は本体と同じく種類と理由の記号だけです。
+
+```bash
+docker build --platform linux/amd64 -f deploy/identity-vault/export/Dockerfile -t asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/identity-export:<日付-版> deploy
+```
+
+ジョブとスケジュールは `deploy/identity-vault/export-schedule.sh` で作ります（スケジュールは一時停止で作成）。取り寄せたセットの照合は、空のローカル DB に戻して manifest と比べます。
+
+```bash
+VERIFY_DATABASE_URL=postgres://<ユーザー>@localhost:<ポート>/<空の DB> python3 deploy/identity-vault/export/export.py verify <取り寄せたディレクトリ>
+```
+
+`identity_export_verified` なら一致、`identity_export_verify_failed` なら終了コード1です。手元のテストは `cd deploy/identity-vault/export && TEST_ADMIN_DATABASE_URL=<ローカルの管理接続> python3 -m unittest test_export` です。
+
 ## 決済の件数確認（読み取り専用）
 
 Cloud Run Job `track-talk-payment-counts` は、決済まわりのテーブルの状態別件数と孤立決済の件数だけを、1行の JSON（`event: payment_counts`）でログに出して終わります。行の中身・ID・金額・Stripe の ID は取得も出力もしません。SQL は `SELECT count(*)` と `GROUP BY` だけで、読み取り専用トランザクションで実行してロールバックします。スケジュールは無く、手動で流すときだけ動きます。コードは `deploy/cloud-run/payment-counts/` にあります。

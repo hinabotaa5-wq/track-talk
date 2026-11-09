@@ -54,6 +54,33 @@ jobs:
         working-directory: apps/api
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
+  vault-export:
+    # 金庫 DB の輸出（deploy/identity-vault/export）を合成データだけで確かめる。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tracktalk
+          POSTGRES_PASSWORD: tracktalk
+          POSTGRES_DB: tracktalk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracktalk -d tracktalk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_ADMIN_DATABASE_URL: postgres://tracktalk:tracktalk@localhost:5432/tracktalk?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - name: Tools
+        run: psql --version && pg_dump --version
+      - name: Test
+        working-directory: deploy/identity-vault/export
+        run: python3 -m unittest -v test_export
+
   web:
     runs-on: ubuntu-latest
     steps:
