@@ -259,7 +259,7 @@ export function CoachDashboard() {
 
       {offerCount > 0 ? (
         <Link
-          href="/coach/requests#offers"
+          href="/coach/offers"
           className="block rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm font-semibold text-white"
         >
           新しい依頼が{offerCount}件あります — あと{shortest}分で終了
@@ -267,8 +267,8 @@ export function CoachDashboard() {
       ) : null}
 
       <nav aria-label="コーチのメニュー" className="grid grid-cols-4 gap-2">
-        <Tile href="/coach/requests#offers" label="届いた依頼" Icon={Inbox} badge={offerCount} />
-        <Tile href="/coach/requests#reviewing" label="添削中" Icon={PenLine} badge={reviewingCount} />
+        <Tile href="/coach/offers" label="届いた依頼" Icon={Inbox} badge={offerCount} />
+        <Tile href="/coach/reviewing" label="添削中" Icon={PenLine} badge={reviewingCount} />
         <Tile href="/coach/consultations" label="追加相談" Icon={MessagesSquare} badge={consultations} />
         <Tile href="/coach/contracts" label="契約・申込み" Icon={FileText} badge={appliedContracts} />
         <Tile href="/coach/plans" label="プラン管理" Icon={Layers} />

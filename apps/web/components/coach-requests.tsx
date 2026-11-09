@@ -33,8 +33,9 @@ function RequestSummary({ request }: { request: CoachReviewRequest }) {
   );
 }
 
-// 届いた打診の引き受け・見送りと、添削中の依頼の一覧。/coach/requests で使う。
-export function CoachRequestsSection({ token }: { token: string | null }) {
+// 届いた打診の引き受け・見送り（view="offers"）か、添削中の依頼の一覧（view="reviewing"）。
+// /coach/offers と /coach/reviewing で使う。どちらを出すかは view で一意に決まる。
+export function CoachRequestsSection({ token, view }: { token: string | null; view: "offers" | "reviewing" }) {
   const [data, setData] = useState<CoachRequests | null>(null);
   const [error, setError] = useState("");
   // 読み込みの失敗は、引き受け・見送りの失敗と分ける（読み込めたら消える）。
@@ -89,10 +90,12 @@ export function CoachRequestsSection({ token }: { token: string | null }) {
   const shownError = error || loadError;
   if (!data) return shownError ? <p className="text-sm text-red-400">{shownError}</p> : null;
 
-  return (
-    <>
-      <section className="space-y-2 scroll-mt-20" id="offers">
-        <h2 className="font-bold">届いている依頼</h2>
+  if (view === "offers") {
+    return (
+      <section className="space-y-2" id="offers">
+        <p className="text-sm text-slate-300">
+          新しい依頼が入ってから90分以内（23:00–07:00 はカウントが止まります）に引き受けないと、依頼は終了します。
+        </p>
         {data.offers.length === 0 ? <p className="text-sm text-slate-300">いま届いている依頼はありません</p> : null}
         <ul className="space-y-2">
           {data.offers.map((offer) => (
@@ -121,35 +124,37 @@ export function CoachRequestsSection({ token }: { token: string | null }) {
         </ul>
         {shownError ? <p className="text-sm text-red-400">{shownError}</p> : null}
       </section>
+    );
+  }
 
-      <section className="space-y-2 scroll-mt-20" id="reviewing">
-        <h2 className="font-bold">添削中</h2>
-        {data.reviewing.length === 0 ? <p className="text-sm text-slate-300">添削中の依頼はありません</p> : null}
-        <ul className="space-y-3">
-          {data.reviewing.map((request) => (
-            <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
-              <RequestSummary request={request} />
-              {request.info_request && request.status === "needs_info" ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
-              {request.video_url ? (
-                <video
-                  src={request.video_url}
-                  poster={request.thumbnail_url || undefined}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  className="w-full rounded-lg bg-black"
-                />
-              ) : null}
-              <Link
-                href={`/coach/requests/${request.id}`}
-                className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-              >
-                {request.status === "clarifying" ? "補足を書く" : request.status === "needs_info" ? "依頼を開く" : "返答を書く"}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </>
+  return (
+    <section className="space-y-2" id="reviewing">
+      {data.reviewing.length === 0 ? <p className="text-sm text-slate-300">添削中の依頼はありません</p> : null}
+      <ul className="space-y-3">
+        {data.reviewing.map((request) => (
+          <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
+            <RequestSummary request={request} />
+            {request.info_request && request.status === "needs_info" ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
+            {request.video_url ? (
+              <video
+                src={request.video_url}
+                poster={request.thumbnail_url || undefined}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full rounded-lg bg-black"
+              />
+            ) : null}
+            <Link
+              href={`/coach/requests/${request.id}`}
+              className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
+            >
+              {request.status === "clarifying" ? "補足を書く" : request.status === "needs_info" ? "依頼を開く" : "返答を書く"}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {shownError ? <p className="text-sm text-red-400">{shownError}</p> : null}
+    </section>
   );
 }
