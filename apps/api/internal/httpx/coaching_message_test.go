@@ -100,14 +100,14 @@ func TestCoachingMessages(t *testing.T) {
 	}
 
 	// 連絡先は、どちらから送っても止まり、回数だけ数える。
-	if rec := doJSON(t, h, http.MethodPost, path, tc, map[string]any{"body": "インスタで送ってください"}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "contact_blocked") {
+	if rec := doJSON(t, h, http.MethodPost, path, tc, map[string]any{"body": "インスタの @tt_coach に送ってください"}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "contact_blocked") {
 		t.Fatalf("coach contact %d %s", rec.Code, rec.Body.String())
 	}
 	bad := map[string]any{"title": "1週目", "days": []map[string]any{{"day": "月", "content": "090-1234-5678 に電話"}}}
 	if rec := doJSON(t, h, http.MethodPost, path, tc, map[string]any{"menu": bad}); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("menu contact %d", rec.Code)
 	}
-	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"body": "LINE 教えてください"}); rec.Code != http.StatusUnprocessableEntity {
+	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"body": "090-1234-5678 に電話ください"}); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("user contact %d", rec.Code)
 	}
 	var blocked int

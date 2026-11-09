@@ -1,6 +1,7 @@
 "use client";
 
 import { SupportTermsNotice } from "@/components/support-terms-notice";
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { FieldBlock, selectClass } from "@/components/consult-fields";
 import { Button } from "@/components/ui/button";
@@ -92,8 +93,11 @@ function useAction(token: string | null, onChange: (c: SupportConsult) => void) 
 function ClarifyForm({ consult, token, onChange }: { consult: SupportConsult; token: string | null; onChange: (c: SupportConsult) => void }) {
   const [answer, setAnswer] = useState("");
   const { error, fields, pending, run } = useAction(token, onChange);
+  const guard = useSolicitationGuard();
   return (
-    <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); void run(`/v1/support-consults/${consult.id}/answer`, { answer }); }}>
+    <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (guard.allow(answer)) void run(`/v1/support-consults/${consult.id}/answer`, { answer }); }}>
+      <ContactNotice />
+      {guard.warning}
       <FieldBlock label="答え（500文字まで）" error={fields.answer}>
         <Textarea aria-label="聞き直しへの答え" rows={3} maxLength={500} value={answer} onChange={(e) => setAnswer(e.target.value)} />
       </FieldBlock>
@@ -142,8 +146,10 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
   });
   const { error, fields, pending, run } = useAction(token, onChange);
   const price = Number(d.price.replace(/[,，円\s]/g, ""));
+  const guard = useSolicitationGuard();
   const set = (patch: Partial<typeof d>) => setD((x) => ({ ...x, ...patch }));
   function submit() {
+    if (!guard.allow([d.competition_name, d.content_note, d.answer_to_question].join("\n"))) return;
     let confirmHigh = false;
     if (Number.isFinite(price) && price > highPlanPriceYen) {
       if (!confirm(`${formatYen(price)}で提案します。打ち間違いではありませんか？`)) return;
@@ -155,6 +161,8 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
   return (
     <form className="space-y-3 rounded-xl border border-white/20 p-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <h3 className="font-bold">提案を出す</h3>
+      <ContactNotice />
+      {guard.warning}
       <p className="text-xs text-slate-300">期間は「開始日〜目標大会の日」です。開始日と提案の有効期限は、相談の内容をふまえてここで決めます。</p>
       <FieldBlock label="大会名" error={fields.competition_name}><Input aria-label="提案の大会名" maxLength={100} value={d.competition_name} onChange={(e) => set({ competition_name: e.target.value })} /></FieldBlock>
       <FieldBlock label="開始日" error={fields.support_start_date}><Input aria-label="開始日" type="date" value={d.support_start_date} onChange={(e) => set({ support_start_date: e.target.value })} /></FieldBlock>
@@ -184,12 +192,15 @@ function CoachActions({ consult, token, onChange }: { consult: SupportConsult; t
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const { error, fields, pending, run } = useAction(token, onChange);
+  const guard = useSolicitationGuard();
   if (consult.status !== "requested" && consult.status !== "clarifying") return null;
   return (
     <div className="space-y-3">
       {consult.status === "requested" ? <ProposalForm consult={consult} token={token} onChange={onChange} /> : <p className="text-sm text-slate-300">選手の答えを待っています。</p>}
       {consult.status === "requested" ? (asking ? (
-        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); void run(`/v1/support-consults/${consult.id}/ask`, { question }); }}>
+        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (guard.allow(question)) void run(`/v1/support-consults/${consult.id}/ask`, { question }); }}>
+          <ContactNotice />
+          {guard.warning}
           <FieldBlock label="選手に聞き直す（フォームの回答だけでは分からないこと・300文字まで）" error={fields.question}>
             <Textarea aria-label="聞き直し" rows={3} maxLength={300} value={question} onChange={(e) => setQuestion(e.target.value)} />
           </FieldBlock>

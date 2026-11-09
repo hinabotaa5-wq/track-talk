@@ -106,7 +106,7 @@ func TestCoachingContractFlow(t *testing.T) {
 	// 同意がないと申し込めない。連絡先も書けない。
 	bad := contractBody(planID)
 	bad["agree_report"] = false
-	bad["message"] = "LINE で話しましょう"
+	bad["message"] = "LINE ID は tt_coach です"
 	bad["event"] = "javelin"
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu, bad)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "agree_report") || !strings.Contains(rec.Body.String(), "連絡先") || !strings.Contains(rec.Body.String(), `"event"`) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,8 +34,10 @@ export function SupportConsultForm({
   const set = <K extends keyof SupportConsultAnswers>(key: K, value: SupportConsultAnswers[K]) => setA((x) => ({ ...x, [key]: value }));
   const err = (key: string) => fields[key];
   const paused = consult.reception.status === "paused";
+  const guard = useSolicitationGuard();
 
   async function submit() {
+    if (!guard.allow(Object.values(a).filter((v) => typeof v === "string").join("\n"))) return;
     if (!acquire()) return;
     setError("");
     setFields({});
@@ -60,6 +63,7 @@ export function SupportConsultForm({
       <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm text-slate-100">
         {consultNotContractNote}
         {minor ? <span className="mt-1 block font-semibold">{consultMinorNote}</span> : null}
+        <ContactNotice className="mt-1 block" />
       </p>
       {paused ? <p role="status" className="text-sm text-amber-300">このコーチはいま新しい相談を受け付けていません。</p> : null}
 

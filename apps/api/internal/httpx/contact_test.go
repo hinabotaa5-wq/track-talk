@@ -11,11 +11,7 @@ func TestLooksLikeContact(t *testing.T) {
 		"インスタの @track_coach をフォローして",
 		"090-1234-5678 に電話して",
 		"０９０１２３４５６７８",
-		"LINE で送ってください",
-		"ｌｉｎｅ交換しましょう",
-		"DMください",
 		"IDは tt123 です",
-		"インスタで動画を見せて",
 		// 区切りや字形を変えたもの
 		"090/1234/5678",
 		"(090) 1234 5678",
@@ -33,17 +29,11 @@ func TestLooksLikeContact(t *testing.T) {
 		"〇九〇一二三四五六七八",
 		"①②③④⑤⑥⑦⑧⑨⓪",
 		"0\ufe0f\u20e39\ufe0f\u20e30\ufe0f\u20e31\ufe0f\u20e32\ufe0f\u20e33\ufe0f\u20e34\ufe0f\u20e35\ufe0f\u20e36\ufe0f\u20e37\ufe0f\u20e3",
-		"ins\u200btagram で",
-		"インス\u200bタ見て",
-		"𝐢𝐧𝐬𝐭𝐚𝐠𝐫𝐚𝐦",
 		"@\u200btaro_run",
 		"insta: taro_run",
-		"ライン交換しよ",
-		"らいんで話そう",
-		"Facebook で探して",
-		"フェイスブックで",
-		"スレッズで",
-		"threads やってる",
+		"LINE ID は tt_coach",
+		"ラインID教えて",
+		"line: taro_run",
 		"linktr.ee/taro",
 		"taro.dev",
 	}
@@ -83,6 +73,25 @@ func TestLooksLikeContact(t *testing.T) {
 	for _, s := range allowed {
 		if looksLikeContact(s) {
 			t.Errorf("should allow: %q", s)
+		}
+	}
+	// 勧誘に使われやすい言葉は止めずに警告だけにする（2026-11-09 運営者決定、本体 #485）。
+	warned := []string{
+		"LINE で送ってください", "ｌｉｎｅ交換しましょう", "DMください", "インスタで動画を見せて", "ins\u200btagram で",
+		"インス\u200bタ見て", "𝐢𝐧𝐬𝐭𝐚𝐠𝐫𝐚𝐦", "ライン交換しよ", "らいんで話そう", "Facebook で探して", "フェイスブックで",
+		"スレッズで", "threads やってる", "直接連絡してください", "個人レッスンもやっています", "外でやりとりしませんか", "連絡先を教えて",
+	}
+	for _, s := range warned {
+		if looksLikeContact(s) {
+			t.Errorf("should not block (warn only): %q", s)
+		}
+		if !looksLikeSolicitation(s) {
+			t.Errorf("should warn: %q", s)
+		}
+	}
+	for _, s := range allowed {
+		if looksLikeSolicitation(s) {
+			t.Errorf("should not warn: %q", s)
 		}
 	}
 }

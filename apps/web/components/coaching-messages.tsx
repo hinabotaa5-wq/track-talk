@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { PageLoading } from "@/components/page-loading";
 
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
@@ -157,6 +158,7 @@ function Composer({
   const [fileKey, setFileKey] = useState(0);
   const { pending, acquire, release } = useActionLock();
   const isCoach = contract.role === "coach";
+  const guard = useSolicitationGuard();
 
   // 長さを確かめ終えてから選んだことにする(確かめているあいだに送れないように)。
   // 続けて別の動画を選んだら、前の動画の確認の結果は使わない。
@@ -186,6 +188,7 @@ function Composer({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!body.trim() && !file && !menu) return;
+    if (!guard.allow([body, menu?.title, ...(menu?.days ?? []).flatMap((d) => [d.day, d.content])].filter(Boolean).join("\n"))) return;
     if (!acquire()) return;
     setError("");
     try {
@@ -314,7 +317,8 @@ function Composer({
       <Button type="submit" className="w-full" disabled={pending || (!body.trim() && !file && !menu)}>
         送る
       </Button>
-      <p className="text-xs text-slate-300">連絡先（URL・SNS の ID・電話番号など）は送れません。</p>
+      {guard.warning}
+      <ContactNotice />
     </form>
   );
 }

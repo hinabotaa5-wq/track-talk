@@ -213,6 +213,9 @@ export default function CoachApplyPage() {
             </Link>
             で確認できます。
           </p>
+          <p className="text-sm text-slate-200">
+            TrackTalk で知り合った選手を LINE・SNS など外の連絡手段へ誘うこと、連絡先を交換すること、TrackTalk を通さずに直接取引することは禁止されています。
+          </p>
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">名前</span>
             <Input value={draft.name} maxLength={80} autoComplete="name" required
