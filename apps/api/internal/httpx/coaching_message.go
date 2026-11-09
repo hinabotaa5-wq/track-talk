@@ -16,8 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// パーソナル指導のやりとり欄。申し込んだ人とコーチが読み書きし、18歳未満のときは保護者もリンクから参加する。
-// 期間中だけ送れて、終わったあとは読むだけ。リアルタイムにはせず、送ったら相手に Web Push で知らせる。
+// パーソナル指導のやりとり欄。申し込んだ人とコーチが読み書きし、18歳未満のときは保護者がリンクから読む（送信はできない）。
+// 期間中だけ送れて、終わったあとは90日間だけ読める（送信不可）。終わった時に文章とメニューをダウンロードできる。
+// 90日を過ぎると読めなくなる。未対応の通報があるあいだは閉じずに保全する。リアルタイムにはせず、送ったら相手に Web Push で知らせる。
 // 文章とメニューは、利用者からもコーチからも連絡先らしい文字を止める。止めた文章は保存せず、回数だけ数える。
 
 const maxMessageRunes = 2000
@@ -27,16 +28,30 @@ type planMenuDay struct {
 	Content string `json:"content"`
 }
 
-// planMenu は、コーチが送る練習メニュー。
+// planMenu は、コーチが送る練習メニュー。見直すときは新しいメニューを送り直し、前のものは履歴として残す。
+// Period は対象期間（例: 12/1〜12/7）、Note は全体への一言（今週の狙いなど）。どちらも任意。
 type planMenu struct {
-	Title string        `json:"title"`
-	Days  []planMenuDay `json:"days"`
+	Title  string        `json:"title"`
+	Period string        `json:"period,omitempty"`
+	Note   string        `json:"note,omitempty"`
+	Days   []planMenuDay `json:"days"`
 }
 
 func (m *planMenu) normalize() string {
 	m.Title = strings.TrimSpace(m.Title)
 	if e := coachTextError("メニューの名前", m.Title, 60); e != "" {
 		return e
+	}
+	m.Period, m.Note = strings.TrimSpace(m.Period), strings.TrimSpace(m.Note)
+	if m.Period != "" {
+		if e := coachTextError("対象期間", m.Period, 40); e != "" {
+			return e
+		}
+	}
+	if m.Note != "" {
+		if e := coachTextError("全体への一言", m.Note, 300); e != "" {
+			return e
+		}
 	}
 	if len(m.Days) == 0 || len(m.Days) > 14 {
 		return "メニューは1〜14日分にしてください"
@@ -57,6 +72,12 @@ func (m *planMenu) normalize() string {
 func (m planMenu) text() string {
 	var b strings.Builder
 	b.WriteString(m.Title)
+	if m.Period != "" {
+		b.WriteString("\n" + m.Period)
+	}
+	if m.Note != "" {
+		b.WriteString("\n" + m.Note)
+	}
 	for _, d := range m.Days {
 		b.WriteString("\n" + d.Day + "\n" + d.Content)
 	}
@@ -124,14 +145,50 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, vie
 	return out
 }
 
+// chatViewDays は、契約が終わったあとにやりとり欄を読める日数（閲覧のみ）。
+const chatViewDays = 90
+
+// chatEndedAt は、契約が終わった時刻（期間の終わり、または途中で終えた時）。
+func chatEndedAt(ct db.CoachingContract) time.Time {
+	if ct.EndsAt != nil && ct.EndsAt.Before(ct.UpdatedAt) {
+		return *ct.EndsAt
+	}
+	return ct.UpdatedAt
+}
+
+// chatViewUntil は、終わった契約のやりとり欄を読める期限。期間中・始まる前は nil。
+func chatViewUntil(ct db.CoachingContract) *time.Time {
+	if ct.Status != "ended" && ct.Status != "refunded" {
+		return nil
+	}
+	t := chatEndedAt(ct).AddDate(0, 0, chatViewDays)
+	return &t
+}
+
 // messagesVisible は、やりとり欄を読める状態か。止めている間も、それまでのものは読める。
-func messagesVisible(status string) bool {
-	return status == "active" || status == "suspended" || status == "ended" || status == "refunded"
+// 終わったあとは90日まで。未対応の通報があるあいだは閉じない（保全）。
+func (s *Server) messagesVisible(ctx context.Context, ct db.CoachingContract, now time.Time) (bool, error) {
+	switch ct.Status {
+	case "active", "suspended":
+		return true, nil
+	case "ended", "refunded":
+	default:
+		return false, nil
+	}
+	if now.Before(*chatViewUntil(ct)) {
+		return true, nil
+	}
+	return s.q.ContractHasOpenReport(ctx, ct.ID)
 }
 
 func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, viewer uuid.UUID, viewerRole string) {
-	if !messagesVisible(ct.Status) {
-		JSON(w, http.StatusOK, map[string]any{"messages": []any{}})
+	visible, err := s.messagesVisible(r.Context(), ct, time.Now())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if !visible {
+		JSON(w, http.StatusOK, map[string]any{"messages": []any{}, "view_closed": ct.Status == "ended" || ct.Status == "refunded", "view_until": chatViewUntil(ct)})
 		return
 	}
 	msgs, err := s.q.ListCoachingMessages(r.Context(), ct.ID)
@@ -143,7 +200,7 @@ func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, c
 	for _, m := range msgs {
 		out = append(out, s.coachingMessageJSON(m, viewer, viewerRole))
 	}
-	JSON(w, http.StatusOK, map[string]any{"messages": out})
+	JSON(w, http.StatusOK, map[string]any{"messages": out, "view_closed": false, "view_until": chatViewUntil(ct)})
 }
 
 func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
@@ -169,15 +226,19 @@ func (s *Server) createCoachingMessage(w http.ResponseWriter, r *http.Request) {
 	s.sendCoachingMessage(w, r, ct, &me.ID, role)
 }
 
-// sendCoachingMessage は1通を送る。保護者は sender が nil で、動画は送れない（アップロードにログインが要るため）。
+// sendCoachingMessage は1通を送る。送れるのは申し込んだ本人とコーチだけ（保護者は読むだけ）。
 func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, sender *uuid.UUID, role string) {
+	if role != "requester" && role != "coach" || sender == nil {
+		Error(w, http.StatusForbidden, "forbidden", "保護者のページからは、やりとりを見ることだけができます")
+		return
+	}
 	switch ct.Status {
 	case "active":
 	case "suspended":
 		Error(w, http.StatusConflict, "conflict", "運営が確認のため、やりとりを止めています")
 		return
 	default:
-		Error(w, http.StatusConflict, "conflict", "期間中だけ送れます")
+		Error(w, http.StatusConflict, "conflict", "期間中だけ送れます。終わったあとは90日間、読むことだけができます")
 		return
 	}
 	var req coachingMessageReq
@@ -415,4 +476,52 @@ func lockUnusedCoachingVideo(ctx context.Context, q *db.Queries, id, retained *s
 		return &ticketRuleError{"video_in_use", "この動画は使用済みです。別の動画を選んでください"}
 	}
 	return nil
+}
+
+// exportCoachingMessages は、やりとり（文章とメニュー）をテキストで渡す。読める期間のあいだ、申し込んだ本人とコーチがダウンロードできる。
+// 動画はダウンロードに含めない（読める期間のあいだ、画面で見られる）。
+func (s *Server) exportCoachingMessages(w http.ResponseWriter, r *http.Request) {
+	_, ct, _, ok := s.contractParty(w, r)
+	if !ok {
+		return
+	}
+	visible, err := s.messagesVisible(r.Context(), ct, time.Now())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if !visible {
+		Error(w, http.StatusConflict, "conflict", "このやりとりはもう見られません")
+		return
+	}
+	msgs, err := s.q.ListCoachingMessages(r.Context(), ct.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	labels := map[string]string{"requester": "選手", "coach": "コーチ", "guardian": "保護者"}
+	var b strings.Builder
+	b.WriteString("TrackTalk やりとりの記録\n" + ct.PlanTitle + "\n")
+	if until := chatViewUntil(ct); until != nil {
+		b.WriteString("画面で見られる期限: " + jstDateTime(*until) + "\n")
+	}
+	for _, m := range msgs {
+		b.WriteString("\n---\n" + jstDateTime(m.CreatedAt) + " " + labels[m.SenderRole] + "\n")
+		if m.Body != "" {
+			b.WriteString(m.Body + "\n")
+		}
+		if m.VideoPublicID != nil {
+			b.WriteString("［動画］\n")
+		}
+		if len(m.Menu) > 0 {
+			var menu planMenu
+			if json.Unmarshal(m.Menu, &menu) == nil {
+				b.WriteString("［メニュー］" + menu.text() + "\n")
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="tracktalk-chat-`+ct.ID.String()[:8]+`.txt"`)
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(b.String()))
 }

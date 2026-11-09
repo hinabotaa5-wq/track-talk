@@ -89,3 +89,25 @@ export async function apiFetch<T>(
   trackSuccessfulMutation(path, rest.method);
   return data as T;
 }
+
+// apiDownloadText は、テキストを返す API（やりとりのダウンロードなど）を読む。失敗したら ApiRequestError。
+export async function apiDownloadText(path: string, token: string | null): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" });
+  } catch {
+    throw new ApiRequestError(0, { error: { code: "network", message: "通信に失敗しました。接続を確認してください。" } });
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    let data: unknown = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    const body = data as ApiError | null;
+    throw new ApiRequestError(res.status, body?.error ? body : "ダウンロードできませんでした");
+  }
+  return text;
+}

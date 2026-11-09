@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
-import { apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
+import { apiDownloadText, apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -17,8 +17,9 @@ import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-// パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも送れる。終わったあとは読むだけ。
-// 18歳未満のときは保護者もリンクから参加する（保護者は文章だけ）。相手の1通ごとに通報できる。
+// パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも作って送れる。
+// 終わったあとは90日間だけ読める（送信不可）。終了時に文章とメニューをダウンロードできる。
+// 18歳未満のときは保護者がリンクから読む（送信はできない）。相手の1通ごとに通報できる。
 // リアルタイムではないので、開いている間は30秒ごとと、画面に戻ったときに読み直す。
 
 const maxVideoBytes = 100 * 1024 * 1024;
@@ -37,6 +38,8 @@ function MenuCard({ menu }: { menu: PlanMenu }) {
     <div className="space-y-1.5 rounded-lg border border-blue-400/40 bg-blue-500/10 p-2">
       <p className="text-xs font-semibold text-blue-300">練習メニュー</p>
       <p className="font-semibold text-white">{menu.title}</p>
+      {menu.period ? <p className="text-xs text-slate-300">{menu.period}</p> : null}
+      {menu.note ? <p className="whitespace-pre-wrap text-sm text-slate-100">{menu.note}</p> : null}
       <dl className="space-y-1">
         {menu.days.map((d, i) => (
           <div key={i} className="grid grid-cols-[4.5rem_1fr] gap-2">
@@ -236,7 +239,7 @@ function Composer({
       {menu ? (
         <div className="space-y-2 rounded-xl border border-blue-400/40 bg-blue-500/10 p-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-blue-300">練習メニュー</p>
+            <p className="text-xs font-semibold text-blue-300">練習メニューを作る（見直すときは新しく作って送ると、前のメニューも残ります）</p>
             <button type="button" className="text-xs text-slate-300 underline" onClick={() => setMenu(null)}>
               メニューをやめる
             </button>
@@ -247,6 +250,21 @@ function Composer({
             onChange={(e) => setMenu({ ...menu, title: e.target.value })}
             placeholder="例: 1週目 スタートの練習"
             aria-label="メニューの名前"
+          />
+          <Input
+            value={menu.period ?? ""}
+            maxLength={40}
+            onChange={(e) => setMenu({ ...menu, period: e.target.value })}
+            placeholder="対象期間（例: 12/1〜12/7）"
+            aria-label="対象期間"
+          />
+          <Textarea
+            rows={2}
+            value={menu.note ?? ""}
+            maxLength={300}
+            onChange={(e) => setMenu({ ...menu, note: e.target.value })}
+            placeholder="全体への一言（例: 今週はスタートを固めます）"
+            aria-label="全体への一言"
           />
           {menu.days.map((d, i) => (
             <div key={i} className="grid grid-cols-[5rem_1fr] gap-2">
@@ -287,7 +305,7 @@ function Composer({
         ) : null}
         {isCoach && !menu ? (
           <button type="button" className="text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>
-            メニューをつける
+            メニュー作成
           </button>
         ) : null}
       </div>
@@ -344,11 +362,41 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
   );
 }
 
-// やりとりは、期間の終わりから1年たつと文章も動画も消える（未解決の通報があるものは運営の対応が終わるまで残る）。
-function purgeDate(endsAt: string): string {
-  const d = new Date(endsAt);
-  d.setFullYear(d.getFullYear() + 1);
-  return formatDate(d.toISOString());
+// 返答の目安（全コーチ一律、強制の期限ではない）。
+export const replyGuideline = "コーチからの返答は24時間以内を目安としています。";
+export const coachReplyGuideline = "選手への返答は24時間以内を目安にしてください（目安で、期限ではありません）。";
+
+// 終わったあとに読める期限の案内。
+function viewUntilNote(until: string | null | undefined): string {
+  if (!until) return "終わってから90日間は読むことだけができ、その後は見られなくなります。";
+  return `${formatDate(until)}まで読むことだけができ（送信はできません）、その後は見られなくなります。`;
+}
+
+// DownloadChat は、やりとり（文章とメニュー）をテキストで保存する。動画は含めない。
+function DownloadChat({ contract, token }: { contract: CoachingContract; token: string | null }) {
+  const [error, setError] = useState("");
+  async function download() {
+    setError("");
+    try {
+      const text = await apiDownloadText(`/v1/coaching/contracts/${contract.id}/messages/export`, token);
+      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tracktalk-chat-${contract.id.slice(0, 8)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "ダウンロードできませんでした");
+    }
+  }
+  return (
+    <div className="space-y-1">
+      <Button type="button" variant="secondary" className="w-full" onClick={() => void download()}>
+        やりとり（文章とメニュー）をダウンロード
+      </Button>
+      {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
+    </div>
+  );
 }
 
 // CoachingMessages は、期間中・止めている間・終わったあとの契約に出すやりとり欄。
@@ -371,7 +419,8 @@ export function CoachingMessages({
   const loadSeq = useRef(0);
   const path = contractPath(contract, { token, guardianToken });
 
-  const fetchMessages = useCallback(() => apiFetch<{ messages: CoachingMessage[] }>(`${path}/messages`, { token }), [path, token]);
+  const [viewClosed, setViewClosed] = useState(false);
+  const fetchMessages = useCallback(() => apiFetch<{ messages: CoachingMessage[]; view_closed?: boolean }>(`${path}/messages`, { token }), [path, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,6 +430,7 @@ export function CoachingMessages({
         .then((d) => {
           if (cancelled || seq !== loadSeq.current) return;
           setMessages(d.messages);
+          setViewClosed(Boolean(d.view_closed));
           setError("");
         })
         .catch(() => {
@@ -422,14 +472,23 @@ export function CoachingMessages({
       </div>
     );
   }
-  const readOnlyNote = contract.ends_at ? `${purgeDate(contract.ends_at)}ごろに、やりとりは消えます。` : "";
+  const readOnlyNote = viewUntilNote(contract.messages_view_until);
+  const isGuardian = Boolean(guardianToken) || contract.role === "guardian";
+  const ended = contract.status === "ended" || contract.status === "refunded";
   return (
     <div className="space-y-4">
       <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
-        {contract.minor
-          ? "保護者も参加しています。通報があったときだけ、運営が確認します。"
-          : "このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。"}
+        {isGuardian
+          ? "保護者のページでは、やりとりを見ることだけができます（送信はできません）。気になるやりとりは通報できます。"
+          : contract.minor
+            ? "保護者もやりとりを見ることができます（保護者は送信できません）。通報があったときだけ、運営が確認します。"
+            : "このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。"}
+        {contract.status === "active" ? ` ${contract.role === "coach" ? coachReplyGuideline : replyGuideline}` : ""}
+        {contract.status === "active" ? " 契約が終わった後も90日間は読むことができ、その後は見られなくなります。" : ""}
       </p>
+      {viewClosed ? (
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">終わってから90日を過ぎたので、このやりとりは見られません。</p>
+      ) : null}
       <section className="space-y-2" aria-label="やりとり">
         {messages === null && !error ? <PageLoading label="読み込み中..." /> : null}
         {messages?.length === 0 ? (
@@ -450,7 +509,7 @@ export function CoachingMessages({
       </section>
       {contract.status === "active" && !coachingMessagingEnabled ? (
         <p className="text-sm text-slate-300">{messagingClosedNote}</p>
-      ) : contract.status === "active" ? (
+      ) : contract.status === "active" && isGuardian ? null : contract.status === "active" ? (
         <Composer contract={contract} access={access} onSent={(m) => {
             loadSeq.current++;
             setMessages((list) => [...(list ?? []), m]);
@@ -464,6 +523,7 @@ export function CoachingMessages({
       ) : (
         <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。{readOnlyNote}</p>
       )}
+      {ended && !viewClosed && !isGuardian && messages && messages.length > 0 ? <DownloadChat contract={contract} token={token} /> : null}
       {contract.status === "ended" && contract.role === "requester" ? (
         <RatingForm
           contract={contract}
