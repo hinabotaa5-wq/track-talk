@@ -199,3 +199,44 @@ export function priceHintLabel(min: number | null, max: number | null): string {
   const f = (n: number) => `${n.toLocaleString("ja-JP")}円`;
   return `${f(min)}〜${f(max)}`;
 }
+
+// 大会までプランを途中で終えたときの日割りの算定例。API の supportUnprovidedAsOf と同じ計算
+// （契約価格 ÷ 期間日数 × 未経過日数、円未満切り捨て。終える日は経過に数える）。
+export function supportProrationExample(priceYen: number, days: number) {
+  const total = Math.max(1, Math.floor(days));
+  const elapsed = Math.min(total, Math.max(1, Math.floor(total / 3)));
+  const remaining = total - elapsed;
+  const refund = Math.floor((priceYen * remaining) / total);
+  return { total, elapsed, remaining, refund };
+}
+
+// 契約が終わったあとにチャットを見られる日数（閲覧のみ・送信はできない）。
+export const supportChatViewDays = 90;
+
+// 提案画面と最終確認画面に出す、途中で終わる場合のお金とチャットの扱い。
+export function supportTermsLines(priceYen: number, days: number): { label: string; text: string }[] {
+  const ex = supportProrationExample(priceYen, days);
+  const yen = (n: number) => `${n.toLocaleString("ja-JP")}円`;
+  return [
+    {
+      label: "途中で終わる場合（日割り）",
+      text: `解約料・違約金はかかりません。まだ過ぎていない日数分を日割りで全額返金します（契約価格 ÷ 期間の日数 × 残りの日数、1円未満は切り捨て。期間は実際に始まった日から目標大会の日までで、終える日は過ぎた日に数えます）。例: ${yen(priceYen)}・${ex.total}日間の契約を${ex.elapsed}日目に終えると、残り${ex.remaining}日分の${yen(ex.refund)}を返金します。始まる前に終えた場合は全額を返金します。`,
+    },
+    {
+      label: "コーチの都合で続けられない場合",
+      text: "コーチの責任で続けられなくなった場合は、過ぎた日数分も含めて全額を返金します。病気・災害などやむを得ない事情の場合は、上の日割りの返金になります。",
+    },
+    {
+      label: "返金の時期と方法",
+      text: "終了の手続きをした時点で、お支払いに使ったカードへ返金します。明細に反映されるまでの日数はカード会社によって異なります（通常は数日から2週間ほど）。",
+    },
+    {
+      label: "大会が中止・延期になった場合",
+      text: "主催者が中止・延期を正式に発表した日で契約を終えます。別の大会への振り替えや期間の延長はしません。発表の日までを過ぎた日として、残りの日数分を日割りで返金します。次の大会に向けては、あらためて無料相談ができます。",
+    },
+    {
+      label: "契約後のチャット",
+      text: `コーチからの返答は24時間以内を目安としています。契約が終わった後も${supportChatViewDays}日間はチャットを見ることができます（送信はできません）。終了時にやりとり（文章とメニュー）をダウンロードできます。${supportChatViewDays}日を過ぎると見られなくなります。`,
+    },
+  ];
+}

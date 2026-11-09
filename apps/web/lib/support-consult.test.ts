@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { answerRows, emptyAnswers, priceHintLabel } from "./support-consult";
+import { describe, expect, it } from "vitest";
+import { answerRows, emptyAnswers, priceHintLabel, supportProrationExample, supportTermsLines } from "./support-consult";
 
 it("価格の目安は下限と上限がそろったときだけ出す", () => {
   expect(priceHintLabel(5000, 12000)).toBe("5,000円〜12,000円");
@@ -23,4 +23,22 @@ it("コーチが読む回答は、空の項目を出さず区分ごとにまと�
 it("目標の大会が未定なら、時期の目安を出す", () => {
   const rows = answerRows({ ...emptyAnswers(), goal_decided: false, timing_hint: "3_6m" }, "100m");
   expect(rows.find((r) => r.label === "大会")?.value).toBe("未定（3〜6か月先）");
+});
+
+describe("大会までプランの途中終了の表示", () => {
+  it("算定例は API と同じ日割り（円未満切り捨て・終える日は経過扱い）", () => {
+    expect(supportProrationExample(9000, 30)).toEqual({ total: 30, elapsed: 10, remaining: 20, refund: 6000 });
+    expect(supportProrationExample(10000, 3)).toEqual({ total: 3, elapsed: 1, remaining: 2, refund: 6666 });
+    expect(supportProrationExample(5000, 1)).toEqual({ total: 1, elapsed: 1, remaining: 0, refund: 0 });
+  });
+  it("算定例・返金の時期と方法・中止延期・チャットの閲覧期間をすべて出す", () => {
+    const text = supportTermsLines(9000, 30).map((l) => `${l.label} ${l.text}`).join("\n");
+    expect(text).toContain("残り20日分の6,000円を返金");
+    expect(text).toContain("解約料・違約金はかかりません");
+    expect(text).toContain("お支払いに使ったカードへ返金");
+    expect(text).toContain("主催者が中止・延期を正式に発表した日");
+    expect(text).toContain("振り替えや期間の延長はしません");
+    expect(text).toContain("90日間はチャットを見ることができます");
+    expect(text).toContain("全額を返金します");
+  });
 });

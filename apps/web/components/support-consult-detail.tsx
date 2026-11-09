@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportTermsNotice } from "@/components/support-terms-notice";
 import { ContractConsentChecks, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { FieldBlock, selectClass } from "@/components/consult-fields";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,8 @@ export function ProposalCard({ p, role }: { p: SupportConsultProposal; role: "at
         {p.content_note ? <div><dt className="text-xs text-slate-300">内容の補足</dt><dd className="whitespace-pre-wrap break-words">{p.content_note}</dd></div> : null}
         {p.answer_to_question ? <div><dt className="text-xs text-slate-300">聞きたいことへの回答</dt><dd className="whitespace-pre-wrap break-words">{p.answer_to_question}</dd></div> : null}
       </dl>
-      {role === "coach" ? <p className="text-xs text-slate-300">運営手数料{p.fee_percent}%を引いた、あなたの受け取り: {formatYen(p.coach_receives_yen)}</p> : null}
+      {role === "coach" ? <p className="text-xs text-slate-300">運営手数料{p.fee_percent}%を引いた、あなたの受け取り: {formatYen(p.coach_receives_yen)}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。</p> : null}
+      <SupportTermsNotice priceYen={p.price_yen} days={p.duration_days} />
     </section>
   );
 }
