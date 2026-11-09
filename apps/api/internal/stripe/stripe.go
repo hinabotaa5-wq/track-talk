@@ -28,6 +28,10 @@ var (
 	ErrBadSignature  = errors.New("stripe webhook signature invalid")
 )
 
+// CheckoutFallbackAPIVersion は、版が未設定のときに支払い方法を絞った支払い画面の作成だけに付ける版。
+// payment_method_types を受け付ける Dahlia 世代で、本番の STRIPE_API_VERSION と同じ値。
+const CheckoutFallbackAPIVersion = "2026-08-26.dahlia"
+
 type Client struct {
 	Secret  string
 	APIBase string
@@ -190,7 +194,13 @@ type CheckoutSession struct {
 // （managed_payments[enabled]=false は旧版でも受付可のため、ピン留めの有無にかかわらず送る）。
 // payment_method_types は API 版 2026-09-30.endive で削除されたため、
 // STRIPE_API_VERSION に Dahlia 世代（例：2026-08-26.dahlia）を設定する運用が前提。
+// 版が未設定（アカウントの既定に任せる状態）のまま支払い方法を絞るときは、この呼び出しだけ
+// CheckoutFallbackAPIVersion を付ける。アカウントの既定が endive 以降になっていても、
+// payment_method_types が原因で支払い画面の作成が 400 にならないようにするため。
 func (c Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (CheckoutSession, error) {
+	if c.APIVersion == "" && len(p.PaymentMethodTypes) > 0 {
+		c.APIVersion = CheckoutFallbackAPIVersion
+	}
 	form := url.Values{}
 	form.Set("mode", "payment")
 	// Managed Payments が既定で有効なアカウントでも Connect の代行処理にならないように外す。

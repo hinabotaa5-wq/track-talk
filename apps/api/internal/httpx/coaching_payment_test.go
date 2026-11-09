@@ -23,10 +23,12 @@ const (
 
 // fakeStripe は、Stripe の代わりに支払い画面と返金を受け付けるサーバー。
 type fakeStripe struct {
-	transferDelay      time.Duration
-	serverConfig       config.Config
-	mu                 sync.Mutex
-	sessions           []url.Values
+	transferDelay time.Duration
+	serverConfig  config.Config
+	mu            sync.Mutex
+	sessions      []url.Values
+	// 支払い画面の作成ごとに届いた Stripe-Version（sessions と同じ並び）。
+	sessionVersions    []string
 	refunds            []url.Values
 	ticketRefundStatus string
 	// 仮押さえの確定・取り消しを受けた PaymentIntent。
@@ -131,6 +133,7 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
 		case r.URL.Path == "/v1/checkout/sessions":
 			f.sessions = append(f.sessions, r.PostForm)
+			f.sessionVersions = append(f.sessionVersions, r.Header.Get("Stripe-Version"))
 			n := len(f.sessions)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": fmt.Sprintf("cs_test_%d_%s", n, r.PostForm.Get("client_reference_id")), "url": fmt.Sprintf("https://checkout.stripe.test/%d", n),
