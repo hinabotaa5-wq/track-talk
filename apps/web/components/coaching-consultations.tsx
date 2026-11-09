@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { WorkOrderTermsView, WorkOrderView } from "@/components/work-order-terms";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -74,7 +75,9 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price
   const [buy, setBuy] = useState(false);
   const requestKey = useRef(draft?.request_key ?? crypto.randomUUID());
   const { pending, acquire, release } = useActionLock();
+  const guard = useSolicitationGuard();
   async function submit() {
+    if (!guard.allow(body)) return;
     if (needsDeclaration && !declared) { setError("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"); return; }
     if (!acquire()) return;
     setError(""); setBuy(false);
@@ -93,6 +96,8 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price
   return <div className="space-y-3">
     <p className="text-sm font-semibold">{funding === "ticket" ? `チケット1枚（${formatYen(price)}相当）` : formatYen(price)} / 質問1件と回答1件</p>
     <ConsultationTermsNote kind={kind} />
+    <ContactNotice />
+    {guard.warning}
     <Textarea aria-label="追加相談の質問" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder="新しく相談したいこと" />
     <label className="block text-xs text-slate-200">動画（30秒・100MB以内{requiresVideo ? "、必須" : "、任意"}）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">保存済みの動画を添付します。<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">外す</button></p> : null}
@@ -123,7 +128,9 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   const declared = declaration.checked;
   const [body, setBody] = useState(""); const [file, setFile] = useState<File | null>(null); const [error, setError] = useState(""); const [reported, setReported] = useState(false);
   const { pending, acquire, release } = useActionLock(); const confirmDialog = useConfirm();
+  const guard = useSolicitationGuard();
   async function act(action: string) {
+    if (action !== "checkout" && action !== "accept" && action !== "decline" && !guard.allow(body)) return;
     if (!acquire()) return; setError("");
     try {
       const video = action === "answer" && file ? await uploadVideo(file, token) : "";
@@ -159,6 +166,8 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
       {role === "coach" && c.status === "offered" ? <div className="flex gap-3"><Button disabled={pending} onClick={() => void act("accept")}>引き受ける</Button><Button disabled={pending} onClick={() => void act("decline")}>辞退する</Button></div> : null}
       {sendEnabled && (reply || clarify || clarifyReply) ? <div className="space-y-2">
+        <ContactNotice />
+        {guard.warning}
         <Textarea aria-label={reply ? "コーチの回答" : clarify ? "回答への確認質問" : "コーチの補足"} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} disabled={pending} />
         {reply ? <label className="block text-xs">実践動画（30秒・100MB以内、任意）<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? "回答を送る" : clarify ? "回答について確認する（1回無料）" : "補足を送る"}</Button>

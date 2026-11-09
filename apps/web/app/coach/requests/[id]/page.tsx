@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { WorkOrderView } from "@/components/work-order-terms";
 import { PageLoading } from "@/components/page-loading";
 
@@ -68,6 +69,7 @@ function fieldErrors(err: unknown): Record<string, string> {
 
 function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void }) {
   const [good, setGood] = useState("");
+  const guard = useSolicitationGuard();
   const [fix1, setFix1] = useState("");
   const [fix2, setFix2] = useState("");
   const [drill, setDrill] = useState("");
@@ -92,6 +94,7 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!guard.allow([good, fix1, fix2, drill].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -127,6 +130,8 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
       <p className="text-xs text-slate-300">
         URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは送れません。直接のやりとりに誘うと利用停止になります。
       </p>
+      <ContactNotice />
+      {guard.warning}
       <p className="text-xs text-slate-300">返答と一緒に、ニックネーム・担当種目・記録・成績や指導経験が利用者に届きます。</p>
       <Field label="良い点（1つ）" value={good} onChange={setGood} error={errors.good_point} />
       <Field label="直す点（1つ目）" value={fix1} onChange={setFix1} error={errors.fix_points} />
@@ -156,9 +161,11 @@ function ClarificationForm({ request, token, onSent }: { request: CoachReviewReq
   const [text, setText] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { pending, acquire, release } = useActionLock();
+  const guard = useSolicitationGuard();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!guard.allow(text)) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -178,6 +185,8 @@ function ClarificationForm({ request, token, onSent }: { request: CoachReviewReq
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
+      <ContactNotice />
+      {guard.warning}
       <Field label="補足（1回だけ送れます）" value={text} onChange={setText} error={errors.clarification} />
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>

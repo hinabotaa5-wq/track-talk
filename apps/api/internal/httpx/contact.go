@@ -15,6 +15,9 @@ import (
 // 見落としより止めすぎを選ぶが、陸上の用語(スタートライン、ラップの「12.1 12.3」など)では止めない。
 // 「at」「dot」と書く、何通かに分けて送るといった言い換えまでは追わない(通報と運営の確認で拾う)。
 
+// 連絡先そのもの（URL・メール・電話・SNS の ID の形）。見つけたら送れない。
+// 2026-11-09 の運営者決定（本体 #485）：勧誘に使われやすい言葉（LINE・インスタ・DM・直接連絡など）は止めずに警告だけにする。
+// 誤検出で通常のやりとりを壊さないため、言葉だけの段階では止めない（looksLikeSolicitation、画面で送信前に警告する）。
 var contactPatterns = []*regexp.Regexp{
 	// URL とドメイン
 	regexp.MustCompile(`(?i)https?://|www\.`),
@@ -23,10 +26,27 @@ var contactPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}`),
 	// SNS のアカウント名（@ のあとに英数字）
 	regexp.MustCompile(`(?i)@[a-z0-9_.]{3,}`),
-	// SNS やメッセージアプリの名前と、ID のやりとり
-	regexp.MustCompile(`(?i)\bline\b|instagram|\binsta\b|インスタ|twitter|ツイッター|tiktok|ティックトック|discord|ディスコード|カカオ|kakao|facebook|フェイスブック|threads|スレッズ|\bDM\b|メアド|メールアドレス|電話番号|連絡先|\bID\s*[:：は]`),
-	// 「ライン」は陸上の用語でもあるので、交換や ID と一緒のときと、ひらがなのときだけ止める。
-	regexp.MustCompile(`らいん|ライン\s*(交換|教え|追加|やって|で話|でやり|ID|id)`),
+	// ID を書いたもの（「ID: xxx」「IDは xxx」、アプリ名のあとに「:」と英数字）
+	regexp.MustCompile(`(?i)\bID\s*[:：は]`),
+	regexp.MustCompile(`(?i)(\bline\b|ライン|らいん|instagram|\binsta\b|インスタ|twitter|\bx\b|tiktok|discord|kakao|カカオ|facebook|threads)\s*(id|ｉｄ)?\s*[:：]\s*[a-z0-9_.]{3,}`),
+	regexp.MustCompile(`(?i)(\bline\b|ライン|らいん)\s*(id|ｉｄ)`),
+}
+
+// 外部の連絡手段への誘導に使われやすい言葉。送信は止めず、画面で送る前に警告する（Web の lib/solicitation.ts と同じ並び）。
+var solicitationPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bline\b|らいん|ライン\s*(交換|教え|追加|やって|で話|でやり|で連絡|で送)|instagram|\binsta\b|インスタ|twitter|ツイッター|tiktok|ティックトック|discord|ディスコード|カカオ|kakao|facebook|フェイスブック|threads|スレッズ`),
+	regexp.MustCompile(`(?i)\bDM\b|ＤＭ|メアド|メールアドレス|電話番号|連絡先|直接(連絡|やりとり|やり取り|取引|指導|会)|個人レッスン|個別(レッスン|指導|に連絡)|(外|ほか|他)で(やりとり|やり取り|連絡|会)`),
+}
+
+// looksLikeSolicitation は、外部の連絡手段への誘導に使われやすい言葉があれば true を返す（警告だけで、送信は止めない）。
+func looksLikeSolicitation(s string) bool {
+	folded := normalizeForContact(s)
+	for _, re := range solicitationPatterns {
+		if re.MatchString(folded) {
+			return true
+		}
+	}
+	return false
 }
 
 // looksLikeContact は、文章に連絡先らしき文字列があれば true を返す。

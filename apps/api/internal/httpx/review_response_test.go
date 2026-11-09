@@ -61,7 +61,7 @@ func TestReviewResponseFlow(t *testing.T) {
 
 	// 連絡先らしき文字列があると止める。
 	bad := responseBody()
-	bad["good_point"] = "続きは LINE で送ります"
+	bad["good_point"] = "続きは coach@example.com に送ります"
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"good_point"`) {
 		t.Fatalf("contact %d %s", rec.Code, rec.Body.String())

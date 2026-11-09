@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { SellerNote } from "@/components/seller-note";
 import { PageLoading } from "@/components/page-loading";
@@ -52,6 +53,7 @@ export default function NewReviewRequestPage() {
   const tier = "coach";
   const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
   const [question, setQuestion] = useState("");
+  const guard = useSolicitationGuard();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   // 18歳未満の購入のたびの宣言。毎回チェックなしから始める。
@@ -154,6 +156,7 @@ export default function NewReviewRequestPage() {
     e.preventDefault();
     if (!estimate) { setError("料金と受付状況を確認してから送信してください。"); return; }
     if (!coach) { setError("コーチを選んでください。"); return; }
+    if (question.trim() && !guard.allow(question)) return;
     if (!question.trim()) {
       setError("相談内容を記入してください");
       return;
@@ -261,6 +264,8 @@ export default function NewReviewRequestPage() {
           </div>
           <label className="block space-y-2 text-sm">
             <span className="font-semibold">相談内容</span>
+            <ContactNotice />
+            {guard.warning}
             <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} maxLength={1000} required disabled={pending} placeholder="例：後半にスピードが落ちます。動画を見て、改善点や練習方法を教えてください。" />
             <span className="block text-xs text-slate-300">{question.length}/1000文字</span>
           </label>

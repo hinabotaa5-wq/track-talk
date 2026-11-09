@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { PublicAvailability } from "@/components/coach-availability";
 import { hasAvailability } from "@/lib/coach-availability";
 import { PageLoading } from "@/components/page-loading";
@@ -43,6 +44,7 @@ export default function ApplyCoachingPlanPage() {
   const [goal, setGoal] = useState("");
   const [record, setRecord] = useState("");
   const [message, setMessage] = useState("");
+  const guard = useSolicitationGuard();
   const [preferredDates, setPreferredDates] = useState<string[]>([]);
   const [availabilityRevision, setAvailabilityRevision] = useState(0);
   const [consents, setConsents] = useState<ContractConsents>(noConsents);
@@ -94,6 +96,7 @@ export default function ApplyCoachingPlanPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!guard.allow([goal, record, message].join("\n"))) return;
     if (!acquire()) return;
     setError("");
     setFields({});
@@ -213,7 +216,8 @@ export default function ApplyCoachingPlanPage() {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="例: スタートの出遅れが気になっています。練習は週4回です。"
             />
-            <span className="block text-xs text-slate-300">連絡先（URL・SNS の ID・電話番号など）は書けません。</span>
+            <ContactNotice className="block" />
+            {guard.warning}
             {fieldError("message")}
           </label>
           <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
