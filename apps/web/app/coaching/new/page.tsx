@@ -266,10 +266,9 @@ export default function NewReviewRequestPage() {
           </label>
 
           {ticketSummary && ticketsUsable ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
-            <p>チケット残高：{ticketSummary.balance.available}枚（確保中 {ticketSummary.balance.reserved}枚）</p>
             <p className="text-xs text-slate-300">動画添削1本はチケット2枚です。</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-              {ticketSummary.can_purchase ? "チケットを購入・確認する" : "チケットの残高・履歴を見る"}<ArrowRight className="size-4 text-blue-300" aria-hidden />
+              {ticketSummary.can_purchase ? "チケットを購入・確認する" : "コーチングチケット"}<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
           </div> : null}
           <label className="block space-y-1 text-sm">

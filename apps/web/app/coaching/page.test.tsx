@@ -87,4 +87,11 @@ describe("コーチタブ", () => {
     flags.list = true;
     expect(supportCard(renderToStaticMarkup(createElement(CoachingPage)))).toContain("大会サポート・対面指導を選ぶ");
   });
+  it("コーチングを開けると、利用中の方には残高・履歴ではなくコーチングチケットへの案内を出す", () => {
+    flags.coaching = true;
+    const html = renderToStaticMarkup(createElement(CoachingPage));
+    expect(html).toContain("利用中の方");
+    expect(html).toContain("コーチングチケット");
+    expect(html).not.toContain("チケットの残高・履歴");
+  });
 });
