@@ -36,7 +36,7 @@ it("keeps the page usable during auth startup, loads the initial profile once, a
     expect(container.textContent).toContain("loading");
     expect(state.callback).toBeTypeOf("function");
     await act(async () => state.callback?.("INITIAL_SESSION", { user: { id: "fixture" }, access_token: "token-1" }));
-    expect(state.fetch).toHaveBeenCalledExactlyOnceWith("/v1/me", { token: "token-1" });
+    expect(state.fetch).toHaveBeenCalledExactlyOnceWith("/v1/me", { token: "token-1", signal: expect.any(AbortSignal) });
     expect(container.textContent).toContain("token-1:runner");
     await act(async () => state.callback?.("SIGNED_OUT", null));
     expect(container.textContent).toContain("null:guest");
