@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, minInfoRequestChars, reviewInfoReasonLabels, tooLong, videoDuration } from "@/lib/review";
 import type { CoachReviewRequest, ReviewInfoReason, ReviewInfoRequest, ReviewRequest } from "@/lib/types";
@@ -161,10 +161,10 @@ export function ResubmitForm({ request, token, onChange }: { request: ReviewRequ
     try {
       let video = "";
       if (file) {
-        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
+        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
         setPhase("upload");
         setUpload({ loaded: 0, total: file.size, percent: 0 });
-        const payload = await uploadToCloudinary("video", file, signed, setUpload);
+        const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
         if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
         video = payload.public_id;
         setPhase("saving");

@@ -21,13 +21,18 @@ import (
 )
 
 const (
-	Folder        = "track-talk"
-	ImagePreset   = "track-talk-image"
-	VideoPreset   = "track-talk-video"
-	ImageFormats  = "gif,heic,heif,jpg,png,webp"
-	VideoFormats  = "mov,mp4,webm"
-	MaxImageBytes = 10 << 20
-	MaxVideoBytes = 100 << 20
+	Folder      = "track-talk"
+	ImagePreset = "track-talk-image"
+	VideoPreset = "track-talk-video"
+	// VideoAsyncPreset は、保存前に縮めない（incoming 変換なし）動画のプリセット。
+	// 配信に使う変換は、アップロードの署名に付ける eager（eager_async=true）で裏で作る。
+	// Cloudinary は同期で処理できる動画の大きさに上限があり（Free は 40MB）、incoming 変換はその上限に当たるため。
+	// https://cloudinary.com/documentation/video_trimming_and_concatenating#troubleshooting_video_transformation_errors
+	VideoAsyncPreset = "track-talk-video-async"
+	ImageFormats     = "gif,heic,heif,jpg,png,webp"
+	VideoFormats     = "mov,mp4,webm"
+	MaxImageBytes    = 10 << 20
+	MaxVideoBytes    = 100 << 20
 
 	// 添削の動画は顔や体が写るので、公開 URL では配信しない（type=authenticated）。
 	// 署名付きの URL を知っている人だけが見られる。
@@ -38,9 +43,54 @@ const (
 
 	// 保存する前に Cloudinary 側で縮める。元ファイルは残らない。
 	// 写真は表示(長辺1600px)より少し大きい2048pxまで、動画は720p相当(長辺1280px)まで。
+	// 動画の incoming は、署名に eager を付けない古い画面（VideoPreset）のときだけ使う。
 	ImageIncoming = "c_limit,w_2048,h_2048"
 	VideoIncoming = "c_limit,w_1280,h_1280,q_auto"
+
+	// 動画の配信に使う変換。eager で事前に作る変換と、配信 URL の変換は一字一句同じでなければならない
+	// （違うと配信のときに同期で作ろうとして、大きな動画では失敗する）。
+	videoPlayback       = "c_limit,w_1280,h_1280,q_auto"
+	videoThumbnail      = "so_auto,c_limit,w_800,q_auto,f_jpg"
+	videoCardThumbnail  = "so_auto,c_limit,w_" + cardWidth + ",q_auto,f_jpg"
+	coachingPlayback    = "c_limit,w_1280,h_1280,q_auto,du_30"
+	coachingThumbnail   = "so_auto,c_limit,w_800,f_jpg"
+	playbackExt         = "mp4"
+	thumbnailExt        = "jpg"
+	eagerAsyncParameter = "true"
+
+	// SyncVideoMaxBytes より大きい動画は、eager の派生ができるまで投稿に使わせない。
+	// それ以下なら、派生がまだでも配信のときに同期で作れる。Cloudinary の同期処理の上限（Free は 40MB）より
+	// 余裕をもって小さくしてある。
+	SyncVideoMaxBytes = 30 << 20
 )
+
+type derivedSpec struct {
+	transformation string
+	ext            string
+}
+
+func (d derivedSpec) eager() string { return d.transformation + "/" + d.ext }
+
+// publicVideoDerived は公開動画の配信（再生・詳細のサムネイル・カードのサムネイル）。
+var publicVideoDerived = []derivedSpec{
+	{videoPlayback, playbackExt},
+	{videoThumbnail, thumbnailExt},
+	{videoCardThumbnail, thumbnailExt},
+}
+
+// coachingVideoDerived は非公開の添削・やりとりの動画の配信（再生・サムネイル）。
+var coachingVideoDerived = []derivedSpec{
+	{coachingPlayback, playbackExt},
+	{coachingThumbnail, thumbnailExt},
+}
+
+func eagerFor(specs []derivedSpec) string {
+	parts := make([]string, len(specs))
+	for i, d := range specs {
+		parts[i] = d.eager()
+	}
+	return strings.Join(parts, "|")
+}
 
 var (
 	ErrNotConfigured = errors.New("cloudinary not configured")
@@ -50,6 +100,8 @@ var (
 	ErrTooLarge      = errors.New("asset too large")
 	ErrTooLong       = errors.New("video too long")
 	ErrUnavailable   = errors.New("cloudinary unavailable")
+	// ErrProcessing は、大きな動画の配信用の変換を Cloudinary がまだ作っている途中であること。
+	ErrProcessing = errors.New("video still processing")
 )
 
 type Client struct {
@@ -96,6 +148,9 @@ type UploadSignature struct {
 	AllowedFormats string `json:"allowed_formats"`
 	ResourceType   string `json:"resource_type"`
 	Type           string `json:"type,omitempty"`
+	// Eager と EagerAsync は、配信用の変換をアップロード後に裏で作らせる指定。署名に含まれるので、そのまま送る。
+	Eager      string `json:"eager,omitempty"`
+	EagerAsync string `json:"eager_async,omitempty"`
 }
 
 func NewPublicID() string {
@@ -155,6 +210,16 @@ func presetFor(resource string) (preset, formats string, maxBytes int64, err err
 }
 
 func (c Client) SignedUpload(now time.Time, resource string) (UploadSignature, error) {
+	return c.signedUpload(now, resource, false)
+}
+
+// SignedAsyncVideoUpload は、保存前に縮めず、配信用の変換を eager（非同期）で作らせる公開動画の署名を返す。
+// eager と eager_async を送れる画面だけが使う（送らないと署名が合わず、Cloudinary が断る）。
+func (c Client) SignedAsyncVideoUpload(now time.Time) (UploadSignature, error) {
+	return c.signedUpload(now, "video", true)
+}
+
+func (c Client) signedUpload(now time.Time, resource string, async bool) (UploadSignature, error) {
 	if !c.Configured() {
 		return UploadSignature{}, ErrNotConfigured
 	}
@@ -170,21 +235,39 @@ func (c Client) SignedUpload(now time.Time, resource string) (UploadSignature, e
 		"timestamp":       fmt.Sprintf("%d", ts),
 		"upload_preset":   preset,
 	}
-	return UploadSignature{
+	signed := UploadSignature{
 		CloudName:      c.Cloud,
 		APIKey:         c.Key,
 		Timestamp:      ts,
 		PublicID:       publicID,
-		Signature:      Sign(params, c.Secret),
 		UploadPreset:   preset,
 		AllowedFormats: formats,
 		ResourceType:   resource,
-	}, nil
+	}
+	if async && resource == "video" {
+		signed.UploadPreset = VideoAsyncPreset
+		signed.Eager = eagerFor(publicVideoDerived)
+		signed.EagerAsync = eagerAsyncParameter
+		params["upload_preset"] = signed.UploadPreset
+		params["eager"] = signed.Eager
+		params["eager_async"] = signed.EagerAsync
+	}
+	signed.Signature = Sign(params, c.Secret)
+	return signed, nil
 }
 
 // SignedCoachingUpload は添削の動画を非公開（authenticated）でアップロードする署名を返す。
 // type も署名に含めるので、ブラウザ側で公開に書き換えると Cloudinary が受け付けない。
 func (c Client) SignedCoachingUpload(now time.Time) (UploadSignature, error) {
+	return c.signedCoachingUpload(now, false)
+}
+
+// SignedAsyncCoachingUpload は、SignedCoachingUpload の、保存前に縮めず eager（非同期）で配信用の変換を作らせる版。
+func (c Client) SignedAsyncCoachingUpload(now time.Time) (UploadSignature, error) {
+	return c.signedCoachingUpload(now, true)
+}
+
+func (c Client) signedCoachingUpload(now time.Time, async bool) (UploadSignature, error) {
 	if !c.Configured() {
 		return UploadSignature{}, ErrNotConfigured
 	}
@@ -197,17 +280,26 @@ func (c Client) SignedCoachingUpload(now time.Time) (UploadSignature, error) {
 		"type":            CoachingVideoType,
 		"upload_preset":   VideoPreset,
 	}
-	return UploadSignature{
+	signed := UploadSignature{
 		CloudName:      c.Cloud,
 		APIKey:         c.Key,
 		Timestamp:      ts,
 		PublicID:       publicID,
-		Signature:      Sign(params, c.Secret),
 		UploadPreset:   VideoPreset,
 		AllowedFormats: VideoFormats,
 		ResourceType:   "video",
 		Type:           CoachingVideoType,
-	}, nil
+	}
+	if async {
+		signed.UploadPreset = VideoAsyncPreset
+		signed.Eager = eagerFor(coachingVideoDerived)
+		signed.EagerAsync = eagerAsyncParameter
+		params["upload_preset"] = signed.UploadPreset
+		params["eager"] = signed.Eager
+		params["eager_async"] = signed.EagerAsync
+	}
+	signed.Signature = Sign(params, c.Secret)
+	return signed, nil
 }
 
 func (c Client) EnsureUploadPresets(ctx context.Context) error {
@@ -223,7 +315,8 @@ func (c Client) EnsureUploadPresets(ctx context.Context) error {
 			return err
 		}
 	}
-	return nil
+	// 縮めない動画のプリセット。配信用の変換は署名の eager で作る。
+	return c.ensurePreset(ctx, VideoAsyncPreset, VideoFormats, "")
 }
 
 func incomingFor(resource string) string {
@@ -240,7 +333,9 @@ func (c Client) ensurePreset(ctx context.Context, name, formats, transformation 
 		"allowed_formats": {formats},
 		"overwrite":       {"false"},
 		"unique_filename": {"false"},
-		"transformation":  {transformation},
+	}
+	if transformation != "" {
+		values.Set("transformation", transformation)
 	}
 	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/upload_presets"
 	status, body, err := c.form(ctx, http.MethodPost, endpoint, values)
@@ -287,7 +382,7 @@ func (c Client) ThumbnailURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_800,q_auto,f_jpg/" + deliveryPath(publicID) + ".jpg"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/" + videoThumbnail + "/" + deliveryPath(publicID) + "." + thumbnailExt
 }
 
 // CardThumbnailURL は一覧カード用の小さな動画サムネイル URL を返す。
@@ -296,14 +391,14 @@ func (c Client) CardThumbnailURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/so_auto,c_limit,w_" + cardWidth + ",q_auto,f_jpg/" + deliveryPath(publicID) + ".jpg"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/" + videoCardThumbnail + "/" + deliveryPath(publicID) + "." + thumbnailExt
 }
 
 func (c Client) PlaybackURL(publicID string) string {
 	if c.Cloud == "" || publicID == "" {
 		return ""
 	}
-	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/c_limit,w_1280,h_1280,q_auto/" + deliveryPath(publicID) + ".mp4"
+	return "https://res.cloudinary.com/" + url.PathEscape(c.Cloud) + "/video/upload/" + videoPlayback + "/" + deliveryPath(publicID) + "." + playbackExt
 }
 
 func (c Client) ImageURL(publicID string) string {
@@ -334,13 +429,14 @@ func (c Client) AvatarURL(publicID string) string {
 
 // CoachingPlaybackURL は非公開の添削動画を再生する署名付き URL を返す。
 // du_30 で、万一長い動画が入っていても30秒までしか配信しない。
+// 保存前に縮めなくなった動画も、これまでどおり長辺1280px以内で配信する。
 func (c Client) CoachingPlaybackURL(publicID string) string {
-	return c.signedVideoURL("q_auto,du_"+fmt.Sprint(MaxCoachingSeconds), publicID, "mp4")
+	return c.signedVideoURL(coachingPlayback, publicID, playbackExt)
 }
 
 // CoachingThumbnailURL は非公開の添削動画のサムネイルの署名付き URL を返す。
 func (c Client) CoachingThumbnailURL(publicID string) string {
-	return c.signedVideoURL("so_auto,c_limit,w_800,f_jpg", publicID, "jpg")
+	return c.signedVideoURL(coachingThumbnail, publicID, thumbnailExt)
 }
 
 // signedVideoURL は非公開の動画を配信する URL を返す。
@@ -490,9 +586,10 @@ func (c Client) ready(ctx context.Context, resource, publicID string) error {
 		return ErrUnavailable
 	}
 	var info struct {
-		Bytes        int64  `json:"bytes"`
-		Format       string `json:"format"`
-		ResourceType string `json:"resource_type"`
+		Bytes        int64     `json:"bytes"`
+		Format       string    `json:"format"`
+		ResourceType string    `json:"resource_type"`
+		Derived      []derived `json:"derived"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&info); err != nil {
 		return ErrUnavailable
@@ -506,6 +603,9 @@ func (c Client) ready(ctx context.Context, resource, publicID string) error {
 	}
 	if info.Bytes <= 0 || info.Bytes > maxBytes {
 		return ErrTooLarge
+	}
+	if resource == "video" && !derivedReady(info.Bytes, info.Derived, publicVideoDerived) {
+		return ErrProcessing
 	}
 	return nil
 }
@@ -536,11 +636,12 @@ func (c Client) CoachingVideoReady(ctx context.Context, publicID string) error {
 		return ErrUnavailable
 	}
 	var info struct {
-		Bytes        int64   `json:"bytes"`
-		Format       string  `json:"format"`
-		ResourceType string  `json:"resource_type"`
-		Type         string  `json:"type"`
-		Duration     float64 `json:"duration"`
+		Bytes        int64     `json:"bytes"`
+		Format       string    `json:"format"`
+		ResourceType string    `json:"resource_type"`
+		Type         string    `json:"type"`
+		Duration     float64   `json:"duration"`
+		Derived      []derived `json:"derived"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&info); err != nil {
 		return ErrUnavailable
@@ -555,7 +656,74 @@ func (c Client) CoachingVideoReady(ctx context.Context, publicID string) error {
 	if info.Duration > MaxCoachingSeconds+coachingSecondsSlop {
 		return ErrTooLong
 	}
+	if !derivedReady(info.Bytes, info.Derived, coachingVideoDerived) {
+		return ErrProcessing
+	}
 	return nil
+}
+
+// derived は、Admin API の資産の詳細に入っている、作り終えた派生の1件。
+type derived struct {
+	Transformation string `json:"transformation"`
+	Format         string `json:"format"`
+}
+
+// derivedReady は、配信のときに同期で作れない大きさの動画について、配信に使う派生がすべて作り終わっているかを返す。
+// 小さい動画は、派生がまだでも配信のときに作れるので待たない（署名に eager を付けない古い画面の動画もここを通る）。
+func derivedReady(bytes int64, have []derived, want []derivedSpec) bool {
+	if bytes <= SyncVideoMaxBytes {
+		return true
+	}
+	for _, w := range want {
+		found := false
+		for _, d := range have {
+			if sameDerived(d, w) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// sameDerived は、派生の変換と形式が、配信に使う変換と同じかを返す。
+// Cloudinary は変換を "c_limit,w_1280/mp4" のように拡張子付きで返すことがあるので、拡張子は format と合わせて見る。
+// 変換の中の項目の並びは比べない。
+func sameDerived(d derived, w derivedSpec) bool {
+	transformation, ext := d.Transformation, strings.ToLower(d.Format)
+	if i := strings.LastIndex(transformation, "/"); i >= 0 {
+		if suffix := strings.ToLower(transformation[i+1:]); suffix != "" && !strings.Contains(suffix, "_") && !strings.Contains(suffix, ",") {
+			transformation = transformation[:i]
+			if ext == "" {
+				ext = suffix
+			}
+		}
+	}
+	if ext == "jpeg" {
+		ext = "jpg"
+	}
+	if ext != "" && ext != w.ext {
+		return false
+	}
+	return sameComponents(transformation, w.transformation)
+}
+
+func sameComponents(a, b string) bool {
+	as, bs := strings.Split(a, ","), strings.Split(b, ",")
+	if len(as) != len(bs) {
+		return false
+	}
+	sort.Strings(as)
+	sort.Strings(bs)
+	for i := range as {
+		if as[i] != bs[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func formatAllowed(format, allowed string) bool {

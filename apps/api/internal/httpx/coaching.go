@@ -670,6 +670,9 @@ func (s *Server) signCoachingVideoUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.issueUpload(w, r, p.ID, "動画", func() (cloudinary.UploadSignature, error) {
+		if wantsEager(r) {
+			return s.cloud.SignedAsyncCoachingUpload(time.Now())
+		}
 		return s.cloud.SignedCoachingUpload(time.Now())
 	})
 }

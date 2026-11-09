@@ -16,7 +16,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
   maxReviewSeconds,
   reviewEvents,
@@ -180,10 +180,10 @@ export default function NewReviewRequestPage() {
     if (!acquire()) return;
     setError("");
     try {
-      const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
+      const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
       setUploadPhase("upload");
       setUpload({ loaded: 0, total: file.size, percent: 0 });
-      const payload = await uploadToCloudinary("video", file, signed, setUpload);
+      const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
       if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
       setUploadPhase("saving");
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {

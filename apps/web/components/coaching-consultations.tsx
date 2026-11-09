@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
-import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
+import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { coachingConsultationEnabled, coachingMessagingEnabled, consultationClosedNote, messagingClosedNote } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
@@ -56,8 +56,8 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
 async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (file.size > 100 * 1024 * 1024) throw new Error("動画は100MB以内にしてください");
   if (tooLong(await videoDuration(file))) throw new Error(`動画は${maxReviewSeconds}秒以内にしてください`);
-  const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
-  const uploaded = await uploadToCloudinary("video", file, signed, () => {});
+  const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+  const uploaded = await uploadVideoToCloudinary(file, signed, token, () => {});
   if (uploaded.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
   return uploaded.public_id;
 }

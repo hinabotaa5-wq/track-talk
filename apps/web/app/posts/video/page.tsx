@@ -8,8 +8,9 @@ import { ComposerPage } from "@/components/composer-page";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  eagerVideoQuery,
   staleUploadMessage,
-  uploadToCloudinary,
+  uploadVideoToCloudinary,
   type CloudinarySignature,
   type CloudinaryUploadProgress,
 } from "@/lib/cloudinary-upload";
@@ -80,7 +81,7 @@ export default function OwnVideoPage() {
   }
 
   function requestSignature(owner: AbortSignal | null): PendingSignature {
-    const promise = apiFetch<CloudinarySignature>("/v1/uploads/video", { method: "POST", token }).then((signed) => ({
+    const promise = apiFetch<CloudinarySignature>(`/v1/uploads/video${eagerVideoQuery}`, { method: "POST", token }).then((signed) => ({
       signed,
       at: Date.now(),
     }));
@@ -171,7 +172,7 @@ export default function OwnVideoPage() {
       if (!entry) return;
       let payload;
       try {
-        payload = await uploadToCloudinary("video", target, entry.signed, onProgress, controller.signal);
+        payload = await uploadVideoToCloudinary(target, entry.signed, token, onProgress, controller.signal);
       } catch (err) {
         // 先読みした署名が期限切れで断られたときは、取り直して1回だけやり直す（失敗は見せない）。
         if (!(entry.prefetched && err instanceof Error && err.message === staleUploadMessage)) throw err;
@@ -179,7 +180,7 @@ export default function OwnVideoPage() {
         if (!fresh) return;
         entry = fresh;
         onProgress({ loaded: 0, total: target.size, percent: 0 });
-        payload = await uploadToCloudinary("video", target, entry.signed, onProgress, controller.signal);
+        payload = await uploadVideoToCloudinary(target, entry.signed, token, onProgress, controller.signal);
       }
       if (payload.public_id !== entry.signed.public_id) {
         throw new Error("アップロードに失敗しました");
