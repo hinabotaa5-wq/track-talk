@@ -804,16 +804,16 @@ func (s *Server) askSupportConsult(w http.ResponseWriter, r *http.Request) {
 }
 
 type proposalReq struct {
-	CompetitionName  string   `json:"competition_name"`
-	SupportStartDate string   `json:"support_start_date"`
-	CompetitionDate  string   `json:"competition_date"`
-	CallCount        int      `json:"call_count"`
-	CallMinutes      int      `json:"call_minutes"`
-	PriceYen         int      `json:"price_yen"`
-	ConfirmHighPrice bool     `json:"confirm_high_price"`
-	ContentNote      string   `json:"content_note"`
-	AnswerToQuestion string   `json:"answer_to_question"`
-	ValidUntil       string   `json:"valid_until"`
+	CompetitionName  string `json:"competition_name"`
+	SupportStartDate string `json:"support_start_date"`
+	CompetitionDate  string `json:"competition_date"`
+	CallCount        int    `json:"call_count"`
+	CallMinutes      int    `json:"call_minutes"`
+	PriceYen         int    `json:"price_yen"`
+	ConfirmHighPrice bool   `json:"confirm_high_price"`
+	ContentNote      string `json:"content_note"`
+	AnswerToQuestion string `json:"answer_to_question"`
+	ValidUntil       string `json:"valid_until"`
 	// 提案を出すことが、コーチ側の契約への同意になる（相談由来の契約では、引受をあらためて挟まない）。
 	AgreeReport    bool `json:"agree_report"`
 	AgreeDetection bool `json:"agree_detection"`
