@@ -85,3 +85,38 @@ for (const [landing, parent, fallback] of [
     }
   });
 }
+
+// コーチの子画面は、Stripe往復・ガイド経由など履歴が深くても、ヘッダーの「＜」1回で /coach に戻る。
+for (const landing of [
+  "/coach/offers",
+  "/coach/reviewing",
+  "/coach/consultations",
+  "/coach/contracts",
+  "/coach/plans",
+  "/coach/availability",
+  "/coach/commerce",
+  "/coach/payouts",
+  "/coach/profile",
+  "/coach/requests/example",
+]) {
+  it(`${landing} は履歴が深くてもヘッダーの戻る1回で /coach に戻る`, async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    replace.mockClear(); back.mockClear();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    for (const step of ["/coach", "/coach/payout-guide", "/coach/payouts"]) window.history.pushState({}, "", step);
+    window.history.pushState({}, "", landing);
+    pathname = landing;
+    try {
+      await act(async () => root.render(<Header />));
+      await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="戻る"]')!.click());
+      expect(back).not.toHaveBeenCalled();
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenLastCalledWith("/coach");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+}

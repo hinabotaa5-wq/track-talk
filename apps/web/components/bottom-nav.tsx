@@ -91,12 +91,32 @@ function isDetailPage(pathname: string) {
     ["/coaches/", "/coaching/", "/coach/", "/competitions/", "/prefectures/", "/guardian/", "/admin/"].some((prefix) => pathname.startsWith(prefix));
 }
 
+// ヘッダーの「＜」1回で、履歴の深さに関係なく /coach へ戻す画面。
+// CoachSubpageShell を使うコーチの子画面と、依頼の詳細。
+const coachChildPaths = new Set([
+  "/coach/offers",
+  "/coach/reviewing",
+  "/coach/requests",
+  "/coach/consultations",
+  "/coach/contracts",
+  "/coach/plans",
+  "/coach/availability",
+  "/coach/commerce",
+  "/coach/payouts",
+  "/coach/profile",
+]);
+
+export function isCoachChildPage(pathname: string) {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return coachChildPaths.has(path) || /^\/coach\/requests\/[^/]+$/.test(path);
+}
+
 export function headerBackFallback(pathname: string) {
   if (pathname === "/admin") return "/me";
   if (pathname.startsWith("/admin/")) return "/admin";
   if (/^\/coaching\/personal\/plans\/[^/]+$/.test(pathname) || pathname.startsWith("/coaches/")) return "/coaches";
   if (pathname === "/coach/about") return "/coach/apply";
-  if (pathname.startsWith("/coach/requests/")) return "/coach";
+  if (isCoachChildPage(pathname) || pathname.startsWith("/coach/requests/")) return "/coach";
   if (pathname === "/coach" || pathname.startsWith("/coach/") || pathname.startsWith("/coaching/") || pathname === "/coaches") return "/coaching";
   if (pathname.startsWith("/competitions/")) return "/competitions";
   if (pathname.startsWith("/me/")) return "/me";

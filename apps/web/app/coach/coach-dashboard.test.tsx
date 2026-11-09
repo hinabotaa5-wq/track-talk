@@ -123,8 +123,8 @@ it("ランチャーは10タイルの入口だけで、中身のセクション�
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
-    "/coach/requests#offers",
-    "/coach/requests#reviewing",
+    "/coach/offers",
+    "/coach/reviewing",
     "/coach/consultations",
     "/coach/contracts",
     "/coach/plans",
@@ -152,7 +152,7 @@ it("ランチャーは10タイルの入口だけで、中身のセクション�
 it("期限アラートは依頼がある時だけ出て、件数と最短の残り分を示す", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
-  const band = container.querySelector('a[href="/coach/requests#offers"]');
+  const band = container.querySelector('a[href="/coach/offers"]');
   expect(band?.textContent).toContain("新しい依頼が2件あります");
   expect(band?.textContent).toContain("あと");
   expect(band?.textContent).toContain("分で終了");
