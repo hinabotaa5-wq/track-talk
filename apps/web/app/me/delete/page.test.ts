@@ -102,4 +102,23 @@ describe("DeleteAccountPage", () => {
     expect(replace).toHaveBeenCalledWith("/goodbye");
     await view.unmount();
   });
+
+  it("shows the coaching notice in theme-aware body text (readable in light mode)", async () => {
+    apiFetch.mockResolvedValueOnce({ application: { status: "approved" } });
+    apiFetch.mockResolvedValue({ auth_deleted: true });
+    const view = await renderPage();
+    await act(async () => {});
+    const notice = Array.from(view.div.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("コーチだけをやめたいときは"),
+    );
+    if (!notice) throw new Error("coaching notice missing");
+    // 明表示では text-pure-white（常時 #fff）が淡い背景に埋もれるため、
+    // ページ本文と同じテーマ対応の文字色を使うこと。
+    expect(notice.className).not.toContain("text-pure-white");
+    expect(notice.className).toContain("text-slate-300");
+    const link = notice.querySelector('a[href="/coach/withdraw"]');
+    if (!link) throw new Error("withdraw link missing");
+    expect(link.className).toContain("text-blue-300");
+    await view.unmount();
+  });
 });
