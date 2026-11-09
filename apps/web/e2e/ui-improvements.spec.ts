@@ -137,7 +137,10 @@ test("コーチ画面は空き高さを使った3つの入口にまとめ、未�
   await page.screenshot({ path: test.info().outputPath("coaching-recruitment.png") });
   await choices.locator('a[href="/coach"]').click();
   await expect(page).toHaveURL(/\/login\?next=%2Fcoach$/);
-  await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+  // 本体 #471：ログイン画面の大きな「コーチに応募する」ボタンは出さない。
+  await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "ログイン" })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("login-no-coach-apply.png") });
 });
 
 test("募集のみの間は直接URLでも準備中を案内し、コーチタブの選択色を保つ", async ({ page }) => {
