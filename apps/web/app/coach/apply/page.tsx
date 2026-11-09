@@ -171,7 +171,7 @@ export default function CoachApplyPage() {
 
       {application ? (
         <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-slate-200">
             {coachStatusLabels[application.status]}
             <span className="ml-2 text-xs font-normal text-slate-300">応募日 {formatDateTime(application.applied_at)}</span>
           </p>

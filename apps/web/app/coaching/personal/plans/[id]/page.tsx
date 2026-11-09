@@ -159,7 +159,7 @@ export default function ApplyCoachingPlanPage() {
       {hasAvailability(plan.service_type) && (plan.full || !me.demo || !me.birth_month) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
 
       {plan.full ? (
-        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-pure-white">
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
           このプランはいま満員です。空いたらまた申し込めます。
         </p>
       ) : !me.demo ? (

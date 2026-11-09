@@ -280,7 +280,7 @@ function ReviewRequestView() {
       </div>
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{request.withdrawal ? "コーチの都合で依頼は終了しました" : request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
+        <p className="text-sm font-semibold text-slate-200">{request.withdrawal ? "コーチの都合で依頼は終了しました" : request.status === "expired" && request.requested_coach_id ? "依頼は終了しました" : reviewStatusLabels[request.status]}</p>
         {waiting || request.status === "awaiting_payment" ? (
           <p className="text-sm text-slate-100">返却期限: {formatDateTime(request.due_at)}</p>
         ) : null}

@@ -251,7 +251,7 @@ export function CoachDashboard() {
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {rating?.paused ? (
-          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-pure-white">
+          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
             評価の平均が★3を下回ったため、いまは依頼が回ってきません。
           </p>
         ) : null}
@@ -260,7 +260,7 @@ export function CoachDashboard() {
       {offerCount > 0 ? (
         <Link
           href="/coach/requests#offers"
-          className="block rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm font-semibold text-white"
+          className="block rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm font-semibold text-slate-200"
         >
           新しい依頼が{offerCount}件あります — あと{shortest}分で終了
         </Link>

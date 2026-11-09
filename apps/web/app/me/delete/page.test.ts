@@ -102,4 +102,40 @@ describe("DeleteAccountPage", () => {
     expect(replace).toHaveBeenCalledWith("/goodbye");
     await view.unmount();
   });
+
+  // 本体 #468：淡い水色背景の案内ボックスは本文と同じ濃い文字色にする。
+  it("上部の案内ボックスは白文字ではなく本文色で読める", async () => {
+    apiFetch.mockImplementation((path: string) =>
+      Promise.resolve(path === "/v1/coach/me" ? { application: { status: "approved" } } : {}),
+    );
+    const view = await renderPage();
+    await act(async () => {});
+    const box = Array.from(view.div.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("コーチだけをやめたいときは"),
+    );
+    if (!(box instanceof HTMLParagraphElement)) throw new Error("案内ボックスが表示されていない");
+    expect(box.className).toContain("text-slate-300");
+    expect(box.className).not.toContain("text-pure-white");
+    expect(box.className).not.toContain("text-white");
+    await view.unmount();
+  });
+
+  // リンク「コーチをやめる」は青文字＋下線のまま本文と見分けられる。文面は変えない。
+  it("案内ボックス内のリンクは青文字＋下線で文面は現状のまま", async () => {
+    apiFetch.mockImplementation((path: string) =>
+      Promise.resolve(path === "/v1/coach/me" ? { application: { status: "approved" } } : {}),
+    );
+    const view = await renderPage();
+    await act(async () => {});
+    const box = Array.from(view.div.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("コーチだけをやめたいときは"),
+    );
+    if (!(box instanceof HTMLParagraphElement)) throw new Error("案内ボックスが表示されていない");
+    const link = box.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("/coach/withdraw");
+    expect(link?.className).toContain("text-blue-300");
+    expect(link?.className).toContain("underline");
+    expect(box.textContent).toContain("送金が済んでから退会してください。");
+    await view.unmount();
+  });
 });
