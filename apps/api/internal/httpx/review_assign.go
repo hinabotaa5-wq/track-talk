@@ -202,8 +202,9 @@ type coachingTickResult struct {
 	Offered       int `json:"offered"`
 	HelpfulAsk    int `json:"helpful_ask"`
 	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
-	ContractsExpired int `json:"contracts_expired"`
-	ContractsEnded   int `json:"contracts_ended"`
+	ContractsExpired       int `json:"contracts_expired"`
+	SupportConsultsExpired int `json:"support_consults_expired"`
+	ContractsEnded         int `json:"contracts_ended"`
 	// 支払い: 自動で返金したもの（コーチが72時間書かなかった、始まらなかった）。
 	PaymentsRefunded int `json:"payments_refunded"`
 	// 添削の支払い: 目安を過ぎたなどで取り消し・返金したもの。
@@ -251,6 +252,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.ContractsExpired, out.ContractsEnded, err = s.closeCoachingContracts(ctx); err != nil {
+		return out, err
+	}
+	if out.SupportConsultsExpired, err = s.expireSupportConsults(ctx); err != nil {
 		return out, err
 	}
 	if out.PaymentsRefunded, err = s.refundCoachingPayments(ctx); err != nil {

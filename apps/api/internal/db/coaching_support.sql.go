@@ -418,7 +418,7 @@ func (q *Queries) PurgeSupportLinks(ctx context.Context, contractID uuid.UUID) e
 }
 
 const saveSupportPlan = `-- name: SaveSupportPlan :one
-UPDATE coaching_plans SET competition_name=$2,competition_date=$3,support_start_date=$4,call_count=$5,call_minutes=$6 WHERE id=$1 RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants
+UPDATE coaching_plans SET competition_name=$2,competition_date=$3,support_start_date=$4,call_count=$5,call_minutes=$6 WHERE id=$1 RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, consult_template
 `
 
 type SaveSupportPlanParams struct {
@@ -469,6 +469,7 @@ func (q *Queries) SaveSupportPlan(ctx context.Context, arg SaveSupportPlanParams
 		&i.SessionMinutes,
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
+		&i.ConsultTemplate,
 	)
 	return i, err
 }

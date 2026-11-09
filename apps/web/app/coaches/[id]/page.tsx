@@ -68,7 +68,7 @@ export default function CoachDetailPage() {
         {(coach.plans ?? []).some((plan) => hasAvailability(plan.service_type)) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
         <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
           <h2 id="coach-plans" className="text-lg font-bold">サポートプラン</h2>
-          <CoachServicePlans key={coach.id} services={coach.service_types ?? []} plans={coach.plans ?? []} />
+          <CoachServicePlans key={coach.id} services={coach.service_types ?? []} plans={coach.plans ?? []} coachID={coach.id} consult={coach.support_consult} />
         </section>
       </>}
     </div>

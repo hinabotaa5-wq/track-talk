@@ -472,6 +472,7 @@ type CoachingPlan struct {
 	SessionMinutes                 int16      `json:"session_minutes"`
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
+	ConsultTemplate                bool       `json:"consult_template"`
 }
 
 type CoachingTicketAllocation struct {
@@ -588,6 +589,15 @@ type Competition struct {
 	SourceUrl     string     `json:"source_url"`
 	LinkLabel     string     `json:"link_label"`
 	GuidelinesUrl string     `json:"guidelines_url"`
+}
+
+type CompetitionImportAttempt struct {
+	Prefecture          string    `json:"prefecture"`
+	AttemptedAt         time.Time `json:"attempted_at"`
+	Outcome             string    `json:"outcome"`
+	ConsecutiveFailures int32     `json:"consecutive_failures"`
+	FailedUrls          []string  `json:"failed_urls"`
+	RequestsMade        int32     `json:"requests_made"`
 }
 
 type CompetitionNewsCheck struct {
@@ -1250,6 +1260,53 @@ type SenseNoteSummaryClaim struct {
 type SenseSummaryAttempt struct {
 	ID          int64     `json:"id"`
 	AttemptedAt time.Time `json:"attempted_at"`
+}
+
+type SupportConsult struct {
+	ID         uuid.UUID  `json:"id"`
+	AthleteID  uuid.UUID  `json:"athlete_id"`
+	CoachID    uuid.UUID  `json:"coach_id"`
+	Status     string     `json:"status"`
+	Minor      bool       `json:"minor"`
+	Event      string     `json:"event"`
+	Answers    []byte     `json:"answers"`
+	AnswerBy   *time.Time `json:"answer_by"`
+	ContractID *uuid.UUID `json:"contract_id"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+type SupportConsultProposal struct {
+	ConsultID        uuid.UUID `json:"consult_id"`
+	CompetitionName  string    `json:"competition_name"`
+	SupportStartDate time.Time `json:"support_start_date"`
+	CompetitionDate  time.Time `json:"competition_date"`
+	CallCount        int16     `json:"call_count"`
+	CallMinutes      int16     `json:"call_minutes"`
+	PriceYen         int32     `json:"price_yen"`
+	ContentNote      string    `json:"content_note"`
+	AnswerToQuestion string    `json:"answer_to_question"`
+	ValidUntil       time.Time `json:"valid_until"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type SupportConsultQuestion struct {
+	ID         uuid.UUID  `json:"id"`
+	ConsultID  uuid.UUID  `json:"consult_id"`
+	Question   string     `json:"question"`
+	Answer     *string    `json:"answer"`
+	AskedAt    time.Time  `json:"asked_at"`
+	AnsweredAt *time.Time `json:"answered_at"`
+}
+
+type SupportConsultSetting struct {
+	CoachID     uuid.UUID `json:"coach_id"`
+	Accepting   bool      `json:"accepting"`
+	Events      []string  `json:"events"`
+	Description string    `json:"description"`
+	PriceMinYen *int32    `json:"price_min_yen"`
+	PriceMaxYen *int32    `json:"price_max_yen"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type TargetMeet struct {

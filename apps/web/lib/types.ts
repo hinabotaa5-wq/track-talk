@@ -855,6 +855,8 @@ export type PublicCoach = {
   rating_average: number;
   // パーソナル指導の公開中のプラン。安い順。
   plans: CoachingPlan[];
+  // 大会までプランの無料相談の入口。相談を受け付けていないコーチは null。
+  support_consult?: import("./support-consult").PublicSupportConsult | null;
 };
 
 // コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。

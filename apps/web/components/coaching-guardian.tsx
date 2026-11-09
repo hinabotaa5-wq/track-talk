@@ -1,11 +1,13 @@
 "use client";
 
 import { CoachAvatar } from "@/components/coach-photo";
+import { ProposalCard } from "@/components/support-consult-detail";
 import { ContractConsentChecks, ContractDetails, contractPeriod, noConsents, type ContractConsents } from "@/components/coaching-contracts";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabel } from "@/lib/coaching-plan";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { consultNotContractNote, type SupportConsult } from "@/lib/support-consult";
 import type { CoachingContract } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -178,6 +180,95 @@ export function GuardianPersonalSection({ token }: { token: string }) {
                 ) : null}
               </>
             )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// GuardianSupportConsultSection は、お子さんが保護者に送った大会までプランの提案。
+// 保護者が内容を確認して同意し、お支払いをすると契約が成立して始まる（コーチの引き受けはもう挟まない）。
+function ConsultCard({ consult, token, onDone }: { consult: SupportConsult & { coach_nickname?: string }; token: string; onDone: () => void }) {
+  const [consents, setConsents] = useState<ContractConsents>(noConsents);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
+  const p = consult.proposal;
+
+  async function answer(action: "consent" | "decline") {
+    if (action === "decline" && !confirm("同意しない場合、この提案では始まりません。費用はかかりません。よろしいですか？")) return;
+    if (!acquire()) return;
+    setError("");
+    setFields({});
+    try {
+      const d = await apiFetch<{ checkout_url?: string }>(`/v1/guardian/${encodeURIComponent(token)}/support-consults/${consult.id}/${action}`, {
+        method: "POST",
+        body: action === "consent" ? JSON.stringify(consents) : undefined,
+      });
+      if (d.checkout_url) {
+        window.location.href = d.checkout_url;
+        return;
+      }
+      onDone();
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
+      else setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+    } finally {
+      release();
+    }
+  }
+
+  if (!p) return null;
+  return (
+    <div className="space-y-3">
+      <ProposalCard p={p} role="athlete" />
+      <p className="text-xs text-slate-200">{consultNotContractNote}</p>
+      <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
+        <li>同意すると契約が成立し、お支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。</li>
+        <li>期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。連絡先の交換と、直接会う約束は禁止です。</li>
+      </ul>
+      <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
+      <div className="flex gap-2">
+        <Button type="button" className="flex-1" disabled={pending || p.expired || !consents.agree_report || !consents.agree_detection} onClick={() => void answer("consent")}>
+          同意してお支払いへ進む
+        </Button>
+        <button type="button" disabled={pending} onClick={() => void answer("decline")}
+          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50">
+          同意しない
+        </button>
+      </div>
+      {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
+    </div>
+  );
+}
+
+export function GuardianSupportConsultSection({ token }: { token: string }) {
+  const [consults, setConsults] = useState<(SupportConsult & { coach_nickname?: string; coach_photo_url?: string | null })[] | null>(null);
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ consults: (SupportConsult & { coach_nickname?: string; coach_photo_url?: string | null })[] }>(`/v1/guardian/${encodeURIComponent(token)}/support-consults`)
+      .then((d) => { if (!cancelled) setConsults(d.consults); })
+      .catch(() => { if (!cancelled) setConsults([]); });
+    return () => { cancelled = true; };
+  }, [token, reload]);
+  const waiting = (consults ?? []).filter((c) => c.status === "sent_to_guardian");
+  if (waiting.length === 0) return null;
+  return (
+    <section className="space-y-3" aria-label="お子さんから届いた大会までプランの提案">
+      <div className="space-y-1">
+        <h2 className="text-lg font-bold">大会までプランの提案</h2>
+        <p className="text-sm text-slate-300">お子さんがコーチに無料で相談して、届いた提案です。内容を確認して、同意するかどうかを決めてください。</p>
+      </div>
+      <ul className="space-y-3">
+        {waiting.map((c) => (
+          <li key={c.id} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
+            <div className="flex items-center gap-3">
+              <CoachAvatar url={c.coach_photo_url ?? ""} name={c.coach_nickname ?? null} size={44} />
+              <p className="font-semibold text-white">{c.coach_nickname ?? "コーチ"}</p>
+            </div>
+            <ConsultCard consult={c} token={token} onDone={() => setReload((n) => n + 1)} />
           </li>
         ))}
       </ul>

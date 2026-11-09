@@ -170,7 +170,7 @@ function CoachingContractView() {
       {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={token} /> : null}
       {contract.fulfillment_version === 2 ? <CoachingInPersonPanel contract={contract} token={token} /> : null}
 
-      <CoachingConsultations rootID={contract.id} kind="contract" token={token} />
+      {contract.service_type === "competition_support" ? null : <CoachingConsultations rootID={contract.id} kind="contract" token={token} />}
 
       {!isCoach && contract.status === "applied" ? (
         <button

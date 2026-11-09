@@ -62,7 +62,7 @@ export default function GuardianContractPage() {
       {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={null} guardianToken={token} /> : null}
       {contract.fulfillment_version === 2 ? <CoachingInPersonPanel contract={contract} token={null} guardianToken={token} /> : null}
 
-      <CoachingConsultations rootID={contract.id} kind="contract" token={null} guardianToken={token} />
+      {contract.service_type === "competition_support" ? null : <CoachingConsultations rootID={contract.id} kind="contract" token={null} guardianToken={token} />}
 
       <Link href={`/guardian/${encodeURIComponent(token)}`} className="block text-center text-sm text-blue-300 underline">
         保護者のページへ

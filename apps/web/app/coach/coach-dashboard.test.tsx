@@ -119,7 +119,7 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは10タイルの入口だけで、中身のセクションを出さない", async () => {
+it("ランチャーは11タイルの入口だけで、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
@@ -127,6 +127,7 @@ it("ランチャーは10タイルの入口だけで、中身のセクション�
     "/coach/reviewing",
     "/coach/consultations",
     "/coach/contracts",
+    "/coach/support-consults",
     "/coach/plans",
     "/coach/availability",
     "/coach/commerce",
@@ -203,7 +204,7 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(10);
+  expect(tileHrefs()).toHaveLength(11);
 });
 
 it("未承認の表示は現行のまま変えない", async () => {

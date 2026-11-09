@@ -6,13 +6,45 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
+// supportUnlimited は、動画への返答に回数の上限がない契約（無料相談の提案から成立した大会までプラン）。
+// 契約の動画回数は 0（回数を決めない）で保存する。
+func supportUnlimited(ct db.CoachingContract) bool {
+	return ct.VideoReviews != nil && *ct.VideoReviews == 0
+}
+
+// supportRemainingByDays は、動画が無制限の契約の未提供分。契約価格 ÷ 期間日数 × 未経過日数（円未満は切り捨て）。
+// 期間日数は、開始日〜目標大会の日（両端を含む・日本時間の日付）。開始日は実際に始まった日で、まだ始まっていなければ全額。
+// 返金を決める日（今日）は経過した日に数える。通話や動画の回数は数えない（返金の単位は期間で一本化）。
+func supportRemainingByDays(ct db.CoachingContract, now time.Time) int32 {
+	if ct.StartsAt == nil || ct.CompetitionDate == nil {
+		return ct.PriceYen
+	}
+	day := func(t time.Time) time.Time {
+		j := t.In(jst.Zone)
+		return time.Date(j.Year(), j.Month(), j.Day(), 0, 0, 0, 0, time.UTC)
+	}
+	start, end, today := day(*ct.StartsAt), day(*ct.CompetitionDate), day(now)
+	total := int64(end.Sub(start).Hours()/24) + 1
+	if total <= 0 {
+		return 0
+	}
+	elapsed := int64(today.Sub(start).Hours()/24) + 1
+	elapsed = min(max(elapsed, 0), total)
+	return int32(int64(ct.PriceYen) * (total - elapsed) / total)
+}
+
 func supportRemaining(ct db.CoachingContract, usage db.SupportUsageRow) int32 {
+	if supportUnlimited(ct) {
+		return supportRemainingByDays(ct, time.Now())
+	}
 	total := int64(ct.CallCount)
 	if ct.VideoReviews != nil {
 		total += int64(*ct.VideoReviews)

@@ -271,6 +271,7 @@ export function CoachDashboard() {
         <Tile href="/coach/reviewing" label="添削中" Icon={PenLine} badge={reviewingCount} />
         <Tile href="/coach/consultations" label="追加相談" Icon={MessagesSquare} badge={consultations} />
         <Tile href="/coach/contracts" label="契約・申込み" Icon={FileText} badge={appliedContracts} />
+        <Tile href="/coach/support-consults" label="無料相談" Icon={MessagesSquare} />
         <Tile href="/coach/plans" label="プラン管理" Icon={Layers} />
         <Tile href="/coach/availability" label="カレンダー" Icon={CalendarDays} />
         <Tile href="/coach/commerce" label="特商法・身元" Icon={Landmark} dot={commerceDot} />

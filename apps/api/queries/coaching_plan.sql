@@ -10,7 +10,7 @@ RETURNING *;
 
 -- name: CountCoachingPlans :one
 SELECT count(*) FROM coaching_plans
-WHERE coach_id = $1;
+WHERE coach_id = $1 AND NOT consult_template;
 
 -- name: CreateCoachingPlan :one
 INSERT INTO coaching_plans (id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen)
@@ -42,7 +42,7 @@ RETURNING *;
 
 -- name: ListMyCoachingPlans :many
 SELECT * FROM coaching_plans
-WHERE coach_id = $1
+WHERE coach_id = $1 AND NOT consult_template
 ORDER BY created_at, id;
 
 -- name: ListPublicCoachingPlans :many
@@ -51,7 +51,7 @@ SELECT pl.*,
     (SELECT count(*) FROM coaching_contracts ct WHERE ct.plan_id = pl.id AND ct.status IN ('accepted', 'active', 'suspended'))::int AS active_count
 FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
-WHERE pl.published
+WHERE pl.published AND NOT pl.consult_template
   AND c.status = 'approved'
   AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))

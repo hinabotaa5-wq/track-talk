@@ -87,6 +87,7 @@ export default function CoachingPage() {
           {[
             ["/me/coaching/tickets", "コーチングチケット"],
             ["/me/coaching/requests", "依頼した動画添削"],
+            ["/coaching/support-consults", "大会までプランの無料相談"],
             ["/me/coaching/personal", "申し込んだサポートプラン"],
           ].map(([href, label]) => (
             <Link key={href} href={href} className="flex min-h-12 items-center justify-between gap-3 px-4 text-sm text-slate-200 transition hover:bg-white/10">

@@ -11,7 +11,7 @@ FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 JOIN profiles p ON p.id = pl.coach_id
 WHERE pl.id = sqlc.arg(id)
-  AND pl.published
+  AND pl.published AND NOT pl.consult_template
   AND c.status = 'approved'
   AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
@@ -87,7 +87,7 @@ WHERE ct.id = sqlc.arg(id)
   AND ct.respond_by > now()
   AND (ct.competition_date IS NULL OR (ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
   AND pl.id = ct.plan_id
-  AND (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity
+  AND (pl.consult_template OR (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity)
 RETURNING ct.*;
 
 -- name: DeclineCoachingContract :one

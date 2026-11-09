@@ -177,6 +177,9 @@ func (req *coachingPlanReq) validate(prevPrice int) map[string]string {
 		var price *int
 		if err := json.Unmarshal(req.AdditionalConsultationPriceYen, &price); err != nil || (price != nil && (*price < 500 || *price > maxPlanPriceYen)) {
 			fields["additional_consultation_price_yen"] = "追加相談の値段は500円以上で入力してください"
+		} else if price != nil && req.ServiceType != nil && *req.ServiceType == "competition_support" {
+			// 大会までプランは、追加相談という別料金を持たない（動画への返答は期間中は無制限）。
+			fields["additional_consultation_price_yen"] = "大会までプランには追加相談の料金は設定できません"
 		} else if price != nil {
 			n := int32(*price)
 			req.additionalPrice = &n
@@ -399,7 +402,7 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 	if req.ServiceType == nil {
 		req.ServiceType = current.ServiceType
 	}
-	if len(req.AdditionalConsultationPriceYen) == 0 {
+	if len(req.AdditionalConsultationPriceYen) == 0 && (req.ServiceType == nil || *req.ServiceType != "competition_support") {
 		req.additionalPrice = current.AdditionalConsultationPriceYen
 	}
 	published := current.Published
@@ -407,6 +410,9 @@ func (s *Server) updateCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		published = *req.Published
 	}
 	fields := req.supportFields(current, published)
+	if req.ServiceType != nil && *req.ServiceType == "competition_support" && req.additionalPrice != nil {
+		fields["additional_consultation_price_yen"] = "大会までプランには追加相談の料金は設定できません"
+	}
 	for k, v := range req.inPersonFields(current, published) {
 		fields[k] = v
 	}
