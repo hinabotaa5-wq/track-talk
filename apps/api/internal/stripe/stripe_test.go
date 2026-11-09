@@ -168,3 +168,82 @@ func TestGetPayoutDestinationLast4(t *testing.T) {
 		t.Fatalf("unexpanded: last4=%q err=%v", last4, err)
 	}
 }
+
+// endiveLikeStripe は、アカウントの既定版が 2026-09-30.endive 以降の Stripe を真似る。
+// Stripe-Version が無いか Dahlia 世代でないときに payment_method_types を送ると、本物と同じく 400 で断る。
+func endiveLikeStripe(t *testing.T, versions *[]string, forms *[]string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		v := r.Header.Get("Stripe-Version")
+		*versions = append(*versions, v)
+		*forms = append(*forms, string(body))
+		if strings.Contains(string(body), "payment_method_types") && !strings.HasSuffix(v, ".dahlia") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"parameter_unknown","message":"Received unknown parameter: payment_method_types"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"cs_1","url":"https://checkout.stripe.com/pay/cs_1","expires_at":1700000000,"payment_status":"unpaid"}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// 版を Dahlia にピン留めしていても、版を未設定（アカウントの既定に任せる）にしていても、
+// 支払い方法を絞った支払い画面の作成は payment_method_types が原因で 400 にならない。
+// どちらの場合も managed_payments[enabled]=false は毎回送る。
+func TestCreateCheckoutSessionNeverFailsOnPaymentMethodTypes(t *testing.T) {
+	params := CheckoutParams{
+		Name: "動画添削", AmountYen: 1500, SuccessURL: "https://web.test/ok", CancelURL: "https://web.test/cancel",
+		Reference: "ref-1", ExpiresAt: time.Unix(1700000000, 0), IdempotencyKey: "key-1",
+		PaymentMethodTypes: []string{"card"}, CaptureManual: true,
+	}
+	for _, tc := range []struct {
+		name, configured, wantHeader string
+	}{
+		{"pinned to dahlia", "2026-08-26.dahlia", "2026-08-26.dahlia"},
+		{"unset (account default)", "", CheckoutFallbackAPIVersion},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var versions, forms []string
+			srv := endiveLikeStripe(t, &versions, &forms)
+			c := Client{Secret: "sk_test_x", APIBase: srv.URL, APIVersion: tc.configured, RetryDelay: time.Millisecond}
+			s, err := c.CreateCheckoutSession(context.Background(), params)
+			if err != nil || s.ID != "cs_1" {
+				t.Fatalf("session: %+v %v", s, err)
+			}
+			if len(versions) != 1 || versions[0] != tc.wantHeader {
+				t.Fatalf("Stripe-Version %v, want %s", versions, tc.wantHeader)
+			}
+			for _, want := range []string{"managed_payments%5Benabled%5D=false", "payment_method_types%5B0%5D=card"} {
+				if !strings.Contains(forms[0], want) {
+					t.Fatalf("missing %s in %s", want, forms[0])
+				}
+			}
+			// 支払い画面の作成のための版は、ほかの呼び出し（返金など）には持ち越さない。
+			if tc.configured == "" {
+				if _, err := c.CreateRefund(context.Background(), "pi_1", 500, "key-r"); err != nil {
+					t.Fatal(err)
+				}
+				if len(versions) != 2 || versions[1] != "" {
+					t.Fatalf("refund carried Stripe-Version %v", versions)
+				}
+			}
+		})
+	}
+}
+
+// 支払い方法を絞らないときは、版が未設定ならヘッダーを付けない（アカウントの既定に任せる）。
+func TestCreateCheckoutSessionWithoutMethodsKeepsAccountDefault(t *testing.T) {
+	var versions, forms []string
+	srv := endiveLikeStripe(t, &versions, &forms)
+	c := Client{Secret: "sk_test_x", APIBase: srv.URL, RetryDelay: time.Millisecond}
+	if _, err := c.CreateCheckoutSession(context.Background(), CheckoutParams{
+		Name: "x", AmountYen: 600, Reference: "r", ExpiresAt: time.Unix(1700000000, 0), IdempotencyKey: "k",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if versions[0] != "" || !strings.Contains(forms[0], "managed_payments%5Benabled%5D=false") || strings.Contains(forms[0], "payment_method_types") {
+		t.Fatalf("version %q form %s", versions[0], forms[0])
+	}
+}
