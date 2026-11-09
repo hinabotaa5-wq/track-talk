@@ -4,18 +4,22 @@ import { ChevronDown, MapPin, Trophy } from "lucide-react";
 import { useId, useState } from "react";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import type { CoachingPlan, CoachingServiceType } from "@/lib/types";
+import type { PublicSupportConsult } from "@/lib/support-consult";
 import { PublicPlanList } from "./coaching-plans";
+import { SupportConsultEntry } from "./support-consult-entry";
 
 const choices = [
   { service: "competition_support", icon: Trophy, description: "目標の大会まで、練習や調整を継続して相談する" },
   { service: "in_person", icon: MapPin, description: "コーチと現地で会い、動きを見てもらいながら指導を受ける" },
 ] as const;
 
-export function CoachServicePlans({ services, plans }: { services: CoachingServiceType[]; plans: CoachingPlan[] }) {
+// consult があるコーチの大会までプランは、価格の決まった完成品ではなく、無料相談の入口を出す。
+export function CoachServicePlans({ services, plans, coachID, consult }: { services: CoachingServiceType[]; plans: CoachingPlan[]; coachID?: string; consult?: PublicSupportConsult | null }) {
   const [selected, setSelected] = useState<CoachingServiceType | null>(null);
   const panelID = useId();
   const publicPlans = plans.filter((plan) => plan.published && plan.service_type !== "video_review");
-  const available = (service: CoachingServiceType) => services.includes(service) && publicPlans.some((plan) => plan.service_type === service);
+  const consultEntry = coachID && consult ? consult : null;
+  const available = (service: CoachingServiceType) => (service === "competition_support" && consultEntry !== null) || (services.includes(service) && publicPlans.some((plan) => plan.service_type === service));
   const active = selected && available(selected) ? selected : null;
   const legacy = publicPlans.filter((plan) => !plan.service_type);
 
@@ -45,7 +49,7 @@ export function CoachServicePlans({ services, plans }: { services: CoachingServi
       <div id={panelID} hidden={!active}>
         {active ? <section aria-label={`${coachingServiceLabels[active]}のプラン`} className="space-y-3">
           <h3 className="font-bold text-white">{coachingServiceLabels[active]}</h3>
-          <PublicPlanList plans={publicPlans.filter((plan) => plan.service_type === active)} />
+          {active === "competition_support" && consultEntry ? <SupportConsultEntry coachID={coachID!} consult={consultEntry} /> : <PublicPlanList plans={publicPlans.filter((plan) => plan.service_type === active)} />}
         </section> : null}
       </div>
       {legacy.length ? <section className="space-y-2" aria-label="従来のサポートプラン">

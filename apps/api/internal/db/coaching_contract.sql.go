@@ -28,7 +28,7 @@ WHERE ct.id = $2
   AND ct.respond_by > now()
   AND (ct.competition_date IS NULL OR (ct.competition_date+1)::timestamp AT TIME ZONE 'Asia/Tokyo'>now())
   AND pl.id = ct.plan_id
-  AND (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity
+  AND (pl.consult_template OR (SELECT count(*) FROM coaching_contracts a WHERE a.plan_id = ct.plan_id AND a.status IN ('accepted', 'active', 'suspended')) < pl.capacity)
 RETURNING ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates
 `
 
@@ -928,7 +928,7 @@ func (q *Queries) GetCoachingContractDetail(ctx context.Context, id uuid.UUID) (
 
 const getPublicCoachingPlan = `-- name: GetPublicCoachingPlan :one
 SELECT
-    pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at, pl.video_reviews, pl.menu_updates, pl.reply_formats, pl.start_on_first_video, pl.service_type, pl.additional_consultation_price_yen, pl.competition_name, pl.competition_date, pl.support_start_date, pl.call_count, pl.call_minutes, pl.venue_area, pl.venue_name, pl.session_count, pl.session_minutes, pl.travel_fee_yen, pl.max_participants,
+    pl.id, pl.coach_id, pl.kind, pl.title, pl.description, pl.duration_days, pl.price_yen, pl.capacity, pl.published, pl.created_at, pl.updated_at, pl.video_reviews, pl.menu_updates, pl.reply_formats, pl.start_on_first_video, pl.service_type, pl.additional_consultation_price_yen, pl.competition_name, pl.competition_date, pl.support_start_date, pl.call_count, pl.call_minutes, pl.venue_area, pl.venue_name, pl.session_count, pl.session_minutes, pl.travel_fee_yen, pl.max_participants, pl.consult_template,
     COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname,
     c.photo_public_id AS coach_photo_public_id,
     c.tier AS coach_tier,
@@ -938,7 +938,7 @@ FROM coaching_plans pl
 JOIN coach_profiles c ON c.profile_id = pl.coach_id
 JOIN profiles p ON p.id = pl.coach_id
 WHERE pl.id = $1
-  AND pl.published
+  AND pl.published AND NOT pl.consult_template
   AND c.status = 'approved'
   AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
@@ -979,6 +979,7 @@ type GetPublicCoachingPlanRow struct {
 	SessionMinutes                 int16      `json:"session_minutes"`
 	TravelFeeYen                   int32      `json:"travel_fee_yen"`
 	MaxParticipants                int16      `json:"max_participants"`
+	ConsultTemplate                bool       `json:"consult_template"`
 	CoachNickname                  string     `json:"coach_nickname"`
 	CoachPhotoPublicID             *string    `json:"coach_photo_public_id"`
 	CoachTier                      string     `json:"coach_tier"`
@@ -1019,6 +1020,7 @@ func (q *Queries) GetPublicCoachingPlan(ctx context.Context, arg GetPublicCoachi
 		&i.SessionMinutes,
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
+		&i.ConsultTemplate,
 		&i.CoachNickname,
 		&i.CoachPhotoPublicID,
 		&i.CoachTier,

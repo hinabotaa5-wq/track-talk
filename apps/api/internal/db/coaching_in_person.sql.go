@@ -304,7 +304,7 @@ func (q *Queries) MarkInPersonSettled(ctx context.Context, id uuid.UUID) error {
 }
 
 const saveInPersonPlan = `-- name: SaveInPersonPlan :one
-UPDATE coaching_plans SET venue_area=$2,venue_name=$3,session_count=$4,session_minutes=$5,travel_fee_yen=$6,max_participants=$7 WHERE id=$1 RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants
+UPDATE coaching_plans SET venue_area=$2,venue_name=$3,session_count=$4,session_minutes=$5,travel_fee_yen=$6,max_participants=$7 WHERE id=$1 RETURNING id, coach_id, kind, title, description, duration_days, price_yen, capacity, published, created_at, updated_at, video_reviews, menu_updates, reply_formats, start_on_first_video, service_type, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, consult_template
 `
 
 type SaveInPersonPlanParams struct {
@@ -357,6 +357,7 @@ func (q *Queries) SaveInPersonPlan(ctx context.Context, arg SaveInPersonPlanPara
 		&i.SessionMinutes,
 		&i.TravelFeeYen,
 		&i.MaxParticipants,
+		&i.ConsultTemplate,
 	)
 	return i, err
 }

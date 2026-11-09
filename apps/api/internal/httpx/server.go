@@ -277,6 +277,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			// コーチ一覧は COACHING_COACH_LIST_ENABLED でも別に閉じる（閉じている間は 404）。
 			r.With(s.requireCoachList).Get("/coaches", s.listCoaches)
 			r.Get("/coaches/{id}/availability", s.getPublicCoachAvailability)
+			r.Get("/coaches/{id}/support-consult", s.getPublicCoachConsult)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)
 			// 保護者の同意のページ。ログインはいらず、リンクのトークンで本人を確かめる。
 			r.Get("/guardian/{token}", s.getGuardian)
@@ -312,6 +313,19 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// パーソナル指導（利用者側）
 				r.With(s.requireNewAcceptance).Post("/coaching/contracts", s.createCoachingContract)
 				r.Get("/coaching/contracts/{id}", s.getCoachingContract)
+				// 大会までプランの無料相談
+				r.Post("/support-consults", s.createSupportConsult)
+				r.Get("/me/support-consults", s.listMySupportConsults)
+				r.Get("/support-consults/{id}", s.getSupportConsult)
+				r.Post("/support-consults/{id}/answer", s.answerSupportConsult)
+				r.Post("/support-consults/{id}/withdraw", s.withdrawSupportConsult)
+				r.With(s.requireNewAcceptance).Post("/support-consults/{id}/accept", s.acceptSupportConsult)
+				r.Get("/coach/me/support-consult", s.getMyConsultSettings)
+				r.Put("/coach/me/support-consult", s.saveMyConsultSettings)
+				r.Get("/coach/me/support-consults", s.listCoachSupportConsults)
+				r.Post("/support-consults/{id}/decline", s.declineSupportConsult)
+				r.Post("/support-consults/{id}/ask", s.askSupportConsult)
+				r.Post("/support-consults/{id}/propose", s.proposeSupportConsult)
 				r.Post("/coaching/contracts/{id}/cancel", s.cancelCoachingContract)
 				r.Post("/coaching/contracts/{id}/checkout", s.checkoutCoachingContract)
 				r.Get("/coaching/contracts/{id}/support", s.getCoachingSupport)

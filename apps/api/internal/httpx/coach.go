@@ -568,21 +568,28 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		plan["full"] = p.ActiveCount >= int32(p.Capacity)
 		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)
 	}
+	consults, err := s.publicConsultEntries(r.Context(), nil)
+	if err != nil {
+		// 無料相談の入口は付け足しなので、取れなくても一覧は返す。
+		slog.Warn("support consult entries unavailable")
+		consults = map[uuid.UUID]map[string]any{}
+	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
 		out = append(out, map[string]any{
-			"id":             c.ProfileID,
-			"nickname":       c.Nickname,
-			"photo_url":      s.coachPhotoURL(c.PhotoPublicID),
-			"tier":           c.Tier,
-			"events":         c.Events,
-			"service_types":  nonNilStrings(c.ServiceTypes),
-			"best_record":    c.BestRecord,
-			"achievements":   c.Achievements,
-			"years":          c.Years,
-			"sns_urls":       nonNilStrings(c.SnsUrls),
-			"rating_count":   c.RatingCount,
-			"rating_average": c.RatingAverage,
+			"support_consult": consults[c.ProfileID],
+			"id":              c.ProfileID,
+			"nickname":        c.Nickname,
+			"photo_url":       s.coachPhotoURL(c.PhotoPublicID),
+			"tier":            c.Tier,
+			"events":          c.Events,
+			"service_types":   nonNilStrings(c.ServiceTypes),
+			"best_record":     c.BestRecord,
+			"achievements":    c.Achievements,
+			"years":           c.Years,
+			"sns_urls":        nonNilStrings(c.SnsUrls),
+			"rating_count":    c.RatingCount,
+			"rating_average":  c.RatingAverage,
 			// パーソナル指導のプラン。安い順。
 			"plans": nonNilPlans(plansByCoach[c.ProfileID]),
 		})

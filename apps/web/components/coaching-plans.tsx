@@ -1,6 +1,7 @@
 "use client";
 
 import { PageLoading } from "@/components/page-loading";
+import { CoachConsultSettings } from "@/components/coach-consult-settings";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -373,14 +374,14 @@ function PlanForm({
         <legend className="text-sm text-slate-200">サービス</legend>
         <div className="flex flex-wrap gap-2">
           {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来のサポートプラン（分類を選んで移行できます）</span> : null}
-          {services.filter((service) => service !== "video_review").map((service) => (
+          {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).map((service) => (
             <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
               onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
               {coachingServiceLabels[service]}
             </button>
           ))}
         </div>
-        {services.filter((service) => service !== "video_review").length === 0 ? <p className="text-xs text-slate-300">先に担当するサービスを登録してください。</p> : null}
+        {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).length === 0 ? <p className="text-xs text-slate-300">対面指導を登録すると、ここからプランを出品できます。大会までプランは、上の「相談の受付設定」で受け付けます。</p> : null}
         {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">このサービスは準備中です。下書きとして保存されます。</p> : null}
         {fieldError("service_type")}
       </fieldset>
@@ -576,7 +577,7 @@ export function CoachPlansSection({
     <section className="space-y-3">
       <div className="space-y-1">
         <h2 className="font-bold">サポートプラン</h2>
-        <p className="text-xs text-slate-300">動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは大会サポートと対面指導を管理します。</p>
+        <p className="text-xs text-slate-300">動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは、大会までプランの相談の受付設定と、対面指導のプランを管理します。</p>
         <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
       </div>
       <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />
@@ -587,6 +588,7 @@ export function CoachPlansSection({
       ) : (
         <>
           {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
+          <CoachConsultSettings coach={coach} token={token} />
           {plans === null && !error ? <PageLoading label="読み込み中..." /> : null}
           {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
           <ul className="space-y-2">
