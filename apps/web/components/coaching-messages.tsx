@@ -188,7 +188,7 @@ function Composer({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!body.trim() && !file && !menu) return;
-    if (!guard.allow([body, menu?.title, ...(menu?.days ?? []).flatMap((d) => [d.day, d.content])].filter(Boolean).join("\n"))) return;
+    if (!guard.allow([body, menu?.title, menu?.period, menu?.note, ...(menu?.days ?? []).flatMap((d) => [d.day, d.content])].filter(Boolean).join("\n"))) return;
     if (!acquire()) return;
     setError("");
     try {
