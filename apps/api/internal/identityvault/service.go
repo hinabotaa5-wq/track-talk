@@ -212,9 +212,13 @@ func (s *Service) locked(ctx context.Context, coach uuid.UUID, apply func(pgx.Tx
 	return tx.Commit(ctx)
 }
 
+// identityFields は金庫に暗号化して持つ身元情報。電話番号は (2) の開示請求への
+// 応答と重大な緊急連絡にだけ使い、表記要のコーチが公開を確認したプランにだけ出す。
+// 電話番号のない行は、#440 の移行前に登録されたもの。
 type identityFields struct {
 	LegalName string `json:"legal_name"`
 	Address   string `json:"address"`
+	Phone     string `json:"phone"`
 }
 
 func (s *Service) seal(coach uuid.UUID, field, value string) ([]byte, error) {
@@ -235,9 +239,9 @@ func (s *Service) open(coach uuid.UUID, field string, sealed []byte) (string, er
 }
 
 func (s *Service) loadIdentity(ctx context.Context, tx pgx.Tx, coach uuid.UUID) (*identityFields, error) {
-	var name, address []byte
+	var name, address, phone []byte
 	var keyID string
-	err := tx.QueryRow(ctx, "SELECT key_id, legal_name_enc, address_enc FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&keyID, &name, &address)
+	err := tx.QueryRow(ctx, "SELECT key_id, legal_name_enc, address_enc, phone_enc FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&keyID, &name, &address, &phone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -255,7 +259,13 @@ func (s *Service) loadIdentity(ctx context.Context, tx pgx.Tx, coach uuid.UUID) 
 	if err != nil {
 		return nil, err
 	}
-	return &identityFields{LegalName: legalName, Address: street}, nil
+	out := &identityFields{LegalName: legalName, Address: street}
+	if phone != nil {
+		if out.Phone, err = s.open(coach, "phone", phone); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func validText(value string, max int) bool {
@@ -271,7 +281,8 @@ func (s *Service) saveIdentity(w http.ResponseWriter, r *http.Request, coach uui
 	}
 	input.LegalName = strings.TrimSpace(input.LegalName)
 	input.Address = strings.TrimSpace(input.Address)
-	if !validText(input.LegalName, 80) || !validText(input.Address, 200) {
+	input.Phone = strings.TrimSpace(input.Phone)
+	if !validText(input.LegalName, 80) || !validText(input.Address, 200) || !phonePattern.MatchString(input.Phone) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
@@ -285,9 +296,14 @@ func (s *Service) saveIdentity(w http.ResponseWriter, r *http.Request, coach uui
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO identity_vault.identities (coach_id,key_id,legal_name_enc,address_enc)
-			VALUES ($1,'v1',$2,$3) ON CONFLICT (coach_id) DO UPDATE
-			SET key_id=EXCLUDED.key_id,revision=gen_random_uuid(),legal_name_enc=EXCLUDED.legal_name_enc,address_enc=EXCLUDED.address_enc,ended_at=NULL`, coach, name, address); err != nil {
+		phone, err := s.seal(coach, "phone", input.Phone)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO identity_vault.identities (coach_id,key_id,legal_name_enc,address_enc,phone_enc)
+			VALUES ($1,'v1',$2,$3,$4) ON CONFLICT (coach_id) DO UPDATE
+			SET key_id=EXCLUDED.key_id,revision=gen_random_uuid(),legal_name_enc=EXCLUDED.legal_name_enc,address_enc=EXCLUDED.address_enc,
+				phone_enc=EXCLUDED.phone_enc,ended_at=NULL`, coach, name, address, phone); err != nil {
 			return err
 		}
 		// Previously approved values do not authorize publication of replacements.

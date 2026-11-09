@@ -647,7 +647,8 @@ export type PublicCommerce =
   | { required: true; registered: false }
   | { required: true; registered: true; legal_name: string; address: string; phone: string };
 
-export type CoachIdentity = { legal_name: string; address: string };
+// 電話番号は (2) のコーチだけが金庫に登録する。表記要のプランでは、本人が確認した版の値だけが公開される。
+export type CoachIdentity = { legal_name: string; address: string; phone: string };
 
 export type CoachCommerce = {
   required: boolean;
