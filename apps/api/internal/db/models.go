@@ -151,13 +151,14 @@ type CoachProfile struct {
 
 type CoachRefundAdjustment struct {
 	ID         uuid.UUID  `json:"id"`
-	RefundID   uuid.UUID  `json:"refund_id"`
+	RefundID   *uuid.UUID `json:"refund_id"`
 	EarningID  *uuid.UUID `json:"earning_id"`
 	CoachID    *uuid.UUID `json:"coach_id"`
 	Kind       string     `json:"kind"`
 	AmountYen  int32      `json:"amount_yen"`
 	AppliedYen int32      `json:"applied_yen"`
 	CreatedAt  time.Time  `json:"created_at"`
+	ContractID *uuid.UUID `json:"contract_id"`
 }
 
 type CoachRefundApplication struct {
@@ -368,6 +369,9 @@ type CoachingContract struct {
 	MaxParticipants                int16       `json:"max_participants"`
 	DeliveredSessionCount          int32       `json:"delivered_session_count"`
 	PreferredDates                 []time.Time `json:"preferred_dates"`
+	SupportEndCause                *string     `json:"support_end_cause"`
+	SupportEndOn                   *time.Time  `json:"support_end_on"`
+	SupportCoachHold               bool        `json:"support_coach_hold"`
 }
 
 type CoachingContractConsent struct {
@@ -1262,6 +1266,25 @@ type SenseSummaryAttempt struct {
 	AttemptedAt time.Time `json:"attempted_at"`
 }
 
+type SupportCoachAdvance struct {
+	EarningID   uuid.UUID `json:"earning_id"`
+	ContractID  uuid.UUID `json:"contract_id"`
+	ThroughDate time.Time `json:"through_date"`
+	ElapsedDays int32     `json:"elapsed_days"`
+	TotalDays   int32     `json:"total_days"`
+	AmountYen   int32     `json:"amount_yen"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type SupportCoachSettlement struct {
+	ContractID  uuid.UUID `json:"contract_id"`
+	EarnedYen   int32     `json:"earned_yen"`
+	AdvancesYen int32     `json:"advances_yen"`
+	FinalYen    int32     `json:"final_yen"`
+	ClawbackYen int32     `json:"clawback_yen"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type SupportConsult struct {
 	ID         uuid.UUID  `json:"id"`
 	AthleteID  uuid.UUID  `json:"athlete_id"`
@@ -1307,6 +1330,27 @@ type SupportConsultSetting struct {
 	PriceMinYen *int32    `json:"price_min_yen"`
 	PriceMaxYen *int32    `json:"price_max_yen"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type SupportContractStatement struct {
+	ContractID uuid.UUID  `json:"contract_id"`
+	CoachID    *uuid.UUID `json:"coach_id"`
+	Body       []byte     `json:"body"`
+	IssuedAt   time.Time  `json:"issued_at"`
+}
+
+type SupportFaultDetermination struct {
+	ContractID     uuid.UUID  `json:"contract_id"`
+	Decision       string     `json:"decision"`
+	Reason         string     `json:"reason"`
+	DecidedBy      *uuid.UUID `json:"decided_by"`
+	NotifiedAt     time.Time  `json:"notified_at"`
+	Objection      *string    `json:"objection"`
+	ObjectedAt     *time.Time `json:"objected_at"`
+	ReviewDecision *string    `json:"review_decision"`
+	ReviewReason   *string    `json:"review_reason"`
+	ReviewedBy     *uuid.UUID `json:"reviewed_by"`
+	ReviewedAt     *time.Time `json:"reviewed_at"`
 }
 
 type TargetMeet struct {
