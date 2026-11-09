@@ -17,7 +17,25 @@ type WeekRow = {
   deletions: number;
 };
 
+type SenseNoteStats = {
+  total: number;
+  authors: number;
+  non_admin_authors: number;
+  profiles: number;
+  non_admin_profiles: number;
+  first_day: string | null;
+  last_day: string | null;
+  buckets: { one: number; two_four: number; five_nine: number; ten_plus: number };
+  active_days: { days_2_plus: number; days_3_plus: number; days_7_plus: number };
+  repeat_7: { total: number; repeat: number };
+  repeat_28: { total: number; repeat: number };
+  cohorts: { week_start: string; authors: number; next_week: number; since_next_week: number }[];
+  weekly: { week_start: string; notes: number; authors: number }[];
+  monthly: { month: string; notes: number; authors: number }[];
+};
+
 type AdminStats = {
+  sense_notes?: SenseNoteStats | null;
   daily_started_at?: string;
   daily?: {
     day: string;
@@ -203,6 +221,95 @@ export function AdminStatsView({ token }: { token: string | null }) {
           rows={stats.retention.map((r) => [weekLabel(r.week_start), r.signups, r.retained, percent(r.retained, r.signups)])}
         />
       </Section>
+
+      {stats.sense_notes ? (
+        <>
+          <Section
+            title="感覚メモの全体"
+            note="件数・人数・日付だけの集計で、本文やだれが書いたかは出ません。削除・退会のぶんは減ったあとの現在値です。"
+          >
+            <Table
+              head={["項目", "件数・人数・日付"]}
+              rows={[
+                ["総件数", stats.sense_notes.total],
+                ["利用者数", stats.sense_notes.authors],
+                ["非管理者の利用者数", stats.sense_notes.non_admin_authors],
+                ["全登録者数", stats.sense_notes.profiles],
+                ["非管理者の登録者数", stats.sense_notes.non_admin_profiles],
+                ["最初の記録日", stats.sense_notes.first_day ?? "-"],
+                ["最後の記録日", stats.sense_notes.last_day ?? "-"],
+              ]}
+            />
+          </Section>
+
+          <Section title="感覚メモの1人あたり件数" note="人数だけの分布です。">
+            <Table
+              head={["1人あたり", "人数"]}
+              rows={[
+                ["1件", stats.sense_notes.buckets.one],
+                ["2〜4件", stats.sense_notes.buckets.two_four],
+                ["5〜9件", stats.sense_notes.buckets.five_nine],
+                ["10件以上", stats.sense_notes.buckets.ten_plus],
+              ]}
+            />
+          </Section>
+
+          <Section title="感覚メモの書いた日数" note="同じ日に複数件書いても1日と数えます。人数だけの分布です。">
+            <Table
+              head={["書いた日数", "人数"]}
+              rows={[
+                ["2日以上", stats.sense_notes.active_days.days_2_plus],
+                ["3日以上", stats.sense_notes.active_days.days_3_plus],
+                ["7日以上", stats.sense_notes.active_days.days_7_plus],
+              ]}
+            />
+          </Section>
+
+          <Section
+            title="感覚メモの初回からのリピート"
+            note="初回日から7日・28日以内に2回目を書いた人の割合。分母は期間が経過した人だけで、直近に始めた人では薄まりません。対象が0人のときは「まだ測れない」と出します。"
+          >
+            <Table
+              head={["期間", "リピート", "対象", "割合"]}
+              rows={[stats.sense_notes.repeat_7, stats.sense_notes.repeat_28].map((r, i) => [
+                i === 0 ? "7日以内" : "28日以内",
+                r.repeat,
+                r.total,
+                r.total > 0 ? percent(r.repeat, r.total) : "まだ測れない",
+              ])}
+            />
+          </Section>
+
+          <Section
+            title="感覚メモの週次コホート"
+            note="初回日の属する週（月曜始まり）ごとに、翌週（初回週+7日〜+14日未満）と翌週以降（初回週+7日以降）に書いた人数です。"
+          >
+            <Table
+              head={["初回の週", "人数", "翌週も書いた", "翌週以降に書いた"]}
+              rows={stats.sense_notes.cohorts.map((c) => [
+                weekLabel(c.week_start),
+                c.authors,
+                `${c.next_week}（${percent(c.next_week, c.authors)}）`,
+                c.since_next_week,
+              ])}
+            />
+          </Section>
+
+          <Section title="感覚メモの週ごとの推移" note="書いた日（日本時間の日付）の週で分けた件数と利用者数です。">
+            <Table
+              head={["週", "件数", "利用者数"]}
+              rows={stats.sense_notes.weekly.map((w) => [weekLabel(w.week_start), w.notes, w.authors])}
+            />
+          </Section>
+
+          <Section title="感覚メモの月ごとの推移" note="書いた日（日本時間の日付）の月で分けた件数と利用者数です。">
+            <Table
+              head={["月", "件数", "利用者数"]}
+              rows={stats.sense_notes.monthly.map((m) => [m.month.slice(0, 7), m.notes, m.authors])}
+            />
+          </Section>
+        </>
+      ) : null}
 
       <Section title="機能ごとの利用" note={`Umamiに送っていない機能の、直近${days}日の件数・利用アカウント数と、現在残っている全期間の件数。削除や取り消しで件数は減ります。`}>
         <Table

@@ -369,6 +369,257 @@ func (q *Queries) AdminReviewDemand(ctx context.Context, since time.Time) ([]Adm
 	return items, nil
 }
 
+const adminSenseNoteActiveDays = `-- name: AdminSenseNoteActiveDays :one
+WITH per_author AS (
+    SELECT author_id, count(DISTINCT day) AS days FROM sense_notes GROUP BY author_id
+)
+SELECT
+    count(*) FILTER (WHERE days >= 2)::bigint AS days_2_plus,
+    count(*) FILTER (WHERE days >= 3)::bigint AS days_3_plus,
+    count(*) FILTER (WHERE days >= 7)::bigint AS days_7_plus
+FROM per_author
+`
+
+type AdminSenseNoteActiveDaysRow struct {
+	Days2Plus int64 `json:"days_2_plus"`
+	Days3Plus int64 `json:"days_3_plus"`
+	Days7Plus int64 `json:"days_7_plus"`
+}
+
+// 書いた日数（同日の複数件は1日）の分布（人数のみ）。
+func (q *Queries) AdminSenseNoteActiveDays(ctx context.Context) (AdminSenseNoteActiveDaysRow, error) {
+	row := q.db.QueryRow(ctx, adminSenseNoteActiveDays)
+	var i AdminSenseNoteActiveDaysRow
+	err := row.Scan(&i.Days2Plus, &i.Days3Plus, &i.Days7Plus)
+	return i, err
+}
+
+const adminSenseNoteBuckets = `-- name: AdminSenseNoteBuckets :one
+WITH per_author AS (
+    SELECT author_id, count(*) AS cnt FROM sense_notes GROUP BY author_id
+)
+SELECT
+    count(*) FILTER (WHERE cnt = 1)::bigint AS one,
+    count(*) FILTER (WHERE cnt BETWEEN 2 AND 4)::bigint AS two_four,
+    count(*) FILTER (WHERE cnt BETWEEN 5 AND 9)::bigint AS five_nine,
+    count(*) FILTER (WHERE cnt >= 10)::bigint AS ten_plus
+FROM per_author
+`
+
+type AdminSenseNoteBucketsRow struct {
+	One      int64 `json:"one"`
+	TwoFour  int64 `json:"two_four"`
+	FiveNine int64 `json:"five_nine"`
+	TenPlus  int64 `json:"ten_plus"`
+}
+
+// 1人あたりの件数の分布（人数のみ）。
+func (q *Queries) AdminSenseNoteBuckets(ctx context.Context) (AdminSenseNoteBucketsRow, error) {
+	row := q.db.QueryRow(ctx, adminSenseNoteBuckets)
+	var i AdminSenseNoteBucketsRow
+	err := row.Scan(
+		&i.One,
+		&i.TwoFour,
+		&i.FiveNine,
+		&i.TenPlus,
+	)
+	return i, err
+}
+
+const adminSenseNoteCohorts = `-- name: AdminSenseNoteCohorts :many
+WITH firsts AS (
+    SELECT author_id, min(day) AS first_day FROM sense_notes GROUP BY author_id
+),
+cohorts AS (
+    SELECT author_id, date_trunc('week', first_day::timestamp)::date AS week_start FROM firsts
+)
+SELECT
+    c.week_start::date AS week_start,
+    count(*)::bigint AS authors,
+    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = c.author_id AND s.day >= c.week_start + 7 AND s.day < c.week_start + 14))::bigint AS next_week,
+    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = c.author_id AND s.day >= c.week_start + 7))::bigint AS since_next_week
+FROM cohorts c
+GROUP BY c.week_start
+ORDER BY c.week_start DESC
+`
+
+type AdminSenseNoteCohortsRow struct {
+	WeekStart     time.Time `json:"week_start"`
+	Authors       int64     `json:"authors"`
+	NextWeek      int64     `json:"next_week"`
+	SinceNextWeek int64     `json:"since_next_week"`
+}
+
+// 初回日の属する週（月曜始まり）ごとの定着。翌週は初回週+7日〜+14日未満、翌週以降は初回週+7日以降。
+func (q *Queries) AdminSenseNoteCohorts(ctx context.Context) ([]AdminSenseNoteCohortsRow, error) {
+	rows, err := q.db.Query(ctx, adminSenseNoteCohorts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminSenseNoteCohortsRow
+	for rows.Next() {
+		var i AdminSenseNoteCohortsRow
+		if err := rows.Scan(
+			&i.WeekStart,
+			&i.Authors,
+			&i.NextWeek,
+			&i.SinceNextWeek,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminSenseNoteMonthly = `-- name: AdminSenseNoteMonthly :many
+SELECT
+    date_trunc('month', day::timestamp)::date AS month,
+    count(*)::bigint AS notes,
+    count(DISTINCT author_id)::bigint AS authors
+FROM sense_notes
+GROUP BY 1
+ORDER BY 1 DESC
+`
+
+type AdminSenseNoteMonthlyRow struct {
+	Month   time.Time `json:"month"`
+	Notes   int64     `json:"notes"`
+	Authors int64     `json:"authors"`
+}
+
+// 月ごとの件数と利用者数。書いた日（JSTの日付）で分ける。
+func (q *Queries) AdminSenseNoteMonthly(ctx context.Context) ([]AdminSenseNoteMonthlyRow, error) {
+	rows, err := q.db.Query(ctx, adminSenseNoteMonthly)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminSenseNoteMonthlyRow
+	for rows.Next() {
+		var i AdminSenseNoteMonthlyRow
+		if err := rows.Scan(&i.Month, &i.Notes, &i.Authors); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminSenseNoteOverview = `-- name: AdminSenseNoteOverview :one
+SELECT
+    (SELECT count(*) FROM sense_notes)::bigint AS total,
+    (SELECT count(DISTINCT author_id) FROM sense_notes)::bigint AS authors,
+    (SELECT count(DISTINCT s.author_id) FROM sense_notes s JOIN profiles p ON p.id = s.author_id WHERE NOT p.is_admin)::bigint AS non_admin_authors,
+    (SELECT count(*) FROM profiles)::bigint AS profiles,
+    (SELECT count(*) FROM profiles WHERE NOT is_admin)::bigint AS non_admin_profiles,
+    (SELECT COALESCE(min(day), '0001-01-01'::date) FROM sense_notes)::date AS first_day,
+    (SELECT COALESCE(max(day), '0001-01-01'::date) FROM sense_notes)::date AS last_day
+`
+
+type AdminSenseNoteOverviewRow struct {
+	Total            int64     `json:"total"`
+	Authors          int64     `json:"authors"`
+	NonAdminAuthors  int64     `json:"non_admin_authors"`
+	Profiles         int64     `json:"profiles"`
+	NonAdminProfiles int64     `json:"non_admin_profiles"`
+	FirstDay         time.Time `json:"first_day"`
+	LastDay          time.Time `json:"last_day"`
+}
+
+// 感覚メモの全体像。件数と人数と最初・最後の記録日だけを返し、本文やアカウントは返さない。
+// 削除・退会のぶんは減ったあとの現在値をそのまま出す。
+func (q *Queries) AdminSenseNoteOverview(ctx context.Context) (AdminSenseNoteOverviewRow, error) {
+	row := q.db.QueryRow(ctx, adminSenseNoteOverview)
+	var i AdminSenseNoteOverviewRow
+	err := row.Scan(
+		&i.Total,
+		&i.Authors,
+		&i.NonAdminAuthors,
+		&i.Profiles,
+		&i.NonAdminProfiles,
+		&i.FirstDay,
+		&i.LastDay,
+	)
+	return i, err
+}
+
+const adminSenseNoteRepeat = `-- name: AdminSenseNoteRepeat :one
+WITH firsts AS (
+    SELECT author_id, min(day) AS first_day FROM sense_notes GROUP BY author_id
+)
+SELECT
+    (SELECT count(*) FROM firsts WHERE first_day <= $1::date - 7)::bigint AS d7_total,
+    (SELECT count(*) FROM firsts f WHERE f.first_day <= $1::date - 7 AND EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = f.author_id AND s.day > f.first_day AND s.day <= f.first_day + 7))::bigint AS d7_repeat,
+    (SELECT count(*) FROM firsts WHERE first_day <= $1::date - 28)::bigint AS d28_total,
+    (SELECT count(*) FROM firsts f WHERE f.first_day <= $1::date - 28 AND EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = f.author_id AND s.day > f.first_day AND s.day <= f.first_day + 28))::bigint AS d28_repeat
+`
+
+type AdminSenseNoteRepeatRow struct {
+	D7Total   int64 `json:"d7_total"`
+	D7Repeat  int64 `json:"d7_repeat"`
+	D28Total  int64 `json:"d28_total"`
+	D28Repeat int64 `json:"d28_repeat"`
+}
+
+// 初回日から7日・28日以内のリピート。分母は期間が経過した著者のみ。
+// day は製品上の「書いた日」（JSTの日付）で比べる。
+func (q *Queries) AdminSenseNoteRepeat(ctx context.Context, today time.Time) (AdminSenseNoteRepeatRow, error) {
+	row := q.db.QueryRow(ctx, adminSenseNoteRepeat, today)
+	var i AdminSenseNoteRepeatRow
+	err := row.Scan(
+		&i.D7Total,
+		&i.D7Repeat,
+		&i.D28Total,
+		&i.D28Repeat,
+	)
+	return i, err
+}
+
+const adminSenseNoteWeekly = `-- name: AdminSenseNoteWeekly :many
+SELECT
+    date_trunc('week', day::timestamp)::date AS week_start,
+    count(*)::bigint AS notes,
+    count(DISTINCT author_id)::bigint AS authors
+FROM sense_notes
+GROUP BY 1
+ORDER BY 1 DESC
+`
+
+type AdminSenseNoteWeeklyRow struct {
+	WeekStart time.Time `json:"week_start"`
+	Notes     int64     `json:"notes"`
+	Authors   int64     `json:"authors"`
+}
+
+// 週ごとの件数と利用者数。週は月曜始まり、書いた日（JSTの日付）で分ける。
+func (q *Queries) AdminSenseNoteWeekly(ctx context.Context) ([]AdminSenseNoteWeeklyRow, error) {
+	rows, err := q.db.Query(ctx, adminSenseNoteWeekly)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminSenseNoteWeeklyRow
+	for rows.Next() {
+		var i AdminSenseNoteWeeklyRow
+		if err := rows.Scan(&i.WeekStart, &i.Notes, &i.Authors); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const adminWeeklyStats = `-- name: AdminWeeklyStats :many
 
 WITH weeks AS (

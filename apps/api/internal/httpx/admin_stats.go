@@ -80,6 +80,43 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 感覚メモの利用集計。件数・人数・日付・割合だけで、本文やアカウントは返さない。
+	senseOverview, err := s.q.AdminSenseNoteOverview(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	senseBuckets, err := s.q.AdminSenseNoteBuckets(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	senseActiveDays, err := s.q.AdminSenseNoteActiveDays(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, jst.Zone)
+	senseRepeat, err := s.q.AdminSenseNoteRepeat(ctx, today)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	senseCohorts, err := s.q.AdminSenseNoteCohorts(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	senseWeekly, err := s.q.AdminSenseNoteWeekly(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	senseMonthly, err := s.q.AdminSenseNoteMonthly(ctx)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	dailyRows := make([]map[string]any, 0, len(daily))
 	for _, row := range daily {
 		dailyRows = append(dailyRows, map[string]any{
@@ -110,6 +147,31 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 			"retained":   row.Retained,
 		})
 	}
+	// 件数ゼロのとき min/max は番兵日になるので、日付は件数があるときだけ返す。
+	var senseFirstDay, senseLastDay any
+	if senseOverview.Total > 0 {
+		senseFirstDay = senseOverview.FirstDay.Format(time.DateOnly)
+		senseLastDay = senseOverview.LastDay.Format(time.DateOnly)
+	}
+	senseCohortRows := make([]map[string]any, 0, len(senseCohorts))
+	for _, row := range senseCohorts {
+		senseCohortRows = append(senseCohortRows, map[string]any{
+			"week_start": row.WeekStart.Format(time.DateOnly), "authors": row.Authors,
+			"next_week": row.NextWeek, "since_next_week": row.SinceNextWeek,
+		})
+	}
+	senseWeeklyRows := make([]map[string]any, 0, len(senseWeekly))
+	for _, row := range senseWeekly {
+		senseWeeklyRows = append(senseWeeklyRows, map[string]any{
+			"week_start": row.WeekStart.Format(time.DateOnly), "notes": row.Notes, "authors": row.Authors,
+		})
+	}
+	senseMonthlyRows := make([]map[string]any, 0, len(senseMonthly))
+	for _, row := range senseMonthly {
+		senseMonthlyRows = append(senseMonthlyRows, map[string]any{
+			"month": row.Month.Format(time.DateOnly), "notes": row.Notes, "authors": row.Authors,
+		})
+	}
 	JSON(w, http.StatusOK, map[string]any{
 		"recent_days":      adminStatsRecentDays,
 		"weeks":            weekRows,
@@ -119,6 +181,29 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 		"reports":          reports,
 		"daily_started_at": startedAt.Format(time.RFC3339),
 		"daily":            dailyRows,
+		"sense_notes": map[string]any{
+			"total":              senseOverview.Total,
+			"authors":            senseOverview.Authors,
+			"non_admin_authors":  senseOverview.NonAdminAuthors,
+			"profiles":           senseOverview.Profiles,
+			"non_admin_profiles": senseOverview.NonAdminProfiles,
+			"first_day":          senseFirstDay,
+			"last_day":           senseLastDay,
+			"buckets": map[string]any{
+				"one": senseBuckets.One, "two_four": senseBuckets.TwoFour,
+				"five_nine": senseBuckets.FiveNine, "ten_plus": senseBuckets.TenPlus,
+			},
+			"active_days": map[string]any{
+				"days_2_plus": senseActiveDays.Days2Plus,
+				"days_3_plus": senseActiveDays.Days3Plus,
+				"days_7_plus": senseActiveDays.Days7Plus,
+			},
+			"repeat_7":  map[string]any{"total": senseRepeat.D7Total, "repeat": senseRepeat.D7Repeat},
+			"repeat_28": map[string]any{"total": senseRepeat.D28Total, "repeat": senseRepeat.D28Repeat},
+			"cohorts":   senseCohortRows,
+			"weekly":    senseWeeklyRows,
+			"monthly":   senseMonthlyRows,
+		},
 	})
 }
 
