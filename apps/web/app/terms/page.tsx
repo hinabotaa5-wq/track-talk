@@ -10,7 +10,7 @@ export default function TermsPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">利用規約</h1>
         <p className="text-sm leading-7 text-slate-300">この規約は、個人が運営するTrackTalk（以下「本サービス」）の利用条件を定めます。登録時には、この規約とプライバシーポリシーを確認し、同意してください。</p>
-        <p className="text-xs text-slate-300">最終更新日: 2026年11月5日</p>
+        <p className="text-xs text-slate-300">最終更新日: 2026年11月10日</p>
       </div>
 
       <Article n={1} title="現在提供しているサービス">
