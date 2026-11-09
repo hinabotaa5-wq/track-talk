@@ -73,7 +73,7 @@ describe("コーチタブ", () => {
 
   // サポートプランの入口はコーチ一覧（/coaches）。一覧を閉じている間は、開いているように見せない。
   const supportCard = (html: string) => {
-    const at = html.indexOf('href="/coaches"', html.indexOf("<nav"));
+    const at = html.indexOf('href="/coaches?tab=support"', html.indexOf("<nav"));
     return html.slice(at, html.indexOf("</a>", at));
   };
   it("コーチングを開けて一覧を閉じている間は、サポートプランを準備中と案内し、動画添削は案内どおり出す", () => {
