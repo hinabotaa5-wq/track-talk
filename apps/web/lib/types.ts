@@ -877,3 +877,19 @@ export type ReviewCoach = {
   achievements: string;
   years: number;
 };
+
+// サポートプランの入口の一覧の1人。人気の指標（★・件数・残り枠）は持たない。
+export type SupportPlanCoach = {
+  id: string;
+  nickname: string | null;
+  photo_url: string;
+  events: CoachEvent[];
+  kinds: ("competition_support" | "in_person")[];
+  competition_support?: import("./support-consult").PublicSupportConsult | null;
+  in_person?: {
+    plans: { id: string; title: string; price_yen: number; session_minutes: number; venue_area: string }[];
+    min_price_yen: number;
+    areas: string[];
+    reception: { status: "open" | "paused" };
+  } | null;
+};
