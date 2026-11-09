@@ -123,7 +123,7 @@ test("コーチ画面は空き高さを使った3つの入口にまとめ、未�
   const choices = page.getByRole("navigation", { name: "コーチングのプランを選ぶ" });
   await expect(choices.locator("a")).toHaveCount(3);
   await expect(choices.getByRole("link", { name: /コーチ専用画面/ })).toHaveAttribute("href", "/coach");
-  expect(await choices.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(["/coaching/new", "/coaches", "/coach"]);
+  expect(await choices.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(["/coaching/new", "/coaches?tab=support", "/coach"]);
   const boxes = await choices.locator("a").evaluateAll((links) => links.map((link) => {
     const rect = link.getBoundingClientRect();
     return { top: rect.top, bottom: rect.bottom, right: rect.right };
