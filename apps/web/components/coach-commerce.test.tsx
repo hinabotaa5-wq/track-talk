@@ -15,3 +15,10 @@ it("表記不要と申告したコーチは、表記がないことだけを伝�
   expect(html).toContain("表記はありません");
   expect(html).not.toContain("住所");
 });
+
+it("表記要でも本人が確認していないあいだは、電話番号を含め身元情報を出さない", () => {
+  const html = renderToStaticMarkup(<CoachCommerceDisclosure commerce={{ required: true, registered: false }} />);
+  expect(html).toContain("準備中");
+  expect(html).not.toContain("電話番号");
+  expect(html).not.toContain("住所");
+});

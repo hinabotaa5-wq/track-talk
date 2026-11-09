@@ -74,6 +74,7 @@ function IdentityAdmin({ token }: { token: string }) {
       <dl className="space-y-1">
         <div><dt className="text-xs text-slate-300">氏名</dt><dd>{viewed.identity.legal_name}</dd></div>
         <div><dt className="text-xs text-slate-300">住所</dt><dd>{viewed.identity.address}</dd></div>
+        <div><dt className="text-xs text-slate-300">電話番号</dt><dd>{viewed.identity.phone || "未登録"}</dd></div>
       </dl>
       <h2 className="font-semibold">閲覧の記録</h2>
       <ul className="space-y-1 text-xs text-slate-300">{viewed.access_logs.map((log) => (

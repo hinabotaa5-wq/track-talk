@@ -175,9 +175,10 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request, coach uuid.UUI
 	if !ok {
 		return
 	}
+	// 公開する値は、確認した版（identity_revision）の登録内容そのもの。
+	// 電話番号もその版に含まれ、ここでは受け取らない。
 	var input struct {
 		Confirm  bool      `json:"confirm"`
-		Phone    string    `json:"phone"`
 		Revision uuid.UUID `json:"identity_revision"`
 	}
 	if !decode(w, r, &input) {
@@ -200,30 +201,26 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request, coach uuid.UUI
 		if err != nil {
 			return err
 		}
-		var phone *string
-		number := strings.TrimSpace(input.Phone)
-		if st.Required {
-			if !phonePattern.MatchString(number) {
-				return errConflict
-			}
-			phone = &number
-		} else if number != "" {
-			return errConflict
-		}
 		var currentRevision uuid.UUID
-		err = tx.QueryRow(ctx, "SELECT revision FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&currentRevision)
+		var hasPhone bool
+		err = tx.QueryRow(ctx, "SELECT revision, phone_enc IS NOT NULL FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&currentRevision, &hasPhone)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && currentRevision != input.Revision) {
 			return errConflict
 		}
 		if err != nil {
 			return err
 		}
+		// 移行前の登録（電話番号なし）は、登録し直すまで表記要の公開を認めない。
+		if st.Required && !hasPhone {
+			return errConflict
+		}
 		// The second check is at read time. A main DB change concurrent with
 		// this approval can at most leave an approval for an obsolete epoch.
-		_, err = tx.Exec(ctx, `INSERT INTO identity_vault.disclosures (plan_id,coach_id,plan_epoch,coach_epoch,phone)
-			VALUES ($1,$2,$3,$4,$5) ON CONFLICT (plan_id) DO UPDATE
-			SET coach_id=EXCLUDED.coach_id,plan_epoch=EXCLUDED.plan_epoch,coach_epoch=EXCLUDED.coach_epoch,phone=EXCLUDED.phone`,
-			id, coach, p.planVersion, p.coachVersion, phone)
+		// disclosures.phone は旧方式の平文の列。書き込まず、上書きのたびに消す。
+		_, err = tx.Exec(ctx, `INSERT INTO identity_vault.disclosures (plan_id,coach_id,plan_epoch,coach_epoch)
+			VALUES ($1,$2,$3,$4) ON CONFLICT (plan_id) DO UPDATE
+			SET coach_id=EXCLUDED.coach_id,plan_epoch=EXCLUDED.plan_epoch,coach_epoch=EXCLUDED.coach_epoch,phone=NULL`,
+			id, coach, p.planVersion, p.coachVersion)
 		return err
 	}))
 }
@@ -298,35 +295,37 @@ func (s *Service) disclosure(w http.ResponseWriter, r *http.Request) {
 		if current != p {
 			return pgx.ErrNoRows
 		}
-		var phone *string
-		err = tx.QueryRow(ctx, `SELECT phone FROM identity_vault.disclosures
-			WHERE plan_id=$1 AND coach_id=$2 AND plan_epoch=$3 AND coach_epoch=$4`,
-			id, p.coach, p.planVersion, p.coachVersion).Scan(&phone)
+		// 本人が確認した版の公開許可がなければ、表記要・不要を問わず何も返さない。
+		var approved bool
+		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM identity_vault.disclosures
+			WHERE plan_id=$1 AND coach_id=$2 AND plan_epoch=$3 AND coach_epoch=$4)`,
+			id, p.coach, p.planVersion, p.coachVersion).Scan(&approved)
 		if err != nil {
 			return err
+		}
+		if !approved {
+			return pgx.ErrNoRows
 		}
 		st, err := settings(ctx, tx, p.coach)
 		if err != nil {
 			return err
 		}
 		result.Required = st.Required
+		// 表記不要のコーチは、氏名・住所・電話番号のいずれも復号しない。
 		if !st.Required {
 			return nil
-		}
-		if phone == nil {
-			return pgx.ErrNoRows
 		}
 		identity, err := s.loadIdentity(ctx, tx, p.coach)
 		if err != nil {
 			return err
 		}
-		if identity == nil {
+		if identity == nil || identity.Phone == "" {
 			return pgx.ErrNoRows
 		}
 		result.Registered = true
 		result.LegalName = identity.LegalName
 		result.Address = identity.Address
-		result.Phone = *phone
+		result.Phone = identity.Phone
 		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -380,8 +379,9 @@ func (s *Service) approvedPlans(w http.ResponseWriter, r *http.Request) {
 	rows, err = s.vault.Query(ctx, `SELECT d.plan_id FROM identity_vault.disclosures d
 		JOIN unnest($1::uuid[],$2::uuid[],$3::uuid[],$4::uuid[]) AS p(plan_id,coach_id,plan_epoch,coach_epoch)
 		USING (plan_id,coach_id,plan_epoch,coach_epoch)
+		JOIN identity_vault.identities i ON i.coach_id=d.coach_id
 		LEFT JOIN identity_vault.commerce c ON c.coach_id=d.coach_id
-		WHERE c.required=false OR d.phone IS NOT NULL`, planIDs, coaches, planEpochs, coachEpochs)
+		WHERE c.required=false OR i.phone_enc IS NOT NULL`, planIDs, coaches, planEpochs, coachEpochs)
 	if err != nil {
 		unavailable(w)
 		return
