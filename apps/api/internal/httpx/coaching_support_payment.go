@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -24,26 +23,13 @@ func supportUnlimited(ct db.CoachingContract) bool {
 // 期間日数は、開始日〜目標大会の日（両端を含む・日本時間の日付）。開始日は実際に始まった日で、まだ始まっていなければ全額。
 // 返金を決める日（今日）は経過した日に数える。通話や動画の回数は数えない（返金の単位は期間で一本化）。
 func supportRemainingByDays(ct db.CoachingContract, now time.Time) int32 {
-	if ct.StartsAt == nil || ct.CompetitionDate == nil {
-		return ct.PriceYen
-	}
-	day := func(t time.Time) time.Time {
-		j := t.In(jst.Zone)
-		return time.Date(j.Year(), j.Month(), j.Day(), 0, 0, 0, 0, time.UTC)
-	}
-	start, end, today := day(*ct.StartsAt), day(*ct.CompetitionDate), day(now)
-	total := int64(end.Sub(start).Hours()/24) + 1
-	if total <= 0 {
-		return 0
-	}
-	elapsed := int64(today.Sub(start).Hours()/24) + 1
-	elapsed = min(max(elapsed, 0), total)
-	return int32(int64(ct.PriceYen) * (total - elapsed) / total)
+	return supportUnprovidedAsOf(ct, supportDay(now))
 }
 
 func supportRemaining(ct db.CoachingContract, usage db.SupportUsageRow) int32 {
 	if supportUnlimited(ct) {
-		return supportRemainingByDays(ct, time.Now())
+		// 途中で終えた契約は終了の日（大会の中止・延期は主催者の発表の日）、それ以外は今日を経過扱いにする。
+		return supportUnprovidedAsOf(ct, supportAsOf(ct, time.Now()))
 	}
 	total := int64(ct.CallCount)
 	if ct.VideoReviews != nil {
@@ -112,6 +98,23 @@ func (s *Server) prepareSupportSettlement(ctx context.Context, id uuid.UUID, kin
 		}
 		amount := supportRemaining(ct, usage)
 		reason := "support_unprovided"
+		if kind == "end" {
+			// 運営が途中で終えた大会までプラン。解約料は取らず、未経過分を日割りで全額返金する。
+			// コーチ都合だけは、経過分も含めて全額を返金する。
+			if ct.SupportEndCause == nil {
+				return &ticketRuleError{"invalid_support", "終わり方が記録されていません"}
+			}
+			reason = "support_" + *ct.SupportEndCause
+			if *ct.SupportEndCause == supportEndCoachFault {
+				amount = pay.AmountYen
+			}
+			if amount <= 0 {
+				if _, err := q.EndSupportWithoutRefund(ctx, ct.ID); err != nil {
+					return err
+				}
+				return q.MarkSupportSettled(ctx, ct.ID)
+			}
+		}
 		if kind == "full" {
 			amount = pay.AmountYen
 			reason = "support_admin_full"

@@ -107,3 +107,12 @@ it("選手は提案前なら相談を取り下げられる", async () => {
   await render({ ...base, status: "declined", proposal: null }, "athlete");
   expect(button("相談を取り下げる")).toBeUndefined();
 });
+
+it("提案画面に、日割りの算定例・返金の時期と方法・中止延期の扱い・終了後のチャット閲覧期間が出る", async () => {
+  await render(base, "athlete");
+  const text = container.textContent!;
+  expect(text).toContain("9,000円・31日間の契約を10日目に終えると、残り21日分の6,096円を返金します");
+  expect(text).toContain("お支払いに使ったカードへ返金");
+  expect(text).toContain("主催者が中止・延期を正式に発表した日で契約を終えます");
+  expect(text).toContain("90日間はチャットを見ることができます");
+});

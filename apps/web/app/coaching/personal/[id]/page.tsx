@@ -1,6 +1,7 @@
 "use client";
 
 import { PageLoading } from "@/components/page-loading";
+import { SupportTermsNotice } from "@/components/support-terms-notice";
 
 import { CoachingSupportPanel } from "@/components/coaching-support";
 import { CoachingInPersonPanel } from "@/components/coaching-in-person";
@@ -21,6 +22,11 @@ import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+
+// 無料相談の提案から成立した大会までプラン（動画への返答が無制限）か。
+function supportConsultContract(c: CoachingContract): boolean {
+  return c.service_type === "competition_support" && c.video_reviews === 0;
+}
 
 // 支払いのあと戻ってきたとき、Stripe からの知らせが届いて期間が始まるまで、何回か読み直す。
 const paidPolls = 10;
@@ -151,6 +157,7 @@ function CoachingContractView() {
           </p>
         ) : (
           <div className="space-y-2">
+            {supportConsultContract(contract) ? <SupportTermsNotice priceYen={contract.price_yen} days={contract.duration_days} /> : null}
             <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
               お支払いへ進む（{formatYen(contract.price_yen)}）
             </Button>

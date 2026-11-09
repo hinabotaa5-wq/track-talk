@@ -1022,6 +1022,10 @@ func (s *Server) startConsultContract(ctx context.Context, q *db.Queries, c db.S
 	if _, err := q.SetSupportConsultContract(ctx, db.SetSupportConsultContractParams{ID: c.ID, ContractID: &ct.ID}); err != nil {
 		return ct, err
 	}
+	// コーチへ、この契約の取引条件（給付の内容・報酬の算定方法・支払期日など）を電磁的に明示する。
+	if err := issueSupportContractStatement(ctx, q, ct); err != nil {
+		return ct, err
+	}
 	return ct, nil
 }
 

@@ -212,6 +212,8 @@ FROM (
     WHERE ct.status IN ('ended', 'refunded') AND (ct.fulfillment_version=0 OR ct.fulfillment_state='settled')
       AND pay.status IN ('paid', 'partially_refunded')
       AND pay.refund_reason IS DISTINCT FROM 'not_started'
+      -- 無料相談から成立した大会までプラン（動画が無制限）は、仮払いとの差額で確定する（finalizeSupportEarnings）。
+      AND NOT (ct.fulfillment_version = 1 AND COALESCE(ct.video_reviews, -1) = 0 AND COALESCE(ct.service_type, '') = 'competition_support')
       AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.contract_id = ct.id)
     ORDER BY ct.id, pay.paid_at
 ) x
