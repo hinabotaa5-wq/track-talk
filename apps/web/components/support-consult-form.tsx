@@ -61,7 +61,7 @@ export function SupportConsultForm({
         {consultNotContractNote}
         {minor ? <span className="mt-1 block font-semibold">{consultMinorNote}</span> : null}
       </p>
-      {paused ? <p role="status" className="text-sm text-amber-300">このコーチはいま新しい相談を受け付けていません{consult.reception.resume_on ? `（${consult.reception.resume_on}ごろ再開の目安）` : ""}。</p> : null}
+      {paused ? <p role="status" className="text-sm text-amber-300">このコーチはいま新しい相談を受け付けていません。</p> : null}
 
       {section("A. 目標の大会", <>
         <YesNo label="目標の大会は決まっていますか" value={a.goal_decided} onChange={(v) => set("goal_decided", v)} error={err("goal_decided")} />

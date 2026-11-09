@@ -27,9 +27,10 @@ it("受付中は価格の目安と無料相談の入口を出し、契約件数�
   expect(container.textContent).not.toMatch(/満枠|満員|残り|あと\d+名|件/);
 });
 
-it("受付停止中は再開の目安を出し、相談の入口を出さない", async () => {
+it("受付停止中は、再開の目安は出さず、相談の入口も出さない", async () => {
   await act(async () => root.render(<SupportConsultEntry coachID="c1" consult={{ ...open, reception: { status: "paused", resume_on: "2026-11-20" } }} />));
-  expect(container.textContent).toContain("受付停止中（2026-11-20ごろ再開の目安）");
+  expect(container.textContent).toContain("受付停止中");
+  expect(container.textContent).not.toContain("再開の目安");
   expect(container.querySelector("a")).toBeNull();
 });
 

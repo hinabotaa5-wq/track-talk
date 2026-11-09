@@ -30,9 +30,9 @@ it("冒頭で契約ではないこと・支払いがないことを伝え、カ�
   expect(container.textContent).toContain("その他、コーチに聞きたいこと");
 });
 
-it("未成年には、契約の時は保護者の同意とお支払いが必要と伝える", async () => {
+it("未成年には、保護者に提案を送ることと、契約には保護者の同意とお支払いが必要なことを伝える", async () => {
   await render({ minor: true });
-  expect(container.textContent).toContain("契約する時は保護者の同意とお支払いが必要です。");
+  expect(container.textContent).toContain("契約には保護者の同意とお支払いが必要です。");
 });
 
 it("大会が決まっているとき、大会名と開催日の欄が出る。未定なら時期の目安の選択が出る", async () => {
@@ -66,6 +66,6 @@ it("送信すると回答を相談として送り、サーバーの項目エラ�
 
 it("受付停止中は送れない", async () => {
   await render({ consult: { ...consult, reception: { status: "paused", resume_on: "2026-11-20" } } });
-  expect(container.textContent).toContain("2026-11-20ごろ再開の目安");
+  expect(container.textContent).toContain("いま新しい相談を受け付けていません");
   expect((container.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
 });

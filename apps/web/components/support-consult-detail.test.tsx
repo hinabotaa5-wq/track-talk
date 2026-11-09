@@ -10,8 +10,8 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 
 const proposal = {
-  competition_name: "秋季記録会", support_start_date: "2026-11-20", competition_date: "2026-12-20", duration_days: 31, video_reviews: 4,
-  menu_updates: "weekly" as const, reply_formats: ["text" as const], call_count: 1, call_minutes: 30, price_yen: 9000, fee_percent: 20,
+  competition_name: "秋季記録会", support_start_date: "2026-11-20", competition_date: "2026-12-20", duration_days: 31,
+  call_count: 1, call_minutes: 30, price_yen: 9000, fee_percent: 20,
   coach_receives_yen: 7200, content_note: "週1回の返答", answer_to_question: "週1回で十分です", valid_until: "2026-11-30T15:00:00Z", valid_until_date: "2026-11-30",
 };
 const base: SupportConsult = {
@@ -55,11 +55,20 @@ it("同意にチェックを入れるまで申し込めず、申し込むと契�
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ status: "accepted", contract_id: "k1" }));
 });
 
-it("未成年は、保護者の同意とお支払いが必要なことと、保護者へ進む流れを伝える", async () => {
+it("提案には『何が返ってくるか』の標準形（動画への返答は無制限）が出て、回数や形式の選択はない", async () => {
+  await render(base, "athlete");
+  expect(container.textContent).toContain("回数の制限なく受けられます");
+  expect(container.textContent).not.toContain("動画への返答の回数");
+});
+
+it("未成年は契約を作らず、「保護者に提案を送る」だけができる", async () => {
   await render({ ...base, minor: true }, "athlete");
-  expect(container.textContent).toContain("契約する時は保護者の同意とお支払いが必要です。");
-  expect(container.textContent).toContain("保護者が内容を確認して同意し");
-  expect(container.querySelector('button[type="submit"]')?.textContent).toContain("保護者の確認へ進む");
+  expect(container.textContent).toContain("保護者に提案を送ります");
+  expect(container.textContent).toContain("あなたが送っただけでは、契約もお支払いも起きません");
+  const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "保護者に提案を送る")!;
+  expect(container.querySelector('button[type="submit"]')).toBeNull();
+  await act(async () => button.click());
+  expect(apiFetch.mock.calls[0][0]).toBe("/v1/support-consults/s1/send-to-guardian");
 });
 
 it("有効期限が過ぎた提案は申し込めない", async () => {

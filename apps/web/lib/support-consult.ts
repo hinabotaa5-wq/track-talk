@@ -5,7 +5,7 @@ import type { CoachEvent } from "./types";
 
 export type ReceptionStatus = "open" | "paused";
 
-// コーチ一覧・詳細に出す入口。受付中か受付停止中（再開の目安つき）だけ。契約件数・残り枠・満枠は出さない。
+// コーチ一覧・詳細に出す入口。受付中か受付停止中だけ（コーチが手で切り替える）。契約件数・残り枠・満枠は出さない。
 export type PublicSupportConsult = {
   events: CoachEvent[];
   description: string;
@@ -15,12 +15,13 @@ export type PublicSupportConsult = {
   reception: { status: ReceptionStatus; resume_on: string | null };
 };
 
-export type SupportConsultStatus = "requested" | "clarifying" | "proposed" | "accepted" | "declined" | "expired" | "withdrawn";
+export type SupportConsultStatus = "requested" | "clarifying" | "proposed" | "sent_to_guardian" | "accepted" | "declined" | "expired" | "withdrawn";
 
 export const supportConsultStatusLabels: Record<SupportConsultStatus, string> = {
   requested: "コーチの提案を待っています",
   clarifying: "コーチの聞き直しに答えてください",
   proposed: "コーチの提案が届いています",
+  sent_to_guardian: "保護者に提案を送りました。保護者の同意を待っています",
   accepted: "提案を受けて申し込みました",
   declined: "コーチが辞退しました",
   expired: "期限が過ぎました",
@@ -148,9 +149,6 @@ export type SupportConsultProposal = {
   support_start_date: string;
   competition_date: string;
   duration_days: number;
-  video_reviews: number;
-  menu_updates: "none" | "once" | "weekly";
-  reply_formats: ("text" | "video")[];
   call_count: number;
   call_minutes: number;
   price_yen: number;
@@ -191,8 +189,10 @@ export type SupportConsultSettings = {
 };
 
 // 契約と相談は提案ではまだ成立しない、という前置き（フォームの冒頭と提案画面に出す）。
-export const consultNotContractNote = "ここでの相談と提案は契約ではありません。契約は、提案を受けて申し込み、コーチが引き受け、保護者の同意（未成年の場合）とお支払いが済んだ時点で成立します。相談だけなら費用はかからず、カード情報も入力しません。";
-export const consultMinorNote = "契約する時は保護者の同意とお支払いが必要です。";
+export const consultNotContractNote = "ここでの相談と提案は契約ではありません。契約は、提案を受けて申し込み（18歳未満は、保護者が提案の内容に同意して申し込みます）、お支払いが済んだ時点で成立します。コーチは提案を出した時に同意しているので、あらためて引き受ける操作はありません。相談だけなら費用はかからず、カード情報も入力しません。";
+// 大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記する（API の supportStandardContent と同じ文）。
+export const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。返し方（文章・動画）はコーチがその都度選びます。";
+export const consultMinorNote = "18歳未満の方は、あなたが申し込むのではなく、保護者に提案を送ります。契約には保護者の同意とお支払いが必要です。";
 
 export function priceHintLabel(min: number | null, max: number | null): string {
   if (min == null || max == null) return "";

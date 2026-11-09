@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { highPlanPriceYen, planMenuUpdatesLabels, planReplyFormatLabels, videoReviewsLabel } from "@/lib/coaching-plan";
+import { highPlanPriceYen } from "@/lib/coaching-plan";
 import { formatDateTime, formatYen } from "@/lib/format";
 import {
-  answerRows, consultMinorNote, consultNotContractNote, supportConsultStatusLabels, type SupportConsult, type SupportConsultProposal,
+  answerRows, consultMinorNote, consultNotContractNote, supportConsultStatusLabels, supportStandardContent, type SupportConsult, type SupportConsultProposal,
 } from "@/lib/support-consult";
 import type { CoachEvent } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -47,9 +47,7 @@ export function ProposalCard({ p, role }: { p: SupportConsultProposal; role: "at
   const rows: [string, string][] = [
     ["大会", p.competition_name],
     ["期間", `${p.support_start_date} 〜 ${p.competition_date}（目標大会の日まで・${p.duration_days}日間）`],
-    ["動画への返答", videoReviewsLabel(p.video_reviews)],
-    ["練習メニュー", planMenuUpdatesLabels[p.menu_updates]],
-    ["返し方", p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・")],
+    ["サポートの内容", supportStandardContent],
     ["ビデオ通話", p.call_count ? `${p.call_count}回・1回${p.call_minutes}分` : "なし"],
     ["価格", `${formatYen(p.price_yen)}（カード払い）`],
     ["提案の有効期限", `${p.valid_until_date} の終わりまで（それまでに申し込みを済ませてください）`],
@@ -107,15 +105,26 @@ function AthleteAccept({ consult, token, onChange }: { consult: SupportConsult; 
   const [consents, setConsents] = useState<ContractConsents>(noConsents);
   const { error, fields, pending, run } = useAction(token, onChange);
   const p = consult.proposal!;
+  if (consult.minor) {
+    // 未成年本人は申し込めない。保護者に提案を送り、保護者が同意してお支払いをすると契約が成立する。
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-slate-200">{consultNotContractNote}</p>
+        <p className="text-sm font-semibold text-slate-100">{consultMinorNote}この提案を保護者に送ると、保護者のページで内容を確認できます。保護者が同意してカードでお支払いをすると契約が成立して始まります。あなたが送っただけでは、契約もお支払いも起きません。</p>
+        {p.expired ? <p role="alert" className="text-sm text-red-400">この提案は有効期限が過ぎています。</p> : null}
+        {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
+        <Button type="button" className="w-full" disabled={pending || p.expired} onClick={() => void run(`/v1/support-consults/${consult.id}/send-to-guardian`)}>保護者に提案を送る</Button>
+      </div>
+    );
+  }
   const ok = consents.agree_report && consents.agree_detection && !p.expired;
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(`/v1/support-consults/${consult.id}/accept`, consents, async () => { const r = await apiFetch<{ consult: SupportConsult }>(`/v1/support-consults/${consult.id}`, { token }); onChange(r.consult); }); }}>
       <p className="text-sm text-slate-200">{consultNotContractNote}</p>
-      {consult.minor ? <p className="text-sm font-semibold text-slate-100">{consultMinorNote}提案を受けて申し込むと、コーチが引き受けたあとに、保護者へこの提案の内容を送る手続きに進みます。保護者が内容を確認して同意し、カードでお支払いをすると契約が成立して始まります。</p> : null}
       {p.expired ? <p role="alert" className="text-sm text-red-400">この提案は有効期限が過ぎています。</p> : null}
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending || !ok}>{consult.minor ? "この提案で申し込む（保護者の確認へ進む）" : "この提案で申し込む"}</Button>
+      <Button type="submit" className="w-full" disabled={pending || !ok}>この提案で申し込む</Button>
     </form>
   );
 }
@@ -126,8 +135,8 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
   const a = consult.answers;
   const [d, setD] = useState({
     competition_name: a.goal_decided ? a.competition_name : "", support_start_date: a.start_timing === "date" ? a.start_date : today(),
-    competition_date: a.goal_decided ? a.competition_date : "", video_reviews: 4, menu_updates: "weekly", reply_formats: ["text"] as string[],
-    call_count: 0, call_minutes: 30, price: "", content_note: "", answer_to_question: "", valid_until: "",
+    competition_date: a.goal_decided ? a.competition_date : "",
+    call_count: 0, call_minutes: 30, price: "", ...noConsents, content_note: "", answer_to_question: "", valid_until: "",
   });
   const { error, fields, pending, run } = useAction(token, onChange);
   const price = Number(d.price.replace(/[,，円\s]/g, ""));
@@ -148,17 +157,10 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
       <FieldBlock label="大会名" error={fields.competition_name}><Input aria-label="提案の大会名" maxLength={100} value={d.competition_name} onChange={(e) => set({ competition_name: e.target.value })} /></FieldBlock>
       <FieldBlock label="開始日" error={fields.support_start_date}><Input aria-label="開始日" type="date" value={d.support_start_date} onChange={(e) => set({ support_start_date: e.target.value })} /></FieldBlock>
       <FieldBlock label="目標大会の日（終了日）" error={fields.competition_date}><Input aria-label="目標大会の日" type="date" value={d.competition_date} onChange={(e) => set({ competition_date: e.target.value })} /></FieldBlock>
-      <FieldBlock label="動画への返答の回数（1〜30）" error={fields.video_reviews}><Input aria-label="動画への返答の回数" type="number" min={1} max={30} value={d.video_reviews} onChange={(e) => set({ video_reviews: Number(e.target.value) })} /></FieldBlock>
-      <FieldBlock label="練習メニュー" error={fields.menu_updates}>
-        <select aria-label="練習メニュー" className={selectClass} value={d.menu_updates} onChange={(e) => set({ menu_updates: e.target.value })}>
-          {Object.entries(planMenuUpdatesLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      </FieldBlock>
-      <FieldBlock label="返し方" error={fields.reply_formats}>
-        <div className="flex gap-3 text-sm">{Object.entries(planReplyFormatLabels).map(([v, l]) => (
-          <label key={v} className="flex items-center gap-1"><input type="checkbox" checked={d.reply_formats.includes(v)} onChange={(e) => set({ reply_formats: e.target.checked ? [...d.reply_formats, v] : d.reply_formats.filter((x) => x !== v) })} />{l}</label>
-        ))}</div>
-      </FieldBlock>
+      <div className="rounded-lg border border-white/20 bg-white/5 p-2 text-xs text-slate-200">
+        <p className="font-semibold">サポートの内容（標準形・変更できません）</p>
+        <p>{supportStandardContent}</p>
+      </div>
       <FieldBlock label="ビデオ通話の回数（0〜12）" error={fields.call_count}><Input aria-label="通話回数" type="number" min={0} max={12} value={d.call_count} onChange={(e) => set({ call_count: Number(e.target.value) })} /></FieldBlock>
       {d.call_count > 0 ? <FieldBlock label="通話1回の長さ" error={fields.call_minutes}>
         <select aria-label="通話の長さ" className={selectClass} value={d.call_minutes} onChange={(e) => set({ call_minutes: Number(e.target.value) })}>{[15, 30, 45, 60].map((n) => <option key={n} value={n}>{n}分</option>)}</select>
@@ -168,8 +170,10 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
       <FieldBlock label="内容の補足（任意）" error={fields.content_note}><Textarea aria-label="内容の補足" rows={3} maxLength={500} value={d.content_note} onChange={(e) => set({ content_note: e.target.value })} /></FieldBlock>
       {a.question_to_coach ? <FieldBlock label={`選手の質問への回答「${a.question_to_coach}」`} error={fields.answer_to_question}><Textarea aria-label="質問への回答" rows={3} maxLength={1000} value={d.answer_to_question} onChange={(e) => set({ answer_to_question: e.target.value })} /></FieldBlock> : null}
       <FieldBlock label="提案の有効期限（この日の終わりまで）" error={fields.valid_until}><Input aria-label="提案の有効期限" type="date" value={d.valid_until} onChange={(e) => set({ valid_until: e.target.value })} /></FieldBlock>
+      <p className="text-xs text-slate-300">提案を送ることが、この契約への同意になります。選手（18歳未満は保護者）が申し込んでお支払いが済むと、あなたの引き受け操作なしに契約が成立します。</p>
+      <ContractConsentChecks value={{ agree_report: d.agree_report, agree_detection: d.agree_detection }} onChange={(v) => set(v)} errors={fields} />
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending}>提案を送る</Button>
+      <Button type="submit" className="w-full" disabled={pending || !d.agree_report || !d.agree_detection}>提案を送る</Button>
     </form>
   );
 }
@@ -198,7 +202,7 @@ function CoachActions({ consult, token, onChange }: { consult: SupportConsult; t
 
 export function SupportConsultDetail({ consult, role, token, onChange }: { consult: SupportConsult; role: "athlete" | "coach"; token: string | null; onChange: (c: SupportConsult) => void }) {
   const { error, pending, run } = useAction(token, onChange);
-  const open = consult.status === "requested" || consult.status === "clarifying" || consult.status === "proposed";
+  const open = consult.status === "requested" || consult.status === "clarifying" || consult.status === "proposed" || consult.status === "sent_to_guardian";
   const pendingQuestion = consult.questions?.find((q) => q.answer == null);
   return (
     <div className="space-y-3 text-sm">

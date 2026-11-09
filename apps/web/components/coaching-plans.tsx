@@ -343,7 +343,7 @@ function PlanForm({
       price_yen: Number.isFinite(price) ? Math.trunc(price) : null,
       capacity: Number.isFinite(capacity) ? Math.trunc(capacity) : null,
       service_type: draft.service_type,
-      additional_consultation_price_yen: draft.additionalPrice.trim() === "" ? null : (Number.isFinite(additionalPrice) ? additionalPrice : -1),
+      additional_consultation_price_yen: draft.service_type === "competition_support" || draft.additionalPrice.trim() === "" ? null : (Number.isFinite(additionalPrice) ? additionalPrice : -1),
       published: serviceReady(draft.service_type) && draft.published,
       confirm_high_price: confirmHigh,
       video_reviews: draft.video_reviews,
@@ -469,12 +469,12 @@ function PlanForm({
         <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
         {fieldError("price_yen")}
       </label>
-      <label className="block space-y-1.5 text-sm text-slate-200">
+      {draft.service_type === "competition_support" ? null : <label className="block space-y-1.5 text-sm text-slate-200">
         <span>追加相談の料金（任意・500円以上）</span>
         <Input inputMode="numeric" value={draft.additionalPrice} onChange={(e) => setDraft((d) => ({ ...d, additionalPrice: e.target.value }))} placeholder="例: 500" />
         <p className="text-xs text-slate-300">質問1件と回答1件の料金です。契約期間内の文章相談は基本プランに含まれます。設定は新しい申し込みに反映し、空欄で解除できます。</p>
         {fieldError("additional_consultation_price_yen")}
-      </label>
+      </label>}
       <label className="flex items-center gap-2 text-sm text-slate-200">
         <input type="checkbox" checked={serviceReady(draft.service_type) && draft.published} disabled={!serviceReady(draft.service_type)} onChange={(e) => setDraft((d) => ({ ...d, published: e.target.checked }))} />
         公開する

@@ -4,13 +4,7 @@ WHERE coach_id = $1 AND day >= sqlc.arg(today)::date AND day < sqlc.arg(today)::
 ORDER BY day;
 
 -- name: HasPublicAvailabilityPlan :one
-SELECT (EXISTS (
-    SELECT 1 FROM support_consult_settings st
-    JOIN coach_profiles c ON c.profile_id = st.coach_id
-    WHERE st.coach_id = sqlc.arg(coach_id) AND st.accepting
-      AND c.status = 'approved' AND c.pledge_version >= sqlc.arg(pledge_version)::smallint
-      AND 'competition_support' = ANY(c.service_types)
-) OR EXISTS (
+SELECT EXISTS (
     SELECT 1 FROM coaching_plans pl
     JOIN coach_profiles c ON c.profile_id = pl.coach_id
     WHERE pl.coach_id = sqlc.arg(coach_id) AND pl.published
@@ -19,12 +13,7 @@ SELECT (EXISTS (
       AND pl.service_type = ANY(c.service_types)
       AND (pl.service_type <> 'competition_support' OR
           (pl.competition_date >= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
-))::boolean;
-
--- name: ListAvailabilityForCoaches :many
-SELECT * FROM coach_availability
-WHERE coach_id = ANY(sqlc.arg(coach_ids)::uuid[]) AND day >= sqlc.arg(today)::date AND day < sqlc.arg(today)::date + 21
-ORDER BY coach_id, day;
+)::boolean;
 
 -- name: UpsertCoachAvailability :exec
 INSERT INTO coach_availability (coach_id, day, status, note)

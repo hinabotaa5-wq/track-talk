@@ -134,9 +134,9 @@ func (q *Queries) CreateSupportConsult(ctx context.Context, arg CreateSupportCon
 }
 
 const createSupportConsultProposal = `-- name: CreateSupportConsultProposal :one
-INSERT INTO support_consult_proposals (consult_id, competition_name, support_start_date, competition_date, video_reviews, menu_updates, reply_formats, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING consult_id, competition_name, support_start_date, competition_date, video_reviews, menu_updates, reply_formats, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until, created_at
+INSERT INTO support_consult_proposals (consult_id, competition_name, support_start_date, competition_date, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING consult_id, competition_name, support_start_date, competition_date, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until, created_at
 `
 
 type CreateSupportConsultProposalParams struct {
@@ -144,9 +144,6 @@ type CreateSupportConsultProposalParams struct {
 	CompetitionName  string    `json:"competition_name"`
 	SupportStartDate time.Time `json:"support_start_date"`
 	CompetitionDate  time.Time `json:"competition_date"`
-	VideoReviews     int16     `json:"video_reviews"`
-	MenuUpdates      string    `json:"menu_updates"`
-	ReplyFormats     []string  `json:"reply_formats"`
 	CallCount        int16     `json:"call_count"`
 	CallMinutes      int16     `json:"call_minutes"`
 	PriceYen         int32     `json:"price_yen"`
@@ -161,9 +158,6 @@ func (q *Queries) CreateSupportConsultProposal(ctx context.Context, arg CreateSu
 		arg.CompetitionName,
 		arg.SupportStartDate,
 		arg.CompetitionDate,
-		arg.VideoReviews,
-		arg.MenuUpdates,
-		arg.ReplyFormats,
 		arg.CallCount,
 		arg.CallMinutes,
 		arg.PriceYen,
@@ -177,9 +171,6 @@ func (q *Queries) CreateSupportConsultProposal(ctx context.Context, arg CreateSu
 		&i.CompetitionName,
 		&i.SupportStartDate,
 		&i.CompetitionDate,
-		&i.VideoReviews,
-		&i.MenuUpdates,
-		&i.ReplyFormats,
 		&i.CallCount,
 		&i.CallMinutes,
 		&i.PriceYen,
@@ -219,7 +210,7 @@ const expireSupportConsults = `-- name: ExpireSupportConsults :many
 UPDATE support_consults sc
 SET status = 'expired', updated_at = now()
 WHERE (sc.status = 'requested' AND sc.answer_by <= now())
-   OR (sc.status = 'proposed' AND EXISTS (SELECT 1 FROM support_consult_proposals pr WHERE pr.consult_id = sc.id AND pr.valid_until <= now()))
+   OR (sc.status IN ('proposed', 'sent_to_guardian') AND EXISTS (SELECT 1 FROM support_consult_proposals pr WHERE pr.consult_id = sc.id AND pr.valid_until <= now()))
 RETURNING sc.id, sc.athlete_id, sc.coach_id, sc.status, sc.minor, sc.event, sc.answers, sc.answer_by, sc.contract_id, sc.created_at, sc.updated_at
 `
 
@@ -321,7 +312,7 @@ func (q *Queries) GetSupportConsult(ctx context.Context, id uuid.UUID) (SupportC
 }
 
 const getSupportConsultProposal = `-- name: GetSupportConsultProposal :one
-SELECT consult_id, competition_name, support_start_date, competition_date, video_reviews, menu_updates, reply_formats, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until, created_at FROM support_consult_proposals WHERE consult_id = $1
+SELECT consult_id, competition_name, support_start_date, competition_date, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until, created_at FROM support_consult_proposals WHERE consult_id = $1
 `
 
 func (q *Queries) GetSupportConsultProposal(ctx context.Context, consultID uuid.UUID) (SupportConsultProposal, error) {
@@ -332,9 +323,6 @@ func (q *Queries) GetSupportConsultProposal(ctx context.Context, consultID uuid.
 		&i.CompetitionName,
 		&i.SupportStartDate,
 		&i.CompetitionDate,
-		&i.VideoReviews,
-		&i.MenuUpdates,
-		&i.ReplyFormats,
 		&i.CallCount,
 		&i.CallMinutes,
 		&i.PriceYen,
@@ -544,15 +532,77 @@ func (q *Queries) ListConsultTemplatePlans(ctx context.Context, coachIds []uuid.
 	return items, nil
 }
 
+const listGuardianSupportConsults = `-- name: ListGuardianSupportConsults :many
+SELECT sc.id, sc.athlete_id, sc.coach_id, sc.status, sc.minor, sc.event, sc.answers, sc.answer_by, sc.contract_id, sc.created_at, sc.updated_at, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+FROM support_consults sc
+JOIN profiles p ON p.id = sc.coach_id
+LEFT JOIN coach_profiles c ON c.profile_id = sc.coach_id
+WHERE sc.athlete_id = $1 AND sc.minor AND sc.status IN ('sent_to_guardian', 'accepted')
+ORDER BY sc.created_at DESC
+LIMIT 50
+`
+
+type ListGuardianSupportConsultsRow struct {
+	ID                 uuid.UUID  `json:"id"`
+	AthleteID          uuid.UUID  `json:"athlete_id"`
+	CoachID            uuid.UUID  `json:"coach_id"`
+	Status             string     `json:"status"`
+	Minor              bool       `json:"minor"`
+	Event              string     `json:"event"`
+	Answers            []byte     `json:"answers"`
+	AnswerBy           *time.Time `json:"answer_by"`
+	ContractID         *uuid.UUID `json:"contract_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	CoachNickname      string     `json:"coach_nickname"`
+	CoachPhotoPublicID *string    `json:"coach_photo_public_id"`
+}
+
+// 保護者のページに出す、子の無料相談のうち、保護者に提案が送られたもの。
+func (q *Queries) ListGuardianSupportConsults(ctx context.Context, athleteID uuid.UUID) ([]ListGuardianSupportConsultsRow, error) {
+	rows, err := q.db.Query(ctx, listGuardianSupportConsults, athleteID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGuardianSupportConsultsRow
+	for rows.Next() {
+		var i ListGuardianSupportConsultsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AthleteID,
+			&i.CoachID,
+			&i.Status,
+			&i.Minor,
+			&i.Event,
+			&i.Answers,
+			&i.AnswerBy,
+			&i.ContractID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CoachNickname,
+			&i.CoachPhotoPublicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicSupportConsultSettings = `-- name: ListPublicSupportConsultSettings :many
 SELECT st.coach_id, st.accepting, st.events, st.description, st.price_min_yen, st.price_max_yen, st.updated_at FROM support_consult_settings st
 JOIN coach_profiles c ON c.profile_id = st.coach_id
-WHERE st.accepting AND c.status = 'approved'
+WHERE EXISTS (SELECT 1 FROM coaching_plans pl WHERE pl.coach_id = st.coach_id AND pl.consult_template)
+  AND c.status = 'approved'
   AND c.pledge_version >= $1::smallint
   AND 'competition_support' = ANY(c.service_types)
 `
 
-// 相談を受け付けているコーチ。承認済みで、いまの版の誓約をして、大会までプランを担当しているコーチだけ。
+// 相談の入口を出すコーチ。受付中か、受付停止中（一度でも受付を始めたコーチ）。承認済みで、いまの版の誓約をして、大会までプランを担当しているコーチだけ。
 func (q *Queries) ListPublicSupportConsultSettings(ctx context.Context, pledgeVersion int16) ([]SupportConsultSetting, error) {
 	rows, err := q.db.Query(ctx, listPublicSupportConsultSettings, pledgeVersion)
 	if err != nil {

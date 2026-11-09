@@ -1281,9 +1281,6 @@ type SupportConsultProposal struct {
 	CompetitionName  string    `json:"competition_name"`
 	SupportStartDate time.Time `json:"support_start_date"`
 	CompetitionDate  time.Time `json:"competition_date"`
-	VideoReviews     int16     `json:"video_reviews"`
-	MenuUpdates      string    `json:"menu_updates"`
-	ReplyFormats     []string  `json:"reply_formats"`
 	CallCount        int16     `json:"call_count"`
 	CallMinutes      int16     `json:"call_minutes"`
 	PriceYen         int32     `json:"price_yen"`

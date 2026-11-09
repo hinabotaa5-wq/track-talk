@@ -190,35 +190,14 @@ func (a *consultAnswers) validate(coachEvents []string, today time.Time) map[str
 	return f
 }
 
-// 受け入れ状況。コーチの対応可能カレンダーだけで決める。人数の上限・満枠・残り枠は持たない。
-type consultReception struct {
-	Open     bool
-	ResumeOn *string
-}
-
-func receptionFromCalendar(today time.Time, rows []db.CoachAvailability) consultReception {
-	closed := func(day time.Time) bool {
-		return slices.ContainsFunc(rows, func(r db.CoachAvailability) bool { return r.Day.Equal(day) && r.Status == "unavailable" })
-	}
-	if !closed(today) {
-		return consultReception{Open: true}
-	}
-	for i := 1; i < 21; i++ {
-		day := today.AddDate(0, 0, i)
-		if !closed(day) {
-			v := day.Format("2006-01-02")
-			return consultReception{ResumeOn: &v}
-		}
-	}
-	return consultReception{}
-}
-
-func receptionJSON(r consultReception) map[string]any {
+// 受け入れ状況。コーチが手で切り替える「受付中／受付停止中」だけで決める。
+// 人数の上限・満枠・残り枠は持たず、契約件数も選手には出さない。カレンダーとは連動しない。
+func receptionJSON(accepting bool) map[string]any {
 	status := "open"
-	if !r.Open {
+	if !accepting {
 		status = "paused"
 	}
-	return map[string]any{"status": status, "resume_on": r.ResumeOn}
+	return map[string]any{"status": status, "resume_on": nil}
 }
 
 func consultSettingsJSON(st db.SupportConsultSetting) map[string]any {
@@ -229,10 +208,10 @@ func consultSettingsJSON(st db.SupportConsultSetting) map[string]any {
 }
 
 // publicConsultJSON は、コーチ一覧・詳細に出す無料相談の入口。件数や残り枠は出さない。
-func publicConsultJSON(st db.SupportConsultSetting, rec consultReception) map[string]any {
+func publicConsultJSON(st db.SupportConsultSetting) map[string]any {
 	out := consultSettingsJSON(st)
 	delete(out, "accepting")
-	out["reception"] = receptionJSON(rec)
+	out["reception"] = receptionJSON(st.Accepting)
 	return out
 }
 
@@ -380,20 +359,11 @@ func (s *Server) publicConsultEntries(ctx context.Context, only *uuid.UUID) (map
 	if err != nil {
 		return nil, err
 	}
-	today := availabilityToday(time.Now())
-	rows, err := s.q.ListAvailabilityForCoaches(ctx, db.ListAvailabilityForCoachesParams{CoachIds: ids, Today: today})
-	if err != nil {
-		return nil, err
-	}
-	byCoach := map[uuid.UUID][]db.CoachAvailability{}
-	for _, row := range rows {
-		byCoach[row.CoachID] = append(byCoach[row.CoachID], row)
-	}
 	for _, st := range settings {
 		if !slices.Contains(ids, st.CoachID) || !approved[templateOf[st.CoachID]] {
 			continue
 		}
-		out[st.CoachID] = publicConsultJSON(st, receptionFromCalendar(today, byCoach[st.CoachID]))
+		out[st.CoachID] = publicConsultJSON(st)
 	}
 	return out, nil
 }
@@ -433,7 +403,6 @@ func proposalJSON(p db.SupportConsultProposal) map[string]any {
 	return map[string]any{
 		"competition_name": p.CompetitionName, "support_start_date": p.SupportStartDate.Format("2006-01-02"),
 		"competition_date": p.CompetitionDate.Format("2006-01-02"), "duration_days": proposalDays(p),
-		"video_reviews": p.VideoReviews, "menu_updates": p.MenuUpdates, "reply_formats": nonNilStrings(p.ReplyFormats),
 		"call_count": p.CallCount, "call_minutes": p.CallMinutes, "price_yen": p.PriceYen,
 		"fee_percent": personalFeePercent, "coach_receives_yen": p.PriceYen - p.PriceYen*personalFeePercent/100,
 		"content_note": p.ContentNote, "answer_to_question": p.AnswerToQuestion, "valid_until": p.ValidUntil, "valid_until_date": p.ValidUntil.In(jst.Zone).AddDate(0, 0, -1).Format("2006-01-02"),
@@ -487,22 +456,10 @@ func (s *Server) createSupportConsult(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	// 受付停止中、または開始希望日がカレンダーで閉じた日のときは送れない（開始日がカレンダーの範囲外なら送れる）。
-	rows, err := s.q.ListCoachAvailability(r.Context(), db.ListCoachAvailabilityParams{CoachID: req.CoachID, Today: today})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if !receptionFromCalendar(today, rows).Open {
+	// 受付停止中は新しい相談を送れない（コーチが手で切り替える。カレンダーとは連動しない）。
+	if rec, _ := entry["reception"].(map[string]any); rec == nil || rec["status"] != "open" {
 		Error(w, http.StatusConflict, "consult_paused", "このコーチはいま新しい相談を受け付けていません")
 		return
-	}
-	if req.Answers.StartTiming == "date" {
-		day, _ := time.Parse("2006-01-02", req.Answers.StartDate)
-		if slices.ContainsFunc(rows, func(row db.CoachAvailability) bool { return row.Day.Equal(day) && row.Status == "unavailable" }) {
-			FieldError(w, map[string]string{"start_date": "その日はコーチが新しい受け入れをお休みしています。別の日を選んでください"})
-			return
-		}
 	}
 	raw, err := json.Marshal(req.Answers)
 	if err != nil {
@@ -672,7 +629,7 @@ func (s *Server) withdrawSupportConsult(w http.ResponseWriter, r *http.Request) 
 			fail = true
 			return nil
 		}
-		if c.AthleteID != me.ID || !slices.Contains([]string{"requested", "clarifying", "proposed"}, c.Status) {
+		if c.AthleteID != me.ID || !slices.Contains([]string{"requested", "clarifying", "proposed", "sent_to_guardian"}, c.Status) {
 			s.consultConflict(w)
 			fail = true
 			return nil
@@ -850,9 +807,6 @@ type proposalReq struct {
 	CompetitionName  string   `json:"competition_name"`
 	SupportStartDate string   `json:"support_start_date"`
 	CompetitionDate  string   `json:"competition_date"`
-	VideoReviews     int      `json:"video_reviews"`
-	MenuUpdates      string   `json:"menu_updates"`
-	ReplyFormats     []string `json:"reply_formats"`
 	CallCount        int      `json:"call_count"`
 	CallMinutes      int      `json:"call_minutes"`
 	PriceYen         int      `json:"price_yen"`
@@ -860,6 +814,9 @@ type proposalReq struct {
 	ContentNote      string   `json:"content_note"`
 	AnswerToQuestion string   `json:"answer_to_question"`
 	ValidUntil       string   `json:"valid_until"`
+	// 提案を出すことが、コーチ側の契約への同意になる（相談由来の契約では、引受をあらためて挟まない）。
+	AgreeReport    bool `json:"agree_report"`
+	AgreeDetection bool `json:"agree_detection"`
 }
 
 // validate は提案を確かめる。有効期限（valid_until）は日本時間のその日の終わりまで。
@@ -886,15 +843,6 @@ func (p *proposalReq) validate(today time.Time, askedQuestion bool) (map[string]
 			f["competition_date"] = "支援期間は90日までです"
 		}
 	}
-	if p.VideoReviews < 1 || p.VideoReviews > maxVideoReviews {
-		f["video_reviews"] = "動画への返答は1〜30回で設定してください"
-	}
-	if !slices.Contains(planMenuUpdates, p.MenuUpdates) {
-		f["menu_updates"] = "メニューの作り方を選んでください"
-	}
-	if !subsetOf(p.ReplyFormats, planReplyFormats) || len(p.ReplyFormats) == 0 {
-		f["reply_formats"] = "返し方を選んでください"
-	}
 	if p.CallCount < 0 || p.CallCount > 12 {
 		f["call_count"] = "通話は0〜12回で設定してください"
 	}
@@ -920,6 +868,9 @@ func (p *proposalReq) validate(today time.Time, askedQuestion bool) (map[string]
 		}
 	} else if p.AnswerToQuestion != "" && looksLikeContact(p.AnswerToQuestion) {
 		f["answer_to_question"] = "連絡先（URL・メールアドレス・SNS の ID・電話番号など）は書けません"
+	}
+	for k, v := range (contractConsentReq{AgreeReport: p.AgreeReport, AgreeDetection: p.AgreeDetection}).fields() {
+		f[k] = v
 	}
 	var validUntil time.Time
 	day, err := time.Parse("2006-01-02", p.ValidUntil)
@@ -955,6 +906,10 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 	if !s.commerceReadyToPublish(w, r, coach.ProfileID) {
 		return
 	}
+	if !s.payoutsReady(s.refreshPayoutsEnabled(r.Context(), coach)) {
+		Error(w, http.StatusUnprocessableEntity, "payouts_required", payoutsNotReadyMessage)
+		return
+	}
 	var out db.SupportConsult
 	var fail bool
 	err := s.tx(r.Context(), func(q *db.Queries) error {
@@ -976,15 +931,8 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 			fail = true
 			return nil
 		}
-		formats := []string{}
-		for _, f := range planReplyFormats {
-			if slices.Contains(req.ReplyFormats, f) {
-				formats = append(formats, f)
-			}
-		}
 		if _, err := q.CreateSupportConsultProposal(r.Context(), db.CreateSupportConsultProposalParams{
 			ConsultID: c.ID, CompetitionName: req.CompetitionName, SupportStartDate: start, CompetitionDate: end,
-			VideoReviews: int16(req.VideoReviews), MenuUpdates: req.MenuUpdates, ReplyFormats: formats,
 			CallCount: int16(req.CallCount), CallMinutes: int16(req.CallMinutes), PriceYen: int32(req.PriceYen),
 			ContentNote: req.ContentNote, AnswerToQuestion: req.AnswerToQuestion, ValidUntil: validUntil,
 		}); err != nil {
@@ -1018,11 +966,111 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"consult": detail})
 }
 
-// ---- 選手: 提案を受ける（既存の契約フローへ接続） ----
+// ---- 提案を受ける ----
 
-// acceptSupportConsult は、選手が提案の内容を確認して申し込む。ここで契約（コーチの返事待ち）ができて、
-// 以降は既存のサポートプランの流れ（コーチの引受 → 未成年は保護者の同意 → カード支払い → 開始）に進む。
-// 未成年の選手は、この操作では支払いも契約の成立も起きない。引受のあとに保護者へ提案の中身を送り、保護者が同意してお支払いをする。
+// supportStandardContent は、大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記し、契約の説明にも写す。
+// 返答の回数や形式は選ばせない（動画への返答は期間中は無制限。追加相談という別料金もない）。
+const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。返し方（文章・動画）はコーチがその都度選びます。"
+
+// startConsultContract は、相談の提案から契約を作る。コーチの同意は提案を出した時に済んでいるので、
+// コーチの再引受は挟まず、そのまま「受けた」状態（支払い待ち・保護者の同意待ち）にする。
+// 契約の相手（requester）は選手本人。呼ぶのは、大人が申し込んだ時と、保護者が同意した時だけ。
+func (s *Server) startConsultContract(ctx context.Context, q *db.Queries, c db.SupportConsult, requester uuid.UUID, requesterConsent bool) (db.CoachingContract, error) {
+	p, err := q.GetSupportConsultProposal(ctx, c.ID)
+	if err != nil {
+		return db.CoachingContract{}, err
+	}
+	tpl, err := q.GetConsultTemplatePlan(ctx, c.CoachID)
+	if err != nil {
+		return db.CoachingContract{}, err
+	}
+	var a consultAnswers
+	_ = json.Unmarshal(c.Answers, &a)
+	desc := strings.TrimSpace("大会までプラン（無料相談の提案）。" + p.CompetitionName + "の日まで。" + supportStandardContent + p.ContentNote)
+	title := truncateRunes("大会までプラン: "+p.CompetitionName, 60)
+	zero := int16(0)
+	ct, err := q.CreateCoachingContract(ctx, db.CreateCoachingContractParams{
+		PreferredDates: []time.Time{}, ID: uuid.New(), PlanID: tpl.ID, CoachID: c.CoachID, RequesterID: requester,
+		PlanKind: "period", PlanTitle: title, DurationDays: int16(proposalDays(p)), PriceYen: p.PriceYen,
+		Event: c.Event, Goal: consultGoalSummary(a, p), CurrentRecord: truncateRunes("自己ベスト "+a.PersonalBest, 100),
+		Message: truncateRunes(a.MainWorry, 1000), Minor: c.Minor, RespondBy: time.Now().Add(contractRespondWindow),
+		VideoReviews: &zero, ReplyFormats: []string{},
+		ServiceType: ptrString("competition_support"), PlanDescription: &desc,
+	})
+	if err != nil {
+		return ct, err
+	}
+	if ct, err = q.SnapshotSupportContractFromProposal(ctx, db.SnapshotSupportContractFromProposalParams{ContractID: ct.ID, ConsultID: c.ID}); err != nil {
+		return ct, err
+	}
+	if err := q.InsertContractConsent(ctx, db.InsertContractConsentParams{
+		ContractID: ct.ID, Party: "coach", ProfileID: &c.CoachID, Version: contractConsentVersion,
+	}); err != nil {
+		return ct, err
+	}
+	if requesterConsent {
+		if err := q.InsertContractConsent(ctx, db.InsertContractConsentParams{
+			ContractID: ct.ID, Party: "requester", ProfileID: &requester, Version: contractConsentVersion,
+		}); err != nil {
+			return ct, err
+		}
+	}
+	// コーチの引受の代わり。未成年は保護者の同意と支払い待ち、大人は支払い待ち（支払いのないデモ版はそのまま開始）。
+	if ct, err = q.AcceptCoachingContract(ctx, db.AcceptCoachingContractParams{ID: ct.ID, CoachID: c.CoachID, PaymentRequired: s.stripe.Configured()}); err != nil {
+		return ct, err
+	}
+	if _, err := q.SetSupportConsultContract(ctx, db.SetSupportConsultContractParams{ID: c.ID, ContractID: &ct.ID}); err != nil {
+		return ct, err
+	}
+	return ct, nil
+}
+
+// checkConsultStartable は、提案がまだ有効で、契約を作れる状態かを確かめる。だめなら応答を書いて false。
+func (s *Server) checkConsultStartable(w http.ResponseWriter, r *http.Request, q *db.Queries, c db.SupportConsult, requester uuid.UUID) bool {
+	p, err := q.GetSupportConsultProposal(r.Context(), c.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if !p.ValidUntil.After(time.Now()) || p.CompetitionDate.Before(availabilityToday(time.Now())) {
+		Error(w, http.StatusConflict, "proposal_expired", "この提案は有効期限が過ぎています")
+		return false
+	}
+	if err := q.LockCoachingPlans(r.Context(), c.CoachID); err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	tpl, err := q.GetConsultTemplatePlan(r.Context(), c.CoachID)
+	if err != nil {
+		MapDBError(w, err)
+		return false
+	}
+	if _, approved, err := s.identity.disclosure(r.Context(), tpl.ID); err != nil {
+		identityServiceError(w)
+		return false
+	} else if !approved {
+		Error(w, http.StatusConflict, "commerce_unregistered", "この提案はいま申し込めません")
+		return false
+	}
+	if coach, err := s.q.GetCoachProfile(r.Context(), c.CoachID); err != nil || coach.Status != "approved" {
+		Error(w, http.StatusConflict, "conflict", "この提案はいま申し込めません")
+		return false
+	} else if !s.payoutsReady(s.refreshPayoutsEnabled(r.Context(), coach)) {
+		Error(w, http.StatusConflict, "conflict", "この提案はいま申し込めません")
+		return false
+	}
+	if open, err := q.HasOpenCoachingContract(r.Context(), db.HasOpenCoachingContractParams{RequesterID: requester, CoachID: c.CoachID}); err != nil {
+		MapDBError(w, err)
+		return false
+	} else if open {
+		Error(w, http.StatusConflict, "conflict", "このコーチには、返事待ちか期間中の申し込みがあります")
+		return false
+	}
+	return true
+}
+
+// acceptSupportConsult は、大人の選手が提案の内容を確認して申し込む。ここで契約ができ、コーチの再引受は挟まず、
+// お支払いが済んだ時点で始まる。未成年の選手は、ここでは契約をつくれない（保護者に提案を送る）。
 func (s *Server) acceptSupportConsult(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
@@ -1054,66 +1102,17 @@ func (s *Server) acceptSupportConsult(w http.ResponseWriter, r *http.Request) {
 			fail = true
 			return nil
 		}
-		p, err := q.GetSupportConsultProposal(r.Context(), c.ID)
-		if err != nil {
-			return err
-		}
-		if !p.ValidUntil.After(time.Now()) || p.CompetitionDate.Before(availabilityToday(time.Now())) {
-			Error(w, http.StatusConflict, "proposal_expired", "この提案は有効期限が過ぎています")
+		if c.Minor {
+			Error(w, http.StatusConflict, "guardian_required", "18歳未満の方は、保護者に提案を送って、保護者が同意してお支払いをします")
 			fail = true
 			return nil
 		}
-		if err := q.LockCoachingPlans(r.Context(), c.CoachID); err != nil {
-			return err
-		}
-		tpl, err := q.GetConsultTemplatePlan(r.Context(), c.CoachID)
-		if err != nil {
-			return err
-		}
-		if _, approved, err := s.identity.disclosure(r.Context(), tpl.ID); err != nil {
-			identityServiceError(w)
-			fail = true
-			return nil
-		} else if !approved {
-			Error(w, http.StatusConflict, "commerce_unregistered", "この提案はいま申し込めません")
+		if !s.checkConsultStartable(w, r, q, c, me.ID) {
 			fail = true
 			return nil
 		}
-		if open, err := q.HasOpenCoachingContract(r.Context(), db.HasOpenCoachingContractParams{RequesterID: me.ID, CoachID: c.CoachID}); err != nil {
-			return err
-		} else if open {
-			Error(w, http.StatusConflict, "conflict", "このコーチには、返事待ちか期間中の申し込みがあります")
-			fail = true
-			return nil
-		}
-		var a consultAnswers
-		_ = json.Unmarshal(c.Answers, &a)
-		desc := "大会までプラン（無料相談の提案）。" + p.CompetitionName + "の日まで。" + p.ContentNote
-		desc = strings.TrimSpace(desc)
-		title := "大会までプラン: " + p.CompetitionName
-		if utf8.RuneCountInString(title) > 60 {
-			title = string([]rune(title)[:60])
-		}
-		ct, err = q.CreateCoachingContract(r.Context(), db.CreateCoachingContractParams{
-			PreferredDates: []time.Time{}, ID: uuid.New(), PlanID: tpl.ID, CoachID: c.CoachID, RequesterID: me.ID,
-			PlanKind: "period", PlanTitle: title, DurationDays: int16(proposalDays(p)), PriceYen: p.PriceYen,
-			Event: c.Event, Goal: consultGoalSummary(a, p), CurrentRecord: truncateRunes("自己ベスト "+a.PersonalBest, 100),
-			Message: truncateRunes(a.MainWorry, 1000), Minor: c.Minor, RespondBy: time.Now().Add(contractRespondWindow),
-			VideoReviews: ptrInt16(p.VideoReviews), MenuUpdates: &p.MenuUpdates, ReplyFormats: nonNilStrings(p.ReplyFormats),
-			ServiceType: ptrString("competition_support"), PlanDescription: &desc,
-		})
-		if err != nil {
-			return err
-		}
-		if ct, err = q.SnapshotSupportContractFromProposal(r.Context(), db.SnapshotSupportContractFromProposalParams{ContractID: ct.ID, ConsultID: c.ID}); err != nil {
-			return err
-		}
-		if err := q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
-			ContractID: ct.ID, Party: "requester", ProfileID: &me.ID, Version: contractConsentVersion,
-		}); err != nil {
-			return err
-		}
-		_, err = q.SetSupportConsultContract(r.Context(), db.SetSupportConsultContractParams{ID: c.ID, ContractID: &ct.ID})
+		var err error
+		ct, err = s.startConsultContract(r.Context(), q, c, me.ID, true)
 		return err
 	})
 	var pgErr *pgconn.PgError
@@ -1128,12 +1127,240 @@ func (s *Server) acceptSupportConsult(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	body := "お支払いを済ませると始まります"
+	if ct.Status == "active" {
+		body = "「" + ct.PlanTitle + "」が始まりました"
+	}
 	s.notify(r.Context(), ct.CoachID, notifyCoaching, push.Message{
-		Title: "大会までプランの申し込みが届きました",
-		Body:  "提案が受け入れられました。48時間以内に引き受けるか、お断りしてください",
-		URL:   "/coach", Tag: "contract-" + ct.ID.String(),
+		Title: "無料相談の提案が受け入れられました", Body: body,
+		URL: "/coach", Tag: "contract-" + ct.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusCreated, map[string]any{"contract": s.contractJSON(ct)})
+}
+
+// sendSupportConsultToGuardian は、未成年の選手が、届いた提案を保護者に送る。契約はまだできない。
+// 保護者が、このサービスの保護者としての同意を済ませているときだけ送れる。
+func (s *Server) sendSupportConsultToGuardian(w http.ResponseWriter, r *http.Request) {
+	me, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var out db.SupportConsult
+	var fail bool
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		c, ok := s.loadConsultFor(w, r, q, me.ID, true)
+		if !ok {
+			fail = true
+			return nil
+		}
+		if c.AthleteID != me.ID || c.Status != "proposed" || !c.Minor {
+			s.consultConflict(w)
+			fail = true
+			return nil
+		}
+		p, err := q.GetSupportConsultProposal(r.Context(), c.ID)
+		if err != nil {
+			return err
+		}
+		if !p.ValidUntil.After(time.Now()) || p.CompetitionDate.Before(availabilityToday(time.Now())) {
+			Error(w, http.StatusConflict, "proposal_expired", "この提案は有効期限が過ぎています")
+			fail = true
+			return nil
+		}
+		g, err := q.GetGuardianConsentByMinor(r.Context(), me.ID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && g.Status != "consented") {
+			Error(w, http.StatusConflict, "guardian_not_consented", "先に保護者のリンクを作り、保護者に同意してもらってください")
+			fail = true
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		out, err = q.SetSupportConsultStatus(r.Context(), db.SetSupportConsultStatusParams{ID: c.ID, Status: "sent_to_guardian"})
+		return err
+	})
+	if fail {
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	detail, err := s.consultDetail(r.Context(), out)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"consult": detail})
+}
+
+// ---- 保護者: 子に届いた提案 ----
+
+func (s *Server) guardianConsult(w http.ResponseWriter, r *http.Request, q *db.Queries, lock bool) (db.SupportConsult, bool) {
+	minor, ok := s.guardianMinor(w, r)
+	if !ok {
+		return db.SupportConsult{}, false
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return db.SupportConsult{}, false
+	}
+	var c db.SupportConsult
+	var err error
+	if lock {
+		c, err = q.LockSupportConsult(r.Context(), id)
+	} else {
+		c, err = q.GetSupportConsult(r.Context(), id)
+	}
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (c.AthleteID != minor || !c.Minor || (c.Status != "sent_to_guardian" && c.Status != "accepted"))) {
+		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+		return db.SupportConsult{}, false
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return db.SupportConsult{}, false
+	}
+	return c, true
+}
+
+func (s *Server) listGuardianSupportConsults(w http.ResponseWriter, r *http.Request) {
+	minor, ok := s.guardianMinor(w, r)
+	if !ok {
+		return
+	}
+	rows, err := s.q.ListGuardianSupportConsults(r.Context(), minor)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		c := db.SupportConsult{ID: row.ID, AthleteID: row.AthleteID, CoachID: row.CoachID, Status: row.Status, Minor: row.Minor, Event: row.Event,
+			Answers: row.Answers, AnswerBy: row.AnswerBy, ContractID: row.ContractID, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+		v, err := s.consultDetail(r.Context(), c)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		v["coach_id"], v["coach_nickname"], v["coach_photo_url"] = row.CoachID, row.CoachNickname, s.coachPhotoURL(row.CoachPhotoPublicID)
+		out = append(out, v)
+	}
+	JSON(w, http.StatusOK, map[string]any{"consults": out})
+}
+
+func (s *Server) getGuardianSupportConsult(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.guardianConsult(w, r, s.q, false)
+	if !ok {
+		return
+	}
+	out, err := s.consultDetail(r.Context(), c)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"consult": out})
+}
+
+// consentGuardianSupportConsult は、保護者が提案に同意して申し込む。ここで初めて契約ができ、
+// コーチの再引受は挟まず、保護者の同意とお支払いで成立する（支払いのないデモ版は同意でそのまま開始）。
+func (s *Server) consentGuardianSupportConsult(w http.ResponseWriter, r *http.Request) {
+	var req contractConsentReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	if fields := req.fields(); len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	var ct db.CoachingContract
+	var fail bool
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		c, ok := s.guardianConsult(w, r, q, true)
+		if !ok {
+			fail = true
+			return nil
+		}
+		if c.Status != "sent_to_guardian" {
+			s.consultConflict(w)
+			fail = true
+			return nil
+		}
+		if !s.checkConsultStartable(w, r, q, c, c.AthleteID) {
+			fail = true
+			return nil
+		}
+		var err error
+		ct, err = s.startConsultContract(r.Context(), q, c, c.AthleteID, false)
+		if err != nil {
+			return err
+		}
+		if err := q.InsertContractConsent(r.Context(), db.InsertContractConsentParams{
+			ContractID: ct.ID, Party: "guardian", ProfileID: nil, Version: contractConsentVersion,
+		}); err != nil {
+			return err
+		}
+		if !ct.PaymentRequired {
+			ct, err = q.GuardianStartCoachingContract(r.Context(), db.GuardianStartCoachingContractParams{ID: ct.ID, RequesterID: ct.RequesterID})
+		}
+		return err
+	})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		Error(w, http.StatusConflict, "conflict", "このコーチには、返事待ちか期間中の申し込みがあります")
+		return
+	}
+	if fail {
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if ct.Status == "active" {
+		msg := push.Message{Title: "パーソナル指導が始まりました", Body: "保護者が「" + ct.PlanTitle + "」に同意しました", URL: "/coaching/personal/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}
+		s.notify(r.Context(), ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
+		s.notify(r.Context(), ct.CoachID, notifyCoaching, msg, 24*time.Hour)
+		s.writeGuardianContract(w, r, ct.ID)
+		return
+	}
+	s.notify(r.Context(), ct.CoachID, notifyCoaching, push.Message{
+		Title: "無料相談の提案が、保護者に受け入れられました", Body: "保護者がお支払いを済ませると始まります",
+		URL: "/coach", Tag: "contract-" + ct.ID.String(),
+	}, 24*time.Hour)
+	s.consentAndCheckoutGuardian(w, r, ct)
+}
+
+func (s *Server) declineGuardianSupportConsult(w http.ResponseWriter, r *http.Request) {
+	var out db.SupportConsult
+	var fail bool
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		c, ok := s.guardianConsult(w, r, q, true)
+		if !ok {
+			fail = true
+			return nil
+		}
+		if c.Status != "sent_to_guardian" {
+			s.consultConflict(w)
+			fail = true
+			return nil
+		}
+		var err error
+		out, err = q.SetSupportConsultStatus(r.Context(), db.SetSupportConsultStatusParams{ID: c.ID, Status: "withdrawn"})
+		return err
+	})
+	if fail {
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	s.notify(r.Context(), out.AthleteID, notifyCoaching, push.Message{
+		Title: "保護者が提案に同意しませんでした", Body: "費用はかかっていません。保護者と話してから、もう一度相談できます",
+		URL: "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
+	}, 24*time.Hour)
+	JSON(w, http.StatusOK, map[string]any{"consult": s.consultViewJSON(out)})
 }
 
 func ptrInt16(v int16) *int16    { return &v }

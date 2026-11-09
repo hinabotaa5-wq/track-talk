@@ -4,7 +4,7 @@ import { PageLoading } from "@/components/page-loading";
 
 import { GuardianConsultationReviews } from "@/components/guardian-consultation-reviews";
 
-import { GuardianPersonalSection } from "@/components/coaching-guardian";
+import { GuardianPersonalSection, GuardianSupportConsultSection } from "@/components/coaching-guardian";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -163,7 +163,7 @@ export default function GuardianPage() {
       {notice ? <p className="rounded-md bg-emerald-500/15 p-3 text-sm text-emerald-200">{notice}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
-      {consent.status === "consented" ? <><GuardianPersonalSection token={token} /><GuardianConsultationReviews token={token} /></> : null}
+      {consent.status === "consented" ? <><GuardianSupportConsultSection token={token} /><GuardianPersonalSection token={token} /><GuardianConsultationReviews token={token} /></> : null}
 
       {consent.status === "consented" ? (
         <form onSubmit={onUpdate} className="space-y-5">

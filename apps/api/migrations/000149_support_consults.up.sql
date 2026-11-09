@@ -16,7 +16,8 @@ CREATE TABLE support_consult_settings (
 );
 
 -- 無料相談。requested: コーチの提案か辞退を待っている、clarifying: コーチの聞き直しに選手が答えるのを待っている、
--- proposed: 提案を出した、accepted: 選手が提案を受けて契約の申込みになった、
+-- proposed: 提案を出した、sent_to_guardian: 未成年の選手が保護者に提案を送った（保護者の同意と支払いで契約が成立する）、
+-- accepted: 提案が受け入れられて契約ができた、
 -- declined: コーチが辞退した、expired: 期限が過ぎた、withdrawn: 選手が取り下げた。
 CREATE TABLE support_consults (
     id uuid PRIMARY KEY,
@@ -31,12 +32,12 @@ CREATE TABLE support_consults (
     contract_id uuid REFERENCES coaching_contracts (id) ON DELETE SET NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CHECK (status IN ('requested', 'clarifying', 'proposed', 'accepted', 'declined', 'expired', 'withdrawn')),
+    CHECK (status IN ('requested', 'clarifying', 'proposed', 'sent_to_guardian', 'accepted', 'declined', 'expired', 'withdrawn')),
     CHECK (athlete_id <> coach_id),
     CHECK (status <> 'requested' OR answer_by IS NOT NULL)
 );
 -- 進行中の相談は、同じコーチに1つまで。
-CREATE UNIQUE INDEX support_consults_open_idx ON support_consults (athlete_id, coach_id) WHERE status IN ('requested', 'clarifying', 'proposed');
+CREATE UNIQUE INDEX support_consults_open_idx ON support_consults (athlete_id, coach_id) WHERE status IN ('requested', 'clarifying', 'proposed', 'sent_to_guardian');
 CREATE INDEX support_consults_coach_idx ON support_consults (coach_id, status, created_at DESC);
 CREATE INDEX support_consults_athlete_idx ON support_consults (athlete_id, created_at DESC);
 
@@ -52,15 +53,13 @@ CREATE TABLE support_consult_questions (
 );
 CREATE INDEX support_consult_questions_idx ON support_consult_questions (consult_id, asked_at);
 
--- コーチの提案。1つの相談に1つ。
+-- コーチの提案。1つの相談に1つ。動画への返答は期間中回数無制限、練習メニューは最初に作って期間中は必要に応じて見直す、
+-- が標準で、コーチに選ばせない（コーチごとの違いは期間・価格・補足で出す）。
 CREATE TABLE support_consult_proposals (
     consult_id uuid PRIMARY KEY REFERENCES support_consults (id) ON DELETE CASCADE,
     competition_name text NOT NULL CHECK (char_length(btrim(competition_name)) BETWEEN 1 AND 100),
     support_start_date date NOT NULL,
     competition_date date NOT NULL,
-    video_reviews smallint NOT NULL CHECK (video_reviews BETWEEN 1 AND 30),
-    menu_updates text NOT NULL CHECK (menu_updates IN ('none', 'once', 'weekly')),
-    reply_formats text[] NOT NULL DEFAULT '{}' CHECK (reply_formats <@ ARRAY['text', 'video']),
     call_count smallint NOT NULL DEFAULT 0 CHECK (call_count BETWEEN 0 AND 12),
     call_minutes smallint NOT NULL DEFAULT 30 CHECK (call_minutes IN (15, 30, 45, 60)),
     price_yen integer NOT NULL CHECK (price_yen BETWEEN 2000 AND 9999999),

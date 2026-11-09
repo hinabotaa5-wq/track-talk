@@ -53,7 +53,7 @@ func consultAnswersBody() map[string]any {
 func proposalBody() map[string]any {
 	return map[string]any{
 		"competition_name": "秋季記録会", "support_start_date": day(1), "competition_date": day(40),
-		"video_reviews": 4, "menu_updates": "weekly", "reply_formats": []string{"text"},
+		"agree_report": true, "agree_detection": true,
 		"call_count": 1, "call_minutes": 30, "price_yen": 9000, "content_note": "週1回の返答とメニュー見直しです",
 		"answer_to_question": "週に1回で十分です", "valid_until": day(7),
 	}
@@ -150,25 +150,31 @@ func TestSupportConsultFullFlow(t *testing.T) {
 	if r := doJSON(t, h, "GET", "/v1/support-consults/"+id, tother, nil); r.Code != 404 {
 		t.Fatalf("other %d", r.Code)
 	}
-	// 選手が受けると、既存の契約（コーチの返事待ち）になり、中身は提案と一致する。
+	// 選手が受けると契約ができる。コーチの再引受は挟まず、デモ版（支払いなし）はそのまま始まる。中身は提案と一致する。
 	r = doJSON(t, h, "POST", "/v1/support-consults/"+id+"/accept", ta, consentBody)
 	if r.Code != 201 {
 		t.Fatalf("accept %d %s", r.Code, r.Body.String())
 	}
 	ct := decodeContract(t, r.Body.Bytes())
-	if ct.Status != "applied" {
+	if ct.Status != "active" {
 		t.Fatalf("contract %+v", ct)
 	}
 	var price, days int
-	var service, name string
+	var service, name, desc string
 	var compDate time.Time
-	queryRowArgs(t, `SELECT price_yen, duration_days, service_type, competition_name, competition_date FROM coaching_contracts WHERE id=$1`, []any{ct.ID}, &price, &days, &service, &name, &compDate)
-	if price != 9000 || days != 40 || service != "competition_support" || name != "秋季記録会" || compDate.Format("2006-01-02") != day(40) {
-		t.Fatalf("snapshot %d %d %s %s %s", price, days, service, name, compDate)
+	var videos int
+	queryRowArgs(t, `SELECT price_yen, duration_days, service_type, competition_name, competition_date, plan_description, video_reviews FROM coaching_contracts WHERE id=$1`, []any{ct.ID}, &price, &days, &service, &name, &compDate, &desc, &videos)
+	if price != 9000 || days != 40 || service != "competition_support" || name != "秋季記録会" || compDate.Format("2006-01-02") != day(40) || videos != 0 {
+		t.Fatalf("snapshot %d %d %s %s %s %d", price, days, service, name, compDate, videos)
 	}
-	// コーチが引き受けると、終了日は目標大会の日の終わりになる。
-	if r := doJSON(t, h, "POST", "/v1/coach/contracts/"+ct.ID+"/accept", tc, consentBody); r.Code != 200 {
-		t.Fatalf("coach accept %d %s", r.Code, r.Body.String())
+	// 「何が返ってくるか」は標準形（動画への返答は無制限）が契約の説明に入る。
+	if !strings.Contains(desc, "回数の制限なく") {
+		t.Fatalf("standard content missing: %s", desc)
+	}
+	var coachConsent int
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_contract_consents WHERE contract_id=$1 AND party='coach'`, []any{ct.ID}, &coachConsent)
+	if coachConsent != 1 {
+		t.Fatalf("coach consent %d", coachConsent)
 	}
 	var endsOK bool
 	queryRowArgs(t, `SELECT ends_at IS NULL OR (ends_at AT TIME ZONE 'Asia/Tokyo')::date = ($2::date + 1) FROM coaching_contracts WHERE id=$1`, []any{ct.ID, day(40)}, &endsOK)
@@ -178,6 +184,10 @@ func TestSupportConsultFullFlow(t *testing.T) {
 	// 契約が進行中のコーチへは、新しい無料相談を起こせない。
 	if r := doJSON(t, h, "POST", "/v1/support-consults", ta, map[string]any{"coach_id": coach, "answers": consultAnswersBody()}); r.Code != 409 {
 		t.Fatalf("consult during contract %d", r.Code)
+	}
+	// 追加相談は大会までプランにはない。
+	if r := doJSON(t, h, "GET", "/v1/coaching/contracts/"+ct.ID, ta, nil); r.Code != 200 {
+		t.Fatalf("contract get %d", r.Code)
 	}
 }
 
@@ -245,41 +255,43 @@ func TestSupportConsultValidationAndContact(t *testing.T) {
 	}
 }
 
-func TestSupportConsultCalendarClosesReception(t *testing.T) {
+func TestSupportConsultReceptionIsManualAndIgnoresCalendar(t *testing.T) {
 	h := setup(t)
 	coach, tc := consultCoach(t, h)
 	_, ta := demoUser(t, h, bornYearsAgo(20))
-	setDays := func(days ...map[string]any) {
-		if r := doJSON(t, h, "PUT", "/v1/coach/me/availability", tc, map[string]any{"days": days}); r.Code != 200 {
-			t.Fatalf("availability %d %s", r.Code, r.Body.String())
-		}
+	// カレンダーを閉じても、受付状態は変わらない（連動しない）。
+	if r := doJSON(t, h, "PUT", "/v1/coach/me/availability", tc, map[string]any{"days": []map[string]any{{"date": day(0), "status": "unavailable"}, {"date": day(1), "status": "unavailable"}}}); r.Code != 200 {
+		t.Fatalf("availability %d %s", r.Code, r.Body.String())
 	}
-	// 開始希望日が閉じた日なら送れない。
-	setDays(map[string]any{"date": day(5), "status": "unavailable"})
+	if r := doJSON(t, h, "GET", "/v1/coaches/"+coach.String()+"/support-consult", "", nil); !strings.Contains(r.Body.String(), `"status":"open"`) {
+		t.Fatalf("still open %s", r.Body.String())
+	}
 	a := consultAnswersBody()
 	a["start_timing"] = "date"
-	a["start_date"] = day(5)
-	if r := doJSON(t, h, "POST", "/v1/support-consults", ta, map[string]any{"coach_id": coach, "answers": a}); r.Code != 422 {
-		t.Fatalf("closed start date %d %s", r.Code, r.Body.String())
-	}
-	a["start_date"] = day(6)
+	a["start_date"] = day(0)
 	if r := doJSON(t, h, "POST", "/v1/support-consults", ta, map[string]any{"coach_id": coach, "answers": a}); r.Code != 201 {
-		t.Fatalf("open start date %d %s", r.Code, r.Body.String())
+		t.Fatalf("send with closed calendar day %d %s", r.Code, r.Body.String())
 	}
-	// 今日が閉じていれば受付停止中（再開の目安つき）。送れない。
-	_, ta2 := demoUser(t, h, bornYearsAgo(20))
-	setDays(map[string]any{"date": day(0), "status": "unavailable"}, map[string]any{"date": day(1), "status": "unavailable"})
+	// コーチが手で受付停止中にすると、入口は「受付停止中」で、新しい相談は送れない。
+	set := func(accepting bool) {
+		if r := doJSON(t, h, "PUT", "/v1/coach/me/support-consult", tc, map[string]any{
+			"accepting": accepting, "events": []string{"100m"}, "description": "スプリントのフォームと大会に向けた調整を見ます。",
+			"price_min_yen": 5000, "price_max_yen": 12000,
+		}); r.Code != 200 {
+			t.Fatalf("settings %d %s", r.Code, r.Body.String())
+		}
+	}
+	set(false)
 	r := doJSON(t, h, "GET", "/v1/coaches/"+coach.String()+"/support-consult", "", nil)
-	if !strings.Contains(r.Body.String(), `"status":"paused"`) || !strings.Contains(r.Body.String(), `"resume_on":"`+day(2)+`"`) {
+	if !strings.Contains(r.Body.String(), `"status":"paused"`) || strings.Contains(r.Body.String(), "capacity") || strings.Contains(r.Body.String(), "remaining") {
 		t.Fatalf("paused %s", r.Body.String())
 	}
+	_, ta2 := demoUser(t, h, bornYearsAgo(20))
 	if r := doJSON(t, h, "POST", "/v1/support-consults", ta2, map[string]any{"coach_id": coach, "answers": consultAnswersBody()}); r.Code != 409 {
 		t.Fatalf("paused send %d", r.Code)
 	}
-	// 閉じた期間が終われば、コーチの操作なしに受付中へ戻る。
-	setDays(map[string]any{"date": day(0), "status": ""}, map[string]any{"date": day(1), "status": ""})
-	r = doJSON(t, h, "GET", "/v1/coaches/"+coach.String()+"/support-consult", "", nil)
-	if !strings.Contains(r.Body.String(), `"status":"open"`) {
+	set(true)
+	if r := doJSON(t, h, "GET", "/v1/coaches/"+coach.String()+"/support-consult", "", nil); !strings.Contains(r.Body.String(), `"status":"open"`) {
 		t.Fatalf("reopen %s", r.Body.String())
 	}
 }
@@ -287,7 +299,7 @@ func TestSupportConsultCalendarClosesReception(t *testing.T) {
 func TestSupportConsultMinorGoesThroughGuardianFlow(t *testing.T) {
 	h := setup(t)
 	coach, tc := consultCoach(t, h)
-	_, tm := demoUser(t, h, bornYearsAgo(15))
+	tm, gt := guardianMinor(t, h)
 	id := sendConsult(t, h, tm, coach, consultAnswersBody())
 	if v := decodeConsult(t, doJSON(t, h, "GET", "/v1/support-consults/"+id, tm, nil).Body.Bytes()); !v.Consult.Minor {
 		t.Fatal("minor flag")
@@ -295,20 +307,96 @@ func TestSupportConsultMinorGoesThroughGuardianFlow(t *testing.T) {
 	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/propose", tc, proposalBody()); r.Code != 200 {
 		t.Fatalf("propose %d %s", r.Code, r.Body.String())
 	}
-	r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/accept", tm, consentBody)
-	if r.Code != 201 {
-		t.Fatalf("accept %d %s", r.Code, r.Body.String())
+	countContracts := func() (n int) {
+		queryRowArgs(t, `SELECT count(*)::int FROM coaching_contracts WHERE requester_id=(SELECT athlete_id FROM support_consults WHERE id=$1)`, []any{id}, &n)
+		return
 	}
-	ct := decodeContract(t, r.Body.Bytes())
-	if !ct.Minor || ct.Status != "applied" || ct.StartsAt != nil {
-		t.Fatalf("minor contract %+v", ct)
+	// 未成年本人の「申し込む」では契約ができない。保護者に送る前は、保護者のページにも出ない。
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/accept", tm, consentBody); r.Code != 409 || countContracts() != 0 {
+		t.Fatalf("minor accept %d contracts=%d", r.Code, countContracts())
 	}
-	// コーチが引き受けても、保護者の同意とお支払いが済むまで始まらない。
-	if r := doJSON(t, h, "POST", "/v1/coach/contracts/"+ct.ID+"/accept", tc, consentBody); r.Code != 200 {
-		t.Fatalf("coach accept %d", r.Code)
+	if r := doJSON(t, h, "GET", "/v1/guardian/"+gt+"/support-consults/"+id, "", nil); r.Code != 404 {
+		t.Fatalf("guardian sees before send %d", r.Code)
 	}
-	if got := decodeContract(t, doJSON(t, h, "GET", "/v1/coaching/contracts/"+ct.ID, tm, nil).Body.Bytes()); got.Status != "accepted" || got.StartsAt != nil {
-		t.Fatalf("minor after accept %+v", got)
+	// 保護者に提案を送る。まだ契約はできない。
+	r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/send-to-guardian", tm, nil)
+	if r.Code != 200 || decodeConsult(t, r.Body.Bytes()).Consult.Status != "sent_to_guardian" || countContracts() != 0 {
+		t.Fatalf("send %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, "GET", "/v1/guardian/"+gt+"/support-consults", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), id) {
+		t.Fatalf("guardian list %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, "GET", "/v1/guardian/"+gt+"/support-consults/"+id, "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"price_yen":9000`) {
+		t.Fatalf("guardian get %d %s", r.Code, r.Body.String())
+	}
+	// 他の子の保護者には見えない。
+	_, gt2 := guardianMinor(t, h)
+	if r := doJSON(t, h, "GET", "/v1/guardian/"+gt2+"/support-consults/"+id, "", nil); r.Code != 404 {
+		t.Fatalf("other guardian %d", r.Code)
+	}
+	if r := doJSON(t, h, "POST", "/v1/guardian/"+gt+"/support-consults/"+id+"/consent", "", map[string]any{"agree_report": true}); r.Code != 422 {
+		t.Fatalf("partial consent %d", r.Code)
+	}
+	// 保護者の同意で契約ができ、コーチの再引受なしに、デモ版（支払いなし）はそのまま始まる。
+	r = doJSON(t, h, "POST", "/v1/guardian/"+gt+"/support-consults/"+id+"/consent", "", consentBody)
+	if r.Code != 200 || countContracts() != 1 {
+		t.Fatalf("guardian consent %d %s", r.Code, r.Body.String())
+	}
+	var status string
+	var guardianConsents, coachConsents int
+	queryRowArgs(t, `SELECT status FROM coaching_contracts WHERE requester_id=(SELECT athlete_id FROM support_consults WHERE id=$1)`, []any{id}, &status)
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_contract_consents WHERE party='guardian' AND contract_id=(SELECT contract_id FROM support_consults WHERE id=$1)`, []any{id}, &guardianConsents)
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_contract_consents WHERE party='coach' AND contract_id=(SELECT contract_id FROM support_consults WHERE id=$1)`, []any{id}, &coachConsents)
+	if status != "active" || guardianConsents != 1 || coachConsents != 1 {
+		t.Fatalf("contract status=%s guardian=%d coach=%d", status, guardianConsents, coachConsents)
+	}
+	if r := doJSON(t, h, "POST", "/v1/guardian/"+gt+"/support-consults/"+id+"/consent", "", consentBody); r.Code != 409 {
+		t.Fatalf("double consent %d", r.Code)
+	}
+}
+
+func TestSupportConsultMinorGuardianNeedsConsentAndCanDecline(t *testing.T) {
+	h := setup(t)
+	coach, tc := consultCoach(t, h)
+	// 保護者が未同意なら、保護者に送れない。
+	_, tm0 := demoUser(t, h, bornYearsAgo(15))
+	id0 := sendConsult(t, h, tm0, coach, consultAnswersBody())
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id0+"/propose", tc, proposalBody()); r.Code != 200 {
+		t.Fatalf("propose %d", r.Code)
+	}
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id0+"/send-to-guardian", tm0, nil); r.Code != 409 {
+		t.Fatalf("send without guardian %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id0+"/withdraw", tm0, nil); r.Code != 200 {
+		t.Fatalf("withdraw %d", r.Code)
+	}
+	// 保護者が同意しない場合は、契約ができないまま終わる。
+	tm, gt := guardianMinor(t, h)
+	id := sendConsult(t, h, tm, coach, consultAnswersBody())
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/propose", tc, proposalBody()); r.Code != 200 {
+		t.Fatalf("propose2 %d", r.Code)
+	}
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/send-to-guardian", tm, nil); r.Code != 200 {
+		t.Fatalf("send %d", r.Code)
+	}
+	if r := doJSON(t, h, "POST", "/v1/guardian/"+gt+"/support-consults/"+id+"/decline", "", nil); r.Code != 200 {
+		t.Fatalf("decline %d %s", r.Code, r.Body.String())
+	}
+	var n int
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_contracts WHERE requester_id=(SELECT athlete_id FROM support_consults WHERE id=$1)`, []any{id}, &n)
+	if n != 0 {
+		t.Fatalf("contracts %d", n)
+	}
+}
+
+func TestSupportPlanHasNoAdditionalConsultation(t *testing.T) {
+	h := setup(t)
+	_, tc := consultCoach(t, h)
+	body := nominationSupportTestBody()
+	body["service_type"] = "competition_support"
+	body["additional_consultation_price_yen"] = 600
+	if r := doJSON(t, h, "POST", "/v1/coach/me/plans", tc, body); r.Code != 422 || !strings.Contains(r.Body.String(), "additional_consultation_price_yen") {
+		t.Fatalf("support plan with additional price %d %s", r.Code, r.Body.String())
 	}
 }
 

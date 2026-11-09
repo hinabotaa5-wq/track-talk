@@ -10,10 +10,11 @@ SET accepting = EXCLUDED.accepting, events = EXCLUDED.events, description = EXCL
 RETURNING *;
 
 -- name: ListPublicSupportConsultSettings :many
--- 相談を受け付けているコーチ。承認済みで、いまの版の誓約をして、大会までプランを担当しているコーチだけ。
+-- 相談の入口を出すコーチ。受付中か、受付停止中（一度でも受付を始めたコーチ）。承認済みで、いまの版の誓約をして、大会までプランを担当しているコーチだけ。
 SELECT st.* FROM support_consult_settings st
 JOIN coach_profiles c ON c.profile_id = st.coach_id
-WHERE st.accepting AND c.status = 'approved'
+WHERE EXISTS (SELECT 1 FROM coaching_plans pl WHERE pl.coach_id = st.coach_id AND pl.consult_template)
+  AND c.status = 'approved'
   AND c.pledge_version >= sqlc.arg(pledge_version)::smallint
   AND 'competition_support' = ANY(c.service_types);
 
@@ -37,6 +38,16 @@ SELECT * FROM support_consults WHERE id = $1;
 
 -- name: LockSupportConsult :one
 SELECT * FROM support_consults WHERE id = $1 FOR UPDATE;
+
+-- name: ListGuardianSupportConsults :many
+-- 保護者のページに出す、子の無料相談のうち、保護者に提案が送られたもの。
+SELECT sc.*, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
+FROM support_consults sc
+JOIN profiles p ON p.id = sc.coach_id
+LEFT JOIN coach_profiles c ON c.profile_id = sc.coach_id
+WHERE sc.athlete_id = $1 AND sc.minor AND sc.status IN ('sent_to_guardian', 'accepted')
+ORDER BY sc.created_at DESC
+LIMIT 50;
 
 -- name: ListAthleteSupportConsults :many
 SELECT sc.*, COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS coach_nickname, c.photo_public_id AS coach_photo_public_id
@@ -84,8 +95,8 @@ UPDATE support_consult_questions SET answer = $2, answered_at = now() WHERE cons
 SELECT count(*)::int FROM support_consult_questions WHERE consult_id = $1;
 
 -- name: CreateSupportConsultProposal :one
-INSERT INTO support_consult_proposals (consult_id, competition_name, support_start_date, competition_date, video_reviews, menu_updates, reply_formats, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO support_consult_proposals (consult_id, competition_name, support_start_date, competition_date, call_count, call_minutes, price_yen, content_note, answer_to_question, valid_until)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetSupportConsultProposal :one
@@ -105,7 +116,7 @@ RETURNING ct.*;
 UPDATE support_consults sc
 SET status = 'expired', updated_at = now()
 WHERE (sc.status = 'requested' AND sc.answer_by <= now())
-   OR (sc.status = 'proposed' AND EXISTS (SELECT 1 FROM support_consult_proposals pr WHERE pr.consult_id = sc.id AND pr.valid_until <= now()))
+   OR (sc.status IN ('proposed', 'sent_to_guardian') AND EXISTS (SELECT 1 FROM support_consult_proposals pr WHERE pr.consult_id = sc.id AND pr.valid_until <= now()))
 RETURNING sc.*;
 
 -- name: ListConsultTemplatePlans :many

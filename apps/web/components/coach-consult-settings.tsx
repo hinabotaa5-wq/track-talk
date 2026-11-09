@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 
 // 大会までプランの「相談の受付設定」。固定期間のプランを出品する代わりに、受付中かどうか、担当できる種目、
 // 相談で聞きたいこと・サポートできる内容、価格の目安を設定する。期間・内容・価格は、相談のあとの提案で決める。
-// 受け入れ状況は、対応可能カレンダーで閉じた期間だけで決まる（人数の上限は置かない）。
+// 受け入れ状況は、ここで手で切り替える「受付中／受付停止中」だけ（人数の上限は置かない。カレンダーとは連動しない）。
 export function CoachConsultSettings({ coach, token }: { coach: CoachApplication; token: string | null }) {
   const [s, setS] = useState<SupportConsultSettings | null>(null);
   const [approved, setApproved] = useState(true);
@@ -97,7 +97,7 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
               <Input aria-label="価格の目安の上限" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
             </div>
           </FieldBlock>
-          <p className="text-xs text-slate-300">新しい相談を受けられない期間は、<Link href="/coach/availability" className="underline">カレンダー</Link>で「不可」にしてください。選手側には「受付停止中」と表示され、期間が終わると自動で「受付中」に戻ります。</p>
+          <p className="text-xs text-slate-300">新しい相談を受けない間は、上の「相談を受け付ける」のチェックを外してください。選手側には「受付停止中」と表示されます。対応可能カレンダーとは連動しません。人数の上限もありません。</p>
           {s.accepting && !approved ? <p className="text-xs text-amber-300">特商法の表記が承認されるまで、選手側には公開されません。<Link href="/coach/commerce" className="underline">特商法・身元</Link>で、このサービスの表記を承認してください。</p> : null}
           {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
           {saved ? <p role="status" className="text-sm text-emerald-300">保存しました</p> : null}

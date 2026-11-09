@@ -41,13 +41,7 @@ func (q *Queries) DeletePastCoachAvailability(ctx context.Context, arg DeletePas
 }
 
 const hasPublicAvailabilityPlan = `-- name: HasPublicAvailabilityPlan :one
-SELECT (EXISTS (
-    SELECT 1 FROM support_consult_settings st
-    JOIN coach_profiles c ON c.profile_id = st.coach_id
-    WHERE st.coach_id = $1 AND st.accepting
-      AND c.status = 'approved' AND c.pledge_version >= $2::smallint
-      AND 'competition_support' = ANY(c.service_types)
-) OR EXISTS (
+SELECT EXISTS (
     SELECT 1 FROM coaching_plans pl
     JOIN coach_profiles c ON c.profile_id = pl.coach_id
     WHERE pl.coach_id = $1 AND pl.published
@@ -56,7 +50,7 @@ SELECT (EXISTS (
       AND pl.service_type = ANY(c.service_types)
       AND (pl.service_type <> 'competition_support' OR
           (pl.competition_date >= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
-))::boolean
+)::boolean
 `
 
 type HasPublicAvailabilityPlanParams struct {
@@ -69,43 +63,6 @@ func (q *Queries) HasPublicAvailabilityPlan(ctx context.Context, arg HasPublicAv
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const listAvailabilityForCoaches = `-- name: ListAvailabilityForCoaches :many
-SELECT coach_id, day, status, note, updated_at FROM coach_availability
-WHERE coach_id = ANY($1::uuid[]) AND day >= $2::date AND day < $2::date + 21
-ORDER BY coach_id, day
-`
-
-type ListAvailabilityForCoachesParams struct {
-	CoachIds []uuid.UUID `json:"coach_ids"`
-	Today    time.Time   `json:"today"`
-}
-
-func (q *Queries) ListAvailabilityForCoaches(ctx context.Context, arg ListAvailabilityForCoachesParams) ([]CoachAvailability, error) {
-	rows, err := q.db.Query(ctx, listAvailabilityForCoaches, arg.CoachIds, arg.Today)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []CoachAvailability
-	for rows.Next() {
-		var i CoachAvailability
-		if err := rows.Scan(
-			&i.CoachID,
-			&i.Day,
-			&i.Status,
-			&i.Note,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listCoachAvailability = `-- name: ListCoachAvailability :many
