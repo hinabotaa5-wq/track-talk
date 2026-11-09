@@ -153,6 +153,90 @@ WHERE r.created_at >= sqlc.arg(since)::timestamptz
 GROUP BY r.event
 ORDER BY requests DESC, r.event;
 
+-- name: AdminSenseNoteOverview :one
+-- 感覚メモの全体像。件数と人数と最初・最後の記録日だけを返し、本文やアカウントは返さない。
+-- 削除・退会のぶんは減ったあとの現在値をそのまま出す。
+SELECT
+    (SELECT count(*) FROM sense_notes)::bigint AS total,
+    (SELECT count(DISTINCT author_id) FROM sense_notes)::bigint AS authors,
+    (SELECT count(DISTINCT s.author_id) FROM sense_notes s JOIN profiles p ON p.id = s.author_id WHERE NOT p.is_admin)::bigint AS non_admin_authors,
+    (SELECT count(*) FROM profiles)::bigint AS profiles,
+    (SELECT count(*) FROM profiles WHERE NOT is_admin)::bigint AS non_admin_profiles,
+    (SELECT COALESCE(min(day), '0001-01-01'::date) FROM sense_notes)::date AS first_day,
+    (SELECT COALESCE(max(day), '0001-01-01'::date) FROM sense_notes)::date AS last_day;
+
+-- name: AdminSenseNoteBuckets :one
+-- 1人あたりの件数の分布（人数のみ）。
+WITH per_author AS (
+    SELECT author_id, count(*) AS cnt FROM sense_notes GROUP BY author_id
+)
+SELECT
+    count(*) FILTER (WHERE cnt = 1)::bigint AS one,
+    count(*) FILTER (WHERE cnt BETWEEN 2 AND 4)::bigint AS two_four,
+    count(*) FILTER (WHERE cnt BETWEEN 5 AND 9)::bigint AS five_nine,
+    count(*) FILTER (WHERE cnt >= 10)::bigint AS ten_plus
+FROM per_author;
+
+-- name: AdminSenseNoteActiveDays :one
+-- 書いた日数（同日の複数件は1日）の分布（人数のみ）。
+WITH per_author AS (
+    SELECT author_id, count(DISTINCT day) AS days FROM sense_notes GROUP BY author_id
+)
+SELECT
+    count(*) FILTER (WHERE days >= 2)::bigint AS days_2_plus,
+    count(*) FILTER (WHERE days >= 3)::bigint AS days_3_plus,
+    count(*) FILTER (WHERE days >= 7)::bigint AS days_7_plus
+FROM per_author;
+
+-- name: AdminSenseNoteRepeat :one
+-- 初回日から7日・28日以内のリピート。分母は期間が経過した著者のみ。
+-- day は製品上の「書いた日」（JSTの日付）で比べる。
+WITH firsts AS (
+    SELECT author_id, min(day) AS first_day FROM sense_notes GROUP BY author_id
+)
+SELECT
+    (SELECT count(*) FROM firsts WHERE first_day <= sqlc.arg(today)::date - 7)::bigint AS d7_total,
+    (SELECT count(*) FROM firsts f WHERE f.first_day <= sqlc.arg(today)::date - 7 AND EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = f.author_id AND s.day > f.first_day AND s.day <= f.first_day + 7))::bigint AS d7_repeat,
+    (SELECT count(*) FROM firsts WHERE first_day <= sqlc.arg(today)::date - 28)::bigint AS d28_total,
+    (SELECT count(*) FROM firsts f WHERE f.first_day <= sqlc.arg(today)::date - 28 AND EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = f.author_id AND s.day > f.first_day AND s.day <= f.first_day + 28))::bigint AS d28_repeat;
+
+-- name: AdminSenseNoteCohorts :many
+-- 初回日の属する週（月曜始まり）ごとの定着。翌週は初回週+7日〜+14日未満、翌週以降は初回週+7日以降。
+WITH firsts AS (
+    SELECT author_id, min(day) AS first_day FROM sense_notes GROUP BY author_id
+),
+cohorts AS (
+    SELECT author_id, date_trunc('week', first_day::timestamp)::date AS week_start FROM firsts
+)
+SELECT
+    c.week_start::date AS week_start,
+    count(*)::bigint AS authors,
+    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = c.author_id AND s.day >= c.week_start + 7 AND s.day < c.week_start + 14))::bigint AS next_week,
+    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM sense_notes s WHERE s.author_id = c.author_id AND s.day >= c.week_start + 7))::bigint AS since_next_week
+FROM cohorts c
+GROUP BY c.week_start
+ORDER BY c.week_start DESC;
+
+-- name: AdminSenseNoteWeekly :many
+-- 週ごとの件数と利用者数。週は月曜始まり、書いた日（JSTの日付）で分ける。
+SELECT
+    date_trunc('week', day::timestamp)::date AS week_start,
+    count(*)::bigint AS notes,
+    count(DISTINCT author_id)::bigint AS authors
+FROM sense_notes
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- name: AdminSenseNoteMonthly :many
+-- 月ごとの件数と利用者数。書いた日（JSTの日付）で分ける。
+SELECT
+    date_trunc('month', day::timestamp)::date AS month,
+    count(*)::bigint AS notes,
+    count(DISTINCT author_id)::bigint AS authors
+FROM sense_notes
+GROUP BY 1
+ORDER BY 1 DESC;
+
 -- name: AdminContractDemand :many
 -- 期間内に申し込まれたパーソナル指導を種目ごとに。始まった(期間中・終了)、断られた・期限切れ・取り消しを分けて数える。
 SELECT
