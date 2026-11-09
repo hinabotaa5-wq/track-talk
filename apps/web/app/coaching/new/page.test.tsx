@@ -72,3 +72,29 @@ it("デモの招待コード画面には販売者の表記とリンクを出さ�
   expect(container.textContent).not.toContain("販売者:");
   expect(container.querySelector('a[href="/terms"], a[href="/legal/commerce"]')).toBeNull();
 });
+
+async function renderWithTickets(canPurchase: boolean) {
+  mocks.me = { demo: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 2, reserved: 0 }, can_purchase: canPurchase };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 1500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+}
+
+it("チケットを持っていても申込画面に残高は出さず、チケット払いの選択肢は残す", async () => {
+  await renderWithTickets(false);
+  expect(container.textContent).not.toContain("チケット残高");
+  expect(container.textContent).not.toContain("残高・履歴");
+  expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("コーチングチケット");
+  expect(container.textContent).toContain("チケット（2枚）");
+});
+
+it("販売中のチケット持ちには購入・確認の入口を残す", async () => {
+  await renderWithTickets(true);
+  expect(container.textContent).not.toContain("チケット残高");
+  expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("チケットを購入・確認する");
+});
