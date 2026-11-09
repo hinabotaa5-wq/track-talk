@@ -8,6 +8,8 @@ export type Consultation = {
   question: string; answer: string; video_public_id: string | null; video_url: string | null; answer_video_url: string | null;
   clarify_body: string | null; clarification: string | null; clarify_requested_at: string | null; clarified_at: string | null;
   answered_at: string | null; respond_by: string | null; answer_by: string | null; expires_at: string; created_at: string; purged: boolean; hidden: boolean;
+  // 保存期間（添削の相談は終わりから7日、契約の相談は30日）を過ぎて動画ファイルを消した。
+  videos_purged?: boolean;
   // フォーム添削の追加相談で、コーチにだけ付く取引条件。引き受ける前は terms、引き受けた後は work_order。
   terms?: WorkOrderTerms; work_order?: WorkOrder;
 };

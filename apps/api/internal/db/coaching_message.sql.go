@@ -27,21 +27,6 @@ func (q *Queries) CoachingVideoInUse(ctx context.Context, publicID string) (bool
 	return in_use, err
 }
 
-const contractHasOpenReport = `-- name: ContractHasOpenReport :one
-SELECT EXISTS (
-    SELECT 1 FROM reports rp JOIN coaching_messages m ON m.id = rp.target_id
-    WHERE rp.target_type = 'coaching_message' AND rp.status = 'open' AND m.contract_id = $1
-)::bool
-`
-
-// やりとり欄に未対応の通報がある（紛争・通報の対応中は、閲覧の期限を過ぎても閉じずに保全する）。
-func (q *Queries) ContractHasOpenReport(ctx context.Context, contractID uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, contractHasOpenReport, contractID)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countBlockedContact = `-- name: CountBlockedContact :exec
 INSERT INTO coaching_blocked_counts (contract_id, profile_id, count)
 VALUES ($1, $2, 1)

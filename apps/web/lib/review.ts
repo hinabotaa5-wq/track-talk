@@ -109,3 +109,8 @@ export function videoDuration(file: File): Promise<number | null> {
 export function tooLong(seconds: number | null) {
   return seconds !== null && seconds > maxReviewSeconds + secondsSlop;
 }
+
+// 動画添削の動画ファイルの保存期間（運営者決定 2026-11-10、本体 #506）。スレッドの終わり（返却と「わからなかった」の
+// 確認の往復が終わった時。確認を頼まなかったときは、頼める返却から7日が過ぎた時）から7日で、依頼の動画とコーチの見本動画を消す。
+export const reviewVideoRetentionDays = 7;
+export const reviewVideosPurgedNote = `動画は保存期間（添削のやりとりが終わってから${reviewVideoRetentionDays}日）を過ぎたため削除しました。添削の文章は引き続き見られます。`;

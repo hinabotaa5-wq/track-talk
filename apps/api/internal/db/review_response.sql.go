@@ -79,7 +79,7 @@ func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID uuid.UUID) 
 }
 
 const getCoachReviewRequest = `-- name: GetCoachReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status IN ('in_review', 'needs_info', 'returned', 'clarifying')
@@ -123,6 +123,8 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -340,7 +342,7 @@ SET status = 'returned',
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status = 'clarifying'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type MarkReviewClarifiedParams struct {
@@ -381,6 +383,8 @@ func (q *Queries) MarkReviewClarified(ctx context.Context, arg MarkReviewClarifi
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -393,7 +397,7 @@ WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
   AND returned_at > now()-interval '7 days'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type MarkReviewClarifyingParams struct {
@@ -434,6 +438,8 @@ func (q *Queries) MarkReviewClarifying(ctx context.Context, arg MarkReviewClarif
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -447,7 +453,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'in_review'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type MarkReviewReturnedParams struct {
@@ -489,6 +495,8 @@ func (q *Queries) MarkReviewReturned(ctx context.Context, arg MarkReviewReturned
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }

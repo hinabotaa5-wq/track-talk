@@ -17,7 +17,7 @@ import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
-import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels } from "@/lib/review";
+import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
 import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -317,6 +317,8 @@ function ReviewRequestView() {
           preload="metadata"
           className="w-full rounded-xl bg-black"
         />
+      ) : request.videos_purged ? (
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">{reviewVideosPurgedNote}</p>
       ) : null}
 
       {request.response ? (

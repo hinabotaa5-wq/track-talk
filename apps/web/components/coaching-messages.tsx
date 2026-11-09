@@ -11,7 +11,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { apiDownloadText, apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingSupport } from "@/lib/coaching-support";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
@@ -19,7 +19,9 @@ import { useActionLock } from "@/lib/use-action-lock";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 // パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも作って送れる。
-// 終わったあとは90日間だけ読める（送信不可）。終了時に文章とメニューをダウンロードできる。
+// 契約が終わった時点（満了・途中終了とも）で、選手・コーチ・保護者のだれからも見られなくなる。終わるまでのあいだに、
+// 選手とコーチは文章とメニューをダウンロードできる。通報・紛争の対応中は、対応が終わるまで閉じずに読むだけにする。
+// 動画ファイルは契約の終わりから30日で削除する（運営者決定 2026-11-10、本体 #506）。
 // 18歳未満のときは保護者がリンクから読む（送信はできない）。相手の1通ごとに通報できる。
 // リアルタイムではないので、開いている間は30秒ごとと、画面に戻ったときに読み直す。
 
@@ -112,6 +114,7 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
         </p>
         {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">この動画への回答</a> : null}
         {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
+        {message.video_purged ? <p className="text-xs text-slate-300">動画は保存期間（契約の終わりから30日）を過ぎたため削除しました。</p> : null}
         {message.video_url ? (
           <video
             src={message.video_url}
@@ -370,10 +373,10 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
 export const replyGuideline = "コーチからの返答は24時間以内を目安としています。";
 export const coachReplyGuideline = "選手への返答は24時間以内を目安にしてください（目安で、期限ではありません）。";
 
-// 終わったあとに読める期限の案内。
-function viewUntilNote(until: string | null | undefined): string {
-  if (!until) return "終わってから90日間は読むことだけができ、その後は見られなくなります。";
-  return `${formatDate(until)}まで読むことだけができ（送信はできません）、その後は見られなくなります。`;
+// 期間中に出す、終わったら見られなくなることの案内。保護者はダウンロードできないので、ダウンロードの案内は出さない。
+function closeNote(until: string | null | undefined, guardian: boolean): string {
+  const when = until ? `${formatDateTime(until)}に契約が終わると` : "契約が終わると";
+  return `${when}、このやりとりは見られなくなります（選手・コーチ・保護者とも）。${guardian ? "" : "必要なら、終わる前に文章とメニューをダウンロードしてください。"}`;
 }
 
 // DownloadChat は、やりとり（文章とメニュー）をテキストで保存する。動画は含めない。
@@ -476,9 +479,10 @@ export function CoachingMessages({
       </div>
     );
   }
-  const readOnlyNote = viewUntilNote(contract.messages_view_until);
   const isGuardian = Boolean(guardianToken) || contract.role === "guardian";
   const ended = contract.status === "ended" || contract.status === "refunded";
+  // 終わったあとに読めるのは、通報・紛争の対応中で保全しているときだけ。
+  const preservedNote = "通報・紛争の対応中のため、対応が終わるまで読むことだけができます。";
   return (
     <div className="space-y-4">
       <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
@@ -488,10 +492,10 @@ export function CoachingMessages({
             ? "保護者もやりとりを見ることができます（保護者は送信できません）。通報があったときだけ、運営が確認します。"
             : "このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。"}
         {contract.status === "active" ? ` ${contract.role === "coach" ? coachReplyGuideline : replyGuideline}` : ""}
-        {contract.status === "active" ? " 契約が終わった後も90日間は読むことができ、その後は見られなくなります。" : ""}
+        {contract.status === "active" || contract.status === "suspended" ? ` ${closeNote(contract.messages_view_until, isGuardian)}` : ""}
       </p>
       {viewClosed ? (
-        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">終わってから90日を過ぎたので、このやりとりは見られません。</p>
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">契約が終わったので、このやりとりは見られません。</p>
       ) : null}
       <section className="space-y-2" aria-label="やりとり">
         {messages === null && !error ? <PageLoading label="読み込み中..." /> : null}
@@ -513,7 +517,7 @@ export function CoachingMessages({
       </section>
       {contract.status === "active" && !coachingMessagingEnabled ? (
         <p className="text-sm text-slate-300">{messagingClosedNote}</p>
-      ) : contract.status === "active" && isGuardian ? null : contract.status === "active" ? (
+      ) : viewClosed ? null : contract.status === "active" && isGuardian ? null : contract.status === "active" ? (
         <Composer contract={contract} access={access} onSent={(m) => {
             loadSeq.current++;
             setMessages((list) => [...(list ?? []), m]);
@@ -522,12 +526,10 @@ export function CoachingMessages({
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
           運営が確認のため、やりとりを止めています。{contract.fulfillment_version === 1 ? "大会日までは延長せず、未提供分は回数に応じて返金します。" : "止めている日数の分、期間はあとで延びます。"}
         </p>
-      ) : contract.status === "refunded" ? (
-        <p className="text-sm text-slate-300">返金して終了したので、読むだけになりました。{readOnlyNote}</p>
-      ) : (
-        <p className="text-sm text-slate-300">期間が終わったので、読むだけになりました。{readOnlyNote}</p>
-      )}
-      {ended && !viewClosed && !isGuardian && messages && messages.length > 0 ? <DownloadChat contract={contract} token={token} /> : null}
+      ) : ended ? (
+        <p className="text-sm text-slate-300">{contract.status === "refunded" ? "返金して終了しました。" : "期間が終わりました。"}{preservedNote}</p>
+      ) : null}
+      {!viewClosed && !isGuardian && messages && messages.length > 0 ? <DownloadChat contract={contract} token={token} /> : null}
       {contract.status === "ended" && contract.role === "requester" ? (
         <RatingForm
           contract={contract}

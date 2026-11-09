@@ -556,8 +556,10 @@ export type CoachingContract = PlanIncludes & {
   created_at: string;
   // 保存期間（期間の終わりから1年）を過ぎて、やりとりを消した日時。
   messages_purged_at: string | null;
-  // 終わった契約のやりとりを読める期限（終わってから90日）。期間中は null。
+  // やりとり欄が見られなくなる時刻（契約の終わり）。期間が決まる前は null。
   messages_view_until?: string | null;
+  // 契約の終わりから30日を過ぎて、やりとり欄の動画ファイルを消した日時。
+  videos_purged_at?: string | null;
   role?: "requester" | "coach" | "guardian";
   rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };
@@ -632,6 +634,8 @@ export type CoachingMessage = {
   body: string;
   video_url: string | null;
   thumbnail_url: string | null;
+  // 契約の終わりから30日を過ぎて動画ファイルを消した（保全で読める場合だけ返る）。
+  video_purged?: boolean;
   menu: PlanMenu | null;
   created_at: string;
 };
@@ -737,8 +741,10 @@ export type ReviewRequest = {
   status: ReviewStatus;
   due_at: string;
   created_at: string;
-  video_url: string;
-  thumbnail_url: string;
+  // スレッドの終わりから7日を過ぎて、動画ファイル（依頼の動画とコーチの見本動画）を消した後は null。
+  video_url: string | null;
+  thumbnail_url: string | null;
+  videos_purged?: boolean;
   // コーチが内容確認のために差し戻したときだけ入る。
   info_request?: ReviewInfoRequest | null;
   // コーチが引受後に辞退したときだけ入る。

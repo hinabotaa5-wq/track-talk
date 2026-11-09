@@ -26,7 +26,7 @@ func (q *Queries) DeleteUnpaidSupportAdvances(ctx context.Context, contractID uu
 const endSupportWithoutRefund = `-- name: EndSupportWithoutRefund :one
 UPDATE coaching_contracts SET status = 'ended', ends_at = LEAST(COALESCE(ends_at, now()), now()), updated_at = now()
 WHERE id = $1
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold, videos_purged_at, retention_hold_at, close_notice_at
 `
 
 // 未経過分が無い（目標大会の日に終えた等）ときは、返金せずに終える。
@@ -89,6 +89,9 @@ func (q *Queries) EndSupportWithoutRefund(ctx context.Context, id uuid.UUID) (Co
 		&i.SupportEndCause,
 		&i.SupportEndOn,
 		&i.SupportCoachHold,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.CloseNoticeAt,
 	)
 	return i, err
 }
@@ -373,7 +376,7 @@ func (q *Queries) InsertSupportSettlement(ctx context.Context, arg InsertSupport
 
 const listSupportAdvanceCandidates = `-- name: ListSupportAdvanceCandidates :many
 
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, ct.support_end_cause, ct.support_end_on, ct.support_coach_hold, COALESCE((SELECT sum(a.amount_yen) FROM support_coach_advances a WHERE a.contract_id = ct.id), 0)::int AS advanced_yen
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, ct.support_end_cause, ct.support_end_on, ct.support_coach_hold, ct.videos_purged_at, ct.retention_hold_at, ct.close_notice_at, COALESCE((SELECT sum(a.amount_yen) FROM support_coach_advances a WHERE a.contract_id = ct.id), 0)::int AS advanced_yen
 FROM coaching_contracts ct
 WHERE ct.fulfillment_version = 1 AND ct.video_reviews = 0 AND ct.service_type = 'competition_support'
   AND ct.status = 'active' AND ct.fulfillment_state = 'open' AND NOT ct.support_coach_hold
@@ -439,6 +442,9 @@ type ListSupportAdvanceCandidatesRow struct {
 	SupportEndCause                *string     `json:"support_end_cause"`
 	SupportEndOn                   *time.Time  `json:"support_end_on"`
 	SupportCoachHold               bool        `json:"support_coach_hold"`
+	VideosPurgedAt                 *time.Time  `json:"videos_purged_at"`
+	RetentionHoldAt                *time.Time  `json:"retention_hold_at"`
+	CloseNoticeAt                  *time.Time  `json:"close_notice_at"`
 	AdvancedYen                    int32       `json:"advanced_yen"`
 }
 
@@ -510,6 +516,9 @@ func (q *Queries) ListSupportAdvanceCandidates(ctx context.Context, throughEnd t
 			&i.SupportEndCause,
 			&i.SupportEndOn,
 			&i.SupportCoachHold,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
+			&i.CloseNoticeAt,
 			&i.AdvancedYen,
 		); err != nil {
 			return nil, err
@@ -523,7 +532,7 @@ func (q *Queries) ListSupportAdvanceCandidates(ctx context.Context, throughEnd t
 }
 
 const listSupportFinalizations = `-- name: ListSupportFinalizations :many
-SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, ct.support_end_cause, ct.support_end_on, ct.support_coach_hold FROM coaching_contracts ct
+SELECT ct.id, ct.plan_id, ct.coach_id, ct.requester_id, ct.plan_kind, ct.plan_title, ct.duration_days, ct.price_yen, ct.event, ct.goal, ct.current_record, ct.message, ct.minor, ct.status, ct.respond_by, ct.responded_at, ct.starts_at, ct.ends_at, ct.created_at, ct.updated_at, ct.start_by, ct.suspended_at, ct.payment_required, ct.messages_purged_at, ct.video_reviews, ct.menu_updates, ct.reply_formats, ct.start_on_first_video, ct.clock_started_at, ct.service_type, ct.plan_description, ct.additional_consultation_price_yen, ct.competition_name, ct.competition_date, ct.support_start_date, ct.call_count, ct.call_minutes, ct.fulfillment_version, ct.fulfillment_state, ct.support_refund_amount_yen, ct.support_refund_attempt_id, ct.support_refund_reason, ct.delivered_video_count, ct.delivered_call_count, ct.venue_area, ct.venue_name, ct.session_count, ct.session_minutes, ct.travel_fee_yen, ct.max_participants, ct.delivered_session_count, ct.preferred_dates, ct.support_end_cause, ct.support_end_on, ct.support_coach_hold, ct.videos_purged_at, ct.retention_hold_at, ct.close_notice_at FROM coaching_contracts ct
 WHERE ct.fulfillment_version = 1 AND ct.video_reviews = 0 AND ct.service_type = 'competition_support'
   AND ct.status IN ('ended', 'refunded') AND ct.fulfillment_state = 'settled' AND NOT ct.support_coach_hold
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status IN ('paid', 'partially_refunded', 'refunded')
@@ -599,6 +608,9 @@ func (q *Queries) ListSupportFinalizations(ctx context.Context) ([]CoachingContr
 			&i.SupportEndCause,
 			&i.SupportEndOn,
 			&i.SupportCoachHold,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
+			&i.CloseNoticeAt,
 		); err != nil {
 			return nil, err
 		}
@@ -645,7 +657,7 @@ func (q *Queries) ObjectFaultDetermination(ctx context.Context, arg ObjectFaultD
 const releaseSupportHold = `-- name: ReleaseSupportHold :one
 UPDATE coaching_contracts SET support_end_cause = $1, support_coach_hold = false, updated_at = now()
 WHERE id = $2
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold, videos_purged_at, retention_hold_at, close_notice_at
 `
 
 type ReleaseSupportHoldParams struct {
@@ -712,6 +724,9 @@ func (q *Queries) ReleaseSupportHold(ctx context.Context, arg ReleaseSupportHold
 		&i.SupportEndCause,
 		&i.SupportEndOn,
 		&i.SupportCoachHold,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.CloseNoticeAt,
 	)
 	return i, err
 }
@@ -759,7 +774,7 @@ UPDATE coaching_contracts
 SET support_end_cause = $1, support_end_on = $2,
     support_coach_hold = $3, updated_at = now()
 WHERE id = $4
-RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold
+RETURNING id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold, videos_purged_at, retention_hold_at, close_notice_at
 `
 
 type SetSupportEndParams struct {
@@ -833,6 +848,9 @@ func (q *Queries) SetSupportEnd(ctx context.Context, arg SetSupportEndParams) (C
 		&i.SupportEndCause,
 		&i.SupportEndOn,
 		&i.SupportCoachHold,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.CloseNoticeAt,
 	)
 	return i, err
 }

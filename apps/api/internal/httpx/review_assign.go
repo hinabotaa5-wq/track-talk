@@ -418,9 +418,10 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"info_request":       infoRequestJSON(rr),
 		"withdrawal":         withdrawalJSON(rr),
 	}
+	out["videos_purged"] = rr.VideosPurgedAt != nil
 	if withVideo {
-		out["video_url"] = s.cloud.CoachingPlaybackURL(rr.VideoPublicID)
-		out["thumbnail_url"] = s.cloud.CoachingThumbnailURL(rr.VideoPublicID)
+		out["video_url"] = reviewVideoURL(rr, s.cloud.CoachingPlaybackURL)
+		out["thumbnail_url"] = reviewVideoURL(rr, s.cloud.CoachingThumbnailURL)
 	}
 	return out
 }

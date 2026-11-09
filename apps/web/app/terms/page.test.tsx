@@ -131,3 +131,14 @@ it("第8条：大会までプランの途中終了（7の2）と外部勧誘の�
   expect(html).toContain('value="10"');
   expect(html).toContain('value="11"');
 });
+
+it("動画のファイルの保存期間：フォーム添削はやりとりの終わりから7日、サポートプランは終了時点で見られなくなり動画は30日で削除", () => {
+  const review = article(6);
+  expect(review).toContain("フォーム添削などで送られた動画と、コーチの見本動画のファイルは、そのやりとりが終わってから7日で削除します");
+  expect(review).toContain("添削と回答の文章は、動画のファイルを削除した後も見られます");
+  const plan = article(8);
+  expect(plan).toContain("契約が終わった時点（期間の満了または途中での終了）で、利用者・コーチ・保護者のいずれからも見られなくなります");
+  expect(plan).toContain("契約が終わるまでのあいだに、利用者とコーチは文章とメニューをダウンロードできます");
+  expect(plan).toContain("やりとりの動画のファイルは、契約が終わってから30日で削除します");
+  expect(plan).toContain("対応が終わるまで保全します");
+});

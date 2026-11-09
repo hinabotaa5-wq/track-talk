@@ -17,8 +17,10 @@ import (
 )
 
 // パーソナル指導のやりとり欄。申し込んだ人とコーチが読み書きし、18歳未満のときは保護者がリンクから読む（送信はできない）。
-// 期間中だけ送れて、終わったあとは90日間だけ読める（送信不可）。終わった時に文章とメニューをダウンロードできる。
-// 90日を過ぎると読めなくなる。未対応の通報があるあいだは閉じずに保全する。リアルタイムにはせず、送ったら相手に Web Push で知らせる。
+// 期間中だけ読み書きでき、契約が終わった時点（満了・途中終了とも）で、選手・コーチ・保護者のだれからも見られなくなる
+// （運営者決定 2026-11-10、本体 #506）。終わるまでのあいだに、選手とコーチは文章とメニューをダウンロードできる。
+// 通報・紛争の対応中（未対応の通報、異議の申立ての再審査待ち、運営の保全ホールド）は閉じずに保全する。
+// リアルタイムにはせず、送ったら相手に Web Push で知らせる。
 // 文章とメニューは、利用者からもコーチからも連絡先らしい文字を止める。止めた文章は保存せず、回数だけ数える。
 
 const maxMessageRunes = 2000
@@ -145,40 +147,52 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, vie
 	return out
 }
 
-// chatViewDays は、契約が終わったあとにやりとり欄を読める日数（閲覧のみ）。
-const chatViewDays = 90
-
-// chatEndedAt は、契約が終わった時刻（期間の終わり、または途中で終えた時）。
-func chatEndedAt(ct db.CoachingContract) time.Time {
-	if ct.EndsAt != nil && ct.EndsAt.Before(ct.UpdatedAt) {
-		return *ct.EndsAt
+// chatClosesAt は、やりとり欄が見られなくなる時刻（契約が終わる時刻）。期間が決まっていなければ nil。
+// 期間中は終わる予定の時刻、終わった契約は終わった時刻（途中で終えたときは、その時）。
+func chatClosesAt(ct db.CoachingContract) *time.Time {
+	switch ct.Status {
+	case "active", "ended", "refunded":
+		return ct.EndsAt
 	}
-	return ct.UpdatedAt
+	return nil
 }
 
-// chatViewUntil は、終わった契約のやりとり欄を読める期限。期間中・始まる前は nil。
-func chatViewUntil(ct db.CoachingContract) *time.Time {
-	if ct.Status != "ended" && ct.Status != "refunded" {
-		return nil
+// chatEnded は、契約が終わったか。終わった印（ended・refunded）が付く前でも、期間中の契約は終わる時刻を過ぎたら終わりとみなす
+// （期限の処理は tick で数分おきに回るため）。止めている契約は、再開で期間を延ばすので時刻では閉じない。
+func chatEnded(ct db.CoachingContract, now time.Time) bool {
+	switch ct.Status {
+	case "ended", "refunded":
+		return true
+	case "active":
+		return ct.EndsAt != nil && !now.Before(*ct.EndsAt)
 	}
-	t := chatEndedAt(ct).AddDate(0, 0, chatViewDays)
-	return &t
+	return false
+}
+
+// withoutPurgedVideo は、契約の終わりから30日を過ぎて動画ファイルを消した後（保全で読める場合）に、動画の URL を外す。
+func withoutPurgedVideo(m map[string]any, purged bool) map[string]any {
+	if purged {
+		if _, ok := m["video_url"]; ok {
+			m["video_url"] = nil
+			m["thumbnail_url"] = nil
+			m["video_purged"] = true
+		}
+	}
+	return m
 }
 
 // messagesVisible は、やりとり欄を読める状態か。止めている間も、それまでのものは読める。
-// 終わったあとは90日まで。未対応の通報があるあいだは閉じない（保全）。
+// 終わったら閉じる。通報・紛争の対応中は閉じない（保全）。
 func (s *Server) messagesVisible(ctx context.Context, ct db.CoachingContract, now time.Time) (bool, error) {
 	switch ct.Status {
-	case "active", "suspended":
-		return true, nil
-	case "ended", "refunded":
+	case "active", "suspended", "ended", "refunded":
 	default:
 		return false, nil
 	}
-	if now.Before(*chatViewUntil(ct)) {
+	if !chatEnded(ct, now) {
 		return true, nil
 	}
-	return s.q.ContractHasOpenReport(ctx, ct.ID)
+	return s.q.ContractRetentionHeld(ctx, ct.ID)
 }
 
 func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, ct db.CoachingContract, viewer uuid.UUID, viewerRole string) {
@@ -188,7 +202,7 @@ func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, c
 		return
 	}
 	if !visible {
-		JSON(w, http.StatusOK, map[string]any{"messages": []any{}, "view_closed": ct.Status == "ended" || ct.Status == "refunded", "view_until": chatViewUntil(ct)})
+		JSON(w, http.StatusOK, map[string]any{"messages": []any{}, "view_closed": chatEnded(ct, time.Now()), "view_until": chatClosesAt(ct)})
 		return
 	}
 	msgs, err := s.q.ListCoachingMessages(r.Context(), ct.ID)
@@ -198,9 +212,9 @@ func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, c
 	}
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
-		out = append(out, s.coachingMessageJSON(m, viewer, viewerRole))
+		out = append(out, withoutPurgedVideo(s.coachingMessageJSON(m, viewer, viewerRole), ct.VideosPurgedAt != nil))
 	}
-	JSON(w, http.StatusOK, map[string]any{"messages": out, "view_closed": false, "view_until": chatViewUntil(ct)})
+	JSON(w, http.StatusOK, map[string]any{"messages": out, "view_closed": false, "view_until": chatClosesAt(ct)})
 }
 
 func (s *Server) listCoachingMessages(w http.ResponseWriter, r *http.Request) {
@@ -232,13 +246,13 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 		Error(w, http.StatusForbidden, "forbidden", "保護者のページからは、やりとりを見ることだけができます")
 		return
 	}
-	switch ct.Status {
-	case "active":
-	case "suspended":
+	switch {
+	case ct.Status == "active" && !chatEnded(ct, time.Now()):
+	case ct.Status == "suspended":
 		Error(w, http.StatusConflict, "conflict", "運営が確認のため、やりとりを止めています")
 		return
 	default:
-		Error(w, http.StatusConflict, "conflict", "期間中だけ送れます。終わったあとは90日間、読むことだけができます")
+		Error(w, http.StatusConflict, "conflict", "期間中だけ送れます。契約が終わると、やりとりは見られなくなります")
 		return
 	}
 	var req coachingMessageReq
@@ -478,8 +492,8 @@ func lockUnusedCoachingVideo(ctx context.Context, q *db.Queries, id, retained *s
 	return nil
 }
 
-// exportCoachingMessages は、やりとり（文章とメニュー）をテキストで渡す。読める期間のあいだ、申し込んだ本人とコーチがダウンロードできる。
-// 動画はダウンロードに含めない（読める期間のあいだ、画面で見られる）。
+// exportCoachingMessages は、やりとり（文章とメニュー）をテキストで渡す。契約が終わるまでのあいだ（保全中はそのあいだも）、
+// 申し込んだ本人とコーチがダウンロードできる。動画はダウンロードに含めない。
 func (s *Server) exportCoachingMessages(w http.ResponseWriter, r *http.Request) {
 	_, ct, _, ok := s.contractParty(w, r)
 	if !ok {
@@ -502,8 +516,8 @@ func (s *Server) exportCoachingMessages(w http.ResponseWriter, r *http.Request) 
 	labels := map[string]string{"requester": "選手", "coach": "コーチ", "guardian": "保護者"}
 	var b strings.Builder
 	b.WriteString("TrackTalk やりとりの記録\n" + ct.PlanTitle + "\n")
-	if until := chatViewUntil(ct); until != nil {
-		b.WriteString("画面で見られる期限: " + jstDateTime(*until) + "\n")
+	if until := chatClosesAt(ct); until != nil {
+		b.WriteString("画面で見られる期限（契約の終わり）: " + jstDateTime(*until) + "\n")
 	}
 	for _, m := range msgs {
 		b.WriteString("\n---\n" + jstDateTime(m.CreatedAt) + " " + labels[m.SenderRole] + "\n")

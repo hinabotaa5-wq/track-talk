@@ -292,13 +292,16 @@ func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 		"minor": c.Minor, "question": c.Question, "answer": c.Answer, "video_public_id": c.VideoPublicID, "video_url": nil, "answer_video_url": nil,
 		"clarify_body": c.ClarifyBody, "clarification": c.Clarification, "clarify_requested_at": c.ClarifyRequestedAt, "clarified_at": c.ClarifiedAt,
 		"respond_by": c.RespondBy, "answer_by": c.AnswerBy, "answered_at": c.AnsweredAt, "created_at": c.CreatedAt, "expires_at": c.ExpiresAt,
-		"purged": c.PurgedAt != nil, "hidden": c.HiddenAt != nil}
+		"purged": c.PurgedAt != nil, "hidden": c.HiddenAt != nil, "videos_purged": c.VideosPurgedAt != nil}
 	if c.HiddenAt != nil || c.PurgedAt != nil {
 		out["question"] = ""
 		out["answer"] = ""
 		out["video_public_id"] = nil
 		out["clarify_body"] = nil
 		out["clarification"] = nil
+		return out
+	}
+	if c.VideosPurgedAt != nil {
 		return out
 	}
 	if c.VideoPublicID != nil {

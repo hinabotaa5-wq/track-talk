@@ -38,7 +38,9 @@ describe("大会までプランの途中終了の表示", () => {
     expect(text).toContain("お支払いに使ったカードへ返金");
     expect(text).toContain("主催者が中止・延期を正式に発表した日");
     expect(text).toContain("振り替えや期間の延長はしません");
-    expect(text).toContain("90日間はチャットを見ることができます");
+    expect(text).toContain("契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります");
+    expect(text).toContain("終わるまでのあいだに、やりとり（文章とメニュー）をダウンロードできます");
+    expect(text).not.toContain("90日");
     expect(text).toContain("全額を返金します");
   });
 });

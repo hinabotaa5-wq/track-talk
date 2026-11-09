@@ -113,6 +113,56 @@ function RefundButtons({
   );
 }
 
+// RetentionHoldForm は、運営の保全ホールド。通報・紛争（チャージバックなど）の対応中に立て、対応を終えたら外す。
+// 立っている間は動画ファイルを消さず、サポートプランのやりとり欄は終わった後も閉じない。未対応の通報があるものは、立てなくても保全する。
+export function RetentionHoldForm({ token }: { token: string | null }) {
+  const [target, setTarget] = useState<"review" | "contract">("contract");
+  const [id, setId] = useState("");
+  const [message, setMessage] = useState("");
+  const { pending, acquire, release } = useActionLock();
+
+  async function run(hold: boolean) {
+    const value = id.trim();
+    if (!value) return;
+    if (!acquire()) return;
+    setMessage("");
+    try {
+      const out = await apiFetch<{ retention_hold_at: string | null; videos_purged_at: string | null }>("/v1/admin/coaching/retention-hold", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ target, id: value, hold }),
+      });
+      const state = out.retention_hold_at ? `保全中（${formatDateTime(out.retention_hold_at)}から）` : "保全していません";
+      setMessage(`${state}${out.videos_purged_at ? ` · 動画は${formatDateTime(out.videos_purged_at)}に削除済み` : ""}`);
+    } catch (err) {
+      setMessage(err instanceof ApiRequestError ? err.message : "できませんでした");
+    } finally {
+      release();
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h2 className="font-bold">動画とやりとりの保全</h2>
+      <p className="text-xs text-slate-300">
+        通報・紛争（チャージバックなど）の対応中に立て、対応を終えたら外してください。立っている間は動画ファイル（添削はやりとりの終わりから7日、サポートプランは契約の終わりから30日で消す）を消さず、サポートプランのやりとり欄は終わった後も閉じません。
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="保全の対象" value={target} onChange={(e) => setTarget(e.target.value as "review" | "contract")} className="rounded border border-white/25 bg-slate-900 p-2 text-sm">
+          <option value="contract">サポートプランの契約</option>
+          <option value="review">フォーム添削の依頼</option>
+        </select>
+        <input aria-label="対象の ID" value={id} onChange={(e) => setId(e.target.value)} placeholder="ID" className="min-w-0 flex-1 rounded border border-white/25 bg-slate-900 p-2 text-sm" />
+      </div>
+      <div className="flex gap-3">
+        <button type="button" disabled={pending} onClick={() => void run(true)} className="text-sm text-amber-200 underline">保全する</button>
+        <button type="button" disabled={pending} onClick={() => void run(false)} className="text-sm text-blue-300 underline">保全を外す</button>
+      </div>
+      {message ? <p className="text-xs text-slate-200">{message}</p> : null}
+    </section>
+  );
+}
+
 export function CoachingContractsAdmin({ token }: { token: string | null }) {
   const [data, setData] = useState<{ contracts: AdminCoachingContract[]; blocked_accounts: CoachingBlockedAccount[] } | null>(null);
   const [error, setError] = useState("");
@@ -188,6 +238,7 @@ export function CoachingContractsAdmin({ token }: { token: string | null }) {
           ))}
         </ul>
       </section>
+      <RetentionHoldForm token={token} />
       <section className="space-y-2">
         <h2 className="font-bold">連絡先の検出で止めた回数が多いアカウント</h2>
         <p className="text-xs text-slate-300">止めた文章は保存していません。回数だけです。</p>

@@ -126,7 +126,7 @@ func TestCoachingMessages(t *testing.T) {
 		t.Fatalf("coach view %+v", msgs)
 	}
 
-	// 終わったら読むだけ。利用者が1回だけ★をつけられる。
+	// 終わったら送れず、見られなくなる（本体 #506）。利用者が1回だけ★をつけられる。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/rating", tu, map[string]any{"stars": 5}); rec.Code != http.StatusConflict {
 		t.Fatalf("rate before end %d", rec.Code)
 	}
@@ -134,7 +134,7 @@ func TestCoachingMessages(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, path, tu, map[string]any{"body": "ありがとうございました"}); rec.Code != http.StatusConflict {
 		t.Fatalf("send after end %d", rec.Code)
 	}
-	if got := listMessages(t, h, tu, id); len(got) != 3 {
+	if got := listMessages(t, h, tu, id); len(got) != 0 {
 		t.Fatalf("read after end %d", len(got))
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/rating", tc, map[string]any{"stars": 5}); rec.Code != http.StatusForbidden {
