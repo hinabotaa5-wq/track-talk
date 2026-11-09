@@ -47,7 +47,7 @@ function MenuLink({ href, label, icon: Icon }: { href: string; label: string; ic
 }
 
 export default function MePage() {
-  const { session, profile, profileLoading, token, sessionLoading: loading } = useAuth();
+  const { session, profile, profileLoading, token, sessionLoading: loading, ensureProfile } = useAuth();
   const router = useRouter();
   const userId = session?.user?.id;
   const currentProfile = profile?.id === userId ? profile : null;
@@ -79,6 +79,11 @@ export default function MePage() {
       logoutLock.release();
     }
   }
+
+  // マイページを開いたとき、プロフィールが未取得のまま止まっていれば取り直す(#504)。
+  useEffect(() => {
+    if (userId) ensureProfile();
+  }, [userId, ensureProfile]);
 
   useEffect(() => {
     if (!loading && !session && !leaving.current) router.replace("/login");
