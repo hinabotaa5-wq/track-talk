@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
 func bornYearsAgo(n int) time.Time {
@@ -16,7 +17,11 @@ func bornYearsAgo(n int) time.Time {
 	return time.Date(now.Year()-n, now.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
-func day(offset int) string { return time.Now().AddDate(0, 0, offset).Format("2006-01-02") }
+// day は日本時間の日付を返す。アプリ側も日本時間で判定するため、
+// サーバーのタイムゾーン（CI は UTC）に引きずられないようにする。
+func day(offset int) string {
+	return time.Now().In(jst.Zone).AddDate(0, 0, offset).Format("2006-01-02")
+}
 
 // consultCoach は、大会までプランを担当し、無料相談を受け付けているコーチを作る。
 func consultCoach(t *testing.T, h http.Handler) (uuid.UUID, string) {
