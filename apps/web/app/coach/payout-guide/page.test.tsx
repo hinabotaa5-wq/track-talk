@@ -6,8 +6,10 @@ import CoachPayoutGuidePage from "./page";
 
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 
-it("考えずに入力できる形で業種・URL・商品説明を載せる", () => {
+it("そのまま入力できる形で業種・URL・商品説明を載せる", () => {
   const html = renderToStaticMarkup(<CoachPayoutGuidePage />);
+  expect(html).toContain("コピーして使ってください");
+  expect(html).not.toContain("考えずに");
   expect(html).toContain("個人事業主");
   expect(html).toContain("教育 ＞ その他の教育サービス");
   expect(html).toContain("https://track-talk.netlify.app");

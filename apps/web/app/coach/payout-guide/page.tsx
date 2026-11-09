@@ -81,7 +81,7 @@ export default function CoachPayoutGuidePage() {
       </Step>
 
       <Step n={3} title="ビジネスの詳細をそのまま入力する">
-        <p>「ビジネスの詳細」の画面では、下の3つをそのまま入力します。考えずにコピーして使ってください。</p>
+        <p>「ビジネスの詳細」の画面では、下の3つをそのまま入力します。コピーして使ってください。</p>
         <div className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-3">
           <div className="space-y-1">
             <p className="text-xs font-semibold text-slate-200">業種</p>
