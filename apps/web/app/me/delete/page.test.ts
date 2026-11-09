@@ -121,4 +121,22 @@ describe("DeleteAccountPage", () => {
     expect(link.className).toContain("text-blue-300");
     await view.unmount();
   });
+
+  it("keeps the withdraw link style and wording unchanged", async () => {
+    apiFetch.mockResolvedValueOnce({ application: { status: "approved" } });
+    apiFetch.mockResolvedValue({ auth_deleted: true });
+    const view = await renderPage();
+    await act(async () => {});
+    const notice = Array.from(view.div.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("コーチだけをやめたいときは"),
+    );
+    if (!notice) throw new Error("coaching notice missing");
+    // リンクは青文字＋下線のまま、文面は変えない（#468 の「やらないこと」の回帰網）。
+    const link = notice.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("/coach/withdraw");
+    expect(link?.className).toContain("text-blue-300");
+    expect(link?.className).toContain("underline");
+    expect(notice.textContent).toContain("送金が済んでから退会してください。");
+    await view.unmount();
+  });
 });
