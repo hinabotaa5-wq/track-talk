@@ -316,7 +316,8 @@ func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 		"ends_at":                           ct.EndsAt,
 		"created_at":                        ct.CreatedAt,
 		// 保存期間（終了から1年）を過ぎて、やりとりを消した日時。
-		"messages_purged_at": ct.MessagesPurgedAt,
+		"messages_purged_at":  ct.MessagesPurgedAt,
+		"messages_view_until": chatViewUntil(ct),
 		// 申し込んだ時点で、プランに書いてあった「何が返ってくるか」。
 		"video_reviews": ct.VideoReviews,
 		"menu_updates":  ct.MenuUpdates,
@@ -619,7 +620,7 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 		return len(ex) + len(starts), 0, err
 	}
 	for _, ct := range en {
-		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました", Tag: "contract-" + ct.ID.String()}
+		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました。やりとりは90日間見られます（送信はできません）。文章とメニューはダウンロードできます", Tag: "contract-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
 		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 		msg.URL = "/coach"

@@ -44,6 +44,15 @@ func TestCoachingMessagesPurgedAfterOneYear(t *testing.T) {
 
 	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'ended', starts_at = now() - interval '14 months', ends_at = now() - interval '13 months' WHERE id = ANY($1::uuid[])`, []string{old, reported})
 	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'ended', starts_at = now() - interval '12 months', ends_at = now() - interval '11 months' WHERE id = $1`, recent)
+	// 終わってから90日を過ぎると画面では見られない（データは1年までは残す）。
+	if got := listMessages(t, h, tu3, recent); len(got) != 0 {
+		t.Fatalf("recent visible after 90 days %+v", got)
+	}
+	var kept int
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_messages WHERE contract_id=$1`, []any{recent}, &kept)
+	if kept != 1 {
+		t.Fatalf("recent data %d", kept)
+	}
 
 	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"messages_purged":1`) {
 		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
@@ -58,8 +67,10 @@ func TestCoachingMessagesPurgedAfterOneYear(t *testing.T) {
 	if got := listMessages(t, h, tu2, reported); len(got) != 1 {
 		t.Fatalf("reported kept %+v", got)
 	}
-	if got := listMessages(t, h, tu3, recent); len(got) != 1 {
-		t.Fatalf("recent kept %+v", got)
+	var recentKept int
+	queryRowArgs(t, `SELECT count(*)::int FROM coaching_messages WHERE contract_id=$1`, []any{recent}, &recentKept)
+	if recentKept != 1 {
+		t.Fatalf("recent kept %d", recentKept)
 	}
 
 	// 運営が通報の対応を終えたら、次の tick で消す。

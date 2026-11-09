@@ -556,6 +556,8 @@ export type CoachingContract = PlanIncludes & {
   created_at: string;
   // 保存期間（期間の終わりから1年）を過ぎて、やりとりを消した日時。
   messages_purged_at: string | null;
+  // 終わった契約のやりとりを読める期限（終わってから90日）。期間中は null。
+  messages_view_until?: string | null;
   role?: "requester" | "coach" | "guardian";
   rating?: { stars: number; rated_at: string } | null;
   coach?: { id: string; nickname: string | null; photo_url: string };
@@ -617,7 +619,8 @@ export type CoachingAccessLog = {
 };
 
 // コーチが送る練習メニュー。
-export type PlanMenu = { title: string; days: { day: string; content: string }[] };
+// period は対象期間、note は全体への一言（今週の狙いなど）。どちらも任意。
+export type PlanMenu = { title: string; period?: string; note?: string; days: { day: string; content: string }[] };
 
 // パーソナル指導のやりとり欄の1通。
 export type CoachingMessage = {

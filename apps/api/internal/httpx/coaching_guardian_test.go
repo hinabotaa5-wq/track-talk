@@ -81,15 +81,11 @@ func TestCoachingGuardianParticipation(t *testing.T) {
 		t.Fatalf("consents %d", consents)
 	}
 
-	// 保護者も参加者として読み書きできる。動画と連絡先は送れない。
-	if rec := doJSON(t, h, http.MethodPost, gpath+"/messages", "", map[string]any{"body": "母です。よろしくお願いします。"}); rec.Code != http.StatusCreated {
-		t.Fatalf("guardian send %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, gpath+"/messages", "", map[string]any{"video_public_id": "track-talk-coaching/" + uuid.NewString()}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("guardian video %d", rec.Code)
-	}
-	if rec := doJSON(t, h, http.MethodPost, gpath+"/messages", "", map[string]any{"body": "LINE で連絡ください"}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("guardian contact %d", rec.Code)
+	// 保護者は読むだけ。文章・動画・連絡先のどれも送れない（API でも受け付けない）。
+	for _, body := range []map[string]any{{"body": "母です。よろしくお願いします。"}, {"video_public_id": "track-talk-coaching/" + uuid.NewString()}, {"body": "LINE で連絡ください"}} {
+		if rec := doJSON(t, h, http.MethodPost, gpath+"/messages", "", body); rec.Code != http.StatusForbidden {
+			t.Fatalf("guardian send %v %d", body, rec.Code)
+		}
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts/"+id+"/messages", tc, map[string]any{"body": "よろしくお願いします。"}); rec.Code != http.StatusCreated {
 		t.Fatalf("coach send %d", rec.Code)
@@ -104,18 +100,15 @@ func TestCoachingGuardianParticipation(t *testing.T) {
 		} `json:"messages"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &gview)
-	if len(gview.Messages) != 2 || !gview.Messages[0].Mine || !gview.Messages[0].Active || gview.Messages[1].Mine {
+	if len(gview.Messages) != 1 || gview.Messages[0].Mine || gview.Messages[0].SenderRole != "coach" {
 		t.Fatalf("guardian view %s", rec.Body.String())
 	}
-	if msgs := listMessages(t, h, tm, id); len(msgs) != 2 || msgs[0].SenderRole != "guardian" || msgs[0].Mine {
+	if msgs := listMessages(t, h, tm, id); len(msgs) != 1 || msgs[0].SenderRole != "coach" {
 		t.Fatalf("minor view %+v", msgs)
 	}
-	guardianMsg, coachMsg := gview.Messages[0].ID, gview.Messages[1].ID
+	coachMsg := gview.Messages[0].ID
 
 	// 通報。保護者は自分の書いたものを通報できない。返事に子の ID を入れない。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/messages/"+guardianMsg+"/report", "", map[string]any{"reason": "other"}); rec.Code != http.StatusNotFound {
-		t.Fatalf("guardian self report %d", rec.Code)
-	}
 	rec = doJSON(t, h, http.MethodPost, "/v1/guardian/"+gt+"/messages/"+coachMsg+"/report", "", map[string]any{"reason": "harassment", "detail": "気になる言い方です"})
 	if rec.Code != http.StatusCreated || strings.Contains(rec.Body.String(), "reporter") {
 		t.Fatalf("guardian report %d %s", rec.Code, rec.Body.String())
