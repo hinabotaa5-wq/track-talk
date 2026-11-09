@@ -79,7 +79,12 @@ it("サポートプランは、当事者・債権の帰属・代理受領・債�
 it("サポートプランの返金に伴う精算は、支払済みの報酬相当額の返還・次回以降の支払額からの控除と通知・内訳の説明を定める", () => {
   const text = article(9);
   expect(text).toContain("購入者への返金に伴う精算");
-  expect(text).toContain("その返金に対応する報酬相当額を返還しなければなりません");
+  expect(text).toContain("その返金に対応する報酬相当額を返還します");
+  // 大会までプラン：終了時に日割りで確定、月次は仮払い、コーチ都合は返金額の80%を上限に返還（没収ではなく精算）、返金まで留保。
+  expect(text).toContain("確定前の仮払いとします");
+  expect(text).toContain("債務不履行に基づく精算として、支払済みの仮払いを返還します");
+  expect(text).toContain("（返金額の80%）を上限とし");
+  expect(text).toContain("購入者への返金が終わるまで、その契約に係るコーチへの支払いを留めます");
   expect(text).toContain("次回以降の報酬その他の支払額から控除することができます");
   expect(text).toContain("控除の対象と金額をコーチに通知します");
   expect(text).toContain("運営者に内訳の説明を求めることができます");
@@ -111,4 +116,18 @@ it("未成年者の購入は、購入の都度の法定代理人の許可の申�
   expect(text).toContain("当該購入を取り消し、代金を返金します");
   expect(text).toContain("保護者を契約および支払いの当事者として取り扱います");
   for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
+});
+
+it("第8条：大会までプランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
+  const text = article(8);
+  expect(text).toContain("返金とキャンセル（大会までプラン以外）：大会までプラン以外のサポートプランの返金は");
+  expect(text).toContain("7の2. 大会までプランを途中で終える場合");
+  expect(text).toContain("(1) 解約料・違約金・キャンセル手数料はいただきません。");
+  expect(text).toContain("終える日は過ぎた日に数えます");
+  expect(text).toContain("主催者が正式に発表した日をもって契約を終えます");
+  expect(text).toContain("SNS・LINE などの本サービスの外の連絡手段へ誘うこと");
+  expect(text).toContain("確認は通報があった場合などに限ります");
+  const html = renderToStaticMarkup(<TermsPage />);
+  expect(html).toContain('value="10"');
+  expect(html).toContain('value="11"');
 });

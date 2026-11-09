@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
 import Link from "next/link";
 import { ArrowRight, Shuffle, UserRound, Trophy, MapPin } from "lucide-react";
 
@@ -43,6 +44,7 @@ export default function CoachAboutPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold">報酬について</h2>
         <p className="text-sm leading-relaxed text-slate-200">有料の依頼やプランで指導を提供すると、サービスの手数料を差し引いた報酬が記録されます。受け取り口座の登録、適用される手数料、報酬と送金の状況は、コーチ専用画面で確認できます。</p>
+        <SupportPlanCoachTerms />
       </section>
 
       <section className="space-y-3">

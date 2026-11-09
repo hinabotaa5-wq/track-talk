@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
@@ -216,6 +217,7 @@ export default function CoachApplyPage() {
           <p className="text-sm text-slate-200">
             TrackTalk で知り合った選手を LINE・SNS など外の連絡手段へ誘うこと、連絡先を交換すること、TrackTalk を通さずに直接取引することは禁止されています。
           </p>
+          <SupportPlanCoachTerms />
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">名前</span>
             <Input value={draft.name} maxLength={80} autoComplete="name" required
