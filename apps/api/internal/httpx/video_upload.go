@@ -67,6 +67,8 @@ func (s *Server) videoUploadStatus(w http.ResponseWriter, r *http.Request) {
 		writeVideoReadyError(w, err)
 		return
 	}
+	// 使える状態になったら、縮めずに保存した元ファイルを縮めた版へ置き換える（対象でなければ何もしない）。
+	s.shrinkOriginalSoon(req.PublicID)
 	JSON(w, http.StatusOK, map[string]bool{"ready": true})
 }
 

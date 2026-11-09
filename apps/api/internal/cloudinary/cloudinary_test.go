@@ -116,6 +116,7 @@ func TestReadyRejectsOversizedAndWrongFormat(t *testing.T) {
 func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 	var gotMethod string
 	transformations := map[string]string{}
+	tags := map[string]string{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || user != "key" || pass != "secret" {
@@ -125,6 +126,7 @@ func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 		gotMethod = r.Method
 		if err := r.ParseForm(); err == nil && r.Method == http.MethodPut {
 			transformations[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] = r.PostForm.Get("transformation")
+			tags[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] = r.PostForm.Get("tags")
 		}
 		if r.Method == http.MethodPost {
 			http.Error(w, "already exists", http.StatusBadRequest)
@@ -150,6 +152,10 @@ func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 	// 縮めない動画のプリセットは incoming 変換を持たない（同期処理の上限に当たらないように）。
 	if got, ok := transformations[VideoAsyncPreset]; !ok || got != "" {
 		t.Fatalf("async preset transformation %q (seen %v)", got, ok)
+	}
+	// 縮めない動画にだけ、置き換え待ちの印が付く。
+	if tags[VideoAsyncPreset] != OriginalTag || tags[VideoPreset] != "" || tags[ImagePreset] != "" {
+		t.Fatalf("tags %v", tags)
 	}
 }
 

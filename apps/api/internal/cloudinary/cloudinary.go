@@ -311,12 +311,13 @@ func (c Client) EnsureUploadPresets(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := c.ensurePreset(ctx, preset, formats, incomingFor(resource)); err != nil {
+		if err := c.ensurePreset(ctx, preset, formats, incomingFor(resource), ""); err != nil {
 			return err
 		}
 	}
 	// 縮めない動画のプリセット。配信用の変換は署名の eager で作る。
-	return c.ensurePreset(ctx, VideoAsyncPreset, VideoFormats, "")
+	// 縮めない動画には印（OriginalTag）を付け、元ファイルを縮めた版へ置き換える処理の対象にする（ShrinkOriginal）。
+	return c.ensurePreset(ctx, VideoAsyncPreset, VideoFormats, "", OriginalTag)
 }
 
 func incomingFor(resource string) string {
@@ -326,7 +327,7 @@ func incomingFor(resource string) string {
 	return ImageIncoming
 }
 
-func (c Client) ensurePreset(ctx context.Context, name, formats, transformation string) error {
+func (c Client) ensurePreset(ctx context.Context, name, formats, transformation, tags string) error {
 	values := url.Values{
 		"name":            {name},
 		"unsigned":        {"false"},
@@ -336,6 +337,9 @@ func (c Client) ensurePreset(ctx context.Context, name, formats, transformation 
 	}
 	if transformation != "" {
 		values.Set("transformation", transformation)
+	}
+	if tags != "" {
+		values.Set("tags", tags)
 	}
 	endpoint := c.base() + "/v1_1/" + url.PathEscape(c.Cloud) + "/upload_presets"
 	status, body, err := c.form(ctx, http.MethodPost, endpoint, values)

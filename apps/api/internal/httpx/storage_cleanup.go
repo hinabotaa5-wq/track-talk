@@ -25,6 +25,8 @@ type storageCleanupResult struct {
 	Consultations    int   `json:"consultations_purged"`
 	Messages         int   `json:"message_rooms_purged"`
 	Assets           int   `json:"unused_assets_deleted"`
+	// 縮めずに保存していた動画のうち、縮めた版へ置き換えた数（本体 #497）。
+	Originals int `json:"original_videos_replaced"`
 }
 
 // 日次の専用処理。コーチングの新規受付が閉じていても保存期限の処理は続ける。
@@ -92,8 +94,11 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 	if out.Messages, err = s.purgeCoachingMessages(ctx); err != nil {
 		return out, err
 	}
-	out.Assets, err = s.purgeUnusedStoredAssets(ctx, now.Add(-7*24*time.Hour))
-	return out, err
+	if out.Assets, err = s.purgeUnusedStoredAssets(ctx, now.Add(-7*24*time.Hour)); err != nil {
+		return out, err
+	}
+	out.Originals = s.shrinkPendingOriginals(ctx)
+	return out, nil
 }
 
 // 生きている投稿は非表示・保存年数にかかわらず保護する。ケガ・レビュー・指導も残す。
