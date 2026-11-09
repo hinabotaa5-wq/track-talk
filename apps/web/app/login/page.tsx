@@ -12,7 +12,6 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { useCaptcha } from "@/components/auth-captcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CoachApplyLink } from "@/components/coach-apply-link";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -104,9 +103,6 @@ export default function LoginPage() {
       </form>
       {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
       <GoogleSignInButton nextPath={safeNextPath(next)} />
-      {safeNextPath(next) === "/coach" ? (
-        <CoachApplyLink />
-      ) : null}
       <p className="text-sm">
         アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">登録</Link>
       </p>
