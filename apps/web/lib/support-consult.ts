@@ -210,8 +210,9 @@ export function supportProrationExample(priceYen: number, days: number) {
   return { total, elapsed, remaining, refund };
 }
 
-// 契約が終わったあとにチャットを見られる日数（閲覧のみ・送信はできない）。
-export const supportChatViewDays = 90;
+// 契約が終わったあと、チャットの動画ファイルを消すまでの日数（運営者決定 2026-11-10、本体 #506）。
+// チャット（文章・動画・メニュー）は、契約が終わった時点で見られなくなる。
+export const supportChatVideoRetentionDays = 30;
 
 // 提案画面と最終確認画面に出す、途中で終わる場合のお金とチャットの扱い。
 export function supportTermsLines(priceYen: number, days: number): { label: string; text: string }[] {
@@ -236,7 +237,7 @@ export function supportTermsLines(priceYen: number, days: number): { label: stri
     },
     {
       label: "契約後のチャット",
-      text: `コーチからの返答は24時間以内を目安としています。契約が終わった後も${supportChatViewDays}日間はチャットを見ることができます（送信はできません）。終了時にやりとり（文章とメニュー）をダウンロードできます。${supportChatViewDays}日を過ぎると見られなくなります。`,
+      text: `コーチからの返答は24時間以内を目安としています。チャット（文章・動画・メニュー）は、契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります。終わるまでのあいだに、やりとり（文章とメニュー）をダウンロードできます。終わる3日前にもお知らせします。動画のファイルは契約の終わりから${supportChatVideoRetentionDays}日で削除します。`,
     },
   ];
 }

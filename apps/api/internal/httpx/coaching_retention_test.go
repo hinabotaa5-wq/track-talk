@@ -44,7 +44,7 @@ func TestCoachingMessagesPurgedAfterOneYear(t *testing.T) {
 
 	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'ended', starts_at = now() - interval '14 months', ends_at = now() - interval '13 months' WHERE id = ANY($1::uuid[])`, []string{old, reported})
 	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'ended', starts_at = now() - interval '12 months', ends_at = now() - interval '11 months' WHERE id = $1`, recent)
-	// 終わってから90日を過ぎると画面では見られない（データは1年までは残す）。
+	// 終わったら画面では見られない（文章のデータは1年までは残す）。
 	if got := listMessages(t, h, tu3, recent); len(got) != 0 {
 		t.Fatalf("recent visible after 90 days %+v", got)
 	}

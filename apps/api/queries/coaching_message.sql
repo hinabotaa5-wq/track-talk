@@ -75,10 +75,3 @@ SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = sqlc.arg(p
 
 -- name: LockCoachingVideo :exec
 SELECT pg_advisory_xact_lock(hashtext('coaching-video:' || sqlc.arg(public_id)::text));
-
--- name: ContractHasOpenReport :one
--- やりとり欄に未対応の通報がある（紛争・通報の対応中は、閲覧の期限を過ぎても閉じずに保全する）。
-SELECT EXISTS (
-    SELECT 1 FROM reports rp JOIN coaching_messages m ON m.id = rp.target_id
-    WHERE rp.target_type = 'coaching_message' AND rp.status = 'open' AND m.contract_id = $1
-)::bool;

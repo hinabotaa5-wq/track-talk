@@ -20,7 +20,7 @@ WHERE id = $1
   AND coach_id = $2
   AND status = 'offered'
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type AcceptReviewRequestParams struct {
@@ -61,6 +61,8 @@ func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewReque
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -255,7 +257,7 @@ func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferPa
 const createReviewRequest = `-- name: CreateReviewRequest :one
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type CreateReviewRequestParams struct {
@@ -322,6 +324,8 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -487,7 +491,7 @@ func (q *Queries) ExpireUnresubmittedReviewRequests(ctx context.Context) ([]Expi
 }
 
 const getReviewRequest = `-- name: GetReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
 WHERE id = $1
 `
 
@@ -524,12 +528,14 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
 
 const listCoachOpenOffers = `-- name: ListCoachOpenOffers :many
-SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason
+SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason, r.videos_purged_at, r.retention_hold_at
 FROM review_offers o
 JOIN review_requests r ON r.id = o.request_id
 WHERE o.coach_id = $1
@@ -587,6 +593,8 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 			&i.ReviewRequest.WithdrawnBy,
 			&i.ReviewRequest.WithdrawnFromStatus,
 			&i.ReviewRequest.WithdrawReason,
+			&i.ReviewRequest.VideosPurgedAt,
+			&i.ReviewRequest.RetentionHoldAt,
 		); err != nil {
 			return nil, err
 		}
@@ -599,7 +607,7 @@ func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([
 }
 
 const listCoachReviewing = `-- name: ListCoachReviewing :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
 WHERE coach_id = $1::uuid
   AND (status IN ('in_review', 'clarifying')
        -- 差し戻し中の依頼も、再提出を待っていることが分かるように出す。
@@ -646,6 +654,8 @@ func (q *Queries) ListCoachReviewing(ctx context.Context, coachID uuid.UUID) ([]
 			&i.WithdrawnBy,
 			&i.WithdrawnFromStatus,
 			&i.WithdrawReason,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
 		); err != nil {
 			return nil, err
 		}
@@ -698,7 +708,7 @@ func (q *Queries) ListDemoCodes(ctx context.Context) ([]ListDemoCodesRow, error)
 }
 
 const listMyReviewRequests = `-- name: ListMyReviewRequests :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
 WHERE requester_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -749,6 +759,8 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 			&i.WithdrawnBy,
 			&i.WithdrawnFromStatus,
 			&i.WithdrawReason,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
 		); err != nil {
 			return nil, err
 		}
@@ -943,7 +955,7 @@ func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOff
 }
 
 const lockQueuedReviewRequest = `-- name: LockQueuedReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
 WHERE id = $1
   AND status = 'queued'
   AND due_at > now()
@@ -983,6 +995,8 @@ func (q *Queries) LockQueuedReviewRequest(ctx context.Context, id uuid.UUID) (Re
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -1108,7 +1122,7 @@ WHERE id = $4
   AND status IN ('offered', 'in_review')
   AND info_requested_at IS NULL
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type RequestReviewInfoParams struct {
@@ -1160,6 +1174,8 @@ func (q *Queries) RequestReviewInfo(ctx context.Context, arg RequestReviewInfoPa
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -1192,7 +1208,7 @@ WHERE id = $4
   AND requester_id = $5
   AND status = 'needs_info'
   AND resubmit_by > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type ResubmitReviewRequestParams struct {
@@ -1244,6 +1260,8 @@ func (q *Queries) ResubmitReviewRequest(ctx context.Context, arg ResubmitReviewR
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }
@@ -1381,7 +1399,7 @@ WHERE id = $3
   AND coach_id = $1::uuid
   AND (status = 'in_review' OR (status = 'needs_info' AND info_from_status = 'in_review'))
   AND returned_at IS NULL
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
 `
 
 type WithdrawReviewRequestParams struct {
@@ -1426,6 +1444,8 @@ func (q *Queries) WithdrawReviewRequest(ctx context.Context, arg WithdrawReviewR
 		&i.WithdrawnBy,
 		&i.WithdrawnFromStatus,
 		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
 	)
 	return i, err
 }

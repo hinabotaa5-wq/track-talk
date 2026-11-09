@@ -8,7 +8,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { reviewQuestionText } from "@/lib/review";
+import { reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
 import type { CoachRequests, CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -144,6 +144,8 @@ export function CoachRequestsSection({ token, view }: { token: string | null; vi
                 preload="metadata"
                 className="w-full rounded-lg bg-black"
               />
+            ) : request.videos_purged ? (
+              <p className="text-xs text-slate-300">{reviewVideosPurgedNote}</p>
             ) : null}
             <Link
               href={`/coach/requests/${request.id}`}

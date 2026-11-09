@@ -158,6 +158,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="w-full rounded-lg" /> : null}
       {c.answer ? <p className="whitespace-pre-wrap text-sm">コーチ：{c.answer}</p> : null}
       {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="w-full rounded-lg" /> : null}
+      {c.videos_purged ? <p className="text-xs text-slate-300">動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。</p> : null}
       {c.clarify_body ? <p className="whitespace-pre-wrap text-sm">回答への確認：{c.clarify_body}</p> : null}
       {c.clarification ? <p className="whitespace-pre-wrap text-sm">補足：{c.clarification}</p> : null}
       {c.status === "offered" && c.respond_by ? <p className="text-xs text-slate-300">受諾期限：{formatDateTime(c.respond_by)}</p> : null}

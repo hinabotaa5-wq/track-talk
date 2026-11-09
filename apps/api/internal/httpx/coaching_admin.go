@@ -106,7 +106,7 @@ func (s *Server) adminOpenCoachingContract(w http.ResponseWriter, r *http.Reques
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt, UpdatedAt: row.UpdatedAt, VideosPurgedAt: row.VideosPurgedAt, RetentionHoldAt: row.RetentionHoldAt,
 		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 		CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
@@ -116,7 +116,7 @@ func (s *Server) adminOpenCoachingContract(w http.ResponseWriter, r *http.Reques
 	c["requester"] = map[string]any{"nickname": row.RequesterNickname}
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
-		out = append(out, s.coachingMessageJSON(m, uuid.Nil, "admin"))
+		out = append(out, withoutPurgedVideo(s.coachingMessageJSON(m, uuid.Nil, "admin"), row.VideosPurgedAt != nil))
 	}
 	if logs == nil {
 		logs = []db.ListCoachingAccessLogsRow{}

@@ -85,11 +85,21 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
 		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
 		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
-		"video_url":     s.cloud.CoachingPlaybackURL(rr.VideoPublicID),
-		"thumbnail_url": s.cloud.CoachingThumbnailURL(rr.VideoPublicID),
+		"video_url":     reviewVideoURL(rr, s.cloud.CoachingPlaybackURL),
+		"thumbnail_url": reviewVideoURL(rr, s.cloud.CoachingThumbnailURL),
 		"info_request":  infoRequestJSON(rr),
 		"withdrawal":    withdrawalJSON(rr),
+		// スレッドの終わりから7日を過ぎて、動画ファイル（依頼の動画とコーチの見本動画）を消したか（本体 #506）。
+		"videos_purged": rr.VideosPurgedAt != nil,
 	}
+}
+
+// reviewVideoURL は、依頼の動画の URL。保持期間を過ぎて消した後は nil。
+func reviewVideoURL(rr db.ReviewRequest, url func(string) string) any {
+	if rr.VideosPurgedAt != nil {
+		return nil
+	}
+	return url(rr.VideoPublicID)
 }
 
 type coachDutyReq struct {

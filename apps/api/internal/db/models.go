@@ -297,6 +297,7 @@ type CoachingConsultation struct {
 	PurgedAt            *time.Time `json:"purged_at"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	VideosPurgedAt      *time.Time `json:"videos_purged_at"`
 }
 
 type CoachingConsultationAccessLog struct {
@@ -372,6 +373,9 @@ type CoachingContract struct {
 	SupportEndCause                *string     `json:"support_end_cause"`
 	SupportEndOn                   *time.Time  `json:"support_end_on"`
 	SupportCoachHold               bool        `json:"support_coach_hold"`
+	VideosPurgedAt                 *time.Time  `json:"videos_purged_at"`
+	RetentionHoldAt                *time.Time  `json:"retention_hold_at"`
+	CloseNoticeAt                  *time.Time  `json:"close_notice_at"`
 }
 
 type CoachingContractConsent struct {
@@ -1217,6 +1221,8 @@ type ReviewRequest struct {
 	WithdrawnBy         *uuid.UUID `json:"withdrawn_by"`
 	WithdrawnFromStatus *string    `json:"withdrawn_from_status"`
 	WithdrawReason      *string    `json:"withdraw_reason"`
+	VideosPurgedAt      *time.Time `json:"videos_purged_at"`
+	RetentionHoldAt     *time.Time `json:"retention_hold_at"`
 }
 
 type ReviewResponse struct {

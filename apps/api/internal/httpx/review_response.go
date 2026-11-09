@@ -87,7 +87,12 @@ func (s *Server) withResponse(ctx context.Context, out map[string]any, requestID
 	if err != nil {
 		return err
 	}
-	out["response"] = s.reviewResponseJSON(rs)
+	resp := s.reviewResponseJSON(rs)
+	// 動画ファイルを消した後は、コーチの見本動画も出さない。
+	if out["videos_purged"] == true {
+		resp["demo_video_url"] = nil
+	}
+	out["response"] = resp
 	rating, err := s.q.GetReviewRating(ctx, requestID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil

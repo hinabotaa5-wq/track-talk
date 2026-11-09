@@ -27,6 +27,8 @@ type storageCleanupResult struct {
 	Assets           int   `json:"unused_assets_deleted"`
 	// 縮めずに保存していた動画のうち、縮めた版へ置き換えた数（本体 #497）。
 	Originals int `json:"original_videos_replaced"`
+	// 保持期間（動画添削7日・サポートプラン30日）を過ぎて消した動画ファイル（本体 #506）。
+	Videos videoRetentionResult `json:"videos"`
 }
 
 // 日次の専用処理。コーチングの新規受付が閉じていても保存期限の処理は続ける。
@@ -92,6 +94,9 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 		return out, err
 	}
 	if out.Messages, err = s.purgeCoachingMessages(ctx); err != nil {
+		return out, err
+	}
+	if out.Videos, err = s.purgeExpiredVideos(ctx); err != nil {
 		return out, err
 	}
 	if out.Assets, err = s.purgeUnusedStoredAssets(ctx, now.Add(-7*24*time.Hour)); err != nil {

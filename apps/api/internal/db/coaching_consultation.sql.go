@@ -14,7 +14,7 @@ import (
 
 const acceptConsultation = `-- name: AcceptConsultation :one
 UPDATE coaching_consultations SET status='in_review',answer_by=now()+interval '72 hours',updated_at=now()
-WHERE id=$1 AND coach_id=$2 AND status='offered' AND respond_by>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND coach_id=$2 AND status='offered' AND respond_by>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type AcceptConsultationParams struct {
@@ -60,6 +60,7 @@ func (q *Queries) AcceptConsultation(ctx context.Context, arg AcceptConsultation
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -117,7 +118,7 @@ func (q *Queries) AdminConsultations(ctx context.Context) ([]AdminConsultationsR
 
 const answerConsultation = `-- name: AnswerConsultation :one
 UPDATE coaching_consultations SET status='answered',answer=$2,answer_video_public_id=$3,answered_at=now(),closed_at=now(),updated_at=now()
-WHERE id=$1 AND status='in_review' AND answer_by>now() AND hidden_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='in_review' AND answer_by>now() AND hidden_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type AnswerConsultationParams struct {
@@ -164,13 +165,14 @@ func (q *Queries) AnswerConsultation(ctx context.Context, arg AnswerConsultation
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const answerConsultationClarification = `-- name: AnswerConsultationClarification :one
 UPDATE coaching_consultations SET clarification=$2,clarified_at=now(),updated_at=now()
-WHERE id=$1 AND status='answered' AND clarify_body IS NOT NULL AND clarification IS NULL AND hidden_at IS NULL AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='answered' AND clarify_body IS NOT NULL AND clarification IS NULL AND hidden_at IS NULL AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type AnswerConsultationClarificationParams struct {
@@ -216,13 +218,14 @@ func (q *Queries) AnswerConsultationClarification(ctx context.Context, arg Answe
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const closeConsultation = `-- name: CloseConsultation :one
 UPDATE coaching_consultations SET status=$2,closed_at=now(),updated_at=now()
-WHERE id=$1 AND status IN ('draft','awaiting_payment','offered','in_review') RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status IN ('draft','awaiting_payment','offered','in_review') RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type CloseConsultationParams struct {
@@ -268,6 +271,7 @@ func (q *Queries) CloseConsultation(ctx context.Context, arg CloseConsultationPa
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -301,7 +305,7 @@ func (q *Queries) CountContractVideoSubmissions(ctx context.Context, contractID 
 
 const createConsultationDraft = `-- name: CreateConsultationDraft :one
 INSERT INTO coaching_consultations (id,requester_id,coach_id,request_key,review_request_id,contract_id,minor,funding,price_yen,share_percent,question,video_public_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type CreateConsultationDraftParams struct {
@@ -370,6 +374,7 @@ func (q *Queries) CreateConsultationDraft(ctx context.Context, arg CreateConsult
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -469,7 +474,7 @@ func (q *Queries) CreateGuardianConsultationReport(ctx context.Context, arg Crea
 }
 
 const getConsultation = `-- name: GetConsultation :one
-SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at FROM coaching_consultations WHERE id=$1
+SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at FROM coaching_consultations WHERE id=$1
 `
 
 func (q *Queries) GetConsultation(ctx context.Context, id uuid.UUID) (CoachingConsultation, error) {
@@ -510,12 +515,13 @@ func (q *Queries) GetConsultation(ctx context.Context, id uuid.UUID) (CoachingCo
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const getConsultationByKey = `-- name: GetConsultationByKey :one
-SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at FROM coaching_consultations WHERE requester_id=$1 AND request_key=$2
+SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at FROM coaching_consultations WHERE requester_id=$1 AND request_key=$2
 `
 
 type GetConsultationByKeyParams struct {
@@ -561,6 +567,7 @@ func (q *Queries) GetConsultationByKey(ctx context.Context, arg GetConsultationB
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -726,7 +733,7 @@ func (q *Queries) ListConsultationsToExpire(ctx context.Context) ([]uuid.UUID, e
 }
 
 const listConsultationsToPurge = `-- name: ListConsultationsToPurge :many
-SELECT c.id, c.requester_id, c.coach_id, c.request_key, c.review_request_id, c.contract_id, c.minor, c.funding, c.price_yen, c.share_percent, c.status, c.question, c.video_public_id, c.answer, c.answer_video_public_id, c.clarify_body, c.clarification, c.clarify_requested_at, c.clarified_at, c.respond_by, c.answer_by, c.answered_at, c.closed_at, c.expires_at, c.payment_state, c.checkout_session_id, c.checkout_url, c.session_expires_at, c.payment_intent_id, c.paid_at, c.hidden_at, c.purged_at, c.created_at, c.updated_at FROM coaching_consultations c WHERE c.purged_at IS NULL AND
+SELECT c.id, c.requester_id, c.coach_id, c.request_key, c.review_request_id, c.contract_id, c.minor, c.funding, c.price_yen, c.share_percent, c.status, c.question, c.video_public_id, c.answer, c.answer_video_public_id, c.clarify_body, c.clarification, c.clarify_requested_at, c.clarified_at, c.respond_by, c.answer_by, c.answered_at, c.closed_at, c.expires_at, c.payment_state, c.checkout_session_id, c.checkout_url, c.session_expires_at, c.payment_intent_id, c.paid_at, c.hidden_at, c.purged_at, c.created_at, c.updated_at, c.videos_purged_at FROM coaching_consultations c WHERE c.purged_at IS NULL AND
 ((c.status IN ('draft','cancelled') AND c.payment_state='unpaid' AND c.expires_at<now()
   AND NOT EXISTS(SELECT 1 FROM coaching_ticket_reservations t WHERE t.consultation_id=c.id))
  OR (c.status IN ('answered','declined','expired','cancelled')
@@ -790,6 +797,7 @@ func (q *Queries) ListConsultationsToPurge(ctx context.Context) ([]CoachingConsu
 			&i.PurgedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VideosPurgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -865,7 +873,7 @@ func (q *Queries) ListPendingConsultationRefunds(ctx context.Context) ([]Coachin
 }
 
 const listRoomConsultations = `-- name: ListRoomConsultations :many
-SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at FROM coaching_consultations
+SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at FROM coaching_consultations
 WHERE review_request_id=$1::uuid OR contract_id=$2::uuid
 ORDER BY created_at,id
 `
@@ -919,6 +927,7 @@ func (q *Queries) ListRoomConsultations(ctx context.Context, arg ListRoomConsult
 			&i.PurgedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VideosPurgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -931,7 +940,7 @@ func (q *Queries) ListRoomConsultations(ctx context.Context, arg ListRoomConsult
 }
 
 const lockConsultation = `-- name: LockConsultation :one
-SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at FROM coaching_consultations WHERE id=$1 FOR UPDATE
+SELECT id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at FROM coaching_consultations WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockConsultation(ctx context.Context, id uuid.UUID) (CoachingConsultation, error) {
@@ -972,12 +981,13 @@ func (q *Queries) LockConsultation(ctx context.Context, id uuid.UUID) (CoachingC
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const lockConsultationContract = `-- name: LockConsultationContract :one
-SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold FROM coaching_contracts WHERE id=$1 FOR UPDATE
+SELECT id, plan_id, coach_id, requester_id, plan_kind, plan_title, duration_days, price_yen, event, goal, current_record, message, minor, status, respond_by, responded_at, starts_at, ends_at, created_at, updated_at, start_by, suspended_at, payment_required, messages_purged_at, video_reviews, menu_updates, reply_formats, start_on_first_video, clock_started_at, service_type, plan_description, additional_consultation_price_yen, competition_name, competition_date, support_start_date, call_count, call_minutes, fulfillment_version, fulfillment_state, support_refund_amount_yen, support_refund_attempt_id, support_refund_reason, delivered_video_count, delivered_call_count, venue_area, venue_name, session_count, session_minutes, travel_fee_yen, max_participants, delivered_session_count, preferred_dates, support_end_cause, support_end_on, support_coach_hold, videos_purged_at, retention_hold_at, close_notice_at FROM coaching_contracts WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockConsultationContract(ctx context.Context, id uuid.UUID) (CoachingContract, error) {
@@ -1039,6 +1049,9 @@ func (q *Queries) LockConsultationContract(ctx context.Context, id uuid.UUID) (C
 		&i.SupportEndCause,
 		&i.SupportEndOn,
 		&i.SupportCoachHold,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.CloseNoticeAt,
 	)
 	return i, err
 }
@@ -1095,7 +1108,7 @@ const markConsultationPaid = `-- name: MarkConsultationPaid :one
 UPDATE coaching_consultations SET payment_state='paid',payment_intent_id=$2,paid_at=now(),checkout_session_id=COALESCE(checkout_session_id,$3),
 status=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN 'offered' ELSE 'expired' END,
 respond_by=now()+interval '48 hours',closed_at=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN NULL ELSE now() END,updated_at=now()
-WHERE id=$1 AND payment_state='unpaid' RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND payment_state='unpaid' RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type MarkConsultationPaidParams struct {
@@ -1142,6 +1155,7 @@ func (q *Queries) MarkConsultationPaid(ctx context.Context, arg MarkConsultation
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -1171,7 +1185,7 @@ func (q *Queries) RecordConsultationEarnings(ctx context.Context, id uuid.UUID) 
 
 const requestConsultationClarification = `-- name: RequestConsultationClarification :one
 UPDATE coaching_consultations SET clarify_body=$2,clarify_requested_at=now(),updated_at=now()
-WHERE id=$1 AND status='answered' AND answered_at>now()-interval '7 days' AND clarify_body IS NULL AND hidden_at IS NULL AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='answered' AND answered_at>now()-interval '7 days' AND clarify_body IS NULL AND hidden_at IS NULL AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type RequestConsultationClarificationParams struct {
@@ -1217,6 +1231,7 @@ func (q *Queries) RequestConsultationClarification(ctx context.Context, arg Requ
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -1254,7 +1269,7 @@ func (q *Queries) SaveConsultationRefund(ctx context.Context, arg SaveConsultati
 
 const setConsultationDraftFunding = `-- name: SetConsultationDraftFunding :one
 UPDATE coaching_consultations SET funding=$2,updated_at=now()
-WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type SetConsultationDraftFundingParams struct {
@@ -1301,6 +1316,7 @@ func (q *Queries) SetConsultationDraftFunding(ctx context.Context, arg SetConsul
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -1321,7 +1337,7 @@ func (q *Queries) SetConsultationPaymentState(ctx context.Context, arg SetConsul
 
 const setConsultationSessionExpiry = `-- name: SetConsultationSessionExpiry :one
 UPDATE coaching_consultations SET session_expires_at=$2,updated_at=now()
-WHERE id=$1 AND status='awaiting_payment' AND checkout_session_id IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='awaiting_payment' AND checkout_session_id IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type SetConsultationSessionExpiryParams struct {
@@ -1367,13 +1383,14 @@ func (q *Queries) SetConsultationSessionExpiry(ctx context.Context, arg SetConsu
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const startCashConsultationPayment = `-- name: StartCashConsultationPayment :one
 UPDATE coaching_consultations SET status='awaiting_payment',expires_at=now()+interval '72 hours',updated_at=now()
-WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 func (q *Queries) StartCashConsultationPayment(ctx context.Context, id uuid.UUID) (CoachingConsultation, error) {
@@ -1414,13 +1431,14 @@ func (q *Queries) StartCashConsultationPayment(ctx context.Context, id uuid.UUID
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
 
 const submitTicketConsultation = `-- name: SubmitTicketConsultation :one
 UPDATE coaching_consultations SET status='offered',respond_by=now()+interval '48 hours',updated_at=now()
-WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 func (q *Queries) SubmitTicketConsultation(ctx context.Context, id uuid.UUID) (CoachingConsultation, error) {
@@ -1461,6 +1479,7 @@ func (q *Queries) SubmitTicketConsultation(ctx context.Context, id uuid.UUID) (C
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }
@@ -1476,7 +1495,7 @@ func (q *Queries) TouchConsultationRefund(ctx context.Context, id uuid.UUID) err
 
 const updateConsultationDraft = `-- name: UpdateConsultationDraft :one
 UPDATE coaching_consultations SET question=$2,video_public_id=$3,updated_at=now()
-WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at
+WHERE id=$1 AND status='draft' AND expires_at>now() AND purged_at IS NULL RETURNING id, requester_id, coach_id, request_key, review_request_id, contract_id, minor, funding, price_yen, share_percent, status, question, video_public_id, answer, answer_video_public_id, clarify_body, clarification, clarify_requested_at, clarified_at, respond_by, answer_by, answered_at, closed_at, expires_at, payment_state, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, paid_at, hidden_at, purged_at, created_at, updated_at, videos_purged_at
 `
 
 type UpdateConsultationDraftParams struct {
@@ -1523,6 +1542,7 @@ func (q *Queries) UpdateConsultationDraft(ctx context.Context, arg UpdateConsult
 		&i.PurgedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VideosPurgedAt,
 	)
 	return i, err
 }

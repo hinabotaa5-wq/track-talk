@@ -316,8 +316,11 @@ func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 		"ends_at":                           ct.EndsAt,
 		"created_at":                        ct.CreatedAt,
 		// 保存期間（終了から1年）を過ぎて、やりとりを消した日時。
-		"messages_purged_at":  ct.MessagesPurgedAt,
-		"messages_view_until": chatViewUntil(ct),
+		"messages_purged_at": ct.MessagesPurgedAt,
+		// やりとり欄が見られなくなる時刻（契約の終わり）。終わるまでに文章とメニューをダウンロードできる。
+		"messages_view_until": chatClosesAt(ct),
+		// 契約の終わりから30日を過ぎて、やりとり欄の動画ファイルを消した日時。
+		"videos_purged_at": ct.VideosPurgedAt,
 		// 申し込んだ時点で、プランに書いてあった「何が返ってくるか」。
 		"video_reviews": ct.VideoReviews,
 		"menu_updates":  ct.MenuUpdates,
@@ -346,7 +349,7 @@ func (s *Server) listMyCoachingContracts(w http.ResponseWriter, r *http.Request)
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt, UpdatedAt: row.UpdatedAt, VideosPurgedAt: row.VideosPurgedAt, RetentionHoldAt: row.RetentionHoldAt,
 			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 			CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
@@ -376,7 +379,7 @@ func (s *Server) listCoachContracts(w http.ResponseWriter, r *http.Request) {
 			PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 			CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 			RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+			StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt, UpdatedAt: row.UpdatedAt, VideosPurgedAt: row.VideosPurgedAt, RetentionHoldAt: row.RetentionHoldAt,
 			VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 			StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 			CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
@@ -417,7 +420,7 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		PlanTitle: row.PlanTitle, DurationDays: row.DurationDays, PriceYen: row.PriceYen, Event: row.Event, Goal: row.Goal,
 		CurrentRecord: row.CurrentRecord, Message: row.Message, Minor: row.Minor, Status: row.Status, RespondBy: row.RespondBy,
 		RespondedAt: row.RespondedAt, StartsAt: row.StartsAt, EndsAt: row.EndsAt, CreatedAt: row.CreatedAt,
-		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt,
+		StartBy: row.StartBy, SuspendedAt: row.SuspendedAt, PaymentRequired: row.PaymentRequired, MessagesPurgedAt: row.MessagesPurgedAt, UpdatedAt: row.UpdatedAt, VideosPurgedAt: row.VideosPurgedAt, RetentionHoldAt: row.RetentionHoldAt,
 		VideoReviews: row.VideoReviews, MenuUpdates: row.MenuUpdates, ReplyFormats: row.ReplyFormats,
 		StartOnFirstVideo: row.StartOnFirstVideo, ClockStartedAt: row.ClockStartedAt,
 		CompetitionName: row.CompetitionName, CompetitionDate: row.CompetitionDate, SupportStartDate: row.SupportStartDate, CallCount: row.CallCount, CallMinutes: row.CallMinutes, VenueArea: row.VenueArea, VenueName: row.VenueName, SessionCount: row.SessionCount, SessionMinutes: row.SessionMinutes, TravelFeeYen: row.TravelFeeYen, MaxParticipants: row.MaxParticipants, DeliveredSessionCount: row.DeliveredSessionCount, FulfillmentVersion: row.FulfillmentVersion, FulfillmentState: row.FulfillmentState,
@@ -615,12 +618,24 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 			Tag:   "contract-" + ct.ID.String(),
 		}, 24*time.Hour)
 	}
+	// 終わる3日前に、終わると見られなくなることと、文章とメニューのダウンロードを案内する（保護者はダウンロードできないので送らない）。
+	notices, err := s.q.ClaimContractCloseNotices(ctx)
+	if err != nil {
+		return len(ex) + len(starts), 0, err
+	}
+	for _, ct := range notices {
+		msg := push.Message{Title: "パーソナル指導の期間がもうすぐ終わります", Body: "「" + ct.PlanTitle + "」は" + jstDateTime(*ct.EndsAt) + "に終わります。終わるとやりとりは見られなくなります。必要なら、文章とメニューを今のうちにダウンロードしてください", Tag: "contract-close-" + ct.ID.String()}
+		msg.URL = "/coaching/personal/" + ct.ID.String()
+		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
+		msg.URL = "/coach"
+		s.notify(ctx, ct.CoachID, notifyCoaching, msg, 24*time.Hour)
+	}
 	en, err := s.q.EndCoachingContracts(ctx)
 	if err != nil {
 		return len(ex) + len(starts), 0, err
 	}
 	for _, ct := range en {
-		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました。やりとりは90日間見られます（送信はできません）。文章とメニューはダウンロードできます", Tag: "contract-" + ct.ID.String()}
+		msg := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「" + ct.PlanTitle + "」の期間が終わりました。やりとりは見られなくなりました", Tag: "contract-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
 		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 		msg.URL = "/coach"
