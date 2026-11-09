@@ -50,3 +50,44 @@ it("「大会まで」「対面」で絞り込める", async () => {
   await click("対面");
   expect([...container.querySelectorAll("li")].map((li) => li.id)).toEqual(["support-coach-b"]);
 });
+
+const inPersonJump = { ...inPerson, id: "c", nickname: "跳躍コーチ", events: ["long-jump", "triple-jump"] };
+const radios = (group: string) => [...container.querySelectorAll(`[role="radiogroup"][aria-label="${group}"] [role="radio"]`)];
+const pick = (group: string, label: string) => act(async () => { (radios(group).find((r) => r.textContent?.replace("✓", "") === label) as HTMLButtonElement).click(); });
+const ids = () => [...container.querySelectorAll("li")].map((li) => li.id);
+
+it("サービスの絞り込みの下に種目のチップが2段目で並び、初期は「すべて」", async () => {
+  apiFetch.mockResolvedValue({ coaches: [inPerson, competition, inPersonJump] });
+  await render();
+  const groups = [...container.querySelectorAll('[role="radiogroup"]')].map((g) => g.getAttribute("aria-label"));
+  expect(groups).toEqual(["絞り込み", "種目で絞り込む"]);
+  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("✓すべて");
+  expect(ids()).toEqual(["support-coach-b", "support-coach-a", "support-coach-c"]);
+});
+
+it("サービスと種目の絞り込みは AND で効き、並びは API の順のまま", async () => {
+  apiFetch.mockResolvedValue({ coaches: [inPerson, competition, inPersonJump] });
+  await render();
+  await pick("種目で絞り込む", "100m");
+  expect(ids()).toEqual(["support-coach-b", "support-coach-a"]);
+  await click("対面");
+  expect(ids()).toEqual(["support-coach-b"]);
+  await pick("種目で絞り込む", "走幅跳");
+  expect(ids()).toEqual(["support-coach-c"]);
+  await click("大会まで");
+  expect(ids()).toEqual([]);
+  expect(container.textContent).toContain("この種目のコーチはまだいません");
+});
+
+it("該当0人の種目では空状態と「すべて」へ戻る導線を出し、押すと種目の絞り込みだけが戻る", async () => {
+  apiFetch.mockResolvedValue({ coaches: [inPerson, competition] });
+  await render();
+  await click("対面");
+  await pick("種目で絞り込む", "やり投");
+  expect(ids()).toEqual([]);
+  expect(container.textContent).toContain("この種目のコーチはまだいません");
+  await click("すべての種目のコーチを見る");
+  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("✓すべて");
+  expect(container.querySelector('[aria-label="絞り込み"] [aria-checked="true"]')?.textContent).toBe("対面");
+  expect(ids()).toEqual(["support-coach-b"]);
+});

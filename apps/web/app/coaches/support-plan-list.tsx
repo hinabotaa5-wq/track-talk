@@ -2,6 +2,7 @@
 
 import { PageLoading } from "@/components/page-loading";
 import { CoachAvatar } from "@/components/coach-photo";
+import { CoachEventChips, CoachEventEmpty, filterCoachesByEvent, type CoachEventFilter } from "@/components/coach-event-filter";
 import { apiFetch } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { supportPlanListEnabled } from "@/lib/features";
@@ -59,6 +60,7 @@ export function SupportPlanList() {
   const [coaches, setCoaches] = useState<SupportPlanCoach[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [event, setEvent] = useState<CoachEventFilter>("all");
 
   useEffect(() => {
     if (!supportPlanListEnabled) return;
@@ -72,7 +74,8 @@ export function SupportPlanList() {
   if (!supportPlanListEnabled) {
     return <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">サポートプランは12月開始予定です</p>;
   }
-  const shown = (coaches ?? []).filter((c) => filter === "all" || c.kinds.includes(filter));
+  // サービスの絞り込みと種目の絞り込みは AND で効く。並びは API の順のまま。
+  const shown = filterCoachesByEvent((coaches ?? []).filter((c) => filter === "all" || c.kinds.includes(filter)), event);
   return (
     <div className="space-y-3">
       <div role="radiogroup" aria-label="絞り込み" className="grid grid-cols-3 gap-1 rounded-xl border border-white/20 bg-white/5 p-1 text-sm">
@@ -80,9 +83,11 @@ export function SupportPlanList() {
           <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} onClick={() => setFilter(f.id)} className={`rounded-lg px-2 py-1.5 ${filter === f.id ? "bg-blue-600 text-white" : "text-slate-200"}`}>{f.label}</button>
         ))}
       </div>
+      <CoachEventChips value={event} onChange={setEvent} />
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
       {!coaches && !error ? <PageLoading label="読み込み中..." /> : null}
-      {coaches && shown.length === 0 ? <p className="text-sm text-slate-200">まだいません</p> : null}
+      {coaches && shown.length === 0 && event === "all" ? <p className="text-sm text-slate-200">まだいません</p> : null}
+      {coaches && shown.length === 0 && event !== "all" ? <CoachEventEmpty onReset={() => setEvent("all")} /> : null}
       <ul className="space-y-3">{shown.map((c) => <CoachCard key={c.id} c={c} filter={filter} />)}</ul>
     </div>
   );

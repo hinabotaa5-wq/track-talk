@@ -73,3 +73,34 @@ it("非公開または存在しないコーチの詳細には案内を出す", a
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("このコーチは現在公開されていません");
 });
+
+it("動画添削の一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [
+    { ...coach, id: "coach-2", nickname: "跳躍", events: ["long-jump"] },
+    { ...coach, id: "coach-1", events: ["100m", "200m", "400m"] },
+    { ...coach, id: "coach-3", nickname: "200", events: ["200m"] },
+  ] });
+  await act(async () => root.render(<CoachList />));
+  const group = container.querySelector('[role="radiogroup"][aria-label="種目で絞り込む"]')!;
+  expect(group.className).toContain("flex-nowrap");
+  expect(group.querySelector('[aria-checked="true"]')?.textContent).toBe("✓すべて");
+  const hrefs = () => [...container.querySelectorAll("li a")].map((a) => a.getAttribute("href"));
+  expect(hrefs()).toEqual(["/coaches/coach-2", "/coaches/coach-1", "/coaches/coach-3"]);
+  const pick = (label: string) => act(async () => { ([...group.querySelectorAll("button")].find((b) => b.textContent?.replace("✓", "") === label) as HTMLButtonElement).click(); });
+  await pick("200m");
+  expect(hrefs()).toEqual(["/coaches/coach-1", "/coaches/coach-3"]);
+  await pick("100m");
+  expect(hrefs()).toEqual(["/coaches/coach-1"]);
+  expect(container.textContent).not.toMatch(/★|ランキング|人気/);
+});
+
+it("動画添削の一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [coach] });
+  await act(async () => root.render(<CoachList />));
+  const group = container.querySelector('[role="radiogroup"][aria-label="種目で絞り込む"]')!;
+  await act(async () => { ([...group.querySelectorAll("button")].find((b) => b.textContent === "やり投") as HTMLButtonElement).click(); });
+  expect(container.querySelectorAll("li")).toHaveLength(0);
+  expect(container.textContent).toContain("この種目のコーチはまだいません");
+  await act(async () => { ([...container.querySelectorAll("button")].find((b) => b.textContent === "すべての種目のコーチを見る") as HTMLButtonElement).click(); });
+  expect([...container.querySelectorAll("li a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/coach-1"]);
+});

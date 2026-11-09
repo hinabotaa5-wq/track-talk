@@ -839,6 +839,19 @@ select:-webkit-autofill {
 .home-feed-grid-strip::-webkit-scrollbar {
   display: none;
 }
+/* コーチ一覧の種目チップの列（#507）。折り返さず横へ送り、スクロールバーは出さない。 */
+/* 右にまだ続くときだけ右端を薄くする（色を足さず透明度で消すので、ライト・ダークどちらでも同じに見える）。 */
+.coach-event-chips {
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.coach-event-chips::-webkit-scrollbar {
+  display: none;
+}
+.coach-event-chips[data-more-right="true"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
 .home-feed-grid-canvas {
   display: grid;
   grid-template-columns: repeat(var(--home-feed-columns), minmax(0, 1fr));
