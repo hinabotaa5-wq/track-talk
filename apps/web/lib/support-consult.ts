@@ -191,7 +191,7 @@ export type SupportConsultSettings = {
 // 契約と相談は提案ではまだ成立しない、という前置き（フォームの冒頭と提案画面に出す）。
 export const consultNotContractNote = "ここでの相談と提案は契約ではありません。契約は、提案を受けて申し込み（18歳未満は、保護者が提案の内容に同意して申し込みます）、お支払いが済んだ時点で成立します。コーチは提案を出した時に同意しているので、あらためて引き受ける操作はありません。相談だけなら費用はかからず、カード情報も入力しません。";
 // 大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記する（API の supportStandardContent と同じ文）。
-export const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。返し方（文章・動画）はコーチがその都度選びます。";
+export const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。";
 export const consultMinorNote = "18歳未満の方は、あなたが申し込むのではなく、保護者に提案を送ります。契約には保護者の同意とお支払いが必要です。";
 
 export function priceHintLabel(min: number | null, max: number | null): string {

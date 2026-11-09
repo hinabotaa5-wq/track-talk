@@ -970,7 +970,7 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 
 // supportStandardContent は、大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記し、契約の説明にも写す。
 // 返答の回数や形式は選ばせない（動画への返答は期間中は無制限。追加相談という別料金もない）。
-const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。返し方（文章・動画）はコーチがその都度選びます。"
+const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。"
 
 // startConsultContract は、相談の提案から契約を作る。コーチの同意は提案を出した時に済んでいるので、
 // コーチの再引受は挟まず、そのまま「受けた」状態（支払い待ち・保護者の同意待ち）にする。
