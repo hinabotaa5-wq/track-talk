@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiDownloadText, apiFetch, ApiRequestError, apiErrorText } from "@/lib/api";
-import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
@@ -194,10 +194,10 @@ function Composer({
     try {
       let videoPublicID = "";
       if (file) {
-        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
+        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
         setUploadPhase("upload");
         setUpload({ loaded: 0, total: file.size, percent: 0 });
-        const payload = await uploadToCloudinary("video", file, signed, setUpload);
+        const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
         if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
         videoPublicID = payload.public_id;
         setUploadPhase("saving");

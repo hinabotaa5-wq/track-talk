@@ -196,6 +196,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/posts/instagram", s.citeInstagram)
 			r.Post("/posts/x", s.citeXPost)
 			r.Post("/uploads/video", s.signVideoUpload)
+			r.Post("/uploads/video/status", s.videoUploadStatus)
 			r.Post("/uploads/image", s.signImageUpload)
 			r.Patch("/posts/{id}", s.updatePost)
 			r.Delete("/posts/{id}", s.deletePost)

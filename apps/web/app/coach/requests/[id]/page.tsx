@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { uploadToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
+import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -103,9 +103,9 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
         // 返答がエラーになって直して送り直すときは、上げ済みの動画を使い回す（同じ動画を上げ直して孤児を増やさない）。
         demo = uploaded.current.id;
       } else if (file) {
-        const signed = await apiFetch<CloudinarySignature>("/v1/uploads/coaching-video", { method: "POST", token });
+        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
         setUpload({ loaded: 0, total: file.size, percent: 0 });
-        const payload = await uploadToCloudinary("video", file, signed, setUpload);
+        const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
         if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
         demo = payload.public_id;
         uploaded.current = { file, id: demo };

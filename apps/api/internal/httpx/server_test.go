@@ -578,6 +578,89 @@ func TestSignedVideoJoinsTheList(t *testing.T) {
 	}
 }
 
+// 40MB を超える動画は、保存前に縮めず、配信用の変換を eager で裏で作らせる（#494）。
+// 変換がそろうまでは status が ready=false、投稿は 409 で、そろったら投稿できる。
+func TestEagerVideoWaitsForDerived(t *testing.T) {
+	var derived atomic.Bool
+	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "key" || pass != "secret" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/resources/video/upload/track-talk/") {
+			http.NotFound(w, r)
+			return
+		}
+		list := "[]"
+		if derived.Load() {
+			list = `[{"transformation":"c_limit,w_1280,h_1280,q_auto/mp4","format":"mp4"},
+				{"transformation":"so_auto,c_limit,w_800,q_auto,f_jpg/jpg","format":"jpg"},
+				{"transformation":"so_auto,c_limit,w_600,q_auto,f_jpg/jpg","format":"jpg"}]`
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"resource_type":"video","format":"mov","bytes":%d,"derived":%s}`, 50<<20, list)
+	}))
+	defer asset.Close()
+	t.Setenv("CLOUDINARY_CLOUD_NAME", "demo")
+	t.Setenv("CLOUDINARY_API_KEY", "key")
+	t.Setenv("CLOUDINARY_API_SECRET", "secret")
+	t.Setenv("CLOUDINARY_API_BASE", asset.URL)
+
+	h := setup(t)
+	a := uuid.New()
+	ta := token(t, a)
+	rec := doJSON(t, h, http.MethodPost, "/v1/uploads/video?eager=1", ta, map[string]any{})
+	if rec.Code != 200 {
+		t.Fatalf("sign %d %s", rec.Code, rec.Body.String())
+	}
+	var signed struct {
+		PublicID     string `json:"public_id"`
+		UploadPreset string `json:"upload_preset"`
+		Eager        string `json:"eager"`
+		EagerAsync   string `json:"eager_async"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &signed)
+	if signed.UploadPreset != cloudinary.VideoAsyncPreset || signed.Eager == "" || signed.EagerAsync != "true" {
+		t.Fatalf("signed %s", rec.Body.String())
+	}
+
+	status := func(tok, id string) (int, string) {
+		rec := doJSON(t, h, http.MethodPost, "/v1/uploads/video/status", tok, map[string]any{"public_id": id})
+		return rec.Code, strings.TrimSpace(rec.Body.String())
+	}
+	if code, body := status(ta, signed.PublicID); code != 200 || !strings.Contains(body, `"ready":false`) {
+		t.Fatalf("processing status %d %s", code, body)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "", "body": "", "kind": "video", "video_public_id": signed.PublicID,
+	})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("post while processing %d %s", rec.Code, rec.Body.String())
+	}
+	// 他人の上げた動画の状態は見られない。
+	if code, body := status(token(t, uuid.New()), signed.PublicID); code != 422 {
+		t.Fatalf("other user's status %d %s", code, body)
+	}
+
+	derived.Store(true)
+	if code, body := status(ta, signed.PublicID); code != 200 || !strings.Contains(body, `"ready":true`) {
+		t.Fatalf("ready status %d %s", code, body)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/v1/posts", ta, map[string]any{
+		"title": "", "body": "", "kind": "video", "video_public_id": signed.PublicID,
+	})
+	if rec.Code != 201 {
+		t.Fatalf("post after processing %d %s", rec.Code, rec.Body.String())
+	}
+
+	// ?eager=1 を付けない古い画面には、これまでどおりの署名を出す。
+	rec = doJSON(t, h, http.MethodPost, "/v1/uploads/video", ta, map[string]any{})
+	if rec.Code != 200 || bytes.Contains(rec.Body.Bytes(), []byte("eager")) || !bytes.Contains(rec.Body.Bytes(), []byte(`"upload_preset":"`+cloudinary.VideoPreset+`"`)) {
+		t.Fatalf("old sign %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSignedImageJoinsTheList(t *testing.T) {
 	asset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()

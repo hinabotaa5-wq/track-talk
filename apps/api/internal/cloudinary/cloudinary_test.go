@@ -2,6 +2,7 @@ package cloudinary
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -146,6 +147,10 @@ func TestEnsureUploadPresetsUpdatesAnExistingPreset(t *testing.T) {
 	if transformations[ImagePreset] != ImageIncoming || transformations[VideoPreset] != VideoIncoming {
 		t.Fatalf("transformations %v", transformations)
 	}
+	// 縮めない動画のプリセットは incoming 変換を持たない（同期処理の上限に当たらないように）。
+	if got, ok := transformations[VideoAsyncPreset]; !ok || got != "" {
+		t.Fatalf("async preset transformation %q (seen %v)", got, ok)
+	}
 }
 
 func TestDeleteSendsPublicIDs(t *testing.T) {
@@ -256,7 +261,8 @@ func TestCoachingURLsAreSigned(t *testing.T) {
 	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
 	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
 	// 期待値は Cloudinary の公式 SDK と同じ手順（SHA-256 → URL 用 Base64 の先頭8文字）で別に計算したもの。
-	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--OE0d7T-_--/q_auto,du_30/v1/"+id+".mp4"; got != want {
+	// 再生は、保存前に縮めなくなった動画も長辺1280px以内で配信する（#494）。
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--8AjFpRpa--/c_limit,w_1280,h_1280,q_auto,du_30/v1/"+id+".mp4"; got != want {
 		t.Fatalf("playback\n got %s\nwant %s", got, want)
 	}
 	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--AF2cg9FF--/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"; got != want {
@@ -313,7 +319,7 @@ func TestCoachingURLsCarryExpiringTokenWithAuthKey(t *testing.T) {
 	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
 	// 期待値は Cloudinary の公式 Python SDK（cloudinary_url の auth_token）で、同じ鍵・期限・acl から作ったもの。
 	token := "?__cld_token__=exp=1800000000~acl=%2fvideo%2fauthenticated%2f*track-talk-coaching%2f0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11*~hmac=d4aea924058f847b18a5c8ed9a4a9b1e114fbdec9421de90650d1e185c53f7d8"
-	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/q_auto,du_30/v1/"+id+".mp4"+token; got != want {
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/c_limit,w_1280,h_1280,q_auto,du_30/v1/"+id+".mp4"+token; got != want {
 		t.Fatalf("playback\n got %s\nwant %s", got, want)
 	}
 	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"+token; got != want {
@@ -322,5 +328,139 @@ func TestCoachingURLsCarryExpiringTokenWithAuthKey(t *testing.T) {
 	c.AuthTokenKey = "not-hex"
 	if c.CoachingPlaybackURL(id) != "" {
 		t.Fatal("a broken key must not fall back to a URL without expiry")
+	}
+}
+
+// 大きな動画は、配信用の変換を eager（非同期）で作らせる。署名には eager と eager_async も入る（#494）。
+func TestAsyncVideoUploadsSignEager(t *testing.T) {
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
+	now := time.Unix(1700000000, 0)
+
+	video, err := c.SignedAsyncVideoUpload(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEager := "c_limit,w_1280,h_1280,q_auto/mp4|so_auto,c_limit,w_800,q_auto,f_jpg/jpg|so_auto,c_limit,w_600,q_auto,f_jpg/jpg"
+	if video.UploadPreset != VideoAsyncPreset || video.Eager != wantEager || video.EagerAsync != "true" || video.Type != "" {
+		t.Fatalf("video %+v", video)
+	}
+	want := Sign(map[string]string{
+		"allowed_formats": VideoFormats,
+		"eager":           wantEager,
+		"eager_async":     "true",
+		"public_id":       video.PublicID,
+		"timestamp":       "1700000000",
+		"upload_preset":   VideoAsyncPreset,
+	}, "secret")
+	if video.Signature != want {
+		t.Fatalf("signature %s want %s", video.Signature, want)
+	}
+
+	coaching, err := c.SignedAsyncCoachingUpload(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCoaching := "c_limit,w_1280,h_1280,q_auto,du_30/mp4|so_auto,c_limit,w_800,f_jpg/jpg"
+	if coaching.UploadPreset != VideoAsyncPreset || coaching.Eager != wantCoaching || coaching.EagerAsync != "true" || coaching.Type != CoachingVideoType {
+		t.Fatalf("coaching %+v", coaching)
+	}
+	want = Sign(map[string]string{
+		"allowed_formats": VideoFormats,
+		"eager":           wantCoaching,
+		"eager_async":     "true",
+		"public_id":       coaching.PublicID,
+		"timestamp":       "1700000000",
+		"type":            CoachingVideoType,
+		"upload_preset":   VideoAsyncPreset,
+	}, "secret")
+	if coaching.Signature != want {
+		t.Fatalf("coaching signature %s want %s", coaching.Signature, want)
+	}
+
+	// 古い画面向けの署名は変えない（eager を送らない画面で署名が合わなくならないように）。
+	old, err := c.SignedUpload(now, "video")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old.UploadPreset != VideoPreset || old.Eager != "" || old.EagerAsync != "" {
+		t.Fatalf("old %+v", old)
+	}
+}
+
+// eager で作る変換と、配信 URL の変換が一字一句同じであること。違うと配信のときに同期で作ろうとして失敗する。
+func TestEagerMatchesDeliveryURLs(t *testing.T) {
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret"}
+	id := "track-talk/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
+	urls := []string{c.PlaybackURL(id), c.ThumbnailURL(id), c.CardThumbnailURL(id)}
+	for i, d := range publicVideoDerived {
+		if want := "/video/upload/" + d.transformation + "/" + id + "." + d.ext; !strings.HasSuffix(urls[i], want) {
+			t.Fatalf("public %d: %s does not end with %s", i, urls[i], want)
+		}
+	}
+	coachingID := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
+	coachingURLs := []string{c.CoachingPlaybackURL(coachingID), c.CoachingThumbnailURL(coachingID)}
+	for i, d := range coachingVideoDerived {
+		if want := "/" + d.transformation + "/v1/" + coachingID + "." + d.ext; !strings.HasSuffix(coachingURLs[i], want) {
+			t.Fatalf("coaching %d: %s does not end with %s", i, coachingURLs[i], want)
+		}
+	}
+	if !strings.Contains(coachingPlayback, fmt.Sprintf("du_%d", MaxCoachingSeconds)) {
+		t.Fatalf("coaching playback %s must cut at %d seconds", coachingPlayback, MaxCoachingSeconds)
+	}
+}
+
+// 同期で作れない大きさの動画は、配信に使う派生がそろうまで ErrProcessing を返す。小さい動画は待たない。
+func TestReadyWaitsForEagerDerivedOnLargeVideos(t *testing.T) {
+	var payload string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+	c := Client{Cloud: "demo", Key: "key", Secret: "secret", APIBase: srv.URL}
+	ctx := context.Background()
+	id := "track-talk/11111111-1111-4111-8111-111111111111"
+	large := SyncVideoMaxBytes + 1
+
+	payload = `{"resource_type":"video","format":"mov","bytes":1024}`
+	if err := c.Ready(ctx, id); err != nil {
+		t.Fatalf("small without derived: %v", err)
+	}
+	payload = fmt.Sprintf(`{"resource_type":"video","format":"mov","bytes":%d,"derived":[]}`, large)
+	if err := c.Ready(ctx, id); err != ErrProcessing {
+		t.Fatalf("large without derived: %v", err)
+	}
+	payload = fmt.Sprintf(`{"resource_type":"video","format":"mov","bytes":%d,"derived":[
+		{"transformation":"c_limit,h_1280,q_auto,w_1280/mp4","format":"mp4"},
+		{"transformation":"so_auto,c_limit,w_800,q_auto,f_jpg/jpg","format":"jpg"}]}`, large)
+	if err := c.Ready(ctx, id); err != ErrProcessing {
+		t.Fatalf("large with card thumbnail missing: %v", err)
+	}
+	payload = fmt.Sprintf(`{"resource_type":"video","format":"mov","bytes":%d,"derived":[
+		{"transformation":"c_limit,h_1280,q_auto,w_1280/mp4","format":"mp4"},
+		{"transformation":"so_auto,c_limit,w_800,q_auto,f_jpg","format":"jpg"},
+		{"transformation":"so_auto,c_limit,w_600,q_auto,f_jpg/jpg"}]}`, large)
+	if err := c.Ready(ctx, id); err != nil {
+		t.Fatalf("large with all derived: %v", err)
+	}
+	// 形式が違う派生（例: 同じ変換の webm）は数えない。
+	payload = fmt.Sprintf(`{"resource_type":"video","format":"mov","bytes":%d,"derived":[
+		{"transformation":"c_limit,w_1280,h_1280,q_auto","format":"webm"},
+		{"transformation":"so_auto,c_limit,w_800,q_auto,f_jpg","format":"jpg"},
+		{"transformation":"so_auto,c_limit,w_600,q_auto,f_jpg","format":"jpg"}]}`, large)
+	if err := c.Ready(ctx, id); err != ErrProcessing {
+		t.Fatalf("wrong format: %v", err)
+	}
+
+	coachingID := "track-talk-coaching/11111111-1111-4111-8111-111111111111"
+	payload = fmt.Sprintf(`{"resource_type":"video","type":"authenticated","format":"mov","bytes":%d,"duration":10}`, large)
+	if err := c.CoachingVideoReady(ctx, coachingID); err != ErrProcessing {
+		t.Fatalf("coaching large without derived: %v", err)
+	}
+	payload = fmt.Sprintf(`{"resource_type":"video","type":"authenticated","format":"mov","bytes":%d,"duration":10,"derived":[
+		{"transformation":"c_limit,w_1280,h_1280,q_auto,du_30/mp4","format":"mp4"},
+		{"transformation":"so_auto,c_limit,w_800,f_jpg/jpg","format":"jpg"}]}`, large)
+	if err := c.CoachingVideoReady(ctx, coachingID); err != nil {
+		t.Fatalf("coaching large with derived: %v", err)
 	}
 }

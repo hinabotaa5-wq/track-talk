@@ -11,7 +11,63 @@ import (
 )
 
 func (s *Server) signVideoUpload(w http.ResponseWriter, r *http.Request) {
+	if wantsEager(r) {
+		p, ok := s.requireProfile(w, r)
+		if !ok {
+			return
+		}
+		s.issueUpload(w, r, p.ID, "動画", func() (cloudinary.UploadSignature, error) {
+			return s.cloud.SignedAsyncVideoUpload(time.Now())
+		})
+		return
+	}
 	s.signUpload(w, r, "video", "動画")
+}
+
+// wantsEager は、画面が eager と eager_async を Cloudinary に送れる（?eager=1 を付けた）かを返す。
+// 付けない古い画面には、これまでどおり保存前に縮める署名を出す。eager を含む署名を送らない画面に出すと、
+// 署名が合わずにアップロードが断られるため。
+func wantsEager(r *http.Request) bool {
+	return r.URL.Query().Get("eager") == "1"
+}
+
+// videoUploadStatus は、上げ終えた動画が投稿・送信に使える状態かを返す（POST /v1/uploads/video/status）。
+// 大きな動画は、配信用の変換を Cloudinary が裏で作り終えるまで ready=false になる。画面はこれを待ってから送る。
+func (s *Server) videoUploadStatus(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		PublicID string `json:"public_id"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "bad_request", "リクエストを読めませんでした")
+		return
+	}
+	var check func() error
+	switch {
+	case cloudinary.ValidPublicID(req.PublicID):
+		check = func() error { return s.cloud.Ready(r.Context(), req.PublicID) }
+	case cloudinary.ValidCoachingPublicID(req.PublicID):
+		check = func() error { return s.cloud.CoachingVideoReady(r.Context(), req.PublicID) }
+	default:
+		FieldError(w, map[string]string{"public_id": "動画を選び直してください"})
+		return
+	}
+	if !s.uploadIssuedToMe(w, r, p.ID, req.PublicID, "public_id", "動画") {
+		return
+	}
+	err := check()
+	if errors.Is(err, cloudinary.ErrProcessing) {
+		JSON(w, http.StatusOK, map[string]bool{"ready": false})
+		return
+	}
+	if err != nil {
+		writeVideoReadyError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]bool{"ready": true})
 }
 
 func (s *Server) signImageUpload(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +141,8 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"はサイズの上限を超えています")
 	case errors.Is(err, cloudinary.ErrTooLong):
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"は30秒以内にしてください")
+	case errors.Is(err, cloudinary.ErrProcessing):
+		Error(w, http.StatusConflict, "processing", noun+"を処理しています。少し待ってからもう一度送ってください")
 	default:
 		Error(w, http.StatusBadGateway, "unavailable", noun+"の確認に失敗しました")
 	}
