@@ -47,7 +47,19 @@ SELECT json_build_object(
                  WHERE c.oid = 'identity_vault.identities'::regclass AND a.privilege_type='INSERT' AND a.grantee <> c.relowner AND g.rolcanlogin AND NOT g.rolsuper
                    AND g.rolname NOT IN ('anon','authenticated','service_role','identity_export')) x
                  WHERE (SELECT bool_and(to_regprocedure(f) IS NOT NULL AND has_function_privilege(x.grantee, to_regprocedure(f), 'EXECUTE')) FROM unnest(ARRAY[{fns}]) f)),
-  'members_admin_rows', (SELECT count(*) FROM identity_vault.members WHERE is_admin)
+  'members_admin_rows', (SELECT count(*) FROM identity_vault.members WHERE is_admin),
+  'app_roles_bypass_rls', (SELECT count(DISTINCT a.grantee) FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a JOIN pg_roles g ON g.oid = a.grantee
+                 WHERE c.oid = 'identity_vault.identities'::regclass AND a.privilege_type='INSERT' AND a.grantee <> c.relowner AND g.rolcanlogin AND NOT g.rolsuper
+                   AND g.rolname NOT IN ('anon','authenticated','service_role','identity_export') AND g.rolbypassrls),
+  'app_roles_can_select_members', (SELECT count(DISTINCT a.grantee) FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a JOIN pg_roles g ON g.oid = a.grantee
+                 WHERE c.oid = 'identity_vault.identities'::regclass AND a.privilege_type='INSERT' AND a.grantee <> c.relowner AND g.rolcanlogin AND NOT g.rolsuper
+                   AND g.rolname NOT IN ('anon','authenticated','service_role','identity_export')
+                   AND has_table_privilege(a.grantee, 'identity_vault.members', 'SELECT')),
+  'rls_enabled_tables', (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'identity_vault' AND c.relkind = 'r' AND c.relrowsecurity),
+  'rls_policies', (SELECT count(*) FROM pg_policies WHERE schemaname = 'identity_vault'),
+  'admins_with_verified_mfa', (SELECT count(*) FROM identity_vault.members m WHERE m.is_admin
+                 AND EXISTS (SELECT 1 FROM auth.mfa_factors f WHERE f.user_id = m.subject AND f.status = 'verified')),
+  'admin_subjects_in_auth', (SELECT count(*) FROM identity_vault.members m WHERE m.is_admin AND EXISTS (SELECT 1 FROM auth.users u WHERE u.id = m.subject))
 );
 """.format(fns=", ".join("'" + f + "'" for f in SYNTHETIC_FUNCTIONS))
 
