@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewInfoReason, ReviewPayMethod, ReviewRequest, ReviewStatus } from "./types";
 
 // 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す（API の reviewEvents と合わせる）。
@@ -5,33 +6,33 @@ export const reviewEvents: CoachEvent[] = ["100m"];
 
 // 以前の依頼で選ばれた項目の表示名。
 const reviewFocusLabels: Record<ReviewFocus, string> = {
-  start: "スタート",
-  acceleration: "加速",
-  "top-speed": "トップスピード",
-  takeoff: "踏切",
-  arm: "腕振り",
-  contact: "接地",
-  rhythm: "リズム",
-  other: "その他",
+  get start() { return L("スタート"); },
+  get acceleration() { return L("加速"); },
+  get "top-speed"() { return L("トップスピード"); },
+  get takeoff() { return L("踏切"); },
+  get arm() { return L("腕振り"); },
+  get contact() { return L("接地"); },
+  get rhythm() { return L("リズム"); },
+  get other() { return L("その他"); },
 };
 
 export function reviewQuestionText(request: Pick<ReviewRequest, "question" | "focus">) {
-  return request.question || request.focus.map((focus) => reviewFocusLabels[focus]).join("、");
+  return request.question || request.focus.map((focus) => reviewFocusLabels[focus]).join(L("、"));
 }
 
 export const reviewStatusLabels: Record<ReviewStatus, string> = {
-  awaiting_payment: "お支払い待ち",
-  queued: "コーチを探しています",
-  offered: "コーチを探しています",
-  in_review: "添削中",
-  needs_info: "コーチが内容の確認を求めています",
-  returned: "返却済み",
-  clarifying: "補足を待っています",
-  expired: "期限切れ",
+  get awaiting_payment() { return L("お支払い待ち"); },
+  get queued() { return L("コーチを探しています"); },
+  get offered() { return L("コーチを探しています"); },
+  get in_review() { return L("添削中"); },
+  get needs_info() { return L("コーチが内容の確認を求めています"); },
+  get returned() { return L("返却済み"); },
+  get clarifying() { return L("補足を待っています"); },
+  get expired() { return L("期限切れ"); },
 };
 
 export const reviewPayMethodLabels: Record<ReviewPayMethod, string> = {
-  card: "カード・Apple Pay・Google Pay",
+  get card() { return L("カード・Apple Pay・Google Pay"); },
   paypay: "PayPay",
 };
 
@@ -48,19 +49,19 @@ export const reviewPayNotice: string | null = availableReviewPayMethods.includes
 
 // 「ここがわからなかった」の選択肢。自由記述は置かない（やりとりは一方通行のまま）。
 export const clarifyReasonLabels: Record<ClarifyReason, string> = {
-  term: "用語がわからない",
-  drill: "ドリルのやり方がわからない",
-  fix: "直す点の意味がわからない",
-  other: "その他",
+  get term() { return L("用語がわからない"); },
+  get drill() { return L("ドリルのやり方がわからない"); },
+  get fix() { return L("直す点の意味がわからない"); },
+  get other() { return L("その他"); },
 };
 
 // 返却前の「内容確認のための差し戻し」の種類（任意）。並びは API と同じ。
 export const reviewInfoReasonLabels: Record<ReviewInfoReason, string> = {
-  focus: "見てほしいポイントが分からない",
-  scene: "動画のどの場面か分からない",
-  goal: "目標・現状が分からない",
-  mismatch: "動画と説明が食い違っている",
-  other: "その他",
+  get focus() { return L("見てほしいポイントが分からない"); },
+  get scene() { return L("動画のどの場面か分からない"); },
+  get goal() { return L("目標・現状が分からない"); },
+  get mismatch() { return L("動画と説明が食い違っている"); },
+  get other() { return L("その他"); },
 };
 
 // 差し戻しの質問の最短の長さ（サーバーと同じ。空白と記号は数えない）。
@@ -70,9 +71,9 @@ export const minInfoRequestChars = 15;
 export const maxWithdrawReasonChars = 200;
 
 export const helpfulLabels: Record<HelpfulAnswer, string> = {
-  yes: "役に立った",
-  some: "少し",
-  no: "役に立たなかった",
+  get yes() { return L("役に立った"); },
+  get some() { return L("少し"); },
+  get no() { return L("役に立たなかった"); },
 };
 
 // 返答の1項目の上限（サーバーと同じ）。

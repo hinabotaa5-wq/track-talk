@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -52,16 +53,16 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       body,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "入力を確認してください");
+      setError(parsed.error.issues[0]?.message ?? L("入力を確認してください"));
       return;
     }
     const when = fromJstInput(parsed.data.starts_at);
     if (Number.isNaN(when.getTime())) {
-      setError("練習日時を入力してください");
+      setError(L("練習日時を入力してください"));
       return;
     }
     if (when.getTime() <= Date.now()) {
-      setError("練習日時は現在より後にしてください");
+      setError(L("練習日時は現在より後にしてください"));
       return;
     }
     if (!acquire()) return;
@@ -91,17 +92,15 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
       (initial ? router.replace : router.push)(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/");
     } catch (e) {
-      setError(apiErrorText(e, "保存に失敗しました"));
+      setError(apiErrorText(e, L("保存に失敗しました")));
       release();
     }
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <label className="block text-sm font-medium">
-        都道府県
-        <select className={selectClass} value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
-          <option value="">選んでください</option>
+      <label className="block text-sm font-medium">{L("都道府県")}<select className={selectClass} value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+          <option value="">{L("選んでください")}</option>
           {PREFECTURES.map((item) => (
             <option key={item.code} value={item.code}>
               {item.name}
@@ -109,19 +108,15 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           ))}
         </select>
       </label>
-      <label className="block text-sm font-medium">
-        練習場所
-        <Input
+      <label className="block text-sm font-medium">{L("練習場所")}<Input
           className={fieldClass}
           maxLength={80}
-          placeholder="〇〇競技場"
+          placeholder={L("〇〇競技場")}
           value={venue}
           onChange={(e) => setVenue(e.target.value)}
         />
       </label>
-      <label className="block min-w-0 text-sm font-medium">
-        練習日時
-        <span className="mt-1 grid grid-cols-[minmax(0,1fr)]">
+      <label className="block min-w-0 text-sm font-medium">{L("練習日時")}<span className="mt-1 grid grid-cols-[minmax(0,1fr)]">
           <Input
             className="block w-full min-w-0 max-w-full"
             type="datetime-local"
@@ -131,10 +126,8 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           />
         </span>
       </label>
-      <label className="block text-sm font-medium">
-        種目
-        <select className={selectClass} value={event} onChange={(e) => setEvent(e.target.value)}>
-          <option value="">選んでください</option>
+      <label className="block text-sm font-medium">{L("種目")}<select className={selectClass} value={event} onChange={(e) => setEvent(e.target.value)}>
+          <option value="">{L("選んでください")}</option>
           {appEvents.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
@@ -142,9 +135,7 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           ))}
         </select>
       </label>
-      <label className="block text-sm font-medium">
-        募集人数
-        <Input
+      <label className="block text-sm font-medium">{L("募集人数")}<Input
           className={fieldClass}
           type="number"
           inputMode="numeric"
@@ -155,14 +146,12 @@ export function PracticeForm({ initial, returnTo }: { initial?: Post; returnTo?:
           onChange={(e) => setCapacity(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
-        詳細
-        <Textarea rows={8} className="mt-1" maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} />
+      <label className="block text-sm font-medium">{L("詳細")}<Textarea rows={8} className="mt-1" maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
-      {submitting ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
+      {submitting ? <SubmittingProgress label={initial ? L("投稿を更新しています") : L("投稿を送信しています")} /> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
+        {submitting ? (initial ? L("更新しています") : L("送っています")) : initial ? L("更新する") : L("投稿する")}
       </Button>
     </form>
   );

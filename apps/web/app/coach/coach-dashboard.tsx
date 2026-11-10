@@ -11,7 +11,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
 import { formatYen } from "@/lib/format";
-import { parseLocale, t, type Locale } from "@/lib/i18n";
+import { t, type Locale, L } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import type {
   CoachApplication,
   CoachEarnings,
@@ -98,7 +99,7 @@ function Tile({
 
 export function CoachDashboard() {
   const { session, profile, token, loading } = useAuth();
-  const locale = parseLocale(profile?.locale);
+  const locale = useLocale();
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
   const [rating, setRating] = useState<CoachRatingSummary | null>(null);
@@ -219,9 +220,7 @@ export function CoachDashboard() {
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold leading-tight">{coach.on_duty ? t(locale, "coach.onDuty") : t(locale, "coach.offDuty")}</p>
             {rating && rating.count > 0 ? (
-              <p className="text-xs text-slate-200">
-                ★{rating.average.toFixed(1)}（{rating.count}件）
-              </p>
+              <p className="text-xs text-slate-200">{L("★{v0}（{count}件）", { v0: rating.average.toFixed(1), count: rating.count })}</p>
             ) : null}
           </div>
           <button

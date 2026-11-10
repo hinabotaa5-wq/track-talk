@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { Lock, Trash2 } from "lucide-react";
@@ -14,17 +15,16 @@ function SenseNoteFields({ body, onBody }: { body: string; onBody: (v: string) =
   return (
     <div className="space-y-2">
       <label className="block">
-        <span className="sr-only">今日の練習で感じた感覚</span>
+        <span className="sr-only">{L("今日の練習で感じた感覚")}</span>
         <Textarea
           value={body}
           onChange={(e) => onBody(e.target.value)}
-          placeholder={senseNotePlaceholder}
+          placeholder={L(senseNotePlaceholder)}
           rows={4}
           maxLength={senseNoteMaxLength + 20}
         />
       </label>
-      <p className="text-sm text-slate-200">
-        日付 <time dateTime={todayInTokyo()}>{todayInTokyo()}</time>
+      <p className="text-sm text-slate-200">{L("日付")}{" "}<time dateTime={todayInTokyo()}>{todayInTokyo()}</time>
       </p>
     </div>
   );
@@ -51,11 +51,11 @@ export function SenseNoteComposer({
     e.preventDefault();
     const text = body.trim();
     if (!text) {
-      setError("感じたことをひとこと書いてください");
+      setError(L("感じたことをひとこと書いてください"));
       return;
     }
     if ([...text].length > senseNoteMaxLength) {
-      setError(`${senseNoteMaxLength}文字までです`);
+      setError(L("{senseNoteMaxLength}文字までです", { senseNoteMaxLength }));
       return;
     }
     if (!lock.acquire()) return;
@@ -70,7 +70,7 @@ export function SenseNoteComposer({
       setCheer(senseCheer(res.stats));
       onCreated(res.note, res.stats);
     } catch (err) {
-      setError(apiErrorText(err, "保存できませんでした"));
+      setError(apiErrorText(err, L("保存できませんでした")));
     } finally {
       lock.release();
     }
@@ -98,11 +98,9 @@ export function SenseNoteComposer({
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1 text-xs text-slate-300">
-          <Lock className="size-3.5" aria-hidden />
-          あなただけに見えます
-        </p>
+          <Lock className="size-3.5" aria-hidden />{L("あなただけに見えます")}</p>
         <Button type="submit" disabled={lock.pending}>
-          {lock.pending ? "ためています…" : "感覚をためる"}
+          {lock.pending ? L("ためています…") : L("感覚をためる")}
         </Button>
       </div>
     </form>
@@ -123,13 +121,13 @@ export function SenseNoteItem({
   const confirmDialog = useConfirm();
 
   async function remove() {
-    if (!(await confirmDialog(deleteConfirmOptions("この感覚メモ")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("この感覚メモ"))))) return;
     if (!lock.acquire()) return;
     try {
       const res = await apiFetch<{ stats: SenseNoteStats }>(`/v1/me/sense-notes/${note.id}`, { method: "DELETE", token });
       onDeleted(note.id, res.stats);
     } catch (err) {
-      alert(apiErrorText(err, "削除できませんでした"));
+      alert(apiErrorText(err, L("削除できませんでした")));
       lock.release();
     }
   }
@@ -139,7 +137,7 @@ export function SenseNoteItem({
       <div className="min-w-0 flex-1 space-y-1.5">
         {note.event_label ? (
           <span className="inline-block rounded-full border border-sky-300/40 bg-sky-400/15 px-2.5 py-0.5 text-xs font-semibold text-sky-100">
-            {note.event_label}
+            {L(note.event_label)}
           </span>
         ) : null}
         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-100">{note.body}</p>
@@ -149,7 +147,7 @@ export function SenseNoteItem({
           type="button"
           onClick={remove}
           disabled={lock.pending}
-          aria-label="削除"
+          aria-label={L("削除")}
           className="inline-flex size-9 items-center justify-center rounded-full text-red-300 transition hover:bg-red-950/40 active:scale-[0.98] disabled:opacity-50"
         >
           <Trash2 className="size-4" aria-hidden />
@@ -161,8 +159,8 @@ export function SenseNoteItem({
 
 export function SenseNoteStatsRow({ stats }: { stats: SenseNoteStats }) {
   const items = [
-    { label: "連続", value: stats.streak, unit: "日" },
-    { label: "これまでの数", value: stats.total, unit: "個" },
+    { label: L("連続"), value: stats.streak, unit: L("日") },
+    { label: L("これまでの数"), value: stats.total, unit: L("個") },
   ];
   return (
     <dl className="grid grid-cols-2 gap-2">

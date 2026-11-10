@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -6,10 +7,10 @@ import { homeHref, parseHomeSort, type HomeSort } from "@/lib/home-sort";
 import { HomePostButton } from "./home-post-button";
 
 const chips: { sort: HomeSort; label: string }[] = [
-  { sort: "new", label: "新しい" },
-  { sort: "popular", label: "人気" },
-  { sort: "recruitment", label: "募集" },
-  { sort: "review", label: "レビュー" },
+  { sort: "new", get label() { return L("新しい"); } },
+  { sort: "popular", get label() { return L("人気"); } },
+  { sort: "recruitment", get label() { return L("募集"); } },
+  { sort: "review", get label() { return L("レビュー"); } },
 ];
 
 function chipClass(active: boolean) {
@@ -62,7 +63,7 @@ export function HomeFilters() {
       onFocusCapture={() => setHidden(false)}
       className={`px-4 py-3 md:mb-4 md:px-0 motion-safe:transition-[translate,opacity] motion-safe:duration-200 ${hidden ? "pointer-events-none -translate-y-full opacity-0" : ""}`}
     >
-      <nav aria-label="投稿の並び替え" className="flex items-center gap-1.5 sm:gap-2">
+      <nav aria-label={L("投稿の並び替え")} className="flex items-center gap-1.5 sm:gap-2">
         <HomePostButton />
         {chips.map((chip) => {
           const href = homeHref(chip.sort, "");

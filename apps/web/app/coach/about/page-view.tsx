@@ -1,0 +1,60 @@
+"use client";
+
+import { L } from "@/lib/i18n";
+import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
+import Link from "next/link";
+import { ArrowRight, Shuffle, UserRound, Trophy, MapPin } from "lucide-react";
+
+
+export function CoachAboutView() {
+  return (
+    <div className="mx-auto max-w-md space-y-7">
+      <section className="space-y-3">
+        <p className="text-sm font-semibold text-blue-300">{L("TrackTalkのコーチ機能")}</p>
+        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">{L("現在はコーチ募集のみです。以下は公開後に提供する機能の紹介です。指導の申込み・チケットの購入はまだできません。")}</p>
+        <h1 className="text-2xl font-bold leading-relaxed">{L("あなたの陸上経験を、")}<br />{L("誰かの次の一歩に。")}</h1>
+        <p className="text-sm leading-relaxed text-slate-200">{L("「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画でのアドバイスから継続的な指導まで、自分が対応できる形で活動できます。")}</p>
+      </section>
+
+      <section className="space-y-4" aria-labelledby="coach-ways">
+        <h2 id="coach-ways" className="text-lg font-bold">{L("関わり方は、大きく2つ")}</h2>
+        <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
+          <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("動画添削プラン：動画1本から支える")}</h3>
+          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容、動画を送ります。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1本1,500円で、コーチの報酬はその70％（1,050円）です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("コーチは届いた依頼を確認し、対応できるものを引き受けます。動画を見て、良い点・直す点・おすすめのドリルを返し、選手が次の練習で試せる具体的な一歩を伝えます。")}</p>
+        </article>
+        <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">
+          <h3 className="flex items-center gap-2 font-bold"><UserRound className="size-5 text-blue-300" aria-hidden />{L("サポートプラン：あなたに相談したい人を支える")}</h3>
+          <p className="text-sm leading-relaxed text-slate-200">{L("コーチが指導内容・料金・期間・定員を決めてプランを公開し、利用者はプロフィールや内容を見て申し込みます。申し込みをコーチが承諾した後、必要な支払い・同意を経て指導が始まります。")}</p>
+          <ul className="space-y-3 text-sm text-slate-200">
+            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("大会までプラン")}</strong>{L("：目標の大会に向けて、準備や調整をサポート。")}</span></li>
+            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("対面プラン")}</strong>{L("：場所や回数などをプランに明記し、現地で指導します。空き日カレンダーから希望日を受け取り、メッセージで相談して日時を提案・確定します。")}</span></li>
+          </ul>
+        </article>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold">{L("自分のペースで、責任を持って")}</h2>
+        <p className="text-sm leading-relaxed text-slate-200">{L("動画添削は、受付のオン・オフと1日の上限で、受ける量を調整できます。受付中で上限に届いていないときだけ、選手の一覧に表示されます。サポートプランは対応できる内容と定員を自分で決めます。引き受けた依頼では期限を守り、選手の経験や目標に合わせて、分かりやすい言葉で伝えてください。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。")}</p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold">{L("報酬について")}</h2>
+        <p className="text-sm leading-relaxed text-slate-200">{L("有料の依頼やプランで指導を提供すると、サービスの手数料を差し引いた報酬が記録されます。受け取り口座の登録、適用される手数料、報酬と送金の状況は、コーチ専用画面で確認できます。")}</p>
+        <SupportPlanCoachTerms />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold">{L("応募から活動まで")}</h2>
+        <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
+          <li>{L("名前、担当種目、記録、成績や指導経験、顔写真と、SNSまたは所属チームのホームページのURLを入力します。URLは1〜3件必須です。")}</li>
+          <li>{L("運営が内容を確認します。審査状況は応募画面で確認できます。")}</li>
+          <li>{L("承認後も公開までは準備中です。「コーチ」タブの「コーチ専用画面」から、承認状況や顔写真を確認できます。活動開始の方法は公開時に案内します。")}</li>
+        </ol>
+      </section>
+      <Link href="/coach/apply" replace className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-pure-white transition hover:bg-blue-500">{L("応募画面へ進む")}<ArrowRight className="size-4" aria-hidden />
+      </Link>
+    </div>
+  );
+}

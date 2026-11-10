@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -100,7 +101,7 @@ function AuthCaptcha({ onToken, resetKey }: { onToken: (token: string) => void; 
   return (
     <div className="space-y-1">
       <div ref={ref} className="min-h-[65px]" />
-      {failed ? <p className="text-sm text-red-400">確認の読み込みに失敗しました。ページを読み直してください。</p> : null}
+      {failed ? <p className="text-sm text-red-400">{L("確認の読み込みに失敗しました。ページを読み直してください。")}</p> : null}
     </div>
   );
 }

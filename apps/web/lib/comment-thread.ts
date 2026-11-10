@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { Comment } from "@/lib/types";
 
 export type CommentThread = {
@@ -28,5 +29,5 @@ export function buildCommentThreads(comments: Comment[]): CommentThread[] {
 }
 
 export function replyLabel(c: Pick<Comment, "reply_to_name" | "reply_to_removed">): string {
-  return c.reply_to_removed || !c.reply_to_name ? "削除されたコメント" : c.reply_to_name;
+  return c.reply_to_removed || !c.reply_to_name ? L("削除されたコメント") : c.reply_to_name;
 }

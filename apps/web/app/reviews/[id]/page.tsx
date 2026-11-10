@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -29,7 +30,7 @@ import type { Meta, Product, ProductReview } from "@/lib/types";
 
 function Stars({ value }: { value: number }) {
   return (
-    <span className="text-amber-300" aria-label={`5点中${value}点`}>
+    <span className="text-amber-300" aria-label={L("5点中{value}点", { value })}>
       {"★".repeat(value)}
       <span className="text-slate-500">{"★".repeat(5 - value)}</span>
     </span>
@@ -79,7 +80,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
       setError("");
     } catch (e) {
       if (seq !== loadSeq.current) return;
-      setError(e instanceof ApiRequestError && e.status === 404 ? "商品が見つかりませんでした。" : "取得に失敗しました。");
+      setError(e instanceof ApiRequestError && e.status === 404 ? L("商品が見つかりませんでした。") : L("取得に失敗しました。"));
     }
   }, [id, token, filterQuery]);
 
@@ -99,8 +100,8 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
-    if (rating < 1) return setFormError("評価を選んでください");
-    if (body.trim() === "") return setFormError("コメントを入力してください");
+    if (rating < 1) return setFormError(L("評価を選んでください"));
+    if (body.trim() === "") return setFormError(L("コメントを入力してください"));
     setPending(true);
     setFormError("");
     try {
@@ -114,19 +115,19 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
       setBody("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiRequestError ? err.message : "投稿できませんでした");
+      setFormError(err instanceof ApiRequestError ? err.message : L("投稿できませんでした"));
     } finally {
       setPending(false);
     }
   }
 
   async function remove(reviewId: string) {
-    if (!(await confirmDialog(deleteConfirmOptions("このレビュー")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("このレビュー"))))) return;
     try {
       await apiFetch(`/v1/product-reviews/${reviewId}`, { method: "DELETE", token });
       await load();
     } catch {
-      setFormError("削除できませんでした");
+      setFormError(L("削除できませんでした"));
     }
   }
 
@@ -139,7 +140,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
     <article className="mx-auto max-w-2xl space-y-4">
       <div className="overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {product.product_url ? (
-          <a href={product.product_url} target="_blank" rel="noopener noreferrer" aria-label={`${product.name}の公式ページを開く`}>
+          <a href={product.product_url} target="_blank" rel="noopener noreferrer" aria-label={L("{name}の公式ページを開く", { name: product.name })}>
             <ProductImage product={product} className="aspect-[16/9]" />
           </a>
         ) : (
@@ -150,9 +151,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
             {productKindLabels[product.kind]}
           </span>
           {product.discontinued ? (
-            <span className="ml-2 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">
-              旧モデル
-            </span>
+            <span className="ml-2 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">{L("旧モデル")}</span>
           ) : null}
           <p className="text-xs text-slate-300">{product.brand}</p>
           <h1 className="text-xl font-bold">{product.name}</h1>
@@ -163,26 +162,23 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-[0.98]"
-            >
-              公式ページを見る ↗
-            </a>
+            >{L("公式ページを見る ↗")}</a>
           ) : null}
         </div>
       </div>
 
       <section className="space-y-3">
-        <h2 className="font-semibold">レビュー {product.review_count}件</h2>
+        <h2 className="font-semibold">{L("レビュー {review_count}件", { review_count: product.review_count })}</h2>
         <ReviewFilterBar filters={filters} onChange={(next) => window.history.pushState(null, "", withReviewFilters(`/reviews/${id}`, next))} />
         {filtered && summary ? (
-          <p className="text-sm text-slate-200">
-            条件に合うレビュー <span className="text-amber-300">{ratingText(summary.avg_rating, summary.review_count)}</span>
+          <p className="text-sm text-slate-200">{L("条件に合うレビュー")}{" "}<span className="text-amber-300">{ratingText(summary.avg_rating, summary.review_count)}</span>
           </p>
         ) : null}
         {reviews.length === 0 ? (
           filtered ? (
-            <EmptyState title="条件に合うレビューがありません" body="絞り込みを変えるか、解除してください。" />
+            <EmptyState title={L("条件に合うレビューがありません")} body={L("絞り込みを変えるか、解除してください。")} />
           ) : (
-            <EmptyState title="まだレビューがありません" body="最初のレビューを書いてみましょう。" />
+            <EmptyState title={L("まだレビューがありません")} body={L("最初のレビューを書いてみましょう。")} />
           )
         ) : null}
         {reviews.map((r) => (
@@ -193,9 +189,7 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center justify-between text-xs text-slate-300">
               <span>{formatDateTime(r.created_at)}</span>
               {r.mine ? (
-                <button type="button" onClick={() => remove(r.id)} className="cursor-pointer text-red-300 underline">
-                  削除
-                </button>
+                <button type="button" onClick={() => remove(r.id)} className="cursor-pointer text-red-300 underline">{L("削除")}</button>
               ) : null}
             </div>
           </div>
@@ -203,17 +197,11 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
       </section>
 
       {!session ? (
-        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
-          レビューを書くには<Link href="/login" className="text-blue-300 underline">ログイン</Link>してください。
-        </p>
+        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">{L("レビューを書くには")}<Link href="/login" className="text-blue-300 underline">{L("ログイン")}</Link>{L("してください。")}</p>
       ) : filtered ? (
-        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
-          レビューを書くときは、絞り込みを解除してください。
-        </p>
+        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">{L("レビューを書くときは、絞り込みを解除してください。")}</p>
       ) : mineExists ? (
-        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">
-          この商品にはレビューを書いています。書き直す場合は削除してください。
-        </p>
+        <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">{L("この商品にはレビューを書いています。書き直す場合は削除してください。")}</p>
       ) : (
         <form
           onSubmit={submit}
@@ -225,15 +213,15 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
           }}
           className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3.5"
         >
-          <p className="text-sm font-medium">レビューを書く</p>
-          <div className="flex gap-1" role="radiogroup" aria-label="評価">
+          <p className="text-sm font-medium">{L("レビューを書く")}</p>
+          <div className="flex gap-1" role="radiogroup" aria-label={L("評価")}>
             {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
                 type="button"
                 role="radio"
                 aria-checked={rating === n}
-                aria-label={`${n}点`}
+                aria-label={L("{n}点", { n })}
                 onClick={() => setRating(n)}
                 className={`size-10 cursor-pointer text-2xl ${n <= rating ? "text-amber-300" : "text-slate-500"}`}
               >
@@ -246,13 +234,13 @@ export default function ProductReviewsPage({ params }: { params: Promise<{ id: s
             maxLength={2000}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="履き心地、反発、フィット感など"
+            placeholder={L("履き心地、反発、フィット感など")}
             className="glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500"
           />
           <ReviewAttrsFields value={attrs} onChange={setAttrs} />
           {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "送っています" : "投稿する"}
+            {pending ? L("送っています") : L("投稿する")}
           </Button>
         </form>
       )}

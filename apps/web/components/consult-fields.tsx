@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import type { Choice } from "@/lib/support-consult";
 import type { ReactNode } from "react";
@@ -24,8 +25,8 @@ export function YesNo({ label, value, onChange, error }: { label: string; value:
   return (
     <FieldBlock label={label} error={error}>
       <div className="flex gap-2" role="group" aria-label={label}>
-        <button type="button" aria-pressed={value === true} className={chip(value === true)} onClick={() => onChange(true)}>はい</button>
-        <button type="button" aria-pressed={value === false} className={chip(value === false)} onClick={() => onChange(false)}>いいえ</button>
+        <button type="button" aria-pressed={value === true} className={chip(value === true)} onClick={() => onChange(true)}>{L("はい")}</button>
+        <button type="button" aria-pressed={value === false} className={chip(value === false)} onClick={() => onChange(false)}>{L("いいえ")}</button>
       </div>
     </FieldBlock>
   );
@@ -45,7 +46,7 @@ export function SingleChoice({ label, choices, value, onChange, error }: { label
 
 export function MultiChoice({ label, choices, values, onChange, error }: { label: string; choices: Choice[]; values: string[]; onChange: (v: string[]) => void; error?: string }) {
   return (
-    <FieldBlock label={`${label}（複数選べます）`} error={error}>
+    <FieldBlock label={L("{label}（複数選べます）", { label })} error={error}>
       <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
         {choices.map((x) => {
           const on = values.includes(x.value);

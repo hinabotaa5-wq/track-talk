@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvailabilityEditor } from "@/components/coach-availability";
@@ -18,10 +19,10 @@ export default function CoachAvailabilityPage() {
     }
   }, [loading, session, router]);
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="カレンダー">
+    <CoachSubpageShell title={L("カレンダー")}>
       <CoachAvailabilityEditor token={token} />
     </CoachSubpageShell>
   );

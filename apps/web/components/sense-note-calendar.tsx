@@ -1,4 +1,5 @@
 "use client";
+import { L, weekdayLabel } from "@/lib/i18n";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -39,7 +40,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
   const closeButton = useRef<HTMLButtonElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const shared = records !== undefined;
-  const title = shared ? "感覚と記録のカレンダー" : "感覚メモの履歴";
+  const title = shared ? L("感覚と記録のカレンダー") : L("感覚メモの履歴");
   const today = todayInTokyo();
   const [year, monthNumber] = month.split("-").map(Number);
   const offset = new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay();
@@ -59,7 +60,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
       const bounds = calendar.current?.getBoundingClientRect();
       if (!bounds) return;
       const headerBottom = Math.max(0, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
-      const nav = [...document.querySelectorAll<HTMLElement>('nav[aria-label="メイン"]')]
+      const nav = [...document.querySelectorAll<HTMLElement>("nav[data-main-nav]")]
         .find((element) => getComputedStyle(element).position === "fixed" && element.getBoundingClientRect().height > 0);
       const bottom = nav?.getBoundingClientRect().top ?? window.innerHeight;
       const next = { top: Math.max(8, Math.ceil(headerBottom + 8 - bounds.top)), bottom: Math.max(8, Math.ceil(bounds.bottom - bottom + 8)) };
@@ -92,12 +93,12 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
       <div className="space-y-4">
         {shared ? null : <h2 className="text-base font-bold">{title}</h2>}
         <div className="flex items-center justify-between">
-          <Button variant="secondary" aria-label="前の月" onClick={() => moveMonth(-1)}><ChevronLeft className="size-5" aria-hidden /></Button>
-          <h3 aria-live="polite" className="font-semibold tabular-nums">{year}年{monthNumber}月</h3>
-          <Button variant="secondary" aria-label="次の月" disabled={month >= today.slice(0, 7)} onClick={() => moveMonth(1)}><ChevronRight className="size-5" aria-hidden /></Button>
+          <Button variant="secondary" aria-label={L("前の月")} onClick={() => moveMonth(-1)}><ChevronLeft className="size-5" aria-hidden /></Button>
+          <h3 aria-live="polite" className="font-semibold tabular-nums">{L("{year}年{monthNumber}月", { year, monthNumber })}</h3>
+          <Button variant="secondary" aria-label={L("次の月")} disabled={month >= today.slice(0, 7)} onClick={() => moveMonth(1)}><ChevronRight className="size-5" aria-hidden /></Button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center" aria-busy={loading || recordsLoading}>
-          {[..."日月火水木金土"].map((day, index) => <span key={day} className={`py-2 text-xs ${index === 0 ? "text-rose-300" : index === 6 ? "text-sky-300" : "text-slate-300"}`}>{day}</span>)}
+          {Array.from({ length: 7 }, (_, index) => weekdayLabel(index)).map((day, index) => <span key={index} className={`py-2 text-xs ${index === 0 ? "text-rose-300" : index === 6 ? "text-sky-300" : "text-slate-300"}`}>{day}</span>)}
           {Array.from({ length: offset }, (_, index) => <span key={`blank-${index}`} aria-hidden />)}
           {Array.from({ length: dayCount }, (_, index) => {
             const number = index + 1;
@@ -111,7 +112,7 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
                 key={day}
                 type="button"
                 disabled={!hasContent}
-                aria-label={`${year}年${monthNumber}月${number}日${written ? "、感覚メモあり" : "、感覚メモなし"}${shared ? hasRecord ? "、記録あり" : "、記録なし" : ""}${hasSummary ? "、AI要約あり" : ""}`}
+                aria-label={L("{year}年{monthNumber}月{number}日{v3}{v4}{v5}", { year, monthNumber, number, v3: written ? L("、感覚メモあり") : L("、感覚メモなし"), v4: shared ? hasRecord ? L("、記録あり") : L("、記録なし") : "", v5: hasSummary ? L("、AI要約あり") : "" })}
                 aria-pressed={selectedDay === day}
                 aria-current={day === today ? "date" : undefined}
                 onClick={(event) => { trigger.current = event.currentTarget; setSelectedDay(day); }}
@@ -128,26 +129,26 @@ export function SenseNoteCalendar({ notes, token, month, onMonthChange, loading,
           })}
         </div>
         {shared || summaries.length ? <p className="flex flex-nowrap items-center gap-3 whitespace-nowrap text-xs text-slate-300 sm:gap-4">
-          {shared ? <><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-300" />感覚メモ</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-300" />記録</span></> : null}
-          <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#a855f7]" />AI要約</span>
+          {shared ? <><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-300" />{L("感覚メモ")}</span><span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-amber-300" />{L("記録")}</span></> : null}
+          <span className="flex items-center gap-1"><span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#a855f7]" />{L("AI要約")}</span>
         </p> : null}
-        {summariesLoading ? <p role="status" className="sr-only">AI要約を読み込み中...</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">AI要約を読み込めませんでした。</p><Button variant="secondary" onClick={onSummariesRetry}>まとめを再読み込み</Button></div> : null}
-        {recordsLoading ? <p role="status" className="sr-only">記録を読み込み中...</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">記録を読み込めませんでした。</p><Button variant="secondary" onClick={onRecordsRetry}>記録を再読み込み</Button></div> : null}
-        {loading ? <p role="status" className="sr-only">この月のメモを読み込み中...</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">過去のメモを読み込めませんでした。</p><Button variant="secondary" onClick={onRetry}>再読み込み</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? "この月の感覚メモ・記録はありません。" : "この月の感覚メモはありません。"}</p> : null}
+        {summariesLoading ? <p role="status" className="sr-only">{L("AI要約を読み込み中...")}</p> : summariesFailed ? <div role="alert"><p className="text-sm text-red-300">{L("AI要約を読み込めませんでした。")}</p><Button variant="secondary" onClick={onSummariesRetry}>{L("まとめを再読み込み")}</Button></div> : null}
+        {recordsLoading ? <p role="status" className="sr-only">{L("記録を読み込み中...")}</p> : recordsFailed ? <div role="alert"><p className="text-sm text-red-300">{L("記録を読み込めませんでした。")}</p><Button variant="secondary" onClick={onRecordsRetry}>{L("記録を再読み込み")}</Button></div> : null}
+        {loading ? <p role="status" className="sr-only">{L("この月のメモを読み込み中...")}</p> : failed ? <div role="alert" className="space-y-2"><p className="text-sm text-red-300">{L("過去のメモを読み込めませんでした。")}</p><Button variant="secondary" onClick={onRetry}>{L("再読み込み")}</Button></div> : !notes.some((note) => note.day.startsWith(month)) && !records?.some((record) => record.raced_on.startsWith(month)) && !summaries.some((summary) => summary.to_day.startsWith(month)) && !recordsLoading && !recordsFailed && !summariesLoading && !summariesFailed ? <p className="text-sm text-slate-300">{shared ? L("この月の感覚メモ・記録はありません。") : L("この月の感覚メモはありません。")}</p> : null}
       </div>
       {detailsOpen && selectedDay ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/60 px-2 backdrop-blur-sm" style={{ paddingTop: overlayPadding.top, paddingBottom: overlayPadding.bottom }} onClick={(event) => { if (event.target === event.currentTarget) closeDetails(); }}>
-          <section role="dialog" aria-label={`${senseDayLabel(selectedDay)}の詳細`} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); closeDetails(); } }} className="flex max-h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-white/25 bg-slate-900 shadow-xl">
+          <section role="dialog" aria-label={L("{v0}の詳細", { v0: senseDayLabel(selectedDay) })} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); closeDetails(); } }} className="flex max-h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-white/25 bg-slate-900 shadow-xl">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/15 px-3 py-1">
               <h3 className="text-sm font-semibold">{senseDayLabel(selectedDay)}</h3>
-              <button type="button" ref={closeButton} aria-label="詳細を閉じる" onClick={closeDetails} className="flex size-10 items-center justify-center rounded-full hover:bg-white/10"><X className="size-4" aria-hidden /></button>
+              <button type="button" ref={closeButton} aria-label={L("詳細を閉じる")} onClick={closeDetails} className="flex size-10 items-center justify-center rounded-full hover:bg-white/10"><X className="size-4" aria-hidden /></button>
             </div>
             <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3">
-              {selectedSummaries.length ? <h4 className="text-sm font-semibold text-violet-200">AI要約</h4> : null}
+              {selectedSummaries.length ? <h4 className="text-sm font-semibold text-violet-200">{L("AI要約")}</h4> : null}
               {selectedSummaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} open />)}
-              {selectedRecords.length ? <h4 className="text-sm font-semibold text-amber-200">記録</h4> : null}
+              {selectedRecords.length ? <h4 className="text-sm font-semibold text-amber-200">{L("記録")}</h4> : null}
               {selectedRecords.map((record) => <RaceRecordRow key={record.id} record={record} kind={raceMarkKind(record.event)} token={token} onChanged={(next) => onRecordsChanged?.(next)} />)}
-              {shared && selectedNotes.length ? <h4 className="text-sm font-semibold text-sky-200">感覚メモ</h4> : null}
+              {shared && selectedNotes.length ? <h4 className="text-sm font-semibold text-sky-200">{L("感覚メモ")}</h4> : null}
               {selectedNotes.map((note) => <SenseNoteItem key={note.id} note={note} token={token} onDeleted={onDeleted} />)}
             </div>
           </section>

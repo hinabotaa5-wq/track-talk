@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -29,12 +30,12 @@ export function FeedbackBox() {
     const body = message.trim();
     if (!body) {
       setSent(false);
-      setError("書いてから送ってね");
+      setError(L("書いてから送ってね"));
       return;
     }
     if (Array.from(body).length > 2000) {
       setSent(false);
-      setError("2000文字以内で書いてね");
+      setError(L("2000文字以内で書いてね"));
       return;
     }
     if (!token || !acquire()) return;
@@ -54,7 +55,7 @@ export function FeedbackBox() {
       setMessage("");
       setSent(true);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "送れなかった。もう一度試してね");
+      setError(err instanceof ApiRequestError ? err.message : L("送れなかった。もう一度試してね"));
     } finally {
       release();
     }
@@ -64,7 +65,7 @@ export function FeedbackBox() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        aria-label="ご意見"
+        aria-label={L("ご意見")}
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => setOpen((current) => !current)}
@@ -80,7 +81,7 @@ export function FeedbackBox() {
         onClose={() => setOpen(false)}
         className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-surface p-3 shadow-xl"
       >
-          <p className="text-balance text-sm font-semibold leading-snug text-slate-100">{prompt}</p>
+          <p className="text-balance text-sm font-semibold leading-snug text-slate-100">{L(prompt)}</p>
           <form
             className="mt-3 space-y-2"
             onSubmit={(event) => {
@@ -91,18 +92,16 @@ export function FeedbackBox() {
             <Textarea
               rows={4}
               value={message}
-              placeholder="なんでも書いてね"
-              aria-label={prompt}
+              placeholder={L("なんでも書いてね")}
+              aria-label={L(prompt)}
               onChange={(event) => {
                 setMessage(event.target.value);
                 setSent(false);
               }}
             />
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
-            {sent ? <p className="text-sm text-blue-400">受け取ったよ</p> : null}
-            <Button type="submit" className="w-full" disabled={pending}>
-              送る
-            </Button>
+            {sent ? <p className="text-sm text-blue-400">{L("受け取ったよ")}</p> : null}
+            <Button type="submit" className="w-full" disabled={pending}>{L("送る")}</Button>
           </form>
       </AnchoredPanel>
     </div>

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
@@ -38,7 +39,7 @@ export function HeaderCoachLink() {
 
   if (!token || result?.token !== token || !result.approved) return null;
   return (
-    <Link href="/coach" aria-label="コーチ専用画面" title="コーチ専用画面"
+    <Link href="/coach" aria-label={L("コーチ専用画面")} title={L("コーチ専用画面")}
       onClick={(event) => guardedClick(event, "/coach")}
       className="inline-flex size-10 items-center justify-center rounded-full text-blue-300 transition hover:bg-white/16 active:scale-[0.98]">
       <GraduationCap className="size-5" aria-hidden />

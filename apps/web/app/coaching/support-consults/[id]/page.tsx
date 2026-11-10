@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageLoading } from "@/components/page-loading";
@@ -29,14 +30,14 @@ export default function SupportConsultPage() {
     return () => { cancelled = true; };
   }, [token, id]);
 
-  if (loading || !session || consult === undefined) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || consult === undefined) return <PageLoading screen label={L("読み込み中...")} />;
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">無料相談</h1>
-      {consult === null ? <p className="text-sm text-red-400">相談を読み込めませんでした。</p> : (
+      <h1 className="text-2xl font-bold">{L("無料相談")}</h1>
+      {consult === null ? <p className="text-sm text-red-400">{L("相談を読み込めませんでした。")}</p> : (
         <SupportConsultDetail consult={consult} role="athlete" token={token} onChange={setConsult} />
       )}
-      <Link href="/coaching/support-consults" className="block text-sm text-blue-300 underline">相談の一覧へ</Link>
+      <Link href="/coaching/support-consults" className="block text-sm text-blue-300 underline">{L("相談の一覧へ")}</Link>
     </div>
   );
 }

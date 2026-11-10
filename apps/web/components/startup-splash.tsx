@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -48,7 +49,7 @@ export function StartupSplash() {
     <div
       id="startup-splash"
       role="status"
-      aria-label="TrackTalkを起動しています"
+      aria-label={L("TrackTalkを起動しています")}
       aria-busy={phase === "shown"}
       data-state={phase}
       style={{

@@ -13,7 +13,8 @@ import { TodayMeetBalloon } from "./today-meet-balloon";
 import { useCurrentMainTab, headerBackFallback, isCoachChildPage, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { trackHeaderHistory } from "@/lib/header-history";
-import { mainTabLabel, parseLocale, t } from "@/lib/i18n";
+import { mainTabLabel, t } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
@@ -66,7 +67,7 @@ export function Header() {
   }
 
   const current = useCurrentMainTab(pathname);
-  const locale = parseLocale(profile?.locale);
+  const locale = useLocale();
 
   // ヘッダーを出さない画面でも、iPhone の上の切り欠きに中身が重ならないよう余白だけ残す。
   if (hidesHeader(pathname, search, profileIncomplete(profile))) return <div aria-hidden style={{ paddingTop: "env(safe-area-inset-top)" }} />;
@@ -97,7 +98,7 @@ export function Header() {
         </div>
         {backOnly ? null : (
           <div className="flex shrink-0 items-center gap-1">
-            <nav className="hidden items-center gap-1 md:flex" aria-label={t(locale, "nav.main")}>
+            <nav className="hidden items-center gap-1 md:flex" aria-label={t(locale, "nav.main")} data-main-nav="">
               {mainTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = current === tab.id;

@@ -1,4 +1,6 @@
 "use client";
+import { L } from "@/lib/i18n";
+import { useTitleTranslation } from "@/components/locale-provider";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,7 +29,8 @@ import {
 
 type Load = { kind: "loading" } | { kind: "joined"; group: InjuryGroup } | { kind: "not-joined" } | { kind: "failed" };
 
-export function GroupView({ part, members, summary }: { part: string; members: number | null; summary: ReactNode }) {
+export function GroupView({ part, members, summary, titleJa = "" }: { part: string; members: number | null; summary: ReactNode; titleJa?: string }) {
+  useTitleTranslation(titleJa, injuryGroupTitle(part));
   const { session, token, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [selected, setSelected] = useState<InjuryStage | null>(null);
@@ -78,7 +81,7 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       <div>
         <h1 className="text-2xl font-bold">
           {injuryGroupTitle(part)}
-          {members !== null ? <span className="text-lg font-semibold text-slate-200"> · {members}人</span> : null}
+          {members !== null ? <span className="text-lg font-semibold text-slate-200">{L("· {members}人", { members })}</span> : null}
         </h1>
         <p className="mt-2 text-sm text-slate-200">{injuryGroupDescriptions[part]}</p>
       </div>
@@ -89,22 +92,18 @@ export function GroupView({ part, members, summary }: { part: string; members: n
 
   if (!loading && !session) {
     return intro(
-      <Link href={`/login?next=${encodeURIComponent(`/injury/${part}`)}`} className={ctaClass}>
-        ログインしてグループに入る
-      </Link>,
+      <Link href={`/login?next=${encodeURIComponent(`/injury/${part}`)}`} className={ctaClass}>{L("ログインしてグループに入る")}</Link>,
     );
   }
 
   if (load.kind === "failed") {
-    return intro(<ErrorState message="グループの取得に失敗しました。時間をおいて、もう一度開いてください。" />);
+    return intro(<ErrorState message={L("グループの取得に失敗しました。時間をおいて、もう一度開いてください。")} />);
   }
 
   if (load.kind === "not-joined") {
     if (!joining) {
       return intro(
-        <button type="button" onClick={() => setJoining(true)} className={ctaClass}>
-          このグループに入る
-        </button>,
+        <button type="button" onClick={() => setJoining(true)} className={ctaClass}>{L("このグループに入る")}</button>,
       );
     }
     return (
@@ -137,28 +136,24 @@ export function GroupView({ part, members, summary }: { part: string; members: n
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">
-            {injuryGroupTitle(part)} · {group.members}人
-          </h1>
-          <p className="mt-1 text-sm text-slate-200">段階をタップで読めます</p>
+          <h1 className="text-2xl font-bold">{L("{v0} · {members}人", { v0: injuryGroupTitle(part), members: group.members })}</h1>
+          <p className="mt-1 text-sm text-slate-200">{L("段階をタップで読めます")}</p>
         </div>
         <Link
           href={`/injury/${part}/stage`}
           className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/15 active:scale-[0.98]"
-        >
-          段階を変える
-        </Link>
+        >{L("段階を変える")}</Link>
       </div>
 
       {celebrate ? <InjuryGoalCelebration onClose={() => setCelebrate(false)} /> : null}
 
       <InjuryRoadmap stages={group.stages} mine={mine} selected={selected} onSelect={setSelected} />
 
-      <h2 className="pt-2 text-base font-bold">{selectedLabel}の投稿</h2>
+      <h2 className="pt-2 text-base font-bold">{L("{selectedLabel}の投稿", { selectedLabel })}</h2>
       {current === null ? (
         <FeedLoadingFrame />
       ) : current.length === 0 ? (
-        <EmptyState title="まだ投稿がありません" body={own ? "最初の一言を書いてみましょう。" : "この段階の投稿は、まだありません。"} />
+        <EmptyState title={L("まだ投稿がありません")} body={own ? L("最初の一言を書いてみましょう。") : L("この段階の投稿は、まだありません。")} />
       ) : (
         <FeedGrid>
           {current.map((post) => (
@@ -169,10 +164,10 @@ export function GroupView({ part, members, summary }: { part: string; members: n
       {feed.hasMore ? <LoadMore onLoad={() => void feed.loadMore()} loading={feed.loadingMore} error={feed.moreError} expired={feed.expired} /> : null}
 
       {summary ? (
-        <section className="space-y-3 border-t border-white/15 pt-4" aria-label="みんなのデータ">
+        <section className="space-y-3 border-t border-white/15 pt-4" aria-label={L("みんなのデータ")}>
           <div>
-            <h2 className="text-base font-bold">みんなのデータ</h2>
-            <p className="mt-1 text-xs text-slate-300">グループ外の人も見られます</p>
+            <h2 className="text-base font-bold">{L("みんなのデータ")}</h2>
+            <p className="mt-1 text-xs text-slate-300">{L("グループ外の人も見られます")}</p>
           </div>
           {summary}
         </section>
@@ -185,15 +180,11 @@ export function GroupView({ part, members, summary }: { part: string; members: n
           <Link
             href={`/injury/${part}/new`}
             className="block rounded-full bg-white py-3 text-center text-sm font-semibold text-blue-700 shadow-lg shadow-slate-950/60 transition hover:bg-blue-50 active:scale-[0.98]"
-          >
-            {selectedLabel}に投稿
-          </Link>
+          >{L("{selectedLabel}に投稿", { selectedLabel })}</Link>
         ) : (
           <>
-            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">
-              この段階には投稿できません
-            </span>
-            <p className="text-center text-xs text-slate-300">投稿できるのは、いまの段階({injuryStages.find((i) => i.value === mine)?.label})だけです。</p>
+            <span className="block rounded-full border border-white/25 py-3 text-center text-sm font-semibold text-slate-300">{L("この段階には投稿できません")}</span>
+            <p className="text-center text-xs text-slate-300">{L("投稿できるのは、いまの段階({label})だけです。", { label: injuryStages.find((i) => i.value === mine)?.label })}</p>
           </>
         )}
       </div>

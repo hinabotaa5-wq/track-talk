@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 const jst = "Asia/Tokyo";
 
 export function formatDateTime(iso: string) {
@@ -12,13 +13,13 @@ export function formatRelativeTime(iso: string, now = Date.now()) {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const seconds = Math.max(0, Math.floor((now - then) / 1000));
-  if (seconds < 60) return "たった今";
+  if (seconds < 60) return L("たった今");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}分前`;
+  if (minutes < 60) return L("{minutes}分前", { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}時間前`;
+  if (hours < 24) return L("{hours}時間前", { hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}日前`;
+  if (days < 7) return L("{days}日前", { days });
   return formatDateTime(iso);
 }
 
@@ -67,5 +68,5 @@ export function todayInTokyo(now = new Date()) {
 
 // 金額を "1,000円" の形にする。
 export function formatYen(yen: number) {
-  return `${yen.toLocaleString("ja-JP")}円`;
+  return L("{v0}円", { v0: yen.toLocaleString("ja-JP") });
 }

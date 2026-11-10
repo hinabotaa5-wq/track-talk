@@ -1,4 +1,5 @@
 "use client";
+import { L, localizeJaDate } from "@/lib/i18n";
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -25,13 +26,13 @@ import { competitionDates, destination } from "./regional/regional-view";
 type View = "domestic" | "international";
 
 const views: { id: View; label: string }[] = [
-  { id: "domestic", label: "国内主要大会" },
-  { id: "international", label: "国際大会" },
+  { id: "domestic", get label() { return L("国内主要大会"); } },
+  { id: "international", get label() { return L("国際大会"); } },
 ];
 
 const entries = [
-  { href: regionalCompetitionsPath, label: "都道府県の大会", icon: MapPin },
-  { href: "/competitions/major-hosts", label: "今後の国際大会", icon: Globe },
+  { href: regionalCompetitionsPath, get label() { return L("都道府県の大会"); }, icon: MapPin },
+  { href: "/competitions/major-hosts", get label() { return L("今後の国際大会"); }, icon: Globe },
 ];
 
 export function CompetitionsHome({ initialMajors = null }: { initialMajors?: DomesticMajor[] | null }) {
@@ -65,7 +66,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   return (
     <div className="space-y-5">
       {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
-      <nav aria-label="ほかの大会" className="grid grid-cols-2 gap-2 md:max-w-md">
+      <nav aria-label={L("ほかの大会")} className="grid grid-cols-2 gap-2 md:max-w-md">
         {entries.map((entry) => {
           const Icon = entry.icon;
           return (
@@ -82,7 +83,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
         })}
       </nav>
       <MotionConfig reducedMotion="user">
-        <ViewSwitch label="表示する大会" layoutId="competition-view-pill" views={views} current={view} onSelect={select} />
+        <ViewSwitch label={L("表示する大会")} layoutId="competition-view-pill" views={views} current={view} onSelect={select} />
         {views.map((item) =>
           opened.has(item.id) || item.id === view ? (
             <motion.div
@@ -118,7 +119,7 @@ function DomesticSchedule({ initial, meets, resources }: { initial: DomesticMajo
         setError("");
       })
       .catch(() => {
-        if (active) setError("国内主要大会を取得できませんでした。");
+        if (active) setError(L("国内主要大会を取得できませんでした。"));
       });
     return () => {
       active = false;
@@ -133,7 +134,7 @@ function DomesticSchedule({ initial, meets, resources }: { initial: DomesticMajo
       itemKey={(major) => `${major.slug}:${major.year}`}
       renderCard={(major, today) => <DomesticCard major={major} today={today} thread={meetThreadForMajor(meets, major)} timetableURL={resources.find((r) => r.major_slug === major.slug && r.major_year === major.year)?.timetable_url} />}
       undecided={undecidedDomesticMeets(majors)}
-      emptyBody="今シーズンの国内主要大会はまだ発表されていません。"
+      emptyBody={L("今シーズンの国内主要大会はまだ発表されていません。")}
     />
   );
 }
@@ -159,7 +160,7 @@ function InternationalSchedule({ meets, resources }: { meets: MeetThread[]; reso
       items={entry.items}
       itemKey={(c) => c.id}
       renderCard={(c, today) => <InternationalCard competition={c} today={today} thread={meetThreadForCompetition(meets, c)} timetableURL={resources.find((r) => r.competition_id === c.id)?.timetable_url} />}
-      emptyBody="今シーズンの国際大会はまだ取り込まれていません。"
+      emptyBody={L("今シーズンの国際大会はまだ取り込まれていません。")}
     />
   );
 }
@@ -183,7 +184,7 @@ function Schedule<T extends Scheduled>({
   const today = now === null ? "0000-01-01" : todayInTokyo(new Date(now));
   const { upcoming, ended } = seasonSchedule(items, today);
   if (items.length === 0 && undecided.length === 0) {
-    return <EmptyState title="大会がありません" body={emptyBody} />;
+    return <EmptyState title={L("大会がありません")} body={emptyBody} />;
   }
 
   const months = (groups: MonthGroup<T>[]) =>
@@ -201,18 +202,18 @@ function Schedule<T extends Scheduled>({
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-slate-100">開催予定</h2>
+        <h2 className="text-xl font-semibold text-slate-100">{L("開催予定")}</h2>
         {upcoming.length === 0 && undecided.length === 0 ? (
-          <p className="text-sm text-slate-200">今シーズンの開催予定の大会はありません。</p>
+          <p className="text-sm text-slate-200">{L("今シーズンの開催予定の大会はありません。")}</p>
         ) : null}
         {months(upcoming)}
         {undecided.length > 0 ? (
           <section className="space-y-3">
-            <h3 className="text-base font-semibold text-slate-200">日程未定</h3>
+            <h3 className="text-base font-semibold text-slate-200">{L("日程未定")}</h3>
             <div className="grid gap-3 md:grid-cols-2">
               {undecided.map((meet) => (
                 <div key={meet.slug} className={`${cardBase} opacity-70`}>
-                  <p className="text-xs text-slate-200">日程未定</p>
+                  <p className="text-xs text-slate-200">{L("日程未定")}</p>
                   <h4 className="text-lg font-semibold text-slate-100">{meet.label}</h4>
                 </div>
               ))}
@@ -222,7 +223,7 @@ function Schedule<T extends Scheduled>({
       </section>
       {ended.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-slate-100">終了済み</h2>
+          <h2 className="text-xl font-semibold text-slate-100">{L("終了済み")}</h2>
           {months(ended)}
         </section>
       ) : null}
@@ -233,8 +234,8 @@ function Schedule<T extends Scheduled>({
 const cardBase = "block h-full rounded-xl border border-white/20 glass bg-white/10 p-4";
 
 function StateBadge({ item, today }: { item: Scheduled; today: string }) {
-  if (isOver(item, today)) return <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-slate-100">終了</span>;
-  if (isOngoing(item, today)) return <span className="ml-2 rounded-full bg-blue-500/30 px-2 py-0.5 text-blue-100">開催中</span>;
+  if (isOver(item, today)) return <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-slate-100">{L("終了")}</span>;
+  if (isOngoing(item, today)) return <span className="ml-2 rounded-full bg-blue-500/30 px-2 py-0.5 text-blue-100">{L("開催中")}</span>;
   return null;
 }
 
@@ -265,11 +266,11 @@ function ScheduleCard({
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
       ) : <div className={action ? "pr-10" : ""}>{children}</div>}
-      {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">タイムテーブル</a> : null}
+      {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">{L("タイムテーブル")}</a> : null}
       {thread ? (
         <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
           <span className="min-w-0">
-            <span className="block">実況スレッドへ</span>
+            <span className="block">{L("実況スレッドへ")}</span>
             <NowRunning events={thread.now_running} className="block truncate text-xs font-semibold text-emerald-200" />
           </span>
           <span className="flex shrink-0 items-center gap-1 text-xs text-amber-100/80">
@@ -288,13 +289,13 @@ function DomesticCard({ major, today, thread, timetableURL }: { major: DomesticM
     <ScheduleCard
       timetableURL={timetableURL}
       href={major.site_url}
-      linkLabel={major.site_url ? "公式サイト" : ""}
+      linkLabel={major.site_url ? L("公式サイト") : ""}
       over={isOver(major, today)}
       thread={thread}
       action={isOver(major, today) ? null : <TargetMeetButton className="absolute right-3 top-3" source="major" meetRef={`${major.slug}:${major.year}`} name={major.name} />}
     >
       <p className="text-xs text-slate-200">
-        {major.schedule_label}
+        {localizeJaDate(major.schedule_label)}
         <StateBadge item={major} today={today} />
       </p>
       <h4 className="text-lg font-semibold text-slate-100">{major.name}</h4>

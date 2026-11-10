@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -75,7 +76,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
   function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const incoming = Array.from(list);
-    setPhotoNotice(incoming.length > maxPhotos ? "1枚までです。" : "");
+    setPhotoNotice(incoming.length > maxPhotos ? L("1枚までです。") : "");
     const room = maxPhotos - kept.length - files.length;
     if (room <= 0) return;
     const next = [...files];
@@ -107,16 +108,16 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       body,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "入力を確認してください");
+      setError(parsed.error.issues[0]?.message ?? L("入力を確認してください"));
       return;
     }
     if (kept.length + files.length > maxPhotos) {
-      setError("写真は1枚までです");
+      setError(L("写真は1枚までです"));
       return;
     }
     for (const item of files) {
       if (!looksLikeImage(item.file)) {
-        setError("写真ファイルを選んでください");
+        setError(L("写真ファイルを選んでください"));
         return;
       }
     }
@@ -124,10 +125,10 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
     try {
       const imageIDs = kept.map((photo) => photo.public_id);
       for (const [index, item] of files.entries()) {
-        setStatus(`写真を準備しています（${index + 1}/${files.length}）`);
+        setStatus(L("写真を準備しています（{v0}/{length}）", { v0: index + 1, length: files.length }));
         const sending = await shrinkImage(item.file);
         if (sending.size > maxPhotoBytes) {
-          throw new Error("10MB以内の写真にしてください");
+          throw new Error(L("10MB以内の写真にしてください"));
         }
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         setStatus("");
@@ -136,7 +137,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         setUpload({ loaded: 0, total: sending.size, percent: 0 });
         const result = await uploadToCloudinary("image", sending, signed, setUpload);
         if (result.public_id !== signed.public_id) {
-          throw new Error("写真のアップロードに失敗しました");
+          throw new Error(L("写真のアップロードに失敗しました"));
         }
         imageIDs.push(result.public_id);
       }
@@ -158,7 +159,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
       (initial ? router.replace : router.push)(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
     } catch (e) {
-      setError(apiErrorText(e, e instanceof Error ? e.message : "保存に失敗しました"));
+      setError(apiErrorText(e, e instanceof Error ? e.message : L("保存に失敗しました")));
       setStatus("");
       setUpload(null);
       setUploadFile(null);
@@ -170,12 +171,10 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <label className="block text-sm font-medium">
-        チーム名
-        <Input className={fieldClass} maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <label className="block text-sm font-medium">{L("チーム名")}<Input className={fieldClass} maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">活動場所</legend>
+        <legend className="text-sm font-medium">{L("活動場所")}</legend>
         <div className="max-h-48 overflow-y-auto rounded-md border border-white/25 glass bg-white/8 p-2">
           <ul className="grid grid-cols-3 gap-1">
             {PREFECTURES.map((prefecture) => (
@@ -195,54 +194,46 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
         <Input
           className={fieldClass}
           maxLength={80}
-          placeholder="〇〇競技場"
+          placeholder={L("〇〇競技場")}
           value={venue}
           onChange={(e) => setVenue(e.target.value)}
-          aria-label="活動場所の詳細"
+          aria-label={L("活動場所の詳細")}
         />
       </fieldset>
-      <label className="block text-sm font-medium">
-        活動時間
-        <Input
+      <label className="block text-sm font-medium">{L("活動時間")}<Input
           className={fieldClass}
           maxLength={80}
-          placeholder="毎週火曜 19:00–21:00"
+          placeholder={L("毎週火曜 19:00–21:00")}
           value={schedule}
           onChange={(e) => setSchedule(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
-        男女比
-        <Input
+      <label className="block text-sm font-medium">{L("男女比")}<Input
           className={fieldClass}
           maxLength={80}
-          placeholder="男性7：女性3"
+          placeholder={L("男性7：女性3")}
           value={genderRatio}
           onChange={(e) => setGenderRatio(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
-        平均年齢
-        <Input
+      <label className="block text-sm font-medium">{L("平均年齢")}<Input
           className={fieldClass}
           maxLength={80}
-          placeholder="25歳"
+          placeholder={L("25歳")}
           value={averageAge}
           onChange={(e) => setAverageAge(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
-        募集年齢
-        <Input
+      <label className="block text-sm font-medium">{L("募集年齢")}<Input
           className={fieldClass}
           maxLength={80}
-          placeholder="18〜30歳"
+          placeholder={L("18〜30歳")}
           value={recruitAge}
           onChange={(e) => setRecruitAge(e.target.value)}
         />
       </label>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">SNSのURL</legend>
+        <legend className="text-sm font-medium">{L("SNSのURL")}</legend>
         {links.map((link, index) => (
           <div key={index} className="flex items-center gap-2">
             <Input
@@ -251,7 +242,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
               maxLength={500}
               placeholder="https://"
               value={link}
-              aria-label={`SNSのURL ${index + 1}`}
+              aria-label={L("SNSのURL {v0}", { v0: index + 1 })}
               onChange={(e) =>
                 setLinks((current) => current.map((item, i) => (i === index ? e.target.value : item)))
               }
@@ -261,9 +252,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                 type="button"
                 className="shrink-0 text-sm text-slate-200 transition active:scale-[0.98]"
                 onClick={() => setLinks((current) => current.filter((_, i) => i !== index))}
-              >
-                削除
-              </button>
+              >{L("削除")}</button>
             ) : null}
           </div>
         ))}
@@ -272,16 +261,12 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           className="text-sm text-blue-400 transition active:scale-[0.98] disabled:text-slate-600"
           disabled={links.length >= 4}
           onClick={() => setLinks((current) => [...current, ""])}
-        >
-          URLを追加
-        </button>
+        >{L("URLを追加")}</button>
       </fieldset>
-      <label className="block text-sm font-medium">
-        詳細
-        <Textarea rows={10} className="mt-1" maxLength={10000} value={body} onChange={(e) => setBody(e.target.value)} />
+      <label className="block text-sm font-medium">{L("詳細")}<Textarea rows={10} className="mt-1" maxLength={10000} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
       <div className="space-y-2">
-        <p className="text-sm font-medium">チームの写真</p>
+        <p className="text-sm font-medium">{L("チームの写真")}</p>
         {photoNotice ? <p className="text-sm text-red-400">{photoNotice}</p> : null}
         {kept.length > 0 || files.length > 0 ? (
           <ul className="grid grid-cols-3 gap-2">
@@ -296,9 +281,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                     setPhotoNotice("");
                     setKept((current) => current.filter((item) => item.public_id !== photo.public_id));
                   }}
-                >
-                  削除
-                </button>
+                >{L("削除")}</button>
               </li>
             ))}
             {files.map((preview) => (
@@ -313,9 +296,7 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
                     URL.revokeObjectURL(preview.url);
                     setFiles((current) => current.filter((item) => item !== preview));
                   }}
-                >
-                  削除
-                </button>
+                >{L("削除")}</button>
               </li>
             ))}
           </ul>
@@ -342,11 +323,11 @@ export function RecruitmentForm({ initial, returnTo }: { initial?: Post; returnT
           fileName={uploadFile?.name}
           fileSize={uploadFile?.size}
         />
-      ) : submitting ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
+      ) : submitting ? <SubmittingProgress label={initial ? L("投稿を更新しています") : L("投稿を送信しています")} /> : null}
       {status ? <p className="text-sm text-slate-200">{status}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
+        {submitting ? (initial ? L("更新しています") : L("送っています")) : initial ? L("更新する") : L("投稿する")}
       </Button>
     </form>
   );

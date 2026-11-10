@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { usePathname, useRouter } from "next/navigation";
 import { rememberAccountOrigin, readAccountOrigin } from "@/lib/account-origin";
@@ -14,7 +15,7 @@ export function HeaderAccountPanel({ signedIn, label }: { signedIn: boolean; lab
     <MainTabLink
       pendingDelay={200}
       href={signedIn ? "/me" : "/login"}
-      aria-label={label ?? "マイページ"}
+      aria-label={label ?? L("マイページ")}
       aria-expanded={pathname === "/me"}
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;

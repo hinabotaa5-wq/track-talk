@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { SellerNote } from "@/components/seller-note";
 import { PageLoading } from "@/components/page-loading";
@@ -37,7 +38,7 @@ function TicketsPage() {
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
       if (!cancelled) setSummary(data);
-    }).catch((err) => { if (!cancelled) setError(err instanceof ApiRequestError ? err.message : "読み込めませんでした"); });
+    }).catch((err) => { if (!cancelled) setError(err instanceof ApiRequestError ? err.message : L("読み込めませんでした")); });
     return () => { cancelled = true; };
   }, [token]);
 
@@ -54,16 +55,16 @@ function TicketsPage() {
         if (purchase.status !== "pending") {
           await load();
           if (cancelled) return;
-          setMessage("購入内容を反映しました");
+          setMessage(L("購入内容を反映しました"));
           const target = ticketReturnPath(purchase.return_path);
           router.replace(target);
           return;
         }
-        setMessage("お支払いの確認中です。確認が済みしだい元の画面に戻ります。");
+        setMessage(L("お支払いの確認中です。確認が済みしだい元の画面に戻ります。"));
         if (++attempts < 30) timer = setTimeout(() => void check(), 2000);
-        else setMessage("確認に時間がかかっています。少し待ってから再読み込みしてください。追加購入は必要ありません。");
+        else setMessage(L("確認に時間がかかっています。少し待ってから再読み込みしてください。追加購入は必要ありません。"));
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : "購入状況を確認できませんでした。画面を再読み込みしてください。");
+        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : L("購入状況を確認できませんでした。画面を再読み込みしてください。"));
       }
     }
     void check();
@@ -90,27 +91,27 @@ function TicketsPage() {
       } else if (result.checkout_url) window.location.assign(result.checkout_url);
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "ticket_checkout_expired") sessionStorage.removeItem(storageKey);
-      setError(err instanceof ApiRequestError ? err.message : "購入画面を開けませんでした。同じボタンで再試行できます。");
+      setError(err instanceof ApiRequestError ? err.message : L("購入画面を開けませんでした。同じボタンで再試行できます。"));
     } finally { release(); }
   }
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
   return <div className="mx-auto max-w-md space-y-5">
-    <h1 className="text-2xl font-bold">コーチングチケット</h1>
+    <h1 className="text-2xl font-bold">{L("コーチングチケット")}</h1>
     <SellerNote />
     {message ? <p role="status" className="text-sm text-blue-200">{message}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-    <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError("読み込めませんでした"))}>チケット情報を再読み込み</Button>
+    <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
       {summary.sales_open === false ? <p role="status" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">{summary.purchase_block_reason}</p> : null}
-      <p className="text-sm text-slate-200">動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。</p>
+      <p className="text-sm text-slate-200">{L("動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。")}</p>
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
-        {p.quantity > 1 ? <p className="text-xs text-slate-300">1枚あたり{formatYen(p.amount_yen / p.quantity)}</p> : null}
-        <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => void buy(p.id)}>購入する</Button>
+        {p.quantity > 1 ? <p className="text-xs text-slate-300">{L("1枚あたり{v0}", { v0: formatYen(p.amount_yen / p.quantity) })}</p> : null}
+        <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => void buy(p.id)}>{L("購入する")}</Button>
       </div>)}</div>
     </> : null}
   </div>;
 }
 
-export default function Page() { return <Suspense fallback={<PageLoading screen label="読み込み中..." />}><TicketsPage /></Suspense>; }
+export default function Page() { return <Suspense fallback={<PageLoading screen label={L("読み込み中...")} />}><TicketsPage /></Suspense>; }

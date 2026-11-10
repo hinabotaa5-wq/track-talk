@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -108,7 +109,7 @@ export function ZoomableImage({ src, alt, wrapperClassName, imageClassName, size
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="写真を拡大表示"
+        aria-label={L("写真を拡大表示")}
         className={`${wrapperClassName ?? ""} block cursor-zoom-in`}
       >
         {fill ? (
@@ -121,7 +122,7 @@ export function ZoomableImage({ src, alt, wrapperClassName, imageClassName, size
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="写真の拡大表示"
+          aria-label={L("写真の拡大表示")}
           ref={overlayRef}
           className="fixed inset-0 z-[100] flex touch-none items-center justify-center bg-black/90 p-4"
           onClick={() => {
@@ -130,7 +131,7 @@ export function ZoomableImage({ src, alt, wrapperClassName, imageClassName, size
         >
           <button
             type="button"
-            aria-label="閉じる"
+            aria-label={L("閉じる")}
             onClick={() => setOpen(false)}
             className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-2xl text-pure-white"
           >

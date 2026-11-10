@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, ApiRequestError, apiErrorText } from "./api";
+import { installEnglish, setActiveLocale } from "./i18n";
+import { en } from "./i18n-en";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -51,5 +53,24 @@ describe("apiErrorText", () => {
   it("API 以外のエラーは fallback を出す", () => {
     expect(apiErrorText(new Error("network"), "保存できませんでした")).toBe("保存できませんでした");
     expect(apiErrorText("oops", "保存できませんでした")).toBe("保存できませんでした");
+  });
+});
+
+describe("API のエラー文の表示言語（本体 #530）", () => {
+  afterEach(() => setActiveLocale("ja"));
+
+  it("日本語の表示では API の文をそのまま出す", () => {
+    const err = new ApiRequestError(422, { error: { code: "validation_error", message: "入力内容を確認してください", fields: { body: "本文は1〜200文字で入力してください" } } });
+    expect(err.message).toBe("入力内容を確認してください");
+    expect(apiErrorText(err, "")).toBe("本文は1〜200文字で入力してください");
+  });
+
+  it("英語の表示では辞書の英語にし、辞書に無い文は日本語を混ぜずに一般的な英語にする", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    expect(new ApiRequestError(404, { error: { code: "not_found", message: "見つかりませんでした" } }).message).toBe("Not found");
+    const unknown = new ApiRequestError(422, { error: { code: "x", message: "辞書に無いエラーの文です", fields: { a: "辞書に無い項目の指摘です" } } });
+    expect(unknown.message).toBe("This can't be done. Please check your input and try again.");
+    expect(apiErrorText(unknown, "")).toBe("This can't be done. Please check your input and try again.");
   });
 });

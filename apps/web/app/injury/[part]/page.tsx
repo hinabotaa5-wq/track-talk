@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -19,9 +20,9 @@ async function loadPublicGroup(part: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { part } = await params;
   if (!isInjuryBodyPart(part)) return {};
-  const title = `${injuryGroupTitle(part)}｜ケガ部`;
-  const subject = part === "other" ? "ケガ" : injuryBodyPartLabel(part);
-  const description = `${subject}をした陸上選手が集まるグループ。復帰までの目安、ケガをしたときの状況、みんなが意識的にやったこと、次の人への一言を見られます。`;
+  const title = L("{v0}｜ケガ部", { v0: injuryGroupTitle(part) });
+  const subject = part === "other" ? L("ケガ") : injuryBodyPartLabel(part);
+  const description = L("{subject}をした陸上選手が集まるグループ。復帰までの目安、ケガをしたときの状況、みんなが意識的にやったこと、次の人への一言を見られます。", { subject });
   return { title, description, alternates: { canonical: `/injury/${part}` }, openGraph: { title, description } };
 }
 
@@ -33,6 +34,7 @@ export default async function InjuryGroupPage({ params }: Props) {
     <GroupView
       part={part}
       members={publicGroup?.members ?? null}
+      titleJa={injuryGroupTitle(part)}
       summary={publicGroup ? <InjuryPublicSummary group={publicGroup} /> : null}
     />
   );

@@ -33,7 +33,7 @@ export default async function CompetitionsPage({
   // 他のタブと同じく、読み込み中も1画面より高くしておく。
   return (
     <div className="min-h-svh md:min-h-0">
-      <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
+      <Suspense fallback={<PageLoading screen />}>
         <CompetitionsHome initialMajors={majors} />
       </Suspense>
     </div>

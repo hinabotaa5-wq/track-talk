@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -42,10 +43,8 @@ function EventRanking({ kind, event, filters }: { kind: ProductKind; event: stri
   if (!ranking || ranking.products.length === 0) return null;
   return (
     <section className="mb-4 rounded-2xl border border-white/20 glass bg-white/10 p-3">
-      <h2 className="text-sm font-semibold text-slate-100">
-        {ranking.event_label}の人の{productKindLabels[kind]}ランキング
-      </h2>
-      <p className="mb-2 text-xs text-slate-300">{ranking.event_label}を選んだ人のレビューだけで平均★を出しています（{ranking.min_reviews}件以上の商品）。</p>
+      <h2 className="text-sm font-semibold text-slate-100">{L("{event_label}の人の{v1}ランキング", { event_label: L(ranking.event_label), v1: productKindLabels[kind] })}</h2>
+      <p className="mb-2 text-xs text-slate-300">{L("{event_label}を選んだ人のレビューだけで平均★を出しています（{min_reviews}件以上の商品）。", { event_label: L(ranking.event_label), min_reviews: ranking.min_reviews })}</p>
       <ol className="space-y-1.5">
         {ranking.products.map((p, i) => (
           <li key={p.id}>
@@ -86,7 +85,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
         setMeta(d.meta);
       })
       .catch(() => {
-        if (active) setError("商品の取得に失敗しました。");
+        if (active) setError(L("商品の取得に失敗しました。"));
       });
     return () => {
       active = false;
@@ -101,7 +100,7 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
     <>
       <div className="mb-3">
         <ViewSwitch
-          label="種類"
+          label={L("種類")}
           layoutId="review-kind-pill"
           views={kinds.map((k) => ({ id: k, label: productKindLabels[k] }))}
           current={kind}
@@ -119,12 +118,12 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
       {!error && products === null ? <FeedLoadingFrame /> : null}
       {products && products.length === 0 ? (
         <EmptyState
-          title={filtered ? "条件に合うレビューがありません" : "商品がありません"}
-          body={filtered ? "絞り込みを変えるか、解除してください。" : q ? "キーワードを変えて探してください。" : "商品は運営が順次追加します。"}
+          title={filtered ? L("条件に合うレビューがありません") : L("商品がありません")}
+          body={filtered ? L("絞り込みを変えるか、解除してください。") : q ? L("キーワードを変えて探してください。") : L("商品は運営が順次追加します。")}
         />
       ) : null}
       {products && products.length > 0 ? (
-        <div role="region" aria-label="レビューの商品一覧" className="grid grid-cols-2 items-start gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <div role="region" aria-label={L("レビューの商品一覧")} className="grid grid-cols-2 items-start gap-3 md:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
             <Link
               key={p.id}
@@ -135,11 +134,11 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
               <div className="space-y-0.5 px-3.5 py-2.5">
                 <p className="text-xs text-slate-300">
                   {p.brand}
-                  {p.discontinued ? <span className="ml-1.5 text-amber-300">旧モデル</span> : null}
+                  {p.discontinued ? <span className="ml-1.5 text-amber-300">{L("旧モデル")}</span> : null}
                 </p>
                 <p className="line-clamp-2 text-sm font-medium text-slate-100 group-hover:text-blue-400">{p.name}</p>
                 <p className="text-xs text-amber-300">
-                  {filtered && p.review_count > 0 ? "条件に合う " : ""}
+                  {filtered && p.review_count > 0 ? L("条件に合う ") : ""}
                   {ratingText(p.avg_rating, p.review_count)}
                 </p>
               </div>
@@ -151,10 +150,10 @@ export function ReviewHome({ kind, q, page, filters }: { kind: ProductKind; q: s
       {products && (meta.page > 1 || hasNext) ? (
         <nav className="mt-4 flex justify-between text-sm">
           {meta.page > 1 ? (
-            <a className="text-blue-300 underline" href={href(meta.page - 1)}>前へ</a>
+            <a className="text-blue-300 underline" href={href(meta.page - 1)}>{L("前へ")}</a>
           ) : <span />}
           {hasNext ? (
-            <a className="text-blue-300 underline" href={href(meta.page + 1)}>次へ</a>
+            <a className="text-blue-300 underline" href={href(meta.page + 1)}>{L("次へ")}</a>
           ) : null}
         </nav>
       ) : null}

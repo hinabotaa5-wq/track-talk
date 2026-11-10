@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { appEvents } from "./practice-events";
 import { prefectureName, PREFECTURES } from "./prefectures";
 import type { Post } from "./types";
@@ -36,7 +37,9 @@ export function practicePagePath(filter: PracticeFilter) {
 
 // practiceCountLabel は「東京都の100m これからの募集 3件」のような見出し。
 export function practiceCountLabel(filter: PracticeFilter, total: number) {
-  const where = filter.prefecture ? prefectureName(filter.prefecture) : "全国";
+  const where = filter.prefecture ? prefectureName(filter.prefecture) : L("全国");
   const event = appEvents.find((item) => item.value === filter.event)?.label;
-  return `${where}${event ? `の${event}` : ""} これからの募集 ${total}件`;
+  return event
+    ? L("{where}の{event} これからの募集 {total}件", { where, event, total })
+    : L("{where} これからの募集 {total}件", { where, total });
 }

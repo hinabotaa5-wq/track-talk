@@ -1,3 +1,4 @@
+import { L } from "./i18n";
 // 受け取り口座の登録状態。コーチ画面の「報酬」と管理画面で文言を揃える。
 // 判定の根拠は Stripe の実状態を映す2値。payouts_enabled は Stripe の
 // payouts_enabled を読んで記録したもの（受け取れる状態）、stripe_linked は
@@ -13,7 +14,7 @@ export function payoutAccountStatus(flags: { stripe_linked: boolean; payouts_ena
 }
 
 export const payoutAccountStatusLabels: Record<PayoutAccountStatus, string> = {
-  registered: "登録済み",
-  in_progress: "登録の途中・確認中",
-  unregistered: "未登録",
+  get registered() { return L("登録済み"); },
+  get in_progress() { return L("登録の途中・確認中"); },
+  get unregistered() { return L("未登録"); },
 };

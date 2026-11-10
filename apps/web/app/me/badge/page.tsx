@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -31,21 +32,21 @@ export default function BadgePage() {
         body: JSON.stringify({ post_master_badge_public: next }),
       });
       await refreshProfile();
-      setMessage(next ? "バッジを表示します。" : "バッジを隠しました。");
+      setMessage(next ? L("バッジを表示します。") : L("バッジを隠しました。"));
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : "更新に失敗しました。");
+      setError(e instanceof ApiRequestError ? e.message : L("更新に失敗しました。"));
     } finally {
       setSaving(false);
     }
   }
 
   if (loading || !session) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">バッジ</h1>
+      <h1 className="text-2xl font-bold">{L("バッジ")}</h1>
       <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-4">
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input
@@ -54,12 +55,8 @@ export default function BadgePage() {
             checked={shown}
             disabled={saving}
             onChange={(e) => void toggle(e.target.checked)}
-          />
-          「投稿マスター」のバッジを表示する
-        </label>
-        <p className="text-xs text-slate-400">
-          いいねがついた投稿が30件以上になると、ニックネームの横にバッジが付きます。ニックネームを公開していないときは出ません。
-        </p>
+          />{L("「投稿マスター」のバッジを表示する")}</label>
+        <p className="text-xs text-slate-400">{L("いいねがついた投稿が30件以上になると、ニックネームの横にバッジが付きます。ニックネームを公開していないときは出ません。")}</p>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       {message ? <p className="text-sm text-emerald-400">{message}</p> : null}

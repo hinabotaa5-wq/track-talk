@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -14,11 +15,11 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   const { code } = await params;
-  if (!isPrefecturePageCode(code)) return { title: "都道府県" };
+  if (!isPrefecturePageCode(code)) return { title: L("都道府県") };
   const name = prefectureName(code);
   return {
-    title: `${name}の陸上競技の大会日程`,
-    description: `${name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程をまとめています。`,
+    title: L("{name}の陸上競技の大会日程", { name }),
+    description: L("{name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程をまとめています。", { name }),
     alternates: { canonical: `/prefectures/${code}` },
   };
 }
@@ -29,5 +30,5 @@ export default async function PrefectureRoute({ params }: { params: Promise<{ co
   const page = await apiFetch<PrefecturePage>(`/v1/prefectures/${code}`, { signal: AbortSignal.timeout(3000) }).catch(
     () => null,
   );
-  return <PrefectureView code={code} initialPage={page} />;
+  return <PrefectureView code={code} initialPage={page} titleJa={L("{name}の陸上競技の大会日程", { name: prefectureName(code) })} />;
 }

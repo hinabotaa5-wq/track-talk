@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachEarningsSection } from "@/components/coach-payouts";
@@ -18,10 +19,10 @@ export default function CoachPayoutsPage() {
     }
   }, [loading, session, router]);
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="報酬・口座">
+    <CoachSubpageShell title={L("報酬・口座")}>
       <CoachEarningsSection token={token} onReady={() => {}} />
     </CoachSubpageShell>
   );

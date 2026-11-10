@@ -4,7 +4,8 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachRequestsSection } from "@/components/coach-requests";
 import { CoachSubpageShell } from "@/components/coach-subpage";
 import { PageLoading } from "@/components/page-loading";
-import { parseLocale, t, type I18nKey } from "@/lib/i18n";
+import { t, type I18nKey } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -15,8 +16,8 @@ const views = {
 } as const satisfies Record<string, { path: string; title: I18nKey }>;
 
 export function CoachRequestsPage({ view }: { view: keyof typeof views }) {
-  const { session, token, profile, loading } = useAuth();
-  const locale = parseLocale(profile?.locale);
+  const { session, token, loading } = useAuth();
+  const locale = useLocale();
   const router = useRouter();
   const { path, title } = views[view];
 

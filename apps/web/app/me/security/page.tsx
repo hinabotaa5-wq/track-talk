@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -90,7 +91,7 @@ export default function SecurityPage() {
     e.preventDefault();
     if (!enrolling) return;
     if (!isTotpCode(code)) {
-      setError("認証アプリに出ている6桁の数字を入れてください。");
+      setError(L("認証アプリに出ている6桁の数字を入れてください。"));
       return;
     }
     const supabase = createClient();
@@ -104,7 +105,7 @@ export default function SecurityPage() {
         return;
       }
       setEnrolling(null);
-      setMessage("二段階認証を設定しました。次からログインのときに、認証アプリのコードも入れます。");
+      setMessage(L("二段階認証を設定しました。次からログインのときに、認証アプリのコードも入れます。"));
       await load();
       await refreshProfile();
       const next = new URLSearchParams(window.location.search).get("next");
@@ -116,9 +117,9 @@ export default function SecurityPage() {
 
   async function remove(factor: Factor) {
     const ok = await confirm({
-      title: "二段階認証を解除しますか？",
-      body: "解除すると、パスワードだけでログインできるようになります。管理者は、設定し直すまで管理の画面と操作が使えなくなります。",
-      confirmLabel: "解除する",
+      title: L("二段階認証を解除しますか？"),
+      body: L("解除すると、パスワードだけでログインできるようになります。管理者は、設定し直すまで管理の画面と操作が使えなくなります。"),
+      confirmLabel: L("解除する"),
     });
     if (!ok) return;
     const supabase = createClient();
@@ -133,38 +134,32 @@ export default function SecurityPage() {
       }
       // 解除しても手元のセッションは aal2 のままなので、取り直して段階を下げる。
       await supabase.auth.refreshSession();
-      setMessage("二段階認証を解除しました。");
+      setMessage(L("二段階認証を解除しました。"));
       await load();
     } finally {
       release();
     }
   }
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">二段階認証</h1>
-      <p className="text-sm text-slate-300">
-        ログインのときに、パスワードに加えて認証アプリ(Google Authenticator・Microsoft Authenticator など)の6桁のコードを入れます。パスワードが漏れても、他人にログインされにくくなります。
-      </p>
+      <h1 className="text-2xl font-bold">{L("二段階認証")}</h1>
+      <p className="text-sm text-slate-300">{L("ログインのときに、パスワードに加えて認証アプリ(Google Authenticator・Microsoft Authenticator など)の6桁のコードを入れます。パスワードが漏れても、他人にログインされにくくなります。")}</p>
       {profile?.mfa_required ? (
-        <p className="rounded-md border border-amber-300/40 bg-amber-400/10 p-3 text-sm text-amber-100">
-          管理の画面と操作は、二段階認証を設定してから使えます。
-        </p>
+        <p className="rounded-md border border-amber-300/40 bg-amber-400/10 p-3 text-sm text-amber-100">{L("管理の画面と操作は、二段階認証を設定してから使えます。")}</p>
       ) : null}
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
         {factors === null ? (
-          <PageLoading label="読み込み中..." />
+          <PageLoading label={L("読み込み中...")} />
         ) : factors.length > 0 ? (
           <>
-            <p className="text-sm font-semibold text-emerald-300">設定済み</p>
+            <p className="text-sm font-semibold text-emerald-300">{L("設定済み")}</p>
             {factors.map((f) => (
               <div key={f.id} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-200">{f.friendly_name || "認証アプリ"}</span>
-                <Button type="button" variant="secondary" onClick={() => remove(f)} disabled={pending}>
-                  解除する
-                </Button>
+                <span className="text-sm text-slate-200">{f.friendly_name || L("認証アプリ")}</span>
+                <Button type="button" variant="secondary" onClick={() => remove(f)} disabled={pending}>{L("解除する")}</Button>
               </div>
             ))}
           </>
@@ -172,10 +167,8 @@ export default function SecurityPage() {
           <MfaEnrollSteps qr={enrolling.qr} secret={enrolling.secret} code={code} onCode={setCode} pending={pending} onSubmit={finishEnroll} />
         ) : (
           <>
-            <p className="text-sm text-slate-300">まだ設定していません。</p>
-            <Button type="button" className="w-full" onClick={startEnroll} disabled={pending}>
-              設定を始める
-            </Button>
+            <p className="text-sm text-slate-300">{L("まだ設定していません。")}</p>
+            <Button type="button" className="w-full" onClick={startEnroll} disabled={pending}>{L("設定を始める")}</Button>
           </>
         )}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}

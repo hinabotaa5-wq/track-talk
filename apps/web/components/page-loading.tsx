@@ -1,9 +1,12 @@
+"use client";
+
+import { L } from "@/lib/i18n";
 import { LoadingStopwatch } from "./loading-stopwatch";
 
 // screen を付けると、ヘッダーと下のバーを除いた画面の真ん中に出す(ページ全体を読み込むとき用。globals.css の .page-loading-screen)。
 // どちらも文字は出さず、ストップウォッチだけにする(label は読み上げ用に残す)。
 // 付けないと、置いた場所の中で真ん中に出す(カードや一覧の一部を読み込むとき用)。
-export function PageLoading({ label = "読み込み中...", screen = false }: { label?: string; screen?: boolean }) {
+export function PageLoading({ label = L("読み込み中..."), screen = false }: { label?: string; screen?: boolean }) {
   return (
     <div
       role="status"

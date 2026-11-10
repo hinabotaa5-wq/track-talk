@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { retainHomeFeedWindow, type PostsPage } from "@/lib/fetch-posts";
@@ -69,7 +70,7 @@ export function HomeFeed({
           prefetch();
         })
         .catch(() => {
-          if (active && !hasInitial) setError(loadError);
+          if (active && !hasInitial) setError(L(loadError));
         });
     }
     if ((chunksRef.current?.length ?? 0) <= 1 && !(hasInitial && isFeedFresh(path))) refresh(!hasInitial);
@@ -108,7 +109,7 @@ export function HomeFeed({
         // 順位変動や削除で欠けたIDの枠は残す。既存の座標をずらさない。
         const byID = new Map(data.posts.map((post) => [post.id, post]));
         setChunks((value) => value ? retainHomeFeedWindow(value.map((part, i) => i === index ? {
-          ...part, unloaded: false, unavailable_ids: part.posts.filter((post) => !byID.has(post.id)).map((post) => post.id), posts: part.posts.map((post) => byID.get(post.id) ?? { ...post, title: "この投稿は現在表示できません" }),
+          ...part, unloaded: false, unavailable_ids: part.posts.filter((post) => !byID.has(post.id)).map((post) => post.id), posts: part.posts.map((post) => byID.get(post.id) ?? { ...post, title: L("この投稿は現在表示できません") }),
         } : part), visibleIDs.current) : value);
         reloading.current.delete(index);
       }).catch((error) => {
@@ -133,7 +134,7 @@ export function HomeFeed({
     } catch (error) {
       if (alive.current) {
         if (error instanceof ApiRequestError && error.code === "invalid_cursor") setCursorExpired(true);
-        setMoreError("続きの読み込みに失敗しました");
+        setMoreError(L("続きの読み込みに失敗しました"));
       }
     } finally {
       morePending.current = false;
@@ -148,17 +149,17 @@ export function HomeFeed({
     <>
       {posts.length === 0 ? (
         <EmptyState
-          title={q ? "一致する投稿がありません" : kind === "recruitment" ? "まだ募集がありません" : "まだ投稿がありません"}
-          body={q ? "別の言葉で探してください。" : kind === "recruitment" ? undefined : "最初のレース感想を書いてみましょう。"}
+          title={q ? L("一致する投稿がありません") : kind === "recruitment" ? L("まだ募集がありません") : L("まだ投稿がありません")}
+          body={q ? L("別の言葉で探してください。") : kind === "recruitment" ? undefined : L("最初のレース感想を書いてみましょう。")}
         />
       ) : null}
-      {cursorExpired ? <button type="button" className="text-sm text-slate-300" onClick={() => window.location.reload()}>一覧の有効期限が切れました。更新する</button> : null}
-      {reloadError ? <button type="button" className="text-sm text-slate-300" onClick={() => { reloading.current.clear(); setReloadError(false); onVisibleIndices(posts.map((post, i) => visibleIDs.current.has(post.id) ? i : -1).filter((i) => i >= 0)); }}>投稿の再取得に失敗しました。再試行</button> : null}
+      {cursorExpired ? <button type="button" className="text-sm text-slate-300" onClick={() => window.location.reload()}>{L("一覧の有効期限が切れました。更新する")}</button> : null}
+      {reloadError ? <button type="button" className="text-sm text-slate-300" onClick={() => { reloading.current.clear(); setReloadError(false); onVisibleIndices(posts.map((post, i) => visibleIDs.current.has(post.id) ? i : -1).filter((i) => i >= 0)); }}>{L("投稿の再取得に失敗しました。再試行")}</button> : null}
       {posts.length > 0 ? (
         <HomeFeedGrid onVisibleIndices={onVisibleIndices} storageKey={path} onEndReached={hasNext && !moreError ? loadMore : undefined}>
           {posts.map((post) => unloadedIDs.has(post.id)
             ? <div key={post.id} aria-busy="true" className="aspect-[4/3] rounded-2xl glass bg-white/10 animate-pulse" />
-            : unavailableIDs.has(post.id) ? <div key={post.id} className="flex aspect-[4/3] items-center justify-center rounded-2xl glass p-4 text-sm text-slate-300">この投稿は現在表示できません</div>
+            : unavailableIDs.has(post.id) ? <div key={post.id} className="flex aspect-[4/3] items-center justify-center rounded-2xl glass p-4 text-sm text-slate-300">{L("この投稿は現在表示できません")}</div>
             : <FeedCard key={post.id} post={post} />)}
           {hasNext ? (
             <button
@@ -169,7 +170,7 @@ export function HomeFeed({
               aria-live="polite"
               className="flex h-full w-full items-center justify-center rounded-2xl border border-white/20 glass bg-white/10 px-4 text-center text-sm font-semibold text-slate-200 transition hover:bg-white/16 disabled:opacity-60"
             >
-              {loadingMore ? "読み込み中…" : moreError ? "読み込みに失敗しました。再試行" : "続きを読み込む"}
+              {loadingMore ? L("読み込み中…") : moreError ? L("読み込みに失敗しました。再試行") : L("続きを読み込む")}
             </button>
           ) : null}
         </HomeFeedGrid>

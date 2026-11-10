@@ -1,10 +1,13 @@
+"use client";
+
+import { L } from "@/lib/i18n";
 import { TargetReport } from "./target-report";
 import { injuryPercent, injuryRecoveryRangeText, type InjuryPublicGroup, type InjuryTally } from "@/lib/injury";
 
 const panel = "space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4";
 
 function Waiting({ min }: { min: number }) {
-  return <p className="text-sm text-slate-400">{min}人そろうと表示</p>;
+  return <p className="text-sm text-slate-400">{L("{min}人そろうと表示", { min })}</p>;
 }
 
 function BarRow({ label, people, total, hidePeople = false }: { label: string; people: number; total: number; hidePeople?: boolean }) {
@@ -15,7 +18,7 @@ function BarRow({ label, people, total, hidePeople = false }: { label: string; p
         <span>{label}</span>
         <span className="shrink-0 tabular-nums">
           <span className="font-semibold text-slate-100">{percent}%</span>
-          {hidePeople ? null : <span className="ml-1 text-xs text-slate-400">{people}人</span>}
+          {hidePeople ? null : <span className="ml-1 text-xs text-slate-400">{L("{people}人", { people })}</span>}
         </span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-white/10" aria-hidden>
@@ -36,19 +39,19 @@ export function Bars({ title, tally, top, hidePeople = false }: { title: string;
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-bold text-slate-100">{title}</h3>
-        {hidePeople ? null : <span className="shrink-0 text-xs text-slate-400">{tally.people}人が回答</span>}
+        {hidePeople ? null : <span className="shrink-0 text-xs text-slate-400">{L("{people}人が回答", { people: tally.people })}</span>}
       </div>
       <ul className="space-y-1.5">
         {shown.map((item) => (
-          <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} hidePeople={hidePeople} />
+          <BarRow key={item.code} label={L(item.label)} people={item.people} total={tally.people} hidePeople={hidePeople} />
         ))}
       </ul>
       {rest.length > 0 ? (
         <details className="group">
-          <summary className="cursor-pointer list-none text-xs text-blue-300 group-open:hidden">ほかの回答を見る({rest.length})</summary>
+          <summary className="cursor-pointer list-none text-xs text-blue-300 group-open:hidden">{L("ほかの回答を見る({length})", { length: rest.length })}</summary>
           <ul className="mt-1.5 space-y-1.5">
             {rest.map((item) => (
-              <BarRow key={item.code} label={item.label} people={item.people} total={tally.people} hidePeople={hidePeople} />
+              <BarRow key={item.code} label={L(item.label)} people={item.people} total={tally.people} hidePeople={hidePeople} />
             ))}
           </ul>
         </details>
@@ -66,31 +69,29 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
   // 目安がひとつも出ていない重さは、行ごと省く。
   const recovery = group.recovery.filter((r) => r.stages.some((s) => s.low_days !== null));
   const prevention = [
-    { title: "ケガの前に変わったこと", tally: group.pre_changes },
-    { title: "そのときしていたこと", tally: group.activities },
-    { title: "場所", tally: group.places },
-    { title: "種目", tally: group.events },
+    { title: L("ケガの前に変わったこと"), tally: group.pre_changes },
+    { title: L("そのときしていたこと"), tally: group.activities },
+    { title: L("場所"), tally: group.places },
+    { title: L("種目"), tally: group.events },
   ];
   return (
     <div className="space-y-4">
       <section className={panel} aria-labelledby="injury-recovery">
-        <h2 id="injury-recovery" className="text-base font-bold">
-          復帰までの目安
-        </h2>
+        <h2 id="injury-recovery" className="text-base font-bold">{L("復帰までの目安")}</h2>
         {recovery.length > 0 ? (
           <div className="space-y-3">
             {recovery.map((r) => (
               <div key={r.severity}>
-                <h3 className="text-sm font-bold text-slate-100">{r.severity_label}</h3>
+                <h3 className="text-sm font-bold text-slate-100">{L(r.severity_label)}</h3>
                 <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                   {r.stages.map((s) => (
                     <div key={s.stage} className="contents">
-                      <dt className="text-slate-300">{s.stage_label}</dt>
+                      <dt className="text-slate-300">{L(s.stage_label)}</dt>
                       <dd>
                         {s.low_days !== null && s.high_days !== null ? (
                           <>
                             {injuryRecoveryRangeText(s.low_days, s.high_days)}
-                            <span className="text-slate-300">({s.people}人)</span>
+                            <span className="text-slate-300">{L("({people}人)", { people: s.people })}</span>
                           </>
                         ) : (
                           <span className="text-slate-400">—</span>
@@ -108,9 +109,7 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
       </section>
 
       <section className={panel} aria-labelledby="injury-prevention">
-        <h2 id="injury-prevention" className="text-base font-bold">
-          どんなときにケガをしたか
-        </h2>
+        <h2 id="injury-prevention" className="text-base font-bold">{L("どんなときにケガをしたか")}</h2>
         {hasItems(...prevention.map((item) => item.tally)) ? (
           prevention.map((item) => <Bars key={item.title} title={item.title} tally={item.tally} />)
         ) : (
@@ -119,35 +118,27 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
       </section>
 
       <section className={panel} aria-labelledby="injury-hindsight">
-        <h2 id="injury-hindsight" className="text-base font-bold">
-          いま思うと、どうすればよかったか
-        </h2>
-        {hasItems(group.hindsight) ? <Bars title="選んだ人の割合" tally={group.hindsight} /> : <Waiting min={min} />}
+        <h2 id="injury-hindsight" className="text-base font-bold">{L("いま思うと、どうすればよかったか")}</h2>
+        {hasItems(group.hindsight) ? <Bars title={L("選んだ人の割合")} tally={group.hindsight} /> : <Waiting min={min} />}
       </section>
 
       <section className={panel} aria-labelledby="injury-actions">
-        <h2 id="injury-actions" className="text-base font-bold">
-          復帰までにやったこと
-        </h2>
-        {hasItems(group.actions) ? <Bars title="やった人の割合" tally={group.actions} /> : <Waiting min={min} />}
+        <h2 id="injury-actions" className="text-base font-bold">{L("復帰までにやったこと")}</h2>
+        {hasItems(group.actions) ? <Bars title={L("やった人の割合")} tally={group.actions} /> : <Waiting min={min} />}
       </section>
 
       <section className={panel} aria-labelledby="injury-notes">
-        <h2 id="injury-notes" className="text-base font-bold">
-          次の人への一言
-        </h2>
+        <h2 id="injury-notes" className="text-base font-bold">{L("次の人への一言")}</h2>
         {group.notes.length === 0 ? (
-          <p className="text-sm text-slate-400">まだありません</p>
+          <p className="text-sm text-slate-400">{L("まだありません")}</p>
         ) : (
           <ul className="space-y-2">
             {group.notes.map((n) => (
               <li key={n.id} className="rounded-xl border border-white/15 bg-white/5 p-3">
                 <p className="whitespace-pre-wrap text-sm">{n.note}</p>
                 <div className="mt-1.5 flex items-center justify-between gap-3">
-                  <p className="text-xs text-slate-300">
-                    {n.stage_label}になったとき{n.event_label ? `・${n.event_label}` : ""}
-                  </p>
-                  <TargetReport targetType="injury_note" id={n.id} next={`/injury/${group.body_part}`} noun="一言" />
+                  <p className="text-xs text-slate-300">{L("{stage_label}になったとき{v1}", { stage_label: L(n.stage_label), v1: n.event_label ? L("・{event}", { event: L(n.event_label) }) : "" })}</p>
+                  <TargetReport targetType="injury_note" id={n.id} next={`/injury/${group.body_part}`} noun={L("一言")} />
                 </div>
               </li>
             ))}
@@ -155,7 +146,7 @@ export function InjuryPublicSummary({ group }: { group: InjuryPublicGroup }) {
         )}
       </section>
 
-      <p className="text-xs text-slate-400">診断のかわりにはなりません。痛みが続くときは病院へ。</p>
+      <p className="text-xs text-slate-400">{L("診断のかわりにはなりません。痛みが続くときは病院へ。")}</p>
     </div>
   );
 }

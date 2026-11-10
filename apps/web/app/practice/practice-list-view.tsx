@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -41,7 +42,7 @@ export function PracticeListView() {
         if (!controller.signal.aborted) setState({ key, list, error: "", moreError: "", expired: false });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ key, list: null, error: "募集の取得に失敗しました。時間をおいて開き直してください。", moreError: "", expired: false });
+        if (!controller.signal.aborted) setState({ key, list: null, error: L("募集の取得に失敗しました。時間をおいて開き直してください。"), moreError: "", expired: false });
       });
     return () => controller.abort();
   }, [key]);
@@ -64,7 +65,7 @@ export function PracticeListView() {
       });
     } catch (error) {
       const expired = error instanceof ApiRequestError && error.code === "invalid_cursor";
-      setState((value) => (value && value.key === key ? { ...value, moreError: "続きの読み込みに失敗しました", expired } : value));
+      setState((value) => (value && value.key === key ? { ...value, moreError: L("続きの読み込みに失敗しました"), expired } : value));
     } finally {
       setLoadingMore(false);
     }
@@ -73,14 +74,12 @@ export function PracticeListView() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">練習相手募集</h1>
-        <p className="mt-1 text-sm text-slate-200">これから開かれる練習の募集です。</p>
+        <h1 className="text-2xl font-bold text-slate-100">{L("練習相手募集")}</h1>
+        <p className="mt-1 text-sm text-slate-200">{L("これから開かれる練習の募集です。")}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label className="block text-sm font-medium">
-          都道府県
-          <select className={selectClass} value={filter.prefecture} onChange={(e) => change({ prefecture: e.target.value })}>
-            <option value="">すべて</option>
+        <label className="block text-sm font-medium">{L("都道府県")}<select className={selectClass} value={filter.prefecture} onChange={(e) => change({ prefecture: e.target.value })}>
+            <option value="">{L("すべて")}</option>
             {PREFECTURES.map((item) => (
               <option key={item.code} value={item.code}>
                 {item.name}
@@ -88,10 +87,8 @@ export function PracticeListView() {
             ))}
           </select>
         </label>
-        <label className="block text-sm font-medium">
-          種目
-          <select className={selectClass} value={filter.event} onChange={(e) => change({ event: e.target.value })}>
-            <option value="">すべて</option>
+        <label className="block text-sm font-medium">{L("種目")}<select className={selectClass} value={filter.event} onChange={(e) => change({ event: e.target.value })}>
+            <option value="">{L("すべて")}</option>
             {appEvents.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
@@ -103,12 +100,12 @@ export function PracticeListView() {
       {current?.error ? (
         <ErrorState message={current.error} />
       ) : !current?.list ? (
-        <PageLoading label="読み込み中..." />
+        <PageLoading label={L("読み込み中...")} />
       ) : (
         <>
           <p className="text-sm font-semibold text-slate-100">{practiceCountLabel(filter, current.list.total)}</p>
           {current.list.posts.length === 0 ? (
-            <EmptyState title="これからの募集はまだありません" body="条件を変えるか、自分で募集してみましょう。" />
+            <EmptyState title={L("これからの募集はまだありません")} body={L("条件を変えるか、自分で募集してみましょう。")} />
           ) : (
             <FeedGrid>
               {current.list.posts.map((post) => (

@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 // シーズンの大会を始まる月ごとにまとめ、これからの大会を終わった大会より上に置く。
 
 export type Scheduled = { starts_on: string; ends_on: string | null };
@@ -24,7 +25,7 @@ export function isOngoing(item: Scheduled, today: string) {
 }
 
 function monthLabel(key: string) {
-  return `${Number(key.slice(5, 7))}月`;
+  return L("{v0}月", { v0: Number(key.slice(5, 7)) });
 }
 
 function groupByMonth<T extends Scheduled>(items: T[]): MonthGroup<T>[] {

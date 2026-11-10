@@ -4,7 +4,8 @@ import { PageLoading } from "@/components/page-loading";
 
 import { apiFetch } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
-import { parseLocale, t, type I18nKey, type Locale } from "@/lib/i18n";
+import { t, type I18nKey, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import type { AppNotification, Meta, NotificationKind } from "@/lib/types";
 import { Bell } from "lucide-react";
 import Link from "next/link";
@@ -61,8 +62,8 @@ function badgeText(count: number) {
 }
 
 export function NotificationBell() {
-  const { token, profile } = useAuth();
-  const locale = parseLocale(profile?.locale);
+  const { token } = useAuth();
+  const locale = useLocale();
   const panelID = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);

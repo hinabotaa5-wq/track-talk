@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { apiFetch } from "./api";
 
 export type CloudinarySignature = {
@@ -51,14 +52,14 @@ export class CloudinaryUploadError extends Error {
 export function cloudinaryErrorMessage(message?: string): string {
   const text = message?.toLowerCase() ?? "";
   if (text.includes("file size") || text.includes("too large")) {
-    return "ファイルサイズが大きすぎます";
+    return L("ファイルサイズが大きすぎます");
   }
-  if (text.includes("image")) return "写真ファイルを確認してください";
-  if (text.includes("video") || text.includes("format")) return "対応していないファイル形式です";
+  if (text.includes("image")) return L("写真ファイルを確認してください");
+  if (text.includes("video") || text.includes("format")) return L("対応していないファイル形式です");
   if (text.includes("stale") || text.includes("signature") || text.includes("timestamp")) {
-    return staleUploadMessage;
+    return L(staleUploadMessage);
   }
-  return "アップロードに失敗しました";
+  return L("アップロードに失敗しました");
 }
 
 export function uploadToCloudinary(
@@ -69,7 +70,7 @@ export function uploadToCloudinary(
   signal?: AbortSignal,
 ): Promise<CloudinaryUploadResult> {
   if (signed.resource_type !== resource) {
-    return Promise.reject(new Error("アップロードに失敗しました"));
+    return Promise.reject(new Error(L("アップロードに失敗しました")));
   }
   const body = new FormData();
   body.append("file", file);
@@ -94,16 +95,16 @@ export function uploadToCloudinary(
         percent: (event.loaded / event.total) * 100,
       });
     };
-    xhr.onerror = () => reject(new Error("アップロードに失敗しました"));
+    xhr.onerror = () => reject(new Error(L("アップロードに失敗しました")));
     // 選び直しなどで呼び出し側が止めたときは、失敗ではないことが分かるよう AbortError で返す。
     xhr.onabort = () =>
-      reject(signal?.aborted ? new DOMException("Aborted", "AbortError") : new Error("アップロードに失敗しました"));
+      reject(signal?.aborted ? new DOMException("Aborted", "AbortError") : new Error(L("アップロードに失敗しました")));
     xhr.onload = () => {
       let payload: CloudinaryUploadResult = {};
       try {
         payload = JSON.parse(xhr.responseText) as CloudinaryUploadResult;
       } catch {
-        reject(new Error("アップロードに失敗しました"));
+        reject(new Error(L("アップロードに失敗しました")));
         return;
       }
       if (xhr.status < 200 || xhr.status >= 300) {
@@ -169,7 +170,7 @@ export async function waitForVideoReady(
       signal,
     });
     if (status.ready) return;
-    if (now() - started >= videoStatusTimeout) throw new Error(videoProcessingTimeoutMessage);
+    if (now() - started >= videoStatusTimeout) throw new Error(L(videoProcessingTimeoutMessage));
     await sleep(videoStatusDelays[Math.min(attempt, videoStatusDelays.length - 1)], signal);
   }
 }

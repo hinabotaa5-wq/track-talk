@@ -1,3 +1,4 @@
+import { JapaneseOfficialNote } from "./japanese-official-note";
 // 大会までプランの報酬と精算（コーチ向け条件）。コーチの応募画面と「コーチ機能について」に出し、登録時に明示する。
 // 契約ごとの取引条件の明示（support_contract_statements）とは別に、登録の時点で示すための文。
 export const supportPlanCoachTerms: { title: string; text: string }[] = [
@@ -23,6 +24,7 @@ export function SupportPlanCoachTerms() {
   return (
     <section aria-labelledby="support-plan-coach-terms" className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3">
       <h3 id="support-plan-coach-terms" className="text-sm font-bold text-white">大会までプランの報酬と精算</h3>
+      <JapaneseOfficialNote subject="section" />
       <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
         {supportPlanCoachTerms.map((t) => (
           <li key={t.title}>

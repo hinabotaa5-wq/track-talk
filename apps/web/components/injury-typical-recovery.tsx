@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -22,18 +23,16 @@ export function InjuryTypicalRecovery({ bodyPart, bodyPartLabel }: { bodyPart: s
 
   return (
     <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-4">
-      <h2 className="text-base font-semibold text-slate-100">{bodyPartLabel}の復帰の目安</h2>
+      <h2 className="text-base font-semibold text-slate-100">{L("{bodyPartLabel}の復帰の目安", { bodyPartLabel })}</h2>
       <dl className="space-y-1.5 text-sm">
         {stages.map((stage) => (
           <div key={stage.stage} className="flex justify-between gap-3">
-            <dt className="font-medium text-slate-100">{stage.stage_label}</dt>
+            <dt className="font-medium text-slate-100">{L(stage.stage_label)}</dt>
             <dd className="text-right text-slate-200">{injuryStageStatText(stage, stats.min_sample)}</dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-slate-300">
-        みんなの経過報告の中央値で、回復を保証するものではありません。
-      </p>
+      <p className="text-xs text-slate-300">{L("みんなの経過報告の中央値で、回復を保証するものではありません。")}</p>
     </section>
   );
 }

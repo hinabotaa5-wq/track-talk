@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { apiFetch } from "./api";
 import type { Meta, Post } from "./types";
 
@@ -73,7 +74,7 @@ export async function fetchPostsRetrying(
   }
 
   if (lastError instanceof Error) throw lastError;
-  throw new Error("投稿の取得に失敗しました。");
+  throw new Error(L("投稿の取得に失敗しました。"));
 }
 
 // 画面から遠いページはID・形だけ残し、本文などのデータを解放する。

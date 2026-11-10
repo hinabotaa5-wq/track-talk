@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { senseGrainColor, senseJarLevel, senseJarSize } from "@/lib/sense-notes";
 
 // 感覚がたまっていくビン。1件書くごとに粒が1つ増え、6粒で満杯になって次のビンに移る。
@@ -24,7 +25,7 @@ export function SenseNoteJar({ total, summarized = false, dropLatest = false, cl
   const fillTop = shown === 0 ? 168 : shown === senseJarSize ? 44 : Math.max(44, Math.min(...grains.slice(0, shown).map((g) => g.cy - g.r)) + 6);
   return (
     <div className={`relative shrink-0 ${className}`}>
-      <svg viewBox="0 0 120 184" className="h-full w-full" role="img" aria-label={`感覚のビン ${jarIndex}杯目、${shown}/${senseJarSize}粒`}>
+      <svg viewBox="0 0 120 184" className="h-full w-full" role="img" aria-label={L("感覚のビン {jarIndex}杯目、{shown}/{senseJarSize}粒", { jarIndex, shown, senseJarSize })}>
         <defs>
           <linearGradient id="sense-jar-glass" x1="0" x2="1">
             <stop offset="0" style={{ stopColor: "color-mix(in oklab, var(--tt-white) 22%, transparent)" }} />
@@ -69,9 +70,7 @@ export function SenseNoteJar({ total, summarized = false, dropLatest = false, cl
         <path d="M24 60 Q22 108 24 150" style={{ stroke: "color-mix(in oklab, var(--tt-white) 30%, transparent)" }} strokeWidth="3" strokeLinecap="round" fill="none" />
       </svg>
       {filled > 0 ? (
-        <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-xs font-bold text-slate-900 shadow">
-          {jarIndex}杯目
-        </span>
+        <span className="absolute -right-1 -top-1 rounded-full border border-amber-200/60 bg-amber-400/90 px-2 py-0.5 text-xs font-bold text-slate-900 shadow">{L("{jarIndex}杯目", { jarIndex })}</span>
       ) : null}
     </div>
   );

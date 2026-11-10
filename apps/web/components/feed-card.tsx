@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { useState } from "react";
 import Link from "next/link";
 import type { Post } from "@/lib/types";
@@ -67,11 +68,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         <div className="flex aspect-[4/3] flex-col justify-center gap-2 bg-blue-500/10 p-3.5">
           {info ? (
             <div className="space-y-2 text-xs leading-snug text-slate-200">
-              <p className="line-clamp-1 text-sm font-bold text-slate-100 transition-colors group-hover:text-blue-400">{info.event_label}</p>
-              <p>日付　{formatDate(info.starts_at)}</p>
-              <p>時間　{formatPracticeTime(info.starts_at)}</p>
-              <p className="line-clamp-1">競技場　{info.prefecture ? `${prefectureName(info.prefecture)} ` : ""}{info.venue}</p>
-              <p className="font-semibold">募集 {info.accepted_count}/{info.capacity}人</p>
+              <p className="line-clamp-1 text-sm font-bold text-slate-100 transition-colors group-hover:text-blue-400">{L(info.event_label)}</p>
+              <p>{L("日付　{v0}", { v0: formatDate(info.starts_at) })}</p>
+              <p>{L("時間　{v0}", { v0: formatPracticeTime(info.starts_at) })}</p>
+              <p className="line-clamp-1">{L("競技場　{v0}{venue}", { v0: info.prefecture ? `${prefectureName(info.prefecture)} ` : "", venue: info.venue })}</p>
+              <p className="font-semibold">{L("募集 {accepted_count}/{capacity}人", { accepted_count: info.accepted_count, capacity: info.capacity })}</p>
             </div>
           ) : (
             <p className="line-clamp-3 break-words text-sm font-bold text-slate-100 group-hover:text-blue-400">{title}</p>
@@ -90,11 +91,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
             {info ? (
               <>
                 <span className="w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-slate-200 border border-white/20">
-                  {info.body_part_label}
+                  {L(info.body_part_label)}
                 </span>
                 {info.stage_label ? (
                   <span className="w-fit rounded-full bg-emerald-950/70 px-2.5 py-0.5 text-xs font-bold text-emerald-300 border border-emerald-800/60">
-                    {info.stage_label}
+                    {L(info.stage_label)}
                   </span>
                 ) : null}
               </>
@@ -105,7 +106,7 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
           </p>
           <div className="flex items-center justify-between border-t border-white/20 pt-1 text-xs font-mono text-slate-300">
             <span>TrackTalk</span>
-            <span className="font-semibold text-blue-300">わかる {post.like_count}</span>
+            <span className="font-semibold text-blue-300">{L("わかる {like_count}", { like_count: post.like_count })}</span>
           </div>
         </div>
         <CardPending />
@@ -114,12 +115,12 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
   }
   const hasThumbnail = Boolean(thumbnail || (post.kind === "instagram" && isInstagramShortcode(post.instagram_shortcode ?? "")));
   return (
-    <Link prefetch={false} href={href} data-pending-link="" aria-label={description ? undefined : "投稿の詳細を開く"}
+    <Link prefetch={false} href={href} data-pending-link="" aria-label={description ? undefined : L("投稿の詳細を開く")}
       className={`${cardClass}${hasThumbnail ? " feed-card-has-thumbnail" : ""}${post.kind === "text" && !hasThumbnail ? " feed-card-text" : ""}`}>
       <div className={`feed-card-thumbnail relative overflow-hidden bg-black/25 ${thumbnail || post.kind === "instagram" ? "" : "aspect-[4/3]"}`}>
         {post.kind === "recruitment" ? (
           <span className="absolute top-2.5 left-2.5 z-10">
-            <KindBadge>クラブ</KindBadge>
+            <KindBadge>{L("クラブ")}</KindBadge>
           </span>
         ) : post.kind === "x" ? (
           <span className="absolute top-2.5 left-2.5 z-10"><KindBadge>X</KindBadge></span>

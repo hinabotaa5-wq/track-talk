@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -85,7 +86,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 onClick={() => answer(false)}
                 className="h-11 rounded-full border border-white/25 text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
               >
-                {open.cancelLabel ?? "やめる"}
+                {open.cancelLabel ?? L("やめる")}
               </button>
             </div>
           </div>
@@ -104,18 +105,18 @@ export function useConfirm() {
 // 通報の確認。どの画面でも同じ文言と見た目にする。
 export function reportConfirmOptions(options: { title?: string; body?: string } = {}): ConfirmOptions {
   return {
-    title: options.title ?? "この内容を通報しますか？",
-    body: options.body ?? "運営が内容を確認します。",
-    confirmLabel: "通報する",
+    title: options.title ?? L("この内容を通報しますか？"),
+    body: options.body ?? L("運営が内容を確認します。"),
+    confirmLabel: L("通報する"),
   };
 }
 
 // 運営が投稿やコメントを非表示にするときの確認。戻す画面がないことを先に伝える。
 export function hideConfirmOptions(noun: string): ConfirmOptions {
   return {
-    title: `${noun}を非表示にしますか？`,
-    body: "投稿者を含むすべての利用者から見えなくなります。画面からは元に戻せません。",
-    confirmLabel: "非表示にする",
+    title: L("{noun}を非表示にしますか？", { noun }),
+    body: L("投稿者を含むすべての利用者から見えなくなります。画面からは元に戻せません。"),
+    confirmLabel: L("非表示にする"),
   };
 }
 
@@ -123,8 +124,8 @@ export function hideConfirmOptions(noun: string): ConfirmOptions {
 // モバイルのアプリ内ブラウザでも操作が途切れず、誤操作も防げる。
 export function deleteConfirmOptions(noun: string): ConfirmOptions {
   return {
-    title: `${noun}を削除しますか？`,
-    body: "この操作は取り消せません。",
-    confirmLabel: "削除する",
+    title: L("{noun}を削除しますか？", { noun }),
+    body: L("この操作は取り消せません。"),
+    confirmLabel: L("削除する"),
   };
 }

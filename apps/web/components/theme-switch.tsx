@@ -1,13 +1,14 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
 import { readThemePreference, saveThemePreference, type ThemePreference } from "@/lib/theme";
 
 const options: readonly { id: ThemePreference; label: string; icon: LucideIcon }[] = [
-  { id: "light", label: "ライト", icon: Sun },
-  { id: "dark", label: "ダーク", icon: Moon },
-  { id: "system", label: "端末の設定", icon: Monitor },
+  { id: "light", get label() { return L("ライト"); }, icon: Sun },
+  { id: "dark", get label() { return L("ダーク"); }, icon: Moon },
+  { id: "system", get label() { return L("端末の設定"); }, icon: Monitor },
 ];
 
 const listeners = new Set<() => void>();
@@ -30,7 +31,7 @@ export function ThemeSwitch() {
 
   return (
     <section aria-labelledby="theme-switch-title" className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <h2 id="theme-switch-title" className="text-sm font-semibold text-slate-100">画面の表示</h2>
+      <h2 id="theme-switch-title" className="text-sm font-semibold text-slate-100">{L("画面の表示")}</h2>
       <div role="radiogroup" aria-labelledby="theme-switch-title" className="grid grid-cols-3 gap-1 rounded-full border border-white/25 bg-white/8 p-1">
         {options.map(({ id, label, icon: Icon }) => {
           const active = current === id;

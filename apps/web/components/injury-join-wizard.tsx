@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useRef, useState, type FormEvent } from "react";
 import { Input } from "./ui/input";
@@ -30,22 +31,22 @@ import {
 } from "@/lib/injury";
 
 const questions: Record<InjuryJoinStep, string> = {
-  diagnosis: "ケガの名前は?",
-  severity: "ケガの重さは?",
-  sawDoctor: "病院でみてもらいましたか?",
-  injuredOn: "いつケガをしましたか?",
-  place: "どこでケガをしましたか?",
-  activity: "そのとき何をしていましたか?",
-  preChanges: "ケガの前に変わったことは?",
-  hindsight: "いま思うと、どうすればよかったですか?",
-  stage: "いまの段階は?",
+  get diagnosis() { return L("ケガの名前は?"); },
+  get severity() { return L("ケガの重さは?"); },
+  get sawDoctor() { return L("病院でみてもらいましたか?"); },
+  get injuredOn() { return L("いつケガをしましたか?"); },
+  get place() { return L("どこでケガをしましたか?"); },
+  get activity() { return L("そのとき何をしていましたか?"); },
+  get preChanges() { return L("ケガの前に変わったことは?"); },
+  get hindsight() { return L("いま思うと、どうすればよかったですか?"); },
+  get stage() { return L("いまの段階は?"); },
 };
 
 const hints: Partial<Record<InjuryJoinStep, string>> = {
-  diagnosis: "診断名がわからなければ「わからない」と書いてください。",
-  injuredOn: "覚えているいちばん近い日でも大丈夫です。",
-  preChanges: "当てはまるものをいくつでも選べます。「とくになし」は単独で選んでください。",
-  hindsight: "これから同じケガをしないための、ほかの人へのヒントとして集計します。当てはまるものをいくつでも選べます。「わからない・とくにない」は単独で選んでください。",
+  get diagnosis() { return L("診断名がわからなければ「わからない」と書いてください。"); },
+  get injuredOn() { return L("覚えているいちばん近い日でも大丈夫です。"); },
+  get preChanges() { return L("当てはまるものをいくつでも選べます。「とくになし」は単独で選んでください。"); },
+  get hindsight() { return L("これから同じケガをしないための、ほかの人へのヒントとして集計します。当てはまるものをいくつでも選べます。「わからない・とくにない」は単独で選んでください。"); },
 };
 
 export function InjuryJoinWizard({
@@ -88,7 +89,7 @@ export function InjuryJoinWizard({
       return;
     }
     if (!consent) {
-      setError("ケガの情報の取り扱いに同意してください");
+      setError(L("ケガの情報の取り扱いに同意してください"));
       return;
     }
     if (!acquire()) return;
@@ -101,7 +102,7 @@ export function InjuryJoinWizard({
       setDirty(false);
       onJoined(member);
     } catch (e) {
-      setError(apiErrorText(e, "参加に失敗しました"));
+      setError(apiErrorText(e, L("参加に失敗しました")));
       release();
     }
   }
@@ -110,14 +111,14 @@ export function InjuryJoinWizard({
     <LeaveGuardArea>
       <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-5">
         <div>
-          <p className="text-sm text-slate-300">{injuryBodyPartLabel(part)}のグループに入る</p>
+          <p className="text-sm text-slate-300">{L("{v0}のグループに入る", { v0: injuryBodyPartLabel(part) })}</p>
           <div
             className="mt-2 flex gap-1.5"
             role="progressbar"
             aria-valuemin={1}
             aria-valuemax={steps.length}
             aria-valuenow={index + 1}
-            aria-label="質問の進み具合"
+            aria-label={L("質問の進み具合")}
           >
             {steps.map((item, i) => (
               <span key={item} className={`h-1 flex-1 rounded-full ${i <= index ? "bg-blue-400" : "bg-white/20"}`} />
@@ -132,9 +133,9 @@ export function InjuryJoinWizard({
 
         {step === "diagnosis" ? (
           <Input
-            aria-label="ケガの名前"
+            aria-label={L("ケガの名前")}
             maxLength={injuryDiagnosisMaxLength}
-            placeholder="例: 脛骨の疲労骨折"
+            placeholder={L("例: 脛骨の疲労骨折")}
             value={answers.diagnosis}
             onChange={(e) => change({ diagnosis: e.target.value })}
           />
@@ -142,7 +143,7 @@ export function InjuryJoinWizard({
 
         {step === "severity" ? (
           <Choices
-            label="ケガの重さ"
+            label={L("ケガの重さ")}
             options={injurySeverities}
             selected={(value) => answers.severity === value}
             onSelect={(severity) => change({ severity })}
@@ -151,10 +152,10 @@ export function InjuryJoinWizard({
 
         {step === "sawDoctor" ? (
           <Choices
-            label="病院でみてもらったか"
+            label={L("病院でみてもらったか")}
             options={[
-              { value: "yes", label: "はい" },
-              { value: "no", label: "いいえ" },
+              { value: "yes", label: L("はい") },
+              { value: "no", label: L("いいえ") },
             ]}
             selected={(value) => answers.sawDoctor === (value === "yes")}
             onSelect={(value) => change({ sawDoctor: value === "yes" })}
@@ -164,7 +165,7 @@ export function InjuryJoinWizard({
         {step === "injuredOn" ? (
           <input
             type="date"
-            aria-label="ケガをした日"
+            aria-label={L("ケガをした日")}
             value={answers.injuredOn}
             max={today}
             onChange={(e) => change({ injuredOn: e.target.value })}
@@ -174,7 +175,7 @@ export function InjuryJoinWizard({
 
         {step === "place" ? (
           <Choices
-            label="ケガをした場所"
+            label={L("ケガをした場所")}
             options={injuryPlaces}
             selected={(value) => answers.place === value}
             onSelect={(place) => change({ place })}
@@ -183,7 +184,7 @@ export function InjuryJoinWizard({
 
         {step === "activity" ? (
           <Choices
-            label="そのとき何をしていたか"
+            label={L("そのとき何をしていたか")}
             options={injuryActivities}
             selected={(value) => answers.activity === value}
             onSelect={(activity) => change({ activity })}
@@ -192,7 +193,7 @@ export function InjuryJoinWizard({
 
         {step === "preChanges" ? (
           <Choices
-            label="ケガの前に変わったこと"
+            label={L("ケガの前に変わったこと")}
             options={injuryPreChanges}
             selected={(value) => answers.preChanges.includes(value)}
             onSelect={(value) => change((current) => ({ preChanges: togglePreChange(current.preChanges, value) }))}
@@ -201,7 +202,7 @@ export function InjuryJoinWizard({
 
         {step === "hindsight" ? (
           <Choices
-            label="どうすればよかったか"
+            label={L("どうすればよかったか")}
             options={injuryHindsights}
             selected={(value) => answers.hindsight.includes(value)}
             onSelect={(value) => change((current) => ({ hindsight: toggleHindsight(current.hindsight, value) }))}
@@ -211,7 +212,7 @@ export function InjuryJoinWizard({
 
         {step === "stage" ? (
           <Choices
-            label="いまの段階"
+            label={L("いまの段階")}
             options={injuryStages}
             selected={(value) => answers.stage === value}
             onSelect={(stage) => change({ stage })}
@@ -221,9 +222,7 @@ export function InjuryJoinWizard({
         {last ? (
           // ケガの情報は健康に関する情報(要配慮個人情報)なので、送る前に扱いを見せて、はっきり同意をもらう(プライバシーポリシー第4条)。
           <div className="space-y-2 text-xs leading-6 text-slate-300">
-            <p>
-              回答と段階の記録は、名前を出さずに人数の割合や日数に集計し、誰でも見られるページに表示します(5人に満たない項目は出しません)。
-            </p>
+            <p>{L("回答と段階の記録は、名前を出さずに人数の割合や日数に集計し、誰でも見られるページに表示します(5人に満たない項目は出しません)。")}</p>
             <div className="flex items-start gap-2 text-sm text-slate-100">
               <input
                 type="checkbox"
@@ -237,16 +236,14 @@ export function InjuryJoinWizard({
                 className="mt-1 h-4 w-4 shrink-0"
               />
               <span id="injury-privacy-consent-label">
-                <label htmlFor="injury-privacy-consent">ケガの情報を健康に関する情報として、</label>
+                <label htmlFor="injury-privacy-consent">{L("ケガの情報を健康に関する情報として、")}</label>
                 <button
                   type="button"
                   aria-haspopup="dialog"
                   className="text-left text-blue-400 underline"
                   onClick={() => privacyDialog.current?.showModal()}
-                >
-                  プライバシーポリシー
-                </button>
-                <label htmlFor="injury-privacy-consent">第4条のとおり扱うことに同意します。15歳以下の人は、保護者も同意しています。</label>
+                >{L("プライバシーポリシー")}</button>
+                <label htmlFor="injury-privacy-consent">{L("第4条のとおり扱うことに同意します。15歳以下の人は、保護者も同意しています。")}</label>
               </span>
             </div>
           </div>
@@ -263,12 +260,10 @@ export function InjuryJoinWizard({
                 setIndex(index - 1);
                 setError("");
               }}
-            >
-              戻る
-            </Button>
+            >{L("戻る")}</Button>
           ) : null}
           <Button type="submit" className="flex-1" disabled={pending}>
-            {last ? (pending ? "入っています" : "グループに入る") : "次へ"}
+            {last ? (pending ? L("入っています") : L("グループに入る")) : L("次へ")}
           </Button>
         </div>
       </form>
@@ -279,9 +274,7 @@ export function InjuryJoinWizard({
           className="fixed inset-0 m-auto max-h-[85dvh] w-11/12 max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-white/20 bg-slate-900 text-slate-100 backdrop:bg-black/60"
         >
           <div className="sticky top-0 flex justify-end border-b border-white/15 bg-slate-900 px-4 py-2">
-            <Button type="button" variant="secondary" onClick={() => privacyDialog.current?.close()}>
-              回答に戻る
-            </Button>
+            <Button type="button" variant="secondary" onClick={() => privacyDialog.current?.close()}>{L("回答に戻る")}</Button>
           </div>
           <div className="p-4"><PrivacyPolicy titleId="injury-privacy-title" /></div>
         </dialog>

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { availabilityDateLabel } from "@/lib/coach-availability";
 import { PlanIncludesList } from "@/components/coaching-plans";
@@ -36,7 +37,7 @@ export function ContractConsentChecks({
 }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold">やりとりについての同意</legend>
+      <legend className="text-sm font-semibold">{L("やりとりについての同意")}</legend>
       {(Object.keys(contractConsentItems) as ContractConsentKey[]).map((key) => (
         <div key={key}>
           <label className="flex items-start gap-2 text-sm text-slate-100">
@@ -60,36 +61,35 @@ export function ContractDetails({ contract }: { contract: CoachingContract }) {
   return (
     <dl className="space-y-1.5 text-sm">
       <div>
-        <dt className="text-xs text-slate-300">プラン</dt>
+        <dt className="text-xs text-slate-300">{L("プラン")}</dt>
         <dd className="text-slate-100">
-          {contract.plan_title}（{planKindLabels[contract.plan_kind]} · {planDurationLabel(contract.plan_kind, contract.duration_days)} ·{" "}
-          {formatYen(contract.price_yen)}）
-          <PlanIncludesList plan={contract} />
+          {contract.plan_title}{L("（")}{planKindLabels[contract.plan_kind]} · {planDurationLabel(contract.plan_kind, contract.duration_days)} ·{" "}
+          {formatYen(contract.price_yen)}{L("）")}<PlanIncludesList plan={contract} />
         </dd>
       </div>
       {contract.plan_description ? <div>
-        <dt className="text-xs text-slate-300">申し込み時のサービス内容</dt>
+        <dt className="text-xs text-slate-300">{L("申し込み時のサービス内容")}</dt>
         <dd className="whitespace-pre-wrap text-slate-100">{contract.plan_description}</dd>
       </div> : null}
       <div>
-        <dt className="text-xs text-slate-300">種目</dt>
+        <dt className="text-xs text-slate-300">{L("種目")}</dt>
         <dd className="text-slate-100">{coachEventLabels[contract.event]}</dd>
       </div>
       {contract.preferred_dates?.length ? <div>
-        <dt className="text-xs text-slate-300">希望日（未確定）</dt>
-        <dd className="text-slate-100">{contract.preferred_dates.map(availabilityDateLabel).join("、")}</dd>
-        <dd className="text-xs text-slate-300">日程はメッセージで相談して決めます。</dd>
+        <dt className="text-xs text-slate-300">{L("希望日（未確定）")}</dt>
+        <dd className="text-slate-100">{contract.preferred_dates.map(availabilityDateLabel).join(L("、"))}</dd>
+        <dd className="text-xs text-slate-300">{L("日程はメッセージで相談して決めます。")}</dd>
       </div> : null}
       <div>
-        <dt className="text-xs text-slate-300">目標</dt>
+        <dt className="text-xs text-slate-300">{L("目標")}</dt>
         <dd className="whitespace-pre-wrap text-slate-100">{contract.goal}</dd>
       </div>
       <div>
-        <dt className="text-xs text-slate-300">いまの記録</dt>
+        <dt className="text-xs text-slate-300">{L("いまの記録")}</dt>
         <dd className="whitespace-pre-wrap text-slate-100">{contract.current_record}</dd>
       </div>
       <div>
-        <dt className="text-xs text-slate-300">相談したいこと</dt>
+        <dt className="text-xs text-slate-300">{L("相談したいこと")}</dt>
         <dd className="whitespace-pre-wrap text-slate-100">{contract.message}</dd>
       </div>
     </dl>
@@ -108,7 +108,7 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
   const { pending, acquire, release } = useActionLock();
 
   async function answer(action: "accept" | "decline") {
-    if (action === "decline" && !confirm("この申し込みを断りますか？")) return;
+    if (action === "decline" && !confirm(L("この申し込みを断りますか？"))) return;
     if (!acquire()) return;
     setError("");
     setFields({});
@@ -121,7 +121,7 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
       onDone();
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
-      else setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+      else setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -130,15 +130,13 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
   return (
     <li className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold text-white">{contract.requester?.nickname ?? "名前なし"}さん</p>
-        {contract.minor ? <span className="rounded-full bg-amber-500/30 px-2 py-0.5 text-xs text-pure-white">18歳未満</span> : null}
+        <p className="font-semibold text-white">{L("{v0}さん", { v0: contract.requester?.nickname ?? L("名前なし") })}</p>
+        {contract.minor ? <span className="rounded-full bg-amber-500/30 px-2 py-0.5 text-xs text-pure-white">{L("18歳未満")}</span> : null}
       </div>
       <ContractDetails contract={contract} />
-      <p className="text-sm font-semibold text-white">{formatDateTime(contract.respond_by)}までに返事をしてください</p>
+      <p className="text-sm font-semibold text-white">{L("{v0}までに返事をしてください", { v0: formatDateTime(contract.respond_by) })}</p>
       {contract.minor ? (
-        <p className="text-xs text-slate-200">
-          18歳未満の人です。引き受けたあと、保護者が72時間以内にこの申し込みに同意すると始まります。保護者もやりとりに参加します。
-        </p>
+        <p className="text-xs text-slate-200">{L("18歳未満の人です。引き受けたあと、保護者が72時間以内にこの申し込みに同意すると始まります。保護者もやりとりに参加します。")}</p>
       ) : null}
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
       <div className="flex gap-2">
@@ -147,17 +145,13 @@ function ApplicationCard({ contract, token, onDone }: { contract: CoachingContra
           className="flex-1"
           disabled={pending || !consents.agree_report || !consents.agree_detection}
           onClick={() => void answer("accept")}
-        >
-          引き受ける
-        </Button>
+        >{L("引き受ける")}</Button>
         <button
           type="button"
           disabled={pending}
           onClick={() => void answer("decline")}
           className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
-        >
-          断る
-        </button>
+        >{L("断る")}</button>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </li>
@@ -182,7 +176,7 @@ export function CoachContractsSection({ token }: { token: string | null }) {
         if (!cancelled) setContracts(d.contracts);
       })
       .catch(() => {
-        if (!cancelled) setError("申し込みを読み込めませんでした");
+        if (!cancelled) setError(L("申し込みを読み込めませんでした"));
       });
     return () => {
       cancelled = true;
@@ -197,8 +191,8 @@ export function CoachContractsSection({ token }: { token: string | null }) {
   return (
     <>
       <section className="space-y-2">
-        <h2 className="font-bold">パーソナル指導の申し込み</h2>
-        {applied.length === 0 ? <p className="text-sm text-slate-300">いま届いている申し込みはありません</p> : null}
+        <h2 className="font-bold">{L("パーソナル指導の申し込み")}</h2>
+        {applied.length === 0 ? <p className="text-sm text-slate-300">{L("いま届いている申し込みはありません")}</p> : null}
         <ul className="space-y-2">
           {applied.map((c) => (
             <ApplicationCard key={c.id} contract={c} token={token} onDone={() => setReload((n) => n + 1)} />
@@ -206,8 +200,8 @@ export function CoachContractsSection({ token }: { token: string | null }) {
         </ul>
       </section>
       <section className="space-y-2">
-        <h2 className="font-bold">パーソナル指導の期間中</h2>
-        {active.length === 0 ? <p className="text-sm text-slate-300">期間中の人はいません</p> : null}
+        <h2 className="font-bold">{L("パーソナル指導の期間中")}</h2>
+        {active.length === 0 ? <p className="text-sm text-slate-300">{L("期間中の人はいません")}</p> : null}
         <ul className="space-y-2">
           {active.map((c) => (
             <li key={c.id}>
@@ -215,9 +209,7 @@ export function CoachContractsSection({ token }: { token: string | null }) {
                 href={`/coaching/personal/${c.id}`}
                 className="block space-y-0.5 rounded-xl border border-white/20 glass bg-white/10 p-3"
               >
-                <span className="block text-sm font-semibold text-white">
-                  {c.requester?.nickname ?? "名前なし"}さん · {c.plan_title}
-                </span>
+                <span className="block text-sm font-semibold text-white">{L("{v0}さん · {plan_title}", { v0: c.requester?.nickname ?? L("名前なし"), plan_title: c.plan_title })}</span>
                 <span className="block text-xs text-slate-300">
                   {c.status === "active" ? contractPeriod(c) : contractStatusLabel(c)}
                 </span>

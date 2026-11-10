@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { uploadToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
@@ -16,7 +17,7 @@ export function CoachAvatar({ url, name, size = 56 }: { url: string; name: strin
   const style = { width: size, height: size };
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={`${name ?? "コーチ"}の顔写真`} style={style} className="shrink-0 rounded-full bg-white/10 object-cover" />;
+    return <img src={url} alt={L("{v0}の顔写真", { v0: name ?? L("コーチ") })} style={style} className="shrink-0 rounded-full bg-white/10 object-cover" />;
   }
   return (
     <span
@@ -32,14 +33,14 @@ export function CoachAvatar({ url, name, size = 56 }: { url: string; name: strin
 // uploadCoachPhoto は、選んだ写真を縮めて上げ、コーチの顔写真として登録する。失敗したら理由を Error で投げる。
 export async function uploadCoachPhoto(file: File, token: string | null): Promise<CoachApplication> {
   if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
-    throw new Error("写真ファイルを選んでください");
+    throw new Error(L("写真ファイルを選んでください"));
   }
   const sending = await shrinkImage(file);
-  if (sending.size > maxPhotoBytes) throw new Error("10MB以内の写真にしてください");
+  if (sending.size > maxPhotoBytes) throw new Error(L("10MB以内の写真にしてください"));
   try {
     const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
     const uploaded = await uploadToCloudinary("image", sending, signed, () => {});
-    if (uploaded.public_id !== signed.public_id) throw new Error("写真のアップロードに失敗しました");
+    if (uploaded.public_id !== signed.public_id) throw new Error(L("写真のアップロードに失敗しました"));
     const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/photo", {
       method: "PUT",
       token,
@@ -72,10 +73,10 @@ export function CoachPhotoForm({
     if (!file || !acquire()) return;
     setError("");
     try {
-      setStatus("アップロードしています…");
+      setStatus(L("アップロードしています…"));
       onSaved(await uploadCoachPhoto(file, token));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "写真を登録できませんでした");
+      setError(err instanceof Error ? err.message : L("写真を登録できませんでした"));
     } finally {
       setStatus("");
       release();
@@ -86,9 +87,9 @@ export function CoachPhotoForm({
     <div className="flex items-center gap-3">
       <CoachAvatar url={application.photo_url} name={nickname} size={64} />
       <div className="min-w-0 space-y-1 text-sm">
-        <p className="font-semibold">顔写真</p>
+        <p className="font-semibold">{L("顔写真")}</p>
         <label className="inline-flex cursor-pointer rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-slate-100">
-          {application.photo_url ? "写真を変える" : "写真を選ぶ"}
+          {application.photo_url ? L("写真を変える") : L("写真を選ぶ")}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
@@ -100,10 +101,7 @@ export function CoachPhotoForm({
             }}
           />
         </label>
-        <p className="text-xs text-slate-300">
-          顔がはっきり写った写真にしてください。コーチ一覧に載ります。
-          {application.photo_url ? "" : "写真がないと承認されません。"}
-        </p>
+        <p className="text-xs text-slate-300">{L("顔がはっきり写った写真にしてください。コーチ一覧に載ります。{v0}", { v0: application.photo_url ? "" : L("写真がないと承認されません。") })}</p>
         {status ? <p className="text-xs text-slate-200">{status}</p> : null}
         {error ? <p className="text-xs text-red-400">{error}</p> : null}
       </div>

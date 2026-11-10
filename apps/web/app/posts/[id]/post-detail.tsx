@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -85,11 +86,11 @@ export function PostDetail({
       setError("");
     } catch (e) {
       if (stale()) return;
-      if (e instanceof ApiRequestError && e.status === 404) setError("投稿が見つかりません");
+      if (e instanceof ApiRequestError && e.status === 404) setError(L("投稿が見つかりません"));
       else if (e instanceof ApiRequestError && (e.status === 401 || e.code === "not_joined")) {
         // ケガの投稿は、同じケガのグループに参加した人だけが読める。
-        setError("この投稿は、同じケガのグループに参加すると読めます");
-      } else setError("読み込みに失敗しました");
+        setError(L("この投稿は、同じケガのグループに参加すると読めます"));
+      } else setError(L("読み込みに失敗しました"));
     } finally {
       if (!stale()) setLoading(false);
     }
@@ -129,7 +130,7 @@ export function PostDetail({
   }, [id, token]);
 
   if (loading) return <DetailLoadingFrame />;
-  if (error || !post) return <p className="text-red-400">{error || "エラー"}</p>;
+  if (error || !post) return <p className="text-red-400">{error || L("エラー")}</p>;
 
   const current = post;
   const mine = current.mine;
@@ -146,7 +147,7 @@ export function PostDetail({
       clearHomeFeeds();
       await load();
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "いいねできませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("いいねできませんでした"));
     } finally {
       action.release();
     }
@@ -162,7 +163,7 @@ export function PostDetail({
       await apiFetch(`/v1/posts/${current.id}/saves`, { method: current.saved_by_me ? "DELETE" : "POST", token });
       await load();
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "保存できませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("保存できませんでした"));
     } finally {
       action.release();
     }
@@ -177,26 +178,26 @@ export function PostDetail({
   }
 
   async function remove() {
-    if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("この投稿"))))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/posts/${current.id}`, { method: "DELETE", token });
     } catch (e) {
       action.release();
-      alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("削除できませんでした"));
       return;
     }
     leaveRemovedPost();
   }
 
   async function hidePost() {
-    if (!(await confirmDialog(hideConfirmOptions("この投稿")))) return;
+    if (!(await confirmDialog(hideConfirmOptions(L("この投稿"))))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/admin/posts/${current.id}/hide`, { method: "POST", token });
     } catch (e) {
       action.release();
-      alert(e instanceof ApiRequestError ? e.message : "非表示にできませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("非表示にできませんでした"));
       return;
     }
     leaveRemovedPost();
@@ -226,12 +227,12 @@ export function PostDetail({
         }),
       });
       markReported(targetType, targetId);
-      alert("通報を受け付けました");
+      alert(L("通報を受け付けました"));
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
         markReported(targetType, targetId);
-        alert("すでに通報済みです");
-      } else alert(e instanceof ApiRequestError ? e.message : "通報できませんでした");
+        alert(L("すでに通報済みです"));
+      } else alert(e instanceof ApiRequestError ? e.message : L("通報できませんでした"));
     } finally {
       action.release();
     }
@@ -254,7 +255,7 @@ export function PostDetail({
       setReplyTo(null);
       await load();
     } catch (e) {
-      setCommentError(e instanceof ApiRequestError ? e.message : "コメントできませんでした");
+      setCommentError(e instanceof ApiRequestError ? e.message : L("コメントできませんでした"));
       await load();
     } finally {
       commentLock.release();
@@ -263,7 +264,7 @@ export function PostDetail({
 
   // 返信先コメントの投稿者名(API が「あなた」「投稿者」「ニックネーム/匿名」に解決済み)。
   function replyTargetName(c: Comment) {
-    return c.author_name ?? "匿名";
+    return c.author_name ?? L("匿名");
   }
 
   function openThread(c: Comment) {
@@ -282,7 +283,7 @@ export function PostDetail({
         onClick={() => openThread(c)}
         className="flex min-h-28 min-w-0 flex-col overflow-hidden rounded-xl border border-white/20 glass bg-white/10 p-3 text-left text-slate-200 transition hover:bg-white/16 active:scale-[0.98]"
       >
-        <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? "匿名"}</span>
+        <span className="mb-1 truncate text-xs font-semibold text-slate-100">{c.author_name ?? L("匿名")}</span>
         <span className={`line-clamp-4 whitespace-pre-wrap [overflow-wrap:anywhere] ${c.body.length > 280 ? "text-xs" : "text-sm"}`}>{c.body}</span>
         <span className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-slate-300">
           <span className={thread.replies.length > 0 ? "font-semibold text-blue-200" : ""}>💬 {thread.replies.length}</span>
@@ -306,7 +307,7 @@ export function PostDetail({
   }
 
   async function editComment(c: Comment) {
-    const body = window.prompt("コメントを編集", c.body);
+    const body = window.prompt(L("コメントを編集"), c.body);
     if (!body) return;
     if (!action.acquire()) return;
     try {
@@ -317,33 +318,33 @@ export function PostDetail({
       });
       await load();
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "編集できませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("編集できませんでした"));
     } finally {
       action.release();
     }
   }
 
   async function deleteComment(cid: string) {
-    if (!(await confirmDialog(deleteConfirmOptions("このコメント")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("このコメント"))))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/comments/${cid}`, { method: "DELETE", token });
       await load();
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("削除できませんでした"));
     } finally {
       action.release();
     }
   }
 
   async function hideComment(cid: string) {
-    if (!(await confirmDialog(hideConfirmOptions("このコメント")))) return;
+    if (!(await confirmDialog(hideConfirmOptions(L("このコメント"))))) return;
     if (!action.acquire()) return;
     try {
       await apiFetch(`/v1/admin/comments/${cid}/hide`, { method: "POST", token });
       await load();
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "非表示にできませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("非表示にできませんでした"));
     } finally {
       action.release();
     }
@@ -388,7 +389,7 @@ export function PostDetail({
         onPointerDown={(e) => e.stopPropagation()}
       >
         <span className="block truncate font-semibold">{replyLabel(c)}</span>
-        <span className="line-clamp-2 [overflow-wrap:anywhere] opacity-80">{target && !c.reply_to_removed ? target.body : "削除されたコメント"}</span>
+        <span className="line-clamp-2 [overflow-wrap:anywhere] opacity-80">{target && !c.reply_to_removed ? target.body : L("削除されたコメント")}</span>
       </button>
     );
   }
@@ -396,7 +397,7 @@ export function PostDetail({
   function renderBubble(c: Comment) {
     return (
       <div key={c.id} id={`comment-${c.id}`} className={`flex flex-col ${c.mine ? "items-end" : "items-start"}`}>
-        {c.mine ? null : <span className="mb-0.5 ml-3 text-xs font-semibold text-slate-200">{c.author_name ?? "匿名"}</span>}
+        {c.mine ? null : <span className="mb-0.5 ml-3 text-xs font-semibold text-slate-200">{c.author_name ?? L("匿名")}</span>}
         <div className={`flex min-w-0 max-w-[95%] items-end gap-1.5 ${c.mine ? "flex-row-reverse" : ""}`}>
           <div
             onPointerDown={(e) => startPress(e, c)}
@@ -418,9 +419,7 @@ export function PostDetail({
           </div>
           <span className="shrink-0 pb-0.5 text-xs text-slate-300">{formatRelativeTime(c.created_at)}</span>
           {isAdmin ? (
-            <button type="button" className="shrink-0 pb-0.5 text-xs text-red-300 underline disabled:opacity-50" disabled={action.pending} onClick={() => void hideComment(c.id)}>
-              非表示
-            </button>
+            <button type="button" className="shrink-0 pb-0.5 text-xs text-red-300 underline disabled:opacity-50" disabled={action.pending} onClick={() => void hideComment(c.id)}>{L("非表示")}</button>
           ) : null}
         </div>
       </div>
@@ -445,9 +444,7 @@ export function PostDetail({
                 close();
                 startReply(c);
               }}
-            >
-              返信
-            </button>
+            >{L("返信")}</button>
           ) : null}
           {c.mine ? (
             <>
@@ -459,9 +456,7 @@ export function PostDetail({
                   close();
                   void editComment(c);
                 }}
-              >
-                編集
-              </button>
+              >{L("編集")}</button>
               <button
                 type="button"
                 className={`${item} text-red-400`}
@@ -470,9 +465,7 @@ export function PostDetail({
                   close();
                   void deleteComment(c.id);
                 }}
-              >
-                削除
-              </button>
+              >{L("削除")}</button>
             </>
           ) : (
             <button
@@ -484,12 +477,10 @@ export function PostDetail({
                 void report("comment", c.id);
               }}
             >
-              {reportedComments.has(c.id) ? "通報済み" : "通報"}
+              {reportedComments.has(c.id) ? L("通報済み") : L("通報")}
             </button>
           )}
-          <button type="button" className={`${item} text-slate-300`} onClick={close}>
-            キャンセル
-          </button>
+          <button type="button" className={`${item} text-slate-300`} onClick={close}>{L("キャンセル")}</button>
         </div>
       </div>
     );
@@ -513,16 +504,16 @@ export function PostDetail({
         <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{post.body}</p>
       ) : null}
       {post.kind === "practice" ? (
-        <h1 className="sr-only">{post.practice?.event_label || "練習相手募集"}</h1>
+        <h1 className="sr-only">{post.practice?.event_label || L("練習相手募集")}</h1>
       ) : null}
       {post.kind === "injury" && post.injury ? (
         <p className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-slate-200 border border-white/20">
-            {post.injury.body_part_label}
+            {L(post.injury.body_part_label)}
           </span>
           {post.injury.stage_label ? (
             <span className="rounded-full bg-emerald-950/70 px-3 py-1 text-xs font-bold text-emerald-300 border border-emerald-800/60">
-              {post.injury.stage_label}
+              {L(post.injury.stage_label)}
             </span>
           ) : null}
         </p>
@@ -544,11 +535,11 @@ export function PostDetail({
       ) : post.kind === "youtube" && post.youtube_video_id ? (
         <YouTubePlayer
           videoId={post.youtube_video_id}
-          title={feedTitle(post.title) || post.source_title || "YouTube動画"}
+          title={feedTitle(post.title) || post.source_title || L("YouTube動画")}
           shorts={post.youtube_shorts}
         />
       ) : post.kind === "instagram" && post.instagram_type && post.instagram_shortcode ? (
-        <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title) || "投稿"} />
+        <InstagramEmbed type={post.instagram_type} shortcode={post.instagram_shortcode} title={feedTitle(post.title) || L("投稿")} />
       ) : post.kind === "x" && post.x_post_id ? (
         <div className="space-y-3">
           {post.thumbnail_url ? <ZoomableImage src={post.thumbnail_url} alt="" sizes="(max-width: 640px) 100vw, 560px" /> : null}
@@ -569,24 +560,22 @@ export function PostDetail({
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
-        <p className="text-xs text-slate-400">元動画: {post.source_title}</p>
+        <p className="text-xs text-slate-400">{L("元動画: {source_title}", { source_title: post.source_title })}</p>
       ) : null}
       {post.kind === "meet" ? null : (
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
         {post.author_name ? <span>{post.author_name}</span> : null}
         {post.author_name && post.author_post_master ? (
           <span
-            title="いいねがついた投稿が30件以上ある人"
+            title={L("いいねがついた投稿が30件以上ある人")}
             className="rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-200"
-          >
-            投稿マスター
-          </span>
+          >{L("投稿マスター")}</span>
         ) : null}
         <span className="ml-auto text-xs text-slate-300">{formatDateTime(post.created_at)}</span>
       </p>
       )}
       {post.kind === "injury" && post.injury ? (
-        <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={post.injury.body_part_label} />
+        <InjuryTypicalRecovery bodyPart={post.injury.body_part} bodyPartLabel={L(post.injury.body_part_label)} />
       ) : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-2">
         {post.kind === "meet" ? null : (
@@ -596,7 +585,7 @@ export function PostDetail({
               count={post.like_count}
               disabled={action.pending}
               onClick={toggleLike}
-              label={post.kind === "injury" ? "わかる" : undefined}
+              label={post.kind === "injury" ? L("わかる") : undefined}
             />
             <SaveButton
               saved={post.saved_by_me}
@@ -611,41 +600,35 @@ export function PostDetail({
               href={returnTo === "me" ? `/posts/${post.id}/edit?from=me` : `/posts/${post.id}/edit`}
               aria-disabled={action.pending}
               className="inline-flex items-center justify-center rounded-full border border-white/25 glass bg-white/12 px-4 py-2 text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 active:scale-[0.98] aria-disabled:pointer-events-none aria-disabled:opacity-50"
-            >
-              編集
-            </Link>
+            >{L("編集")}</Link>
             <Button
               type="button"
               variant="danger"
               className="rounded-full shadow-xs active:scale-[0.98]"
               disabled={action.pending}
               onClick={remove}
-            >
-              削除
-            </Button>
+            >{L("削除")}</Button>
           </>
         ) : null}
         {post.kind === "meet" ? null : (
           <ReportButton reported={reportedPost} disabled={action.pending} onClick={() => report("post", post.id)} />
         )}
         {isAdmin ? (
-          <Button type="button" variant="danger" className="rounded-full shadow-xs active:scale-[0.98]" disabled={action.pending} onClick={hidePost}>
-            非表示にする
-          </Button>
+          <Button type="button" variant="danger" className="rounded-full shadow-xs active:scale-[0.98]" disabled={action.pending} onClick={hidePost}>{L("非表示にする")}</Button>
         ) : null}
       </div>
       </div>
       )}
       <section className={`min-w-0 space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="mx-auto max-w-prose whitespace-pre-wrap text-center [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || "コメント"}</h2>
+          <h2 className="mx-auto max-w-prose whitespace-pre-wrap text-center [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || L("コメント")}</h2>
         ) : (
-          <h2 className="text-xl font-semibold">コメント</h2>
+          <h2 className="text-xl font-semibold">{L("コメント")}</h2>
         )}
-        {comments.length === 0 ? <p className="text-sm text-slate-200">まだコメントはありません。</p> : null}
+        {comments.length === 0 ? <p className="text-sm text-slate-200">{L("まだコメントはありません。")}</p> : null}
         {activeThread ? (
           <div className="space-y-3">
-            <p className="text-center text-xs text-slate-300">吹き出しを長押しで、メンション・編集・削除・通報ができます</p>
+            <p className="text-center text-xs text-slate-300">{L("吹き出しを長押しで、メンション・編集・削除・通報ができます")}</p>
             <div className="space-y-3">
               {renderBubble(activeThread.top)}
               {activeThread.replies.map((r) => renderBubble(r))}
@@ -658,9 +641,7 @@ export function PostDetail({
               thread.top ? (
                 renderCommentCard({ ...thread, top: thread.top })
               ) : (
-                <p key={thread.replies[0].id} className="rounded-xl border border-dashed border-white/20 p-3 text-xs text-slate-300">
-                  削除されたコメント（返信{thread.replies.length}件）
-                </p>
+                <p key={thread.replies[0].id} className="rounded-xl border border-dashed border-white/20 p-3 text-xs text-slate-300">{L("削除されたコメント（返信{length}件）", { length: thread.replies.length })}</p>
               ),
             )}
           </div>
@@ -679,23 +660,23 @@ export function PostDetail({
             {roomReplyTo ? (
               <div className="mx-auto mb-2 flex w-full max-w-5xl items-center gap-2 rounded-lg bg-blue-400/20 px-3 py-1.5 text-xs text-blue-100 lg:mx-0 lg:max-w-none">
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold">@{replyTargetName(roomReplyTo)}</span> に返信中: {roomReplyTo.body}
+                  <span className="font-semibold">@{replyTargetName(roomReplyTo)}</span>{" "}{L("に返信中:")}{" "}{roomReplyTo.body}
                 </span>
-                <button type="button" aria-label="返信をやめる" className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
+                <button type="button" aria-label={L("返信をやめる")} className="shrink-0 px-1 text-base leading-none" onClick={() => setReplyTo(null)}>
                   ×
                 </button>
               </div>
             ) : null}
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2 lg:mx-0 lg:max-w-none lg:flex-col lg:items-stretch">
-              <Textarea rows={2} className="min-h-11 flex-1 glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500" placeholder="コメントを書く" {...form.register("body")} />
+              <Textarea rows={2} className="min-h-11 flex-1 glass bg-white/8 border-white/20 text-white placeholder:text-slate-300 focus:border-blue-500" placeholder={L("コメントを書く")} {...form.register("body")} />
               <Button type="submit" className="shrink-0 lg:w-full" disabled={commentLock.pending}>
-                {commentLock.pending ? "送っています" : "コメントする"}
+                {commentLock.pending ? L("送っています") : L("コメントする")}
               </Button>
             </div>
             {commentError ? <p className="mt-2 text-sm text-red-400">{commentError}</p> : null}
           </form>
         ) : (
-          <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">募集は終了しています。</p>
+          <p className="rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm text-slate-200">{L("募集は終了しています。")}</p>
         )}
       </section>
       {menuComment ? renderMenu(menuComment) : null}
@@ -704,15 +685,15 @@ export function PostDetail({
 }
 
 function practiceStatusLabel(status: "open" | "full" | "dissolved") {
-  if (status === "full") return "満員";
-  if (status === "dissolved") return "解散";
-  return "募集中";
+  if (status === "full") return L("満員");
+  if (status === "dissolved") return L("解散");
+  return L("募集中");
 }
 
 function applicationStatusLabel(status: "pending" | "accepted" | "declined") {
-  if (status === "accepted") return "承認済み";
-  if (status === "declined") return "見送り";
-  return "申請中";
+  if (status === "accepted") return L("承認済み");
+  if (status === "declined") return L("見送り");
+  return L("申請中");
 }
 
 function RatingForm({
@@ -731,36 +712,32 @@ function RatingForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (!score) return;
-        if (!confirm("この評価は変更できません。送信しますか？")) return;
+        if (!confirm(L("この評価は変更できません。送信しますか？"))) return;
         onSubmit(score, comment);
       }}
       className="mt-2 space-y-2"
     >
-      <label className="block text-sm font-medium">
-        評価
-        <select
+      <label className="block text-sm font-medium">{L("評価")}<select
           className="mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
           value={score}
           onChange={(event) => setScore(event.target.value)}
         >
-          <option value="">選んでください</option>
-          <option value="good">良い</option>
-          <option value="ok">普通</option>
-          <option value="bad">悪い</option>
-          {allowNoShow ? <option value="no_show">ドタキャン（当日来なかった）</option> : null}
+          <option value="">{L("選んでください")}</option>
+          <option value="good">{L("良い")}</option>
+          <option value="ok">{L("普通")}</option>
+          <option value="bad">{L("悪い")}</option>
+          {allowNoShow ? <option value="no_show">{L("ドタキャン（当日来なかった）")}</option> : null}
         </select>
       </label>
       <Textarea
         rows={2}
         maxLength={200}
-        placeholder="ひとこと（任意）"
-        aria-label="評価コメント"
+        placeholder={L("ひとこと（任意）")}
+        aria-label={L("評価コメント")}
         value={comment}
         onChange={(event) => setComment(event.target.value)}
       />
-      <Button type="submit" disabled={disabled || score === ""}>
-        評価を送る
-      </Button>
+      <Button type="submit" disabled={disabled || score === ""}>{L("評価を送る")}</Button>
     </form>
   );
 }
@@ -785,7 +762,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
       await apiFetch(path, { method: "POST", token });
       await onDone();
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
+      setError(e instanceof ApiRequestError ? e.message : L("処理に失敗しました"));
     } finally {
       release();
     }
@@ -806,7 +783,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
       });
       await onDone();
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : "処理に失敗しました");
+      setError(e instanceof ApiRequestError ? e.message : L("処理に失敗しました"));
     } finally {
       release();
     }
@@ -818,25 +795,21 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
   return (
     <div className="space-y-3">
       {mine && info.status !== "dissolved" ? (
-        <Button type="button" variant="danger" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/dissolve`, "この練習を解散しますか？")}>
-          解散する
-        </Button>
+        <Button type="button" variant="danger" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/dissolve`, L("この練習を解散しますか？"))}>{L("解散する")}</Button>
       ) : null}
-      {!mine && info.my_application === "pending" ? <p className="text-sm">申請中です。投稿者の承認をお待ちください。</p> : null}
-      {!mine && info.my_application === "accepted" ? <p className="text-sm">参加が承認されました</p> : null}
-      {!mine && info.my_application === "declined" ? <p className="text-sm">見送りになりました</p> : null}
-      {!mine && !info.my_application && info.status === "full" ? <p className="text-sm">満員です</p> : null}
+      {!mine && info.my_application === "pending" ? <p className="text-sm">{L("申請中です。投稿者の承認をお待ちください。")}</p> : null}
+      {!mine && info.my_application === "accepted" ? <p className="text-sm">{L("参加が承認されました")}</p> : null}
+      {!mine && info.my_application === "declined" ? <p className="text-sm">{L("見送りになりました")}</p> : null}
+      {!mine && !info.my_application && info.status === "full" ? <p className="text-sm">{L("満員です")}</p> : null}
       {!mine && !info.my_application && open ? (
-        <Button type="button" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/applications`)}>
-          参加したい
-        </Button>
+        <Button type="button" disabled={pending} onClick={() => run(`/v1/posts/${post.id}/practice/applications`)}>{L("参加したい")}</Button>
       ) : null}
       {!mine && info.ratable && info.my_application === "accepted" && info.my_application_id ? (
         info.rated_host ? (
-          <p className="text-sm">評価しました</p>
+          <p className="text-sm">{L("評価しました")}</p>
         ) : (
           <div>
-            <p className="text-sm font-medium">募集者を評価</p>
+            <p className="text-sm font-medium">{L("募集者を評価")}</p>
             <RatingForm disabled={pending} onSubmit={(score, comment) => rate(info.my_application_id ?? "", score, comment)} />
           </div>
         )
@@ -845,7 +818,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
         <ul className="space-y-2">
           {info.applications.map((application) => (
             <li key={application.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3">
-              <p className="text-sm">参加希望 · {formatDateTime(application.created_at)}</p>
+              <p className="text-sm">{L("参加希望 · {v0}", { v0: formatDateTime(application.created_at) })}</p>
               <p className="mt-1 text-sm text-slate-200">{applicationStatusLabel(application.status)}</p>
               <p className="mt-1 text-sm text-slate-200">{practiceAttendanceLine(application.attendance)}</p>
               {application.status === "pending" && info.status !== "dissolved" ? (
@@ -854,9 +827,7 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
                     type="button"
                     disabled={pending || info.status === "full"}
                     onClick={() => run(`/v1/posts/${post.id}/practice/applications/${application.id}/accept`)}
-                  >
-                    承認
-                  </Button>
+                  >{L("承認")}</Button>
                   <Button
                     type="button"
                     variant="secondary"
@@ -864,17 +835,15 @@ function PracticeJoin({ post, onDone }: { post: Post; onDone: () => Promise<void
                     onClick={() =>
                       run(
                         `/v1/posts/${post.id}/practice/applications/${application.id}/decline`,
-                        "この参加希望を見送りますか？",
+                        L("この参加希望を見送りますか？"),
                       )
                     }
-                  >
-                    見送り
-                  </Button>
+                  >{L("見送り")}</Button>
                 </div>
               ) : null}
               {application.status === "accepted" && info.ratable ? (
                 application.rated ? (
-                  <p className="mt-2 text-sm">評価済み</p>
+                  <p className="mt-2 text-sm">{L("評価済み")}</p>
                 ) : (
                   <RatingForm
                     disabled={pending}
@@ -896,11 +865,11 @@ function PracticeFacts({ post }: { post: Post }) {
   const info = post.practice;
   if (!info) return null;
   const rows = [
-    { label: "練習場所", value: info.prefecture ? `${prefectureName(info.prefecture)} ${info.venue}` : info.venue },
-    { label: "練習日時", value: formatDateTime(info.starts_at) },
-    { label: "種目", value: info.event_label },
-    { label: "募集人数", value: `${info.accepted_count}/${info.capacity}人` },
-    { label: "状態", value: practiceStatusLabel(info.status) },
+    { label: L("練習場所"), value: info.prefecture ? `${prefectureName(info.prefecture)} ${info.venue}` : info.venue },
+    { label: L("練習日時"), value: formatDateTime(info.starts_at) },
+    { label: L("種目"), value: L(info.event_label) },
+    { label: L("募集人数"), value: L("{accepted_count}/{capacity}人", { accepted_count: info.accepted_count, capacity: info.capacity }) },
+    { label: L("状態"), value: practiceStatusLabel(info.status) },
   ];
   return (
     <div className="space-y-4">
@@ -914,7 +883,7 @@ function PracticeFacts({ post }: { post: Post }) {
       </dl>
       <PracticeReputationSummary
         reputation={info.reputation}
-        heading="これまでの評価"
+        heading={L("これまでの評価")}
         reportNext={post.mine ? undefined : `/posts/${post.id}`}
       />
     </div>
@@ -924,14 +893,14 @@ function PracticeFacts({ post }: { post: Post }) {
 function RecruitmentFacts({ post }: { post: Post }) {
   const info = post.recruitment;
   if (!info) return null;
-  const place = info.prefectures.map((code) => prefectureName(code)).join("、");
+  const place = info.prefectures.map((code) => prefectureName(code)).join(L("、"));
   const location = [place, info.venue].filter(Boolean).join(" ");
   const rows = [
-    { label: "活動場所", value: location },
-    { label: "活動時間", value: info.schedule },
-    { label: "男女比", value: info.gender_ratio },
-    { label: "平均年齢", value: info.average_age },
-    { label: "募集年齢", value: info.recruit_age },
+    { label: L("活動場所"), value: location },
+    { label: L("活動時間"), value: info.schedule },
+    { label: L("男女比"), value: info.gender_ratio },
+    { label: L("平均年齢"), value: info.average_age },
+    { label: L("募集年齢"), value: info.recruit_age },
   ].filter((row) => row.value);
 
   return (

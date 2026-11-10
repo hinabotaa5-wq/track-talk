@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -141,10 +142,8 @@ export function ZoomableVideo({ src, poster, className }: Props) {
       />
       {failed ? (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/85 p-3 text-center text-sm text-pure-white">
-          <p role="alert">動画を再生できませんでした。</p>
-          <button type="button" onClick={retry} className="rounded-full bg-white/20 px-4 py-2 font-semibold">
-            再試行
-          </button>
+          <p role="alert">{L("動画を再生できませんでした。")}</p>
+          <button type="button" onClick={retry} className="rounded-full bg-white/20 px-4 py-2 font-semibold">{L("再試行")}</button>
         </div>
       ) : null}
       {zoomed && showControls && !failed ? (
@@ -153,7 +152,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
             type="button"
             onClick={() => skip(-10)}
             className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-pure-white"
-            aria-label="10秒戻る"
+            aria-label={L("10秒戻る")}
           >
             -10
           </button>
@@ -161,7 +160,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
             type="button"
             onClick={togglePlay}
             className="pointer-events-auto rounded-full bg-black/60 px-4 py-2 text-sm text-pure-white"
-            aria-label={playing ? "一時停止" : "再生"}
+            aria-label={playing ? L("一時停止") : L("再生")}
           >
             {playing ? "❚❚" : "▶"}
           </button>
@@ -169,7 +168,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
             type="button"
             onClick={() => skip(10)}
             className="pointer-events-auto rounded-full bg-black/60 px-3 py-2 text-sm text-pure-white"
-            aria-label="10秒進む"
+            aria-label={L("10秒進む")}
           >
             +10
           </button>
@@ -180,9 +179,7 @@ export function ZoomableVideo({ src, poster, className }: Props) {
           type="button"
           onClick={() => setView({ scale: 1, x: 0, y: 0 })}
           className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-xs text-pure-white"
-        >
-          元に戻す
-        </button>
+        >{L("元に戻す")}</button>
       ) : null}
     </div>
   );

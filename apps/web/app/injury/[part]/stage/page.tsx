@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
@@ -31,9 +32,9 @@ export default function InjuryStagePage({ params }: { params: Promise<{ part: st
 
   const back = injuryGroupPath(part);
   return (
-    <ComposerPage title={`${injuryBodyPartLabel(part)}の段階を変える`}>
+    <ComposerPage title={L("{v0}の段階を変える", { v0: injuryBodyPartLabel(part) })}>
       {failed ? (
-        <ErrorState message="グループの取得に失敗しました。グループに入っているか確認してください。" />
+        <ErrorState message={L("グループの取得に失敗しました。グループに入っているか確認してください。")} />
       ) : group ? (
         <InjuryStageChange
           part={part}

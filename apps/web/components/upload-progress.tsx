@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 
 function formatAmount(bytes: number, total: number) {
@@ -32,7 +33,7 @@ export function UploadProgress({
   const sent = progress.total > 0 && progress.loaded >= progress.total;
   const sending = phase === "upload" && !sent;
   const shown = Math.min(99, Math.round(progress.percent));
-  const label = phase === "saving" ? "投稿を保存しています" : sending ? `${noun}を送っています` : "取り込み中";
+  const label = phase === "saving" ? L("投稿を保存しています") : sending ? (noun === "写真" ? L("写真を送っています") : L("動画を送っています")) : L("取り込み中");
 
   return (
     <div className="rounded-2xl border border-blue-800/60 bg-blue-950/40 p-4">
@@ -47,7 +48,7 @@ export function UploadProgress({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={shown}
-          aria-valuetext={`${shown}パーセント`}
+          aria-valuetext={L("{shown}パーセント", { shown })}
           aria-label={label}
         >
           <div className="h-full rounded-full bg-blue-600 transition-[width] duration-150 ease-out" style={{ width: `${shown}%` }} />
@@ -58,7 +59,7 @@ export function UploadProgress({
         </div>
       )}
       {sending ? <p className="mt-2 text-sm tabular-nums text-slate-200">{formatAmount(progress.loaded, progress.total)}</p> : null}
-      <p className="mt-1 text-sm text-slate-200">自動でホームに移動します</p>
+      <p className="mt-1 text-sm text-slate-200">{L("自動でホームに移動します")}</p>
     </div>
   );
 }
