@@ -3,7 +3,7 @@ import { Article } from "@/components/legal-prose";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
-const privacyUpdated = "2026年11月10日";
+const privacyUpdated = "2026年11月11日";
 
 export function PrivacyPolicy({ titleId }: { titleId?: string }) {
   return (
@@ -73,6 +73,20 @@ export function PrivacyPolicy({ titleId }: { titleId?: string }) {
         <p>
           対応が終わっていない通報や紛争があるやりとりは、運営の対応が終わるまで閲覧の停止と削除をせずに保管します。保管中のやりとりについての本人からの開示の請求は、第11条の手続きで受け付けます。
         </p>
+        <p className="font-semibold text-white">海外コーチとのやりとりの翻訳と委託費の送金</p>
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            海外に住むコーチ（以下「海外コーチ」）とのやりとりでは、選手とコーチが書いた文章を AI で翻訳し、原文と訳文を並べて表示します。翻訳は Anthropic（Claude API）に委託し、翻訳のために文章を送ります。
+          </li>
+          <li>Anthropic は、送られた文章を AI の学習に使いません。</li>
+          <li>
+            運営者は、翻訳の品質を上げるため、原文・訳文・運営者が直した訳と用語の候補を、個人を特定できない形にして、翻訳の用語集と指示文の改善に使います。氏名などあなたを特定する情報は取り除き、ケガや体調についての情報は使いません。改善に使う文は運営者が選んで記録し、やりとりを自動で集めることはしません。
+          </li>
+          <li>海外コーチへの業務委託の対価（委託費）は、Wise を使って送金します。</li>
+        </ul>
+        <p>
+          海外コーチ向けに、コーチ自身の情報の取り扱いを英語でまとめた<Link href="/legal/coach-privacy" className="text-blue-300 underline">Privacy Notice for Overseas Coaches</Link>を掲載します。内容が異なる場合は、このポリシーが優先します。
+        </p>
         <p>
           提供を始める前に、取得する情報、利用目的、委託先をこのポリシーに追加し、本サービス上で知らせます。
         </p>
@@ -97,6 +111,7 @@ export function PrivacyPolicy({ titleId }: { titleId?: string }) {
           <li>ケガの復帰の目安と、ケガの予防に役立つ傾向の集計と表示</li>
           <li>通報、問い合わせ、商品のリクエスト、権利侵害の申立てへの対応</li>
           <li>コーチの応募の検討と、応募者への連絡</li>
+          <li>海外コーチとのやりとりの翻訳と、個人を特定できない形にした対訳と用語による、翻訳の用語集と指示文の改善（第3条）</li>
           <li>不正利用の防止、利用規約に基づく非表示やアカウント停止</li>
           <li>退会その他、利用者からの請求への対応</li>
           <li>本サービスの不具合の調査と改善</li>
@@ -130,6 +145,8 @@ export function PrivacyPolicy({ titleId }: { titleId?: string }) {
           <li>Google、Mozilla、Apple、Microsoft（いずれも米国。米国ほか）: 通知をオンにした端末への通知の配信。端末のブラウザに応じて、そのブラウザの通知サービスを使います</li>
           <li>Stripe（米国。米国ほか）: オンラインコーチングの支払いの処理と、コーチへの報酬の送金。提供を始めるまで使いません</li>
           <li>Anthropic（Claude API。米国。米国）: 感覚メモのふりかえりの作成。利用者が「6個の感覚をまとめる」を押したときだけ、まだまとめていない感覚メモを保存した順に6個選び、本文と種目、日付と曜日を送ります。元の6個の感覚もまとめと一緒に保存するため、感覚メモを個別に削除した後も、まとめには作成時の内容が残ります。ニックネームやメールアドレスなど、あなたを特定する情報は送りません。送った内容は、AI の学習には使われません</li>
+          <li>Anthropic（Claude API。米国。米国）: 海外コーチとのやりとりの翻訳（第3条）。送った内容は、AI の学習には使われません。提供を始めるまで使いません</li>
+          <li>Wise Payments Japan（日本）: 海外コーチへの委託費の送金。提供を始めるまで使いません</li>
         </ul>
         <p>
           委託先には、このポリシーの利用目的の範囲を超えて使わせません。ホスティング事業者が、接続の維持のために技術上のログを各自の基準で保持することがあります。
