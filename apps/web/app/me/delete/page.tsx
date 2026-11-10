@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -59,7 +60,7 @@ export default function DeleteAccountPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (phrase !== confirmPhrase || !session || !acquire()) return;
+    if (phrase !== L(confirmPhrase) || !session || !acquire()) return;
     setError("");
     try {
       const result = await apiFetch<{ auth_deleted: boolean }>("/v1/me", {
@@ -76,69 +77,53 @@ export default function DeleteAccountPage() {
       if (err instanceof ApiRequestError) {
         setError(err.fields?.confirm || err.message);
       } else {
-        setError("退会に失敗しました");
+        setError(L("退会に失敗しました"));
       }
       release();
     }
   }
 
   if (loading || !session) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   if (authLeft) {
     return (
       <div className="mx-auto max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">退会</h1>
-        <p className="text-sm text-slate-300">
-          投稿・コメントなどのデータは削除しました。ログイン用アカウントは削除できなかったため、同じメールアドレスで再びログインできることがあります。
-        </p>
-        <Button type="button" className="w-full" onClick={() => void leave("/")}>
-          ログアウトしてホームへ
-        </Button>
+        <h1 className="text-2xl font-bold">{L("退会")}</h1>
+        <p className="text-sm text-slate-300">{L("投稿・コメントなどのデータは削除しました。ログイン用アカウントは削除できなかったため、同じメールアドレスで再びログインできることがあります。")}</p>
+        <Button type="button" className="w-full" onClick={() => void leave("/")}>{L("ログアウトしてホームへ")}</Button>
       </div>
     );
   }
 
-  const ready = phrase === confirmPhrase;
+  const ready = phrase === L(confirmPhrase);
 
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">退会</h1>
-        <p className="text-sm text-slate-300">退会すると、次のデータが削除され、元に戻せません。</p>
+        <h1 className="text-2xl font-bold">{L("退会")}</h1>
+        <p className="text-sm text-slate-300">{L("退会すると、次のデータが削除され、元に戻せません。")}</p>
       </div>
       {coaching ? (
-        <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-300">
-          コーチだけをやめたいときは、退会しなくても大丈夫です。
-          <Link href="/coach/withdraw" className="text-blue-300 underline">
-            コーチをやめる
-          </Link>
-          から手続きすると、アカウントは残ります。まだ送金していないコーチの報酬があるあいだは退会できません。先にコーチをやめると、残りの報酬は最低額に届かなくても次の月次の送金でお送りします。送金が済んでから退会してください。
-        </p>
+        <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-300">{L("コーチだけをやめたいときは、退会しなくても大丈夫です。")}<Link href="/coach/withdraw" className="text-blue-300 underline">{L("コーチをやめる")}</Link>{L("から手続きすると、アカウントは残ります。まだ送金していないコーチの報酬があるあいだは退会できません。先にコーチをやめると、残りの報酬は最低額に届かなくても次の月次の送金でお送りします。送金が済んでから退会してください。")}</p>
       ) : null}
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
-        <li>あなたの投稿、コメント、レビュー、いいね、保存、通知</li>
-        <li>感覚メモと競技会の記録、エグ練グランプリのエントリーと投票</li>
-        <li>ケガのグループへの参加、回答、段階の記録と一言</li>
-        <li>練習への参加と評価。あなたが作った練習の投稿も削除されます</li>
-        <li>お問い合わせ（商品のリクエストを含みます）、コーチの応募と顔写真、あなたが送った通報</li>
-        <li>ログインに使うアカウント</li>
+        <li>{L("あなたの投稿、コメント、レビュー、いいね、保存、通知")}</li>
+        <li>{L("感覚メモと競技会の記録、エグ練グランプリのエントリーと投票")}</li>
+        <li>{L("ケガのグループへの参加、回答、段階の記録と一言")}</li>
+        <li>{L("練習への参加と評価。あなたが作った練習の投稿も削除されます")}</li>
+        <li>{L("お問い合わせ（商品のリクエストを含みます）、コーチの応募と顔写真、あなたが送った通報")}</li>
+        <li>{L("ログインに使うアカウント")}</li>
       </ul>
-      <p className="text-sm text-slate-300">
-        他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます。
-      </p>
-      <p className="text-sm text-slate-300">
-        18歳未満の場合、保護者の同意の記録、購入のたびの保護者の許可の申告の記録、購入の記録は、事実の証明と紛争の対応のため退会後も残し、23歳になる月が終わったら削除します。
-      </p>
+      <p className="text-sm text-slate-300">{L("他の人の投稿は残ります。あなたの投稿についたコメントも、投稿といっしょに削除されます。オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます。")}</p>
+      <p className="text-sm text-slate-300">{L("18歳未満の場合、保護者の同意の記録、購入のたびの保護者の許可の申告の記録、購入の記録は、事実の証明と紛争の対応のため退会後も残し、23歳になる月が終わったら削除します。")}</p>
       {coaching ? (
-        <p className="text-sm text-slate-300">
-          コーチとして登録した氏名・住所・電話番号（特定商取引法の表記のためのもの）は、開示請求と紛争の対応のため退会後も残し、最後の取引と退会の遅いほうから5年たったら削除します。
-        </p>
+        <p className="text-sm text-slate-300">{L("コーチとして登録した氏名・住所・電話番号（特定商取引法の表記のためのもの）は、開示請求と紛争の対応のため退会後も残し、最後の取引と退会の遅いほうから5年たったら削除します。")}</p>
       ) : null}
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
-          <span className="text-slate-300">確認のため「退会する」と入力</span>
+          <span className="text-slate-300">{L("確認のため「退会する」と入力")}</span>
           <Input
             value={phrase}
             onChange={(event) => setPhrase(event.target.value)}
@@ -146,9 +131,7 @@ export default function DeleteAccountPage() {
           />
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" variant="danger" className="w-full" disabled={!ready || submitting}>
-          退会する
-        </Button>
+        <Button type="submit" variant="danger" className="w-full" disabled={!ready || submitting}>{L("退会する")}</Button>
       </form>
     </div>
   );

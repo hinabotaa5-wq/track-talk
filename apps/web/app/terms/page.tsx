@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Article } from "@/components/legal-prose";
+import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
 export const metadata: Metadata = { title: "利用規約", description: "TrackTalkの利用条件と、現在のコーチ募集に関する規約。" };
 
@@ -9,6 +10,7 @@ export default function TermsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">利用規約</h1>
+        <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">この規約は、個人が運営するTrackTalk（以下「本サービス」）の利用条件を定めます。登録時には、この規約とプライバシーポリシーを確認し、同意してください。</p>
         <p className="text-xs text-slate-300">最終更新日: 2026年11月10日</p>
       </div>

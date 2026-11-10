@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Rule } from "@/components/legal-prose";
 import { coachingEnabled, coachingMessagingEnabled } from "@/lib/features";
+import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
 // 取引デジタルプラットフォーム消費者保護法 第3条の措置の概要（サポートプラン向け）。文面は運営者が承認したもの。
 // 措置1の「メッセージ機能で連絡を取り合える」は、契約のやりとり欄の送信が開いていないと事実にならない。
@@ -20,6 +21,7 @@ export default function PlatformMeasuresPage() {
     <div className="mx-auto max-w-2xl space-y-6 [overflow-wrap:anywhere]">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">取引デジタルプラットフォーム消費者保護法に基づく措置について</h1>
+        <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">
           TrackTalkのサポートプランでは、出品者であるコーチ（販売者）と購入者が取引を行い、運営者は、取引の場の提供と、代金の代理受領を行っています。運営者は、取引デジタルプラットフォーム消費者保護法第3条に基づき、次の措置を講じています。
         </p>

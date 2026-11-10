@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { LoadingStopwatch } from "./loading-stopwatch";
 import { useIsAnyLinkPending } from "@/lib/pending-link";
@@ -11,7 +12,7 @@ export function ScreenLoader() {
   return (
     <div className={`screen-loader ${pending ? "flex" : "hidden"}`} aria-hidden={!pending}>
       <LoadingStopwatch />
-      {pending ? <span role="status" className="sr-only">画面を開いています</span> : null}
+      {pending ? <span role="status" className="sr-only">{L("画面を開いています")}</span> : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -41,7 +42,7 @@ import {
 const selectClass =
   "w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400";
 
-const markPlaceholder: Record<RaceMarkKind, string> = { time: "例: 10.85 / 1:58.32", distance: "例: 7.05", points: "例: 5800" };
+const markPlaceholder: Record<RaceMarkKind, string> = { get time() { return L("例: 10.85 / 1:58.32"); }, get distance() { return L("例: 7.05"); }, get points() { return L("例: 5800"); } };
 
 // 記録を書く欄。新しく書くときと、直すときの両方で使う。
 function RaceRecordForm({
@@ -76,16 +77,16 @@ function RaceRecordForm({
     e.preventDefault();
     const parsedMark = parseRaceMark(mark, kind);
     if (parsedMark === null) {
-      setError(kind === "time" ? "記録は 10.85 や 1:58.32 の形で入力してください" : kind === "distance" ? "記録は 7.05 のようにメートルで入力してください" : "記録は点数を数字で入力してください");
+      setError(kind === "time" ? L("記録は 10.85 や 1:58.32 の形で入力してください") : kind === "distance" ? L("記録は 7.05 のようにメートルで入力してください") : L("記録は点数を数字で入力してください"));
       return;
     }
     const parsedWind = hasWind ? parseRaceWind(wind) : undefined;
     if (parsedWind === null) {
-      setError("風は +1.8 や -0.5 の形で入力してください");
+      setError(L("風は +1.8 や -0.5 の形で入力してください"));
       return;
     }
     if ([...memo.trim()].length > raceRecordMemoMaxLength) {
-      setError(`感想は${raceRecordMemoMaxLength}文字までです`);
+      setError(L("感想は{raceRecordMemoMaxLength}文字までです", { raceRecordMemoMaxLength }));
       return;
     }
     if (!lock.acquire()) return;
@@ -104,7 +105,7 @@ function RaceRecordForm({
       }
       onSaved(res, event);
     } catch (err) {
-      setError(apiErrorText(err, "保存できませんでした"));
+      setError(apiErrorText(err, L("保存できませんでした")));
     } finally {
       lock.release();
     }
@@ -114,18 +115,18 @@ function RaceRecordForm({
     <form onSubmit={onSubmit} className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-300">日付</span>
+          <span className="mb-1 block text-xs text-slate-300">{L("日付")}</span>
           <Input
             type="date"
             value={day}
             max={todayInTokyo()}
             onChange={(e) => { e.currentTarget.setCustomValidity(""); setDay(e.target.value); }}
-            onInvalid={(e) => { if (e.currentTarget.validity.rangeOverflow) e.currentTarget.setCustomValidity(`${todayInTokyo().replaceAll("-", "/")}以下に設定してください`); }}
+            onInvalid={(e) => { if (e.currentTarget.validity.rangeOverflow) e.currentTarget.setCustomValidity(L("{v0}以下に設定してください", { v0: todayInTokyo().replaceAll("-", "/") })); }}
             required
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-300">種目</span>
+          <span className="mb-1 block text-xs text-slate-300">{L("種目")}</span>
           <select className={selectClass} value={event} onChange={(e) => setEvent(e.target.value)}>
             {raceRecordEvents.map((item) => (
               <option key={item.value} value={item.value}>
@@ -135,18 +136,18 @@ function RaceRecordForm({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-300">記録</span>
+          <span className="mb-1 block text-xs text-slate-300">{L("記録")}</span>
           <Input inputMode="decimal" value={mark} onChange={(e) => setMark(e.target.value)} placeholder={markPlaceholder[kind]} required />
         </label>
         {hasWind ? (
           <label className="block">
-            <span className="mb-1 block text-xs text-slate-300">風(m/s)</span>
+            <span className="mb-1 block text-xs text-slate-300">{L("風(m/s)")}</span>
             <span className="flex gap-1">
-              <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder="例: +1.8" className="min-w-0 flex-1" />
+              <Input inputMode="decimal" value={wind} onChange={(e) => setWind(e.target.value)} placeholder={L("例: +1.8")} className="min-w-0 flex-1" />
               <button
                 type="button"
                 onClick={() => setWind((current) => toggleRaceWindSign(current))}
-                aria-label="追い風(+)と向かい風(-)を切り替える"
+                aria-label={L("追い風(+)と向かい風(-)を切り替える")}
                 className="shrink-0 rounded-md border border-white/25 glass bg-white/10 px-3 text-sm font-semibold text-white transition active:scale-[0.98]"
               >
                 +/−
@@ -156,32 +157,28 @@ function RaceRecordForm({
         ) : null}
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-300">大会名</span>
-        <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder="例: 県高校総体" />
+        <span className="mb-1 block text-xs text-slate-300">{L("大会名")}</span>
+        <Input value={meetName} onChange={(e) => setMeetName(e.target.value)} maxLength={raceRecordMeetNameMaxLength} placeholder={L("例: 県高校総体")} />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-300">ラウンド（任意）</span>
-        <Input value={round} onChange={(e) => setRound(e.target.value)} list={roundListId} maxLength={raceRecordRoundMaxLength} placeholder="例: 予選 / 準決勝 / 決勝" />
-        <datalist id={roundListId}>{raceRoundSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+        <span className="mb-1 block text-xs text-slate-300">{L("ラウンド（任意）")}</span>
+        <Input value={round} onChange={(e) => setRound(e.target.value)} list={roundListId} maxLength={raceRecordRoundMaxLength} placeholder={L("例: 予選 / 準決勝 / 決勝")} />
+        <datalist id={roundListId}>{raceRoundSuggestions.map((value) => <option key={value} value={L(value)} />)}</datalist>
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-300">感想</span>
-        <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder="例: 後半で腕振りが小さくなった" />
+        <span className="mb-1 block text-xs text-slate-300">{L("感想")}</span>
+        <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} maxLength={raceRecordMemoMaxLength + 20} placeholder={L("例: 後半で腕振りが小さくなった")} />
       </label>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1 text-xs text-slate-300">
-          <Lock className="size-3.5" aria-hidden />
-          あなただけに見えます
-        </p>
+          <Lock className="size-3.5" aria-hidden />{L("あなただけに見えます")}</p>
         <div className="flex gap-2">
           {onCancel ? (
-            <Button type="button" variant="secondary" onClick={onCancel}>
-              やめる
-            </Button>
+            <Button type="button" variant="secondary" onClick={onCancel}>{L("やめる")}</Button>
           ) : null}
           <Button type="submit" disabled={lock.pending}>
-            {lock.pending ? "保存しています…" : record ? "直す" : "記録を残す"}
+            {lock.pending ? L("保存しています…") : record ? L("直す") : L("記録を残す")}
           </Button>
         </div>
       </div>
@@ -198,8 +195,8 @@ function chartDay(day: string) {
 
 function RaceChartLegend({ records }: { records: RaceRecord[] }) {
   return <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-300">
-    <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full bg-amber-300" aria-hidden />自己ベスト更新</span>
-    {records.some((record) => record.wind_aided) ? <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full border border-slate-200" aria-hidden />追い風参考</span> : null}
+    <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full bg-amber-300" aria-hidden />{L("自己ベスト更新")}</span>
+    {records.some((record) => record.wind_aided) ? <span className="flex items-center gap-1"><span className="inline-block size-2.5 rounded-full border border-slate-200" aria-hidden />{L("追い風参考")}</span> : null}
   </div>;
 }
 
@@ -218,7 +215,7 @@ function RaceRecordChart({ records, kind, label, box = raceChartBox, showLegend 
   return (
     <figure className="space-y-1">
       {label ? <h3 className="text-sm font-semibold">{label}</h3> : null}
-      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label={`${label ?? ""}記録の推移のグラフ`}>
+      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="h-auto w-full" role="img" aria-label={L("{v0}記録の推移のグラフ", { v0: label ?? "" })}>
         <line x1={box.left} x2={box.width - box.right} y1={box.top} y2={box.top} className="stroke-white/15" />
         <line x1={box.left} x2={box.width - box.right} y1={box.height - box.bottom} y2={box.height - box.bottom} className="stroke-white/25" />
         <line x1={box.left} x2={box.width - box.right} y1={(box.top + box.height - box.bottom) / 2} y2={(box.top + box.height - box.bottom) / 2} className="stroke-white/10" strokeDasharray="3 3" />
@@ -268,7 +265,7 @@ function RaceEventCharts({ records, events }: { records: RaceRecord[]; events: R
   return (
     <div className="space-y-4">
       {events.map((item) => (
-        <RaceRecordChart key={item.event} records={records.filter((record) => record.event === item.event)} kind={item.kind} label={item.event_label} box={smallChartBox} showLegend={false} />
+        <RaceRecordChart key={item.event} records={records.filter((record) => record.event === item.event)} kind={item.kind} label={L(item.event_label)} box={smallChartBox} showLegend={false} />
       ))}
       <RaceChartLegend records={records} />
     </div>
@@ -291,13 +288,13 @@ export function RaceRecordRow({
   const confirmDialog = useConfirm();
 
   async function remove() {
-    if (!(await confirmDialog(deleteConfirmOptions("この記録")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("この記録"))))) return;
     if (!lock.acquire()) return;
     try {
       const res = await apiFetch<RaceRecords>(`/v1/me/race-records/${record.id}`, { method: "DELETE", token });
       onChanged(res, record.event);
     } catch (err) {
-      alert(apiErrorText(err, "削除できませんでした"));
+      alert(apiErrorText(err, L("削除できませんでした")));
     } finally {
       lock.release();
     }
@@ -325,23 +322,23 @@ export function RaceRecordRow({
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-xs text-slate-300">
           {senseDayLabel(record.raced_on)}
-          {record.meet_name ? ` ・ ${record.meet_name}` : ""}
-          {record.round ? ` ・ ${record.round}` : ""}
+          {record.meet_name ? L(" ・ {meet_name}", { meet_name: record.meet_name }) : ""}
+          {record.round ? L(" ・ {round}", { round: record.round }) : ""}
         </p>
         <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-xs text-sky-200">{record.event_label}</span>
+          <span className="text-xs text-sky-200">{L(record.event_label)}</span>
           <span className="text-lg font-bold tabular-nums text-slate-100">{formatRaceMark(record.mark, kind)}</span>
-          {record.wind !== null ? <span className="text-xs tabular-nums text-slate-300">風 {formatRaceWind(record.wind)}</span> : null}
-          {record.is_pb ? <span className="rounded-full bg-amber-300/20 px-2 py-0.5 text-xs font-semibold text-amber-200">自己ベスト</span> : null}
-          {record.wind_aided ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-200">追い風参考</span> : null}
+          {record.wind !== null ? <span className="text-xs tabular-nums text-slate-300">{L("風 {v0}", { v0: formatRaceWind(record.wind) })}</span> : null}
+          {record.is_pb ? <span className="rounded-full bg-amber-300/20 px-2 py-0.5 text-xs font-semibold text-amber-200">{L("自己ベスト")}</span> : null}
+          {record.wind_aided ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-200">{L("追い風参考")}</span> : null}
         </p>
         {record.memo ? <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{record.memo}</p> : null}
       </div>
       <div className="flex shrink-0 gap-1">
-        <button type="button" aria-label="記録を直す" onClick={() => setEditing(true)} className="rounded-md p-1.5 text-slate-300 hover:bg-white/10">
+        <button type="button" aria-label={L("記録を直す")} onClick={() => setEditing(true)} className="rounded-md p-1.5 text-slate-300 hover:bg-white/10">
           <Pencil className="size-4" aria-hidden />
         </button>
-        <button type="button" aria-label="記録を削除" onClick={remove} disabled={lock.pending} className="rounded-md p-1.5 text-red-300 hover:bg-red-950/40 disabled:opacity-50">
+        <button type="button" aria-label={L("記録を削除")} onClick={remove} disabled={lock.pending} className="rounded-md p-1.5 text-red-300 hover:bg-red-950/40 disabled:opacity-50">
           <Trash2 className="size-4" aria-hidden />
         </button>
       </div>
@@ -369,15 +366,15 @@ function PBStatsCard({ token }: { token: string | null }) {
   if (!stats || stats.events.length === 0) return null;
   return (
     <section className="rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <h2 className="text-sm font-semibold text-slate-100">この{stats.days}日で自己ベストを更新した人</h2>
+      <h2 className="text-sm font-semibold text-slate-100">{L("この{days}日で自己ベストを更新した人", { days: stats.days })}</h2>
       <ul className="mt-2 flex flex-wrap gap-2">
         {stats.events.map((item) => (
           <li key={item.event} className="rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-sm text-amber-100">
-            {item.event_label} <span className="font-semibold">{item.authors}人</span>
+            {L(item.event_label)} <span className="font-semibold">{L("{authors}人", { authors: item.authors })}</span>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-slate-300">記録を残した人の数です。だれが更新したかは出しません（{stats.min_authors}人に満たない種目は出しません）。</p>
+      <p className="mt-2 text-xs text-slate-300">{L("記録を残した人の数です。だれが更新したかは出しません（{min_authors}人に満たない種目は出しません）。", { min_authors: stats.min_authors })}</p>
     </section>
   );
 }
@@ -406,10 +403,10 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
     return () => controller.abort();
   }, [token, externalData]);
 
-  if (failed) return <ErrorState message="記録の取得に失敗しました。時間をおいて、もう一度開いてください。" />;
+  if (failed) return <ErrorState message={L("記録の取得に失敗しました。時間をおいて、もう一度開いてください。")} />;
   // ログインしていない人には、空の記録の画面を見せる(書こうとするとログインへ案内する)。
   const shown = token ? (externalData === undefined ? data : externalData) : noRecords;
-  if (!shown) return <PageLoading label="読み込み中..." />;
+  if (!shown) return <PageLoading label={L("読み込み中...")} />;
 
   const events = sortRaceEvents(shown.events);
   const current = events.find((item) => item.event === selected) ?? events[0];
@@ -430,11 +427,11 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
       </section>
 
       {!current ? (
-        <EmptyState title="まだ記録がありません" body="競技会の記録を残すと、種目ごとの推移がグラフになります。" />
+        <EmptyState title={L("まだ記録がありません")} body={L("競技会の記録を残すと、種目ごとの推移がグラフになります。")} />
       ) : (
         <section className="space-y-3">
-          <div className="flex gap-2 overflow-x-auto pb-1" aria-label="グラフの種目">
-            <button type="button" onClick={() => setSelected("all")} aria-pressed={overview} className={`shrink-0 rounded-full border px-3 py-1 text-sm ${overview ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"}`}>全種目<span className="ml-1 text-xs">{shown.records.length}</span></button>
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label={L("グラフの種目")}>
+            <button type="button" onClick={() => setSelected("all")} aria-pressed={overview} className={`shrink-0 rounded-full border px-3 py-1 text-sm ${overview ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"}`}>{L("全種目")}<span className="ml-1 text-xs">{shown.records.length}</span></button>
             {events.map((item) => (
               <button
                 key={item.event}
@@ -445,7 +442,7 @@ export function RaceRecordsPanel({ token, data: externalData, onRecordsChanged, 
                   !overview && item.event === current.event ? "border-sky-300 bg-sky-400/20 text-sky-100" : "border-white/20 bg-white/10 text-slate-200"
                 }`}
               >
-                {item.event_label}
+                {L(item.event_label)}
                 <span className="ml-1 text-xs text-slate-300">{item.count}</span>
               </button>
             ))}

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -35,7 +36,7 @@ function ConsentForm() {
       await apiFetch<void>("/v1/me/consents/overseas", { method: "POST", token });
       await refreshProfile();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "同意を記録できませんでした。時間をおいてもう一度お試しください。");
+      setError(err instanceof ApiRequestError ? err.message : L("同意を記録できませんでした。時間をおいてもう一度お試しください。"));
     } finally {
       release();
     }
@@ -43,10 +44,8 @@ function ConsentForm() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">利用にあたっての同意</h1>
-      <p className="text-sm leading-7 text-slate-300">
-        TrackTalk を利用する前に、以下の内容を確認してください。海外への個人情報提供の詳細は、プライバシーポリシー第7条に記載しています。
-      </p>
+      <h1 className="text-2xl font-bold">{L("利用にあたっての同意")}</h1>
+      <p className="text-sm leading-7 text-slate-300">{L("TrackTalk を利用する前に、以下の内容を確認してください。海外への個人情報提供の詳細は、プライバシーポリシー第7条に記載しています。")}</p>
       <label className="flex cursor-pointer items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -57,27 +56,15 @@ function ConsentForm() {
         <ServiceConsentText />
       </label>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <Button type="button" className="w-full" disabled={!checked || pending || !session} onClick={onConsent}>
-        同意して続ける
-      </Button>
-      <p className="text-sm text-slate-300">
-        同意しない場合は、TrackTalk を使い続けられません。
-        <Link href="/me/delete" className="text-blue-300 underline">
-          退会の手続き
-        </Link>
-        からアカウントとデータを削除できます。わからないことは
-        <Link href="/contact" className="text-blue-300 underline">
-          お問い合わせ
-        </Link>
-        ください。
-      </p>
+      <Button type="button" className="w-full" disabled={!checked || pending || !session} onClick={onConsent}>{L("同意して続ける")}</Button>
+      <p className="text-sm text-slate-300">{L("同意しない場合は、TrackTalk を使い続けられません。")}<Link href="/me/delete" className="text-blue-300 underline">{L("退会の手続き")}</Link>{L("からアカウントとデータを削除できます。わからないことは")}<Link href="/contact" className="text-blue-300 underline">{L("お問い合わせ")}</Link>{L("ください。")}</p>
     </div>
   );
 }
 
 export default function ConsentPage() {
   return (
-    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label={L("読み込み中...")} />}>
       <ConsentForm />
     </Suspense>
   );

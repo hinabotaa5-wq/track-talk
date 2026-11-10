@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 // エグ練グランプリ: 12月〜3月に2週間ごとに開く。その回で一番エグかった練習を1人1件応募し、
 // 運営が選んだトップ3にみんなで投票して1位を決める。日程は API が決める。
 
@@ -56,9 +57,9 @@ export function remainingParts(untilMs: number, nowMs: number) {
 
 export function formatRemaining(parts: { days: number; hours: number; minutes: number }) {
   const out: string[] = [];
-  if (parts.days > 0) out.push(`${parts.days}日`);
-  if (parts.days > 0 || parts.hours > 0) out.push(`${parts.hours}時間`);
-  out.push(`${parts.minutes}分`);
+  if (parts.days > 0) out.push(L("{days}日", { days: parts.days }));
+  if (parts.days > 0 || parts.hours > 0) out.push(L("{hours}時間", { hours: parts.hours }));
+  out.push(L("{minutes}分", { minutes: parts.minutes }));
   return out.join(" ");
 }
 
@@ -66,11 +67,11 @@ export function formatRemaining(parts: { days: number; hours: number; minutes: n
 export function menuContestDeadline(round: MenuContestRound) {
   switch (round.phase) {
     case "entry":
-      return { label: "応募受付中", until: round.entry_ends_at, prefix: "応募終了まで" };
+      return { label: L("応募受付中"), until: round.entry_ends_at, prefix: L("応募終了まで") };
     case "picking":
-      return { label: "運営が選考中", until: round.vote_starts_at, prefix: "投票開始まで" };
+      return { label: L("運営が選考中"), until: round.vote_starts_at, prefix: L("投票開始まで") };
     case "voting":
-      return { label: "投票受付中", until: round.vote_ends_at, prefix: "投票終了まで" };
+      return { label: L("投票受付中"), until: round.vote_ends_at, prefix: L("投票終了まで") };
   }
 }
 

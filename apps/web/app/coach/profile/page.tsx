@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm } from "@/components/coach-photo";
@@ -38,10 +39,10 @@ export default function CoachProfilePage() {
     };
   }, [token]);
 
-  if (loading || !session || coach === undefined) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || coach === undefined) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="プロフィール">
+    <CoachSubpageShell title={L("プロフィール")}>
       {coach ? (
         <>
           <CoachPhotoForm
@@ -50,12 +51,10 @@ export default function CoachProfilePage() {
             token={token}
             onSaved={setCoach}
           />
-          <Link href={coachApplyPath} className="block text-sm text-blue-300 underline">
-            応募内容を確認する
-          </Link>
+          <Link href={coachApplyPath} className="block text-sm text-blue-300 underline">{L("応募内容を確認する")}</Link>
         </>
       ) : (
-        <p className="text-sm text-red-400">プロフィールを読み込めませんでした</p>
+        <p className="text-sm text-red-400">{L("プロフィールを読み込めませんでした")}</p>
       )}
     </CoachSubpageShell>
   );

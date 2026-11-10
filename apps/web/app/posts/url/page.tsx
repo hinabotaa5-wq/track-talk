@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -41,7 +42,7 @@ export default function VideoUrlPostPage() {
       return;
     }
     if (!kind) {
-      setError(urlError);
+      setError(L(urlError));
       return;
     }
     if (!acquire()) return;
@@ -49,12 +50,12 @@ export default function VideoUrlPostPage() {
     try {
       let imagePublicId: string | undefined;
       if ((kind === "instagram" || kind === "x") && cover) {
-        setStatus("送信しています…");
+        setStatus(L("送信しています…"));
         const sending = await shrinkImage(cover);
-        if (sending.size > maxCoverBytes) throw new Error("10MB以内の画像にしてください");
+        if (sending.size > maxCoverBytes) throw new Error(L("10MB以内の画像にしてください"));
         const signed = await apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token });
         const result = await uploadToCloudinary("image", sending, signed, () => {});
-        if (result.public_id !== signed.public_id) throw new Error("サムネの画像を送れませんでした");
+        if (result.public_id !== signed.public_id) throw new Error(L("サムネの画像を送れませんでした"));
         imagePublicId = result.public_id;
         setStatus("");
       }
@@ -71,14 +72,14 @@ export default function VideoUrlPostPage() {
       clearHomeFeeds();
       router.push("/?sort=new");
     } catch (err) {
-      setError(apiErrorText(err, err instanceof Error ? err.message : "保存に失敗しました"));
+      setError(apiErrorText(err, err instanceof Error ? err.message : L("保存に失敗しました")));
       setStatus("");
       release();
     }
   }
 
   return (
-    <ComposerPage title="動画URL">
+    <ComposerPage title={L("動画URL")}>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium">
           URL
@@ -86,22 +87,18 @@ export default function VideoUrlPostPage() {
             className="mt-1"
             type="url"
             inputMode="url"
-            placeholder="YouTube・Instagram・X の URL"
+            placeholder={L("YouTube・Instagram・X の URL")}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
         </label>
         {url.trim() === "" ? null : kind ? (
-          <p className="text-sm text-slate-200">{kindLabel[kind]}のURLとして引用します</p>
+          <p className="text-sm text-slate-200">{L("{v0}のURLとして引用します", { v0: kindLabel[kind] })}</p>
         ) : (
-          <p className="text-sm text-red-400">{urlError}</p>
+          <p className="text-sm text-red-400">{L(urlError)}</p>
         )}
         {kind === "instagram" || kind === "x" ? (
-          <label className="block text-sm font-medium">
-            サムネの画像（任意）
-            <span className="mt-0.5 block text-xs font-normal text-slate-300">
-              {kindLabel[kind]}のサムネはこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。
-            </span>
+          <label className="block text-sm font-medium">{L("サムネの画像（任意）")}<span className="mt-0.5 block text-xs font-normal text-slate-300">{L("{v0}のサムネはこちらで読み込めないことがあります。スクリーンショットなどを付けると、一覧のカードに出ます。", { v0: kindLabel[kind] })}</span>
             <input
               className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
               type="file"
@@ -111,15 +108,13 @@ export default function VideoUrlPostPage() {
             />
           </label>
         ) : null}
-        <label className="block text-sm font-medium">
-          詳細
-          <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
+        <label className="block text-sm font-medium">{L("詳細")}<Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
-        {submitting ? <SubmittingProgress label="投稿を送信しています" /> : null}
+        {submitting ? <SubmittingProgress label={L("投稿を送信しています")} /> : null}
         {status ? <p className="text-sm text-slate-200">{status}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={submitting || !kind}>
-          {submitting ? "送っています" : "投稿する"}
+          {submitting ? L("送っています") : L("投稿する")}
         </Button>
       </form>
     </ComposerPage>

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -16,21 +17,21 @@ import type { Competition } from "@/lib/types";
 
 export function destination(competition: Competition, prefecture: string) {
   // 新着から補った最新の要項を優先し、無ければ年間表の要項を出す。
-  if (competition.guidelines_url) return { href: competition.guidelines_url, label: "要項" };
-  if (competition.link_label === "要項") return { href: competition.organizer_url, label: "要項" };
+  if (competition.guidelines_url) return { href: competition.guidelines_url, label: L("要項") };
+  if (competition.link_label === "要項") return { href: competition.organizer_url, label: L("要項") };
   if (competition.link_label) return { href: competition.organizer_url, label: competition.link_label };
-  if (prefecture === INTERNATIONAL) return { href: competition.organizer_url, label: "公式サイト" };
+  if (prefecture === INTERNATIONAL) return { href: competition.organizer_url, label: L("公式サイト") };
   if (competition.organizer_url === competition.source_url) {
     return { href: competition.organizer_url, label: associationListLabel(prefecture) };
   }
-  return { href: competition.organizer_url, label: "要項" };
+  return { href: competition.organizer_url, label: L("要項") };
 }
 
 export function competitionDates(startsOn: string, endsOn: string | null) {
   const start = formatDate(startsOn);
   if (!endsOn) return start;
   const end = formatDate(endsOn);
-  return start === end ? start : `${start} 〜 ${end}`;
+  return start === end ? start : L("{start} 〜 {end}", { start, end });
 }
 
 export function RegionalCompetitionsView() {
@@ -70,13 +71,13 @@ export function RegionalCompetitionsView() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-100">都道府県の大会</h1>
+      <h1 className="text-2xl font-bold text-slate-100">{L("都道府県の大会")}</h1>
       <CompetitionFilters month={month} prefecture={prefecture} />
-      {!prefecture ? <EmptyState title="都道府県を選んでください" body="選んだ都道府県の年間日程を月ごとに表示します。" /> : null}
+      {!prefecture ? <EmptyState title={L("都道府県を選んでください")} body={L("選んだ都道府県の年間日程を月ごとに表示します。")} /> : null}
       {prefecture && loading ? <CompetitionLoadingFrame /> : null}
       {prefecture && !loading && shownError ? <ErrorState message={shownError} /> : null}
       {prefecture && !loading && !shownError && shownItems.length === 0 ? (
-        <EmptyState title="この月の大会はありません" body="別の月か都道府県を選んでください。" />
+        <EmptyState title={L("この月の大会はありません")} body={L("別の月か都道府県を選んでください。")} />
       ) : null}
       {prefecture && !loading && shownItems.length > 0 ? (
         <div className="grid gap-3 md:grid-cols-2">

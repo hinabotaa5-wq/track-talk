@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -35,7 +36,7 @@ export function EditPost({ id, returnTo }: { id: string; returnTo?: "me" }) {
       })
       .catch((e) => {
         if (!alive) return;
-        setError(e instanceof ApiRequestError && e.status === 404 ? "投稿が見つかりません" : "読み込みに失敗しました");
+        setError(e instanceof ApiRequestError && e.status === 404 ? L("投稿が見つかりません") : L("読み込みに失敗しました"));
       });
     return () => {
       alive = false;
@@ -43,15 +44,15 @@ export function EditPost({ id, returnTo }: { id: string; returnTo?: "me" }) {
   }, [id, token]);
 
   if (error && !post) return <p className="text-red-400">{error}</p>;
-  if (loading || !post) return <PageLoading screen label="読み込み中…" />;
+  if (loading || !post) return <PageLoading screen label={L("読み込み中…")} />;
   if (!post.mine) {
-    return <p>この投稿を編集する権限がありません。</p>;
+    return <p>{L("この投稿を編集する権限がありません。")}</p>;
   }
 
   const recruitment = post.kind === "recruitment";
   const practice = post.kind === "practice";
   const injury = post.kind === "injury";
-  const heading = practice ? "練習相手募集を編集" : recruitment ? "募集を編集" : injury ? "ケガの投稿を編集" : "投稿を編集";
+  const heading = practice ? L("練習相手募集を編集") : recruitment ? L("募集を編集") : injury ? L("ケガの投稿を編集") : L("投稿を編集");
 
   return (
     <LeaveGuardArea className="mx-auto max-w-2xl space-y-4">

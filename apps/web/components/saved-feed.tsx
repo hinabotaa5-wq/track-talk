@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -20,7 +21,7 @@ export function SavedFeed() {
   if (sessionLoading || !session || feed.posts === null) return <FeedLoadingFrame />;
   return <>
     {feed.error ? <ErrorState message={feed.error} /> : null}
-    {!feed.error && !feed.posts.length ? <EmptyState title="まだ保存がありません" body="投稿の保存ボタンから残せます。" /> : null}
+    {!feed.error && !feed.posts.length ? <EmptyState title={L("まだ保存がありません")} body={L("投稿の保存ボタンから残せます。")} /> : null}
     <FeedGrid>{feed.posts.map((post) => <FeedCard key={post.id} post={post} />)}</FeedGrid>
     {feed.hasMore ? <LoadMore onLoad={() => void feed.loadMore()} loading={feed.loadingMore} error={feed.moreError} expired={feed.expired} /> : null}
   </>;

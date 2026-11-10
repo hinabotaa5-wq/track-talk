@@ -11,27 +11,29 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
 import { useConfirm } from "@/components/confirm-dialog";
-import { parseLocale, t } from "@/lib/i18n";
+import { t, L } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { ThemeSwitch } from "@/components/theme-switch";
+import { LanguageSwitch } from "@/components/language-switch";
 
 const accountLinks = [
-  { href: "/me/posts", label: "自分の投稿", icon: LayoutGrid },
-  { href: "/me/saved", label: "保存した投稿", icon: Bookmark },
-  { href: "/me/injury", label: "自分のケガ履歴", icon: HeartPulse },
-  { href: "/me/profile", label: "ニックネームと種目の変更", icon: UserRoundPen },
-  { href: "/me/email", label: "メールアドレスの変更", icon: AtSign },
-  { href: "/me/password", label: "パスワードの変更", icon: KeyRound },
-  { href: "/me/security", label: "二段階認証", icon: ShieldCheck },
-  { href: "/me/badge", label: "バッジ", icon: Award },
+  { href: "/me/posts", get label() { return L("自分の投稿"); }, icon: LayoutGrid },
+  { href: "/me/saved", get label() { return L("保存した投稿"); }, icon: Bookmark },
+  { href: "/me/injury", get label() { return L("自分のケガ履歴"); }, icon: HeartPulse },
+  { href: "/me/profile", get label() { return L("ニックネームと種目の変更"); }, icon: UserRoundPen },
+  { href: "/me/email", get label() { return L("メールアドレスの変更"); }, icon: AtSign },
+  { href: "/me/password", get label() { return L("パスワードの変更"); }, icon: KeyRound },
+  { href: "/me/security", get label() { return L("二段階認証"); }, icon: ShieldCheck },
+  { href: "/me/badge", get label() { return L("バッジ"); }, icon: Award },
 ] as const;
 
 const infoLinks = [
-  { href: "/guide", label: "利用ガイド", icon: FileText },
-  { href: "/me/contact", label: "お問い合わせ", icon: Mail },
-  { href: "/guidelines", label: "ガイドライン", icon: ScrollText },
-  { href: "/terms", label: "利用規約", icon: FileText },
-  { href: "/privacy", label: "プライバシーポリシー", icon: Shield },
+  { href: "/guide", get label() { return L("利用ガイド"); }, icon: FileText },
+  { href: "/me/contact", get label() { return L("お問い合わせ"); }, icon: Mail },
+  { href: "/guidelines", get label() { return L("ガイドライン"); }, icon: ScrollText },
+  { href: "/terms", get label() { return L("利用規約"); }, icon: FileText },
+  { href: "/privacy", get label() { return L("プライバシーポリシー"); }, icon: Shield },
 ] as const;
 
 const menuRowClass =
@@ -60,13 +62,13 @@ export default function MePage() {
 
   async function logout() {
     if (!userId) return;
-    if (!(await confirmDialog({ title: "ログアウトしますか？", confirmLabel: "ログアウト" }))) return;
+    if (!(await confirmDialog({ title: L("ログアウトしますか？"), confirmLabel: L("ログアウト") }))) return;
     if (!logoutLock.acquire()) return;
     leaving.current = true;
     setLogoutError("");
     try {
       const supabase = createClient();
-      if (!supabase) throw new Error("認証を読み込めませんでした");
+      if (!supabase) throw new Error(L("認証を読み込めませんでした"));
       await signOutOnThisDevice(userId, async () => {
         const { error } = await supabase.auth.signOut({ scope: "local" });
         // SDK は通信エラーでも端末のセッションを削除する。残っている場合だけ再試行を案内する。
@@ -76,7 +78,7 @@ export default function MePage() {
       router.refresh();
     } catch {
       leaving.current = false;
-      setLogoutError("ログアウトできませんでした。もう一度お試しください。");
+      setLogoutError(L("ログアウトできませんでした。もう一度お試しください。"));
       logoutLock.release();
     }
   }
@@ -90,7 +92,7 @@ export default function MePage() {
     if (!loading && !session && !leaving.current) router.replace("/login");
   }, [loading, session, router]);
 
-  const locale = parseLocale(profile?.locale);
+  const locale = useLocale();
   if (loading || !session) {
     return <PageLoading screen label={t(locale, "common.loading")} />;
   }
@@ -98,15 +100,16 @@ export default function MePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-xl font-bold text-slate-100">{t(locale, "mypage.title")}</h1>
+      <LanguageSwitch />
       <ThemeSwitch />
-      <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
+      <nav aria-label={L("アカウント")} className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {currentProfile?.is_admin ? (
-          <MenuLink href="/admin" label="アプリ管理" icon={Shield} />
+          <MenuLink href="/admin" label={L("アプリ管理")} icon={Shield} />
         ) : !currentProfile && profileLoading ? (
           <div role="status" aria-busy="true" className="flex min-h-12 items-center gap-3 px-4">
             <span className="size-4 rounded bg-white/15 motion-safe:animate-pulse" aria-hidden="true" />
             <span className="h-3 w-24 rounded bg-white/15 motion-safe:animate-pulse" aria-hidden="true" />
-            <span className="sr-only">プロフィールを確認中</span>
+            <span className="sr-only">{L("プロフィールを確認中")}</span>
           </div>
         ) : null}
         {accountLinks.map((item) => (
@@ -118,15 +121,15 @@ export default function MePage() {
             userId={userId}
             renderControl={(status, activate, busy) => {
               if (status === "granted" || status === "unsupported" || status === null) {
-                return <MenuLink href="/me/push" label="通知" icon={Bell} />;
+                return <MenuLink href="/me/push" label={L("通知")} icon={Bell} />;
               }
               return (
                 <button type="button" className={menuRowClass} disabled={busy} onClick={activate}>
                   <Bell className="size-4 shrink-0 text-blue-300" aria-hidden />
                   <span className="flex-1">
-                    <span className="block">通知設定</span>
+                    <span className="block">{L("通知設定")}</span>
                     <span className="text-xs text-slate-300">
-                      {status === "denied" ? "通知がオフになっています" : "通知を受け取る"}
+                      {status === "denied" ? L("通知がオフになっています") : L("通知を受け取る")}
                     </span>
                   </span>
                   <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
@@ -134,19 +137,19 @@ export default function MePage() {
               );
             }}
           />
-        ) : <MenuLink href="/me/push" label="通知" icon={Bell} />}
-        <MenuLink href="/me/install" label="ホーム画面に追加して使う" icon={Smartphone} />
+        ) : <MenuLink href="/me/push" label={L("通知")} icon={Bell} />}
+        <MenuLink href="/me/install" label={L("ホーム画面に追加して使う")} icon={Smartphone} />
         {infoLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
         <Link href="/me/delete" className={menuRowClass}>
           <UserX className="size-4 shrink-0 text-blue-300" aria-hidden />
-          <span className="flex-1">退会する</span>
+          <span className="flex-1">{L("退会する")}</span>
           <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
         </Link>
         <button type="button" onClick={logout} disabled={logoutLock.pending} className={menuRowClass}>
           <LogOut className="size-4 shrink-0 text-blue-300" aria-hidden />
-          <span className="flex-1">ログアウト</span>
+          <span className="flex-1">{L("ログアウト")}</span>
         </button>
       </nav>
       {logoutError ? <p role="alert" className="text-sm text-red-400">{logoutError}</p> : null}

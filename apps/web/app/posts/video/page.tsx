@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -157,7 +158,7 @@ export default function OwnVideoPage() {
     if (target.size > maxBytes) {
       setUpload(null);
       setUploadState("failed");
-      setError("100MB以内の動画にしてください");
+      setError(L("100MB以内の動画にしてください"));
       return;
     }
 
@@ -175,7 +176,7 @@ export default function OwnVideoPage() {
         payload = await uploadVideoToCloudinary(target, entry.signed, token, onProgress, controller.signal);
       } catch (err) {
         // 先読みした署名が期限切れで断られたときは、取り直して1回だけやり直す（失敗は見せない）。
-        if (!(entry.prefetched && err instanceof Error && err.message === staleUploadMessage)) throw err;
+        if (!(entry.prefetched && err instanceof Error && err.message === L(staleUploadMessage))) throw err;
         const fresh = await takeSignature(controller.signal, { useSpare: false });
         if (!fresh) return;
         entry = fresh;
@@ -183,7 +184,7 @@ export default function OwnVideoPage() {
         payload = await uploadVideoToCloudinary(target, entry.signed, token, onProgress, controller.signal);
       }
       if (payload.public_id !== entry.signed.public_id) {
-        throw new Error("アップロードに失敗しました");
+        throw new Error(L("アップロードに失敗しました"));
       }
       if (seq !== uploadSeq.current) return;
       uploaded.current = { file: target, id: payload.public_id };
@@ -193,7 +194,7 @@ export default function OwnVideoPage() {
       if (isAbort(err) || seq !== uploadSeq.current) return;
       setUpload(null);
       setUploadState("failed");
-      setError(apiErrorText(err, err instanceof Error ? err.message : "アップロードに失敗しました"));
+      setError(apiErrorText(err, err instanceof Error ? err.message : L("アップロードに失敗しました")));
     } finally {
       if (inflight.current === controller) inflight.current = null;
     }
@@ -219,7 +220,7 @@ export default function OwnVideoPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!file) {
-      setError("動画ファイルを選んでください");
+      setError(L("動画ファイルを選んでください"));
       return;
     }
     // 送っている間はボタンを押せない（二重送信にしない）。送り終わるまで待つ。
@@ -251,29 +252,27 @@ export default function OwnVideoPage() {
         setUpload(null);
         setUploadState("failed");
       }
-      setError(apiErrorText(err, err instanceof Error ? err.message : "保存に失敗しました"));
+      setError(apiErrorText(err, err instanceof Error ? err.message : L("保存に失敗しました")));
       release();
     }
   }
 
   const percent = upload ? Math.min(uploadState === "done" ? 100 : 99, Math.round(upload.percent)) : 0;
   const buttonLabel = !file
-    ? "動画を選んでください"
+    ? L("動画を選んでください")
     : uploadState === "uploading"
-      ? `動画を読み込んでいます ${percent}%`
+      ? L("動画を読み込んでいます {percent}%", { percent })
       : uploadState === "failed"
-        ? "動画を送り直す"
+        ? L("動画を送り直す")
         : submitting
-          ? "投稿しています"
-          : "投稿する";
+          ? L("投稿しています")
+          : L("投稿する");
 
   return (
-    <ComposerPage title="自分の動画">
+    <ComposerPage title={L("自分の動画")}>
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium">
-            動画ファイル
-            <input
+          <label className="block text-sm font-medium">{L("動画ファイル")}<input
               className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
               type="file"
               accept="video/mp4,video/quicktime,video/webm"
@@ -288,9 +287,7 @@ export default function OwnVideoPage() {
             この待ちは Web 側では縮められないので、このひとことは時間を短くするためではなく、
             固まったと思って離れたり連打したりしないように伝えるためのもの。
           */}
-          <p className="mt-1 text-xs text-slate-400">
-            動画を選んで✓を押すと、iPhoneの準備で少し時間がかかることがあります。そのままお待ちください
-          </p>
+          <p className="mt-1 text-xs text-slate-400">{L("動画を選んで✓を押すと、iPhoneの準備で少し時間がかかることがあります。そのままお待ちください")}</p>
         </div>
         {file ? (
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2" data-testid="video-upload-status">
@@ -301,16 +298,16 @@ export default function OwnVideoPage() {
                 muted
                 playsInline
                 preload="metadata"
-                aria-label="選んだ動画のプレビュー"
+                aria-label={L("選んだ動画のプレビュー")}
               />
             ) : null}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-slate-200">{file.name}</p>
               <p className="text-xs tabular-nums text-slate-400">
                 {formatSize(file.size)}
-                {uploadState === "uploading" ? ` ・ 読み込んでいます ${percent}%` : null}
-                {uploadState === "done" ? " ・ 送信済み" : null}
-                {uploadState === "failed" ? " ・ 送れませんでした" : null}
+                {uploadState === "uploading" ? L(" ・ 読み込んでいます {percent}%", { percent }) : null}
+                {uploadState === "done" ? L(" ・ 送信済み") : null}
+                {uploadState === "failed" ? L(" ・ 送れませんでした") : null}
               </p>
               {uploadState === "uploading" || uploadState === "done" ? (
                 <div
@@ -319,8 +316,8 @@ export default function OwnVideoPage() {
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={percent}
-                  aria-valuetext={`${percent}パーセント`}
-                  aria-label="動画の読み込み"
+                  aria-valuetext={L("{percent}パーセント", { percent })}
+                  aria-label={L("動画の読み込み")}
                 >
                   <div
                     className="h-full rounded-full bg-blue-600 transition-[width] duration-150 ease-out"
@@ -331,9 +328,7 @@ export default function OwnVideoPage() {
             </div>
           </div>
         ) : null}
-        <label className="block text-sm font-medium">
-          詳細
-          <Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
+        <label className="block text-sm font-medium">{L("詳細")}<Textarea rows={3} className="mt-1" value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button

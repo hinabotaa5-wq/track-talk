@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useLinkStatus } from "next/link";
 import { LoaderCircle } from "lucide-react";
@@ -10,7 +11,7 @@ export function CardPending() {
   return (
     <span className={`card-pending pointer-events-none absolute inset-0 z-20 items-center justify-center bg-slate-950/45 ${pending ? "flex" : "hidden"}`}>
       <LoaderCircle className="size-8 animate-spin text-white" aria-hidden />
-      {pending ? <span role="status" className="sr-only">投稿を開いています</span> : null}
+      {pending ? <span role="status" className="sr-only">{L("投稿を開いています")}</span> : null}
     </span>
   );
 }

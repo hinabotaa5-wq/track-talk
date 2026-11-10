@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 // 二段階認証(認証アプリの6桁のコード)まわりの判定。画面から切り離してテストする。
 
 // Supabase の currentLevel・nextLevel。"aal1"(パスワードなどだけ)か "aal2"(二段階認証まで済み)。
@@ -45,14 +46,14 @@ export function isTotpCode(raw: string): boolean {
 }
 
 const mfaMessages: Record<string, string> = {
-  mfa_verification_failed: "コードが違うか、有効期限が切れています。認証アプリの新しいコードを入れてください。",
-  mfa_challenge_expired: "時間がたちすぎました。もう一度コードを入れてください。",
-  mfa_factor_not_found: "二段階認証の設定が見つかりません。もう一度設定してください。",
-  too_many_enrolled_mfa_factors: "設定できる数の上限です。使っていない設定を解除してください。",
-  mfa_verification_rejected: "確認できませんでした。しばらくしてからもう一度試してください。",
-  insufficient_aal: "先に二段階認証のコードを入れてください。",
-  mfa_totp_enroll_not_enabled: "二段階認証は現在使えません。",
-  mfa_totp_verify_not_enabled: "二段階認証は現在使えません。",
+  get mfa_verification_failed() { return L("コードが違うか、有効期限が切れています。認証アプリの新しいコードを入れてください。"); },
+  get mfa_challenge_expired() { return L("時間がたちすぎました。もう一度コードを入れてください。"); },
+  get mfa_factor_not_found() { return L("二段階認証の設定が見つかりません。もう一度設定してください。"); },
+  get too_many_enrolled_mfa_factors() { return L("設定できる数の上限です。使っていない設定を解除してください。"); },
+  get mfa_verification_rejected() { return L("確認できませんでした。しばらくしてからもう一度試してください。"); },
+  get insufficient_aal() { return L("先に二段階認証のコードを入れてください。"); },
+  get mfa_totp_enroll_not_enabled() { return L("二段階認証は現在使えません。"); },
+  get mfa_totp_verify_not_enabled() { return L("二段階認証は現在使えません。"); },
 };
 
 export function mfaErrorMessage(error: { code?: string; message?: string }): string {
@@ -60,5 +61,5 @@ export function mfaErrorMessage(error: { code?: string; message?: string }): str
   const message = (error.message ?? "").toLowerCase();
   if (message.includes("invalid totp") || message.includes("invalid code")) return mfaMessages.mfa_verification_failed;
   if (message.includes("aal2")) return mfaMessages.insufficient_aal;
-  return "確認に失敗しました。もう一度試してください。";
+  return L("確認に失敗しました。もう一度試してください。");
 }

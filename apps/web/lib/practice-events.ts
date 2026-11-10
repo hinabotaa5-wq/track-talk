@@ -5,7 +5,10 @@ import type { CoachEvent } from "./types";
 // コーチ・練習相手募集・利用者の種目(登録のときに選ぶ)・感覚メモ・競技会の記録・レビュー・ケガで使う。
 export const appEvents: readonly { value: CoachEvent; label: string }[] = (Object.keys(coachEventLabels) as CoachEvent[]).map((value) => ({
   value,
-  label: coachEventLabels[value],
+  // 表示言語に合わせて、使うときに引く（本体 #530）。
+  get label() {
+    return coachEventLabels[value];
+  },
 }));
 
 export const appEventValues = appEvents.map((event) => event.value) as [CoachEvent, ...CoachEvent[]];

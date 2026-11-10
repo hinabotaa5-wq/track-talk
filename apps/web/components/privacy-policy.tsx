@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Article } from "@/components/legal-prose";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
+import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
 const privacyUpdated = "2026年11月11日";
 
@@ -9,6 +10,7 @@ export function PrivacyPolicy({ titleId }: { titleId?: string }) {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 id={titleId} className="text-2xl font-bold">プライバシーポリシー</h1>
+        <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">
           TrackTalk 運営（個人。以下「運営者」）は、本サービスで扱う個人情報を、個人情報の保護に関する法律その他の法令に従って取り扱います。
         </p>

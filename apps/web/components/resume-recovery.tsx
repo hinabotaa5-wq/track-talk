@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -120,20 +121,16 @@ export function ResumeRecovery() {
       className="fixed inset-x-0 z-50 px-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6"
     >
       <div className="mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/25 bg-slate-900/90 p-3 shadow-lg backdrop-blur-xl">
-        <p className="min-w-0 flex-1 text-xs leading-snug text-slate-100">
-          画面が正しく表示されませんでした。再読み込みしてください。
-        </p>
+        <p className="min-w-0 flex-1 text-xs leading-snug text-slate-100">{L("画面が正しく表示されませんでした。再読み込みしてください。")}</p>
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="min-h-9 shrink-0 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-pure-white transition active:scale-[0.98]"
-        >
-          再読み込み
-        </button>
+        >{L("再読み込み")}</button>
         <button
           type="button"
           onClick={() => setOfferReload(false)}
-          aria-label="閉じる"
+          aria-label={L("閉じる")}
           className="flex size-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/16 hover:text-white active:scale-[0.98]"
         >
           <X className="size-4" aria-hidden />

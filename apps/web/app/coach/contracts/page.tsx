@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachContractsSection } from "@/components/coaching-contracts";
@@ -18,10 +19,10 @@ export default function CoachContractsPage() {
     }
   }, [loading, session, router]);
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="契約・申込み">
+    <CoachSubpageShell title={L("契約・申込み")}>
       <CoachContractsSection token={token} />
     </CoachSubpageShell>
   );

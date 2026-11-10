@@ -1,4 +1,5 @@
 "use client";
+import { L, localizeJaDate } from "@/lib/i18n";
 
 import { MessageCircle, Trophy } from "lucide-react";
 import Link from "next/link";
@@ -38,7 +39,7 @@ export function TodayMeetBalloon() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="今日開催中の大会"
+        aria-label={L("今日開催中の大会")}
         aria-expanded={open}
         aria-controls={panelID}
         onClick={() => (open ? close() : setOpen(true))}
@@ -63,8 +64,8 @@ export function TodayMeetBalloon() {
         rightShiftRem={6}
         className="w-80 max-w-[calc(100vw-2rem)] mt-2 rounded-2xl border border-amber-200/60 bg-amber-50 text-slate-900 shadow-xl"
       >
-        <div role="dialog" aria-label="今日開催中の大会" className="p-4">
-          <p className="text-sm font-bold leading-relaxed">今日は以下の大会が開催されてるよ！</p>
+        <div role="dialog" aria-label={L("今日開催中の大会")} className="p-4">
+          <p className="text-sm font-bold leading-relaxed">{L("今日は以下の大会が開催されてるよ！")}</p>
           <ul className="mt-3 space-y-2">
             {meets.map((meet) => (
               <li key={meet.meet_key}>
@@ -76,7 +77,7 @@ export function TodayMeetBalloon() {
                   <span className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-blue-700">{meet.name}</span>
-                      <span className="block text-xs text-slate-500">{meet.date_label}</span>
+                      <span className="block text-xs text-slate-500">{localizeJaDate(meet.date_label)}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
                       <MessageCircle className="size-3.5" aria-hidden />

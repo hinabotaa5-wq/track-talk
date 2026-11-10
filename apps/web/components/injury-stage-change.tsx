@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { Button } from "./ui/button";
@@ -53,9 +54,9 @@ export function InjuryStageChange({
   const step = injuryStageChangeSteps[index];
   const last = index === injuryStageChangeSteps.length - 1;
   const questions = {
-    stage: "新しい段階は?",
-    actions: `${member.stage_label}のあいだ、やったことは?`,
-    note: "気づいたこと・次の人へ一言(任意)",
+    stage: L("新しい段階は?"),
+    actions: L("{stage_label}のあいだ、やったことは?", { stage_label: L(member.stage_label) }),
+    note: L("気づいたこと・次の人へ一言(任意)"),
   } as const;
 
   function change(patch: Partial<InjuryStageChangeAnswers>) {
@@ -94,7 +95,7 @@ export function InjuryStageChange({
       // 変更後の画面に切り替わるまで、処理中の表示と二重送信防止を保つ。
       onChanged(next, claimCelebration(part, next.stage));
     } catch (e) {
-      setError(apiErrorText(e, "段階を変えられませんでした"));
+      setError(apiErrorText(e, L("段階を変えられませんでした")));
       setSaving(false);
       release();
     }
@@ -110,7 +111,7 @@ export function InjuryStageChange({
             aria-valuemin={1}
             aria-valuemax={injuryStageChangeSteps.length}
             aria-valuenow={index + 1}
-            aria-label="質問の進み具合"
+            aria-label={L("質問の進み具合")}
           >
             {injuryStageChangeSteps.map((item, i) => (
               <span key={item} className={`h-1 flex-1 rounded-full ${i <= index ? "bg-blue-400" : "bg-white/20"}`} />
@@ -119,7 +120,7 @@ export function InjuryStageChange({
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
             <div>
               <h3 className="text-base font-bold">{questions[step]}</h3>
-              {step === "actions" ? <p className="mt-1 text-sm text-slate-300">いくつでも</p> : null}
+              {step === "actions" ? <p className="mt-1 text-sm text-slate-300">{L("いくつでも")}</p> : null}
               <p className="mt-1 text-xs text-slate-300">
                 {index + 1} / {injuryStageChangeSteps.length}
               </p>
@@ -138,18 +139,18 @@ export function InjuryStageChange({
 
         {step === "stage" ? (
           <InjuryChoices
-            label="新しい段階"
+            label={L("新しい段階")}
             options={injuryStages}
             selected={(value) => answers.stage === value}
             onSelect={(stage) => change({ stage })}
             disabled={(value) => pending || value === member.stage}
-            note={(value) => (value === member.stage ? "(いま)" : "")}
+            note={(value) => (value === member.stage ? L("(いま)") : "")}
           />
         ) : null}
 
         {step === "actions" ? (
           <InjuryChoices
-            label="意識的にやったこと"
+            label={L("意識的にやったこと")}
             options={injuryActions}
             selected={(value) => answers.actions.includes(value)}
             onSelect={(value) => change({ actions: toggleInjuryAction(answers.actions, value) })}
@@ -160,10 +161,10 @@ export function InjuryStageChange({
         {step === "note" ? (
           <div className="space-y-2">
             <Textarea
-              aria-label="気づいたこと・次の人へ一言"
+              aria-label={L("気づいたこと・次の人へ一言")}
               rows={3}
               maxLength={injuryStageNoteMaxLength}
-              placeholder="例: 痛みがなくても、ジョグは1日おきにした"
+              placeholder={L("例: 痛みがなくても、ジョグは1日おきにした")}
               value={answers.note}
               disabled={pending}
               onChange={(e) => change({ note: e.target.value })}
@@ -179,9 +180,7 @@ export function InjuryStageChange({
                 disabled={pending || noteLength === 0}
                 onChange={(e) => change({ notePublic: e.target.checked })}
               />
-              <span>
-                グループの紹介ページに載せてよい
-                <span className="block text-xs text-slate-300">名前は出ません</span>
+              <span>{L("グループの紹介ページに載せてよい")}<span className="block text-xs text-slate-300">{L("名前は出ません")}</span>
               </span>
             </label>
           </div>
@@ -189,7 +188,7 @@ export function InjuryStageChange({
 
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <p role="status" className={saving ? "text-sm text-slate-200" : "sr-only"}>
-          {saving ? "段階を変えています" : ""}
+          {saving ? L("段階を変えています") : ""}
         </p>
 
         <div className="flex gap-2">
@@ -206,10 +205,10 @@ export function InjuryStageChange({
             }}
             disabled={pending}
           >
-            {index === 0 ? "やめる" : "戻る"}
+            {index === 0 ? L("やめる") : L("戻る")}
           </Button>
           <Button type="submit" className="flex-1" disabled={pending}>
-            {saving ? `${nextStageLabel}に変更しています…` : last ? "段階を変える" : "次へ"}
+            {saving ? L("{nextStageLabel}に変更しています…", { nextStageLabel }) : last ? L("段階を変える") : L("次へ")}
           </Button>
         </div>
       </form>

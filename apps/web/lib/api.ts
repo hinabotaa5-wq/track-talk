@@ -1,3 +1,4 @@
+import { currentLocale, hasEnglish, L } from "@/lib/i18n";
 import type { ApiError } from "./types";
 import { trackSuccessfulMutation } from "./analytics";
 
@@ -16,6 +17,19 @@ function isApiError(value: unknown): value is ApiError {
   return !!error && typeof error.code === "string" && typeof error.message === "string";
 }
 
+// API のエラー文（日本語）を表示言語に合わせる（本体 #530）。英語の辞書に無い文は、日本語を混ぜずに一般的な英語の文にする。
+function localizedApiMessage(message: string, status: number): string {
+  if (currentLocale() !== "en" || hasEnglish(message)) return L(message);
+  if (status === 0) return L("通信に失敗しました。接続を確認してください。");
+  if (status === 401) return "Please log in again.";
+  if (status === 403) return "You can't do this.";
+  if (status === 404) return "Not found. It may have been deleted.";
+  if (status === 409) return "This has already changed. Reload the page and try again.";
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status >= 400 && status < 500) return "This can't be done. Please check your input and try again.";
+  return L(unknownError);
+}
+
 export class ApiRequestError extends Error {
   status: number;
   code: string;
@@ -23,15 +37,17 @@ export class ApiRequestError extends Error {
 
   constructor(status: number, body: ApiError | string) {
     if (typeof body === "string") {
-      super(body);
+      super(localizedApiMessage(body, status));
       this.status = status;
       this.code = "unknown";
       return;
     }
-    super(body.error.message);
+    super(localizedApiMessage(body.error.message, status));
     this.status = status;
     this.code = body.error.code;
-    this.fields = body.error.fields;
+    this.fields = body.error.fields
+      ? Object.fromEntries(Object.entries(body.error.fields).map(([key, text]) => [key, localizedApiMessage(text, status)]))
+      : undefined;
   }
 }
 
@@ -64,7 +80,7 @@ export async function apiFetch<T>(
     });
   } catch {
     throw new ApiRequestError(0, {
-      error: { code: "network", message: "通信に失敗しました。接続を確認してください。" },
+      error: { code: "network", message: L("通信に失敗しました。接続を確認してください。") },
     });
   }
   if (res.status === 204) {
@@ -83,7 +99,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     throw new ApiRequestError(
       res.status,
-      isApiError(data) ? data : { error: { code: "unknown", message: unknownError } },
+      isApiError(data) ? data : { error: { code: "unknown", message: L(unknownError) } },
     );
   }
   trackSuccessfulMutation(path, rest.method);
@@ -96,7 +112,7 @@ export async function apiDownloadText(path: string, token: string | null): Promi
   try {
     res = await fetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" });
   } catch {
-    throw new ApiRequestError(0, { error: { code: "network", message: "通信に失敗しました。接続を確認してください。" } });
+    throw new ApiRequestError(0, { error: { code: "network", message: L("通信に失敗しました。接続を確認してください。") } });
   }
   const text = await res.text();
   if (!res.ok) {
@@ -107,7 +123,7 @@ export async function apiDownloadText(path: string, token: string | null): Promi
       data = null;
     }
     const body = data as ApiError | null;
-    throw new ApiRequestError(res.status, body?.error ? body : "ダウンロードできませんでした");
+    throw new ApiRequestError(res.status, body?.error ? body : L("ダウンロードできませんでした"));
   }
   return text;
 }

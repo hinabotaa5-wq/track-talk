@@ -1,3 +1,4 @@
+import { L, weekdayLabel } from "@/lib/i18n";
 // 感覚メモ: 練習で体を動かして感じた感覚を、本人だけが書き溜める。投稿とは別で、誰にも公開しない。
 
 import { todayInTokyo } from "./format";
@@ -38,8 +39,8 @@ export function senseJarLevel(total: number) {
 
 // 保存直後と、今日のメモを保存済みの画面で同じ一文を表示する。連続1日目は続けた日数を出さない。
 export function senseCheer(stats: Pick<SenseNoteStats, "streak">) {
-  if (stats.streak <= 1) return "また明日も書こう！";
-  return `${stats.streak}日続けて書けてる。また明日も書こう！`;
+  if (stats.streak <= 1) return L("また明日も書こう！");
+  return L("{streak}日続けて書けてる。また明日も書こう！", { streak: stats.streak });
 }
 
 // 日付の新しい順(同じ日は保存の新しい順)に並べる。日付を選んで書けるので、書いた順とは限らない。
@@ -62,9 +63,9 @@ export function groupSenseNotesByDay(notes: SenseNote[]) {
 export function senseDayLabel(day: string, now = new Date()) {
   const [y, m, d] = day.split("-").map(Number);
   if (!y || !m || !d) return day;
-  const week = "日月火水木金土"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const week = weekdayLabel(new Date(Date.UTC(y, m - 1, d)).getUTCDay());
   const thisYear = Number(todayInTokyo(now).slice(0, 4));
-  return `${y === thisYear ? "" : `${y}年`}${m}月${d}日(${week})`;
+  return y === thisYear ? L("{m}月{d}日({week})", { m, d, week }) : L("{y}年{m}月{d}日({week})", { y, m, d, week });
 }
 
 // 器の中の粒の色。アクセントの青の濃淡を少しずつ変えて、積み重なりが見えるようにする。
@@ -96,5 +97,5 @@ export type SenseSummaryResponse = {
 
 // まとめた期間。"10月14日(火)〜10月20日(月)"。
 export function senseSummaryRangeLabel(summary: Pick<SenseSummary, "from_day" | "to_day">, now = new Date()) {
-  return `${senseDayLabel(summary.from_day, now)}〜${senseDayLabel(summary.to_day, now)}`;
+  return L("{v0}〜{v1}", { v0: senseDayLabel(summary.from_day, now), v1: senseDayLabel(summary.to_day, now) });
 }

@@ -1,11 +1,12 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { InjuryBodyFigure } from "@/components/injury-body-figure";
 import { injuryRegionSpots, type InjuryFigureSide, type InjuryRegion } from "@/lib/injury";
 
 const sides: { side: InjuryFigureSide; label: string }[] = [
-  { side: "front", label: "まえ（前面）" },
-  { side: "back", label: "うしろ（背面）" },
+  { side: "front", get label() { return L("まえ（前面）"); } },
+  { side: "back", get label() { return L("うしろ（背面）"); } },
 ];
 
 // まえ・うしろの人型に、まとまりごとの人数の丸を置く。丸を押すとそのまとまりを選ぶ。

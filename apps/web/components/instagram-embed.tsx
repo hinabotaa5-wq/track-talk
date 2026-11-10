@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
@@ -44,9 +45,7 @@ export function InstagramEmbed({ type, shortcode, title }: { type: string; short
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-300 underline-offset-2 hover:underline"
-    >
-      Instagramで見る
-      <ExternalLink className="size-3.5" aria-hidden />
+    >{L("Instagramで見る")}<ExternalLink className="size-3.5" aria-hidden />
     </a>
   );
 
@@ -55,7 +54,7 @@ export function InstagramEmbed({ type, shortcode, title }: { type: string; short
       <iframe
         ref={frameRef}
         src={`${permalink}embed/`}
-        title={`Instagram「${title}」`}
+        title={L("Instagram「{title}」", { title })}
         className="w-full overflow-hidden rounded-xl border border-white/20 bg-white"
         style={{ height: height ?? 600 }}
         loading="lazy"
@@ -65,9 +64,7 @@ export function InstagramEmbed({ type, shortcode, title }: { type: string; short
         referrerPolicy="strict-origin-when-cross-origin"
       />
       {slow && height === null ? (
-        <p className="text-sm text-slate-200">
-          表示されないときは、非公開か削除された投稿かもしれません。Instagramで開いて確かめてください。
-        </p>
+        <p className="text-sm text-slate-200">{L("表示されないときは、非公開か削除された投稿かもしれません。Instagramで開いて確かめてください。")}</p>
       ) : null}
       {link}
     </div>

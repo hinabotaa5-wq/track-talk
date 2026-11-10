@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { ArrowDown, Bandage, Flag, Footprints, HeartPulse, PersonStanding, Zap, type LucideIcon } from "lucide-react";
 import { injuryFaceHue, injuryFaceInitial, injuryFaceOverflow, type InjuryGroupStage, type InjuryStage } from "@/lib/injury";
@@ -44,8 +45,8 @@ export function InjuryRoadmap({
   onSelect: (stage: InjuryStage) => void;
 }) {
   return (
-    <ol className="space-y-0" aria-label="復帰までのロードマップ">
-      <li className="mb-1 text-xs text-slate-300">スタート: ケガ直後</li>
+    <ol className="space-y-0" aria-label={L("復帰までのロードマップ")}>
+      <li className="mb-1 text-xs text-slate-300">{L("スタート: ケガ直後")}</li>
       {stages.map((stage, index) => {
         const { icon: Icon, tone } = stageStyle[stage.stage];
         const isMine = stage.stage === mine;
@@ -67,11 +68,11 @@ export function InjuryRoadmap({
                 }`}
               >
                 <span className="block text-sm font-bold">
-                  {stage.stage_label}
-                  <span className="ml-1.5 font-normal text-slate-300">· {stage.members}人</span>
+                  {L(stage.stage_label)}
+                  <span className="ml-1.5 font-normal text-slate-300">{L("· {members}人", { members: stage.members })}</span>
                 </span>
-                {isMine ? <span className="block text-xs font-semibold text-blue-200">あなたはここ</span> : null}
-                {stage.stage === "race" && !isMine ? <span className="block text-xs text-slate-300">ゴール</span> : null}
+                {isMine ? <span className="block text-xs font-semibold text-blue-200">{L("あなたはここ")}</span> : null}
+                {stage.stage === "race" && !isMine ? <span className="block text-xs text-slate-300">{L("ゴール")}</span> : null}
                 <Faces stage={stage} />
               </span>
             </button>

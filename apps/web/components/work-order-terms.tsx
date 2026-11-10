@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { WorkOrder, WorkOrderTerms } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 
@@ -7,9 +8,7 @@ import { formatDateTime } from "@/lib/format";
 export function WorkOrderTermsView({ terms, recordedAt, deliveredAt }: { terms: WorkOrderTerms; recordedAt?: string; deliveredAt?: string }) {
   return (
     <details id="work-order" className="scroll-mt-20 rounded-lg border border-white/20 bg-white/5 p-2 text-sm" open={!recordedAt}>
-      <summary className="cursor-pointer font-semibold text-white">
-        取引条件の通知{recordedAt ? `（${formatDateTime(recordedAt)} に引き受け）` : "（引き受ける前に確認してください）"}
-      </summary>
+      <summary className="cursor-pointer font-semibold text-white">{L("取引条件の通知{v0}", { v0: recordedAt ? L("（{at} に引き受け）", { at: formatDateTime(recordedAt) }) : L("（引き受ける前に確認してください）") })}</summary>
       <dl className="mt-2 space-y-2">
         {terms.items.map((item) => (
           <div key={item.label}>
@@ -18,8 +17,8 @@ export function WorkOrderTermsView({ terms, recordedAt, deliveredAt }: { terms: 
           </div>
         ))}
       </dl>
-      {deliveredAt ? <p className="mt-2 text-xs text-slate-300">この通知は {formatDateTime(deliveredAt)} にお知らせで届けました。</p> : null}
-      {recordedAt ? null : <p className="mt-2 text-xs text-slate-300">「引き受ける」を押すと、この条件で業務を受けたことになり、通知として記録され、お知らせにも届きます。</p>}
+      {deliveredAt ? <p className="mt-2 text-xs text-slate-300">{L("この通知は {v0} にお知らせで届けました。", { v0: formatDateTime(deliveredAt) })}</p> : null}
+      {recordedAt ? null : <p className="mt-2 text-xs text-slate-300">{L("「引き受ける」を押すと、この条件で業務を受けたことになり、通知として記録され、お知らせにも届きます。")}</p>}
     </details>
   );
 }

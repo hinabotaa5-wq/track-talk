@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachConsultationQueue } from "@/components/coaching-consultations";
@@ -18,10 +19,10 @@ export default function CoachConsultationsPage() {
     }
   }, [loading, session, router]);
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="追加相談">
+    <CoachSubpageShell title={L("追加相談")}>
       <CoachConsultationQueue token={token} />
     </CoachSubpageShell>
   );

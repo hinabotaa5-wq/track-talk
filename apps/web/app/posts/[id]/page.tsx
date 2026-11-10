@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { ApiRequestError, apiFetch } from "@/lib/api";
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const loaded = await loadPost(id);
   if (loaded.kind !== "ok") {
-    return { title: "投稿", ...(loaded.kind === "hidden" ? { robots: { index: false, follow: true } } : {}) };
+    return { title: L("投稿"), ...(loaded.kind === "hidden" ? { robots: { index: false, follow: true } } : {}) };
   }
   const { post } = loaded;
   const description = snippet(post.body) || undefined;
@@ -67,7 +68,7 @@ function postJsonLd(post: Post, comments: Comment[]) {
     text: snippet(post.body, 500) || post.title,
     datePublished: post.created_at,
     dateModified: post.updated_at,
-    author: { "@type": "Person", name: post.author_name || "匿名" },
+    author: { "@type": "Person", name: post.author_name || L("匿名") },
     ...(post.thumbnail_url ? { image: post.thumbnail_url } : {}),
     interactionStatistic: [
       { "@type": "InteractionCounter", interactionType: "https://schema.org/LikeAction", userInteractionCount: post.like_count },
@@ -77,7 +78,7 @@ function postJsonLd(post: Post, comments: Comment[]) {
       "@type": "Comment",
       text: snippet(c.body, 300),
       datePublished: c.created_at,
-      author: { "@type": "Person", name: c.author_name || "匿名" },
+      author: { "@type": "Person", name: c.author_name || L("匿名") },
     })),
   };
 }

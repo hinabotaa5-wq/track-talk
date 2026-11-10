@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachSubpageShell } from "@/components/coach-subpage";
@@ -27,11 +28,11 @@ export default function CoachSupportConsultsPage() {
     let cancelled = false;
     apiFetch<{ consults: SupportConsult[] }>("/v1/coach/me/support-consults", { token })
       .then((d) => { if (!cancelled) setRows(d.consults); })
-      .catch(() => { if (!cancelled) setError("無料相談を読み込めませんでした"); });
+      .catch(() => { if (!cancelled) setError(L("無料相談を読み込めませんでした")); });
     return () => { cancelled = true; };
   }, [token]);
 
-  if (loading || !session || (rows === null && !error)) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || (rows === null && !error)) return <PageLoading screen label={L("読み込み中...")} />;
 
   // 詳細（質問・提案つき）は開いたときに取る。一覧に出す形と同じ id で置き換える。
   async function open(id: string) {
@@ -41,19 +42,19 @@ export default function CoachSupportConsultsPage() {
       const d = await apiFetch<{ consult: SupportConsult }>(`/v1/support-consults/${id}`, { token });
       setRows((r) => r?.map((x) => (x.id === id ? { ...x, ...d.consult } : x)) ?? r);
     } catch {
-      setError("相談を読み込めませんでした");
+      setError(L("相談を読み込めませんでした"));
     }
   }
 
   return (
-    <CoachSubpageShell title="無料相談">
+    <CoachSubpageShell title={L("無料相談")}>
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      {rows?.length === 0 ? <p className="text-sm text-slate-200">届いている相談はありません。受付設定はプラン管理にあります。</p> : null}
+      {rows?.length === 0 ? <p className="text-sm text-slate-200">{L("届いている相談はありません。受付設定はプラン管理にあります。")}</p> : null}
       <ul className="space-y-2">
         {rows?.map((c) => (
           <li key={c.id} className="rounded-xl border border-white/20 bg-white/10 p-3">
             <button type="button" className="w-full text-left text-sm" aria-expanded={openID === c.id} onClick={() => void open(c.id)}>
-              <span className="block font-semibold">{c.athlete_nickname || "選手"}{c.minor ? "（未成年）" : ""}</span>
+              <span className="block font-semibold">{c.athlete_nickname || L("選手")}{c.minor ? L("（未成年）") : ""}</span>
               <span className="block text-slate-200">{supportConsultStatusLabels[c.status]}</span>
               <span className="block text-xs text-slate-300">{formatDateTime(c.created_at)}</span>
             </button>

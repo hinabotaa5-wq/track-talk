@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageLoading } from "@/components/page-loading";
@@ -38,12 +39,12 @@ export default function CoachConsultPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  if (loading || !session || consult === undefined) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || consult === undefined) return <PageLoading screen label={L("読み込み中...")} />;
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">大会までプランの無料相談</h1>
+      <h1 className="text-2xl font-bold">{L("大会までプランの無料相談")}</h1>
       {consult === null ? (
-        <p className="text-sm text-slate-200">このコーチはいま相談を受け付けていません。<Link href={`/coaches/${id}`} className="underline">コーチのページへ戻る</Link></p>
+        <p className="text-sm text-slate-200">{L("このコーチはいま相談を受け付けていません。")}<Link href={`/coaches/${id}`} className="underline">{L("コーチのページへ戻る")}</Link></p>
       ) : (
         <SupportConsultForm coachID={id} consult={consult} token={token} minor={minor} onSent={(c) => router.replace(`/coaching/support-consults/${c.id}`)} />
       )}

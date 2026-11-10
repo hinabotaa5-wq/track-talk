@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 import { CoachConsultSettings } from "@/components/coach-consult-settings";
@@ -63,7 +64,7 @@ function CoachPledgeForm({ token, onSaved }: { token: string | null; onSaved: (c
       });
       onSaved(d.application);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.agree || err.message : "送信に失敗しました");
+      setError(err instanceof ApiRequestError ? err.fields?.agree || err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -71,19 +72,17 @@ function CoachPledgeForm({ token, onSaved }: { token: string | null; onSaved: (c
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-200">プランを作る前に、次のことを約束してください。利用者の多くは中高生です。</p>
+      <p className="text-sm text-slate-200">{L("プランを作る前に、次のことを約束してください。利用者の多くは中高生です。")}</p>
       <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-100">
         {coachPledgeItems.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item}>{L(item)}</li>
         ))}
       </ul>
       <label className="flex items-start gap-2 text-sm text-white">
         <input type="checkbox" className="mt-1 size-4" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-        <span>上のことを守ります</span>
+        <span>{L("上のことを守ります")}</span>
       </label>
-      <Button type="button" className="w-full" disabled={!agree || pending} onClick={() => void submit()}>
-        誓約する
-      </Button>
+      <Button type="button" className="w-full" disabled={!agree || pending} onClick={() => void submit()}>{L("誓約する")}</Button>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
@@ -101,18 +100,18 @@ function CoachServicesForm({ coach, token, onSaved }: { coach: CoachApplication;
       const result = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/services", { method: "PATCH", token, body: JSON.stringify({ service_types: services }) });
       onSaved(result.application); setSaved(true);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.service_types || err.message : "保存できませんでした");
+      setError(err instanceof ApiRequestError ? err.fields?.service_types || err.message : L("保存できませんでした"));
     } finally { release(); }
   }
   return <fieldset className="space-y-3 rounded-xl border border-white/20 p-3" disabled={pending}>
-    <legend className="text-sm font-semibold">担当するサービス（複数選択可）</legend>
+    <legend className="text-sm font-semibold">{L("担当するサービス（複数選択可）")}</legend>
     {(Object.keys(coachingServiceLabels) as CoachingServiceType[]).filter((service) => service !== "video_review").map((service) => <label key={service} className="flex items-center gap-2 text-sm text-slate-100">
       <input type="checkbox" checked={services.includes(service)} onChange={() => { setSaved(false); setServices((values) => values.includes(service) ? values.filter((v) => v !== service) : [...values, service]); }} />
-      {coachingServiceLabels[service]}{!serviceReady(service) ? "（公開準備中）" : ""}
+      {coachingServiceLabels[service]}{!serviceReady(service) ? L("（公開準備中）") : ""}
     </label>)}
-    <p className="text-xs text-slate-300">担当を外す場合は、そのサービスのプランを先に非公開にしてください。</p>
-    <Button type="button" disabled={pending} onClick={() => void save()}>担当サービスを保存</Button>
-    {saved ? <p role="status" className="text-xs text-slate-200">保存しました</p> : null}
+    <p className="text-xs text-slate-300">{L("担当を外す場合は、そのサービスのプランを先に非公開にしてください。")}</p>
+    <Button type="button" disabled={pending} onClick={() => void save()}>{L("担当サービスを保存")}</Button>
+    {saved ? <p role="status" className="text-xs text-slate-200">{L("保存しました")}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </fieldset>;
 }
@@ -208,20 +207,18 @@ function PlanIncludesFields({
   return (
     <div className="space-y-3 rounded-lg border border-white/15 p-3">
       <div className="space-y-0.5">
-        <p className="text-sm font-semibold text-white">何が返ってくるか</p>
-        <p className="text-xs text-slate-300">書いておくと、コーチ一覧で利用者が比べやすくなります。書かなくても保存できます。</p>
+        <p className="text-sm font-semibold text-white">{L("何が返ってくるか")}</p>
+        <p className="text-xs text-slate-300">{L("書いておくと、コーチ一覧で利用者が比べやすくなります。書かなくても保存できます。")}</p>
       </div>
       <div className="space-y-1.5">
-        <p className="text-sm text-slate-200">動画への返答</p>
+        <p className="text-sm text-slate-200">{L("動画への返答")}</p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             aria-pressed={draft.video_reviews === null}
             onClick={() => setDraft((d) => ({ ...d, video_reviews: null }))}
             className={chip(draft.video_reviews === null)}
-          >
-            書かない
-          </button>
+          >{L("書かない")}</button>
           {reviewChoices.map((n) => (
             <button
               key={n}
@@ -237,16 +234,14 @@ function PlanIncludesFields({
         {fieldError("video_reviews")}
       </div>
       <div className="space-y-1.5">
-        <p className="text-sm text-slate-200">練習メニュー</p>
+        <p className="text-sm text-slate-200">{L("練習メニュー")}</p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             aria-pressed={draft.menu_updates === null}
             onClick={() => setDraft((d) => ({ ...d, menu_updates: null }))}
             className={chip(draft.menu_updates === null)}
-          >
-            書かない
-          </button>
+          >{L("書かない")}</button>
           {(Object.keys(planMenuUpdatesLabels) as PlanMenuUpdates[]).map((m) => (
             <button
               key={m}
@@ -262,7 +257,7 @@ function PlanIncludesFields({
         {fieldError("menu_updates")}
       </div>
       <div className="space-y-1.5">
-        <p className="text-sm text-slate-200">返し方（いくつでも）</p>
+        <p className="text-sm text-slate-200">{L("返し方（いくつでも）")}</p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(planReplyFormatLabels) as PlanReplyFormat[]).map((f) => (
             <button
@@ -285,11 +280,7 @@ function PlanIncludesFields({
           checked={draft.start_on_first_video}
           onChange={(e) => setDraft((d) => ({ ...d, start_on_first_video: e.target.checked }))}
         />
-        <span>
-          期間を、最初の動画が届いた日から数える
-          <span className="block text-xs text-slate-300">
-            払ったのに撮影できず日数が減る、を防げます。{firstVideoWaitDays}日のあいだに届かなければ、その時から数え始めます。
-          </span>
+        <span>{L("期間を、最初の動画が届いた日から数える")}<span className="block text-xs text-slate-300">{L("払ったのに撮影できず日数が減る、を防げます。{firstVideoWaitDays}日のあいだに届かなければ、その時から数え始めます。", { firstVideoWaitDays })}</span>
         </span>
       </label>
     </div>
@@ -323,12 +314,12 @@ function PlanForm({
     const capacity = Number(draft.capacity);
     const additionalPrice = Number(draft.additionalPrice.replace(/[,，円\s]/g, ""));
     if (!plan && !draft.service_type) {
-      setFields({ service_type: "サービスを選んでください" });
+      setFields({ service_type: L("サービスを選んでください") });
       return;
     }
     let confirmHigh = false;
     if (Number.isFinite(price) && price > highPlanPriceYen && price !== plan?.price_yen) {
-      if (!confirm(`${formatYen(price)}で保存します。打ち間違いではありませんか？`)) return;
+      if (!confirm(L("{v0}で保存します。打ち間違いではありませんか？", { v0: formatYen(price) }))) return;
       confirmHigh = true;
     }
     if (!acquire()) return;
@@ -360,7 +351,7 @@ function PlanForm({
       onSaved(d.plan);
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
-      else setError(err instanceof ApiRequestError ? err.message : "保存できませんでした");
+      else setError(err instanceof ApiRequestError ? err.message : L("保存できませんでした"));
     } finally {
       release();
     }
@@ -371,9 +362,9 @@ function PlanForm({
   return (
     <div className="space-y-3 rounded-xl border border-white/20 bg-white/5 p-3">
       <fieldset className="space-y-1.5">
-        <legend className="text-sm text-slate-200">サービス</legend>
+        <legend className="text-sm text-slate-200">{L("サービス")}</legend>
         <div className="flex flex-wrap gap-2">
-          {plan && draft.service_type == null ? <span className="text-sm text-slate-300">従来のサポートプラン（分類を選んで移行できます）</span> : null}
+          {plan && draft.service_type == null ? <span className="text-sm text-slate-300">{L("従来のサポートプラン（分類を選んで移行できます）")}</span> : null}
           {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).map((service) => (
             <button key={service} type="button" aria-pressed={draft.service_type === service} className={chip(draft.service_type === service)}
               onClick={() => setDraft((d) => ({ ...d, service_type: service, kind: service === "competition_support" || service === "in_person" ? "period" : d.kind, start_on_first_video: service === "competition_support" ? false : d.start_on_first_video, published: serviceReady(service) && d.published }))}>
@@ -381,29 +372,29 @@ function PlanForm({
             </button>
           ))}
         </div>
-        {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).length === 0 ? <p className="text-xs text-slate-300">対面指導を登録すると、ここからプランを出品できます。大会までプランは、上の「相談の受付設定」で受け付けます。</p> : null}
-        {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">このサービスは準備中です。下書きとして保存されます。</p> : null}
+        {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).length === 0 ? <p className="text-xs text-slate-300">{L("対面指導を登録すると、ここからプランを出品できます。大会までプランは、上の「相談の受付設定」で受け付けます。")}</p> : null}
+        {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">{L("このサービスは準備中です。下書きとして保存されます。")}</p> : null}
         {fieldError("service_type")}
       </fieldset>
-      {draft.service_type === "competition_support" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">大会と支援日程</legend>
-        <label className="block text-sm">大会名<Input aria-label="大会名" maxLength={100} value={draft.competitionName} onChange={(e) => setDraft((d) => ({ ...d, competitionName:e.target.value }))} /></label>{fieldError("competition_name")}
-        <label className="block text-sm">支援開始日<Input aria-label="支援開始日" type="date" value={draft.supportStartDate} onChange={(e) => setDraft((d) => ({ ...d, supportStartDate:e.target.value }))} /></label>{fieldError("support_start_date")}
-        <label className="block text-sm">大会日（この日までサポート）<Input aria-label="大会日" type="date" value={draft.competitionDate} onChange={(e) => setDraft((d) => ({ ...d, competitionDate:e.target.value }))} /></label>{fieldError("competition_date")}
-        <label className="block text-sm">通話回数（0〜12回）<Input aria-label="通話回数" type="number" min={0} max={12} value={draft.callCount} onChange={(e) => setDraft((d) => ({ ...d, callCount:Number(e.target.value) }))} /></label>{fieldError("call_count")}
-        <label className="block text-sm">通話1回の長さ<select aria-label="通話の長さ" value={draft.callMinutes} onChange={(e) => setDraft((d) => ({ ...d, callMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[15,30,45,60].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
-        <p className="text-xs text-slate-300">支援期間は1〜90日。動画添削は有限回数を選び、通話は候補登録後に参加者が確定します。未成年は保護者が確定します。大会日を過ぎても延長せず、未提供分を回数に応じて返金します。</p>
+      {draft.service_type === "competition_support" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">{L("大会と支援日程")}</legend>
+        <label className="block text-sm">{L("大会名")}<Input aria-label={L("大会名")} maxLength={100} value={draft.competitionName} onChange={(e) => setDraft((d) => ({ ...d, competitionName:e.target.value }))} /></label>{fieldError("competition_name")}
+        <label className="block text-sm">{L("支援開始日")}<Input aria-label={L("支援開始日")} type="date" value={draft.supportStartDate} onChange={(e) => setDraft((d) => ({ ...d, supportStartDate:e.target.value }))} /></label>{fieldError("support_start_date")}
+        <label className="block text-sm">{L("大会日（この日までサポート）")}<Input aria-label={L("大会日")} type="date" value={draft.competitionDate} onChange={(e) => setDraft((d) => ({ ...d, competitionDate:e.target.value }))} /></label>{fieldError("competition_date")}
+        <label className="block text-sm">{L("通話回数（0〜12回）")}<Input aria-label={L("通話回数")} type="number" min={0} max={12} value={draft.callCount} onChange={(e) => setDraft((d) => ({ ...d, callCount:Number(e.target.value) }))} /></label>{fieldError("call_count")}
+        <label className="block text-sm">{L("通話1回の長さ")}<select aria-label={L("通話の長さ")} value={draft.callMinutes} onChange={(e) => setDraft((d) => ({ ...d, callMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[15,30,45,60].map((n) => <option key={n} value={n}>{L("{n}分", { n })}</option>)}</select></label>
+        <p className="text-xs text-slate-300">{L("支援期間は1〜90日。動画添削は有限回数を選び、通話は候補登録後に参加者が確定します。未成年は保護者が確定します。大会日を過ぎても延長せず、未提供分を回数に応じて返金します。")}</p>
       </fieldset> : null}
-      {draft.service_type === "in_person" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">対面の場所と回数</legend>
-        <label className="block text-sm">地域<Input aria-label="対面の地域" maxLength={100} value={draft.venueArea} onChange={(e) => setDraft((d) => ({ ...d, venueArea:e.target.value }))} /></label>{fieldError("venue_area")}
-        <label className="block text-sm">会場<Input aria-label="対面の会場" maxLength={100} value={draft.venueName} onChange={(e) => setDraft((d) => ({ ...d, venueName:e.target.value }))} /></label>{fieldError("venue_name")}
-        <label className="block text-sm">対面回数（1〜12回）<Input aria-label="対面回数" type="number" min={1} max={12} value={draft.sessionCount} onChange={(e) => setDraft((d) => ({ ...d, sessionCount:Number(e.target.value) }))} /></label>{fieldError("session_count")}
-        <label className="block text-sm">1回の長さ<select aria-label="対面の長さ" value={draft.sessionMinutes} onChange={(e) => setDraft((d) => ({ ...d, sessionMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[30,60,90,120].map((n) => <option key={n} value={n}>{n}分</option>)}</select></label>
-        <label className="block text-sm">交通費（円・料金に加算）<Input aria-label="交通費" type="number" min={0} value={draft.travelFee} onChange={(e) => setDraft((d) => ({ ...d, travelFee:e.target.value }))} /></label>{fieldError("travel_fee_yen")}
-        <label className="block text-sm">募集人数（1〜20人）<Input aria-label="募集人数" type="number" min={1} max={20} value={draft.maxParticipants} onChange={(e) => setDraft((d) => ({ ...d, maxParticipants:Number(e.target.value) }))} /></label>{fieldError("max_participants")}
-        <p className="text-xs text-slate-300">場所と集合方法は契約の専用欄だけに出します。未成年は保護者が日時・場所・料金を確認します。未実施分は期間終了48時間後に返金します。</p>
+      {draft.service_type === "in_person" ? <fieldset className="space-y-3 rounded-xl border border-white/20 p-3"><legend className="text-sm font-semibold">{L("対面の場所と回数")}</legend>
+        <label className="block text-sm">{L("地域")}<Input aria-label={L("対面の地域")} maxLength={100} value={draft.venueArea} onChange={(e) => setDraft((d) => ({ ...d, venueArea:e.target.value }))} /></label>{fieldError("venue_area")}
+        <label className="block text-sm">{L("会場")}<Input aria-label={L("対面の会場")} maxLength={100} value={draft.venueName} onChange={(e) => setDraft((d) => ({ ...d, venueName:e.target.value }))} /></label>{fieldError("venue_name")}
+        <label className="block text-sm">{L("対面回数（1〜12回）")}<Input aria-label={L("対面回数")} type="number" min={1} max={12} value={draft.sessionCount} onChange={(e) => setDraft((d) => ({ ...d, sessionCount:Number(e.target.value) }))} /></label>{fieldError("session_count")}
+        <label className="block text-sm">{L("1回の長さ")}<select aria-label={L("対面の長さ")} value={draft.sessionMinutes} onChange={(e) => setDraft((d) => ({ ...d, sessionMinutes:Number(e.target.value) }))} className="ml-2 rounded border border-white/25 bg-slate-900 p-2">{[30,60,90,120].map((n) => <option key={n} value={n}>{L("{n}分", { n })}</option>)}</select></label>
+        <label className="block text-sm">{L("交通費（円・料金に加算）")}<Input aria-label={L("交通費")} type="number" min={0} value={draft.travelFee} onChange={(e) => setDraft((d) => ({ ...d, travelFee:e.target.value }))} /></label>{fieldError("travel_fee_yen")}
+        <label className="block text-sm">{L("募集人数（1〜20人）")}<Input aria-label={L("募集人数")} type="number" min={1} max={20} value={draft.maxParticipants} onChange={(e) => setDraft((d) => ({ ...d, maxParticipants:Number(e.target.value) }))} /></label>{fieldError("max_participants")}
+        <p className="text-xs text-slate-300">{L("場所と集合方法は契約の専用欄だけに出します。未成年は保護者が日時・場所・料金を確認します。未実施分は期間終了48時間後に返金します。")}</p>
       </fieldset> : null}
       <div className="space-y-1.5">
-        <p className="text-sm text-slate-200">種類</p>
+        <p className="text-sm text-slate-200">{L("種類")}</p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(planKindLabels) as CoachingPlanKind[]).filter((k) => (draft.service_type !== "competition_support" && draft.service_type !== "in_person") || k === "period").map((k) => (
             <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => setKind(k)} className={chip(draft.kind === k)}>
@@ -413,16 +404,16 @@ function PlanForm({
         </div>
         <p className="text-xs text-slate-300">
           {draft.kind === "period"
-            ? "期間中、メニュー作りや動画への返答を続けて見ます。"
+            ? L("期間中、メニュー作りや動画への返答を続けて見ます。")
             : draft.kind === "single"
-              ? "動画を詳しく見て返すなど、7日以内に終わる1回きりの指導です。"
-              : `あなたの指導をはじめて受ける人だけが申し込める、7日以内の安いお試しです（${formatYen(minPlanPriceYen)}〜${formatYen(maxTrialPriceYen)}、1つまで）。コーチ一覧ではいちばん上に出ます。`}
+              ? L("動画を詳しく見て返すなど、7日以内に終わる1回きりの指導です。")
+              : L("あなたの指導をはじめて受ける人だけが申し込める、7日以内の安いお試しです（{v0}〜{v1}、1つまで）。コーチ一覧ではいちばん上に出ます。", { v0: formatYen(minPlanPriceYen), v1: formatYen(maxTrialPriceYen) })}
         </p>
         {fieldError("kind")}
       </div>
       {draft.service_type !== "competition_support" && planDurations[draft.kind].length > 1 ? (
         <div className="space-y-1.5">
-          <p className="text-sm text-slate-200">期間</p>
+          <p className="text-sm text-slate-200">{L("期間")}</p>
           <div className="flex flex-wrap gap-2">
             {planDurations[draft.kind].map((days) => (
               <button
@@ -440,64 +431,55 @@ function PlanForm({
         </div>
       ) : null}
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>プラン名（60文字まで）</span>
-        <Input value={draft.title} maxLength={60} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="例: 1か月で100mのスタートを直す" />
+        <span>{L("プラン名（60文字まで）")}</span>
+        <Input value={draft.title} maxLength={60} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder={L("例: 1か月で100mのスタートを直す")} />
         {fieldError("title")}
       </label>
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>内容（1000文字まで）</span>
+        <span>{L("内容（1000文字まで）")}</span>
         <Textarea
           rows={5}
           value={draft.description}
           maxLength={1000}
           onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-          placeholder="例: 最初に動画を見て、1か月分の練習メニューを作ります。週に1回、送ってもらった動画に返答します。"
+          placeholder={L("例: 最初に動画を見て、1か月分の練習メニューを作ります。週に1回、送ってもらった動画に返答します。")}
         />
         {fieldError("description")}
       </label>
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>
-          値段（{formatYen(minPlanPriceYen)}
-          {draft.kind === "trial" ? `〜${formatYen(maxTrialPriceYen)}` : "から"}）
-        </span>
+        <span>{L("値段（{v0}{v1}）", { v0: formatYen(minPlanPriceYen), v1: draft.kind === "trial" ? `〜${formatYen(maxTrialPriceYen)}` : L("から") })}</span>
         <Input
           inputMode="numeric"
           value={draft.price}
           onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
           placeholder={draft.kind === "trial" ? "2500" : "8000"}
         />
-        <p className="text-xs text-slate-300">TrackTalk の手数料（20%）を引いた分が報酬になります。</p>
+        <p className="text-xs text-slate-300">{L("TrackTalk の手数料（20%）を引いた分が報酬になります。")}</p>
         {fieldError("price_yen")}
       </label>
       {draft.service_type === "competition_support" ? null : <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>追加相談の料金（任意・500円以上）</span>
-        <Input inputMode="numeric" value={draft.additionalPrice} onChange={(e) => setDraft((d) => ({ ...d, additionalPrice: e.target.value }))} placeholder="例: 500" />
-        <p className="text-xs text-slate-300">質問1件と回答1件の料金です。契約期間内の文章相談は基本プランに含まれます。設定は新しい申し込みに反映し、空欄で解除できます。</p>
+        <span>{L("追加相談の料金（任意・500円以上）")}</span>
+        <Input inputMode="numeric" value={draft.additionalPrice} onChange={(e) => setDraft((d) => ({ ...d, additionalPrice: e.target.value }))} placeholder={L("例: 500")} />
+        <p className="text-xs text-slate-300">{L("質問1件と回答1件の料金です。契約期間内の文章相談は基本プランに含まれます。設定は新しい申し込みに反映し、空欄で解除できます。")}</p>
         {fieldError("additional_consultation_price_yen")}
       </label>}
       <label className="flex items-center gap-2 text-sm text-slate-200">
-        <input type="checkbox" checked={serviceReady(draft.service_type) && draft.published} disabled={!serviceReady(draft.service_type)} onChange={(e) => setDraft((d) => ({ ...d, published: e.target.checked }))} />
-        公開する
-      </label>
+        <input type="checkbox" checked={serviceReady(draft.service_type) && draft.published} disabled={!serviceReady(draft.service_type)} onChange={(e) => setDraft((d) => ({ ...d, published: e.target.checked }))} />{L("公開する")}</label>
       {fieldError("published")}
       <PlanIncludesFields draft={draft} setDraft={setDraft} fields={fields} />
       <label className="block space-y-1.5 text-sm text-slate-200">
-        <span>同時に受ける人数（1〜50人）</span>
+        <span>{L("同時に受ける人数（1〜50人）")}</span>
         <Input inputMode="numeric" value={draft.capacity} onChange={(e) => setDraft((d) => ({ ...d, capacity: e.target.value }))} />
         {fieldError("capacity")}
       </label>
       <div className="flex gap-2">
-        <Button type="button" className="flex-1" disabled={pending} onClick={() => void submit()}>
-          保存する
-        </Button>
+        <Button type="button" className="flex-1" disabled={pending} onClick={() => void submit()}>{L("保存する")}</Button>
         <button
           type="button"
           disabled={pending}
           onClick={onCancel}
           className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
-        >
-          やめる
-        </button>
+        >{L("やめる")}</button>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
@@ -526,7 +508,7 @@ export function CoachPlansSection({
         if (!cancelled) setPlans(d.plans);
       })
       .catch(() => {
-        if (!cancelled) setError("プランを読み込めませんでした");
+        if (!cancelled) setError(L("プランを読み込めませんでした"));
       });
     return () => {
       cancelled = true;
@@ -567,7 +549,7 @@ export function CoachPlansSection({
       });
       saved(d.plan);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "保存できませんでした");
+      setError(err instanceof ApiRequestError ? err.message : L("保存できませんでした"));
     } finally {
       release();
     }
@@ -576,9 +558,9 @@ export function CoachPlansSection({
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h2 className="font-bold">サポートプラン</h2>
-        <p className="text-xs text-slate-300">動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは、大会までプランの相談の受付設定と、対面指導のプランを管理します。</p>
-        <p className="text-xs text-slate-300">公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。</p>
+        <h2 className="font-bold">{L("サポートプラン")}</h2>
+        <p className="text-xs text-slate-300">{L("動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは、大会までプランの相談の受付設定と、対面指導のプランを管理します。")}</p>
+        <p className="text-xs text-slate-300">{L("公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。")}</p>
       </div>
       <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />
       {!coach.pledged ? (
@@ -587,10 +569,10 @@ export function CoachPlansSection({
         </div>
       ) : (
         <>
-          {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
+          {coach.pledged_current === false ? <div className="space-y-2 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3"><p className="text-sm">{L("誓約の文面が新しくなりました。対面指導を公開するには、再同意が必要です。既存プランの表示は続けます。")}</p><CoachPledgeForm token={token} onSaved={onCoachChange} /></div> : null}
           <CoachConsultSettings coach={coach} token={token} />
-          {plans === null && !error ? <PageLoading label="読み込み中..." /> : null}
-          {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">まだプランがありません</p> : null}
+          {plans === null && !error ? <PageLoading label={L("読み込み中...")} /> : null}
+          {plans?.length === 0 && editing !== "new" ? <p className="text-sm text-slate-300">{L("まだプランがありません")}</p> : null}
           <ul className="space-y-2">
             {plans?.map((p) =>
               editing === p.id ? (
@@ -602,13 +584,11 @@ export function CoachPlansSection({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-white">{p.title}</p>
-                      <p className="text-xs text-slate-300">
-                        {planSummary(p)} · {p.capacity}人まで
-                      </p>
+                      <p className="text-xs text-slate-300">{L("{v0} · {capacity}人まで", { v0: planSummary(p), capacity: p.capacity })}</p>
                       <PlanIncludesList plan={p} />
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.published ? "bg-blue-500/30 text-pure-white" : "bg-white/15 text-slate-300"}`}>
-                      {p.service_type === "video_review" ? "動画添削は出品終了" : p.published ? "公開中" : "非公開"}
+                      {p.service_type === "video_review" ? L("動画添削は出品終了") : p.published ? L("公開中") : L("非公開")}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap text-slate-200">{p.description}</p>
@@ -618,16 +598,14 @@ export function CoachPlansSection({
                       disabled={pending || editing !== null || p.service_type === "video_review"}
                       onClick={() => setEditing(p.id)}
                       className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
-                    >
-                      直す
-                    </button>
+                    >{L("直す")}</button>
                     <button
                       type="button"
                       disabled={pending || editing !== null || (!p.published && !serviceReady(p.service_type))}
                       onClick={() => void togglePublished(p)}
                       className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
                     >
-                      {p.published ? "非公開にする" : serviceReady(p.service_type) ? "公開する" : "公開準備中"}
+                      {p.published ? L("非公開にする") : serviceReady(p.service_type) ? L("公開する") : L("公開準備中")}
                     </button>
                   </div>
                 </li>
@@ -637,9 +615,7 @@ export function CoachPlansSection({
           {editing === "new" ? (
             <PlanForm plan={null} token={token} services={coach.service_types ?? []} onSaved={saved} onCancel={() => setEditing(null)} />
           ) : plans && plans.length < 10 ? (
-            <Button type="button" className="w-full" disabled={editing !== null} onClick={() => setEditing("new")}>
-              プランを追加する
-            </Button>
+            <Button type="button" className="w-full" disabled={editing !== null} onClick={() => setEditing("new")}>{L("プランを追加する")}</Button>
           ) : null}
         </>
       )}
@@ -651,9 +627,7 @@ export function CoachPlansSection({
 // TrialBadge は、お試しプランにつける印。
 export function TrialBadge() {
   return (
-    <p className="mb-1 inline-flex rounded-full bg-blue-500/30 px-2 py-0.5 text-xs font-semibold text-blue-100">
-      はじめての人だけのお試し
-    </p>
+    <p className="mb-1 inline-flex rounded-full bg-blue-500/30 px-2 py-0.5 text-xs font-semibold text-blue-100">{L("はじめての人だけのお試し")}</p>
   );
 }
 
@@ -662,7 +636,7 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
   if (plans.length === 0) return null;
   return (
     <div className="space-y-1.5 border-t border-white/15 pt-2">
-      <p className="text-xs text-slate-300">公開中のプラン</p>
+      <p className="text-xs text-slate-300">{L("公開中のプラン")}</p>
       <ul className="space-y-2">
         {sortTrialFirst(plans).map((p) => (
           <li key={p.id} className={`rounded-lg p-2 ${p.kind === "trial" ? "border border-blue-400/40 bg-blue-500/10" : "bg-white/5"}`}>
@@ -672,14 +646,12 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
             <PlanIncludesList plan={p} />
             <p className="mt-1 whitespace-pre-wrap text-slate-200">{p.description}</p>
             {p.full ? (
-              <p className="mt-2 text-xs font-semibold text-amber-300">いまは満員です</p>
+              <p className="mt-2 text-xs font-semibold text-amber-300">{L("いまは満員です")}</p>
             ) : (
               <Link
                 href={`/coaching/personal/plans/${p.id}`}
                 className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-              >
-                このプランに申し込む
-              </Link>
+              >{L("このプランに申し込む")}</Link>
             )}
           </li>
         ))}

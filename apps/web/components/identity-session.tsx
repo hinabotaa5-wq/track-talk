@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -12,17 +13,17 @@ const issuer = process.env.NEXT_PUBLIC_IDENTITY_AUTH_URL;
 const key = process.env.NEXT_PUBLIC_IDENTITY_AUTH_PUBLIC_KEY;
 
 export async function identityFetch<T>(path: string, token: string, method = "GET", body?: object): Promise<T> {
-  if (!api) throw new Error("専用画面は準備中です");
+  if (!api) throw new Error(L("専用画面は準備中です"));
   const res = await fetch(new URL(path, api), {
     method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: body && JSON.stringify(body), cache: "no-store", credentials: "omit", redirect: "error",
   });
   if (!res.ok) {
-    if (res.status === 401) throw new Error("専用画面にログインし直してください");
-    if (res.status === 403) throw new Error("この操作を行う権限がありません");
-    if (res.status === 404) throw new Error("対象の登録情報が見つかりません");
-    if (res.status === 409 || res.status === 422) throw new Error("入力内容と公開条件を確かめてください");
-    throw new Error("専用画面に接続できません。時間をおいてもう一度お試しください");
+    if (res.status === 401) throw new Error(L("専用画面にログインし直してください"));
+    if (res.status === 403) throw new Error(L("この操作を行う権限がありません"));
+    if (res.status === 404) throw new Error(L("対象の登録情報が見つかりません"));
+    if (res.status === 409 || res.status === 422) throw new Error(L("入力内容と公開条件を確かめてください"));
+    throw new Error(L("専用画面に接続できません。時間をおいてもう一度お試しください"));
   }
   return res.status === 204 ? undefined as T : await res.json() as T;
 }
@@ -68,7 +69,7 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
       if (enrollment.error) throw enrollment.error;
       setFactor({ id: enrollment.data.id, setupKey: enrollment.data.totp.secret });
     } catch {
-      setError("専用アカウントでログインできませんでした");
+      setError(L("専用アカウントでログインできませんでした"));
     } finally {
       setPassword("");
       release();
@@ -85,7 +86,7 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
       setToken(verified.data.access_token);
       setFactor(undefined);
     } catch {
-      setError("認証アプリのコードを確かめてください");
+      setError(L("認証アプリのコードを確かめてください"));
     } finally {
       setCode("");
       release();
@@ -99,23 +100,23 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
     void client?.auth.signOut({ scope: "local" });
   }
 
-  if (!client) return <p>身元情報の専用画面は準備中です。</p>;
-  if (token) return <>{children(token)}<Button type="button" variant="secondary" onClick={signOut}>専用画面からログアウト</Button></>;
+  if (!client) return <p>{L("身元情報の専用画面は準備中です。")}</p>;
+  if (token) return <>{children(token)}<Button type="button" variant="secondary" onClick={signOut}>{L("専用画面からログアウト")}</Button></>;
   if (factor) return (
     <form method="post" className="space-y-2" onSubmit={verify}>
-      {factor.setupKey && <p>認証アプリに次の設定キーを登録してください。<code className="block break-all">{factor.setupKey}</code></p>}
-      <label className="block">認証アプリのコード<Input autoComplete="one-time-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
-      <Button disabled={pending}>認証する</Button>
-      <Button type="button" variant="secondary" onClick={signOut}>最初に戻る</Button>
+      {factor.setupKey && <p>{L("認証アプリに次の設定キーを登録してください。")}<code className="block break-all">{factor.setupKey}</code></p>}
+      <label className="block">{L("認証アプリのコード")}<Input autoComplete="one-time-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
+      <Button disabled={pending}>{L("認証する")}</Button>
+      <Button type="button" variant="secondary" onClick={signOut}>{L("最初に戻る")}</Button>
       {error && <p role="alert">{error}</p>}
     </form>
   );
   return (
     <form method="post" className="space-y-2" onSubmit={login}>
-      <p>運営から案内された身元情報専用アカウントでログインしてください。</p>
-      <label className="block">メールアドレス<Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-      <label className="block">パスワード<Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-      <Button disabled={pending}>専用画面にログイン</Button>
+      <p>{L("運営から案内された身元情報専用アカウントでログインしてください。")}</p>
+      <label className="block">{L("メールアドレス")}<Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+      <label className="block">{L("パスワード")}<Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+      <Button disabled={pending}>{L("専用画面にログイン")}</Button>
       {error && <p role="alert">{error}</p>}
     </form>
   );

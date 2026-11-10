@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachCommerceSection } from "@/components/coach-commerce";
@@ -18,10 +19,10 @@ export default function CoachCommercePage() {
     }
   }, [loading, session, router]);
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="特商法・身元">
+    <CoachSubpageShell title={L("特商法・身元")}>
       <CoachCommerceSection />
     </CoachSubpageShell>
   );

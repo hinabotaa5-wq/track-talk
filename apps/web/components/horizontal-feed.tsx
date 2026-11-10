@@ -1,8 +1,9 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { Children, useEffect, useRef, type ReactNode } from "react";
 
-export function HorizontalFeed({ children, label = "投稿一覧" }: { children: ReactNode; label?: string }) {
+export function HorizontalFeed({ children, label = L("投稿一覧") }: { children: ReactNode; label?: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const items = Children.toArray(children);
 

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
@@ -36,20 +37,18 @@ export default function ResetPasswordPage() {
     setMessage(
       error
         ? authErrorMessage(error)
-        : "リセット用メールを送信しました。\n届かない場合は迷惑メールに入っているかアカウントを作成していない可能性があります。",
+        : L("リセット用メールを送信しました。\n届かない場合は迷惑メールに入っているかアカウントを作成していない可能性があります。"),
     );
   }
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">パスワードリセット</h1>
+      <h1 className="text-2xl font-bold">{L("パスワードリセット")}</h1>
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input type="email" placeholder="メールアドレス" {...form.register("email")} />
+        <Input type="email" placeholder={L("メールアドレス")} {...form.register("email")} />
         {captcha.widget}
         {message ? <p className="whitespace-pre-line text-sm">{message}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
-          送信
-        </Button>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>{L("送信")}</Button>
       </form>
     </div>
   );

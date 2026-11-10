@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
 import { PageLoading } from "@/components/page-loading";
@@ -39,12 +40,12 @@ const chip = (on: boolean) =>
   }`;
 
 const statusNotes: Record<CoachApplication["status"], string> = {
-  pending: "運営が内容を確認しています。審査中は内容を書き直せます。",
-  approved: coachingEnabled ? "応募が承認されました。コーチ画面で受付を始められます。" : "応募が承認されました。コーチングは準備中です。活動の開始は公開後にご案内します。",
-  rejected: "今回は見送りになりました。内容を見直して、もう一度応募できます。",
-  suspended: "コーチの活動を停止しています。詳しくはお問い合わせください。",
-  withdrawn: "コーチをやめました。もう一度応募すると、審査からやり直します。",
-  ended: "コーチの登録は終了しました。残りの報酬は次の支払日にお支払いします。詳しくはお問い合わせください。",
+  get pending() { return L("運営が内容を確認しています。審査中は内容を書き直せます。"); },
+  get approved() { return coachingEnabled ? L("応募が承認されました。コーチ画面で受付を始められます。") : L("応募が承認されました。コーチングは準備中です。活動の開始は公開後にご案内します。"); },
+  get rejected() { return L("今回は見送りになりました。内容を見直して、もう一度応募できます。"); },
+  get suspended() { return L("コーチの活動を停止しています。詳しくはお問い合わせください。"); },
+  get withdrawn() { return L("コーチをやめました。もう一度応募すると、審査からやり直します。"); },
+  get ended() { return L("コーチの登録は終了しました。残りの報酬は次の支払日にお支払いします。詳しくはお問い合わせください。"); },
 };
 
 function draftFrom(a: CoachApplication): Draft {
@@ -89,7 +90,7 @@ export default function CoachApplyPage() {
         setLoaded(true);
       })
       .catch(() => {
-        if (!cancelled) setError("読み込みに失敗しました");
+        if (!cancelled) setError(L("読み込みに失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -114,12 +115,12 @@ export default function CoachApplyPage() {
     try {
       const sns_urls = draft.sns_urls.split("\n").map((v) => v.trim()).filter(Boolean);
       const missing: Record<string, string> = {};
-      if (!draft.name.trim()) missing.name = "名前を入力してください";
-      if (draft.events.length === 0) missing.events = "担当種目を1つ以上選んでください";
-      if (!draft.best_record.trim()) missing.best_record = "記録を入力してください";
-      if (!draft.achievements.trim()) missing.achievements = "成績や指導経験を入力してください";
-      if (sns_urls.length === 0) missing.sns_urls = "SNS・ホームページを1件以上入力してください";
-      if (!photo && !application?.photo_url) missing.photo = "顔写真を選んでください";
+      if (!draft.name.trim()) missing.name = L("名前を入力してください");
+      if (draft.events.length === 0) missing.events = L("担当種目を1つ以上選んでください");
+      if (!draft.best_record.trim()) missing.best_record = L("記録を入力してください");
+      if (!draft.achievements.trim()) missing.achievements = L("成績や指導経験を入力してください");
+      if (sns_urls.length === 0) missing.sns_urls = L("SNS・ホームページを1件以上入力してください");
+      if (!photo && !application?.photo_url) missing.photo = L("顔写真を選んでください");
       if (Object.keys(missing).length > 0) {
         setFieldErrors(missing);
         return;
@@ -131,14 +132,14 @@ export default function CoachApplyPage() {
       });
       setApplication(d.application);
       setDraft(draftFrom(d.application));
-      const done = application?.status === "pending" ? "応募内容を更新しました" : "応募しました。審査の結果をお待ちください。";
+      const done = application?.status === "pending" ? L("応募内容を更新しました") : L("応募しました。審査の結果をお待ちください。");
       if (photo) {
         try {
           setApplication(await uploadCoachPhoto(photo, token));
           setPhoto(null);
           setMessage(done);
         } catch (err) {
-          setMessage(`応募は受け付けましたが、顔写真を登録できませんでした（${err instanceof Error ? err.message : "エラー"}）。下の「顔写真」からもう一度選んでください。`);
+          setMessage(L("応募は受け付けましたが、顔写真を登録できませんでした（{v0}）。下の「顔写真」からもう一度選んでください。", { v0: err instanceof Error ? err.message : L("エラー") }));
         }
       } else {
         setMessage(done);
@@ -148,7 +149,7 @@ export default function CoachApplyPage() {
         if (err.fields) setFieldErrors(err.fields);
         else setError(err.message);
       } else {
-        setError("送信に失敗しました");
+        setError(L("送信に失敗しました"));
       }
     } finally {
       release();
@@ -156,7 +157,7 @@ export default function CoachApplyPage() {
   }
 
   if (loading || !session || (!loaded && !error)) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   const editable = !application || application.status === "pending" || application.status === "rejected" || application.status === "withdrawn";
@@ -166,35 +167,25 @@ export default function CoachApplyPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">コーチに応募する</h1>
-        <p className="text-sm text-slate-200">運営が内容を確認して、結果をこの画面でお知らせします。</p>
+        <h1 className="text-2xl font-bold">{L("コーチに応募する")}</h1>
+        <p className="text-sm text-slate-200">{L("運営が内容を確認して、結果をこの画面でお知らせします。")}</p>
       </div>
 
       {application ? (
         <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
           <p className="text-sm font-semibold text-white">
             {coachStatusLabels[application.status]}
-            <span className="ml-2 text-xs font-normal text-slate-300">応募日 {formatDateTime(application.applied_at)}</span>
+            <span className="ml-2 text-xs font-normal text-slate-300">{L("応募日 {v0}", { v0: formatDateTime(application.applied_at) })}</span>
           </p>
           <p className="text-sm text-slate-100">{statusNotes[application.status]}</p>
           {application.status === "approved" ? (
-            <Link href="/coach" className="text-sm text-blue-300 underline">
-              コーチ画面へ
-            </Link>
+            <Link href="/coach" className="text-sm text-blue-300 underline">{L("コーチ画面へ")}</Link>
           ) : null}
           {application.status === "pending" ? (
-            <Link href="/coach/withdraw" className="block text-sm text-blue-300 underline">
-              応募を取り下げる
-            </Link>
+            <Link href="/coach/withdraw" className="block text-sm text-blue-300 underline">{L("応募を取り下げる")}</Link>
           ) : null}
           {application.status === "pending" && coachingEnabled ? (
-            <p className="text-xs text-slate-300">
-              結果を通知で受け取るには、
-              <Link href="/me/push" className="text-blue-300 underline">
-                通知の設定
-              </Link>
-              をしてください。
-            </p>
+            <p className="text-xs text-slate-300">{L("結果を通知で受け取るには、")}<Link href="/me/push" className="text-blue-300 underline">{L("通知の設定")}</Link>{L("をしてください。")}</p>
           ) : null}
         </section>
       ) : null}
@@ -207,25 +198,17 @@ export default function CoachApplyPage() {
 
       {editable ? (
         <form onSubmit={onSubmit} className="space-y-5">
-          <p className="text-sm text-slate-200">
-            コーチの仕事内容や報酬など、コーチ機能の詳細は
-            <Link href="/coach/about" replace className="text-blue-300 underline">
-              コーチ機能について
-            </Link>
-            で確認できます。
-          </p>
-          <p className="text-sm text-slate-200">
-            TrackTalk で知り合った選手を LINE・SNS など外の連絡手段へ誘うこと、連絡先を交換すること、TrackTalk を通さずに直接取引することは禁止されています。
-          </p>
+          <p className="text-sm text-slate-200">{L("コーチの仕事内容や報酬など、コーチ機能の詳細は")}<Link href="/coach/about" replace className="text-blue-300 underline">{L("コーチ機能について")}</Link>{L("で確認できます。")}</p>
+          <p className="text-sm text-slate-200">{L("TrackTalk で知り合った選手を LINE・SNS など外の連絡手段へ誘うこと、連絡先を交換すること、TrackTalk を通さずに直接取引することは禁止されています。")}</p>
           <SupportPlanCoachTerms />
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">名前</span>
+            <span className="font-semibold">{L("名前")}</span>
             <Input value={draft.name} maxLength={80} autoComplete="name" required
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
             {fieldError("name")}
           </label>
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">担当種目(複数可)</legend>
+            <legend className="text-sm font-semibold">{L("担当種目(複数可)")}</legend>
             <div className="flex flex-wrap gap-2">
               {coachEvents.map((group) => (
                 <button
@@ -243,32 +226,32 @@ export default function CoachApplyPage() {
           </fieldset>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">記録</span>
+            <span className="font-semibold">{L("記録")}</span>
             <Input
               value={draft.best_record}
               required
               maxLength={200}
-              placeholder="例: 100m 10秒95(2025年)"
+              placeholder={L("例: 100m 10秒95(2025年)")}
               onChange={(e) => setDraft((d) => ({ ...d, best_record: e.target.value }))}
             />
             {fieldError("best_record")}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">成績や指導経験</span>
+            <span className="font-semibold">{L("成績や指導経験")}</span>
             <Textarea
               rows={3}
               value={draft.achievements}
               required
               maxLength={500}
-              placeholder="例: インターハイ 100m 準決勝"
+              placeholder={L("例: インターハイ 100m 準決勝")}
               onChange={(e) => setDraft((d) => ({ ...d, achievements: e.target.value }))}
             />
             {fieldError("achievements")}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">SNS・ホームページ</span>
+            <span className="font-semibold">{L("SNS・ホームページ")}</span>
             <Textarea
               rows={3}
               required
@@ -276,13 +259,13 @@ export default function CoachApplyPage() {
               placeholder={"@example\nhttps://example-club.jp/"}
               onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
             />
-            <span className="block text-xs text-slate-300">SNSのアカウント名やホームページのURLなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。</span>
+            <span className="block text-xs text-slate-300">{L("SNSのアカウント名やホームページのURLなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。")}</span>
             {fieldError("sns_urls")}
           </label>
 
           {!application?.photo_url ? (
             <label className="block space-y-1 text-sm">
-              <span className="font-semibold">顔写真</span>
+              <span className="font-semibold">{L("顔写真")}</span>
               <input
                 className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
                 type="file"
@@ -291,7 +274,7 @@ export default function CoachApplyPage() {
                 onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
                 disabled={pending}
               />
-              <span className="block text-xs text-slate-300">顔がはっきり写った写真にしてください。コーチ一覧に載ります。</span>
+              <span className="block text-xs text-slate-300">{L("顔がはっきり写った写真にしてください。コーチ一覧に載ります。")}</span>
               {fieldError("photo")}
             </label>
           ) : null}
@@ -305,34 +288,34 @@ export default function CoachApplyPage() {
             </div>
           ) : null}
           <Button type="submit" className="w-full" disabled={pending || (!photo && !application?.photo_url)}>
-            {application?.status === "pending" ? "応募内容を更新する" : "応募する"}
+            {application?.status === "pending" ? L("応募内容を更新する") : L("応募する")}
           </Button>
         </form>
       ) : application ? (
         <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
           <div>
-            <dt className="text-xs text-slate-300">名前</dt>
-            <dd>{application.name || profile?.nickname || "未登録"}</dd>
+            <dt className="text-xs text-slate-300">{L("名前")}</dt>
+            <dd>{application.name || profile?.nickname || L("未登録")}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-300">枠</dt>
+            <dt className="text-xs text-slate-300">{L("枠")}</dt>
             <dd>{coachTierLabels[application.tier]}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-300">担当種目</dt>
-            <dd>{application.events.map((g) => coachEventLabels[g]).join("、")}</dd>
+            <dt className="text-xs text-slate-300">{L("担当種目")}</dt>
+            <dd>{application.events.map((g) => coachEventLabels[g]).join(L("、"))}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-300">記録</dt>
+            <dt className="text-xs text-slate-300">{L("記録")}</dt>
             <dd className="whitespace-pre-wrap">{application.best_record}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-300">成績や指導経験</dt>
+            <dt className="text-xs text-slate-300">{L("成績や指導経験")}</dt>
             <dd className="whitespace-pre-wrap">{application.achievements}</dd>
           </div>
           {(application.sns_urls ?? []).length ? (
             <div>
-              <dt className="text-xs text-slate-300">SNS・ホームページ</dt>
+              <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
               <dd className="space-y-1">
                 {application.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>

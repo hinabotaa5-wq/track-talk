@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -32,7 +33,7 @@ export default function MyCoachingContractsPage() {
         if (!cancelled) setContracts(d.contracts);
       })
       .catch(() => {
-        if (!cancelled) setError("読み込みに失敗しました");
+        if (!cancelled) setError(L("読み込みに失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -40,19 +41,13 @@ export default function MyCoachingContractsPage() {
   }, [token]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !contracts) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || !contracts) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">パーソナル指導の申し込み</h1>
+      <h1 className="text-2xl font-bold">{L("パーソナル指導の申し込み")}</h1>
       {contracts.length === 0 ? (
-        <p className="text-sm text-slate-200">
-          まだ申し込みはありません。
-          <Link href="/coaches" className="text-blue-300 underline">
-            コーチ一覧
-          </Link>
-          からプランを選べます。
-        </p>
+        <p className="text-sm text-slate-200">{L("まだ申し込みはありません。")}<Link href="/coaches" className="text-blue-300 underline">{L("コーチ一覧")}</Link>{L("からプランを選べます。")}</p>
       ) : null}
       <ul className="space-y-2">
         {contracts.map((c) => (
@@ -64,7 +59,7 @@ export default function MyCoachingContractsPage() {
               <span className="min-w-0 space-y-0.5">
                 <span className="block text-sm font-semibold text-white">{c.plan_title}</span>
                 <span className="block text-xs text-slate-300">
-                  {c.coach?.nickname ?? "名前なし"} · {formatDateTime(c.created_at)}
+                  {c.coach?.nickname ?? L("名前なし")} · {formatDateTime(c.created_at)}
                 </span>
               </span>
               <span className="shrink-0 text-xs text-blue-300">{contractStatusLabel(c)}</span>

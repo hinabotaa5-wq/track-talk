@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { FieldBlock } from "@/components/consult-fields";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
         setMax(d.settings.price_max_yen?.toString() ?? "");
         setApproved(d.disclosure_approved !== false);
       })
-      .catch(() => { if (!cancelled) setError("相談の受付設定を読み込めませんでした"); });
+      .catch(() => { if (!cancelled) setError(L("相談の受付設定を読み込めませんでした")); });
     return () => { cancelled = true; };
   }, [token]);
 
@@ -55,27 +56,27 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
       setSaved(true);
     } catch (e) {
       if (e instanceof ApiRequestError && e.fields) setFields(e.fields);
-      else setError(e instanceof ApiRequestError ? e.message : "保存できませんでした");
+      else setError(e instanceof ApiRequestError ? e.message : L("保存できませんでした"));
     } finally {
       release();
     }
   }
 
   return (
-    <section aria-label="大会までプランの相談の受付設定" className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+    <section aria-label={L("大会までプランの相談の受付設定")} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <div className="space-y-1">
-        <h3 className="font-bold">大会までプラン: 相談の受付設定</h3>
-        <p className="text-xs text-slate-300">大会までプランは、固定の期間・価格では出品しません。選手が無料で相談してから、あなたが期間（開始日〜目標大会の日）・内容・価格を提案して始まります。運営手数料は20%です。</p>
+        <h3 className="font-bold">{L("大会までプラン: 相談の受付設定")}</h3>
+        <p className="text-xs text-slate-300">{L("大会までプランは、固定の期間・価格では出品しません。選手が無料で相談してから、あなたが期間（開始日〜目標大会の日）・内容・価格を提案して始まります。運営手数料は20%です。")}</p>
       </div>
-      {!canServe ? <p className="text-xs text-amber-300">先に、上の「担当するサービス」で大会までプランを登録してください。</p> : null}
+      {!canServe ? <p className="text-xs text-amber-300">{L("先に、上の「担当するサービス」で大会までプランを登録してください。")}</p> : null}
       {s ? (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={s.accepting} disabled={!canServe} onChange={(e) => setS({ ...s, accepting: e.target.checked })} />
-            <span className="font-semibold">相談を受け付ける</span>
+            <span className="font-semibold">{L("相談を受け付ける")}</span>
           </label>
           {fields.accepting ? <p className="text-sm text-red-400">{fields.accepting}</p> : null}
-          <FieldBlock label="相談を受ける種目" error={fields.events}>
+          <FieldBlock label={L("相談を受ける種目")} error={fields.events}>
             <div className="flex flex-wrap gap-2">
               {(coach.events ?? []).map((ev: CoachEvent) => {
                 const on = s.events.includes(ev);
@@ -87,24 +88,24 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
               })}
             </div>
           </FieldBlock>
-          <FieldBlock label="相談で聞きたいこと・サポートできる内容（1000文字まで）" error={fields.description}>
-            <Textarea aria-label="相談で聞きたいこと・サポートできる内容" rows={4} maxLength={1000} value={s.description} onChange={(e) => setS({ ...s, description: e.target.value })} />
+          <FieldBlock label={L("相談で聞きたいこと・サポートできる内容（1000文字まで）")} error={fields.description}>
+            <Textarea aria-label={L("相談で聞きたいこと・サポートできる内容")} rows={4} maxLength={1000} value={s.description} onChange={(e) => setS({ ...s, description: e.target.value })} />
           </FieldBlock>
-          <FieldBlock label="価格の目安（任意・円）。選手は相談の前に見られます。実際の価格は提案で決めます" error={fields.price_min_yen}>
+          <FieldBlock label={L("価格の目安（任意・円）。選手は相談の前に見られます。実際の価格は提案で決めます")} error={fields.price_min_yen}>
             <div className="flex items-center gap-2">
-              <Input aria-label="価格の目安の下限" inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value)} />
-              <span>〜</span>
-              <Input aria-label="価格の目安の上限" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
+              <Input aria-label={L("価格の目安の下限")} inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value)} />
+              <span>{L("〜")}</span>
+              <Input aria-label={L("価格の目安の上限")} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
             </div>
           </FieldBlock>
-          <p className="text-xs text-slate-300">新しい相談を受けない間は、上の「相談を受け付ける」のチェックを外してください。選手側には「受付停止中」と表示されます。対応可能カレンダーとは連動しません。人数の上限もありません。</p>
-          {s.accepting && !approved ? <p className="text-xs text-amber-300">特商法の表記が承認されるまで、選手側には公開されません。<Link href="/coach/commerce" className="underline">特商法・身元</Link>で、このサービスの表記を承認してください。</p> : null}
+          <p className="text-xs text-slate-300">{L("新しい相談を受けない間は、上の「相談を受け付ける」のチェックを外してください。選手側には「受付停止中」と表示されます。対応可能カレンダーとは連動しません。人数の上限もありません。")}</p>
+          {s.accepting && !approved ? <p className="text-xs text-amber-300">{L("特商法の表記が承認されるまで、選手側には公開されません。")}<Link href="/coach/commerce" className="underline">{L("特商法・身元")}</Link>{L("で、このサービスの表記を承認してください。")}</p> : null}
           {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-          {saved ? <p role="status" className="text-sm text-emerald-300">保存しました</p> : null}
-          <Button type="submit" disabled={pending}>受付設定を保存</Button>
+          {saved ? <p role="status" className="text-sm text-emerald-300">{L("保存しました")}</p> : null}
+          <Button type="submit" disabled={pending}>{L("受付設定を保存")}</Button>
         </form>
       ) : error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      <Link href="/coach/support-consults" className="block text-blue-300 underline">届いた相談を見る</Link>
+      <Link href="/coach/support-consults" className="block text-blue-300 underline">{L("届いた相談を見る")}</Link>
     </section>
   );
 }

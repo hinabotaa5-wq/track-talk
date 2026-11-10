@@ -23,6 +23,8 @@ import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ThemeSync } from "@/components/theme-sync";
 import { InstallGuide } from "@/components/install-guide";
 import { LocalePrompt } from "@/components/locale-prompt";
+import { LocaleProvider } from "@/components/locale-provider";
+import { localeStartupScript } from "@/lib/i18n";
 import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
@@ -91,6 +93,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* マイページで選んだ表示(ライト・ダーク)を、画面を描く前に当てる。 */}
         <script dangerouslySetInnerHTML={{ __html: themeStartupScript }} />
         <script dangerouslySetInnerHTML={{ __html: pendingLinkStartupScript }} />
+        {/* 英語を選んだ端末は、英語に切り替え終えるまで中身を隠す（本体 #530）。 */}
+        <script dangerouslySetInnerHTML={{ __html: localeStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
         <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
@@ -123,6 +127,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </Suspense>
           <ThemeSync />
           <CompetitionPrefetch />
+          <LocaleProvider>
           <Header />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 has-[>.home-layout]:max-w-none">
             <AccountMfaGate>{children}</AccountMfaGate>
@@ -134,6 +139,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <InstallGuide />
           {/* TEMPORARY（本体 #521 追加要件）：未ログイン時の言語選択プロンプト。外すときはこの1行と locale-prompt.tsx を消す。 */}
           <LocalePrompt />
+          </LocaleProvider>
           </ConfirmProvider>
           </LeaveGuardProvider>
         </AuthProvider>

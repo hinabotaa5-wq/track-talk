@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { HeartPulse } from "lucide-react";
@@ -30,7 +31,7 @@ export function InjuryMeCards({ token }: { token: string | null }) {
     apiFetch<{ groups: InjuryGroupSummary[] }>("/v1/injury/groups", { token, signal: controller.signal })
       .then((d) =>
         setJoined(
-          sortInjuryGroups(d.groups ?? []).flatMap((g) => (g.me ? [{ part: g.body_part, label: g.body_part_label, me: g.me }] : [])),
+          sortInjuryGroups(d.groups ?? []).flatMap((g) => (g.me ? [{ part: g.body_part, label: L(g.body_part_label), me: g.me }] : [])),
         ),
       )
       .catch(() => {
@@ -43,7 +44,7 @@ export function InjuryMeCards({ token }: { token: string | null }) {
   if (current.length === 0 && celebrating === null) return null;
 
   return (
-    <section aria-label="いまのケガ" className="space-y-3 md:col-span-2">
+    <section aria-label={L("いまのケガ")} className="space-y-3 md:col-span-2">
       {/* お祝いは「大会に復帰」に変えた直後だけ。そのケガのカードは消えるので、カードの代わりにここへ出す。 */}
       {celebrating !== null ? <InjuryGoalCelebration onClose={() => setCelebrating(null)} /> : null}
       {current.map((item) => {
@@ -53,19 +54,15 @@ export function InjuryMeCards({ token }: { token: string | null }) {
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
               <HeartPulse className="size-6 shrink-0 text-blue-300" aria-hidden />
               <Link href={injuryGroupPath(item.part)} className="min-w-0 flex-1 hover:underline">
-                <p className="text-xs text-slate-300">いまのケガ</p>
-                <p className="font-bold">
-                  {label}・{item.me.stage_label}
-                </p>
+                <p className="text-xs text-slate-300">{L("いまのケガ")}</p>
+                <p className="font-bold">{L("{label}・{stage_label}", { label, stage_label: L(item.me.stage_label) })}</p>
               </Link>
               <Button
                 variant="secondary"
                 className="shrink-0"
                 aria-expanded={changing === item.part}
                 onClick={() => setChanging((current) => (current === item.part ? null : item.part))}
-              >
-                段階を変える
-              </Button>
+              >{L("段階を変える")}</Button>
             </div>
             {changing === item.part ? (
               <InjuryStageChange
