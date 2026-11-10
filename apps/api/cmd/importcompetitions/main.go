@@ -20,6 +20,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// OverallTimeout はジョブ全体の期限（ワークフロー側の30分より短く）。
+// SourceTimeout は1県あたりの期限で、1県の失敗の連鎖が全体を使い切らないようにする。
+// どちらも変えたら、時間配分のテスト（TestTimeBudgetsFitOverall）が担保する。
+const (
+	OverallTimeout = 20 * time.Minute
+	SourceTimeout  = 4 * time.Minute
+)
+
 func main() {
 	prefecture := flag.String("prefecture", "", "取り込む都道府県コード。00 は国際大会。空なら国際大会と、Gemini の1日の上限（GEMINI_DAILY_REQUESTS、既定15回）に収まる県まで")
 	dryRun := flag.Bool("dry-run", false, "DB に書かず、読み取れた大会を表示する。-prefecture が必要")
@@ -44,7 +52,7 @@ func main() {
 		log.Fatal("DATABASE_URL is required")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), OverallTimeout)
 	defer cancel()
 	pool, err := db.NewPool(ctx, databaseURL, db.AppNameImport)
 	if err != nil {
@@ -144,10 +152,17 @@ func main() {
 	if key == "" {
 		log.Fatal("GEMINI_API_KEY is required")
 	}
-	client := competitions.Client{Key: key}
+	var httpTotal int
+	client := competitions.Client{Key: key, HTTPCalls: &httpTotal}
 	var results importResults
 	windowStart := competitions.ImportWindowStart(time.Now())
 	for i, source := range targets {
+		// リトライ込みの実呼び出しが無料枠の最低報告値（20回/日）に届いたら、
+		// 残りは翌日に回して枠を超えない。未試行のまま残るので先頭固定にならない。
+		if httpTotal >= competitions.MaxRealCallsPerDay {
+			log.Printf("実呼び出しが1日の上限 %d 回に届いたので、残りは翌日に回します", competitions.MaxRealCallsPerDay)
+			break
+		}
 		if i > 0 {
 			if err := competitions.Wait(ctx, 15*time.Second); err != nil {
 				break
@@ -158,17 +173,29 @@ func main() {
 		if prev := prevAttempt(sel.attempts, source.Prefecture, windowStart); prev != nil && prev.Outcome == competitions.AttemptPartial {
 			retry = prev.FailedURLs
 		}
-		outcome, err := importSource(ctx, pool, client, source, retry)
+		// 1県の失敗の連鎖（タイムアウト×再試行など）が全体20分を使い切らないよう、
+		// 県ごとに期限を区切る。期限切れは transient として記録し、翌日の選定では後回しになる。
+		srcCtx, cancel := context.WithTimeout(ctx, SourceTimeout)
+		before := httpTotal
+		outcome, err := importSource(srcCtx, pool, client, source, retry)
+		calls := httpTotal - before
+		cancel()
 		if err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
-			results.recordOutcome(source.Prefecture, outcome.result, err, outcome.geminiCalls)
+			// 全体の期限切れで試行の記録が消える（#39 の33）と、翌日に未試行のまま
+			// 先頭に戻り固定化する。書き込みは切り離してあるのでここでは必ず残す。
+			results.recordOutcome(source.Prefecture, outcome.result, err, outcome.geminiCalls, calls)
 			recordImportAttempt(ctx, pool, source.Prefecture, nextAttempt(prevAttempt(sel.attempts, source.Prefecture, windowStart), windowStart, outcome.result, outcome.failed, outcome.geminiCalls))
 			if errors.Is(err, competitions.ErrRateLimited) || errors.Is(err, competitions.ErrAuthentication) {
 				fmt.Fprintln(os.Stdout, results.summary(len(targets), sel.limit))
 				os.Exit(1)
 			}
+			// 全体の期限が切れていたら、残りの県は未試行のまま翌日に回す。
+			if ctx.Err() != nil {
+				break
+			}
 		} else {
-			results.recordOutcome(source.Prefecture, outcome.result, nil, outcome.geminiCalls)
+			results.recordOutcome(source.Prefecture, outcome.result, nil, outcome.geminiCalls, calls)
 			recordImportAttempt(ctx, pool, source.Prefecture, nextAttempt(prevAttempt(sel.attempts, source.Prefecture, windowStart), windowStart, outcome.result, outcome.failed, outcome.geminiCalls))
 		}
 	}
@@ -333,8 +360,11 @@ func readMeets(ctx context.Context, client competitions.Client, source competiti
 		var err error
 		urls, err = source.ResolveURLs(ctx)
 		if err != nil {
-			if source.Prefecture == "26" && strings.Contains(err.Error(), "403 Forbidden") {
-				return out, fmt.Errorf("%w: 26 京都陸協が取得元へのアクセスを403で拒否。既存データを維持: %v", competitions.ErrSourceSkipped, err)
+			// 取得元の 403（bot 対策などの一時的拒否を含む）は、一時失敗として翌日に
+			// 回す。skipped にすると次の4/1か10/1まで二度と対象にならないため。
+			// get() は 403 のとき通常 UA→ブラウザ UA の順に1回ずつ試している。
+			if strings.Contains(err.Error(), "403") {
+				return out, fmt.Errorf("%w: %s の取得元が403で拒否。既存データを維持: %v", competitions.ErrTransient, source.Prefecture, err)
 			}
 			return out, err
 		}

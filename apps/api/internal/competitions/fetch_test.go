@@ -111,6 +111,41 @@ func TestExtractSendsPDFsInline(t *testing.T) {
 }
 
 // 日本時間の4月1日の朝（UTC ではまだ3月31日）でも、年のない PDF の競技年度は新しい年度になる。
+// Issue #515: 403 のときだけブラウザ UA で1回だけ取り直す。
+// 通常は連絡先入りの UA のままにし、Wikimedia の方針を壊さない。
+func TestGetFallsBackToBrowserUAOn403(t *testing.T) {
+	var agents []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agents = append(agents, r.Header.Get("User-Agent"))
+		if len(agents) == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<html><body>ok</body></html>`))
+	}))
+	defer server.Close()
+	res, _, err := get(context.Background(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if len(agents) != 2 {
+		t.Fatalf("requests=%d", len(agents))
+	}
+	if agents[0] == agents[1] || !strings.Contains(agents[1], "Mozilla") {
+		t.Fatalf("agents=%q", agents)
+	}
+	// 2回とも 403 ならそのまま失敗として返す。
+	denied := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer denied.Close()
+	if _, _, err := get(context.Background(), denied.URL); err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
 func TestPDFPageSeasonStartsInJST(t *testing.T) {
 	now := time.Date(2027, 3, 31, 21, 0, 0, 0, time.UTC) // 日本時間 4月1日 6:00
 	page, err := PDFPage([]byte("%PDF-1.7 schedule"), "https://example.com/schedule.pdf", now)

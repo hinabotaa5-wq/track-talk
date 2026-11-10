@@ -19,7 +19,7 @@ const ensureImportAttemptsDDL = `CREATE TABLE IF NOT EXISTS competition_import_a
     attempted_at timestamptz NOT NULL DEFAULT now(),
     outcome text NOT NULL
         CONSTRAINT competition_import_attempts_outcome_chk
-        CHECK (outcome IN ('success', 'partial', 'transient', 'permanent', 'skipped')),
+        CHECK (outcome IN ('success', 'partial', 'transient', 'permanent', 'skipped', 'rate_limited')),
     consecutive_failures integer NOT NULL DEFAULT 0,
     failed_urls text[] NOT NULL DEFAULT '{}',
     requests_made integer NOT NULL DEFAULT 0,
@@ -74,7 +74,11 @@ func recordImportAttempt(ctx context.Context, pool *pgxpool.Pool, prefecture str
 	if attempt.FailedURLs == nil {
 		attempt.FailedURLs = []string{}
 	}
-	_, err := pool.Exec(ctx, `INSERT INTO competition_import_attempts
+	// 試行の記録は、県あたりの期限切れ・全体の期限切れのときも残す。
+	// 親の期限が切れていると Exec まで道連れになるので、書き込みだけ切り離す。
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	_, err := pool.Exec(wctx, `INSERT INTO competition_import_attempts
 		(prefecture, attempted_at, outcome, consecutive_failures, failed_urls, requests_made)
 		VALUES ($1, now(), $2, $3, $4, $5)
 		ON CONFLICT (prefecture) DO UPDATE SET
@@ -96,7 +100,7 @@ func nextAttempt(prev *competitions.Attempt, windowStart time.Time, outcome stri
 		fails = prev.ConsecutiveFailures
 	}
 	switch outcome {
-	case competitions.AttemptTransient, competitions.AttemptPermanent:
+	case competitions.AttemptTransient, competitions.AttemptPermanent, competitions.AttemptRateLimited:
 		fails++
 	default:
 		fails = 0

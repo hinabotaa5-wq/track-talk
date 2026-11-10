@@ -7,9 +7,14 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 )
 
-// DailyRequestLimit は、1日1回の実行で使ってよい Gemini リクエスト数の既定値。
+// DailyRequestLimit は、1日1回の実行で使ってよい Gemini リクエスト数（論理数）の既定値。
 // 無料枠の1日あたりの上限はプロジェクトごとで、AI Studio にしか出ないので、報告されている中でいちばん低い値（モデルごとに1日20回）より十分少なくする。
 const DailyRequestLimit = 15
+
+// MaxRealCallsPerDay は、リトライ込みの実 HTTP 呼び出し数の1日の上限。
+// 無料枠の最低報告値（モデルごとに1日20回）を恒常的に超えないための枠で、
+// 論理数の上限（DailyRequestLimit）とは別に実行時に数える。
+const MaxRealCallsPerDay = 20
 
 // ImportWindowStart は、年間の日程表を取り込む今の期間が始まった時刻。now より後ではない、いちばん新しい4月1日か10月1日（日本時間）。
 // 県は春にその年の日程表を出し、秋に直す県もあるので、県ごとに期間ごとに1回だけ取り込み、あとはそのままにする。
@@ -36,12 +41,15 @@ func (s Source) Requests() int {
 }
 
 // 試行の結果。今の期間の記録だけを DueSourcesWithAttempts が見る。
+// rate_limited は回数制限での打ち切りで、選定上は transient/permanent と同じ後回し。
+// 旧 permanent に混ぜていたものを、読み手を誤らせないよう分けている。
 const (
-	AttemptSuccess   = "success"
-	AttemptPartial   = "partial"
-	AttemptTransient = "transient"
-	AttemptPermanent = "permanent"
-	AttemptSkipped   = "skipped"
+	AttemptSuccess     = "success"
+	AttemptPartial     = "partial"
+	AttemptTransient   = "transient"
+	AttemptPermanent   = "permanent"
+	AttemptSkipped     = "skipped"
+	AttemptRateLimited = "rate_limited"
 )
 
 // Attempt は、今の期間のある県の取り込み試行の記録。失敗しても残るので、
@@ -113,7 +121,7 @@ func DueSourcesWithAttempts(sources []Source, updated map[string]time.Time, atte
 		}
 		if fresh && !imported.Before(windowStart) {
 			// 今の期間に取り込み済み。部分成功・失敗の記録がある県だけ、残りの分を取り直す。
-			if !ok || (att.Outcome != AttemptPartial && att.Outcome != AttemptTransient && att.Outcome != AttemptPermanent) {
+			if !ok || (att.Outcome != AttemptPartial && att.Outcome != AttemptTransient && att.Outcome != AttemptPermanent && att.Outcome != AttemptRateLimited) {
 				continue
 			}
 		} else {

@@ -114,6 +114,29 @@ func TestDueSourcesWithAttemptsRetriesPartialRemainders(t *testing.T) {
 	}
 }
 
+// Issue #515: 回数制限は transient/permanent と同じく後回しになり、未試行の後になる。
+func TestDueSourcesWithAttemptsDefersRateLimited(t *testing.T) {
+	sources := []Source{
+		{Prefecture: "26", PageURL: "https://example.com/26"},
+		{Prefecture: "27", PageURL: "https://example.com/27"},
+		{Prefecture: "28", PageURL: "https://example.com/28"},
+	}
+	now := time.Date(2026, 11, 9, 6, 0, 0, 0, jst.Zone)
+	lastTry := time.Date(2026, 11, 8, 7, 0, 0, 0, jst.Zone)
+	attempts := map[string]Attempt{
+		"26": {Outcome: AttemptRateLimited, AttemptedAt: lastTry, ConsecutiveFailures: 1, RequestsMade: 1},
+		"27": {Outcome: AttemptTransient, AttemptedAt: lastTry, ConsecutiveFailures: 1, RequestsMade: 1},
+	}
+	var codes []string
+	for _, source := range DueSourcesWithAttempts(sources, nil, attempts, now, 15) {
+		codes = append(codes, source.Prefecture)
+	}
+	// 未試行の28が先で、制限と一時失敗は後回し。どちらも試行として残る。
+	if strings.Join(codes, ",") != "28,26,27" {
+		t.Fatalf("due %v", codes)
+	}
+}
+
 // 期間が変われば試行の記録は仕切り直しになる。
 func TestDueSourcesWithAttemptsIgnoresPreviousWindow(t *testing.T) {
 	sources := []Source{

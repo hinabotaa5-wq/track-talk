@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hinata/track-talk/apps/api/internal/competitions"
 )
@@ -190,18 +191,57 @@ func TestReadMeetsRetriesOnlyFailedURLs(t *testing.T) {
 }
 
 // Issue #460 受け入れ基準: 末尾サマリに県ごとの結果が一覧できる。
+// Issue #515: サマリに論理呼び出し数とリトライ込み実呼び出し数の両方を出す。
 func TestImportResultsSummary(t *testing.T) {
 	var r importResults
-	r.recordOutcome("14", competitions.AttemptTransient, fmt.Errorf("gemini temporary failure: request timeout"), 3)
-	r.recordOutcome("18", competitions.AttemptPartial, nil, 9)
-	r.recordOutcome("21", competitions.AttemptSkipped, fmt.Errorf("取り込み元をスキップ"), 0)
+	r.recordOutcome("14", competitions.AttemptTransient, fmt.Errorf("gemini temporary failure: request timeout"), 3, 4)
+	r.recordOutcome("18", competitions.AttemptPartial, nil, 9, 10)
+	r.recordOutcome("21", competitions.AttemptSkipped, fmt.Errorf("取り込み元をスキップ"), 0, 0)
 	summary := r.summary(3, 15)
-	for _, want := range []string{"targets=3", "success=1", "partial=1", "transient=1", "skipped=1", "14:", "18:", "21:"} {
+	for _, want := range []string{"targets=3", "success=1", "partial=1", "transient=1", "skipped=1", "rate_limited=0", "gemini_calls=12/15", "http_calls=14", "14:", "18:", "21:"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary missing %q:\n%s", want, summary)
 		}
 	}
 	if r.failed() {
 		t.Fatal("partial success should not fail the job")
+	}
+}
+
+// Issue #515: 回数制限は permanent ではなく rate_limited に分け、失敗として残る。
+func TestImportResultsRateLimited(t *testing.T) {
+	var r importResults
+	r.recordOutcome("25", competitions.AttemptRateLimited, competitions.ErrRateLimited, 1, 1)
+	summary := r.summary(1, 15)
+	for _, want := range []string{"rate_limited=1", "rate_limited=yes", "25: rate_limited"} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("summary missing %q:\n%s", want, summary)
+		}
+	}
+	if strings.Contains(summary, "permanent_failure=yes") {
+		t.Fatalf("rate limit should not be reported as permanent:\n%s", summary)
+	}
+	if !r.failed() {
+		t.Fatal("rate limit should fail the job")
+	}
+}
+
+// Issue #515: 1回の実行が全体上限（コード20分）を超えない時間配分になっていること。
+func TestTimeBudgetsFitOverall(t *testing.T) {
+	if SourceTimeout >= OverallTimeout {
+		t.Fatalf("source %v must be shorter than overall %v", SourceTimeout, OverallTimeout)
+	}
+	// 1回の論理呼び出しの worst case（HTTP上限×試行回数＋待ち）が県の上限に収まること。
+	worstCall := time.Duration(competitions.GeminiMaxAttempts)*competitions.GeminiHTTPTimeout + competitions.GeminiRetryWait
+	if worstCall >= SourceTimeout {
+		t.Fatalf("worst gemini call %v must fit in source timeout %v", worstCall, SourceTimeout)
+	}
+	// 再試行なしなら論理数の上限が実数の上限に収まること（平常時は枠を超えない）。
+	if competitions.DailyRequestLimit > competitions.MaxRealCallsPerDay {
+		t.Fatalf("logical limit %d must fit in real cap %d", competitions.DailyRequestLimit, competitions.MaxRealCallsPerDay)
+	}
+	// リトライ嵐でも実数の上限が論理数×試行回数で頭打ちになる設計であること。
+	if competitions.MaxRealCallsPerDay > competitions.DailyRequestLimit*competitions.GeminiMaxAttempts {
+		t.Fatalf("real cap %d exceeds worst-case logical amplification %d", competitions.MaxRealCallsPerDay, competitions.DailyRequestLimit*competitions.GeminiMaxAttempts)
 	}
 }

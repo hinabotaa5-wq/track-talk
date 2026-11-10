@@ -44,7 +44,19 @@ type Client struct {
 	HTTP            *http.Client
 	// Endpoint はテストで Gemini の代わりのサーバーに向けるためのもの。空なら本物の Gemini。
 	Endpoint string
+	// HTTPCalls は、generateOnce を呼んだ実回数を数える。nil なら数えない。
+	// 論理呼び出し（generate 1回）あたり最大で GeminiMaxAttempts 回まで増える。
+	HTTPCalls *int
 }
+
+// Gemini の呼び出し配分。1回の論理呼び出しの worst case は
+// GeminiHTTPTimeout*GeminiMaxAttempts+GeminiRetryWait で、県あたりの
+// 上限（importcompetitions の SourceTimeout）より十分小さいこと。
+const (
+	GeminiMaxAttempts = 2
+	GeminiRetryWait   = 15 * time.Second
+	GeminiHTTPTimeout = 30 * time.Second
+)
 
 // GenerateJSON は、文だけのプロンプトを Gemini に送り、返ってきた JSON の文字列を返す。
 func (c Client) GenerateJSON(ctx context.Context, prompt string) (string, error) {
@@ -69,20 +81,21 @@ func (c Client) Extract(ctx context.Context, page Page) ([]Draft, error) {
 
 // geminiClient は、HTTP を指定しないときの Gemini 用のクライアント。応答しないまま
 // 全体の時間を使い切って、残りの県が取り込めなくならないよう、1回ごとに時間を区切る。
-var geminiClient = &http.Client{Timeout: 45 * time.Second}
+var geminiClient = &http.Client{Timeout: GeminiHTTPTimeout}
 
-// generate は503とタイムアウトだけを15秒、30秒待って再試行する。
-// 最長は45秒×3回+45秒。親の期限・キャンセルは再試行しない。
+// generate は503とタイムアウトだけを1回だけ待って再試行する（初回＋1回、待ち15秒）。
+// 最長は30秒×2回+15秒。親の期限・キャンセルは再試行しない。
+// 混雑時の503連発でリトライが増幅し、全体20分の枠を使い切らないための絞り込み。
 func (c Client) generate(ctx context.Context, parts []map[string]any) (string, error) {
 	for attempt := 0; ; attempt++ {
 		text, err := c.generateOnce(ctx, parts)
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		if !errors.Is(err, ErrTransient) || attempt == 2 {
+		if !errors.Is(err, ErrTransient) || attempt+1 >= GeminiMaxAttempts {
 			return text, err
 		}
-		if err := retryWait(ctx, time.Duration(attempt+1)*15*time.Second); err != nil {
+		if err := retryWait(ctx, GeminiRetryWait); err != nil {
 			return "", err
 		}
 	}
@@ -123,6 +136,9 @@ func (c Client) generateOnce(ctx context.Context, parts []map[string]any) (strin
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", c.Key)
+	if c.HTTPCalls != nil {
+		*c.HTTPCalls++
+	}
 	res, err := httpClient.Do(req)
 	if err != nil {
 		var timeout net.Error

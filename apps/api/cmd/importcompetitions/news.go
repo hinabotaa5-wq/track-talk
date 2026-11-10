@@ -75,6 +75,12 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 		if budget >= 0 && requests >= budget {
 			break
 		}
+		// 実呼び出しが1日の上限に届いたら、ニュースも翌日に回す。
+		// ニュースも Gemini を使うため、続けると回数制限に当たる。
+		if client.HTTPCalls != nil && *client.HTTPCalls >= competitions.MaxRealCallsPerDay {
+			log.Printf("実呼び出しが1日の上限 %d 回に届いたので、ニュースは翌日に回します", competitions.MaxRealCallsPerDay)
+			return true
+		}
 		rows, err := q.ListCompetitionsForNews(ctx, db.ListCompetitionsForNewsParams{Prefecture: source.Prefecture, SeasonYear: season})
 		if err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
@@ -90,16 +96,24 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 			}
 		}
 		requests++
+		before := 0
+		if client.HTTPCalls != nil {
+			before = *client.HTTPCalls
+		}
 		linked, err := readNews(ctx, client, source, int(season), known, byKey, q, dryRun)
+		calls := 0
+		if client.HTTPCalls != nil {
+			calls = *client.HTTPCalls - before
+		}
 		if err != nil {
 			log.Printf("%s: %v", source.Prefecture, err)
-			results.recordSource(source.Prefecture, err, 0)
+			results.recordSource(source.Prefecture, err, 1, calls)
 			if errors.Is(err, competitions.ErrRateLimited) || errors.Is(err, competitions.ErrAuthentication) {
 				return true
 			}
 			continue
 		}
-		results.recordSource(source.Prefecture, nil, 0)
+		results.recordSource(source.Prefecture, nil, 1, calls)
 		if !dryRun {
 			if err := q.MarkNewsChecked(ctx, source.Prefecture); err != nil {
 				log.Printf("%s: %v", source.Prefecture, err)
@@ -108,8 +122,7 @@ func importNews(ctx context.Context, pool *pgxpool.Pool, client competitions.Cli
 		}
 		fmt.Fprintf(os.Stdout, "news %s: %d meets got guidelines\n", source.Prefecture, linked)
 	}
-	// ニュースの読み取りは県ごとに Gemini を1回使う。FetchNewsList で終わった分だけ多めになる。
-	results.geminiCalls += requests
+	// 論理数は recordSource ごとに1回ずつ数えている（FetchNewsList で終わった分は多めになる）。
 	return results.failed() || ctx.Err() != nil
 }
 
