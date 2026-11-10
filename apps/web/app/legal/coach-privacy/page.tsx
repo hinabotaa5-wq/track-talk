@@ -21,6 +21,10 @@ export default function CoachPrivacyPage() {
           This notice explains how TrackTalk handles the personal data of coaches who live outside Japan (&quot;overseas coaches&quot;). It is a summary of the parts of our{" "}
           <Link href="/privacy" className="text-blue-300 underline">Privacy Policy (Japanese)</Link> that concern you as a coach. If this notice and the Japanese Privacy Policy differ, the Japanese Privacy Policy prevails.
         </p>
+        <p className="text-sm leading-7 text-slate-300">
+          The terms of your engagement as a coach are set out in the{" "}
+          <Link href="/legal/coach-terms" className="text-blue-300 underline">Terms of Engagement for Overseas Coaches</Link>.
+        </p>
         <p className="text-xs text-slate-300">Last updated: {updated}</p>
       </div>
 
