@@ -1,4 +1,5 @@
--- Apply to the separate identity database as its migration owner.
+-- Apply to the separate identity database as its migration owner, then apply
+-- migrations/*.sql in file-name order.
 CREATE SCHEMA identity_vault;
 REVOKE ALL ON SCHEMA identity_vault FROM PUBLIC;
 
@@ -28,8 +29,9 @@ CREATE TABLE identity_vault.commerce (
     exempt_declared_at timestamptz
 );
 
--- Holds only authorizations to publish specific versions of a plan. Phone
--- belongs to the public disclosure and is never stored with the identity.
+-- Holds only authorizations to publish specific versions of a plan. The phone
+-- column is no longer written: since migrations/002_identity_phone.sql the
+-- phone number is encrypted with the identity (identities.phone_enc).
 CREATE TABLE identity_vault.disclosures (
     plan_id uuid PRIMARY KEY,
     coach_id uuid NOT NULL REFERENCES identity_vault.identities ON DELETE CASCADE,

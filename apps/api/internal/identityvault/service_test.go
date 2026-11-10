@@ -8,11 +8,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -26,8 +29,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// captureLogs は試験中の標準ログを集める。身元情報の平文がログに出ないことの確認に使う。
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prevSlog, prevLog := slog.Default(), log.Writer()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	log.SetOutput(&buf)
+	t.Cleanup(func() {
+		slog.SetDefault(prevSlog)
+		log.SetOutput(prevLog)
+	})
+	return &buf
+}
+
 func TestIdentityIsolation(t *testing.T) {
 	ctx := context.Background()
+	logs := captureLogs(t)
 	main, vault := testDatabases(t)
 	coach, coachSubject, staff, outsider, plan := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", coach)
@@ -158,7 +176,8 @@ func TestIdentityIsolation(t *testing.T) {
 		return res
 	}
 
-	const syntheticIdentity = `{"legal_name":"合成テスト氏名","address":"合成テスト住所"}`
+	const syntheticPhone = "000-0000-0000"
+	const syntheticIdentity = `{"legal_name":"合成テスト氏名","address":"合成テスト住所","phone":"` + syntheticPhone + `"}`
 	const viewCoach = "/v1/coach"
 	const save = "/v1/coach/identity"
 	adminView := "/v1/admin/coaches/" + coach.String() + "/identity"
@@ -207,8 +226,26 @@ func TestIdentityIsolation(t *testing.T) {
 	unknown := uuid.New()
 	request("POST", endPath, end, `{"coach_id":"`+unknown.String()+`"}`, 204)
 	execTest(t, main, "DELETE FROM identity_boundary.retirement WHERE coach_id=$1", unknown)
-	request("PUT", save, coachToken, `{"legal_name":"test","address":"test","phone":"0000000000"}`, 400)
+	// 電話番号は (2) の身元登録で必須。形式が合わない値・欠けた登録・未知の項目は受け付けない。
+	request("PUT", save, coachToken, `{"legal_name":"test","address":"test"}`, 422)
+	request("PUT", save, coachToken, `{"legal_name":"test","address":"test","phone":""}`, 422)
+	request("PUT", save, coachToken, `{"legal_name":"test","address":"test","phone":"not-a-phone"}`, 422)
+	request("PUT", save, coachToken, `{"legal_name":"test","address":"test","phone":"0000000000","email":"x"}`, 400)
 	request("PUT", save, coachToken, syntheticIdentity, 204)
+
+	var sealedPhone []byte
+	if err := vault.QueryRow(ctx, "SELECT phone_enc FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&sealedPhone); err != nil || sealedPhone == nil {
+		t.Fatal("phone was not stored in the vault")
+	}
+	if bytes.Contains(sealedPhone, []byte(syntheticPhone)) {
+		t.Fatal("plaintext phone stored in private identity table")
+	}
+	if _, err := svc.open(coach, "address", sealedPhone); err == nil {
+		t.Fatal("phone ciphertext was accepted as another field")
+	}
+	if _, err := svc.open(uuid.New(), "phone", sealedPhone); err == nil {
+		t.Fatal("phone ciphertext substitution was accepted")
+	}
 
 	var sealed []byte
 	if err := vault.QueryRow(ctx, "SELECT address_enc FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&sealed); err != nil {
@@ -224,23 +261,41 @@ func TestIdentityIsolation(t *testing.T) {
 	var own struct {
 		Revision uuid.UUID `json:"identity_revision"`
 	}
-	if err := json.Unmarshal(private.Body.Bytes(), &own); err != nil || own.Revision == uuid.Nil || !strings.Contains(private.Body.String(), "合成テスト住所") {
+	if err := json.Unmarshal(private.Body.Bytes(), &own); err != nil || own.Revision == uuid.Nil || !strings.Contains(private.Body.String(), "合成テスト住所") ||
+		!strings.Contains(private.Body.String(), syntheticPhone) {
 		t.Fatal("owner did not get registered identity")
 	}
+	// 管理閲覧：値は失敗時にも出さず、一致したかどうかだけを判定する。
 	admin := request("POST", adminView, staffToken, `{"purpose":"開示請求の合成試験"}`, 200)
-	if !strings.Contains(admin.Body.String(), "合成テスト住所") || !strings.Contains(admin.Body.String(), staff.String()) ||
-		!strings.Contains(admin.Body.String(), "開示請求の合成試験") || strings.Contains(admin.Body.String(), "phone") {
+	var viewed struct {
+		Identity identityFields `json:"identity"`
+	}
+	if err := json.Unmarshal(admin.Body.Bytes(), &viewed); err != nil || viewed.Identity.Phone != syntheticPhone ||
+		viewed.Identity.Address != "合成テスト住所" || !strings.Contains(admin.Body.String(), staff.String()) ||
+		!strings.Contains(admin.Body.String(), "開示請求の合成試験") {
 		t.Fatal("administrator disclosure or audit record did not match")
 	}
 
-	consent := `{"confirm":true,"phone":"000-0000-0000","identity_revision":"` + own.Revision.String() + `"}`
+	consent := `{"confirm":true,"identity_revision":"` + own.Revision.String() + `"}`
+	// 表記要でも、本人が表示内容を確認するまでは電話番号を含め何も出さない。
+	request("GET", public, machine, "", 404)
+	if plans := request("GET", "/internal/disclosures?ids="+plan.String(), machine, "", 200); strings.Contains(plans.Body.String(), plan.String()) {
+		t.Fatal("unconfirmed plan was listed as approved")
+	}
+	// 電話番号は確認時に受け取らない（登録した版をそのまま公開する）。
+	request("PUT", publish, coachToken, `{"confirm":true,"phone":"`+syntheticPhone+`","identity_revision":"`+own.Revision.String()+`"}`, 400)
+	request("PUT", publish, coachToken, `{"confirm":false,"identity_revision":"`+own.Revision.String()+`"}`, 422)
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, consent, 204)
+	var legacyPhone *string
+	if err := vault.QueryRow(ctx, "SELECT phone FROM identity_vault.disclosures WHERE plan_id=$1", plan).Scan(&legacyPhone); err != nil || legacyPhone != nil {
+		t.Fatal("plaintext phone written to the disclosure grant")
+	}
 	if plans := request("GET", "/internal/disclosures?ids="+plan.String(), machine, "", 200); !strings.Contains(plans.Body.String(), plan.String()) {
 		t.Fatal("approved plan was hidden from the plan list")
 	}
 	res := request("GET", public, machine, "", 200)
-	if !strings.Contains(res.Body.String(), "合成テスト住所") || !strings.Contains(res.Body.String(), "000-0000-0000") || res.Header().Get("Cache-Control") != "no-store" {
+	if !strings.Contains(res.Body.String(), "合成テスト住所") || !strings.Contains(res.Body.String(), syntheticPhone) || res.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("public disclosure did not match the approved data")
 	}
 	execTest(t, publicDB, "UPDATE coaching_plans SET published=false WHERE id=$1", plan)
@@ -253,16 +308,37 @@ func TestIdentityIsolation(t *testing.T) {
 	execTest(t, publicDB, "UPDATE coach_profiles SET status='approved' WHERE profile_id=$1", coach)
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, consent, 204)
+	// 登録済みの電話番号がない（#440 の移行前の）行は、表記要の公開を認めない。
+	execTest(t, vault, "UPDATE identity_vault.identities SET phone_enc=NULL WHERE coach_id=$1", coach)
+	request("GET", public, machine, "", 404)
+	if plans := request("GET", "/internal/disclosures?ids="+plan.String(), machine, "", 200); strings.Contains(plans.Body.String(), plan.String()) {
+		t.Fatal("plan without a registered phone was listed as approved")
+	}
+	request("PUT", publish, coachToken, consent, 409)
+	request("PUT", save, coachToken, syntheticIdentity, 204)
+	request("PUT", publish, coachToken, consent, 409)
+	refreshed := request("GET", viewCoach, coachToken, "", 200)
+	if err := json.Unmarshal(refreshed.Body.Bytes(), &own); err != nil {
+		t.Fatal(err)
+	}
+	consent = `{"confirm":true,"identity_revision":"` + own.Revision.String() + `"}`
+	request("PUT", publish, coachToken, consent, 204)
+	request("GET", public, machine, "", 200)
+
+	// 表記不要のコーチは、登録済みでも電話番号（ほかの身元情報も）を公開経路に出さない。
 	request("PUT", "/v1/coach/exemption", coachToken, `{"exempt":true,"checklist_version":1,"checked":[true,true,true]}`, 204)
 	request("GET", public, machine, "", 404)
-	request("PUT", publish, coachToken, consent, 409)
-	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+own.Revision.String()+`"}`, 204)
+	request("PUT", publish, coachToken, consent, 204)
 	if out := request("GET", public, machine, "", 200); strings.TrimSpace(out.Body.String()) != `{"required":false}` {
 		t.Fatal("exempt plan exposed fields")
 	}
+	if plans := request("GET", "/internal/disclosures?ids="+plan.String(), machine, "", 200); !strings.Contains(plans.Body.String(), plan.String()) ||
+		strings.Contains(plans.Body.String(), syntheticPhone) {
+		t.Fatal("exempt plan list did not match")
+	}
 	request("PUT", save, coachToken, syntheticIdentity, 204)
 	request("GET", public, machine, "", 404)
-	request("PUT", publish, coachToken, `{"confirm":true,"identity_revision":"`+own.Revision.String()+`"}`, 409)
+	request("PUT", publish, coachToken, consent, 409)
 
 	execTest(t, publicDB, "UPDATE coach_profiles SET status='withdrawn' WHERE profile_id=$1", coach)
 	request("POST", "/internal/cleanup", cleanup, "", 204)
@@ -274,6 +350,36 @@ func TestIdentityIsolation(t *testing.T) {
 	execTest(t, vault, "UPDATE identity_vault.identities SET last_transaction_at=now()-interval '6 years' WHERE coach_id=$1", coach)
 	request("POST", "/internal/cleanup", cleanup, "", 204)
 	request("POST", adminView, staffToken, `{"purpose":"retention expired"}`, 404)
+
+	for _, plain := range []string{syntheticPhone, "合成テスト住所", "合成テスト氏名"} {
+		if strings.Contains(logs.String(), plain) {
+			t.Fatal("identity plaintext appeared in logs")
+		}
+	}
+}
+
+// H1 で schema.sql だけを適用した金庫に、#440 の移行を追加だけで足せること。
+func TestIdentityPhoneMigration(t *testing.T) {
+	ctx := context.Background()
+	vault := testVault(t)
+	execTest(t, vault, readVaultFile(t, "schema.sql"))
+	coach := uuid.New()
+	execTest(t, vault, "INSERT INTO identity_vault.identities (coach_id,key_id,legal_name_enc,address_enc) VALUES ($1,'v1','\\x00','\\x00')", coach)
+	migration := readVaultFile(t, filepath.Join("migrations", "002_identity_phone.sql"))
+	execTest(t, vault, migration)
+	execTest(t, vault, migration)
+	var n int
+	var phone []byte
+	if err := vault.QueryRow(ctx, "SELECT count(*) FROM identity_vault.identities").Scan(&n); err != nil || n != 1 {
+		t.Fatal("existing identity rows changed")
+	}
+	if err := vault.QueryRow(ctx, "SELECT phone_enc FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&phone); err != nil || phone != nil {
+		t.Fatal("existing identity did not keep an empty phone")
+	}
+	var rls bool
+	if err := vault.QueryRow(ctx, "SELECT relrowsecurity FROM pg_class WHERE oid='identity_vault.identities'::regclass").Scan(&rls); err != nil || !rls {
+		t.Fatal("row level security was not kept")
+	}
 }
 
 func execTest(t *testing.T, pool *pgxpool.Pool, sql string, args ...any) {
@@ -283,7 +389,8 @@ func execTest(t *testing.T, pool *pgxpool.Pool, sql string, args ...any) {
 	}
 }
 
-func testDatabases(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool) {
+// testDB は、ローカルの試験用サーバーに使い捨ての DB を作る。
+func testDB(t *testing.T, prefix string) (string, *pgxpool.Pool) {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -298,31 +405,58 @@ func testDatabases(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool) {
 		t.Fatal(err)
 	}
 	t.Cleanup(host.Close)
-	newDB := func(prefix string) (string, *pgxpool.Pool) {
-		name := prefix + strings.ReplaceAll(uuid.NewString(), "-", "")
-		execTest(t, host, "CREATE DATABASE "+name)
-		t.Cleanup(func() { execTest(t, host, "DROP DATABASE "+name) })
-		u, err := url.Parse(dsn)
-		if err != nil {
-			t.Fatal(err)
-		}
-		u.Path = "/" + name
-		pool, err := pgxpool.New(ctx, u.String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(pool.Close)
-		return u.String(), pool
-	}
-	mainDSN, main := newDB("main_test_")
-	if err := migrate.Up(mainDSN); err != nil {
-		t.Fatal(err)
-	}
-	_, vault := newDB("vault_test_")
-	schema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "deploy", "identity-vault", "schema.sql"))
+	name := prefix + strings.ReplaceAll(uuid.NewString(), "-", "")
+	execTest(t, host, "CREATE DATABASE "+name)
+	t.Cleanup(func() { execTest(t, host, "DROP DATABASE "+name) })
+	u, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	execTest(t, vault, string(schema))
+	u.Path = "/" + name
+	pool, err := pgxpool.New(ctx, u.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return u.String(), pool
+}
+
+func testVault(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	_, vault := testDB(t, "vault_test_")
+	return vault
+}
+
+func testDatabases(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool) {
+	t.Helper()
+	mainDSN, main := testDB(t, "main_test_")
+	if err := migrate.Up(mainDSN); err != nil {
+		t.Fatal(err)
+	}
+	vault := testVault(t)
+	execTest(t, vault, readVaultFile(t, "schema.sql"))
+	migrations, err := filepath.Glob(filepath.Join(vaultDir, "migrations", "*.sql"))
+	if err != nil || len(migrations) == 0 {
+		t.Fatal("vault migrations not found")
+	}
+	slices.Sort(migrations)
+	for _, file := range migrations {
+		rel, err := filepath.Rel(vaultDir, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		execTest(t, vault, readVaultFile(t, rel))
+	}
 	return main, vault
+}
+
+var vaultDir = filepath.Join("..", "..", "..", "..", "deploy", "identity-vault")
+
+func readVaultFile(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(vaultDir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

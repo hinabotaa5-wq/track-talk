@@ -11,7 +11,7 @@ import { useEffect, useState, type FormEvent } from "react";
 // サポートプランはコーチが販売者なので、コーチごとに特定商取引法の表記を出す。
 // 氏名と住所の登録と、公開するプランの表記の確認を分ける。
 
-const emptyIdentity: CoachIdentity = { legal_name: "", address: "" };
+const emptyIdentity: CoachIdentity = { legal_name: "", address: "", phone: "" };
 
 export function CoachCommerceSection() {
   return <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
@@ -27,13 +27,12 @@ function CoachCommerceEditor({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [planID, setPlanID] = useState("");
-  const [phone, setPhone] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const { pending, acquire, release } = useActionLock();
 
   function apply(d: CoachCommerce) {
     setData(d);
-    setIdentity(d.identity ?? emptyIdentity);
+    setIdentity(d.identity ? { ...d.identity, phone: d.identity.phone ?? "" } : emptyIdentity);
     setChecked(d.checklist.map(() => !d.required));
   }
 
@@ -52,7 +51,6 @@ function CoachCommerceEditor({ token }: { token: string }) {
     try {
       await identityFetch(path, token, method, body);
       apply(await identityFetch<CoachCommerce>("/v1/coach", token));
-      setPhone("");
       setConfirmed(false);
       setMessage(done);
     } catch (e) {
@@ -76,6 +74,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
       <form method="post" onSubmit={onSaveIdentity} className="space-y-2">
         <label className="block text-sm">氏名（本名）<Input value={identity.legal_name} maxLength={80} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} aria-label="氏名" /></label>
         <label className="block text-sm">住所<Input value={identity.address} maxLength={200} onChange={(e) => setIdentity({ ...identity, address: e.target.value })} aria-label="住所" /></label>
+        <label className="block text-sm">電話番号<Input value={identity.phone} inputMode="tel" maxLength={20} required onChange={(e) => setIdentity({ ...identity, phone: e.target.value })} aria-label="電話番号" /></label>
         <p className="text-xs text-slate-300">暗号化して保存します。表記不要と申告した場合は表示せず、開示請求と紛争の対応にだけ使います。コーチをやめたり退会したりしても、最後の取引とやめた時の遅いほうから5年間は保管し、その後に削除します。</p>
         <Button type="submit" disabled={pending}>{data.identity ? "登録内容を更新する" : "登録する"}</Button>
       </form>
@@ -107,17 +106,16 @@ function CoachCommerceEditor({ token }: { token: string }) {
       {data.identity && data.plans.length > 0 && (
         <form method="post" className="space-y-2 border-t border-white/15 pt-3" onSubmit={(e) => {
           e.preventDefault();
-          void send(`/v1/coach/disclosures/${planID}`, { confirm: confirmed, phone: data.required ? phone : "", identity_revision: data.identity_revision }, "公開設定を保存しました");
+          void send(`/v1/coach/disclosures/${planID}`, { confirm: confirmed, identity_revision: data.identity_revision }, "公開設定を保存しました");
         }}>
           <label className="block">表示を設定するプラン
             <select className="block rounded bg-slate-900 p-2" required value={planID} onChange={(e) => {
-              setPlanID(e.target.value); setPhone(""); setConfirmed(false);
+              setPlanID(e.target.value); setConfirmed(false);
             }}>
               <option value="">プランを選択</option>
               {data.plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.title}{plan.authorized ? "（設定済み）" : ""}</option>)}
             </select>
           </label>
-          {data.required && <label className="block">公開する電話番号<Input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={20} required /></label>}
           <label className="flex gap-2"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} required />
             {data.required ? "このプランのページに登録した氏名・住所と表示用電話番号を公開する" : "このプランを身元情報の表記なしで公開する"}
           </label>
