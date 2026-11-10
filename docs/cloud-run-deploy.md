@@ -165,6 +165,36 @@ VERIFY_DATABASE_URL=postgres://<ユーザー>@localhost:<ポート>/<空の DB> 
 
 `identity_export_verified` なら一致、`identity_export_verify_failed` なら終了コード1です。手元のテストは `cd deploy/identity-vault/export && TEST_ADMIN_DATABASE_URL=<ローカルの管理接続> python3 -m unittest test_export` です。
 
+## 本体 DB の migration（コマンドで適用）
+
+公開 API は `DATABASE_MIGRATIONS_EXTERNAL=true` で起動するため、起動時に migration を流しません。本番の migration は Cloud Run Job `track-talk-db-migrate` だけが当てます。ダッシュボードや SQL Editor の手作業は要りません。
+
+- イメージは API と同じもの（Deploy API が作る `api:<コミット>`）で、`/app/dbmigrate` を `--command` で起動します。新しい migration をマージしたら、Deploy API で作られたイメージにジョブを差し替えてから実行します
+- 接続は公開 API の旧接続と同じ秘密（migration を流してきた所有者ロール）の版を `DATABASE_URL` として参照します。値はジョブの秘密参照にだけあり、起動する人の手元・引数・ログには出ません。サービスアカウントはこのジョブ専用で、その秘密1つの読み取りだけを持ちます
+- 出力は1行の JSON（`event: db_migrate`）で、適用前後の版・dirty・適用件数・適用後の確認（真偽と件数）だけです。接続先・SQL・エラーの原文は出しません
+- 冪等です。適用済みなら `applied: 0` で終わります。実行前が dirty なら何も当てずに終了コード3（`dirty_before_apply`）、本番がイメージより新しいときも終了コード3（`database_ahead_of_image`）で止まります。dirty の解消は人の判断が要るので、ジョブは自動で行いません
+- 引数 `check` を付けると、何も当てずに現在の版・dirty・未適用の件数だけを出します
+
+```bash
+gcloud iam service-accounts create track-talk-db-migrate --display-name "TrackTalk DB migrate job"
+gcloud secrets add-iam-policy-binding <所有者ロールの接続の秘密> \
+  --member serviceAccount:track-talk-db-migrate@<プロジェクトID>.iam.gserviceaccount.com --role roles/secretmanager.secretAccessor
+gcloud run jobs create track-talk-db-migrate --region asia-northeast1 \
+  --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/api:<コミット> --command /app/dbmigrate \
+  --service-account track-talk-db-migrate@<プロジェクトID>.iam.gserviceaccount.com \
+  --set-secrets DATABASE_URL=<所有者ロールの接続の秘密>:<版> \
+  --tasks 1 --max-retries 0 --task-timeout 600
+# 読み取りだけ（版・未適用の件数）
+gcloud run jobs execute track-talk-db-migrate --region asia-northeast1 --args check --wait
+# 適用（未適用分を当てて、適用後の確認まで）
+gcloud run jobs execute track-talk-db-migrate --region asia-northeast1 --wait
+# 新しい migration のときはイメージを差し替えてから実行する
+gcloud run jobs update track-talk-db-migrate --region asia-northeast1 \
+  --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/api:<コミット>
+```
+
+結果はジョブのログ（`textPayload` の1行 JSON）で読みます。`result` が `ok` で、`after_version` が `expected_version` と同じ、`after_dirty` が `false` なら成功です。000154 以降は `checks` に、メール一致関数（`identity_boundary.coach_matches_email`）が SECURITY DEFINER・search_path 固定で、公開 API 用ロールと PUBLIC から実行できず、身元専用サービスの本体読み取りロール（`identity_boundary.mark_retired` の実行権を持つロール）だけが実行できることが出ます。手元のテストは `cd apps/api && DATABASE_URL=<ローカル DB> go test ./cmd/dbmigrate` です。
+
 ## 決済の件数確認（読み取り専用）
 
 Cloud Run Job `track-talk-payment-counts` は、決済まわりのテーブルの状態別件数と孤立決済の件数だけを、1行の JSON（`event: payment_counts`）でログに出して終わります。行の中身・ID・金額・Stripe の ID は取得も出力もしません。SQL は `SELECT count(*)` と `GROUP BY` だけで、読み取り専用トランザクションで実行してロールバックします。スケジュールは無く、手動で流すときだけ動きます。コードは `deploy/cloud-run/payment-counts/` にあります。

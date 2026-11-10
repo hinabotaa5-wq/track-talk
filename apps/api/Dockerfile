@@ -8,7 +8,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /api ./cmd/api \
  && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /importmajors ./cmd/importmajors \
  && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /importcompetitions ./cmd/importcompetitions \
- && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /budgetstop ./cmd/budgetstop
+ && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /budgetstop ./cmd/budgetstop \
+ && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /dbmigrate ./cmd/dbmigrate
 
 FROM alpine:3.24
 RUN apk add --no-cache ca-certificates \
@@ -18,6 +19,8 @@ COPY --from=build /api /app/api
 COPY --from=build /importmajors /app/importmajors
 COPY --from=build /importcompetitions /app/importcompetitions
 COPY --from=build /budgetstop /app/budgetstop
+# 本番 DB の migration を当てる Cloud Run Job（track-talk-db-migrate）用。API と同じイメージを --command で使う。
+COPY --from=build /dbmigrate /app/dbmigrate
 EXPOSE 8080
 ENV API_ADDR=:8080
 # このイメージは Cloud Run などの本番で動かす前提なので、ローカル以外の DB への接続を許可する。
