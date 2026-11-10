@@ -112,10 +112,14 @@ func (s *Server) sendMonthly(ctx context.Context, month time.Time) (int64, int64
 	if row, err := s.q.GetMonthlyReminder(ctx, month); err != nil {
 		return 0, 0, err
 	} else if row.InAppDoneAt == nil {
+		// ベルの文面は本人の表示言語に合わせる（本体 #521）。未訳は日本語。
+		en := localizePushMessage("en", monthlyReminderMessage)
 		if err := s.q.InsertMonthlyReminderNotifications(ctx, db.InsertMonthlyReminderNotificationsParams{
-			Title: &monthlyReminderMessage.Title,
-			Body:  &monthlyReminderMessage.Body,
-			Url:   &monthlyReminderMessage.URL,
+			TitleEn: &en.Title,
+			Title:   &monthlyReminderMessage.Title,
+			BodyEn:  &en.Body,
+			Body:    &monthlyReminderMessage.Body,
+			Url:     &monthlyReminderMessage.URL,
 		}); err != nil {
 			slog.Warn("monthly reminder: notifications", "err", err)
 		}

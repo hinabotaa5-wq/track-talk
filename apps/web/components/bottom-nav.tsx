@@ -3,6 +3,7 @@
 import { MainTabLink } from "./main-tab-link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
+import { mainTabLabel, parseLocale, t } from "@/lib/i18n";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
 import { usePathname } from "next/navigation";
 import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
@@ -29,6 +30,8 @@ export const mainTabs = [
   { id: "memo", href: "/memo", label: "メモ", icon: MemoIcon },
   { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
 ] as const;
+
+// mainTabs の label は日本語のまま（互換のため）。表示は mainTabLabel(id, locale) を使う（本体 #521）。
 
 // マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
 const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
@@ -187,7 +190,8 @@ export function hidesBottomNav(pathname: string) {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const locale = parseLocale(profile?.locale);
   const guardedClick = useGuardedLinkClick();
   const current = useCurrentMainTab(pathname);
   if (hidesBottomNav(pathname)) return null;
@@ -198,7 +202,7 @@ export function BottomNav() {
       <nav
         className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden [body[data-comment-typing]_&]:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="メイン"
+        aria-label={t(locale, "nav.main")}
       >
         <ul className="mx-auto grid h-14 max-w-5xl grid-cols-5">
           {mainTabs.map((tab) => {
@@ -217,7 +221,7 @@ export function BottomNav() {
                   aria-current={active ? "page" : undefined}
                 >
                   <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                  <span>{tab.label}</span>
+                  <span>{mainTabLabel(tab.id, locale)}</span>
                 </MainTabLink>
               </li>
             );

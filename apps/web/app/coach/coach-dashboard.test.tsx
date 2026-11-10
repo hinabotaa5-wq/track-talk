@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CoachDashboard } from "./coach-dashboard";
 
 const apiFetch = vi.fn();
-const flags = vi.hoisted(() => ({ enabled: true }));
+const flags = vi.hoisted(() => ({ enabled: true, locale: undefined as string | undefined }));
 vi.mock("@/lib/api", async (original) => ({
   ...await original<typeof import("@/lib/api")>(),
   apiFetch: (...args: unknown[]) => apiFetch(...args),
@@ -17,7 +17,7 @@ vi.mock("@/lib/features", async (original) => ({
   },
 }));
 vi.mock("@/components/auth-provider", () => ({
-  useAuth: () => ({ session: {}, profile: { nickname: "テスト" }, token: "test", loading: false }),
+  useAuth: () => ({ session: {}, profile: { nickname: "テスト", locale: flags.locale }, token: "test", loading: false }),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("next/link", () => ({
@@ -88,6 +88,7 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   apiFetch.mockReset();
   flags.enabled = true;
+  flags.locale = undefined;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -97,16 +98,16 @@ afterEach(async () => {
   container.remove();
 });
 
+function tileLinks() {
+  return [...container.querySelectorAll("nav.grid a")];
+}
+
 function tileHrefs() {
-  return [...container.querySelectorAll('nav[aria-label="コーチのメニュー"] a')].map((a) =>
-    a.getAttribute("href"),
-  );
+  return tileLinks().map((a) => a.getAttribute("href"));
 }
 
 function tileLabels() {
-  return [...container.querySelectorAll('nav[aria-label="コーチのメニュー"] a')].map((a) =>
-    a.getAttribute("aria-label"),
-  );
+  return tileLinks().map((a) => a.getAttribute("aria-label"));
 }
 
 // 取得はマウント時に走るので、条件を変える時は掛け直す。
@@ -212,4 +213,19 @@ it("未承認の表示は現行のまま変えない", async () => {
   await act(async () => root.render(<CoachDashboard />));
   expect(container.textContent).toContain("コーチングは準備中です");
   expect(container.querySelector('nav[aria-label="コーチのメニュー"]')).toBeNull();
+});
+
+it("言語が英語の利用者にはコーチ導線を英語で出す", async () => {
+  flags.locale = "en";
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.querySelector('nav[aria-label="Coach menu"]')).not.toBeNull();
+  expect(tileLabels()).toContain("Incoming (2)");
+  expect(tileLabels()).toContain("Reviewing (1)");
+  const band = container.querySelector('a[href="/coach/offers"]');
+  expect(band?.textContent).toContain("2 new request(s)");
+  expect(band?.textContent).toContain("closing in");
+  // 日本語の文言は出ない。
+  expect(container.textContent).not.toContain("届いた依頼");
+  expect(container.textContent).not.toContain("新しい依頼が");
 });

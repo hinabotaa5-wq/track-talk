@@ -740,7 +740,7 @@ SET birth_month = $2,
     updated_at = now()
 WHERE id = $1
   AND birth_month IS NULL
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale
 `
 
 type SetBirthMonthParams struct {
@@ -764,6 +764,7 @@ func (q *Queries) SetBirthMonth(ctx context.Context, arg SetBirthMonthParams) (P
 		&i.PostMasterBadgePublic,
 		&i.Event,
 		&i.PushEverSubscribed,
+		&i.Locale,
 	)
 	return i, err
 }

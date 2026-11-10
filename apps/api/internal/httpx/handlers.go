@@ -102,6 +102,8 @@ func profileJSON(p db.Profile) map[string]any {
 		"nickname_public": p.NicknamePublic,
 		// 登録のときに選んだ種目(ケガ部の種目と同じコード)。以前から使っている人は、選ぶまで null。
 		"event": p.Event,
+		// 表示言語（ja / en）。未訳の箇所は ja で出す。
+		"locale": p.Locale,
 		// 投稿マスターのバッジを投稿の詳細に出すかどうか
 		"post_master_badge_public": p.PostMasterBadgePublic,
 		"is_admin":                 p.IsAdmin,
@@ -137,6 +139,8 @@ type profileReq struct {
 	Nickname       string `json:"nickname"`
 	NicknamePublic bool   `json:"nickname_public"`
 	Event          string `json:"event"`
+	// 表示言語。空ならそのまま、ja / en 以外は 400。
+	Locale string `json:"locale"`
 }
 
 func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -163,12 +167,22 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		event = &req.Event
 	}
+	// 表示言語は、送らなければそのまま。ja / en 以外は受け付けない。
+	var locale *string
+	if req.Locale != "" {
+		if req.Locale != "ja" && req.Locale != "en" {
+			FieldError(w, map[string]string{"locale": "表示言語は日本語か英語で選んでください"})
+			return
+		}
+		locale = &req.Locale
+	}
 	reserved := isReservedNickname(nickname)
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
 		ID:               p.ID,
 		Nickname:         &nickname,
 		NicknamePublic:   req.NicknamePublic,
 		Event:            event,
+		Locale:           locale,
 		ReservedNickname: reserved,
 	})
 	if reserved && errors.Is(err, pgx.ErrNoRows) {

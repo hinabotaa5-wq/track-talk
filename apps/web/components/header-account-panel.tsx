@@ -5,7 +5,7 @@ import { rememberAccountOrigin, readAccountOrigin } from "@/lib/account-origin";
 import { UserRound } from "lucide-react";
 import { MainTabLink } from "./main-tab-link";
 
-export function HeaderAccountPanel({ signedIn }: { signedIn: boolean }) {
+export function HeaderAccountPanel({ signedIn, label }: { signedIn: boolean; label?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const active = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/admin" || pathname.startsWith("/admin/");
@@ -14,7 +14,7 @@ export function HeaderAccountPanel({ signedIn }: { signedIn: boolean }) {
     <MainTabLink
       pendingDelay={200}
       href={signedIn ? "/me" : "/login"}
-      aria-label="マイページ"
+      aria-label={label ?? "マイページ"}
       aria-expanded={pathname === "/me"}
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;

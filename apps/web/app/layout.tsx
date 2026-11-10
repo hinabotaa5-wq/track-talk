@@ -22,6 +22,7 @@ import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ThemeSync } from "@/components/theme-sync";
 import { InstallGuide } from "@/components/install-guide";
+import { LocalePrompt } from "@/components/locale-prompt";
 import { CaretGuard } from "@/components/caret-guard";
 import { siteDescription, siteName, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
@@ -131,6 +132,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ScrollTopOnTabChange />
           <CaretGuard />
           <InstallGuide />
+          {/* TEMPORARY（本体 #521 追加要件）：未ログイン時の言語選択プロンプト。外すときはこの1行と locale-prompt.tsx を消す。 */}
+          <LocalePrompt />
           </ConfirmProvider>
           </LeaveGuardProvider>
         </AuthProvider>

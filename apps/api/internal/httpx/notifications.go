@@ -127,6 +127,8 @@ func insertReviewNotificationWithURL(ctx context.Context, q *db.Queries, recipie
 func (s *Server) notify(ctx context.Context, to uuid.UUID, category string, msg push.Message, ttl time.Duration) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
+	// 文面は受け手の表示言語に合わせ、未訳は日本語のまま出す（本体 #521）。
+	msg = localizePushMessage(s.recipientLocale(ctx, to), msg)
 	if ok, err := notificationWanted(ctx, s.q, to, category, true); err != nil {
 		slog.Warn("notification setting", "err", err)
 	} else if ok {

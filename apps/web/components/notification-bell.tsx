@@ -4,6 +4,7 @@ import { PageLoading } from "@/components/page-loading";
 
 import { apiFetch } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
+import { parseLocale, t, type I18nKey, type Locale } from "@/lib/i18n";
 import type { AppNotification, Meta, NotificationKind } from "@/lib/types";
 import { Bell } from "lucide-react";
 import Link from "next/link";
@@ -11,28 +12,30 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AnchoredPanel } from "./anchored-panel";
 import { useAuth } from "./auth-provider";
 
-const labels: Record<NotificationKind, string> = {
-  recruitment_post: "新しい募集",
-  comment: "コメントがありました",
-  comment_reply: "あなたのコメントに返信がありました",
-  practice_application: "参加申請がありました",
-  practice_accepted: "参加が承認されました",
-  practice_rate: "解散しました。評価しあってください",
-  injury_update: "復帰の経過が更新されました",
-  review_offer: "フォーム添削の依頼が届きました",
-  review_offer_reminder: "フォーム添削の引受期限が近づいています",
-  review_accepted: "コーチがフォーム添削の依頼を引き受けました",
-  review_nomination_ended: "指名されたフォーム添削の依頼が終了しました",
-  review_expired: "フォーム添削の依頼が期限を過ぎました",
-  review_returned: "フォーム添削の返答が届きました",
-  review_clarify: "添削の補足を頼まれました",
-  review_clarified: "添削の補足が届きました",
-  review_info_request: "コーチから依頼内容の確認が届きました",
-  review_resubmitted: "差し戻した依頼が再提出されました",
-  review_resubmitted_after_accept: "差し戻した依頼が再提出されました",
-  review_withdrawn: "コーチが依頼を辞退しました",
-  review_helpful_ask: "アドバイスは役に立ちましたか",
-  message: "お知らせ",
+// ベルの種類ごとの表示名。API が個別の表題を付けた通知（title あり）はそちらを出す。
+// 未訳の種類は日本語にフォールバックする（本体 #521）。
+const labelKeys: Record<NotificationKind, I18nKey> = {
+  recruitment_post: "notify.recruitment_post",
+  comment: "notify.comment",
+  comment_reply: "notify.comment_reply",
+  practice_application: "notify.practice_application",
+  practice_accepted: "notify.practice_accepted",
+  practice_rate: "notify.practice_rate",
+  injury_update: "notify.injury_update",
+  review_offer: "notify.review_offer",
+  review_offer_reminder: "notify.review_offer_reminder",
+  review_accepted: "notify.review_accepted",
+  review_nomination_ended: "notify.review_nomination_ended",
+  review_expired: "notify.review_expired",
+  review_returned: "notify.review_returned",
+  review_clarify: "notify.review_clarify",
+  review_clarified: "notify.review_clarified",
+  review_info_request: "notify.review_info_request",
+  review_resubmitted: "notify.review_resubmitted",
+  review_resubmitted_after_accept: "notify.review_resubmitted_after_accept",
+  review_withdrawn: "notify.review_withdrawn",
+  review_helpful_ask: "notify.review_helpful_ask",
+  message: "notify.message",
 };
 
 // 通知を開いたときの行き先。添削の通知は投稿ではなく、コーチ画面か依頼の画面へ。
@@ -46,9 +49,10 @@ function hrefFor(item: AppNotification) {
   return `/posts/${item.post_id}`;
 }
 
-function labelFor(item: AppNotification) {
+function labelFor(item: AppNotification, locale: Locale) {
   if (item.title) return item.title;
-  return item.kind in labels ? labels[item.kind] : "通知";
+  const key = labelKeys[item.kind];
+  return key ? t(locale, key) : t(locale, "notify.title");
 }
 
 function badgeText(count: number) {
@@ -57,7 +61,8 @@ function badgeText(count: number) {
 }
 
 export function NotificationBell() {
-  const { token } = useAuth();
+  const { token, profile } = useAuth();
+  const locale = parseLocale(profile?.locale);
   const panelID = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -86,13 +91,13 @@ export function NotificationBell() {
           }
         })
         .catch(() => {
-          if (list) setError("通知を読み込めませんでした");
+          if (list) setError(t(locale, "notify.loadError"));
         })
         .finally(() => {
           if (list) setLoading(false);
         });
     },
-    [token],
+    [token, locale],
   );
 
   useEffect(() => {
@@ -114,7 +119,7 @@ export function NotificationBell() {
       setItems((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
       setUnread((count) => Math.max(0, count - 1));
     } catch {
-      setError("既読にできませんでした");
+      setError(t(locale, "notify.readError"));
     }
   }
 
@@ -125,11 +130,11 @@ export function NotificationBell() {
       setItems((current) => current.map((item) => ({ ...item, read: true })));
       setUnread(0);
     } catch {
-      setError("既読にできませんでした");
+      setError(t(locale, "notify.readError"));
     }
   }
 
-  const label = unread > 0 ? `通知、未読${badgeText(unread)}件` : "通知";
+  const label = unread > 0 ? t(locale, "notify.unread", { count: badgeText(unread) }) : t(locale, "notify.title");
 
   return (
     <div ref={rootRef} className="relative">
@@ -161,17 +166,17 @@ export function NotificationBell() {
         className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-surface shadow-xl"
       >
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
-            <p className="text-sm font-semibold text-slate-100">通知</p>
+            <p className="text-sm font-semibold text-slate-100">{t(locale, "notify.title")}</p>
             {unread > 0 ? (
               <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:scale-[0.98]">
-                すべて既読
+                {t(locale, "notify.markAll")}
               </button>
             ) : null}
           </div>
-          {loading && items.length === 0 ? <PageLoading label="読み込み中" /> : null}
+          {loading && items.length === 0 ? <PageLoading label={t(locale, "common.loading")} /> : null}
           {error && items.length === 0 ? <p className="px-3 py-3 text-sm text-red-400">{error}</p> : null}
           {!loading && !error && items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-slate-200">通知はありません</p>
+            <p className="px-3 py-6 text-center text-sm text-slate-200">{t(locale, "notify.empty")}</p>
           ) : null}
           {items.length > 0 ? (
             <ul className="max-h-96 overflow-y-auto">
@@ -186,8 +191,8 @@ export function NotificationBell() {
                     className="block px-3 py-3 transition hover:bg-white/16 active:scale-[0.98]"
                   >
                     <p className={`text-sm ${item.read ? "font-normal text-slate-300" : "font-bold text-white"}`}>
-                      <span className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs ${item.read ? "bg-white/10 text-slate-400" : "bg-sky-300 text-slate-950"}`}>{item.read ? "既読" : "未読"}</span>
-                      {labelFor(item)}
+                      <span className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs ${item.read ? "bg-white/10 text-slate-400" : "bg-sky-300 text-slate-950"}`}>{item.read ? t(locale, "notify.read") : t(locale, "notify.unreadLabel")}</span>
+                      {labelFor(item, locale)}
                       {item.post_title ? `: ${item.post_title}` : ""}
                     </p>
                     {item.body ? <p className="mt-1 text-xs text-slate-300">{item.body}</p> : null}

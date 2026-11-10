@@ -274,6 +274,8 @@ export type Profile = {
   nickname_public: boolean;
   // 登録のときに選ぶ種目(ケガ部の種目と同じコード)。以前から使っている人は、選ぶまで null。
   event?: string | null;
+  // 表示言語（ja / en）。未訳の箇所は ja で出す。
+  locale?: string | null;
   post_master_badge_public?: boolean;
   is_admin?: boolean;
   // 管理者で、いまのログインに二段階認証が足りないとき true。

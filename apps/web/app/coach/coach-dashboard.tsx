@@ -11,6 +11,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
 import { formatYen } from "@/lib/format";
+import { parseLocale, t, type Locale } from "@/lib/i18n";
 import type {
   CoachApplication,
   CoachEarnings,
@@ -61,15 +62,17 @@ function Tile({
   Icon,
   badge,
   dot,
+  locale,
 }: {
   href: string;
   label: string;
   Icon: typeof Inbox;
   badge?: number;
   dot?: boolean;
+  locale: Locale;
 }) {
   const count = badge ?? 0;
-  const ariaLabel = count > 0 ? `${label}（${count}件）` : dot ? `${label}（要確認）` : label;
+  const ariaLabel = count > 0 ? t(locale, "coach.tile.count", { label, count }) : dot ? t(locale, "coach.tile.attention", { label }) : label;
   return (
     <Link
       href={href}
@@ -95,6 +98,7 @@ function Tile({
 
 export function CoachDashboard() {
   const { session, profile, token, loading } = useAuth();
+  const locale = parseLocale(profile?.locale);
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
   const [rating, setRating] = useState<CoachRatingSummary | null>(null);
@@ -123,7 +127,7 @@ export function CoachDashboard() {
         setRating(c.rating ?? null);
       })
       .catch(() => {
-        if (!cancelled) setError("読み込みに失敗しました");
+        if (!cancelled) setError(t(locale, "coach.loadError"));
       });
     // バッジの件数は、既存の一覧取得の再利用で賄う。取れなくても入口は出す。
     apiFetch<CoachRequests>("/v1/coach/requests", { token })
@@ -154,7 +158,7 @@ export function CoachDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, locale]);
 
   async function save(next: { on_duty?: boolean; daily_cap?: number }) {
     if (!acquire()) return;
@@ -167,34 +171,34 @@ export function CoachDashboard() {
       });
       setCoach(d.application);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.daily_cap || err.message : "保存できませんでした");
+      setError(err instanceof ApiRequestError ? err.fields?.daily_cap || err.message : t(locale, "coach.saveError"));
     } finally {
       release();
     }
   }
 
   if (error && coach === undefined) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || coach === undefined) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || coach === undefined) return <PageLoading screen label={t(locale, "common.loading")} />;
 
   if (!coach || coach.status !== "approved") {
     return (
       <div className="mx-auto max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">コーチ画面</h1>
-        <p className="text-sm leading-relaxed text-slate-200">コーチングは準備中です。競技や指導の経験を生かして、選手の次の一歩を支えるコーチを募集しています。</p>
+        <h1 className="text-2xl font-bold">{t(locale, "coach.title")}</h1>
+        <p className="text-sm leading-relaxed text-slate-200">{t(locale, "coach.notReady")}</p>
         <CoachApplyLink />
-        {coach ? <Link href={coachApplyPath} className="block text-sm text-blue-300 underline">応募状況・応募内容を確認する</Link> : null}
+        {coach ? <Link href={coachApplyPath} className="block text-sm text-blue-300 underline">{t(locale, "coach.checkApplication")}</Link> : null}
       </div>
     );
   }
 
   if (!coachingEnabled) return (
     <div className="mx-auto max-w-md space-y-5">
-      <h1 className="text-2xl font-bold">コーチ画面</h1>
-      <p className="text-sm leading-relaxed text-slate-200">コーチの応募は承認されています。現在は受付開始に向けて準備中です。機能の公開後、この画面から依頼への返答やプランの管理ができます。</p>
+      <h1 className="text-2xl font-bold">{t(locale, "coach.title")}</h1>
+      <p className="text-sm leading-relaxed text-slate-200">{t(locale, "coach.preparing")}</p>
       <CoachPhotoForm application={coach} nickname={coach.name || profile?.nickname || null} token={token} onSaved={setCoach} />
-      <Link href="/coach/about" className="block text-sm text-blue-300 underline">コーチ機能について</Link>
-      <Link href="/coach/apply" className="block text-sm text-blue-300 underline">応募内容を確認する</Link>
-      <CoachWithdrawLink />
+      <Link href="/coach/about" className="block text-sm text-blue-300 underline">{t(locale, "coach.about")}</Link>
+      <Link href="/coach/apply" className="block text-sm text-blue-300 underline">{t(locale, "coach.viewApplication")}</Link>
+      <CoachWithdrawLink locale={locale} />
     </div>
   );
 
@@ -209,11 +213,11 @@ export function CoachDashboard() {
 
   return (
     <div className="mx-auto max-w-md space-y-3">
-      <section aria-label="受付の状態" className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
+      <section aria-label={t(locale, "coach.status")} className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
         <div className="flex items-center gap-3">
           <CoachAvatar url={coach.photo_url} name={coach.name || profile?.nickname || null} size={40} />
           <div className="min-w-0 flex-1">
-            <p className="text-base font-bold leading-tight">{coach.on_duty ? "受付中" : "受付停止中"}</p>
+            <p className="text-base font-bold leading-tight">{coach.on_duty ? t(locale, "coach.onDuty") : t(locale, "coach.offDuty")}</p>
             {rating && rating.count > 0 ? (
               <p className="text-xs text-slate-200">
                 ★{rating.average.toFixed(1)}（{rating.count}件）
@@ -224,7 +228,7 @@ export function CoachDashboard() {
             type="button"
             role="switch"
             aria-checked={coach.on_duty}
-            aria-label="受付中"
+            aria-label={t(locale, "coach.onDuty")}
             disabled={pending}
             onClick={() => void save({ on_duty: !coach.on_duty })}
             className={`relative h-8 w-14 shrink-0 rounded-full transition disabled:opacity-50 ${coach.on_duty ? "bg-blue-600" : "bg-white/25"}`}
@@ -235,7 +239,7 @@ export function CoachDashboard() {
           </button>
         </div>
         <label className="flex items-center justify-between gap-3 text-sm">
-          <span>1日に受ける上限</span>
+          <span>{t(locale, "coach.dailyCap")}</span>
           <select
             className="rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-base text-slate-100"
             value={coach.daily_cap}
@@ -244,7 +248,7 @@ export function CoachDashboard() {
           >
             {capOptions.map((n) => (
               <option key={n} value={n}>
-                {n}本
+                {t(locale, "coach.perDay", { n })}
               </option>
             ))}
           </select>
@@ -252,7 +256,7 @@ export function CoachDashboard() {
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {rating?.paused ? (
           <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
-            評価の平均が★3を下回ったため、いまは依頼が回ってきません。
+            {t(locale, "coach.pausedNote")}
           </p>
         ) : null}
       </section>
@@ -262,58 +266,58 @@ export function CoachDashboard() {
           href="/coach/offers"
           className="block rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm font-semibold text-white"
         >
-          新しい依頼が{offerCount}件あります — あと{shortest}分で終了
+          {t(locale, "coach.newOffers", { count: offerCount, minutes: shortest })}
         </Link>
       ) : null}
 
-      <nav aria-label="コーチのメニュー" className="grid grid-cols-4 gap-2">
-        <Tile href="/coach/offers" label="届いた依頼" Icon={Inbox} badge={offerCount} />
-        <Tile href="/coach/reviewing" label="添削中" Icon={PenLine} badge={reviewingCount} />
-        <Tile href="/coach/consultations" label="追加相談" Icon={MessagesSquare} badge={consultations} />
-        <Tile href="/coach/contracts" label="契約・申込み" Icon={FileText} badge={appliedContracts} />
-        <Tile href="/coach/support-consults" label="無料相談" Icon={MessagesSquare} />
-        <Tile href="/coach/plans" label="プラン管理" Icon={Layers} />
-        <Tile href="/coach/availability" label="カレンダー" Icon={CalendarDays} />
-        <Tile href="/coach/commerce" label="特商法・身元" Icon={Landmark} dot={commerceDot} />
-        <Tile href="/coach/payouts" label="報酬・口座" Icon={Wallet} dot={payoutsDot} />
-        <Tile href="/coach/profile" label="プロフィール" Icon={UserRound} />
-        <Tile href="/me/push" label="通知設定" Icon={BellRing} />
+      <nav aria-label={t(locale, "coach.menu")} className="grid grid-cols-4 gap-2">
+        <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
+        <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
+        <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
+        <Tile locale={locale} href="/coach/contracts" label={t(locale, "coach.tile.contracts")} Icon={FileText} badge={appliedContracts} />
+        <Tile locale={locale} href="/coach/support-consults" label={t(locale, "coach.tile.supportConsults")} Icon={MessagesSquare} />
+        <Tile locale={locale} href="/coach/plans" label={t(locale, "coach.tile.plans")} Icon={Layers} />
+        <Tile locale={locale} href="/coach/availability" label={t(locale, "coach.tile.availability")} Icon={CalendarDays} />
+        <Tile locale={locale} href="/coach/commerce" label={t(locale, "coach.tile.commerce")} Icon={Landmark} dot={commerceDot} />
+        <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
+        <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
+        <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
       </nav>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">
         {earnings ? (
           <p className="text-sm text-slate-200">
-            未払い{formatYen(earnings.unpaid_yen)}
+            {t(locale, "coach.unpaid")}{formatYen(earnings.unpaid_yen)}
             {earnings.next_payout_date && earnings.next_payout_yen != null
-              ? ` · 次回${Number(payoutMonth)}月${Number(payoutDay)}日 ${formatYen(earnings.next_payout_yen)}`
+              ? ` · ${t(locale, "coach.nextPayout", { month: Number(payoutMonth), day: Number(payoutDay) })} ${formatYen(earnings.next_payout_yen)}`
               : null}
           </p>
         ) : null}
-        <CoachWithdrawLink bare />
+        <CoachWithdrawLink bare locale={locale} />
       </footer>
     </div>
   );
 }
 
 // コーチだけをやめる入口。アカウントの退会（マイページ）とは別にする。
-function CoachWithdrawLink({ bare = false }: { bare?: boolean }) {
+function CoachWithdrawLink({ bare = false, locale }: { bare?: boolean; locale: Locale }) {
   const link = (
     <Link href="/coach/withdraw" className="text-sm text-slate-300 underline">
-      コーチをやめる
+      {t(locale, "coach.withdraw")}
     </Link>
   );
   if (bare) {
     return (
       <div className="space-y-1">
         {link}
-        <p className="text-xs text-slate-400">アカウントは残り、一般の利用者として使い続けられます。</p>
+        <p className="text-xs text-slate-400">{t(locale, "coach.withdrawNote")}</p>
       </div>
     );
   }
   return (
     <section className="space-y-1 border-t border-white/15 pt-4">
       {link}
-      <p className="text-xs text-slate-400">アカウントは残り、一般の利用者として使い続けられます。</p>
+      <p className="text-xs text-slate-400">{t(locale, "coach.withdrawNote")}</p>
     </section>
   );
 }

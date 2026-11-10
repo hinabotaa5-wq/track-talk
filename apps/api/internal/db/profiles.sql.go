@@ -17,7 +17,7 @@ SELECT $1::uuid, $2::text, $3::boolean
 WHERE NOT EXISTS (SELECT 1 FROM deleted_accounts d WHERE d.id = $1::uuid)
 ON CONFLICT (id) DO UPDATE
 SET updated_at = profiles.updated_at
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale
 `
 
 type EnsureProfileParams struct {
@@ -42,12 +42,13 @@ func (q *Queries) EnsureProfile(ctx context.Context, arg EnsureProfileParams) (P
 		&i.PostMasterBadgePublic,
 		&i.Event,
 		&i.PushEverSubscribed,
+		&i.Locale,
 	)
 	return i, err
 }
 
 const getProfileByID = `-- name: GetProfileByID :one
-SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed FROM profiles WHERE id = $1
+SELECT id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale FROM profiles WHERE id = $1
 `
 
 // ほぼ全リクエストで呼ぶので、既存の行を更新せずに読むだけにする（行ロックや dead tuple を作らない）。
@@ -66,6 +67,7 @@ func (q *Queries) GetProfileByID(ctx context.Context, id uuid.UUID) (Profile, er
 		&i.PostMasterBadgePublic,
 		&i.Event,
 		&i.PushEverSubscribed,
+		&i.Locale,
 	)
 	return i, err
 }
@@ -75,7 +77,7 @@ UPDATE profiles
 SET post_master_badge_public = $2,
     updated_at = now()
 WHERE id = $1
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale
 `
 
 type UpdatePostMasterBadgeParams struct {
@@ -98,6 +100,7 @@ func (q *Queries) UpdatePostMasterBadge(ctx context.Context, arg UpdatePostMaste
 		&i.PostMasterBadgePublic,
 		&i.Event,
 		&i.PushEverSubscribed,
+		&i.Locale,
 	)
 	return i, err
 }
@@ -107,10 +110,11 @@ UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
     event = COALESCE($4::text, event),
+    locale = COALESCE($5::text, locale),
     updated_at = now()
 WHERE id = $1
-  AND (NOT $5::boolean OR is_admin OR nickname = $2)
-RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed
+  AND (NOT $6::boolean OR is_admin OR nickname = $2)
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale
 `
 
 type UpdateProfileParams struct {
@@ -118,16 +122,19 @@ type UpdateProfileParams struct {
 	Nickname         *string   `json:"nickname"`
 	NicknamePublic   bool      `json:"nickname_public"`
 	Event            *string   `json:"event"`
+	Locale           *string   `json:"locale"`
 	ReservedNickname bool      `json:"reserved_nickname"`
 }
 
 // 予約語の例外は書き込み時点の管理者権限と保存値で判定する。
+// locale は送らなければそのまま、送ったら ja / en だけ受け付ける（判定はハンドラ側）。
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
 	row := q.db.QueryRow(ctx, updateProfile,
 		arg.ID,
 		arg.Nickname,
 		arg.NicknamePublic,
 		arg.Event,
+		arg.Locale,
 		arg.ReservedNickname,
 	)
 	var i Profile
@@ -143,6 +150,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 		&i.PostMasterBadgePublic,
 		&i.Event,
 		&i.PushEverSubscribed,
+		&i.Locale,
 	)
 	return i, err
 }
