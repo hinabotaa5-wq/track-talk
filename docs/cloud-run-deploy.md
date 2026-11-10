@@ -195,6 +195,50 @@ gcloud run jobs update track-talk-db-migrate --region asia-northeast1 \
 
 結果はジョブのログ（`textPayload` の1行 JSON）で読みます。`result` が `ok` で、`after_version` が `expected_version` と同じ、`after_dirty` が `false` なら成功です。000154 以降は `checks` に、000154 の2つの関数（メール一致・合成コーチ ID）（`identity_boundary.coach_matches_email`）が SECURITY DEFINER・search_path 固定で、公開 API 用ロールと PUBLIC から実行できず、身元専用サービスの本体読み取りロール（`identity_boundary.mark_retired` の実行権を持つロール）だけが実行できることが出ます。手元のテストは `cd apps/api && DATABASE_URL=<ローカル DB> go test ./cmd/dbmigrate` です。
 
+## 金庫 DB の migration（コマンドで適用）
+
+Cloud Run Job `track-talk-identity-vault-migrate` が、`deploy/identity-vault/migrations/*.sql` を名前順に1ファイルずつのトランザクションで金庫 DB に当て、適用後の確認を1行の JSON（`event: identity_vault_migrate`）で出します。SQL Editor の手作業は要りません。migration はどれも何度流しても同じ結果になるように書きます（このジョブは毎回すべてのファイルを流します）。コードは `deploy/identity-vault/migrate/` にあります。
+
+- 接続は金庫の migration 所有者の URL（sslmode=require 以上）を、秘密 `track-talk-identity-vault-migrate-url` への参照で `VAULT_MIGRATE_DATABASE_URL` に渡します。この秘密の値の登録だけは運営者が行います（金庫の接続文字列は運営者しか持たないため）。サービスアカウントはこのジョブ専用で、その秘密1つの読み取りだけを持ちます
+- 出力は適用したファイル数と、確認（合成用の関数がそろい SECURITY DEFINER・search_path 固定であること、PUBLIC・API 用ロール・輸出用ロールが実行できないこと、身元専用サービスのアプリ用ロールだけが実行できること、管理者行の件数）の真偽と件数だけです。SQL・値・エラーの原文は出しません
+
+```bash
+docker build --platform linux/amd64 -f deploy/identity-vault/migrate/Dockerfile -t asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/identity-vault-migrate:<日付-版> deploy/identity-vault
+gcloud iam service-accounts create track-talk-identity-vault-migrate --display-name "TrackTalk identity vault migrate job"
+gcloud secrets add-iam-policy-binding track-talk-identity-vault-migrate-url \
+  --member serviceAccount:track-talk-identity-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com --role roles/secretmanager.secretAccessor
+gcloud run jobs create track-talk-identity-vault-migrate --region asia-northeast1 \
+  --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/identity-vault-migrate:<日付-版> \
+  --service-account track-talk-identity-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com \
+  --set-secrets VAULT_MIGRATE_DATABASE_URL=track-talk-identity-vault-migrate-url:<版> \
+  --tasks 1 --max-retries 0 --task-timeout 600
+gcloud run jobs execute track-talk-identity-vault-migrate --region asia-northeast1 --wait
+```
+
+手元のテストは `cd deploy/identity-vault/migrate && TEST_VAULT_ADMIN_DATABASE_URL=<ローカルの金庫相当の管理接続> python3 -m unittest test_migrate` です（接続先が 127.0.0.1 以外なら TLS が要ります）。
+
+## 合成データ専用のプロビジョニング（provision／verify／cleanup／walkthrough）
+
+Cloud Run Job `track-talk-identity-provision` は、本番経路の通し確認に使う**合成**コーチの金庫側の用意と後片付けを、コマンドだけで行います。ダッシュボードでのユーザー作成・SQL Editor での INSERT／UPDATE・画面ログインは要りません。イメージは身元専用サービスと同じもので、`/usr/local/bin/identityprovision` を `--command` で起動します。
+
+```bash
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args provision,<本体コーチ ID>,<タグ> --wait
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args verify,<本体コーチ ID>,<タグ> --wait
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args walkthrough,<本体コーチ ID>,<タグ> --wait
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args cleanup,<本体コーチ ID>,<タグ> --wait
+```
+
+- 合成メールは、ジョブの設定値 `SYNTHETIC_EMAIL_BASE`（運営者が管理する受信箱のアドレス。公開リポジトリには書かない）の @ の前に `+synthetic-<タグ>` を足した形だけです。タグは英小文字と数字の32文字以内です。起動の引数にメールは渡しません
+- provision：本体の `identity_boundary.coach_matches_email` で「そのコーチが承認済みで、アカウントのメールが合成メールと一致する」ことを確かめます。確かめられたら、金庫 Auth の合成ユーザーを作り（既にあれば使い回し）、その ID を subject とする members 行（`is_admin=false`、coach_id＝入力）を作り、自己検証（subject 一致・合成・管理者行0）まで行います。冪等です
+- verify：members 行の件数・subject 一致・合成かどうか・管理者行の件数・身元行の件数を、真偽と件数だけで出します。subject の値・メールは出しません
+- cleanup：割り当ての subject が合成で管理者でないときだけ、members 行・そのコーチの身元行（identities・commerce・disclosures）・合成の金庫 Auth ユーザーを消し、件数を出します。access_log は監査のため残します
+- walkthrough：合成ユーザーのパスワードを乱数で付け直し、TOTP を登録し直して、二段階認証（aal2）までをジョブの中で済ませます。そのうえで身元専用サービスの読み取り→架空の身元の登録→読み戻しの一致→公開 API に氏名・住所・電話が出ないこと→管理者行と管理者の二段階認証の件数、を確かめます。パスワード・TOTP の設定キー・コード・架空の値・トークンは、ジョブのメモリにだけあり、出力・ログには出しません
+- ガード（ジョブ側と金庫側の関数の両方で強制）：合成パターン外のメールは何も作らない／本体側の一致が確かめられなければ作らない／`is_admin=true` の行は作れない／管理者行・合成でない subject の行は作らない・変えない・消さない／自動の付け替えはしない（ずれていたら cleanup→provision）
+- 秘密（参照のみ）：`IDENTITY_DATABASE_URL`・`IDENTITY_MAIN_READ_DATABASE_URL`・`IDENTITY_AUTH_PUBLIC_KEY`（身元専用サービスと同じ版）と、金庫 Auth の管理用キー `track-talk-identity-auth-admin-key`（`IDENTITY_AUTH_ADMIN_KEY`。値の登録だけは運営者）。設定値：`IDENTITY_AUTH_URL`・`SYNTHETIC_EMAIL_BASE`・`IDENTITY_SERVICE_URL`・`PUBLIC_API_URL`
+- 出力は1行の JSON（`event: identity_synthetic`、操作名・成否・件数・真偽・HTTP ステータス・時刻）だけです
+
+手元の統合テスト（公式の Supabase Auth と Postgres を外に出られないネットワークで動かす）は `internal/identityprovision/provision_integration_test.go` の冒頭の説明のとおりで、環境変数が無いときは skip します。
+
 ## 決済の件数確認（読み取り専用）
 
 Cloud Run Job `track-talk-payment-counts` は、決済まわりのテーブルの状態別件数と孤立決済の件数だけを、1行の JSON（`event: payment_counts`）でログに出して終わります。行の中身・ID・金額・Stripe の ID は取得も出力もしません。SQL は `SELECT count(*)` と `GROUP BY` だけで、読み取り専用トランザクションで実行してロールバックします。スケジュールは無く、手動で流すときだけ動きます。コードは `deploy/cloud-run/payment-counts/` にあります。

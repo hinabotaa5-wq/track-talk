@@ -80,6 +80,10 @@ jobs:
       - name: Test
         working-directory: deploy/identity-vault/export
         run: python3 -m unittest -v test_export
+      - name: Vault migrate (unit)
+        # 金庫 migration ジョブ（deploy/identity-vault/migrate）。統合テストは auth スキーマのある隔離環境だけで動く。
+        working-directory: deploy/identity-vault/migrate
+        run: python3 -m unittest -v test_migrate
 
   web:
     runs-on: ubuntu-latest
