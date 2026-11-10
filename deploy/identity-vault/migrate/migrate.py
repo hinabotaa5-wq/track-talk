@@ -57,6 +57,9 @@ SELECT json_build_object(
                    AND has_table_privilege(a.grantee, 'identity_vault.members', 'SELECT')),
   'rls_enabled_tables', (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'identity_vault' AND c.relkind = 'r' AND c.relrowsecurity),
   'rls_policies', (SELECT count(*) FROM pg_policies WHERE schemaname = 'identity_vault'),
+  'app_policy_tables', (SELECT count(DISTINCT p.tablename) FROM pg_policies p WHERE p.schemaname = 'identity_vault' AND p.policyname = 'identity_service_app'),
+  'policies_for_restricted_roles', (SELECT count(*) FROM pg_policies p WHERE p.schemaname = 'identity_vault'
+                   AND p.roles && ARRAY['public','anon','authenticated','service_role','identity_export']::name[]),
   'admins_with_verified_mfa', (SELECT count(*) FROM identity_vault.members m WHERE m.is_admin
                  AND EXISTS (SELECT 1 FROM auth.mfa_factors f WHERE f.user_id = m.subject AND f.status = 'verified')),
   'admin_subjects_in_auth', (SELECT count(*) FROM identity_vault.members m WHERE m.is_admin AND EXISTS (SELECT 1 FROM auth.users u WHERE u.id = m.subject))
@@ -117,7 +120,10 @@ def run(url, out=sys.stdout, environ=None, directory=MIGRATIONS):
         c = report["checks"]
         ok = (c["phone_column"] and c["functions_present"] == len(SYNTHETIC_FUNCTIONS) + 1
               and c["functions_definer_pinned"] == len(SYNTHETIC_FUNCTIONS) + 1 and c["public_can_execute"] == 0
-              and c["restricted_roles_can_execute"] == 0 and c["app_roles"] >= 1 and c["app_roles_can_execute_all"] == c["app_roles"])
+              and c["restricted_roles_can_execute"] == 0 and c["app_roles"] >= 1 and c["app_roles_can_execute_all"] == c["app_roles"]
+              # アプリ用ロールが行を読めること（BYPASSRLS か、5表すべてに方針）。制限ロールに方針が付いていないこと。
+              and (c["app_roles_bypass_rls"] == c["app_roles"] or c["app_policy_tables"] == c["rls_enabled_tables"])
+              and c["policies_for_restricted_roles"] == 0)
         if ok:
             report["result"], code = "ok", 0
         else:
