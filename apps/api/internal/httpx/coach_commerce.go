@@ -122,7 +122,7 @@ func (s *Server) commerceReadyToPublish(w http.ResponseWriter, r *http.Request, 
 		return false
 	}
 	if !ok {
-		FieldError(w, map[string]string{"published": "先に身元情報の専用画面で氏名・住所を登録してください"})
+		FieldError(w, map[string]string{"published": "先に身元情報の専用画面で氏名・住所・電話番号を登録してください"})
 	}
 	return ok
 }
