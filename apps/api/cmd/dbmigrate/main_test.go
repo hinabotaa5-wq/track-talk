@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/migrate"
 	"github.com/hinata/track-talk/apps/api/migrations"
 )
 
@@ -116,7 +117,12 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 		t.Fatalf("check exit %d: %s", code, buf.String())
 	}
 	out := decode(t, &buf)
-	if out["before_version"] != float64(153) || out["pending"] != float64(1) || out["result"] != "ok" {
+	latest, err := migrate.ExpectedVersion()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 版153から最新版まで（以降の migration が増えても通るように、件数は最新版から求める）。
+	if out["before_version"] != float64(153) || out["pending"] != float64(latest-153) || out["result"] != "ok" {
 		t.Fatalf("check output %v", out)
 	}
 	var version int
@@ -129,7 +135,7 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 		t.Fatalf("apply exit %d: %s", code, buf.String())
 	}
 	out = decode(t, &buf)
-	if out["after_version"] != float64(154) || out["after_dirty"] != false || out["applied"] != float64(1) || out["result"] != "ok" {
+	if out["after_version"] != float64(latest) || out["after_dirty"] != false || out["applied"] != float64(latest-153) || out["result"] != "ok" {
 		t.Fatalf("apply output %v", out)
 	}
 	checks := out["checks"].(map[string]any)
@@ -157,7 +163,7 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 		t.Fatalf("repeat apply exit %d: %s", code, buf.String())
 	}
 	out = decode(t, &buf)
-	if out["applied"] != float64(0) || out["after_version"] != float64(154) {
+	if out["applied"] != float64(0) || out["after_version"] != float64(latest) {
 		t.Fatalf("repeat apply output %v", out)
 	}
 

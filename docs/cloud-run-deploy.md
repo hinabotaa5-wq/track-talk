@@ -193,7 +193,7 @@ gcloud run jobs update track-talk-db-migrate --region asia-northeast1 \
   --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/api:<コミット>
 ```
 
-結果はジョブのログ（`textPayload` の1行 JSON）で読みます。`result` が `ok` で、`after_version` が `expected_version` と同じ、`after_dirty` が `false` なら成功です。000154 以降は `checks` に、メール一致関数（`identity_boundary.coach_matches_email`）が SECURITY DEFINER・search_path 固定で、公開 API 用ロールと PUBLIC から実行できず、身元専用サービスの本体読み取りロール（`identity_boundary.mark_retired` の実行権を持つロール）だけが実行できることが出ます。手元のテストは `cd apps/api && DATABASE_URL=<ローカル DB> go test ./cmd/dbmigrate` です。
+結果はジョブのログ（`textPayload` の1行 JSON）で読みます。`result` が `ok` で、`after_version` が `expected_version` と同じ、`after_dirty` が `false` なら成功です。000154 以降は `checks` に、000154 の2つの関数（メール一致・合成コーチ ID）（`identity_boundary.coach_matches_email`）が SECURITY DEFINER・search_path 固定で、公開 API 用ロールと PUBLIC から実行できず、身元専用サービスの本体読み取りロール（`identity_boundary.mark_retired` の実行権を持つロール）だけが実行できることが出ます。手元のテストは `cd apps/api && DATABASE_URL=<ローカル DB> go test ./cmd/dbmigrate` です。
 
 ## 決済の件数確認（読み取り専用）
 
