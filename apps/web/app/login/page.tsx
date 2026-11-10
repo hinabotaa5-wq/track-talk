@@ -2,6 +2,7 @@
 
 import { callbackErrorMessages } from "@/lib/auth-callback";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { localeChangedEvent, parseLocale, readStoredLocale, t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/safe-next";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -37,6 +38,14 @@ function leaveLogin() {
 
 export default function LoginPage() {
   const [submitError, setError] = useState("");
+  // 未ログイン時の言語プロンプトで選んだ言語を、そのままこの画面の表示に引き継ぐ（本体 #521 追加要件）。
+  const [locale, setLocale] = useState<Locale>(() => readStoredLocale());
+  useEffect(() => {
+    const sync = () => setLocale(readStoredLocale());
+    window.addEventListener(localeChangedEvent, sync);
+    return () => window.removeEventListener(localeChangedEvent, sync);
+  }, []);
+  const shown = parseLocale(locale);
   const { pending, acquire, release } = useActionLock();
   const captcha = useCaptcha();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
@@ -91,27 +100,27 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">ログイン</h1>
+      <h1 className="text-2xl font-bold">{t(shown, "login.title")}</h1>
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input type="email" placeholder="メール" {...form.register("email")} />
-        <Input type="password" placeholder="パスワード" {...form.register("password")} />
+        <Input type="email" placeholder={t(shown, "login.email")} {...form.register("email")} />
+        <Input type="password" placeholder={t(shown, "login.password")} {...form.register("password")} />
         {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
-          ログイン
+          {t(shown, "login.submit")}
         </Button>
       </form>
       {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
       <GoogleSignInButton nextPath={safeNextPath(next)} />
       <p className="text-sm">
-        アカウントがない場合は <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">登録</Link>
+        {t(shown, "login.noAccount")} <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">{t(shown, "login.register")}</Link>
       </p>
       <p className="text-sm">
         <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">
-          パスワードを忘れた
+          {t(shown, "login.forgot")}
         </Link>
       </p>
-      <p className="text-sm"><Link href="/contact" className="text-blue-300 underline">ログインできないときのお問い合わせ</Link></p>
+      <p className="text-sm"><Link href="/contact" className="text-blue-300 underline">{t(shown, "login.contact")}</Link></p>
     </div>
   );
 }

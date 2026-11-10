@@ -18,6 +18,7 @@ import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
+import { parseLocale, t, type Locale } from "@/lib/i18n";
 import {
   clarifyReasonLabels,
   maxResponseChars,
@@ -62,12 +63,12 @@ function Field({
   );
 }
 
-function fieldErrors(err: unknown): Record<string, string> {
+function fieldErrors(err: unknown, locale: Locale): Record<string, string> {
   if (err instanceof ApiRequestError) return err.fields ?? { form: err.message };
-  return { form: err instanceof Error ? err.message : "送信に失敗しました" };
+  return { form: err instanceof Error ? err.message : t(locale, "common.sendFailed") };
 }
 
-function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void }) {
+function ResponseForm({ request, token, onSent, locale }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void; locale: Locale }) {
   const [good, setGood] = useState("");
   const guard = useSolicitationGuard();
   const [fix1, setFix1] = useState("");
@@ -84,10 +85,10 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
     setFile(picked);
     if (!picked) return;
     if (picked.size > maxBytes) {
-      setErrors({ demo_video_public_id: "100MB以内の動画にしてください" });
+      setErrors({ demo_video_public_id: t(locale, "coach.detail.demoTooBig") });
       setFile(null);
     } else if (tooLong(await videoDuration(picked))) {
-      setErrors({ demo_video_public_id: `見本動画は${maxReviewSeconds}秒以内にしてください` });
+      setErrors({ demo_video_public_id: t(locale, "coach.detail.demoTooLong", { seconds: maxReviewSeconds }) });
       setFile(null);
     }
   }
@@ -117,7 +118,7 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
       });
       onSent(sent);
     } catch (err) {
-      setErrors(fieldErrors(err));
+      setErrors(fieldErrors(err, locale));
     } finally {
       setUpload(null);
       release();
@@ -126,19 +127,19 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <h2 className="font-bold">返答を書く</h2>
+      <h2 className="font-bold">{t(locale, "coach.detail.responseTitle")}</h2>
       <p className="text-xs text-slate-300">
-        URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは送れません。直接のやりとりに誘うと利用停止になります。
+        {t(locale, "coach.detail.contactNote")}
       </p>
       <ContactNotice />
       {guard.warning}
-      <p className="text-xs text-slate-300">返答と一緒に、ニックネーム・担当種目・記録・成績や指導経験が利用者に届きます。</p>
-      <Field label="良い点（1つ）" value={good} onChange={setGood} error={errors.good_point} />
-      <Field label="直す点（1つ目）" value={fix1} onChange={setFix1} error={errors.fix_points} />
-      <Field label="直す点（2つ目、なくてもよい）" value={fix2} onChange={setFix2} />
-      <Field label="おすすめのドリル（1つ）" value={drill} onChange={setDrill} error={errors.drill} />
+      <p className="text-xs text-slate-300">{t(locale, "coach.detail.responseNote")}</p>
+      <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} />
+      <Field label={t(locale, "coach.detail.fix1")} value={fix1} onChange={setFix1} error={errors.fix_points} />
+      <Field label={t(locale, "coach.detail.fix2")} value={fix2} onChange={setFix2} />
+      <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} />
       <label className="block space-y-1 text-sm">
-        <span className="font-semibold">見本動画（なくてもよい、{maxReviewSeconds}秒まで）</span>
+        <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input
           className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
           type="file"
@@ -151,13 +152,13 @@ function ResponseForm({ request, token, onSent }: { request: CoachReviewRequest;
       {upload && file ? <UploadProgress noun="動画" phase="upload" progress={upload} fileName={file.name} fileSize={file.size} /> : null}
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "送っています" : "返答を送る"}
+        {pending ? t(locale, "common.sending") : t(locale, "coach.detail.sendResponse")}
       </Button>
     </form>
   );
 }
 
-function ClarificationForm({ request, token, onSent }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void }) {
+function ClarificationForm({ request, token, onSent, locale }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void; locale: Locale }) {
   const [text, setText] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { pending, acquire, release } = useActionLock();
@@ -177,7 +178,7 @@ function ClarificationForm({ request, token, onSent }: { request: CoachReviewReq
         }),
       );
     } catch (err) {
-      setErrors(fieldErrors(err));
+      setErrors(fieldErrors(err, locale));
     } finally {
       release();
     }
@@ -187,17 +188,18 @@ function ClarificationForm({ request, token, onSent }: { request: CoachReviewReq
     <form onSubmit={onSubmit} className="space-y-3">
       <ContactNotice />
       {guard.warning}
-      <Field label="補足（1回だけ送れます）" value={text} onChange={setText} error={errors.clarification} />
+      <Field label={t(locale, "coach.detail.followup")} value={text} onChange={setText} error={errors.clarification} />
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "送っています" : "補足を送る"}
+        {pending ? t(locale, "common.sending") : t(locale, "coach.detail.sendFollowup")}
       </Button>
     </form>
   );
 }
 
 export default function CoachReviewRequestPage() {
-  const { session, token, loading } = useAuth();
+  const { session, token, profile, loading } = useAuth();
+  const locale = parseLocale(profile?.locale);
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<CoachReviewRequest | null>(null);
@@ -217,15 +219,15 @@ export default function CoachReviewRequestPage() {
         if (!cancelled) setRequest(d);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiRequestError && err.status === 404 ? "依頼が見つかりません" : "読み込みに失敗しました");
+        if (!cancelled) setError(err instanceof ApiRequestError && err.status === 404 ? t(locale, "coach.detail.notFound") : t(locale, "coach.detail.loadError"));
       });
     return () => {
       cancelled = true;
     };
-  }, [token, id]);
+  }, [token, id, locale]);
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (loading || !session || !request) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || !request) return <PageLoading screen label={t(locale, "common.loading")} />;
 
   const response = request.response;
   const needsClarification = request.status === "clarifying" && response && !response.hidden;
@@ -236,9 +238,9 @@ export default function CoachReviewRequestPage() {
         <h1 className="text-2xl font-bold">
           {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
         </h1>
-        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">相談内容: {reviewQuestionText(request)}</p>
+        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.detail.question", { text: reviewQuestionText(request) })}</p>
         {request.status === "in_review" ? (
-          <p className="text-sm text-slate-300">返却期限: {formatDateTime(request.due_at)}</p>
+          <p className="text-sm text-slate-300">{t(locale, "coach.detail.due", { date: formatDateTime(request.due_at) })}</p>
         ) : null}
       </div>
 
@@ -257,7 +259,7 @@ export default function CoachReviewRequestPage() {
 
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
 
-      {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} /> : null}
+      {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} locale={locale} /> : null}
 
       {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
         <CoachInfoRequestForm requestID={request.id} token={token} onSent={setRequest} />
@@ -271,16 +273,16 @@ export default function CoachReviewRequestPage() {
 
       {needsClarification && response.clarify_reason ? (
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
-          <p className="text-sm font-semibold text-white">「{clarifyReasonLabels[response.clarify_reason]}」と言われました</p>
+          <p className="text-sm font-semibold text-white">{t(locale, "coach.detail.clarifiedAs", { reason: clarifyReasonLabels[response.clarify_reason] })}</p>
           {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
-          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} /> : <p className="text-sm text-slate-300">{messagingClosedNote}</p>}
+          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} locale={locale} /> : <p className="text-sm text-slate-300">{messagingClosedNote}</p>}
         </section>
       ) : null}
 
       <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
-        コーチ画面へ
+        {t(locale, "coach.detail.toCoach")}
       </Link>
     </div>
   );

@@ -33,9 +33,12 @@ SELECT sqlc.arg('id'), sqlc.arg('recipient_id'), 'message', sqlc.arg('title'), s
 WHERE NOT EXISTS (SELECT 1 FROM bumped);
 
 -- name: InsertMonthlyReminderNotifications :exec
--- 月1回の記録のお知らせを、ベルで受け取る人全員に入れる。
+-- 月1回の記録のお知らせを、ベルで受け取る人全員に入れる。文面は本人の表示言語に合わせる。
 INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-SELECT gen_random_uuid(), profiles.id, 'message', sqlc.arg('title'), sqlc.arg('body'), sqlc.arg('url')
+SELECT gen_random_uuid(), profiles.id, 'message',
+    CASE WHEN profiles.locale = 'en' THEN sqlc.arg('title_en') ELSE sqlc.arg('title') END AS title,
+    CASE WHEN profiles.locale = 'en' THEN sqlc.arg('body_en') ELSE sqlc.arg('body') END AS body,
+    sqlc.arg('url') AS url
 FROM profiles
 WHERE NOT EXISTS (
     SELECT 1 FROM notification_settings ns

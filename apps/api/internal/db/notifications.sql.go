@@ -145,7 +145,10 @@ func (q *Queries) InsertMessageNotification(ctx context.Context, arg InsertMessa
 
 const insertMonthlyReminderNotifications = `-- name: InsertMonthlyReminderNotifications :exec
 INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-SELECT gen_random_uuid(), profiles.id, 'message', $1, $2, $3
+SELECT gen_random_uuid(), profiles.id, 'message',
+    CASE WHEN profiles.locale = 'en' THEN $1 ELSE $2 END AS title,
+    CASE WHEN profiles.locale = 'en' THEN $3 ELSE $4 END AS body,
+    $5 AS url
 FROM profiles
 WHERE NOT EXISTS (
     SELECT 1 FROM notification_settings ns
@@ -154,14 +157,22 @@ WHERE NOT EXISTS (
 `
 
 type InsertMonthlyReminderNotificationsParams struct {
-	Title *string `json:"title"`
-	Body  *string `json:"body"`
-	Url   *string `json:"url"`
+	TitleEn *string `json:"title_en"`
+	Title   *string `json:"title"`
+	BodyEn  *string `json:"body_en"`
+	Body    *string `json:"body"`
+	Url     *string `json:"url"`
 }
 
-// 月1回の記録のお知らせを、ベルで受け取る人全員に入れる。
+// 月1回の記録のお知らせを、ベルで受け取る人全員に入れる。文面は本人の表示言語に合わせる。
 func (q *Queries) InsertMonthlyReminderNotifications(ctx context.Context, arg InsertMonthlyReminderNotificationsParams) error {
-	_, err := q.db.Exec(ctx, insertMonthlyReminderNotifications, arg.Title, arg.Body, arg.Url)
+	_, err := q.db.Exec(ctx, insertMonthlyReminderNotifications,
+		arg.TitleEn,
+		arg.Title,
+		arg.BodyEn,
+		arg.Body,
+		arg.Url,
+	)
 	return err
 }
 

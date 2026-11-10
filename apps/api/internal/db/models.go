@@ -1054,6 +1054,7 @@ type Profile struct {
 	PostMasterBadgePublic bool       `json:"post_master_badge_public"`
 	Event                 *string    `json:"event"`
 	PushEverSubscribed    bool       `json:"push_ever_subscribed"`
+	Locale                string     `json:"locale"`
 }
 
 type PushOutbox struct {

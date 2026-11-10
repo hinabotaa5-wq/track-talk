@@ -13,6 +13,7 @@ import { TodayMeetBalloon } from "./today-meet-balloon";
 import { useCurrentMainTab, headerBackFallback, isCoachChildPage, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
 import { trackHeaderHistory } from "@/lib/header-history";
+import { mainTabLabel, parseLocale, t } from "@/lib/i18n";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
@@ -65,6 +66,7 @@ export function Header() {
   }
 
   const current = useCurrentMainTab(pathname);
+  const locale = parseLocale(profile?.locale);
 
   // ヘッダーを出さない画面でも、iPhone の上の切り欠きに中身が重ならないよう余白だけ残す。
   if (hidesHeader(pathname, search, profileIncomplete(profile))) return <div aria-hidden style={{ paddingTop: "env(safe-area-inset-top)" }} />;
@@ -82,7 +84,7 @@ export function Header() {
             <button
               type="button"
               onClick={goBack}
-              aria-label="戻る"
+              aria-label={t(locale, "common.back")}
               className="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/16 transition active:scale-[0.98]"
             >
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
@@ -95,7 +97,7 @@ export function Header() {
         </div>
         {backOnly ? null : (
           <div className="flex shrink-0 items-center gap-1">
-            <nav className="hidden items-center gap-1 md:flex" aria-label="メイン">
+            <nav className="hidden items-center gap-1 md:flex" aria-label={t(locale, "nav.main")}>
               {mainTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = current === tab.id;
@@ -112,7 +114,7 @@ export function Header() {
                     }`}
                   >
                     <Icon className="size-4" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                    <span>{tab.label}</span>
+                    <span>{mainTabLabel(tab.id, locale)}</span>
                   </MainTabLink>
                 );
               })}
@@ -125,7 +127,7 @@ export function Header() {
               </>
             ) : null}
             {showHeaderAccountActions ? (
-              <HeaderAccountPanel key={`me:${pathname}`} signedIn={!!session} />
+              <HeaderAccountPanel key={`me:${pathname}`} signedIn={!!session} label={mainTabLabel("me", locale)} />
             ) : null}
           </div>
         )}

@@ -149,7 +149,9 @@ func (s *Server) failOutboxRow(ctx context.Context, id uuid.UUID, result string)
 
 // sendToSubscriptions は、その人のいまの購読すべてに送る。届いた端末数、購読数、使えなくなっていた宛先数、購読の読み出し失敗を返す。
 // 使えなくなっていた宛先は消す。送信の一時失敗は数えるだけで、呼び出し側が送り直すかどうかを決める。
+// 文面は受け手の表示言語に合わせ、未訳は日本語のまま出す（本体 #521）。
 func (s *Server) sendToSubscriptions(ctx context.Context, profileID uuid.UUID, msg push.Message, ttl time.Duration) (sent, subs, gone int, err error) {
+	msg = localizePushMessage(s.recipientLocale(ctx, profileID), msg)
 	subscriptions, err := s.q.ListPushSubscriptions(ctx, profileID)
 	if err != nil {
 		return 0, 0, 0, err

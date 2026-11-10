@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
 import { useConfirm } from "@/components/confirm-dialog";
+import { parseLocale, t } from "@/lib/i18n";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { ThemeSwitch } from "@/components/theme-switch";
 
@@ -89,13 +90,14 @@ export default function MePage() {
     if (!loading && !session && !leaving.current) router.replace("/login");
   }, [loading, session, router]);
 
+  const locale = parseLocale(profile?.locale);
   if (loading || !session) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={t(locale, "common.loading")} />;
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-xl font-bold text-slate-100">マイページ</h1>
+      <h1 className="text-xl font-bold text-slate-100">{t(locale, "mypage.title")}</h1>
       <ThemeSwitch />
       <nav aria-label="アカウント" className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {currentProfile?.is_admin ? (

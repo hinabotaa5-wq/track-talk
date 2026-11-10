@@ -13,10 +13,12 @@ RETURNING *;
 
 -- name: UpdateProfile :one
 -- 予約語の例外は書き込み時点の管理者権限と保存値で判定する。
+-- locale は送らなければそのまま、送ったら ja / en だけ受け付ける（判定はハンドラ側）。
 UPDATE profiles
 SET nickname = $2,
     nickname_public = $3,
     event = COALESCE(sqlc.narg(event)::text, event),
+    locale = COALESCE(sqlc.narg(locale)::text, locale),
     updated_at = now()
 WHERE id = $1
   AND (NOT sqlc.arg(reserved_nickname)::boolean OR is_admin OR nickname = $2)
