@@ -69,13 +69,13 @@ function CoachCommerceEditor({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-300">
-        サポートプランは、あなたが販売者になります。プランを公開する前に、氏名と住所を登録してください。表記が必要な場合は、プランごとに公開表示を確認し、表示用の電話番号を入力します。
+        サポートプランは、あなたが販売者になります。プランを公開する前に、氏名・住所・電話番号を登録してください。表記が必要な場合は、プランごとに公開表示を確認します。
       </p>
       <form method="post" onSubmit={onSaveIdentity} className="space-y-2">
         <label className="block text-sm">氏名（本名）<Input value={identity.legal_name} maxLength={80} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} aria-label="氏名" /></label>
         <label className="block text-sm">住所<Input value={identity.address} maxLength={200} onChange={(e) => setIdentity({ ...identity, address: e.target.value })} aria-label="住所" /></label>
         <label className="block text-sm">電話番号<Input value={identity.phone} inputMode="tel" maxLength={20} required onChange={(e) => setIdentity({ ...identity, phone: e.target.value })} aria-label="電話番号" /></label>
-        <p className="text-xs text-slate-300">暗号化して保存します。表記不要と申告した場合は表示せず、開示請求と紛争の対応にだけ使います。コーチをやめたり退会したりしても、最後の取引とやめた時の遅いほうから5年間は保管し、その後に削除します。</p>
+        <p className="text-xs text-slate-300">暗号化して保存します。表記不要と申告した場合は表示せず、開示請求と紛争の対応にだけ使います。電話番号は、このほか重大な緊急の連絡にだけ使い、ふだんの連絡には使いません。コーチをやめたり退会したりしても、最後の取引とやめた時の遅いほうから5年間は保管し、その後に削除します。</p>
         <Button type="submit" disabled={pending}>{data.identity ? "登録内容を更新する" : "登録する"}</Button>
       </form>
 
