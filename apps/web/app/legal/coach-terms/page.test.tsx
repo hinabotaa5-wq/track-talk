@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { showsBackButton } from "@/components/bottom-nav";
+import { operatorName } from "@/lib/operator";
 import CoachTermsPage from "./page";
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 
@@ -19,8 +20,8 @@ it("海外コーチの業務委託条件：決定済みの金額・支払・相�
   expect(html).toContain("absorbed by TrackTalk");
   expect(html).toContain("no payment is conditional on a form the Coach cannot truthfully complete");
   expect(html).toContain("the date the order was agreed, the services, the service period or delivery deadline, the fee, and the payment due date");
-  expect(html).toContain('href="/legal/commerce"');
+  expect(html).toContain(`These Terms are issued by <span lang="ja">${operatorName}</span>, the operator of TrackTalk`);
   expect(html).toContain('href="/legal/coach-privacy"');
-  expect(html.replace(/<[^>]*>/g, "")).not.toMatch(/\[|placeholder|TODO|[ぁ-んァ-ン一-龯]/);
+  expect(html.replace(/<[^>]*>/g, "").replace(operatorName, "")).not.toMatch(/\[|placeholder|TODO|[ぁ-んァ-ン一-龯]/);
   expect(showsBackButton("/legal/coach-terms")).toBe(true);
 });

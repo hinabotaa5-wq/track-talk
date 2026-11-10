@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Rule } from "@/components/legal-prose";
+import { operatorName } from "@/lib/operator";
 
 // 海外コーチとの業務委託の条件（英語、#531 項目1）。フリーランス法3条の明示に対応する文書1（2026-11-11 運営者決定を反映した草案）を、
-// コーチごと・依頼ごとの事項（コーチ名・委託日・期間・報酬額・支払期日）は個別の work order に回す形で、常設のページにしたもの。
+// 業務委託事業者の氏名は特商法表記と同じ operatorName をページ内に直接書く。コーチごと・依頼ごとの事項（コーチ名・委託日・期間・報酬額・支払期日）は個別の work order に回す形で、常設のページにしたもの。
 // 条件を変えるときは運営者の承認を経ること。版（version）を変えたら work order が参照する版も合わせる。
 export const metadata: Metadata = {
   title: "Terms of Engagement for Overseas Coaches",
@@ -19,8 +20,7 @@ export default function CoachTermsPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Terms of Engagement — TrackTalk Coaching Services (Contractor)</h1>
         <p className="text-sm leading-7 text-slate-300">
-          These Terms are issued by the operator of TrackTalk, an individual business in Japan (&quot;TrackTalk&quot;), to coaches who live outside Japan and provide services as independent contractors (&quot;Coach&quot;). The operator&apos;s name and address are shown on the{" "}
-          <Link href="/legal/commerce" className="text-blue-300 underline">Specified Commercial Transactions Act page</Link>. The Coach&apos;s name, the date each order is agreed, and the details of each engagement are stated in the individual work order (clause 10).
+          These Terms are issued by <span lang="ja">{operatorName}</span>, the operator of TrackTalk, an individual business in Japan (&quot;TrackTalk&quot;), to coaches who live outside Japan and provide services as independent contractors (&quot;Coach&quot;). The Coach&apos;s name, the date each order is agreed, and the details of each engagement are stated in the individual work order (clause 10).
         </p>
         <p className="text-xs text-slate-300">Version: {coachTermsVersion}</p>
       </div>
