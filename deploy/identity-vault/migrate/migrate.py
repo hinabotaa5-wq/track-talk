@@ -26,6 +26,7 @@ SYNTHETIC_FUNCTIONS = (
     "identity_vault.synthetic_status(uuid,uuid)",
     "identity_vault.synthetic_unbind(uuid)",
     "identity_vault.admin_readiness()",
+    "identity_vault.legacy_unbind_aaa()",
 )
 
 CHECK_SQL = """

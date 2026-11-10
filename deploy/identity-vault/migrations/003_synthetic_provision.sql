@@ -63,7 +63,8 @@ $$;
 -- expected_subject は実行体が金庫 Auth から得た合成ユーザーの ID で、members の subject と一致するかを見る。
 CREATE OR REPLACE FUNCTION identity_vault.synthetic_status(target_coach uuid, expected_subject uuid)
 RETURNS TABLE (member_rows integer, subject_matches boolean, subject_synthetic boolean, admin_rows integer,
-               identity_rows integer, commerce_rows integer, disclosure_rows integer, access_log_rows integer)
+               identity_rows integer, commerce_rows integer, disclosure_rows integer, access_log_rows integer,
+               identity_ended boolean)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE
     bound uuid;
@@ -78,6 +79,7 @@ BEGIN
     commerce_rows := (SELECT count(*) FROM identity_vault.commerce c WHERE c.coach_id = target_coach)::integer;
     disclosure_rows := (SELECT count(*) FROM identity_vault.disclosures d WHERE d.coach_id = target_coach)::integer;
     access_log_rows := (SELECT count(*) FROM identity_vault.access_log l WHERE l.coach_id = target_coach)::integer;
+    identity_ended := EXISTS (SELECT 1 FROM identity_vault.identities i WHERE i.coach_id = target_coach AND i.ended_at IS NOT NULL);
     RETURN NEXT;
 END;
 $$;
@@ -132,7 +134,49 @@ BEGIN
 END;
 $$;
 
+-- 一回限り：運営者決定（2026-11-10 22:53、ops #63）で、合成の標識を満たさない状態でも削除を許可された
+-- 旧「aaa」の割り当て1件だけを外す。対象は本体コーチ ID が 2877c3f1- で始まる、管理者でない members 行で、
+-- 1件に定まらなければ何もせず止まる。そのコーチの身元行も消す。access_log は残す。
+-- 返す subject は、実行体がその金庫 Auth ユーザー（TOTP の設定キーが露出したもの）を消すためだけに使う。
+CREATE OR REPLACE FUNCTION identity_vault.legacy_unbind_aaa()
+RETURNS TABLE (matched_rows integer, legacy_coach uuid, member_rows integer, identity_rows integer, commerce_rows integer,
+               disclosure_rows integer, unbound_subject uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE
+    bound uuid;
+BEGIN
+    matched_rows := 0; member_rows := 0; identity_rows := 0; commerce_rows := 0; disclosure_rows := 0;
+    legacy_coach := NULL; unbound_subject := NULL;
+    SELECT count(*)::integer INTO matched_rows FROM identity_vault.members m
+    WHERE m.coach_id::text LIKE '2877c3f1-%' AND NOT m.is_admin;
+    IF matched_rows = 0 THEN
+        RETURN NEXT;
+        RETURN;
+    END IF;
+    IF matched_rows > 1 THEN
+        RAISE EXCEPTION 'legacy_ambiguous';
+    END IF;
+    SELECT m.coach_id, m.subject INTO legacy_coach, bound FROM identity_vault.members m
+    WHERE m.coach_id::text LIKE '2877c3f1-%' AND NOT m.is_admin FOR UPDATE;
+    IF EXISTS (SELECT 1 FROM identity_vault.members m WHERE m.subject = bound AND m.is_admin) THEN
+        RAISE EXCEPTION 'legacy_subject_is_admin';
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended(legacy_coach::text, 0));
+    DELETE FROM identity_vault.disclosures d WHERE d.coach_id = legacy_coach;
+    GET DIAGNOSTICS disclosure_rows = ROW_COUNT;
+    DELETE FROM identity_vault.identities i WHERE i.coach_id = legacy_coach;
+    GET DIAGNOSTICS identity_rows = ROW_COUNT;
+    DELETE FROM identity_vault.commerce c WHERE c.coach_id = legacy_coach;
+    GET DIAGNOSTICS commerce_rows = ROW_COUNT;
+    DELETE FROM identity_vault.members m WHERE m.coach_id = legacy_coach AND m.subject = bound AND NOT m.is_admin;
+    GET DIAGNOSTICS member_rows = ROW_COUNT;
+    unbound_subject := bound;
+    RETURN NEXT;
+END;
+$$;
+
 REVOKE ALL ON FUNCTION identity_vault.synthetic_subject(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION identity_vault.legacy_unbind_aaa() FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity_vault.synthetic_bind(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity_vault.synthetic_status(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity_vault.synthetic_unbind(uuid) FROM PUBLIC;
@@ -150,7 +194,7 @@ BEGIN
         IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
             FOREACH fn IN ARRAY ARRAY['identity_vault.synthetic_subject(uuid)', 'identity_vault.synthetic_bind(uuid, uuid)',
                                       'identity_vault.synthetic_status(uuid, uuid)', 'identity_vault.synthetic_unbind(uuid)',
-                                      'identity_vault.admin_readiness()'] LOOP
+                                      'identity_vault.admin_readiness()', 'identity_vault.legacy_unbind_aaa()'] LOOP
                 EXECUTE format('REVOKE ALL ON FUNCTION %s FROM %I', fn, r);
             END LOOP;
         END IF;
@@ -168,7 +212,7 @@ BEGIN
           AND g.rolname NOT IN ('anon', 'authenticated', 'service_role', 'identity_export')
     LOOP
         EXECUTE format('GRANT EXECUTE ON FUNCTION identity_vault.synthetic_bind(uuid, uuid), identity_vault.synthetic_status(uuid, uuid), '
-                       'identity_vault.synthetic_unbind(uuid), identity_vault.admin_readiness() TO %I', r);
+                       'identity_vault.synthetic_unbind(uuid), identity_vault.admin_readiness(), identity_vault.legacy_unbind_aaa() TO %I', r);
     END LOOP;
 END
 $$;

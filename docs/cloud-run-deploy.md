@@ -226,7 +226,15 @@ gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 -
 gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args verify,<本体コーチ ID>,<タグ> --wait
 gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args walkthrough,<本体コーチ ID>,<タグ> --wait
 gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args cleanup,<本体コーチ ID>,<タグ> --wait
+# 合成コーチの本体 ID を引く（承認済みで、合成メールが一致するときだけ）
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args lookup,<タグ> --wait
+# 合成コーチの退会（本体の画面操作）の後、終了経路を確かめる
+gcloud run jobs execute track-talk-identity-provision --region asia-northeast1 --args endcheck,<本体コーチ ID>,<タグ> --wait
 ```
+
+- lookup：本体の `identity_boundary.synthetic_coach_id` で、合成メールのアカウントが承認済みコーチならその ID を出します（合成の標識が無いアカウントの ID は返しません）
+- endcheck：本体で承認済みでなくなったこと・身元の保持（`identity_boundary.retention`）に載ったこと・身元専用サービスの身元画面が 403 になることを確かめます。退会そのもの（`/coach/me/withdraw`）は本体のセッションが要るため、本体の画面操作で行います
+- legacy-cleanup（一回限り）：運営者決定（2026-11-10）で削除を許可された旧 aaa の割り当て（本体コーチ ID が `2877c3f1-` で始まる、管理者でない1件）と、その金庫 Auth ユーザーだけを、合成の標識を問わずに消します。1件に定まらなければ止まります
 
 - 合成メールは、ジョブの設定値 `SYNTHETIC_EMAIL_BASE`（運営者が管理する受信箱のアドレス。公開リポジトリには書かない）の @ の前に `+synthetic-<タグ>` を足した形だけです。タグは英小文字と数字の32文字以内です。起動の引数にメールは渡しません
 - provision：本体の `identity_boundary.coach_matches_email` で「そのコーチが承認済みで、アカウントのメールが合成メールと一致する」ことを確かめます。確かめられたら、金庫 Auth の合成ユーザーを作り（既にあれば使い回し）、その ID を subject とする members 行（`is_admin=false`、coach_id＝入力）を作り、自己検証（subject 一致・合成・管理者行0）まで行います。冪等です

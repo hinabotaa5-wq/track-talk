@@ -261,6 +261,14 @@ func TestProvisionVerifyWalkthroughCleanup(t *testing.T) {
 	ctx := context.Background()
 	r := e.runner
 
+	// コーチ ID は合成メールから本体の実物で引く（未承認は見つからない）。
+	lookup := r.Lookup(ctx, "aaa")
+	if lookup["coach_id"] != e.synthCoach.String() || lookup["found"] != true {
+		t.Fatalf("lookup %v", lookup)
+	}
+	if got := r.Lookup(ctx, "ppp"); got["found"] != false || got["coach_id"] != nil {
+		t.Fatalf("lookup pending %v", got)
+	}
 	expect(t, r.Verify(ctx, e.synthCoach, "aaa"), map[string]any{"result": "mismatch", "main_guard": true, "auth_user_exists": false, "member_rows": 0})
 	expect(t, r.Provision(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok", "created_user": true, "binding": "created",
 		"member_rows": 1, "subject_matches": true, "subject_synthetic": true, "admin_rows": 0})
@@ -274,6 +282,14 @@ func TestProvisionVerifyWalkthroughCleanup(t *testing.T) {
 		"admin_member_rows": 0 + 1, "identity_rows": 1})
 	// 2回目も通る（パスワード・TOTP を付け直す）。
 	expect(t, r.Walkthrough(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok"})
+	// 退会の前は終了経路の確認が通らない。
+	expect(t, r.EndCheck(ctx, e.synthCoach, "aaa"), map[string]any{"result": "failed", "approved_on_main": true, "retired_on_main": false})
+	// 本体で退会（画面操作 /coach/me/withdraw と同じ状態の変化）→ 承認済みでなくなり、保持に載り、身元画面は 403。
+	mustExec(t, e.mainAdmin, "UPDATE coach_profiles SET status = 'withdrawn' WHERE profile_id = $1", e.synthCoach)
+	expect(t, r.EndCheck(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok", "approved_on_main": false, "retired_on_main": true,
+		"coach_view_status_after_end": 403, "identity_rows": 1})
+	// 以降の確認のため、承認済みに戻す（試験の都合）。
+	mustExec(t, e.mainAdmin, "UPDATE coach_profiles SET status = 'approved' WHERE profile_id = $1", e.synthCoach)
 
 	// subject のずれ：members 行を別の合成ユーザーに手で付け替えると、verify が不一致として検出する。
 	other := adminCreate(t, e.authURL, e.adminKey, "ops.inbox+synthetic-zzz@example.test")
@@ -384,4 +400,39 @@ func TestVaultFunctionsRefuseRealAndAdmin(t *testing.T) {
 		t.Fatalf("export role can execute: %v %v", exportCan, err)
 	}
 	mustExec(t, e.vaultAdmin, "DELETE FROM identity_vault.members WHERE subject=$1", synth)
+}
+
+// 旧 aaa（合成の標識が無い割り当て）の一回限りの削除：2877c3f1- の1件だけ。管理者・他の行には触れない。
+func TestLegacyCleanup(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	r := e.runner
+	expect(t, r.LegacyCleanup(ctx), map[string]any{"result": "ok", "matched_rows": 0, "deleted_auth_users": 0})
+	legacyCoach := uuid.MustParse("2877c3f1-1111-4111-8111-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12])
+	legacySubject := adminCreate(t, e.authURL, e.adminKey, "legacy."+strings.ReplaceAll(uuid.NewString(), "-", "")[:8]+"@example.test")
+	mustExec(t, e.vaultAdmin, "INSERT INTO identity_vault.members (subject, coach_id, is_admin) VALUES ($1, $2, false)", legacySubject, legacyCoach)
+	mustExec(t, e.vaultAdmin, `INSERT INTO identity_vault.identities (coach_id, key_id, legal_name_enc, address_enc) VALUES ($1, 'v1', '\x00', '\x00')`, legacyCoach)
+	// 2件あれば止まる。
+	extra := uuid.MustParse("2877c3f1-2222-4222-8222-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12])
+	extraSubject := adminCreate(t, e.authURL, e.adminKey, "legacy2."+strings.ReplaceAll(uuid.NewString(), "-", "")[:8]+"@example.test")
+	mustExec(t, e.vaultAdmin, "INSERT INTO identity_vault.members (subject, coach_id, is_admin) VALUES ($1, $2, false)", extraSubject, extra)
+	expect(t, r.LegacyCleanup(ctx), map[string]any{"result": "failed", "error": "legacy_ambiguous"})
+	mustExec(t, e.vaultAdmin, "DELETE FROM identity_vault.members WHERE coach_id = $1", extra)
+	got := r.LegacyCleanup(ctx)
+	if got["legacy_coach_id"] != legacyCoach.String() {
+		t.Fatalf("legacy coach %v", got)
+	}
+	delete(got, "legacy_coach_id")
+	expect(t, got, map[string]any{"result": "ok", "matched_rows": 1, "deleted_member_rows": 1, "deleted_identity_rows": 1, "deleted_auth_users": 1})
+	var admins, realRows, legacyUsers int
+	if err := e.vaultAdmin.QueryRow(ctx, `SELECT (SELECT count(*) FROM identity_vault.members WHERE is_admin),
+		(SELECT count(*) FROM identity_vault.members WHERE coach_id=$1), (SELECT count(*) FROM auth.users WHERE id=$2)`, e.realCoach, legacySubject).
+		Scan(&admins, &realRows, &legacyUsers); err != nil {
+		t.Fatal(err)
+	}
+	if admins != 1 || realRows != 1 || legacyUsers != 0 {
+		t.Fatalf("after legacy cleanup: admins %d real %d legacy users %d", admins, realRows, legacyUsers)
+	}
+	// 2回目は何もしない。
+	expect(t, r.LegacyCleanup(ctx), map[string]any{"result": "ok", "matched_rows": 0})
 }

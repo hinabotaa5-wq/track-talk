@@ -5,6 +5,9 @@
 //	identityprovision verify      <本体コーチ ID> <タグ>
 //	identityprovision cleanup     <本体コーチ ID> <タグ>
 //	identityprovision walkthrough <本体コーチ ID> <タグ>
+//	identityprovision endcheck    <本体コーチ ID> <タグ>   （退会の後、終了経路の確認）
+//	identityprovision lookup      <タグ>                    （合成コーチの本体 ID を引く）
+//	identityprovision legacy-cleanup                       （旧 aaa の1件だけ。運営者決定 2026-11-10）
 //
 // 合成メールはジョブの設定値 SYNTHETIC_EMAIL_BASE とタグから作る（起動の引数にメールは渡さない）。
 // 資格情報はすべてジョブの秘密参照から環境変数で受け取り、出力は1行の JSON（操作名・成否・件数・真偽・時刻）だけ。
@@ -37,21 +40,43 @@ func emit(w io.Writer, r identityprovision.Result) {
 
 func run(args []string, env func(string) string, w io.Writer) int {
 	r := identityprovision.Result{}
-	if len(args) != 3 {
+	if len(args) == 0 {
 		r["result"], r["error"] = "failed", "usage"
 		emit(w, r)
 		return 2
 	}
 	op := args[0]
 	r["op"] = op
-	coach, err := uuid.Parse(args[1])
-	if err != nil || coach == uuid.Nil {
-		r["result"], r["error"] = "failed", "coach_id_invalid"
-		emit(w, r)
-		return 2
-	}
+	var coach uuid.UUID
+	var tag string
 	switch op {
-	case "provision", "verify", "cleanup", "walkthrough":
+	case "provision", "verify", "cleanup", "walkthrough", "endcheck":
+		if len(args) != 3 {
+			r["result"], r["error"] = "failed", "usage"
+			emit(w, r)
+			return 2
+		}
+		var err error
+		coach, err = uuid.Parse(args[1])
+		if err != nil || coach == uuid.Nil {
+			r["result"], r["error"] = "failed", "coach_id_invalid"
+			emit(w, r)
+			return 2
+		}
+		tag = args[2]
+	case "lookup":
+		if len(args) != 2 {
+			r["result"], r["error"] = "failed", "usage"
+			emit(w, r)
+			return 2
+		}
+		tag = args[1]
+	case "legacy-cleanup":
+		if len(args) != 1 {
+			r["result"], r["error"] = "failed", "usage"
+			emit(w, r)
+			return 2
+		}
 	default:
 		r["result"], r["error"] = "failed", "unknown_op"
 		emit(w, r)
@@ -96,13 +121,19 @@ func run(args []string, env func(string) string, w io.Writer) int {
 		IdentityURL: env("IDENTITY_SERVICE_URL"), PublicURL: env("PUBLIC_API_URL")}
 	switch op {
 	case "provision":
-		r = rn.Provision(ctx, coach, args[2])
+		r = rn.Provision(ctx, coach, tag)
 	case "verify":
-		r = rn.Verify(ctx, coach, args[2])
+		r = rn.Verify(ctx, coach, tag)
 	case "cleanup":
-		r = rn.Cleanup(ctx, coach, args[2])
+		r = rn.Cleanup(ctx, coach, tag)
 	case "walkthrough":
-		r = rn.Walkthrough(ctx, coach, args[2])
+		r = rn.Walkthrough(ctx, coach, tag)
+	case "endcheck":
+		r = rn.EndCheck(ctx, coach, tag)
+	case "lookup":
+		r = rn.Lookup(ctx, tag)
+	case "legacy-cleanup":
+		r = rn.LegacyCleanup(ctx)
 	}
 	emit(w, r)
 	if r["result"] == "failed" {

@@ -24,6 +24,9 @@ func TestRunRejectsBadInvocation(t *testing.T) {
 		{[]string{"provision", "not-a-uuid", "aaa"}, "coach_id_invalid"},
 		{[]string{"provision", "00000000-0000-0000-0000-000000000000", "aaa"}, "coach_id_invalid"},
 		{[]string{"promote", "2877c3f1-0000-4000-8000-000000000000", "aaa"}, "unknown_op"},
+		{[]string{"lookup"}, "usage"},
+		{[]string{"legacy-cleanup", "x"}, "usage"},
+		{[]string{"provision", "2877c3f1-0000-4000-8000-000000000000"}, "usage"},
 	} {
 		var buf bytes.Buffer
 		if code := run(c.args, get, &buf); code != 2 {

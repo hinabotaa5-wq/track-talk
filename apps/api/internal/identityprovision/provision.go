@@ -100,14 +100,14 @@ func (rn *Runner) guard(ctx context.Context, coach uuid.UUID, tag string) (strin
 
 type bindingStatus struct {
 	MemberRows, AdminRows, IdentityRows, CommerceRows, DisclosureRows, AccessLogRows int
-	SubjectMatches, SubjectSynthetic                                                 bool
+	SubjectMatches, SubjectSynthetic, IdentityEnded                                  bool
 }
 
 func (rn *Runner) status(ctx context.Context, coach, subject uuid.UUID) (bindingStatus, error) {
 	var s bindingStatus
 	err := rn.Vault.QueryRow(ctx, `SELECT member_rows, subject_matches, subject_synthetic, admin_rows, identity_rows,
-		commerce_rows, disclosure_rows, access_log_rows FROM identity_vault.synthetic_status($1, $2)`, coach, subject).
-		Scan(&s.MemberRows, &s.SubjectMatches, &s.SubjectSynthetic, &s.AdminRows, &s.IdentityRows, &s.CommerceRows, &s.DisclosureRows, &s.AccessLogRows)
+		commerce_rows, disclosure_rows, access_log_rows, identity_ended FROM identity_vault.synthetic_status($1, $2)`, coach, subject).
+		Scan(&s.MemberRows, &s.SubjectMatches, &s.SubjectSynthetic, &s.AdminRows, &s.IdentityRows, &s.CommerceRows, &s.DisclosureRows, &s.AccessLogRows, &s.IdentityEnded)
 	return s, err
 }
 
@@ -124,6 +124,7 @@ func (s bindingStatus) put(r Result) {
 	r["commerce_rows"] = s.CommerceRows
 	r["disclosure_rows"] = s.DisclosureRows
 	r["access_log_rows"] = s.AccessLogRows
+	r["identity_ended"] = s.IdentityEnded
 }
 
 // Provision は、金庫 Auth の合成ユーザー（無ければ作る）と、その ID を subject とする members 行
@@ -442,6 +443,115 @@ func (rn *Runner) Walkthrough(ctx context.Context, coach uuid.UUID, tag string) 
 	} else {
 		r["result"] = "failed"
 		r["error"] = "walkthrough_check_failed"
+	}
+	return r
+}
+
+// Lookup は、合成メール（ベース＋タグ）の本体アカウントが承認済みコーチなら、そのコーチ ID を返す。
+// 合成の標識が無い・未承認・不一致なら found=false。ID は推測で補わず、本体の実物から引く。
+func (rn *Runner) Lookup(ctx context.Context, tag string) Result {
+	r := Result{"op": "lookup"}
+	email, err := SyntheticEmail(rn.Base, tag)
+	if err != nil || !IsSynthetic(rn.Base, email) {
+		return fail(r, errEmail)
+	}
+	var id *uuid.UUID
+	if err := rn.Main.QueryRow(ctx, "SELECT identity_boundary.synthetic_coach_id($1)", email).Scan(&id); err != nil {
+		return fail(r, classify(err))
+	}
+	r["found"] = id != nil
+	if id != nil {
+		r["coach_id"] = id.String()
+	}
+	r["result"] = "ok"
+	return r
+}
+
+// LegacyCleanup は、運営者決定（2026-11-10 22:53）で削除を許可された旧 aaa の割り当て1件と、
+// その金庫 Auth ユーザー（TOTP の設定キーが露出したもの）だけを消す。合成の標識は問わないが、
+// 対象は金庫側の関数が 2877c3f1- の1件に限って決め、管理者は消さない。
+func (rn *Runner) LegacyCleanup(ctx context.Context) Result {
+	r := Result{"op": "legacy-cleanup"}
+	var matched, members, identities, commerce, disclosures int
+	var coach, subject *uuid.UUID
+	if err := rn.Vault.QueryRow(ctx, `SELECT matched_rows, legacy_coach, member_rows, identity_rows, commerce_rows, disclosure_rows, unbound_subject
+		FROM identity_vault.legacy_unbind_aaa()`).Scan(&matched, &coach, &members, &identities, &commerce, &disclosures, &subject); err != nil {
+		var pe *pgconn.PgError
+		if errors.As(err, &pe) && pe.Code == "P0001" && (pe.Message == "legacy_ambiguous" || pe.Message == "legacy_subject_is_admin") {
+			return fail(r, pe.Message)
+		}
+		return fail(r, classify(err))
+	}
+	r["matched_rows"] = matched
+	if coach != nil {
+		r["legacy_coach_id"] = coach.String()
+	}
+	r["deleted_member_rows"] = members
+	r["deleted_identity_rows"] = identities
+	r["deleted_commerce_rows"] = commerce
+	r["deleted_disclosure_rows"] = disclosures
+	r["deleted_auth_users"] = 0
+	if subject != nil {
+		var admin bool
+		if err := rn.Vault.QueryRow(ctx, "SELECT admin_rows > 0 FROM identity_vault.synthetic_status($1, $2)", uuid.Nil, *subject).Scan(&admin); err != nil {
+			return fail(r, classify(err))
+		}
+		if admin {
+			return fail(r, "legacy_subject_is_admin")
+		}
+		ok, err := rn.Auth.deleteUser(ctx, *subject)
+		if err != nil {
+			return fail(r, classify(err))
+		}
+		if ok {
+			r["deleted_auth_users"] = 1
+		}
+	}
+	r["result"] = "ok"
+	return r
+}
+
+// EndCheck は、合成コーチの退会（本体の画面操作）の後に、終了経路が通ったことを確かめる：
+// 本体で承認済みでなくなり、身元の保持（retention）に載ったこと、金庫側の身元画面が 403 になること。
+func (rn *Runner) EndCheck(ctx context.Context, coach uuid.UUID, tag string) Result {
+	r := Result{"op": "endcheck"}
+	if rn.IdentityURL == "" {
+		return fail(r, "walkthrough_configuration_missing")
+	}
+	email, err := SyntheticEmail(rn.Base, tag)
+	if err != nil || !IsSynthetic(rn.Base, email) {
+		return fail(r, errEmail)
+	}
+	var approved, retired bool
+	if err := rn.Main.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity_boundary.approved_coaches WHERE profile_id = $1),
+		EXISTS (SELECT 1 FROM identity_boundary.retention WHERE coach_id = $1)`, coach).Scan(&approved, &retired); err != nil {
+		return fail(r, classify(err))
+	}
+	r["approved_on_main"] = approved
+	r["retired_on_main"] = retired
+	user, err := rn.Auth.findUser(ctx, email)
+	if err != nil {
+		return fail(r, classify(err))
+	}
+	if user == nil || user.DeletedAt != nil {
+		return fail(r, errNotBound)
+	}
+	s, err := rn.status(ctx, coach, user.ID)
+	if err != nil {
+		return fail(r, classify(err))
+	}
+	s.put(r)
+	token, err := rn.Auth.session(ctx, user.ID, email)
+	if err != nil {
+		return fail(r, classify(err))
+	}
+	status, _ := rn.request(ctx, http.MethodGet, strings.TrimRight(rn.IdentityURL, "/")+"/v1/coach", token, nil)
+	r["coach_view_status_after_end"] = status
+	if !approved && retired && status == http.StatusForbidden && s.bound() {
+		r["result"] = "ok"
+	} else {
+		r["result"] = "failed"
+		r["error"] = "end_path_check_failed"
 	}
 	return r
 }
