@@ -175,7 +175,9 @@ func setup(t *testing.T) *env {
 	mustExec(t, e.vaultAdmin, "DROP SCHEMA IF EXISTS identity_vault CASCADE")
 	mustExec(t, e.vaultAdmin, "DELETE FROM auth.users WHERE email LIKE 'ops.inbox+synthetic-%'")
 	mustExec(t, e.vaultAdmin, `DO $$ BEGIN
-		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='identity_app') THEN CREATE ROLE identity_app LOGIN BYPASSRLS PASSWORD 'apppw'; END IF;
+		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='identity_app') THEN CREATE ROLE identity_app LOGIN PASSWORD 'apppw'; END IF;
+		-- 本番と同じく、アプリ用ロールは RLS を素通しできない（2026-11-11 の本番の確認で app_roles_bypass_rls=0）。
+		ALTER ROLE identity_app NOBYPASSRLS;
 		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='identity_export') THEN CREATE ROLE identity_export LOGIN BYPASSRLS NOINHERIT; END IF;
 		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
 	END $$`)
@@ -185,7 +187,7 @@ func setup(t *testing.T) *env {
 		GRANT SELECT, INSERT, UPDATE, DELETE ON identity_vault.identities, identity_vault.commerce, identity_vault.disclosures TO identity_app;
 		GRANT SELECT, INSERT ON identity_vault.access_log TO identity_app;
 		GRANT SELECT ON ALL TABLES IN SCHEMA identity_vault TO identity_export`)
-	for _, f := range []string{"002_identity_phone.sql", "003_synthetic_provision.sql"} {
+	for _, f := range []string{"002_identity_phone.sql", "003_synthetic_provision.sql", "004_app_role_policies.sql"} {
 		mustExec(t, e.vaultAdmin, readRepo(t, "deploy/identity-vault/migrations/"+f))
 	}
 	// 管理者（管理者行）と、合成でない実在相当のコーチの割り当て。
@@ -435,4 +437,26 @@ func TestLegacyCleanup(t *testing.T) {
 	}
 	// 2回目は何もしない。
 	expect(t, r.LegacyCleanup(ctx), map[string]any{"result": "ok", "matched_rows": 0})
+}
+
+// 本番で起きた 403 の再現：RLS の方針（004）が無いと、aal2 のセッションでも身元画面に入れない。
+// 004 を当て直すと通る。
+func TestWalkthroughNeedsAppPolicies(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	r := e.runner
+	expect(t, r.Provision(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok"})
+	for _, tbl := range []string{"members", "identities", "commerce", "disclosures", "access_log"} {
+		mustExec(t, e.vaultAdmin, "DROP POLICY IF EXISTS identity_service_app ON identity_vault."+tbl)
+	}
+	expect(t, r.Walkthrough(ctx, e.synthCoach, "aaa"), map[string]any{"result": "failed", "aal2_session": true, "coach_view_status": 403, "identity_save_status": 403})
+	mustExec(t, e.vaultAdmin, readRepo(t, "deploy/identity-vault/migrations/004_app_role_policies.sql"))
+	expect(t, r.Walkthrough(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok", "coach_view_status": 200, "identity_save_status": 204})
+	// 方針はアプリ用ロールだけ。輸出用ロールや PUBLIC には付かない。
+	var other int
+	if err := e.vaultAdmin.QueryRow(ctx, `SELECT count(*) FROM pg_policies WHERE schemaname='identity_vault'
+		AND roles && ARRAY['public','anon','authenticated','service_role','identity_export']::name[]`).Scan(&other); err != nil || other != 0 {
+		t.Fatalf("policies for restricted roles: %d %v", other, err)
+	}
+	expect(t, r.Cleanup(ctx, e.synthCoach, "aaa"), map[string]any{"result": "ok"})
 }
