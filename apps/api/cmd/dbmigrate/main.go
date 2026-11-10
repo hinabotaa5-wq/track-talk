@@ -47,7 +47,8 @@ func run(mode, databaseURL string, w io.Writer) int {
 		out.Error = "unknown_mode"
 		return 2
 	}
-	if err := checkURL(databaseURL); err != nil {
+	databaseURL, err := checkURL(databaseURL)
+	if err != nil {
 		out.Error = err.Error()
 		return 2
 	}
@@ -94,24 +95,31 @@ func run(mode, databaseURL string, w io.Writer) int {
 	return 0
 }
 
-// checkURL は、接続文字列の形と暗号化の有無だけを確かめる。値は返さない。
-func checkURL(raw string) error {
+// checkURL は、接続文字列の形と暗号化の有無だけを確かめ、使う接続文字列を返す。値は出力しない。
+// ローカル以外で sslmode の指定が無いときは require を付ける（決済件数・バックアップのジョブと同じ扱い）。
+// 暗号化しない指定（disable・allow・prefer）は拒否する。
+func checkURL(raw string) (string, error) {
 	if raw == "" {
-		return errors.New("database_url_missing")
+		return "", errors.New("database_url_missing")
 	}
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Hostname() == "" {
-		return errors.New("invalid_database_configuration")
+		return "", errors.New("invalid_database_configuration")
 	}
 	switch u.Hostname() {
 	case "127.0.0.1", "localhost", "::1", "host.docker.internal":
-		return nil
+		return raw, nil
 	}
-	switch u.Query().Get("sslmode") {
+	q := u.Query()
+	switch q.Get("sslmode") {
 	case "require", "verify-ca", "verify-full":
-		return nil
+		return raw, nil
+	case "":
+		q.Set("sslmode", "require")
+		u.RawQuery = q.Encode()
+		return u.String(), nil
 	}
-	return errors.New("encrypted_database_connection_required")
+	return "", errors.New("encrypted_database_connection_required")
 }
 
 // postChecks は、適用後の状態を読み取り専用のトランザクションで確かめる。版ごとの確認を足すときはここに足す。

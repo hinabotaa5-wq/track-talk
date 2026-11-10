@@ -317,14 +317,14 @@ func TestApplyFailsWithoutBoundaryReader(t *testing.T) {
 
 func TestCheckURL(t *testing.T) {
 	for raw, want := range map[string]string{
-		"":                            "database_url_missing",
-		"mysql://u:p@db.example/x":    "invalid_database_configuration",
-		"postgres://u:p@db.example/x": "encrypted_database_connection_required",
+		"":                         "database_url_missing",
+		"mysql://u:p@db.example/x": "invalid_database_configuration",
 		"postgres://u:p@db.example/x?sslmode=disable": "encrypted_database_connection_required",
+		"postgres://u:p@db.example/x?sslmode=prefer":  "encrypted_database_connection_required",
 		"postgres://u:p@db.example/x?sslmode=require": "",
 		"postgres://u:p@127.0.0.1:5432/x":             "",
 	} {
-		err := checkURL(raw)
+		_, err := checkURL(raw)
 		got := ""
 		if err != nil {
 			got = err.Error()
@@ -332,6 +332,11 @@ func TestCheckURL(t *testing.T) {
 		if got != want {
 			t.Errorf("checkURL(%q) = %q, want %q", raw, got, want)
 		}
+	}
+	// 指定が無ければ require を付ける。
+	got, err := checkURL("postgres://u:p@db.example:6543/x?application_name=a")
+	if err != nil || got != "postgres://u:p@db.example:6543/x?application_name=a&sslmode=require" {
+		t.Fatalf("default sslmode: %q %v", got, err)
 	}
 	var buf bytes.Buffer
 	if code := run("drop", "postgres://u:p@127.0.0.1/x", &buf); code != 2 || strings.Contains(buf.String(), "u:p") {

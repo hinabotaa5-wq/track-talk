@@ -204,12 +204,12 @@ Cloud Run Job `track-talk-identity-vault-migrate` が、`deploy/identity-vault/m
 
 ```bash
 docker build --platform linux/amd64 -f deploy/identity-vault/migrate/Dockerfile -t asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/identity-vault-migrate:<日付-版> deploy/identity-vault
-gcloud iam service-accounts create track-talk-identity-vault-migrate --display-name "TrackTalk identity vault migrate job"
+gcloud iam service-accounts create tt-vault-migrate --display-name "TrackTalk identity vault migrate job"
 gcloud secrets add-iam-policy-binding track-talk-identity-vault-migrate-url \
-  --member serviceAccount:track-talk-identity-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com --role roles/secretmanager.secretAccessor
+  --member serviceAccount:tt-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com --role roles/secretmanager.secretAccessor
 gcloud run jobs create track-talk-identity-vault-migrate --region asia-northeast1 \
   --image asia-northeast1-docker.pkg.dev/<プロジェクトID>/track-talk/identity-vault-migrate:<日付-版> \
-  --service-account track-talk-identity-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com \
+  --service-account tt-vault-migrate@<プロジェクトID>.iam.gserviceaccount.com \
   --set-secrets VAULT_MIGRATE_DATABASE_URL=track-talk-identity-vault-migrate-url:<版> \
   --tasks 1 --max-retries 0 --task-timeout 600
 gcloud run jobs execute track-talk-identity-vault-migrate --region asia-northeast1 --wait
