@@ -108,7 +108,7 @@ func TestGenerateRetriesOnlyTransientFailures(t *testing.T) {
 		want    error
 		calls   int
 	}{
-		{503, "high demand", ErrTransient, 3},
+		{503, "high demand", ErrTransient, 2},
 		{429, "", ErrRateLimited, 1},
 		{503, "RESOURCE_EXHAUSTED", ErrRateLimited, 1},
 		{401, "secret-key", ErrAuthentication, 1},
@@ -130,7 +130,8 @@ func TestGenerateRetriesOnlyTransientFailures(t *testing.T) {
 			}
 		})
 	}
-	if len(delays) != 2 || delays[0] != 15*time.Second || delays[1] != 30*time.Second {
+	// Issue #515: 初回＋1回までに絞ったので、待ちは15秒1回だけ。
+	if len(delays) != 1 || delays[0] != 15*time.Second {
 		t.Fatal(delays)
 	}
 }
@@ -153,7 +154,7 @@ func TestGenerateTimeoutAndParentCancellation(t *testing.T) {
 	retryWait = func(ctx context.Context, _ time.Duration) error { return ctx.Err() }
 	rt := &timeoutTransport{}
 	_, err := (Client{HTTP: &http.Client{Transport: rt}}).GenerateJSON(context.Background(), "test")
-	if !errors.Is(err, ErrTransient) || rt.calls != 3 {
+	if !errors.Is(err, ErrTransient) || rt.calls != 2 {
 		t.Fatalf("%d %v", rt.calls, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -171,6 +172,36 @@ func TestWaitCancellation(t *testing.T) {
 		t.Fatal("not canceled")
 	}
 }
+
+// Issue #515: リトライ込みの実呼び出し数を数え、サマリの http_calls の根拠にする。
+func TestGenerateCountsHTTPCalls(t *testing.T) {
+	old := retryWait
+	defer func() { retryWait = old }()
+	retryWait = func(context.Context, time.Duration) error { return nil }
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.WriteHeader(503)
+			return
+		}
+		io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`)
+	}))
+	defer srv.Close()
+	var counted int
+	client := Client{Endpoint: srv.URL, HTTPCalls: &counted}
+	if _, err := client.GenerateJSON(context.Background(), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if counted != 2 || calls != 2 {
+		t.Fatalf("counted=%d calls=%d", counted, calls)
+	}
+	// 数えない設定（nil）でも壊れないこと。
+	if _, err := (Client{Endpoint: srv.URL}).GenerateJSON(context.Background(), "test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateRecoversAfter503(t *testing.T) {
 	old := retryWait
 	defer func() { retryWait = old }()
