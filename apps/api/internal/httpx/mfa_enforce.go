@@ -25,6 +25,7 @@ type mfaEnrollEntry struct {
 }
 
 // MFAEnrollment は、二段階認証を設定済みの人を Supabase の auth.mfa_factors で調べる。
+// 実行ロールは auth スキーマに入れないため、postgres 所有の関数 public.mfa_verified を経由する（migration 000153）。
 // 設定済みの人は、コードを入れる前のログイン(aal1)では API を使えないようにする。
 // 画面で止めるだけだと、パスワードだけ知った人がトークンで直に API を呼べてしまうため。
 type MFAEnrollment struct {
@@ -74,7 +75,7 @@ func (m *MFAEnrollment) Enrolled(ctx context.Context, id uuid.UUID) (bool, error
 
 	var enrolled bool
 	err := m.pool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM auth.mfa_factors WHERE user_id = $1 AND status = 'verified')`, id,
+		`SELECT public.mfa_verified($1)`, id,
 	).Scan(&enrolled)
 	if err != nil {
 		return false, err
@@ -92,7 +93,9 @@ func (m *MFAEnrollment) Enrolled(ctx context.Context, id uuid.UUID) (bool, error
 // 表が無い・読む権限が無いときは調べるのをやめる(全員が使えなくなるのを避ける)。本番でこうなったらログで気づけるようにする。
 // つながらないなどの一時的な失敗は、次の呼び出しで確かめ直す。
 func (m *MFAEnrollment) probe(ctx context.Context) error {
-	_, err := m.pool.Exec(ctx, `SELECT 1 FROM auth.mfa_factors LIMIT 0`)
+	// 関数の中で auth.mfa_factors を読むので、表・スキーマが無い／読めないときは従来と同じエラーコードになる。
+	// 公開 API の実行ロールが関数を実行できないときも 42501（権限なし）になる。
+	_, err := m.pool.Exec(ctx, `SELECT public.mfa_verified('00000000-0000-0000-0000-000000000000'::uuid)`)
 	var pgErr *pgconn.PgError
 	if err != nil && !(errors.As(err, &pgErr) && (pgErr.Code == "42P01" || pgErr.Code == "3F000" || pgErr.Code == "42501")) {
 		return err
