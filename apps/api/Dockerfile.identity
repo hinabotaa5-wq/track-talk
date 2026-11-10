@@ -5,11 +5,14 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /identityvault ./cmd/identityvault
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /identityvault ./cmd/identityvault \
+ && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /identityprovision ./cmd/identityprovision
 
 FROM alpine:3.24
 RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 identity
 COPY --from=build /identityvault /usr/local/bin/identityvault
+# 合成データ専用のプロビジョニング（Cloud Run Job track-talk-identity-provision）。同じイメージを --command で使う。
+COPY --from=build /identityprovision /usr/local/bin/identityprovision
 EXPOSE 8080
 ENV ALLOW_REMOTE_DB=1
 USER identity
