@@ -131,31 +131,39 @@ func postChecks(ctx context.Context, databaseURL string, version uint) (map[stri
 		return nil, false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var definer, ownerMatches bool
-	var config []string
-	if err := tx.QueryRow(ctx, `
-		SELECT f.prosecdef, COALESCE(f.proconfig, '{}'), f.proowner = r.proowner
-		FROM pg_proc f, pg_proc r
-		WHERE f.oid = 'identity_boundary.coach_matches_email(uuid, text)'::regprocedure
-		  AND r.oid = 'identity_boundary.mark_retired(uuid)'::regprocedure`).Scan(&definer, &config, &ownerMatches); err != nil {
-		return checks, false, err
+	// 000154 の2つの関数：SECURITY DEFINER・search_path 固定・所有者が境界と同じ。
+	definerAll := true
+	for key, fn := range map[string]string{"coach_matches_email": "identity_boundary.coach_matches_email(uuid, text)",
+		"synthetic_coach_id": "identity_boundary.synthetic_coach_id(text)"} {
+		var definer, ownerMatches bool
+		var config []string
+		if err := tx.QueryRow(ctx, `
+			SELECT f.prosecdef, COALESCE(f.proconfig, '{}'), f.proowner = r.proowner
+			FROM pg_proc f, pg_proc r
+			WHERE f.oid = $1::regprocedure
+			  AND r.oid = 'identity_boundary.mark_retired(uuid)'::regprocedure`, fn).Scan(&definer, &config, &ownerMatches); err != nil {
+			return checks, false, err
+		}
+		pinned := len(config) == 1 && config[0] == "search_path=pg_catalog"
+		checks[key+"_definer"] = definer
+		checks[key+"_search_path_fixed"] = pinned
+		checks[key+"_owner_matches_boundary"] = ownerMatches
+		definerAll = definerAll && definer && pinned && ownerMatches
 	}
-	searchPathFixed := len(config) == 1 && config[0] == "search_path=pg_catalog"
-	checks["coach_matches_email_definer"] = definer
-	checks["coach_matches_email_search_path_fixed"] = searchPathFixed
-	checks["coach_matches_email_owner_matches_boundary"] = ownerMatches
 	var apiRoles int
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*) FROM pg_roles
 		WHERE rolname IN ('anon', 'authenticated', 'service_role', 'track_talk_api')
-		  AND has_function_privilege(oid, 'identity_boundary.coach_matches_email(uuid, text)', 'EXECUTE')`).Scan(&apiRoles); err != nil {
+		  AND (has_function_privilege(oid, 'identity_boundary.coach_matches_email(uuid, text)', 'EXECUTE')
+		    OR has_function_privilege(oid, 'identity_boundary.synthetic_coach_id(text)', 'EXECUTE'))`).Scan(&apiRoles); err != nil {
 		return checks, false, err
 	}
 	checks["api_roles_can_execute"] = apiRoles
 	var publicExec bool
 	if err := tx.QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
-		               WHERE p.oid = 'identity_boundary.coach_matches_email(uuid, text)'::regprocedure AND a.grantee = 0)`).Scan(&publicExec); err != nil {
+		               WHERE p.oid IN ('identity_boundary.coach_matches_email(uuid, text)'::regprocedure, 'identity_boundary.synthetic_coach_id(text)'::regprocedure)
+		                 AND a.grantee = 0)`).Scan(&publicExec); err != nil {
 		return checks, false, err
 	}
 	checks["public_can_execute"] = publicExec
@@ -176,7 +184,8 @@ func postChecks(ctx context.Context, databaseURL string, version uint) (map[stri
 	canExecute, callOK, setRoleDenied := 0, 0, 0
 	for i, role := range readers {
 		var can bool
-		if err := tx.QueryRow(ctx, `SELECT has_function_privilege($1, 'identity_boundary.coach_matches_email(uuid, text)', 'EXECUTE')`, role).Scan(&can); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT has_function_privilege($1, 'identity_boundary.coach_matches_email(uuid, text)', 'EXECUTE')
+			AND has_function_privilege($1, 'identity_boundary.synthetic_coach_id(text)', 'EXECUTE')`, role).Scan(&can); err != nil {
 			return checks, false, err
 		}
 		if can {
@@ -207,7 +216,7 @@ func postChecks(ctx context.Context, databaseURL string, version uint) (map[stri
 	checks["boundary_readers_call_ok"] = callOK
 	checks["boundary_readers_set_role_denied"] = setRoleDenied
 	// 実際の呼び出しは、切り替えられたロールでは必ず成功していること（切り替えられないロールは参考値）。
-	ok = definer && searchPathFixed && ownerMatches && apiRoles == 0 && !publicExec &&
+	ok = definerAll && apiRoles == 0 && !publicExec &&
 		len(readers) >= 1 && canExecute == len(readers) && callOK+setRoleDenied == len(readers)
 	return checks, ok, nil
 }

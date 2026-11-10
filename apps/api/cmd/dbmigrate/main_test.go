@@ -136,6 +136,7 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 	for key, want := range map[string]any{
 		"coach_matches_email_definer": true, "coach_matches_email_search_path_fixed": true,
 		"coach_matches_email_owner_matches_boundary": true, "api_roles_can_execute": float64(0),
+		"synthetic_coach_id_definer": true, "synthetic_coach_id_search_path_fixed": true,
 		"public_can_execute": false, "boundary_reader_roles": float64(1), "boundary_readers_can_execute": float64(1),
 	} {
 		if checks[key] != want {
@@ -188,13 +189,13 @@ func TestCoachMatchesEmail(t *testing.T) {
 	if code := run("apply", dsn, &buf); code != 0 {
 		t.Fatalf("apply exit %d: %s", code, buf.String())
 	}
-	approved, pending, deleted := uuid.New(), uuid.New(), uuid.New()
+	approved, pending, deleted, plain := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	for i, c := range []struct {
 		id     uuid.UUID
 		status string
 		email  string
 		gone   bool
-	}{{approved, "approved", "ops+synthetic-a@example.test", false}, {pending, "pending", "ops+synthetic-b@example.test", false}, {deleted, "approved", "ops+synthetic-c@example.test", true}} {
+	}{{approved, "approved", "ops+synthetic-a@example.test", false}, {pending, "pending", "ops+synthetic-b@example.test", false}, {deleted, "approved", "ops+synthetic-c@example.test", true}, {plain, "approved", "plain.coach@example.test", false}} {
 		if _, err := conn.Exec(ctx, `INSERT INTO profiles (id, nickname) VALUES ($1, $2)`, c.id, "合成"+string(rune('A'+i))); err != nil {
 			t.Fatal(err)
 		}
@@ -239,6 +240,27 @@ func TestCoachMatchesEmail(t *testing.T) {
 		}
 		if got != c.want {
 			t.Errorf("coach_matches_email(%v, %v) = %v, want %v", c.coach, c.email, got, c.want)
+		}
+	}
+	// 合成コーチの ID は、合成の標識があり承認済みでメールが一致するときだけ返る。
+	for _, c := range []struct {
+		email any
+		want  *uuid.UUID
+	}{
+		{"ops+synthetic-a@example.test", &approved},
+		{" OPS+Synthetic-A@example.test", &approved},
+		{"ops+synthetic-b@example.test", nil},
+		{"ops+synthetic-c@example.test", nil},
+		{"ops@example.test", nil},
+		{"plain.coach@example.test", nil}, // 承認済み・一致でも、合成の標識が無ければ返さない
+		{nil, nil},
+	} {
+		var got *uuid.UUID
+		if err := tx.QueryRow(ctx, `SELECT identity_boundary.synthetic_coach_id($1::text)`, c.email).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if (got == nil) != (c.want == nil) || (got != nil && *got != *c.want) {
+			t.Errorf("synthetic_coach_id(%v) = %v, want %v", c.email, got, c.want)
 		}
 	}
 	// 読み取りロールのままでは auth.users を直接読めない（関数経由の真偽だけ）。

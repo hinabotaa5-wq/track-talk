@@ -21,7 +21,30 @@ BEGIN
 END;
 $$;
 
+-- 合成コーチ（メールの @ より前に「+synthetic」を含むアカウント）の本体コーチ ID を、メールから引く。
+-- 承認済みで、メールが完全一致（大文字小文字・前後の空白は区別しない）するときだけ ID を返し、
+-- それ以外（合成の標識が無い・未承認・不一致）は NULL を返す。合成でないアカウントの ID は返さない。
+CREATE FUNCTION identity_boundary.synthetic_coach_id(target_email text) RETURNS uuid
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE
+    matched_id uuid;
+BEGIN
+    IF target_email IS NULL OR position('+synthetic' IN lower(split_part(btrim(target_email), '@', 1))) = 0 THEN
+        RETURN NULL;
+    END IF;
+    SELECT c.profile_id INTO matched_id
+    FROM public.coach_profiles c
+    JOIN auth.users u ON u.id = c.profile_id
+    WHERE c.status = 'approved'
+      AND u.deleted_at IS NULL
+      AND u.email IS NOT NULL
+      AND lower(u.email) = lower(btrim(target_email));
+    RETURN matched_id;
+END;
+$$;
+
 REVOKE ALL ON FUNCTION identity_boundary.coach_matches_email(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION identity_boundary.synthetic_coach_id(text) FROM PUBLIC;
 DO $$
 DECLARE
     r text;
@@ -30,6 +53,7 @@ BEGIN
     FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role', 'track_talk_api'] LOOP
         IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
             EXECUTE format('REVOKE ALL ON FUNCTION identity_boundary.coach_matches_email(uuid, text) FROM %I', r);
+            EXECUTE format('REVOKE ALL ON FUNCTION identity_boundary.synthetic_coach_id(text) FROM %I', r);
         END IF;
     END LOOP;
     -- 実行を許すのは身元専用サービスの本体読み取りロールだけ。本番ではロール名を運営者が決めて作成し、
@@ -47,7 +71,7 @@ BEGIN
           AND NOT g.rolsuper
           AND g.rolname NOT IN ('anon', 'authenticated', 'service_role', 'track_talk_api')
     LOOP
-        EXECUTE format('GRANT EXECUTE ON FUNCTION identity_boundary.coach_matches_email(uuid, text) TO %I', r);
+        EXECUTE format('GRANT EXECUTE ON FUNCTION identity_boundary.coach_matches_email(uuid, text), identity_boundary.synthetic_coach_id(text) TO %I', r);
     END LOOP;
 END
 $$;
