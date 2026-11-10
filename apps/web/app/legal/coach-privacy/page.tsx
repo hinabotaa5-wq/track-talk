@@ -76,7 +76,7 @@ export default function CoachPrivacyPage() {
           <li>Netlify (United States; CDN): hosting of the web app.</li>
           <li>Google (United States; API processed in Japan): API hosting on Google Cloud and Google sign-in.</li>
           <li>Anthropic (United States): translation of messages between you and athletes.</li>
-          <li>Wise (United Kingdom and other countries): sending your fees.</li>
+          <li>Wise (Wise Payments Japan; Japan, the United Kingdom and other countries): sending your fees.</li>
           <li>Google, Mozilla, Apple and Microsoft (United States): delivering notifications to devices where you turned them on.</li>
         </ul>
         <p>Translation and Wise transfers are not used until the overseas coach program starts.</p>
