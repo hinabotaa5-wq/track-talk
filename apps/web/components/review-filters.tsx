@@ -1,4 +1,5 @@
 "use client";
+import { L, localizeJaDate } from "@/lib/i18n";
 
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
@@ -65,22 +66,19 @@ export function ReviewFilterBar({ filters, onChange }: { filters: ReviewFilters;
             count > 0 ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
           }`}
         >
-          <SlidersHorizontal className="size-4" aria-hidden />
-          絞り込み{count > 0 ? `（${count}）` : ""}
+          <SlidersHorizontal className="size-4" aria-hidden />{L("絞り込み")}{count > 0 ? L("（{count}）", { count }) : ""}
         </button>
         {count > 0 ? (
-          <button type="button" onClick={() => onChange({})} className="text-sm text-blue-300 underline">
-            解除
-          </button>
+          <button type="button" onClick={() => onChange({})} className="text-sm text-blue-300 underline">{L("解除")}</button>
         ) : null}
       </div>
       {open ? (
         <div className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3">
           <div className="grid grid-cols-2 gap-2">
-            <Select label="種目" value={filters.event ?? ""} onChange={(v) => set("event", v)} options={reviewEvents} empty="すべて" />
-            <Select label="足幅" value={filters.width ?? ""} onChange={(v) => set("width", v)} options={reviewFootWidths} empty="すべて" />
+            <Select label={L("種目")} value={filters.event ?? ""} onChange={(v) => set("event", v)} options={reviewEvents} empty={L("すべて")} />
+            <Select label={L("足幅")} value={filters.width ?? ""} onChange={(v) => set("width", v)} options={reviewFootWidths} empty={L("すべて")} />
           </div>
-          <p className="text-xs text-slate-300">書いた人がこれらを選んだレビューだけで数えます。選んでいない以前のレビューは、絞り込むと対象から外れます。</p>
+          <p className="text-xs text-slate-300">{L("書いた人がこれらを選んだレビューだけで数えます。選んでいない以前のレビューは、絞り込むと対象から外れます。")}</p>
         </div>
       ) : null}
     </div>
@@ -92,13 +90,13 @@ export function ReviewAttrsFields({ value, onChange }: { value: ReviewAttrsInput
   const set = (key: keyof ReviewAttrsInput) => (v: string) => onChange({ ...value, [key]: v });
   return (
     <div className="space-y-1">
-      <p className="text-xs text-slate-300">あなたについて(任意・絞り込みに使います。足のサイズは1cm幅でしか表示しません)</p>
+      <p className="text-xs text-slate-300">{L("あなたについて(任意・絞り込みに使います。足のサイズは1cm幅でしか表示しません)")}</p>
       <div className="grid grid-cols-2 gap-2">
-        <Select label="種目" value={value.event} onChange={set("event")} options={reviewEvents} empty="選ばない" />
-        <Select label="レベル" value={value.level} onChange={set("level")} options={reviewLevels} empty="選ばない" />
-        <Select label="足のサイズ" value={value.footSize} onChange={set("footSize")} options={footSizeOptions} empty="選ばない" />
-        <Select label="足幅" value={value.width} onChange={set("width")} options={reviewFootWidths} empty="選ばない" />
-        <Select label="使い方" value={value.usage} onChange={set("usage")} options={reviewUsages} empty="選ばない" />
+        <Select label={L("種目")} value={value.event} onChange={set("event")} options={reviewEvents} empty={L("選ばない")} />
+        <Select label={L("レベル")} value={value.level} onChange={set("level")} options={reviewLevels} empty={L("選ばない")} />
+        <Select label={L("足のサイズ")} value={value.footSize} onChange={set("footSize")} options={footSizeOptions} empty={L("選ばない")} />
+        <Select label={L("足幅")} value={value.width} onChange={set("width")} options={reviewFootWidths} empty={L("選ばない")} />
+        <Select label={L("使い方")} value={value.usage} onChange={set("usage")} options={reviewUsages} empty={L("選ばない")} />
       </div>
     </div>
   );
@@ -106,7 +104,8 @@ export function ReviewAttrsFields({ value, onChange }: { value: ReviewAttrsInput
 
 // レビューに付いた属性の小さな札。
 export function ReviewAttrChips({ review }: { review: ProductReview }) {
-  const chips = [review.event_label, review.level_label, review.foot_size_label, review.foot_width_label ? `足幅${review.foot_width_label}` : null, review.usage_label].filter(
+  const label = (text: string | null | undefined) => (text ? L(text) : null);
+  const chips = [label(review.event_label), label(review.level_label), review.foot_size_label ? localizeJaDate(review.foot_size_label) : null, review.foot_width_label ? L("足幅{foot_width_label}", { foot_width_label: L(review.foot_width_label) }) : null, label(review.usage_label)].filter(
     (chip): chip is string => Boolean(chip),
   );
   if (chips.length === 0) return null;

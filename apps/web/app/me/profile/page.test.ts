@@ -90,7 +90,7 @@ describe("ProfilePage", () => {
     if (failure) analytics.save.mockRejectedValue(new Error("offline"));
     const view = await renderPage();
     try {
-      const select = view.div.querySelector("select")!;
+      const select = view.div.querySelector<HTMLSelectElement>("select[name='event']")!;
       await act(async () => {
         select.value = select.options[1].value;
         select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -156,7 +156,7 @@ describe("ProfilePage", () => {
     state.profile = { nickname: "ランナー", nickname_public: false, event: "100m" };
     const view = await renderPage();
     try {
-      const select = view.div.querySelector("select")!;
+      const select = view.div.querySelector<HTMLSelectElement>("select[name='event']")!;
       await act(async () => {
         select.value = select.options[1].value;
         select.dispatchEvent(new Event("change", { bubbles: true }));

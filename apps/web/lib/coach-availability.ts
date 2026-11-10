@@ -1,3 +1,4 @@
+import { L, weekdayLabel } from "@/lib/i18n";
 import type { CoachingServiceType } from "./types";
 
 export type AvailabilityStatus = "available" | "consult" | "unavailable" | "";
@@ -5,7 +6,7 @@ export type AvailabilityDay = { date: string; status: AvailabilityStatus; note: 
 export type CoachAvailability = { today: string; days: AvailabilityDay[] };
 
 export const availabilityLabels: Record<AvailabilityStatus, string> = {
-  available: "○ 空きあり", consult: "△ 要相談", unavailable: "× 不可", "": "− 未設定",
+  get available() { return L("○ 空きあり"); }, get consult() { return L("△ 要相談"); }, get unavailable() { return L("× 不可"); }, get ""() { return L("− 未設定"); },
 };
 export function hasAvailability(service: CoachingServiceType | null | undefined): boolean {
   return service === "in_person" || service === "competition_support";
@@ -23,5 +24,5 @@ export function availabilityDays(today: string, days: AvailabilityDay[]): Availa
 }
 export function availabilityDateLabel(date: string): string {
   const day = new Date(`${date}T00:00:00Z`);
-  return `${day.getUTCMonth() + 1}/${day.getUTCDate()}（${"日月火水木金土"[day.getUTCDay()]}）`;
+  return L("{v0}/{v1}（{v2}）", { v0: day.getUTCMonth() + 1, v1: day.getUTCDate(), v2: weekdayLabel(day.getUTCDay()) });
 }

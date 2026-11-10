@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -56,7 +57,7 @@ export default function UpdatePasswordPage() {
     // 漏洩済みパスワードは Supabase に送らずここで止める（本体 #429）。HIBP に届かなくても通す。
     if (await isPwnedPassword(values.password)) {
       release();
-      setMessage(pwnedPasswordMessage);
+      setMessage(L(pwnedPasswordMessage));
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: values.password }).finally(release);
@@ -69,29 +70,22 @@ export default function UpdatePasswordPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">新しいパスワード</h1>
+      <h1 className="text-2xl font-bold">{L("新しいパスワード")}</h1>
       {done ? (
-        <p className="text-sm">
-          パスワードを変更しました。<Link href="/" className="underline">ホームへ</Link>
+        <p className="text-sm">{L("パスワードを変更しました。")}<Link href="/" className="underline">{L("ホームへ")}</Link>
         </p>
       ) : ready === "checking" ? (
-        <PageLoading label="確認しています…" />
+        <PageLoading label={L("確認しています…")} />
       ) : ready === "expired" ? (
-        <p className="text-sm">
-          リンクの有効期限が切れたか、リセットを申し込んだのとは別のブラウザで開いています。
-          <Link href="/reset-password" className="underline">もう一度メールを送ってください</Link>。
-          ログイン中に変えるときは、<Link href="/me/password" className="underline">マイページのパスワードの変更</Link>から変えられます。
-        </p>
+        <p className="text-sm">{L("リンクの有効期限が切れたか、リセットを申し込んだのとは別のブラウザで開いています。")}<Link href="/reset-password" className="underline">{L("もう一度メールを送ってください")}</Link>{L("。 ログイン中に変えるときは、")}<Link href="/me/password" className="underline">{L("マイページのパスワードの変更")}</Link>{L("から変えられます。")}</p>
       ) : (
         <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <Input type="password" autoComplete="new-password" placeholder="新しいパスワード(8文字以上)" {...form.register("password")} />
+          <Input type="password" autoComplete="new-password" placeholder={L("新しいパスワード(8文字以上)")} {...form.register("password")} />
           {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
-          <Input type="password" autoComplete="new-password" placeholder="もう一度" {...form.register("confirm")} />
+          <Input type="password" autoComplete="new-password" placeholder={L("もう一度")} {...form.register("confirm")} />
           {form.formState.errors.confirm ? <p className="text-sm text-red-400">{form.formState.errors.confirm.message}</p> : null}
           {message ? <p className="text-sm text-red-400">{message}</p> : null}
-          <Button type="submit" className="w-full" disabled={pending}>
-            変更する
-          </Button>
+          <Button type="submit" className="w-full" disabled={pending}>{L("変更する")}</Button>
         </form>
       )}
     </div>

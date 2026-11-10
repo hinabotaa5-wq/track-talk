@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { apiFetch } from "@/lib/api";
 import type { Competition } from "@/lib/types";
 
@@ -50,7 +51,7 @@ export function loadCompetitions(prefecture: string, month: number) {
     .catch(() => {
       const previous = cache.get(key);
       if (previous && !previous.error) return previous;
-      return { items: [] as Competition[], error: listError, at: 0 };
+      return { items: [] as Competition[], error: L(listError), at: 0 };
     })
     .finally(() => {
       if (inflight.get(key) === request) inflight.delete(key);

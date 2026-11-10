@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -38,7 +39,7 @@ export default function CoachWithdrawPage() {
         if (!cancelled) setApplication(d.application);
       })
       .catch(() => {
-        if (!cancelled) setError("読み込みに失敗しました");
+        if (!cancelled) setError(L("読み込みに失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -47,7 +48,7 @@ export default function CoachWithdrawPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (phrase !== confirmPhrase || !session || !acquire()) return;
+    if (phrase !== L(confirmPhrase) || !session || !acquire()) return;
     setError("");
     try {
       const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/withdraw", {
@@ -58,26 +59,22 @@ export default function CoachWithdrawPage() {
       setApplication(d.application);
       setDone(true);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.confirm || err.message : "コーチをやめられませんでした");
+      setError(err instanceof ApiRequestError ? err.fields?.confirm || err.message : L("コーチをやめられませんでした"));
     } finally {
       release();
     }
   }
 
   if (loading || !session || (application === undefined && !error)) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   if (done) {
     return (
       <div className="mx-auto max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">コーチをやめました</h1>
-        <p className="text-sm text-slate-300">
-          アカウントはそのまま使えます。もう一度コーチとして活動したくなったら、応募すると審査からやり直せます。
-        </p>
-        <Link href="/" className="block text-sm text-blue-300 underline">
-          ホームへ
-        </Link>
+        <h1 className="text-2xl font-bold">{L("コーチをやめました")}</h1>
+        <p className="text-sm text-slate-300">{L("アカウントはそのまま使えます。もう一度コーチとして活動したくなったら、応募すると審査からやり直せます。")}</p>
+        <Link href="/" className="block text-sm text-blue-300 underline">{L("ホームへ")}</Link>
       </div>
     );
   }
@@ -86,61 +83,49 @@ export default function CoachWithdrawPage() {
   if (!active) {
     return (
       <div className="mx-auto max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">コーチをやめる</h1>
-        {error ? <p className="text-sm text-red-400">{error}</p> : <p className="text-sm text-slate-300">いまはコーチとして活動していません。</p>}
-        <Link href="/me" className="block text-sm text-blue-300 underline">
-          マイページへ
-        </Link>
+        <h1 className="text-2xl font-bold">{L("コーチをやめる")}</h1>
+        {error ? <p className="text-sm text-red-400">{error}</p> : <p className="text-sm text-slate-300">{L("いまはコーチとして活動していません。")}</p>}
+        <Link href="/me" className="block text-sm text-blue-300 underline">{L("マイページへ")}</Link>
       </div>
     );
   }
 
   const pendingOnly = application?.status === "pending";
-  const ready = phrase === confirmPhrase;
+  const ready = phrase === L(confirmPhrase);
 
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{pendingOnly ? "コーチの応募を取り下げる" : "コーチをやめる"}</h1>
-        <p className="text-sm text-slate-300">
-          コーチだけをやめます。アカウントは残り、投稿や記録もそのままで、一般の利用者として使い続けられます。
-        </p>
+        <h1 className="text-2xl font-bold">{pendingOnly ? L("コーチの応募を取り下げる") : L("コーチをやめる")}</h1>
+        <p className="text-sm text-slate-300">{L("コーチだけをやめます。アカウントは残り、投稿や記録もそのままで、一般の利用者として使い続けられます。")}</p>
       </div>
       <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
         {pendingOnly ? (
-          <li>審査中の応募を取り下げます</li>
+          <li>{L("審査中の応募を取り下げます")}</li>
         ) : (
           <>
-            <li>コーチ一覧、プラン、空き状況から外れ、新しい依頼は届かなくなります</li>
-            <li>まだ返事をしていない添削の打診は、ほかのコーチに回ります</li>
-            <li>まだ送金していない報酬は、最低額に届かなくても翌月にまとめて送金します。送金が済むまでは、アカウントの退会はできません</li>
+            <li>{L("コーチ一覧、プラン、空き状況から外れ、新しい依頼は届かなくなります")}</li>
+            <li>{L("まだ返事をしていない添削の打診は、ほかのコーチに回ります")}</li>
+            <li>{L("まだ送金していない報酬は、最低額に届かなくても翌月にまとめて送金します。送金が済むまでは、アカウントの退会はできません")}</li>
           </>
         )}
-        <li>顔写真は削除します</li>
-        <li>もう一度コーチになるには、応募して審査を受け直します</li>
+        <li>{L("顔写真は削除します")}</li>
+        <li>{L("もう一度コーチになるには、応募して審査を受け直します")}</li>
       </ul>
       {pendingOnly ? null : (
-        <p className="text-sm text-slate-300">
-          進行中のパーソナル指導、添削中の依頼、対応中の追加相談があるあいだはやめられません。終わってから手続きしてください。
-        </p>
+        <p className="text-sm text-slate-300">{L("進行中のパーソナル指導、添削中の依頼、対応中の追加相談があるあいだはやめられません。終わってから手続きしてください。")}</p>
       )}
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block space-y-1 text-sm">
-          <span className="text-slate-300">確認のため「{confirmPhrase}」と入力</span>
+          <span className="text-slate-300">{L("確認のため「{confirmPhrase}」と入力", { confirmPhrase: L(confirmPhrase) })}</span>
           <Input value={phrase} onChange={(event) => setPhrase(event.target.value)} autoComplete="off" />
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" variant="danger" className="w-full" disabled={!ready || submitting}>
-          {pendingOnly ? "応募を取り下げる" : "コーチをやめる"}
+          {pendingOnly ? L("応募を取り下げる") : L("コーチをやめる")}
         </Button>
       </form>
-      <p className="text-xs text-slate-400">
-        アカウントごと削除したいときは、
-        <Link href="/me/delete" className="text-blue-300 underline">
-          退会
-        </Link>
-        の手続きをしてください。
-      </p>
+      <p className="text-xs text-slate-400">{L("アカウントごと削除したいときは、")}<Link href="/me/delete" className="text-blue-300 underline">{L("退会")}</Link>{L("の手続きをしてください。")}</p>
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CoachDashboard } from "./coach-dashboard";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 
 const apiFetch = vi.fn();
 const flags = vi.hoisted(() => ({ enabled: true, locale: undefined as string | undefined }));
@@ -20,6 +22,8 @@ vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({ session: {}, profile: { nickname: "テスト", locale: flags.locale }, token: "test", loading: false }),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+// 表示言語は LocaleProvider が決める。ここでは利用者の言語（flags.locale）をそのまま使う。
+vi.mock("@/components/locale-provider", () => ({ useLocale: () => (flags.locale === "en" ? "en" : "ja") }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>{children}</a>
@@ -89,6 +93,7 @@ beforeEach(() => {
   apiFetch.mockReset();
   flags.enabled = true;
   flags.locale = undefined;
+  setActiveLocale("ja");
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -217,6 +222,8 @@ it("未承認の表示は現行のまま変えない", async () => {
 
 it("言語が英語の利用者にはコーチ導線を英語で出す", async () => {
   flags.locale = "en";
+  installEnglish(en);
+  setActiveLocale("en");
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(container.querySelector('nav[aria-label="Coach menu"]')).not.toBeNull();

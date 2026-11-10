@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -37,7 +38,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
         setToast(true);
       }
     } catch (e) {
-      setError(apiErrorText(e, "セットできませんでした"));
+      setError(apiErrorText(e, L("セットできませんでした")));
     } finally {
       release();
     }
@@ -58,7 +59,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
         onClick={toggle}
         disabled={pending}
         aria-pressed={selected}
-        aria-label={selected ? `${name}のセットを解除する` : `${name}を目標の大会にセットする`}
+        aria-label={selected ? L("{name}のセットを解除する", { name }) : L("{name}を目標の大会にセットする", { name })}
         className="-m-1 rounded-full p-1 transition active:scale-[0.94] disabled:opacity-60"
       >
         <span
@@ -75,9 +76,7 @@ export function TargetMeetButton({ source, meetRef, name, className = "" }: { so
             <p
               role="status"
               className="pointer-events-none fixed left-1/2 top-1/2 z-40 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900/90 px-5 py-3 text-base font-semibold text-slate-100 shadow-lg"
-            >
-              目標の大会にセットしました
-            </p>,
+            >{L("目標の大会にセットしました")}</p>,
             document.body,
           )
         : null}

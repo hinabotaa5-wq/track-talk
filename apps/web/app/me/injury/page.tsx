@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -78,7 +79,7 @@ export default function MyInjuryHistoryPage() {
       setMoreError("");
     } catch (error) {
       if (requestGeneration !== generation.current) return;
-      setMoreError("続きを読み込めませんでした");
+      setMoreError(L("続きを読み込めませんでした"));
       setExpired(error instanceof ApiRequestError && error.code === "invalid_cursor");
     } finally {
       requestPending.current = false;
@@ -87,13 +88,13 @@ export default function MyInjuryHistoryPage() {
   }
 
   async function remove(id: string) {
-    if (!(await confirmDialog(deleteConfirmOptions("この投稿")))) return;
+    if (!(await confirmDialog(deleteConfirmOptions(L("この投稿"))))) return;
     setDeletingId(id);
     try {
       await apiFetch(`/v1/posts/${id}`, { method: "DELETE", token });
     } catch (e) {
       setDeletingId(null);
-      alert(e instanceof ApiRequestError ? e.message : "削除できませんでした");
+      alert(e instanceof ApiRequestError ? e.message : L("削除できませんでした"));
       return;
     }
     clearHomeFeeds();
@@ -103,29 +104,25 @@ export default function MyInjuryHistoryPage() {
     setReload((value) => value + 1);
   }
 
-  if (loading || !session) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">自分のケガ履歴</h1>
-        <p className="mt-1 text-sm text-slate-200">
-          これまでのケガの投稿と、経過を報告した段階ごとの日数を振り返れます。あなただけに表示されます。
-        </p>
+        <h1 className="text-2xl font-bold">{L("自分のケガ履歴")}</h1>
+        <p className="mt-1 text-sm text-slate-200">{L("これまでのケガの投稿と、経過を報告した段階ごとの日数を振り返れます。あなただけに表示されます。")}</p>
       </div>
 
       {failed ? (
-        <ErrorState message="履歴の取得に失敗しました。時間をおいて、もう一度開いてください。" />
+        <ErrorState message={L("履歴の取得に失敗しました。時間をおいて、もう一度開いてください。")} />
       ) : items === null ? (
-        <PageLoading label="読み込み中..." />
+        <PageLoading label={L("読み込み中...")} />
       ) : items.length === 0 ? (
-        <EmptyState title="まだケガの投稿がありません" body="ケガのグループに投稿すると、ここに履歴がたまります。" />
+        <EmptyState title={L("まだケガの投稿がありません")} body={L("ケガのグループに投稿すると、ここに履歴がたまります。")} />
       ) : (
         <>
           {repeated.length > 0 ? (
-            <p className="rounded-xl border border-amber-700/60 bg-amber-950/40 p-3 text-sm text-amber-200">
-              {repeated.map((item) => `${item.label}（${item.count}回）`).join("、")}は、これまでに複数回ケガの投稿があります。
-            </p>
+            <p className="rounded-xl border border-amber-700/60 bg-amber-950/40 p-3 text-sm text-amber-200">{L("{v0}は、これまでに複数回ケガの投稿があります。", { v0: repeated.map((item) => L("{label}（{count}回）", { label: item.label, count: item.count })).join(L("、")) })}</p>
           ) : null}
           <ul className="space-y-3">
             {items.map((item) => (
@@ -134,7 +131,7 @@ export default function MyInjuryHistoryPage() {
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="rounded-full border border-white/20 bg-white/12 px-2.5 py-0.5 font-semibold text-slate-200">
-                        {item.body_part_label}
+                        {L(item.body_part_label)}
                       </span>
                       <span className="text-slate-300">{formatDateTime(item.created_at)}</span>
                     </p>
@@ -146,7 +143,7 @@ export default function MyInjuryHistoryPage() {
                         ))}
                       </ol>
                     ) : (
-                      <p className="text-sm text-slate-300">経過の報告はまだありません。</p>
+                      <p className="text-sm text-slate-300">{L("経過の報告はまだありません。")}</p>
                     )}
                   </div>
                   <button
@@ -154,9 +151,7 @@ export default function MyInjuryHistoryPage() {
                     onClick={() => remove(item.id)}
                     disabled={deletingId !== null}
                     className="shrink-0 rounded-lg border border-red-400/40 px-3 py-1.5 text-sm font-semibold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-                  >
-                    削除
-                  </button>
+                  >{L("削除")}</button>
                 </div>
               </li>
             ))}

@@ -1,3 +1,4 @@
+import { L } from "./i18n";
 import type { WorkOrder, WorkOrderTerms } from "@/lib/types";
 export type Consultation = {
   id: string; request_key: string; status: "draft" | "awaiting_payment" | "offered" | "in_review" | "answered" | "declined" | "expired" | "cancelled";
@@ -20,7 +21,7 @@ export type ConsultationRoom = {
   minor?: boolean;
 };
 export const consultationStatus: Record<Consultation["status"], string> = {
-  draft: "下書き", awaiting_payment: "お支払い待ち", offered: "コーチの受諾待ち", in_review: "回答待ち", answered: "回答済み", declined: "辞退されました", expired: "期限切れ", cancelled: "取り下げ済み",
+  get draft() { return L("下書き"); }, get awaiting_payment() { return L("お支払い待ち"); }, get offered() { return L("コーチの受諾待ち"); }, get in_review() { return L("回答待ち"); }, get answered() { return L("回答済み"); }, get declined() { return L("辞退されました"); }, get expired() { return L("期限切れ"); }, get cancelled() { return L("取り下げ済み"); },
 };
 export function canClarify(c: Consultation, now = Date.now()): boolean {
   return c.status === "answered" && !c.clarify_body && !c.hidden && !c.purged && !!c.answered_at && now < new Date(c.answered_at).getTime() + 7 * 86400000;

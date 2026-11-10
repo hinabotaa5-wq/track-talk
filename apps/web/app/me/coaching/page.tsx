@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -15,10 +16,10 @@ import { useEffect, useState, type FormEvent } from "react";
 // 添削の画面ができるまではメニューから辿れない。
 
 const guardianLabels: Record<CoachingGuardian["status"], string> = {
-  pending: "保護者の同意待ち",
-  consented: "保護者が同意済み",
-  declined: "保護者が同意しませんでした",
-  revoked: "保護者が同意を取り消しました",
+  get pending() { return L("保護者の同意待ち"); },
+  get consented() { return L("保護者が同意済み"); },
+  get declined() { return L("保護者が同意しませんでした"); },
+  get revoked() { return L("保護者が同意を取り消しました"); },
 };
 
 function errorMessage(err: unknown, fallback: string) {
@@ -45,7 +46,7 @@ export default function CoachingSetupPage() {
         if (!cancelled) setMe(data);
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(errorMessage(err, "読み込みに失敗しました"));
+        if (!cancelled) setLoadError(errorMessage(err, L("読み込みに失敗しました")));
       });
     return () => {
       cancelled = true;
@@ -65,7 +66,7 @@ export default function CoachingSetupPage() {
         }),
       );
     } catch (err) {
-      setMonthError(err instanceof ApiRequestError ? err.fields?.birth_month || err.message : "登録に失敗しました");
+      setMonthError(err instanceof ApiRequestError ? err.fields?.birth_month || err.message : L("登録に失敗しました"));
     } finally {
       release();
     }
@@ -89,12 +90,12 @@ export default function CoachingSetupPage() {
       });
       setMe((prev) => (prev ? { ...prev, guardian } : prev));
       setGuardianEmail("");
-      setLinkMessage(`${guardian.guardian_email ?? "保護者"} にメールを送りました。届いたメールのリンクから、保護者が同意します。`);
+      setLinkMessage(L("{v0} にメールを送りました。届いたメールのリンクから、保護者が同意します。", { v0: guardian.guardian_email ?? L("保護者") }));
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields?.guardian_email) {
         setGuardianEmailError(err.fields.guardian_email);
       } else {
-        setLinkMessage(errorMessage(err, "メールを送れませんでした"));
+        setLinkMessage(errorMessage(err, L("メールを送れませんでした")));
       }
     } finally {
       release();
@@ -106,78 +107,66 @@ export default function CoachingSetupPage() {
     setPushMessage("");
     try {
       const { sent } = await apiFetch<{ sent: number }>("/v1/me/push-subscriptions/test", { method: "POST", token });
-      setPushMessage(sent > 0 ? "テストの通知を送りました" : "通知を送れる端末がありません。もう一度設定してください。");
+      setPushMessage(sent > 0 ? L("テストの通知を送りました") : L("通知を送れる端末がありません。もう一度設定してください。"));
     } catch (err) {
-      setPushMessage(errorMessage(err, "テストの通知を送れませんでした"));
+      setPushMessage(errorMessage(err, L("テストの通知を送れませんでした")));
     } finally {
       release();
     }
   }
 
   if (loading || !session) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
   if (loadError) {
     return <p className="text-sm text-red-400">{loadError}</p>;
   }
   if (!me) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-8">
-      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">コーチングチケット</Link>
-      <h1 className="text-2xl font-bold">フォーム添削の準備</h1>
+      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">{L("コーチングチケット")}</Link>
+      <h1 className="text-2xl font-bold">{L("フォーム添削の準備")}</h1>
 
       <section className="space-y-3">
-        <h2 className="font-bold">生まれた年月</h2>
+        <h2 className="font-bold">{L("生まれた年月")}</h2>
         {me.birth_month ? (
-          <p className="text-sm text-slate-200">
-            {me.birth_month.replace("-", "年")}月（{me.is_minor ? "18歳未満" : "18歳以上"}）。変更はお問い合わせからお願いします。
-          </p>
+          <p className="text-sm text-slate-200">{L("{v0}月（{v1}）。変更はお問い合わせからお願いします。", { v0: me.birth_month.replace("-", L("年")), v1: me.is_minor ? L("18歳未満") : L("18歳以上") })}</p>
         ) : (
           <form onSubmit={onBirthMonth} className="space-y-2">
-            <p className="text-sm text-slate-300">
-              年齢の確認のために使い、他の人には見えません。登録したあとは自分では変えられません。18歳未満の方は、有料サービスを購入する前に保護者の許可を得てください。
-            </p>
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="生まれた年月" />
+            <p className="text-sm text-slate-300">{L("年齢の確認のために使い、他の人には見えません。登録したあとは自分では変えられません。18歳未満の方は、有料サービスを購入する前に保護者の許可を得てください。")}</p>
+            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label={L("生まれた年月")} />
             {monthError ? <p className="text-sm text-red-400">{monthError}</p> : null}
-            <Button type="submit" className="w-full" disabled={!month || pending}>
-              登録する
-            </Button>
+            <Button type="submit" className="w-full" disabled={!month || pending}>{L("登録する")}</Button>
           </form>
         )}
       </section>
 
       {me.is_minor ? (
         <section className="space-y-3">
-          <h2 className="font-bold">保護者の同意</h2>
+          <h2 className="font-bold">{L("保護者の同意")}</h2>
           <p className="text-sm text-slate-200">
-            {me.guardian ? guardianLabels[me.guardian.status] : "まだ保護者にメールを送っていません"}
+            {me.guardian ? guardianLabels[me.guardian.status] : L("まだ保護者にメールを送っていません")}
           </p>
-          <p className="text-sm text-slate-300">
-            動画添削・追加相談は、この手続きなしで購入できます。購入する前に保護者の許可を得て、購入の画面で毎回確認のチェックを入れてください。保護者の同意は、パーソナル指導など保護者の方が契約する指導に使います。同意は保護者だけが、メールで届くリンクから行えます。
-          </p>
+          <p className="text-sm text-slate-300">{L("動画添削・追加相談は、この手続きなしで購入できます。購入する前に保護者の許可を得て、購入の画面で毎回確認のチェックを入れてください。保護者の同意は、パーソナル指導など保護者の方が契約する指導に使います。同意は保護者だけが、メールで届くリンクから行えます。")}</p>
           {me.guardian?.guardian_email ? (
-            <p className="text-sm text-slate-300">送り先: {me.guardian.guardian_email}</p>
+            <p className="text-sm text-slate-300">{L("送り先: {guardian_email}", { guardian_email: me.guardian.guardian_email })}</p>
           ) : null}
           <form onSubmit={onSendLink} className="space-y-2">
             {guardianEmailLocked ? (
-              <p className="text-xs text-slate-400">
-                保護者が一度答えたあとは、送り先のアドレスは変えられません。変えたいときはお問い合わせください。
-              </p>
+              <p className="text-xs text-slate-400">{L("保護者が一度答えたあとは、送り先のアドレスは変えられません。変えたいときはお問い合わせください。")}</p>
             ) : (
               <>
-                <p className="text-sm text-slate-300">
-                  保護者のメールアドレスに、同意のページのリンクを TrackTalk から送ります。自分のアドレスではなく、保護者のアドレスを入力してください。
-                </p>
+                <p className="text-sm text-slate-300">{L("保護者のメールアドレスに、同意のページのリンクを TrackTalk から送ります。自分のアドレスではなく、保護者のアドレスを入力してください。")}</p>
                 <Input
                   type="email"
                   autoComplete="off"
                   value={guardianEmail}
                   onChange={(e) => setGuardianEmail(e.target.value)}
                   placeholder={me.guardian?.guardian_email ?? "parent@example.com"}
-                  aria-label="保護者のメールアドレス"
+                  aria-label={L("保護者のメールアドレス")}
                 />
                 {guardianEmailError ? <p className="text-sm text-red-400">{guardianEmailError}</p> : null}
               </>
@@ -188,41 +177,31 @@ export default function CoachingSetupPage() {
               className="w-full"
               disabled={pending || (!guardianEmailLocked && !guardianEmail.trim())}
             >
-              {me.guardian?.guardian_email ? "保護者にメールを送り直す" : "保護者にメールを送る"}
+              {me.guardian?.guardian_email ? L("保護者にメールを送り直す") : L("保護者にメールを送る")}
             </Button>
           </form>
           {me.guardian ? (
-            <p className="text-xs text-slate-400">送り直すと、前に送ったリンクは使えなくなります。メールは1日5回まで送れます。</p>
+            <p className="text-xs text-slate-400">{L("送り直すと、前に送ったリンクは使えなくなります。メールは1日5回まで送れます。")}</p>
           ) : null}
           {linkMessage ? <p className="text-sm text-slate-300">{linkMessage}</p> : null}
         </section>
       ) : null}
 
       <section className="space-y-3">
-        <h2 className="font-bold">通知</h2>
-        <p className="text-sm text-slate-300">
-          添削が返ってきたときや、パーソナル指導の申し込みに返事が来たときに、この端末へ通知します。通知を受け取れる端末: {me.push_devices}台
-        </p>
-        <Link href="/me/push" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-200 underline underline-offset-4">
-          通知設定を開く
-        </Link>
+        <h2 className="font-bold">{L("通知")}</h2>
+        <p className="text-sm text-slate-300">{L("添削が返ってきたときや、パーソナル指導の申し込みに返事が来たときに、この端末へ通知します。通知を受け取れる端末: {push_devices}台", { push_devices: me.push_devices })}</p>
+        <Link href="/me/push" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-200 underline underline-offset-4">{L("通知設定を開く")}</Link>
         {me.push_devices > 0 ? (
-          <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void onTestPush()}>
-            テストの通知を送る
-          </Button>
+          <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void onTestPush()}>{L("テストの通知を送る")}</Button>
         ) : null}
         {pushMessage ? <p className="text-sm text-slate-300">{pushMessage}</p> : null}
       </section>
 
       {me.demo ? (
         <section className="space-y-2">
-          <h2 className="font-bold">申し込んだもの</h2>
-          <Link href="/me/coaching/requests" className="block text-sm text-blue-300 underline">
-            フォーム添削の依頼
-          </Link>
-          <Link href="/me/coaching/personal" className="block text-sm text-blue-300 underline">
-            パーソナル指導の申し込み
-          </Link>
+          <h2 className="font-bold">{L("申し込んだもの")}</h2>
+          <Link href="/me/coaching/requests" className="block text-sm text-blue-300 underline">{L("フォーム添削の依頼")}</Link>
+          <Link href="/me/coaching/personal" className="block text-sm text-blue-300 underline">{L("パーソナル指導の申し込み")}</Link>
         </section>
       ) : null}
     </div>

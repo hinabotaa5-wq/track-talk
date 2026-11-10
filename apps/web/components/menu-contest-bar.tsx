@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { ChevronRight, Flame } from "lucide-react";
@@ -72,7 +73,7 @@ export function MenuContestBar() {
         }`}
       >
         <Flame className={`size-4 shrink-0 ${parts.urgent ? "text-red-300" : "text-orange-300"}`} aria-hidden />
-        <span className="shrink-0 font-bold text-white">{menuContestName}</span>
+        <span className="shrink-0 font-bold text-white">{L(menuContestName)}</span>
         <span className="min-w-0 flex-1 truncate text-right text-slate-200">
           <span className="text-xs">{deadline.prefix} </span>
           <span className={`font-bold tabular-nums ${parts.urgent ? "text-red-200" : "text-orange-200"}`}>

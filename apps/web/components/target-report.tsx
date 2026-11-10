@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -31,7 +32,7 @@ export function TargetReport({
       router.push(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
-    if (!(await confirmDialog(reportConfirmOptions({ title: `この${noun}を通報しますか？` })))) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: L("この{noun}を通報しますか？", { noun }) })))) return;
     if (!acquire()) return;
     try {
       await apiFetch("/v1/reports", {
@@ -40,12 +41,12 @@ export function TargetReport({
         body: JSON.stringify({ target_type: targetType, target_id: id, reason: "other", detail: "" }),
       });
       setReported(true);
-      alert("通報を受け付けました");
+      alert(L("通報を受け付けました"));
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
         setReported(true);
-        alert("すでに通報済みです");
-      } else alert(e instanceof ApiRequestError ? e.message : "通報できませんでした");
+        alert(L("すでに通報済みです"));
+      } else alert(e instanceof ApiRequestError ? e.message : L("通報できませんでした"));
     } finally {
       release();
     }
@@ -58,7 +59,7 @@ export function TargetReport({
       disabled={pending || reported}
       className={reported ? "text-xs font-semibold text-amber-300" : "text-xs text-slate-300 transition active:scale-[0.98] disabled:opacity-50"}
     >
-      {reported ? "通報済み" : "通報"}
+      {reported ? L("通報済み") : L("通報")}
     </button>
   );
 }

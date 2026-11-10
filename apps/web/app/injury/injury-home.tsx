@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState } from "react";
 import { motion, MotionConfig } from "motion/react";
@@ -9,8 +10,8 @@ import { DataView } from "./data/data-view";
 type View = "share" | "data";
 
 const views: { id: View; label: string }[] = [
-  { id: "share", label: "共有" },
-  { id: "data", label: "データ" },
+  { id: "share", get label() { return L("共有"); } },
+  { id: "data", get label() { return L("データ"); } },
 ];
 
 // ケガタブ。「共有」と「データ」を、読み込み直さずにその場で切り替える(大会タブと同じ)。
@@ -29,9 +30,9 @@ export function InjuryHome({ initialView }: { initialView: View }) {
 
   return (
     <div className="space-y-4">
-      <h1 className="sr-only">ケガ</h1>
+      <h1 className="sr-only">{L("ケガ")}</h1>
       <MotionConfig reducedMotion="user">
-        <ViewSwitch label="ケガタブの切り替え" layoutId="injury-view-pill" views={views} current={view} onSelect={select} />
+        <ViewSwitch label={L("ケガタブの切り替え")} layoutId="injury-view-pill" views={views} current={view} onSelect={select} />
         {views.map((item) =>
           opened.has(item.id) || item.id === view ? (
             <motion.div

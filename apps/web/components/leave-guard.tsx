@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import {
   createContext,
@@ -59,21 +60,15 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
             aria-describedby="leave-guard-desc"
             className="w-full max-w-sm space-y-4 rounded-2xl border border-white/20 bg-slate-900 p-5 text-white shadow-xl"
           >
-            <h2 id="leave-guard-title" className="text-lg font-bold">
-              ページを離れますか？
-            </h2>
-            <p id="leave-guard-desc" className="text-sm text-slate-300">
-              ページを離れると入力されたデータが消えます。
-            </p>
+            <h2 id="leave-guard-title" className="text-lg font-bold">{L("ページを離れますか？")}</h2>
+            <p id="leave-guard-desc" className="text-sm text-slate-300">{L("ページを離れると入力されたデータが消えます。")}</p>
             <div className="flex flex-col gap-2">
               <button
                 type="button"
                 autoFocus
                 onClick={() => setPending(null)}
                 className="h-11 rounded-full bg-blue-500 font-semibold text-pure-white transition active:scale-[0.98]"
-              >
-                入力を続ける
-              </button>
+              >{L("入力を続ける")}</button>
               <button
                 type="button"
                 onClick={() => {
@@ -83,9 +78,7 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
                   go();
                 }}
                 className="h-11 rounded-full border border-white/25 text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
-              >
-                ページを離れる
-              </button>
+              >{L("ページを離れる")}</button>
             </div>
           </div>
         </div>

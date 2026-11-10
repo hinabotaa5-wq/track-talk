@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { ChevronDown, MapPin, Trophy } from "lucide-react";
 import { useId, useState } from "react";
@@ -9,8 +10,8 @@ import { PublicPlanList } from "./coaching-plans";
 import { SupportConsultEntry } from "./support-consult-entry";
 
 const choices = [
-  { service: "competition_support", icon: Trophy, description: "目標の大会まで、練習や調整を継続して相談する" },
-  { service: "in_person", icon: MapPin, description: "コーチと現地で会い、動きを見てもらいながら指導を受ける" },
+  { service: "competition_support", icon: Trophy, get description() { return L("目標の大会まで、練習や調整を継続して相談する"); } },
+  { service: "in_person", icon: MapPin, get description() { return L("コーチと現地で会い、動きを見てもらいながら指導を受ける"); } },
 ] as const;
 
 // consult があるコーチの大会までプランは、価格の決まった完成品ではなく、無料相談の入口を出す。
@@ -25,8 +26,8 @@ export function CoachServicePlans({ services, plans, coachID, consult }: { servi
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-200">受けたい指導を選ぶと、内容と料金を確認できます。</p>
-      <div className="space-y-2" aria-label="指導の種類">
+      <p className="text-sm text-slate-200">{L("受けたい指導を選ぶと、内容と料金を確認できます。")}</p>
+      <div className="space-y-2" aria-label={L("指導の種類")}>
         {choices.map(({ service, icon: Icon, description }) => {
           const enabled = available(service);
           const expanded = active === service;
@@ -39,7 +40,7 @@ export function CoachServicePlans({ services, plans, coachID, consult }: { servi
               <span className="min-w-0 flex-1 space-y-1">
                 <span className="block font-semibold">{coachingServiceLabels[service]}</span>
                 <span className={`block text-xs leading-relaxed ${enabled ? "text-slate-200" : "text-slate-500"}`}>{description}</span>
-                {!enabled ? <span className="block text-xs">{services.includes(service) ? "公開中のプランがありません" : "このコーチは受付していません"}</span> : null}
+                {!enabled ? <span className="block text-xs">{services.includes(service) ? L("公開中のプランがありません") : L("このコーチは受付していません")}</span> : null}
               </span>
               <ChevronDown className={`size-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
             </button>
@@ -47,13 +48,13 @@ export function CoachServicePlans({ services, plans, coachID, consult }: { servi
         })}
       </div>
       <div id={panelID} hidden={!active}>
-        {active ? <section aria-label={`${coachingServiceLabels[active]}のプラン`} className="space-y-3">
+        {active ? <section aria-label={L("{v0}のプラン", { v0: coachingServiceLabels[active] })} className="space-y-3">
           <h3 className="font-bold text-white">{coachingServiceLabels[active]}</h3>
           {active === "competition_support" && consultEntry ? <SupportConsultEntry coachID={coachID!} consult={consultEntry} /> : <PublicPlanList plans={publicPlans.filter((plan) => plan.service_type === active)} />}
         </section> : null}
       </div>
-      {legacy.length ? <section className="space-y-2" aria-label="従来のサポートプラン">
-        <h3 className="text-sm font-semibold">従来のサポートプラン</h3>
+      {legacy.length ? <section className="space-y-2" aria-label={L("従来のサポートプラン")}>
+        <h3 className="text-sm font-semibold">{L("従来のサポートプラン")}</h3>
         <PublicPlanList plans={legacy} />
       </section> : null}
     </div>

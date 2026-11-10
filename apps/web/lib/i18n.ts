@@ -1,6 +1,12 @@
-// 表示言語の辞書（本体 #521）。対応言語は当面 ja / en。
-// 英語文言が未用意の箇所は日本語にフォールバックする（キー名や空白を出さない）。
-// 選手側画面の辞書整備は段階対応で、ここでは共通部分とコーチ導線を優先する。
+// 表示言語の辞書（本体 #521・#530）。対応言語は当面 ja / en。
+// #530（運営者決定 2026-11-11）：en を選んだら画面上のシステム文言はすべて英語にする。
+// 未訳を日本語で出すことを仕様にしない。辞書の漏れは lib/i18n-coverage.test.ts で検出する。
+//
+// 文言の出し方は2通り：
+// - t(locale, "キー")：#521 からのキー方式（共通部分・コーチ導線）。en はキーをすべて持つ。
+// - L("日本語の文言", vars)：#530 で全画面に広げた方式。日本語の文言そのものを鍵に英語辞書（i18n-en.ts）を引く。
+//   いまの表示言語は LocaleProvider が setActiveLocale で決める。言語が変わると画面を描き直す（key を変える）ので、
+//   描画中に呼ぶ L はいつも新しい言語を返す。
 
 export type Locale = "ja" | "en";
 
@@ -107,7 +113,7 @@ const ja = {
   "profile.eventPlaceholder": "選んでください",
   "profile.nicknamePublic": "投稿にニックネームを公開する",
   "profile.language": "表示言語",
-  "profile.languageHint": "選ぶとすぐに切り替わります。英語の文言がない箇所は日本語で表示します。",
+  "profile.languageHint": "選ぶとすぐに切り替わります。「保存」でアカウントに保存します。",
   "profile.saved": "プロフィールを更新しました。",
 
   "notify.title": "通知",
@@ -214,8 +220,8 @@ const ja = {
 
 export type I18nKey = keyof typeof ja;
 
-// 英語辞書。ないキーは日本語にフォールバックする（t の実装で吸収）。
-const en: Partial<Record<I18nKey, string>> = {
+// 英語辞書。#530 からはキーをすべて持つ（型で強制する）。
+const en: Record<I18nKey, string> = {
   "nav.main": "Main",
   "nav.home": "Home",
   "nav.competitions": "Meets",
@@ -262,7 +268,7 @@ const en: Partial<Record<I18nKey, string>> = {
   "profile.eventPlaceholder": "Select",
   "profile.nicknamePublic": "Show my nickname on posts",
   "profile.language": "Language",
-  "profile.languageHint": "Switches immediately. Parts without English text stay in Japanese.",
+  "profile.languageHint": "Switches immediately. Tap Save to keep it on your account.",
   "profile.saved": "Profile updated.",
 
   "notify.title": "Notifications",
@@ -369,7 +375,7 @@ const en: Partial<Record<I18nKey, string>> = {
 
 // 文言を取る。英語にないキーは日本語を返す。{name} は vars で置き換える。
 export function t(locale: Locale, key: I18nKey, vars?: Record<string, string | number>): string {
-  const template = locale === "en" ? (en[key] ?? ja[key]) : ja[key];
+  const template = locale === "en" ? en[key] : ja[key];
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = vars[name];
@@ -391,4 +397,110 @@ const tabKeys: Record<MainTabId, I18nKey> = {
 
 export function mainTabLabel(id: MainTabId, locale: Locale): string {
   return t(locale, tabKeys[id]);
+}
+
+// ---- #530：日本語の文言を鍵にした辞書引き ----
+
+let activeLocale: Locale = "ja";
+let english: Readonly<Record<string, string>> | null = null;
+
+// いまの表示言語。LocaleProvider が描画のたびに決める（サーバー描画では常に ja）。
+export function currentLocale(): Locale {
+  return activeLocale;
+}
+
+export function setActiveLocale(locale: Locale): void {
+  activeLocale = locale;
+}
+
+export function englishLoaded(): boolean {
+  return english !== null;
+}
+
+export function installEnglish(dictionary: Readonly<Record<string, string>>): void {
+  english = dictionary;
+}
+
+// 英語辞書は英語を選んだ人だけが読み込む（日本語の人の初回読み込みを重くしない）。
+let loading: Promise<void> | null = null;
+export function loadEnglish(): Promise<void> {
+  if (english) return Promise.resolve();
+  loading ??= import("./i18n-en").then((mod) => {
+    english = mod.en;
+  });
+  return loading;
+}
+
+function fill(template: string, vars?: Record<string, string | number | null | undefined>): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const value = vars[name];
+    return value === undefined || value === null ? match : String(value);
+  });
+}
+
+// 画面の文言。ja はそのまま、en は英語辞書から引く。{name} は vars で置き換える。
+// 英語辞書に無いと日本語が出てしまうので、辞書の網羅は i18n-coverage.test.ts で必ず検査する。
+export function L(ja: string, vars?: Record<string, string | number | null | undefined>): string {
+  if (activeLocale === "en" && english) {
+    const found = english[ja];
+    if (found !== undefined) return fill(found, vars);
+    // 動的な文言（API のエラー文など）で辞書に無いものは、日本語のまま出さずに分かる形にする。
+    if (process.env.NODE_ENV !== "production") console.warn("[i18n] missing English:", ja);
+  }
+  return fill(ja, vars);
+}
+
+// 日本語の文言が英語辞書にあるか（動的な文言の出し分けに使う）。
+export function hasEnglish(ja: string): boolean {
+  return !!english && english[ja] !== undefined;
+}
+
+// 英語の人は、辞書を当てるまで画面を隠す（日本語が一瞬見えるのを防ぐ）。3秒で必ず見せる。
+export const localePendingClass = "locale-pending";
+export const localeStartupScript = `try{if(localStorage.getItem(${JSON.stringify(storageKey)})==="en"){var d=document.documentElement;d.lang="en";d.classList.add(${JSON.stringify(localePendingClass)});setTimeout(function(){d.classList.remove(${JSON.stringify(localePendingClass)})},3000)}}catch(e){}`;
+
+// 曜日の短い表記（0 が日曜）。英語は1文字だと火・木などが区別できないので3文字にする。
+const weekdaysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export function weekdayLabel(index: number): string {
+  return activeLocale === "en" && english ? weekdaysEn[index] : "日月火水木金土"[index];
+}
+
+// タブのタイトルの英語化（本体 #530）。タイトルは「ページ名｜TrackTalk」の形で、部分ごとに L で引く。
+// 都道府県名などを埋め込んだタイトルは辞書に無いので、画面側が「日本語の部分 → 英語」を登録する（useTitleTranslation）。
+const titleParts = new Map<string, string>();
+export const titleChangedEvent = "tracktalk:title-parts";
+
+export function registerTitlePart(ja: string, translated: string) {
+  if (!ja || titleParts.get(ja) === translated) return;
+  titleParts.set(ja, translated);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(titleChangedEvent));
+}
+
+export function translateTitle(title: string): string {
+  return title
+    .split("｜")
+    .map((part) => titleParts.get(part) ?? L(part))
+    .join(" | ");
+}
+
+// 文の途中に要素（強調した数字やリンク）を挟むときに、差し込み位置の前後の文言を返す。
+// 例：L("まであと {days} 日") を英語で "{days} days to go" にすると、語順が変わっても正しく並ぶ。
+export function splitAround(ja: string, slot: string): [string, string] {
+  const text = L(ja);
+  const marker = `{${slot}}`;
+  const index = text.indexOf(marker);
+  return index < 0 ? [text, ""] : [text.slice(0, index), text.slice(index + marker.length)];
+}
+
+// API が日本語で作った日付や範囲（「2026年11月10日」「9月11日〜19日」「25.0〜25.5cm」など）を、英語表示のときは数字の形にする。
+export function localizeJaDate(text: string): string {
+  if (activeLocale !== "en" || !english) return text;
+  return text
+    .replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/g, "$2/$3/$1")
+    .replace(/(\d{4})年(\d{1,2})月/g, "$2/$1")
+    .replace(/(\d{1,2})月(\d{1,2})日/g, "$1/$2")
+    .replace(/(\d{1,2})日/g, "$1")
+    .replace(/(\d{4})年/g, "$1")
+    .replace(/〜/g, "–");
 }

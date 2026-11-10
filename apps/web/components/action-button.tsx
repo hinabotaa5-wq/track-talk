@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { motion } from "motion/react";
 import { Heart, Bookmark, Flag } from "lucide-react";
@@ -15,7 +16,7 @@ export function LikeButton({
   count,
   disabled,
   onClick,
-  label = "いいね",
+  label = L("いいね"),
 }: {
   liked: boolean;
   count: number;
@@ -90,7 +91,7 @@ export function SaveButton({
           )}
         />
       </motion.span>
-      <span>{saved ? "保存済み" : "保存"}</span>
+      <span>{saved ? L("保存済み") : L("保存")}</span>
     </motion.button>
   );
 }
@@ -123,7 +124,7 @@ export function ReportButton({
           reported ? "fill-amber-400 text-amber-400" : "text-slate-200"
         )}
       />
-      <span>{reported ? "通報済み" : "通報"}</span>
+      <span>{reported ? L("通報済み") : L("通報")}</span>
     </motion.button>
   );
 }

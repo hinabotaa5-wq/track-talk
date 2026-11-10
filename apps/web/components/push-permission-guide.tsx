@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell } from "lucide-react";
@@ -81,36 +82,34 @@ function PushGuideSheet({
           <Bell aria-hidden className="size-5" />
         </span>
         <h2 id={titleId} className="text-lg font-bold">
-          {denied ? "通知がオフになっています" : install ? "ホーム画面に追加して通知を受け取る" : reviewCompletion ? "返信が届いたら、すぐお知らせします" : "返信やお知らせを、すぐ受け取れます"}
+          {denied ? L("通知がオフになっています") : install ? L("ホーム画面に追加して通知を受け取る") : reviewCompletion ? L("返信が届いたら、すぐお知らせします") : L("返信やお知らせを、すぐ受け取れます")}
         </h2>
         <div id={bodyId} className="space-y-2 text-sm leading-relaxed text-slate-300">
           {denied ? (
             <ol className="list-decimal space-y-1 pl-5">
-              <li>{device === "other" ? "ブラウザで TrackTalk を開く" : "端末の「設定」を開く"}</li>
-              <li>{device === "other" ? "アドレスバーのサイト設定を開く" : device === "android" ? "「アプリ」から TrackTalk を選ぶ" : "TrackTalk を選ぶ"}</li>
-              <li>「通知」を許可する</li>
+              <li>{device === "other" ? L("ブラウザで TrackTalk を開く") : L("端末の「設定」を開く")}</li>
+              <li>{device === "other" ? L("アドレスバーのサイト設定を開く") : device === "android" ? L("「アプリ」から TrackTalk を選ぶ") : L("TrackTalk を選ぶ")}</li>
+              <li>{L("「通知」を許可する")}</li>
             </ol>
           ) : install ? (
             <ol className="list-decimal space-y-1 pl-5">
-              <li>{device === "ios-other" ? "Safari で TrackTalk を開き、共有ボタンをタップ" : "Safari の共有ボタンをタップ"}</li>
-              <li>「ホーム画面に追加」を選び、「追加」をタップ</li>
-              <li>ホーム画面の TrackTalk を開く</li>
+              <li>{device === "ios-other" ? L("Safari で TrackTalk を開き、共有ボタンをタップ") : L("Safari の共有ボタンをタップ")}</li>
+              <li>{L("「ホーム画面に追加」を選び、「追加」をタップ")}</li>
+              <li>{L("ホーム画面の TrackTalk を開く")}</li>
             </ol>
           ) : reviewCompletion ? (
-            <p>コーチが添削を返したら通知します。あとから設定でいつでも切れます。</p>
+            <p>{L("コーチが添削を返したら通知します。あとから設定でいつでも切れます。")}</p>
           ) : (
-            <p>あなたの投稿へのコメントやコメントへの返信、運営からのお知らせがこの端末に届きます。あとからマイページで変更できます。</p>
+            <p>{L("あなたの投稿へのコメントやコメントへの返信、運営からのお知らせがこの端末に届きます。あとからマイページで変更できます。")}</p>
           )}
         </div>
         {message ? <p role="status" className="text-sm text-slate-200">{message}</p> : null}
         <div className="flex flex-col gap-2 pt-1">
           {kind === "default" ? (
-            <Button type="button" className="min-h-11" onClick={onAccept} disabled={busy}>
-              通知を受け取る
-            </Button>
+            <Button type="button" className="min-h-11" onClick={onAccept} disabled={busy}>{L("通知を受け取る")}</Button>
           ) : null}
           <Button type="button" className="min-h-11" variant="secondary" onClick={onClose} disabled={busy} data-push-guide-close>
-            {denied ? "閉じる" : "あとで"}
+            {denied ? L("閉じる") : L("あとで")}
           </Button>
         </div>
       </div>
@@ -219,9 +218,9 @@ export function PushPermissionGuide({
       await registerPushSubscription(userId);
       setSheet(null);
       onEnabled?.();
-      setMessage("この端末で通知を受け取れるようになりました");
+      setMessage(L("この端末で通知を受け取れるようになりました"));
     } catch {
-      setMessage("通知を設定できませんでした。もう一度お試しください。");
+      setMessage(L("通知を設定できませんでした。もう一度お試しください。"));
     } finally {
       release();
     }
@@ -243,7 +242,7 @@ export function PushPermissionGuide({
     }
     try {
       if (snoozed(storageKey(userId, current))) {
-        setMessage("「あとで」を選んでから7日経つと、通知を設定できます。");
+        setMessage(L("「あとで」を選んでから7日経つと、通知を設定できます。"));
         return;
       }
     } catch {
@@ -253,7 +252,7 @@ export function PushPermissionGuide({
       if (current === "default" && await readPushSubscription()) return;
       if (permissionStatus() === current && !document.querySelector(modalSelector)) setSheet(current);
     } catch {
-      setMessage("通知の状態を確認できませんでした。もう一度お試しください。");
+      setMessage(L("通知の状態を確認できませんでした。もう一度お試しください。"));
     }
   }
 

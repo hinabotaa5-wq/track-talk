@@ -1,4 +1,5 @@
-export function SubmittingProgress({ label = "投稿を送信しています" }: { label?: string }) {
+import { L } from "@/lib/i18n";
+export function SubmittingProgress({ label = L("投稿を送信しています") }: { label?: string }) {
   return (
     <div
       className="rounded-2xl border border-blue-800/60 bg-blue-950/40 p-4"
@@ -13,7 +14,7 @@ export function SubmittingProgress({ label = "投稿を送信しています" }:
       >
         <div className="upload-indeterminate h-full rounded-full bg-blue-600" />
       </div>
-      <p className="mt-2 text-sm text-slate-200">このままお待ちください</p>
+      <p className="mt-2 text-sm text-slate-200">{L("このままお待ちください")}</p>
     </div>
   );
 }

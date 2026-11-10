@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 import { useRouter } from "next/navigation";
@@ -13,5 +14,5 @@ export default function CoachRequestsRedirectPage() {
     router.replace(window.location.hash === "#reviewing" ? "/coach/reviewing" : "/coach/offers");
   }, [router]);
 
-  return <PageLoading screen label="読み込み中..." />;
+  return <PageLoading screen label={L("読み込み中...")} />;
 }

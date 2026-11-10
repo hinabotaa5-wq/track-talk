@@ -1,3 +1,6 @@
+"use client";
+
+import { L } from "@/lib/i18n";
 import { coachingEnabled } from "@/lib/features";
 import { videoReviewStartNotice } from "@/lib/video-review-start";
 import { CoachApplyLink } from "./coach-apply-link";
@@ -20,8 +23,8 @@ export function CoachingGate({
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold">ただいま準備中です</h1>
-        <p className="text-sm leading-relaxed text-slate-200">動画添削とサポートプランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。</p>
+        <h1 className="text-2xl font-bold">{L("ただいま準備中です")}</h1>
+        <p className="text-sm leading-relaxed text-slate-200">{L("動画添削とサポートプランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。")}</p>
         {startNotice && <p className="text-sm leading-relaxed text-slate-200">{startNotice}</p>}
       </div>
       <CoachApplyLink />

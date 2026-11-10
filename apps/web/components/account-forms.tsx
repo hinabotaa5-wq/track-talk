@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -26,9 +27,7 @@ import type { z } from "zod";
 function ForgotPasswordLink() {
   return (
     <p className="text-sm">
-      <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">
-        パスワードを忘れた方はこちら
-      </Link>
+      <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">{L("パスワードを忘れた方はこちら")}</Link>
     </p>
   );
 }
@@ -50,7 +49,7 @@ export function EmailSection({ email }: { email: string }) {
     setMessage("");
     try {
       if (values.email.toLowerCase() === email.toLowerCase()) {
-        setError("いまのメールアドレスと同じです。");
+        setError(L("いまのメールアドレスと同じです。"));
         return;
       }
       // 変える前に、いまのパスワードで本人かどうかを確かめる。
@@ -66,7 +65,7 @@ export function EmailSection({ email }: { email: string }) {
         return;
       }
       form.reset();
-      setMessage("確認メールを送りました。メール内のリンクを開くと、メールアドレスが変わります。届かないときは迷惑メールを確認してください。");
+      setMessage(L("確認メールを送りました。メール内のリンクを開くと、メールアドレスが変わります。届かないときは迷惑メールを確認してください。"));
     } finally {
       // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。
       captcha.reset();
@@ -76,19 +75,17 @@ export function EmailSection({ email }: { email: string }) {
 
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-      <p className="text-sm text-slate-300">いま: {email}</p>
+      <p className="text-sm text-slate-300">{L("いま: {email}", { email })}</p>
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input type="email" autoComplete="email" placeholder="新しいメールアドレス" {...form.register("email")} />
+        <Input type="email" autoComplete="email" placeholder={L("新しいメールアドレス")} {...form.register("email")} />
         {form.formState.errors.email ? <p className="text-sm text-red-400">{form.formState.errors.email.message}</p> : null}
-        <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
+        <Input type="password" autoComplete="current-password" placeholder={L("いまのパスワード")} {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
         <ForgotPasswordLink />
         {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
-          変更する
-        </Button>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>{L("変更する")}</Button>
       </form>
     </section>
   );
@@ -119,7 +116,7 @@ export function PasswordSection({ email }: { email: string }) {
       // Supabase の「Require current password when updating」が有効なときは、サーバーもいまのパスワードを確かめる。
       // 漏洩済みパスワードは Supabase に送らずここで止める（本体 #429）。HIBP に届かなくても通す。
       if (await isPwnedPassword(values.password)) {
-        setError(pwnedPasswordMessage);
+        setError(L(pwnedPasswordMessage));
         return;
       }
       const { error: err } = await supabase.auth.updateUser({ password: values.password, current_password: values.current });
@@ -128,7 +125,7 @@ export function PasswordSection({ email }: { email: string }) {
         return;
       }
       form.reset();
-      setMessage("パスワードを変更しました。");
+      setMessage(L("パスワードを変更しました。"));
     } finally {
       // 確認のトークンは1回しか使えないので、成否にかかわらず取り直す。
       captcha.reset();
@@ -139,19 +136,17 @@ export function PasswordSection({ email }: { email: string }) {
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <Input type="password" autoComplete="current-password" placeholder="いまのパスワード" {...form.register("current")} />
+        <Input type="password" autoComplete="current-password" placeholder={L("いまのパスワード")} {...form.register("current")} />
         {form.formState.errors.current ? <p className="text-sm text-red-400">{form.formState.errors.current.message}</p> : null}
         <ForgotPasswordLink />
-        <Input type="password" autoComplete="new-password" placeholder="新しいパスワード(8文字以上)" {...form.register("password")} />
+        <Input type="password" autoComplete="new-password" placeholder={L("新しいパスワード(8文字以上)")} {...form.register("password")} />
         {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
-        <Input type="password" autoComplete="new-password" placeholder="もう一度" {...form.register("confirm")} />
+        <Input type="password" autoComplete="new-password" placeholder={L("もう一度")} {...form.register("confirm")} />
         {form.formState.errors.confirm ? <p className="text-sm text-red-400">{form.formState.errors.confirm.message}</p> : null}
         {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>
-          変更する
-        </Button>
+        <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>{L("変更する")}</Button>
       </form>
     </section>
   );
@@ -159,7 +154,7 @@ export function PasswordSection({ email }: { email: string }) {
 
 // ログインを確かめ、メールアドレスとパスワードでログインしている人にだけフォームを出す。
 // Google でログインしている人は、メールアドレスもパスワードも Google 側で管理する。
-export function AccountPageShell({ title, path, children }: { title: string; path: string; children: (email: string) => ReactNode }) {
+export function AccountPageShell({ title, subject, path, children }: { title: string; subject: string; path: string; children: (email: string) => ReactNode }) {
   const { session, loading } = useAuth();
   const router = useRouter();
 
@@ -167,7 +162,7 @@ export function AccountPageShell({ title, path, children }: { title: string; pat
     if (!loading && !session) router.replace(`/login?next=${path}`);
   }, [loading, session, router, path]);
 
-  if (loading || !session) return <PageLoading label="読み込み中..." />;
+  if (loading || !session) return <PageLoading label={L("読み込み中...")} />;
 
   const email = session.user.email ?? "";
   const providers = session.user.app_metadata?.providers as string[] | undefined;
@@ -179,7 +174,7 @@ export function AccountPageShell({ title, path, children }: { title: string; pat
       {hasPassword && email ? (
         children(email)
       ) : (
-        <p className="text-sm text-slate-300">Google でログインしているので、{title.replace("の変更", "")}は Google のアカウントで変更してください。</p>
+        <p className="text-sm text-slate-300">{L("Google でログインしているので、{v0}は Google のアカウントで変更してください。", { v0: subject })}</p>
       )}
     </div>
   );

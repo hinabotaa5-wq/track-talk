@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { coachEventLabels } from "@/lib/coach-recruit";
 import type { CoachEvent } from "@/lib/types";
@@ -60,14 +61,14 @@ export function CoachEventChips({ value, onChange }: { value: CoachEventFilter; 
   }, [measure]);
 
   const chips: { id: CoachEventFilter; label: string }[] = [
-    { id: "all", label: "すべて" },
+    { id: "all", label: L("すべて") },
     ...coachEventFilterOrder.map((event) => ({ id: event, label: coachEventLabels[event] })),
   ];
   return (
     <div
       ref={scroller}
       role="radiogroup"
-      aria-label="種目で絞り込む"
+      aria-label={L("種目で絞り込む")}
       data-more-right={moreRight ? "true" : "false"}
       onScroll={measure}
       className="coach-event-chips flex flex-nowrap gap-2 overflow-x-auto py-0.5"
@@ -98,10 +99,8 @@ export function CoachEventChips({ value, onChange }: { value: CoachEventFilter; 
 export function CoachEventEmpty({ onReset }: { onReset: () => void }) {
   return (
     <div className="glass space-y-2 rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm">
-      <p className="text-slate-200">この種目のコーチはまだいません</p>
-      <button type="button" onClick={onReset} className="font-semibold text-blue-300 underline underline-offset-2">
-        すべての種目のコーチを見る
-      </button>
+      <p className="text-slate-200">{L("この種目のコーチはまだいません")}</p>
+      <button type="button" onClick={onReset} className="font-semibold text-blue-300 underline underline-offset-2">{L("すべての種目のコーチを見る")}</button>
     </div>
   );
 }

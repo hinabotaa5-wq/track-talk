@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import type { CoachEvent } from "./types";
 
 // 大会までプランの無料相談。API（support_consult.go）の値と合わせる。
@@ -18,14 +19,14 @@ export type PublicSupportConsult = {
 export type SupportConsultStatus = "requested" | "clarifying" | "proposed" | "sent_to_guardian" | "accepted" | "declined" | "expired" | "withdrawn";
 
 export const supportConsultStatusLabels: Record<SupportConsultStatus, string> = {
-  requested: "コーチの提案を待っています",
-  clarifying: "コーチの聞き直しに答えてください",
-  proposed: "コーチの提案が届いています",
-  sent_to_guardian: "保護者に提案を送りました。保護者の同意を待っています",
-  accepted: "提案を受けて申し込みました",
-  declined: "コーチが辞退しました",
-  expired: "期限が過ぎました",
-  withdrawn: "取り下げました",
+  get requested() { return L("コーチの提案を待っています"); },
+  get clarifying() { return L("コーチの聞き直しに答えてください"); },
+  get proposed() { return L("コーチの提案が届いています"); },
+  get sent_to_guardian() { return L("保護者に提案を送りました。保護者の同意を待っています"); },
+  get accepted() { return L("提案を受けて申し込みました"); },
+  get declined() { return L("コーチが辞退しました"); },
+  get expired() { return L("期限が過ぎました"); },
+  get withdrawn() { return L("取り下げました"); },
 };
 
 export type SupportConsultAnswers = {
@@ -75,7 +76,8 @@ export function emptyAnswers(): SupportConsultAnswers {
 }
 
 export type Choice = { value: string; label: string };
-const c = (pairs: [string, string][]): Choice[] => pairs.map(([value, label]) => ({ value, label }));
+// 表示の文言は使うときに引く（英語表示に切り替えても、読み込み時の日本語のまま残らないように。本体 #530）。
+const c = (pairs: [string, string][]): Choice[] => pairs.map(([value, label]) => ({ value, get label() { return L(label); } }));
 
 export const timingHintChoices = c([["within_1m", "1か月以内"], ["1_3m", "1〜3か月先"], ["3_6m", "3〜6か月先"], ["over_6m", "半年より先"]]);
 export const goalChoices = c([["pb", "自己ベストを出す"], ["final", "決勝・上位大会に進む"], ["qualify", "標準記録・参加資格を取る"], ["podium", "入賞・優勝をねらう"], ["experience", "経験を積む・楽しむ"]]);
@@ -97,10 +99,10 @@ export function choiceLabel(choices: Choice[], value: string | number | null | u
   return choices.find((x) => x.value === String(value))?.label ?? "";
 }
 export function choiceLabels(choices: Choice[], values: string[]): string {
-  return values.map((v) => choiceLabel(choices, v)).filter(Boolean).join("・");
+  return values.map((v) => choiceLabel(choices, v)).filter(Boolean).join(L("・"));
 }
 
-const yn = (v: boolean | null | undefined) => (v === true ? "はい" : v === false ? "いいえ" : "");
+const yn = (v: boolean | null | undefined) => (v === true ? L("はい") : v === false ? L("いいえ") : "");
 
 // answerRows は、コーチが読む回答を1項目1行にする。空の項目は出さない。
 export function answerRows(a: SupportConsultAnswers, eventLabel: string): { section: string; label: string; value: string }[] {
@@ -108,39 +110,39 @@ export function answerRows(a: SupportConsultAnswers, eventLabel: string): { sect
   const add = (section: string, label: string, value: string | undefined) => {
     if (value) rows.push({ section, label, value });
   };
-  const A = "目標の大会";
-  add(A, "大会", a.goal_decided ? `${a.competition_name}（${a.competition_date}）` : `未定（${choiceLabel(timingHintChoices, a.timing_hint)}）`);
-  add(A, "種目", eventLabel);
-  add(A, "大会での目標", choiceLabels(goalChoices, a.goals));
-  add(A, "目標記録", a.target_record);
-  const B = "いまの実力";
-  add(B, "自己ベスト", a.personal_best);
-  add(B, "いつの記録か", choiceLabel(pbWhenChoices, a.pb_when));
-  add(B, "最近の調子", choiceLabel(formChoices, a.form));
-  const C = "練習環境";
-  add(C, "部活所属", yn(a.club));
-  add(C, "指導者", yn(a.has_coach));
-  add(C, "メニューを決める人", choiceLabel(menuByChoices, a.menu_by));
-  add(C, "週の練習日数", a.practice_days ? `${a.practice_days}日` : "");
-  add(C, "1回の練習時間", choiceLabel(sessionMinutesChoices, a.session_minutes));
-  add(C, "競技場", choiceLabel(accessChoices, a.track_access));
-  add(C, "ウエイト器具", choiceLabel(accessChoices, a.weights_access));
-  add(C, "動画の撮影", choiceLabel(filmChoices, a.can_film));
-  const D = "体と制約";
-  add(D, "今の痛み・怪我", a.injury_now ? `あり（${choiceLabels(injuryPartChoices, a.injury_parts)}）${a.injury_note}` : yn(a.injury_now));
-  add(D, "過去1年の大きな怪我", choiceLabel(injuryPastChoices, a.injury_past_year));
-  add(D, "休む・減らす時期", yn(a.rest_period));
-  const E = "直したいこと";
-  add(E, "場面・要素", choiceLabels(focusChoices, a.focus));
-  add(E, "一番の悩み", a.main_worry);
-  add(E, "フォーム動画", a.has_video ? "あり" : "なし");
-  const F = "希望するサポート";
-  add(F, "メニュー作成", yn(a.want_menu));
-  add(F, "動画への返答", choiceLabel(videoReplyChoices, a.want_video_reply));
-  add(F, "大会直前の調整", yn(a.want_peak));
-  add(F, "開始時期", a.start_timing === "date" ? a.start_date : "できるだけ早く");
-  add(F, "予算の目安", choiceLabel(budgetChoices, a.budget));
-  add(F, "コーチに聞きたいこと", a.question_to_coach);
+  const A = L("目標の大会");
+  add(A, L("大会"), a.goal_decided ? L("{competition_name}（{competition_date}）", { competition_name: a.competition_name, competition_date: a.competition_date }) : L("未定（{v0}）", { v0: choiceLabel(timingHintChoices, a.timing_hint) }));
+  add(A, L("種目"), eventLabel);
+  add(A, L("大会での目標"), choiceLabels(goalChoices, a.goals));
+  add(A, L("目標記録"), a.target_record);
+  const B = L("いまの実力");
+  add(B, L("自己ベスト"), a.personal_best);
+  add(B, L("いつの記録か"), choiceLabel(pbWhenChoices, a.pb_when));
+  add(B, L("最近の調子"), choiceLabel(formChoices, a.form));
+  const C = L("練習環境");
+  add(C, L("部活所属"), yn(a.club));
+  add(C, L("指導者"), yn(a.has_coach));
+  add(C, L("メニューを決める人"), choiceLabel(menuByChoices, a.menu_by));
+  add(C, L("週の練習日数"), a.practice_days ? L("{practice_days}日", { practice_days: a.practice_days }) : "");
+  add(C, L("1回の練習時間"), choiceLabel(sessionMinutesChoices, a.session_minutes));
+  add(C, L("競技場"), choiceLabel(accessChoices, a.track_access));
+  add(C, L("ウエイト器具"), choiceLabel(accessChoices, a.weights_access));
+  add(C, L("動画の撮影"), choiceLabel(filmChoices, a.can_film));
+  const D = L("体と制約");
+  add(D, L("今の痛み・怪我"), a.injury_now ? L("あり（{v0}）{injury_note}", { v0: choiceLabels(injuryPartChoices, a.injury_parts), injury_note: a.injury_note }) : yn(a.injury_now));
+  add(D, L("過去1年の大きな怪我"), choiceLabel(injuryPastChoices, a.injury_past_year));
+  add(D, L("休む・減らす時期"), yn(a.rest_period));
+  const E = L("直したいこと");
+  add(E, L("場面・要素"), choiceLabels(focusChoices, a.focus));
+  add(E, L("一番の悩み"), a.main_worry);
+  add(E, L("フォーム動画"), a.has_video ? L("あり") : L("なし"));
+  const F = L("希望するサポート");
+  add(F, L("メニュー作成"), yn(a.want_menu));
+  add(F, L("動画への返答"), choiceLabel(videoReplyChoices, a.want_video_reply));
+  add(F, L("大会直前の調整"), yn(a.want_peak));
+  add(F, L("開始時期"), a.start_timing === "date" ? a.start_date : L("できるだけ早く"));
+  add(F, L("予算の目安"), choiceLabel(budgetChoices, a.budget));
+  add(F, L("コーチに聞きたいこと"), a.question_to_coach);
   return rows;
 }
 
@@ -196,8 +198,8 @@ export const consultMinorNote = "18歳未満の方は、あなたが申し込む
 
 export function priceHintLabel(min: number | null, max: number | null): string {
   if (min == null || max == null) return "";
-  const f = (n: number) => `${n.toLocaleString("ja-JP")}円`;
-  return `${f(min)}〜${f(max)}`;
+  const f = (n: number) => L("{v0}円", { v0: n.toLocaleString("ja-JP") });
+  return L("{v0}〜{v1}", { v0: f(min), v1: f(max) });
 }
 
 // 大会までプランを途中で終えたときの日割りの算定例。API の supportUnprovidedAsOf と同じ計算
@@ -217,27 +219,27 @@ export const supportChatVideoRetentionDays = 30;
 // 提案画面と最終確認画面に出す、途中で終わる場合のお金とチャットの扱い。
 export function supportTermsLines(priceYen: number, days: number): { label: string; text: string }[] {
   const ex = supportProrationExample(priceYen, days);
-  const yen = (n: number) => `${n.toLocaleString("ja-JP")}円`;
+  const yen = (n: number) => L("{v0}円", { v0: n.toLocaleString("ja-JP") });
   return [
     {
-      label: "途中で終わる場合（日割り）",
-      text: `解約料・違約金はかかりません。まだ過ぎていない日数分を日割りで全額返金します（契約価格 ÷ 期間の日数 × 残りの日数、1円未満は切り捨て。期間は実際に始まった日から目標大会の日までで、終える日は過ぎた日に数えます）。例: ${yen(priceYen)}・${ex.total}日間の契約を${ex.elapsed}日目に終えると、残り${ex.remaining}日分の${yen(ex.refund)}を返金します。始まる前に終えた場合は全額を返金します。`,
+      label: L("途中で終わる場合（日割り）"),
+      text: L("解約料・違約金はかかりません。まだ過ぎていない日数分を日割りで全額返金します（契約価格 ÷ 期間の日数 × 残りの日数、1円未満は切り捨て。期間は実際に始まった日から目標大会の日までで、終える日は過ぎた日に数えます）。例: {v0}・{total}日間の契約を{elapsed}日目に終えると、残り{remaining}日分の{v4}を返金します。始まる前に終えた場合は全額を返金します。", { v0: yen(priceYen), total: ex.total, elapsed: ex.elapsed, remaining: ex.remaining, v4: yen(ex.refund) }),
     },
     {
-      label: "コーチの都合で続けられない場合",
-      text: "コーチの責任で続けられなくなった場合は、過ぎた日数分も含めて全額を返金します。病気・災害などやむを得ない事情の場合は、上の日割りの返金になります。",
+      label: L("コーチの都合で続けられない場合"),
+      text: L("コーチの責任で続けられなくなった場合は、過ぎた日数分も含めて全額を返金します。病気・災害などやむを得ない事情の場合は、上の日割りの返金になります。"),
     },
     {
-      label: "返金の時期と方法",
-      text: "終了の手続きをした時点で、お支払いに使ったカードへ返金します。明細に反映されるまでの日数はカード会社によって異なります（通常は数日から2週間ほど）。",
+      label: L("返金の時期と方法"),
+      text: L("終了の手続きをした時点で、お支払いに使ったカードへ返金します。明細に反映されるまでの日数はカード会社によって異なります（通常は数日から2週間ほど）。"),
     },
     {
-      label: "大会が中止・延期になった場合",
-      text: "主催者が中止・延期を正式に発表した日で契約を終えます。別の大会への振り替えや期間の延長はしません。発表の日までを過ぎた日として、残りの日数分を日割りで返金します。次の大会に向けては、あらためて無料相談ができます。",
+      label: L("大会が中止・延期になった場合"),
+      text: L("主催者が中止・延期を正式に発表した日で契約を終えます。別の大会への振り替えや期間の延長はしません。発表の日までを過ぎた日として、残りの日数分を日割りで返金します。次の大会に向けては、あらためて無料相談ができます。"),
     },
     {
-      label: "契約後のチャット",
-      text: `コーチからの返答は24時間以内を目安としています。チャット（文章・動画・メニュー）は、契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります。終わるまでのあいだに、やりとり（文章とメニュー）をダウンロードできます。終わる3日前にもお知らせします。動画のファイルは契約の終わりから${supportChatVideoRetentionDays}日で削除します。`,
+      label: L("契約後のチャット"),
+      text: L("コーチからの返答は24時間以内を目安としています。チャット（文章・動画・メニュー）は、契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります。終わるまでのあいだに、やりとり（文章とメニュー）をダウンロードできます。終わる3日前にもお知らせします。動画のファイルは契約の終わりから{supportChatVideoRetentionDays}日で削除します。", { supportChatVideoRetentionDays }),
     },
   ];
 }

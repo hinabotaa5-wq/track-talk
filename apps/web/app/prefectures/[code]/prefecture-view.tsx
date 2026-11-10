@@ -1,4 +1,6 @@
 "use client";
+import { L } from "@/lib/i18n";
+import { useTitleTranslation } from "@/components/locale-provider";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -15,7 +17,7 @@ import { competitionDates } from "../../competitions/regional/regional-view";
 function MoreLink({ href, total, shown }: { href: string; total: number; shown: number }) {
   return (
     <Link href={href} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-      {total > shown ? `もっと見る（全${total}件）` : "一覧で見る"}
+      {total > shown ? L("もっと見る（全{total}件）", { total }) : L("一覧で見る")}
     </Link>
   );
 }
@@ -32,20 +34,19 @@ function PracticeSection({ code, name }: { code: string; name: string }) {
   }, [code]);
   return (
     <section className="space-y-2">
-      <h2 className="text-lg font-semibold text-slate-100">{name}の練習相手募集</h2>
-      {total !== null ? <p className="text-sm text-slate-200">これからの募集 {total}件</p> : null}
-      <Link href={practicePagePath({ prefecture: code, event: "" })} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-        募集を見る
-      </Link>
+      <h2 className="text-lg font-semibold text-slate-100">{L("{name}の練習相手募集", { name })}</h2>
+      {total !== null ? <p className="text-sm text-slate-200">{L("これからの募集 {total}件", { total })}</p> : null}
+      <Link href={practicePagePath({ prefecture: code, event: "" })} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">{L("募集を見る")}</Link>
     </section>
   );
 }
 
 // 中身はサーバーで取ってから渡す(page.tsx)。サーバーで取れなかったときだけ、画面側で取り直す。
-export function PrefectureView({ code, initialPage }: { code: string; initialPage: PrefecturePage | null }) {
+export function PrefectureView({ code, initialPage, titleJa = "" }: { code: string; initialPage: PrefecturePage | null; titleJa?: string }) {
   const [page, setPage] = useState(initialPage);
   const [failed, setFailed] = useState(false);
   const name = prefectureName(code);
+  useTitleTranslation(titleJa, L("{name}の陸上競技の大会日程", { name }));
 
   useEffect(() => {
     if (initialPage) return;
@@ -62,19 +63,19 @@ export function PrefectureView({ code, initialPage }: { code: string; initialPag
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">{name}</h1>
-        <p className="mt-1 text-sm text-slate-200">{name}のこれからの大会をまとめています。</p>
+        <p className="mt-1 text-sm text-slate-200">{L("{name}のこれからの大会をまとめています。", { name })}</p>
       </div>
 
       {failed ? (
-        <ErrorState message="取得に失敗しました。時間をおいて開き直してください。" />
+        <ErrorState message={L("取得に失敗しました。時間をおいて開き直してください。")} />
       ) : !page ? (
-        <PageLoading label="読み込み中..." />
+        <PageLoading label={L("読み込み中...")} />
       ) : (
         <>
           <section className="space-y-2">
-            <h2 className="text-lg font-semibold text-slate-100">これからの大会</h2>
+            <h2 className="text-lg font-semibold text-slate-100">{L("これからの大会")}</h2>
             {page.competitions.length === 0 ? (
-              <EmptyState title="これからの大会はまだありません" body="大会の日程は、都道府県の陸協のページから順次取り込みます。" />
+              <EmptyState title={L("これからの大会はまだありません")} body={L("大会の日程は、都道府県の陸協のページから順次取り込みます。")} />
             ) : (
               <ul className="space-y-2">
                 {page.competitions.map((c) => (

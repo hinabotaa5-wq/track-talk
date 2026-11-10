@@ -1,26 +1,27 @@
+import { L } from "./i18n";
 // シューズ・スパイクのレビューを、書いた人の種目・レベル・足のサイズ・足幅・使い方で絞り込む。
 // 商品の公式ページの仕様は使わない(商品の更新でページが変わるため)。値のコードは API と同じ。
 
 import { appEvents } from "./practice-events";
 
 export const reviewLevels = [
-  { value: "junior-high", label: "中学" },
-  { value: "high-school", label: "高校" },
-  { value: "university", label: "大学" },
-  { value: "adult", label: "社会人" },
-  { value: "masters", label: "マスターズ" },
+  { value: "junior-high", get label() { return L("中学"); } },
+  { value: "high-school", get label() { return L("高校"); } },
+  { value: "university", get label() { return L("大学"); } },
+  { value: "adult", get label() { return L("社会人"); } },
+  { value: "masters", get label() { return L("マスターズ"); } },
 ] as const;
 
 export const reviewFootWidths = [
-  { value: "narrow", label: "細め" },
-  { value: "regular", label: "ふつう" },
-  { value: "wide", label: "広め" },
+  { value: "narrow", get label() { return L("細め"); } },
+  { value: "regular", get label() { return L("ふつう"); } },
+  { value: "wide", get label() { return L("広め"); } },
 ] as const;
 
 export const reviewUsages = [
-  { value: "practice", label: "練習用" },
-  { value: "race", label: "試合用" },
-  { value: "both", label: "練習・試合" },
+  { value: "practice", get label() { return L("練習用"); } },
+  { value: "race", get label() { return L("試合用"); } },
+  { value: "both", get label() { return L("練習・試合"); } },
 ] as const;
 
 export const reviewEvents = appEvents;

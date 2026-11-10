@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { formatDateTime, formatYen } from "./format";
 import type {
   CoachingContract,
@@ -13,9 +14,9 @@ import type {
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
 export const coachingServiceLabels: Record<CoachingServiceType, string> = {
-  video_review: "動画添削",
-  competition_support: "大会までプラン",
-  in_person: "対面プラン",
+  get video_review() { return L("動画添削"); },
+  get competition_support() { return L("大会までプラン"); },
+  get in_person() { return L("対面プラン"); },
 };
 
 export function serviceReady(service: CoachingServiceType | null | undefined): boolean {
@@ -23,13 +24,13 @@ export function serviceReady(service: CoachingServiceType | null | undefined): b
 }
 
 function serviceLabel(service: CoachingServiceType | null | undefined): string {
-  return service ? coachingServiceLabels[service] : "従来のサポートプラン";
+  return service ? coachingServiceLabels[service] : L("従来のサポートプラン");
 }
 
 export const planKindLabels: Record<CoachingPlanKind, string> = {
-  period: "期間プラン",
-  single: "単発",
-  trial: "お試し",
+  get period() { return L("期間プラン"); },
+  get single() { return L("単発"); },
+  get trial() { return L("お試し"); },
 };
 
 // 種類ごとに選べる日数。単発とお試しは7日だけ。
@@ -46,10 +47,10 @@ export const highPlanPriceYen = 30000;
 export const maxTrialPriceYen = 3000;
 
 export function planDurationLabel(kind: CoachingPlanKind, days: number): string {
-  if (kind === "single" || kind === "trial") return `${days}日以内`;
-  if (days === 14) return "2週間";
-  if (days === 30) return "1か月";
-  return `${days}日`;
+  if (kind === "single" || kind === "trial") return L("{days}日以内", { days });
+  if (days === 14) return L("2週間");
+  if (days === 30) return L("1か月");
+  return L("{days}日", { days });
 }
 
 export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | "price_yen">): string {
@@ -57,43 +58,43 @@ export function planSummary(plan: Pick<CoachingPlan, "kind" | "duration_days" | 
 }
 
 export const planMenuUpdatesLabels: Record<PlanMenuUpdates, string> = {
-  none: "なし",
-  once: "最初に1回作る",
-  weekly: "毎週見直す",
+  get none() { return L("なし"); },
+  get once() { return L("最初に1回作る"); },
+  get weekly() { return L("毎週見直す"); },
 };
 
 export const planReplyFormatLabels: Record<PlanReplyFormat, string> = {
-  text: "文章",
-  video: "解説の動画",
+  get text() { return L("文章"); },
+  get video() { return L("解説の動画"); },
 };
 
 // フォームで選べる動画への返答の回数。0 は回数を決めない。
 export const planVideoReviewChoices = [1, 2, 4, 8, 0];
 
 export function videoReviewsLabel(n: number): string {
-  return n === 0 ? "回数を決めない（期間中いつでも）" : `${n}回まで`;
+  return n === 0 ? L("回数を決めない（期間中いつでも）") : L("{n}回まで", { n });
 }
 
 // planIncludes は、「何が返ってくるか」を1項目1行にする。書いていない項目は出さない。
 export function planIncludes(p: PlanIncludes): { label: string; value: string }[] {
   const out: { label: string; value: string }[] = [];
-  if (p.service_type !== undefined) out.push({ label: "サービス", value: serviceLabel(p.service_type) });
-  if (p.additional_consultation_price_yen != null) out.push({ label: "追加相談の料金", value: `${formatYen(p.additional_consultation_price_yen)}／回` });
-  if (p.competition_name) out.push({ label: "大会", value: p.competition_name });
-  if (p.support_start_date && p.competition_date) out.push({ label: "支援日程", value: `${p.support_start_date} 〜 ${p.competition_date}（大会当日まで）` });
-  if (p.call_count) out.push({ label: "ビデオ通話", value: `${p.call_count}回・1回${p.call_minutes ?? 30}分` });
-  if (p.service_type === "competition_support") out.push({ label: "未提供分の返金", value: "動画回答1組・実施確認済み通話1回を各1単位として按分。終了48時間後に精算" });
+  if (p.service_type !== undefined) out.push({ label: L("サービス"), value: serviceLabel(p.service_type) });
+  if (p.additional_consultation_price_yen != null) out.push({ label: L("追加相談の料金"), value: L("{v0}／回", { v0: formatYen(p.additional_consultation_price_yen) }) });
+  if (p.competition_name) out.push({ label: L("大会"), value: p.competition_name });
+  if (p.support_start_date && p.competition_date) out.push({ label: L("支援日程"), value: L("{support_start_date} 〜 {competition_date}（大会当日まで）", { support_start_date: p.support_start_date, competition_date: p.competition_date }) });
+  if (p.call_count) out.push({ label: L("ビデオ通話"), value: L("{call_count}回・1回{v1}分", { call_count: p.call_count, v1: p.call_minutes ?? 30 }) });
+  if (p.service_type === "competition_support") out.push({ label: L("未提供分の返金"), value: L("動画回答1組・実施確認済み通話1回を各1単位として按分。終了48時間後に精算") });
   if (p.service_type === "in_person") {
-    if (p.venue_area) out.push({ label: "地域", value: p.venue_area });
-    if (p.venue_name) out.push({ label: "会場", value: p.venue_name });
-    if (p.session_count) out.push({ label: "対面指導", value: `${p.session_count}回${p.session_minutes ? `・1回${p.session_minutes}分` : ""}` });
-    if (p.travel_fee_yen != null) out.push({ label: "交通費", value: `${formatYen(p.travel_fee_yen)}（基本料金に加算）` });
-    if (p.max_participants) out.push({ label: "募集人数", value: `${p.max_participants}人まで` });
+    if (p.venue_area) out.push({ label: L("地域"), value: p.venue_area });
+    if (p.venue_name) out.push({ label: L("会場"), value: p.venue_name });
+    if (p.session_count) out.push({ label: L("対面指導"), value: L("{session_count}回{v1}", { session_count: p.session_count, v1: p.session_minutes ? L("・1回{minutes}分", { minutes: p.session_minutes }) : "" }) });
+    if (p.travel_fee_yen != null) out.push({ label: L("交通費"), value: L("{v0}（基本料金に加算）", { v0: formatYen(p.travel_fee_yen) }) });
+    if (p.max_participants) out.push({ label: L("募集人数"), value: L("{max_participants}人まで", { max_participants: p.max_participants }) });
   }
-  if (p.video_reviews !== null) out.push({ label: "動画への返答", value: videoReviewsLabel(p.video_reviews) });
-  if (p.menu_updates !== null) out.push({ label: "練習メニュー", value: planMenuUpdatesLabels[p.menu_updates] });
-  if (p.reply_formats.length > 0) out.push({ label: "返し方", value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join("・") });
-  if (p.start_on_first_video) out.push({ label: "期間", value: "最初の動画を送った日から数える" });
+  if (p.video_reviews !== null) out.push({ label: L("動画への返答"), value: videoReviewsLabel(p.video_reviews) });
+  if (p.menu_updates !== null) out.push({ label: L("練習メニュー"), value: planMenuUpdatesLabels[p.menu_updates] });
+  if (p.reply_formats.length > 0) out.push({ label: L("返し方"), value: p.reply_formats.map((f) => planReplyFormatLabels[f]).join(L("・")) });
+  if (p.start_on_first_video) out.push({ label: L("期間"), value: L("最初の動画を送った日から数える") });
   return out;
 }
 
@@ -111,11 +112,11 @@ export function contractPeriodLabel(
     // 待つ日数ぶん先に延ばしてある終了日から期間を引いた時が、数え始めの期限。
     const waitUntil = new Date(new Date(c.ends_at).getTime() - c.duration_days * 24 * 60 * 60 * 1000);
     if (c.status === "active" && now < waitUntil) {
-      return `最初の動画を送った日から${c.duration_days}日（${formatDateTime(waitUntil.toISOString())}までに送らなければ、その時から数えます）`;
+      return L("最初の動画を送った日から{duration_days}日（{v1}までに送らなければ、その時から数えます）", { duration_days: c.duration_days, v1: formatDateTime(waitUntil.toISOString()) });
     }
-    return `${formatDateTime(waitUntil.toISOString())} 〜 ${formatDateTime(c.ends_at)}`;
+    return L("{v0} 〜 {v1}", { v0: formatDateTime(waitUntil.toISOString()), v1: formatDateTime(c.ends_at) });
   }
-  return `${formatDateTime(c.clock_started_at ?? c.starts_at)} 〜 ${formatDateTime(c.ends_at)}`;
+  return L("{v0} 〜 {v1}", { v0: formatDateTime(c.clock_started_at ?? c.starts_at), v1: formatDateTime(c.ends_at) });
 }
 
 // sortTrialFirst は、お試しプランを先頭にする。ほかの並び（安い順）はそのまま。
@@ -133,23 +134,23 @@ export const coachPledgeItems = [
 ];
 
 const contractStatusLabels: Record<CoachingContractStatus, string> = {
-  applied: "コーチの返事待ち",
-  accepted: "保護者の同意待ち",
-  active: "期間中",
-  suspended: "運営が止めています",
-  ended: "終わりました",
-  refunded: "返金して終了しました",
-  declined: "今回は受けられませんでした",
-  guardian_declined: "保護者が同意しませんでした",
-  expired: "期限が過ぎました",
-  cancelled: "取り下げました",
+  get applied() { return L("コーチの返事待ち"); },
+  get accepted() { return L("保護者の同意待ち"); },
+  get active() { return L("期間中"); },
+  get suspended() { return L("運営が止めています"); },
+  get ended() { return L("終わりました"); },
+  get refunded() { return L("返金して終了しました"); },
+  get declined() { return L("今回は受けられませんでした"); },
+  get guardian_declined() { return L("保護者が同意しませんでした"); },
+  get expired() { return L("期限が過ぎました"); },
+  get cancelled() { return L("取り下げました"); },
 };
 
 // contractStatusLabel は、支払いがあるかと年齢で変わる「承諾済み・始まる前」の表示を含めた状態の名前。
 export function contractStatusLabel(c: { status: CoachingContractStatus; minor: boolean; payment_required: boolean }): string {
   if (c.status === "accepted") {
-    if (c.minor && c.payment_required) return "保護者の同意とお支払い待ち";
-    if (c.payment_required) return "お支払い待ち";
+    if (c.minor && c.payment_required) return L("保護者の同意とお支払い待ち");
+    if (c.payment_required) return L("お支払い待ち");
   }
   return contractStatusLabels[c.status];
 }
@@ -157,8 +158,7 @@ export function contractStatusLabel(c: { status: CoachingContractStatus; minor: 
 // 契約を始めるときの同意。利用者は申し込みで、コーチは承諾で、それぞれ別にチェックする。
 // 文面を変えたら API の contractConsentVersion を上げる。
 export const contractConsentItems = {
-  agree_report: "通報があったとき、安全の確認のために TrackTalk の運営がこのやりとりを読むことに同意します。普段は運営も読みません。",
-  agree_detection:
-    "外部の連絡先（URL・電話番号・SNS の ID など）を送ろうとしたとき、機械で検出して送信を止めることに同意します。",
+  get agree_report() { return L("通報があったとき、安全の確認のために TrackTalk の運営がこのやりとりを読むことに同意します。普段は運営も読みません。"); },
+  get agree_detection() { return L("外部の連絡先（URL・電話番号・SNS の ID など）を送ろうとしたとき、機械で検出して送信を止めることに同意します。"); },
 } as const;
 export type ContractConsentKey = keyof typeof contractConsentItems;

@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { authErrorMessage } from "./auth-errors";
 
@@ -7,7 +8,7 @@ import { authErrorMessage } from "./auth-errors";
 export async function confirmCurrentPassword(email: string, password: string, captchaToken?: string): Promise<string> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return "Supabase の公開設定がありません。";
+  if (!url || !key) return L("Supabase の公開設定がありません。");
   const probe = createSupabaseClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });

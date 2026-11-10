@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { operatorName, supportEmail } from "@/lib/operator";
+import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
 // 有料機能の公開前から、運営者の表記だけをログインなしで表示する。
 // サポートプランはコーチが販売するため、各プランの表記を参照する。
@@ -30,6 +31,7 @@ export default function CommercePage() {
     <div className="mx-auto max-w-2xl space-y-6 [overflow-wrap:anywhere]">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">特定商取引法に基づく表記</h1>
+        <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">
           運営者が販売する「フォーム添削」「フォーム添削の追加相談」についての表記です。サポートプラン（大会サポート・対面指導などを含むコーチのプラン）はコーチが販売者になるため、各プランのページにあるコーチの表記を確認してください。
         </p>

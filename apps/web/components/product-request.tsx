@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
       setDone(true);
       setOpen(false);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "送信できませんでした");
+      setError(err instanceof ApiRequestError ? err.message : L("送信できませんでした"));
     } finally {
       release();
     }
@@ -52,42 +53,34 @@ export function ProductRequest({ kind }: { kind: ProductKind }) {
 
   return (
     <section className="mt-6 space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3.5 text-sm">
-      <p className="font-medium">探している{productKindLabels[kind]}がありませんか？</p>
+      <p className="font-medium">{L("探している{v0}がありませんか？", { v0: productKindLabels[kind] })}</p>
       {done ? (
         <div ref={doneRef} role="status" className="flex scroll-mb-24 items-start gap-2 rounded-lg border border-emerald-500/60 bg-emerald-950/50 p-3">
           <CircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-300" aria-hidden />
           <div>
-            <p className="font-semibold text-emerald-200">リクエストしました</p>
-            <p className="mt-0.5 text-emerald-100">運営が確認して追加します。</p>
+            <p className="font-semibold text-emerald-200">{L("リクエストしました")}</p>
+            <p className="mt-0.5 text-emerald-100">{L("運営が確認して追加します。")}</p>
           </div>
         </div>
       ) : null}
       {!session ? (
-        <p className="text-slate-200">
-          リクエストするには<Link href="/login" className="text-blue-300 underline">ログイン</Link>してください。
-        </p>
+        <p className="text-slate-200">{L("リクエストするには")}<Link href="/login" className="text-blue-300 underline">{L("ログイン")}</Link>{L("してください。")}</p>
       ) : !open ? (
         <Button type="button" variant="secondary" onClick={() => { setDone(false); setOpen(true); }}>
-          {done ? "ほかの商品もリクエストする" : "追加をリクエストする"}
+          {done ? L("ほかの商品もリクエストする") : L("追加をリクエストする")}
         </Button>
       ) : (
         <form onSubmit={submit} className="space-y-3">
-          <label className="block">
-            ブランド
-            <input className={input} value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} required />
+          <label className="block">{L("ブランド")}<input className={input} value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} required />
           </label>
-          <label className="block">
-            商品名
-            <input className={input} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} required />
+          <label className="block">{L("商品名")}<input className={input} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} required />
           </label>
-          <label className="block">
-            公式ページURL（https、任意）
-            <input className={input} value={url} maxLength={500} inputMode="url" onChange={(e) => setUrl(e.target.value)} />
+          <label className="block">{L("公式ページURL（https、任意）")}<input className={input} value={url} maxLength={500} inputMode="url" onChange={(e) => setUrl(e.target.value)} />
           </label>
           {error ? <p className="text-red-300">{error}</p> : null}
           <div className="flex gap-2">
-            <Button type="submit" disabled={pending}>{pending ? "送信中..." : "送信"}</Button>
-            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>キャンセル</Button>
+            <Button type="submit" disabled={pending}>{pending ? L("送信中...") : L("送信")}</Button>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>{L("キャンセル")}</Button>
           </div>
         </form>
       )}

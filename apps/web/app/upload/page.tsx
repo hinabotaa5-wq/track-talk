@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { postOptions } from "@/lib/post-options";
 import { MainTabLink } from "@/components/main-tab-link";
@@ -24,7 +25,7 @@ export default function UploadPage() {
   // main の下の余白(1.5rem)は -mb-6 で打ち消し、下の空きを 0.75rem だけにする。
   return (
     <div className="-mb-6 flex h-[calc(100svh-6.0625rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3 md:mb-0 md:h-auto">
-      <h1 className="text-xl font-bold">何を投稿しますか?</h1>
+      <h1 className="text-xl font-bold">{L("何を投稿しますか?")}</h1>
       <div className="grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] gap-2 md:auto-rows-auto md:grid-cols-2 md:grid-rows-none md:gap-3 xl:grid-cols-3">
         {postOptions.map((door) => (
           <MainTabLink

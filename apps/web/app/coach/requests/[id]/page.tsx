@@ -18,7 +18,8 @@ import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
-import { parseLocale, t, type Locale } from "@/lib/i18n";
+import { t, type Locale, L } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import {
   clarifyReasonLabels,
   maxResponseChars,
@@ -107,7 +108,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
         const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
         setUpload({ loaded: 0, total: file.size, percent: 0 });
         const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
-        if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
+        if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
         demo = payload.public_id;
         uploaded.current = { file, id: demo };
       }
@@ -198,8 +199,8 @@ function ClarificationForm({ request, token, onSent, locale }: { request: CoachR
 }
 
 export default function CoachReviewRequestPage() {
-  const { session, token, profile, loading } = useAuth();
-  const locale = parseLocale(profile?.locale);
+  const { session, token, loading } = useAuth();
+  const locale = useLocale();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<CoachReviewRequest | null>(null);
@@ -275,7 +276,7 @@ export default function CoachReviewRequestPage() {
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
           <p className="text-sm font-semibold text-white">{t(locale, "coach.detail.clarifiedAs", { reason: clarifyReasonLabels[response.clarify_reason] })}</p>
           {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
-          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} locale={locale} /> : <p className="text-sm text-slate-300">{messagingClosedNote}</p>}
+          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
         </section>
       ) : null}
 

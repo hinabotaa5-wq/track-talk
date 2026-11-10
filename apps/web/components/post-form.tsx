@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -48,7 +49,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
     }
     const validatesTextContent = !initial || initial.kind === "text";
     if (validatesTextContent && !values.body.trim() && !photo && !initial?.thumbnail_url) {
-      setError("詳細か写真を入力してください");
+      setError(L("詳細か写真を入力してください"));
       return;
     }
     if (!acquire()) return;
@@ -63,17 +64,17 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       if (!initial && photo) {
         const looksLikeImage = photo.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(photo.name);
         if (!looksLikeImage) {
-          setError("写真ファイルを選んでください");
+          setError(L("写真ファイルを選んでください"));
           release();
           return;
         }
-        setStatus("アップロードの準備をしています…");
+        setStatus(L("アップロードの準備をしています…"));
         const [sending, signed] = await Promise.all([
           shrinkImage(photo),
           apiFetch<CloudinarySignature>("/v1/uploads/image", { method: "POST", token }),
         ]);
         if (sending.size > maxPhotoBytes) {
-          setError("10MB以内の写真にしてください");
+          setError(L("10MB以内の写真にしてください"));
           setStatus("");
           release();
           return;
@@ -83,7 +84,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         setUpload({ loaded: 0, total: sending.size, percent: 0 });
         const result = await uploadToCloudinary("image", sending, signed, setUpload);
         if (result.public_id !== signed.public_id) {
-          throw new Error("写真のアップロードに失敗しました");
+          throw new Error(L("写真のアップロードに失敗しました"));
         }
         payload.image_public_id = result.public_id;
         setUpload((current) => (current ? { ...current, loaded: current.total, percent: 100 } : current));
@@ -105,7 +106,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
       // 編集のあとは編集画面を履歴から外し、ヘッダーの戻るで編集画面に戻らないようにする。
       (initial ? router.replace : router.push)(initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : "/?sort=new");
     } catch (e) {
-      setError(apiErrorText(e, e instanceof Error ? e.message : "保存に失敗しました"));
+      setError(apiErrorText(e, e instanceof Error ? e.message : L("保存に失敗しました")));
       setStatus("");
       setUpload(null);
       release();
@@ -115,9 +116,7 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       {!initial ? (
-        <label className="block text-sm font-medium">
-          写真
-          <input
+        <label className="block text-sm font-medium">{L("写真")}<input
             className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
@@ -129,20 +128,18 @@ export function PostForm({ initial, returnTo }: { initial?: Post; returnTo?: "me
         // eslint-disable-next-line @next/next/no-img-element
         <img src={initial.thumbnail_url} alt="" className="max-h-80 w-full rounded-md bg-black/25 object-contain" />
       ) : null}
-      <label className="block text-sm font-medium">
-        詳細
-        <Textarea rows={3} className="mt-1" {...form.register("body")} />
+      <label className="block text-sm font-medium">{L("詳細")}<Textarea rows={3} className="mt-1" {...form.register("body")} />
       </label>
       {form.formState.errors.body ? (
         <p className="text-sm text-red-400">{form.formState.errors.body.message}</p>
       ) : null}
       {upload ? (
         <UploadProgress noun="写真" phase={uploadPhase} progress={upload} fileName={photo?.name} fileSize={photo?.size} />
-      ) : pending ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
+      ) : pending ? <SubmittingProgress label={initial ? L("投稿を更新しています") : L("投稿を送信しています")} /> : null}
       {status ? <p className="text-sm text-slate-200">{status}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
+        {pending ? (initial ? L("更新しています") : L("送っています")) : initial ? L("更新する") : L("投稿する")}
       </Button>
     </form>
   );

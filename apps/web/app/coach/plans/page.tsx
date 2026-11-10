@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPlansSection } from "@/components/coaching-plans";
@@ -36,14 +37,14 @@ export default function CoachPlansPage() {
     };
   }, [token]);
 
-  if (loading || !session || coach === undefined) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || coach === undefined) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title="プラン管理">
+    <CoachSubpageShell title={L("プラン管理")}>
       {coach ? (
         <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
       ) : (
-        <p className="text-sm text-red-400">プランを読み込めませんでした</p>
+        <p className="text-sm text-red-400">{L("プランを読み込めませんでした")}</p>
       )}
     </CoachSubpageShell>
   );

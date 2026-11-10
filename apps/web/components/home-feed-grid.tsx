@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { Children, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createGridLayout, gridTilePosition, visibleGridIndices, type GridLayout } from "@/lib/home-feed-grid";
@@ -38,7 +39,7 @@ export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storage
     const canvas = track.firstElementChild as HTMLElement;
     const header = document.querySelector("header");
     const filters = document.querySelector<HTMLElement>(".home-filter-anchor");
-    const navs = Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="メイン"]'));
+    const navs = Array.from(document.querySelectorAll<HTMLElement>("nav[data-main-nav]"));
     function savePosition(event?: Event) {
       if (!storageKey || pendingPosition.current) return;
       const nodes = Array.from(canvas.children) as HTMLElement[];
@@ -137,7 +138,7 @@ export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storage
     if (layout) visibleRef.current?.(visibleKey.split(",").filter(Boolean).map(Number));
   }, [visibleKey, layout]);
   return <div ref={trackRef} onFocusCapture={(event) => setFocusedIndex(Number((event.target.closest(".home-feed-grid-tile") as HTMLElement | null)?.dataset.index))}
-    onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusedIndex(NaN); }} role="region" aria-label="投稿一覧" tabIndex={0} className="home-feed-grid-strip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+    onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusedIndex(NaN); }} role="region" aria-label={L("投稿一覧")} tabIndex={0} className="home-feed-grid-strip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
     <div className="home-feed-grid-canvas" data-count={items.length} data-ready={layout ? "true" : undefined} style={layout ? { width: layout.width, height: layout.height } : undefined}>
       {indices.sort((a, b) => a - b).map((index) => {
         const position = layout ? gridTilePosition(layout, index) : undefined;

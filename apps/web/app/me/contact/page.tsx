@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -57,7 +58,7 @@ export default function ContactPage() {
         });
       })
       .catch(() => {
-        if (!cancelled) setError("送信履歴の取得に失敗しました");
+        if (!cancelled) setError(L("送信履歴の取得に失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -78,25 +79,25 @@ export default function ContactPage() {
       form.reset({ category: values.category, email: values.email, subject: "", body: "" });
       setSent(true);
     } catch (err) {
-      setError(apiErrorText(err, "送信に失敗しました"));
+      setError(apiErrorText(err, L("送信に失敗しました")));
     } finally {
       release();
     }
   }
 
   if (loading || !session) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">お問い合わせ</h1>
-        <p className="text-sm text-slate-200">不具合やアカウントの相談を運営へ送れます。</p>
+        <h1 className="text-2xl font-bold">{L("お問い合わせ")}</h1>
+        <p className="text-sm text-slate-200">{L("不具合やアカウントの相談を運営へ送れます。")}</p>
       </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <label className="block space-y-1 text-sm">
-          <span className="text-slate-300">種類</span>
+          <span className="text-slate-300">{L("種類")}</span>
           <select
             className="w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
             {...form.register("category")}
@@ -109,28 +110,26 @@ export default function ContactPage() {
             ))}
           </select>
         </label>
-        <Input type="email" autoComplete="email" placeholder="返信先のメールアドレス" {...form.register("email")} />
+        <Input type="email" autoComplete="email" placeholder={L("返信先のメールアドレス")} {...form.register("email")} />
         {form.formState.errors.email ? (
           <p className="text-sm text-red-400">{form.formState.errors.email.message}</p>
         ) : null}
-        <Input placeholder="件名" {...form.register("subject")} />
+        <Input placeholder={L("件名")} {...form.register("subject")} />
         {form.formState.errors.subject ? (
           <p className="text-sm text-red-400">{form.formState.errors.subject.message}</p>
         ) : null}
-        <Textarea rows={6} placeholder="内容" {...form.register("body")} />
+        <Textarea rows={6} placeholder={L("内容")} {...form.register("body")} />
         {form.formState.errors.body ? (
           <p className="text-sm text-red-400">{form.formState.errors.body.message}</p>
         ) : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {sent ? <p className="text-sm text-blue-400">送信しました。</p> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
-          送信
-        </Button>
+        {sent ? <p className="text-sm text-blue-400">{L("送信しました。")}</p> : null}
+        <Button type="submit" className="w-full" disabled={pending}>{L("送信")}</Button>
       </form>
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">送信履歴</h2>
+        <h2 className="text-lg font-semibold">{L("送信履歴")}</h2>
         {inquiries.length === 0 ? (
-          <p className="text-sm text-slate-200">まだお問い合わせはありません</p>
+          <p className="text-sm text-slate-200">{L("まだお問い合わせはありません")}</p>
         ) : (
           <ul className="space-y-3">
             {inquiries.map((item) => (

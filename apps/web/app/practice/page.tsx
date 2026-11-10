@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function PracticeListPage() {
   return (
-    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen />}>
       <PracticeListView />
     </Suspense>
   );

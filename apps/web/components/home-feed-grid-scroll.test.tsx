@@ -73,7 +73,7 @@ it("ヘッダーに帯が後から出ても、一覧を下部メニューの手�
   });
   const header = document.createElement("header");
   const nav = document.createElement("nav");
-  nav.setAttribute("aria-label", "メイン");
+  nav.setAttribute("data-main-nav", "");
   nav.style.position = "fixed";
   container.before(header);
   container.after(nav);
@@ -112,7 +112,7 @@ it("ヘッダーに帯が後から出ても段数は3のまま変わらない", 
   });
   const header = document.createElement("header");
   const nav = document.createElement("nav");
-  nav.setAttribute("aria-label", "メイン");
+  nav.setAttribute("data-main-nav", "");
   nav.style.position = "fixed";
   container.before(header);
   container.after(nav);

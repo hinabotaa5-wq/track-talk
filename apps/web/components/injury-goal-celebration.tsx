@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 // 紙吹雪もアクセントの青の濃淡だけで作る。
 const colors = ["#2ec5ff", "#1f9fff", "#6ccdff", "#0a8cff", "#a8e1ff", "#0a5cff"];
@@ -18,15 +19,13 @@ export function InjuryGoalCelebration({ onClose }: { onClose: () => void }) {
           }}
         />
       ))}
-      <p className="text-lg font-bold text-emerald-200">大会に復帰、おめでとう</p>
-      <p className="mt-1 text-sm text-emerald-100">あなたも乗り越えた仲間の一人です。あなたの経験は、後ろの仲間のヒントになります。</p>
+      <p className="text-lg font-bold text-emerald-200">{L("大会に復帰、おめでとう")}</p>
+      <p className="mt-1 text-sm text-emerald-100">{L("あなたも乗り越えた仲間の一人です。あなたの経験は、後ろの仲間のヒントになります。")}</p>
       <button
         type="button"
         onClick={onClose}
         className="mt-3 rounded-full border border-emerald-400/60 px-4 py-1.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900/50 active:scale-[0.98]"
-      >
-        閉じる
-      </button>
+      >{L("閉じる")}</button>
     </div>
   );
 }

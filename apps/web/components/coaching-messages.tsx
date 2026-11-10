@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { PageLoading } from "@/components/page-loading";
@@ -29,17 +30,17 @@ const maxVideoBytes = 100 * 1024 * 1024;
 const maxBodyChars = 2000;
 
 function senderName(m: CoachingMessage, contract: CoachingContract): string {
-  if (m.mine) return "あなた";
-  if (!m.sender_active) return "退会したユーザー";
-  if (m.sender_role === "coach") return contract.coach?.nickname ?? "コーチ";
-  if (m.sender_role === "guardian") return "保護者";
-  return `${contract.requester?.nickname ?? "名前なし"}さん`;
+  if (m.mine) return L("あなた");
+  if (!m.sender_active) return L("退会したユーザー");
+  if (m.sender_role === "coach") return contract.coach?.nickname ?? L("コーチ");
+  if (m.sender_role === "guardian") return L("保護者");
+  return L("{v0}さん", { v0: contract.requester?.nickname ?? L("名前なし") });
 }
 
 function MenuCard({ menu }: { menu: PlanMenu }) {
   return (
     <div className="space-y-1.5 rounded-lg border border-blue-400/40 bg-blue-500/10 p-2">
-      <p className="text-xs font-semibold text-blue-300">練習メニュー</p>
+      <p className="text-xs font-semibold text-blue-300">{L("練習メニュー")}</p>
       <p className="font-semibold text-white">{menu.title}</p>
       {menu.period ? <p className="text-xs text-slate-300">{menu.period}</p> : null}
       {menu.note ? <p className="whitespace-pre-wrap text-sm text-slate-100">{menu.note}</p> : null}
@@ -70,7 +71,7 @@ function ReportButton({ message, access }: { message: CoachingMessage; access: A
   const confirmDialog = useConfirm();
 
   async function report() {
-    if (!(await confirmDialog(reportConfirmOptions({ title: "このメッセージを運営に通報しますか？", body: "通報すると、運営がこのやりとりを確認します。" })))) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: L("このメッセージを運営に通報しますか？"), body: L("通報すると、運営がこのやりとりを確認します。") })))) return;
     if (!acquire()) return;
     try {
       if (access.guardianToken) {
@@ -93,10 +94,10 @@ function ReportButton({ message, access }: { message: CoachingMessage; access: A
     }
   }
 
-  if (state === "done") return <p className="text-xs text-slate-300">通報しました。運営が確認します。</p>;
+  if (state === "done") return <p className="text-xs text-slate-300">{L("通報しました。運営が確認します。")}</p>;
   return (
     <button type="button" onClick={() => void report()} disabled={pending} className="text-xs text-slate-300 underline">
-      {state === "error" ? "通報できませんでした。もう一度" : "通報する"}
+      {state === "error" ? L("通報できませんでした。もう一度") : L("通報する")}
     </button>
   );
 }
@@ -112,9 +113,9 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
         <p className="text-xs text-slate-300">
           {senderName(message, contract)} · {formatDateTime(message.created_at)}
         </p>
-        {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">この動画への回答</a> : null}
+        {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">{L("この動画への回答")}</a> : null}
         {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
-        {message.video_purged ? <p className="text-xs text-slate-300">動画は保存期間（契約の終わりから30日）を過ぎたため削除しました。</p> : null}
+        {message.video_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間（契約の終わりから30日）を過ぎたため削除しました。")}</p> : null}
         {message.video_url ? (
           <video
             src={message.video_url}
@@ -172,13 +173,13 @@ function Composer({
     setFile(null);
     if (!picked) return;
     if (picked.size > maxVideoBytes) {
-      setError("100MB以内の動画にしてください");
+      setError(L("100MB以内の動画にしてください"));
       return;
     }
     const long = tooLong(await videoDuration(picked));
     if (seq !== pickSeq.current) return;
     if (long) {
-      setError(`動画は${maxReviewSeconds}秒以内にしてください`);
+      setError(L("動画は{maxReviewSeconds}秒以内にしてください", { maxReviewSeconds }));
       return;
     }
     setFile(picked);
@@ -201,7 +202,7 @@ function Composer({
         setUploadPhase("upload");
         setUpload({ loaded: 0, total: file.size, percent: 0 });
         const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
-        if (payload.public_id !== signed.public_id) throw new Error("アップロードに失敗しました");
+        if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
         videoPublicID = payload.public_id;
         setUploadPhase("saving");
       }
@@ -218,7 +219,7 @@ function Composer({
       setFileKey((k) => k + 1);
       setMenu(null);
     } catch (err) {
-      setError(apiErrorText(err, err instanceof Error ? err.message : "送信に失敗しました"));
+      setError(apiErrorText(err, err instanceof Error ? err.message : L("送信に失敗しました")));
     } finally {
       setUpload(null);
       release();
@@ -227,7 +228,7 @@ function Composer({
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-3">
-      {support ? <label className="block text-sm">回答する動画<select aria-label="回答する動画" value={reviewID} onChange={(e) => setReviewID(e.target.value)} className="mt-1 block w-full rounded border border-white/25 bg-slate-900 p-2"><option value="">通常のメッセージ（回数に含めない）</option>{support.videos.filter((v) => !v.answer_id).map((v) => <option key={v.question_id} value={v.question_id}>{formatDateTime(v.created_at)} の動画</option>)}</select></label> : null}
+      {support ? <label className="block text-sm">{L("回答する動画")}<select aria-label={L("回答する動画")} value={reviewID} onChange={(e) => setReviewID(e.target.value)} className="mt-1 block w-full rounded border border-white/25 bg-slate-900 p-2"><option value="">{L("通常のメッセージ（回数に含めない）")}</option>{support.videos.filter((v) => !v.answer_id).map((v) => <option key={v.question_id} value={v.question_id}>{L("{v0} の動画", { v0: formatDateTime(v.created_at) })}</option>)}</select></label> : null}
       <Textarea
         rows={3}
         value={body}
@@ -235,53 +236,51 @@ function Composer({
         onChange={(e) => setBody(e.target.value)}
         placeholder={
           isCoach
-            ? "練習の様子への返事や、次にやることを書きます"
+            ? L("練習の様子への返事や、次にやることを書きます")
             : access.guardianToken
-              ? "コーチへの質問や、家での様子を書きます"
-              : "練習の様子や、聞きたいことを書きます"
+              ? L("コーチへの質問や、家での様子を書きます")
+              : L("練習の様子や、聞きたいことを書きます")
         }
-        aria-label="メッセージ"
+        aria-label={L("メッセージ")}
       />
       {menu ? (
         <div className="space-y-2 rounded-xl border border-blue-400/40 bg-blue-500/10 p-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-blue-300">練習メニューを作る（見直すときは新しく作って送ると、前のメニューも残ります）</p>
-            <button type="button" className="text-xs text-slate-300 underline" onClick={() => setMenu(null)}>
-              メニューをやめる
-            </button>
+            <p className="text-xs font-semibold text-blue-300">{L("練習メニューを作る（見直すときは新しく作って送ると、前のメニューも残ります）")}</p>
+            <button type="button" className="text-xs text-slate-300 underline" onClick={() => setMenu(null)}>{L("メニューをやめる")}</button>
           </div>
           <Input
             value={menu.title}
             maxLength={60}
             onChange={(e) => setMenu({ ...menu, title: e.target.value })}
-            placeholder="例: 1週目 スタートの練習"
-            aria-label="メニューの名前"
+            placeholder={L("例: 1週目 スタートの練習")}
+            aria-label={L("メニューの名前")}
           />
           <Input
             value={menu.period ?? ""}
             maxLength={40}
             onChange={(e) => setMenu({ ...menu, period: e.target.value })}
-            placeholder="対象期間（例: 12/1〜12/7）"
-            aria-label="対象期間"
+            placeholder={L("対象期間（例: 12/1〜12/7）")}
+            aria-label={L("対象期間")}
           />
           <Textarea
             rows={2}
             value={menu.note ?? ""}
             maxLength={300}
             onChange={(e) => setMenu({ ...menu, note: e.target.value })}
-            placeholder="全体への一言（例: 今週はスタートを固めます）"
-            aria-label="全体への一言"
+            placeholder={L("全体への一言（例: 今週はスタートを固めます）")}
+            aria-label={L("全体への一言")}
           />
           {menu.days.map((d, i) => (
             <div key={i} className="grid grid-cols-[5rem_1fr] gap-2">
-              <Input value={d.day} maxLength={20} onChange={(e) => setDay(i, "day", e.target.value)} placeholder="月" aria-label={`${i + 1}日目の日付や曜日`} />
+              <Input value={d.day} maxLength={20} onChange={(e) => setDay(i, "day", e.target.value)} placeholder={L("月")} aria-label={L("{v0}日目の日付や曜日", { v0: i + 1 })} />
               <Textarea
                 rows={2}
                 value={d.content}
                 maxLength={300}
                 onChange={(e) => setDay(i, "content", e.target.value)}
-                placeholder="例: 流し 100m×5、スタート 30m×6"
-                aria-label={`${i + 1}日目の中身`}
+                placeholder={L("例: 流し 100m×5、スタート 30m×6")}
+                aria-label={L("{v0}日目の中身", { v0: i + 1 })}
               />
             </div>
           ))}
@@ -290,16 +289,14 @@ function Composer({
               type="button"
               className="text-xs text-blue-300 underline"
               onClick={() => setMenu({ ...menu, days: [...menu.days, { day: "", content: "" }] })}
-            >
-              1日足す
-            </button>
+            >{L("1日足す")}</button>
           ) : null}
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {canVideo ? (
           <label className="cursor-pointer text-blue-300 underline">
-            {file ? `動画: ${file.name}` : `動画をつける（${maxReviewSeconds}秒まで）`}
+            {file ? L("動画: {name}", { name: file.name }) : L("動画をつける（{maxReviewSeconds}秒まで）", { maxReviewSeconds })}
             <input
               key={fileKey}
               type="file"
@@ -310,16 +307,12 @@ function Composer({
           </label>
         ) : null}
         {isCoach && !menu ? (
-          <button type="button" className="text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>
-            メニュー作成
-          </button>
+          <button type="button" className="text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>{L("メニュー作成")}</button>
         ) : null}
       </div>
       {upload ? <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} /> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending || (!body.trim() && !file && !menu)}>
-        送る
-      </Button>
+      <Button type="submit" className="w-full" disabled={pending || (!body.trim() && !file && !menu)}>{L("送る")}</Button>
       {guard.warning}
       <ContactNotice />
     </form>
@@ -338,7 +331,7 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
       await apiFetch(`/v1/coaching/contracts/${contract.id}/rating`, { method: "POST", token, body: JSON.stringify({ stars: n }) });
       onRated(n);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+      setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -346,16 +339,16 @@ function RatingForm({ contract, token, onRated }: { contract: CoachingContract; 
 
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-semibold">このパーソナル指導の評価</h2>
-      <p className="text-xs text-slate-300">{contract.rating ? "評価しました。ありがとうございました。" : "★を選ぶと送られます。1回だけです。"}</p>
-      <div className="flex gap-1" role="radiogroup" aria-label="評価">
+      <h2 className="text-sm font-semibold">{L("このパーソナル指導の評価")}</h2>
+      <p className="text-xs text-slate-300">{contract.rating ? L("評価しました。ありがとうございました。") : L("★を選ぶと送られます。1回だけです。")}</p>
+      <div className="flex gap-1" role="radiogroup" aria-label={L("評価")}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             role="radio"
             aria-checked={stars === n}
-            aria-label={`${n}つ星`}
+            aria-label={L("{n}つ星", { n })}
             disabled={pending || !!contract.rating}
             onClick={() => void rate(n)}
             className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-80 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
@@ -375,8 +368,8 @@ export const coachReplyGuideline = "選手への返答は24時間以内を目安
 
 // 期間中に出す、終わったら見られなくなることの案内。保護者はダウンロードできないので、ダウンロードの案内は出さない。
 function closeNote(until: string | null | undefined, guardian: boolean): string {
-  const when = until ? `${formatDateTime(until)}に契約が終わると` : "契約が終わると";
-  return `${when}、このやりとりは見られなくなります（選手・コーチ・保護者とも）。${guardian ? "" : "必要なら、終わる前に文章とメニューをダウンロードしてください。"}`;
+  const when = until ? L("{v0}に契約が終わると", { v0: formatDateTime(until) }) : L("契約が終わると");
+  return L("{when}、このやりとりは見られなくなります（選手・コーチ・保護者とも）。{v1}", { when, v1: guardian ? "" : L("必要なら、終わる前に文章とメニューをダウンロードしてください。") });
 }
 
 // DownloadChat は、やりとり（文章とメニュー）をテキストで保存する。動画は含めない。
@@ -393,14 +386,12 @@ function DownloadChat({ contract, token }: { contract: CoachingContract; token: 
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : "ダウンロードできませんでした");
+      setError(e instanceof ApiRequestError ? e.message : L("ダウンロードできませんでした"));
     }
   }
   return (
     <div className="space-y-1">
-      <Button type="button" variant="secondary" className="w-full" onClick={() => void download()}>
-        やりとり（文章とメニュー）をダウンロード
-      </Button>
+      <Button type="button" variant="secondary" className="w-full" onClick={() => void download()}>{L("やりとり（文章とメニュー）をダウンロード")}</Button>
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
@@ -441,7 +432,7 @@ export function CoachingMessages({
           setError("");
         })
         .catch(() => {
-          if (!cancelled && seq === loadSeq.current) setError("やりとりを読み込めませんでした");
+          if (!cancelled && seq === loadSeq.current) setError(L("やりとりを読み込めませんでした"));
         });
     };
     load();
@@ -466,9 +457,7 @@ export function CoachingMessages({
   if (contract.messages_purged_at) {
     return (
       <div className="space-y-4">
-        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">
-          期間の終わりから1年たったので、やりとり（文章と動画）は消しました。
-        </p>
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">{L("期間の終わりから1年たったので、やりとり（文章と動画）は消しました。")}</p>
         {contract.status === "ended" && contract.role === "requester" ? (
           <RatingForm
             contract={contract}
@@ -482,30 +471,30 @@ export function CoachingMessages({
   const isGuardian = Boolean(guardianToken) || contract.role === "guardian";
   const ended = contract.status === "ended" || contract.status === "refunded";
   // 終わったあとに読めるのは、通報・紛争の対応中で保全しているときだけ。
-  const preservedNote = "通報・紛争の対応中のため、対応が終わるまで読むことだけができます。";
+  const preservedNote = L("通報・紛争の対応中のため、対応が終わるまで読むことだけができます。");
   return (
     <div className="space-y-4">
       <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
         {isGuardian
-          ? "保護者のページでは、やりとりを見ることだけができます（送信はできません）。気になるやりとりは通報できます。"
+          ? L("保護者のページでは、やりとりを見ることだけができます（送信はできません）。気になるやりとりは通報できます。")
           : contract.minor
-            ? "保護者もやりとりを見ることができます（保護者は送信できません）。通報があったときだけ、運営が確認します。"
-            : "このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。"}
-        {contract.status === "active" ? ` ${contract.role === "coach" ? coachReplyGuideline : replyGuideline}` : ""}
+            ? L("保護者もやりとりを見ることができます（保護者は送信できません）。通報があったときだけ、運営が確認します。")
+            : L("このやりとりは、あなたと相手だけが見られます。通報があったときだけ、運営が確認します。")}
+        {contract.status === "active" ? ` ${contract.role === "coach" ? L(coachReplyGuideline) : L(replyGuideline)}` : ""}
         {contract.status === "active" || contract.status === "suspended" ? ` ${closeNote(contract.messages_view_until, isGuardian)}` : ""}
       </p>
       {viewClosed ? (
-        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">契約が終わったので、このやりとりは見られません。</p>
+        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">{L("契約が終わったので、このやりとりは見られません。")}</p>
       ) : null}
-      <section className="space-y-2" aria-label="やりとり">
-        {messages === null && !error ? <PageLoading label="読み込み中..." /> : null}
+      <section className="space-y-2" aria-label={L("やりとり")}>
+        {messages === null && !error ? <PageLoading label={L("読み込み中...")} /> : null}
         {messages?.length === 0 ? (
           <p className="text-sm text-slate-300">
             {contract.role === "coach"
-              ? "まずはあいさつと、最初に送ってほしい動画を伝えましょう。"
+              ? L("まずはあいさつと、最初に送ってほしい動画を伝えましょう。")
               : contract.role === "guardian"
-                ? "まだやりとりはありません。"
-                : "まずはあいさつと、いまの練習の様子を送りましょう。"}
+                ? L("まだやりとりはありません。")
+                : L("まずはあいさつと、いまの練習の様子を送りましょう。")}
           </p>
         ) : null}
         <ul className="space-y-3">
@@ -516,18 +505,16 @@ export function CoachingMessages({
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
       {contract.status === "active" && !coachingMessagingEnabled ? (
-        <p className="text-sm text-slate-300">{messagingClosedNote}</p>
+        <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>
       ) : viewClosed ? null : contract.status === "active" && isGuardian ? null : contract.status === "active" ? (
         <Composer contract={contract} access={access} onSent={(m) => {
             loadSeq.current++;
             setMessages((list) => [...(list ?? []), m]);
           }} />
       ) : contract.status === "suspended" ? (
-        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">
-          運営が確認のため、やりとりを止めています。{contract.fulfillment_version === 1 ? "大会日までは延長せず、未提供分は回数に応じて返金します。" : "止めている日数の分、期間はあとで延びます。"}
-        </p>
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100">{L("運営が確認のため、やりとりを止めています。{v0}", { v0: contract.fulfillment_version === 1 ? L("大会日までは延長せず、未提供分は回数に応じて返金します。") : L("止めている日数の分、期間はあとで延びます。") })}</p>
       ) : ended ? (
-        <p className="text-sm text-slate-300">{contract.status === "refunded" ? "返金して終了しました。" : "期間が終わりました。"}{preservedNote}</p>
+        <p className="text-sm text-slate-300">{contract.status === "refunded" ? L("返金して終了しました。") : L("期間が終わりました。")}{preservedNote}</p>
       ) : null}
       {!viewClosed && !isGuardian && messages && messages.length > 0 ? <DownloadChat contract={contract} token={token} /> : null}
       {contract.status === "ended" && contract.role === "requester" ? (

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { notFound } from "next/navigation";
 import { use } from "react";
@@ -10,7 +11,7 @@ export default function InjuryGroupPostPage({ params }: { params: Promise<{ part
   const { part } = use(params);
   if (!isInjuryBodyPart(part)) notFound();
   return (
-    <ComposerPage title={`${injuryBodyPartLabel(part)}のグループに投稿`}>
+    <ComposerPage title={L("{v0}のグループに投稿", { v0: injuryBodyPartLabel(part) })}>
       <InjuryForm groupPart={part} />
     </ComposerPage>
   );

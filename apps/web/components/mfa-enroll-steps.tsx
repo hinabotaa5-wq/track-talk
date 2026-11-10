@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
@@ -65,43 +66,35 @@ export function MfaEnrollSteps({
 
   return (
     <form method="post" onSubmit={onSubmit} className="space-y-5">
-      <Step n={1} title="認証アプリを用意する">
-        <p className="text-xs text-slate-300">
-          iPhone は、最初から入っている「パスワード」アプリで足ります。新しく入れる必要はありません。Android などは、Google Authenticator(無料)を Google Play から入れてください。すでに認証アプリを使っている人は次へ進みます。
-        </p>
+      <Step n={1} title={L("認証アプリを用意する")}>
+        <p className="text-xs text-slate-300">{L("iPhone は、最初から入っている「パスワード」アプリで足ります。新しく入れる必要はありません。Android などは、Google Authenticator(無料)を Google Play から入れてください。すでに認証アプリを使っている人は次へ進みます。")}</p>
       </Step>
 
-      <Step n={2} title={useQr ? "別の端末のアプリで、この QR コードを読み取る" : "アプリに、下のキーを登録する"}>
+      <Step n={2} title={useQr ? L("別の端末のアプリで、この QR コードを読み取る") : L("アプリに、下のキーを登録する")}>
         {useQr ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- Supabase が返す SVG の data URL をそのまま出す */}
-            <img src={qr} alt="二段階認証の QR コード" className="mx-auto size-48 rounded-md bg-white p-2" />
-            <p className="text-xs text-slate-300">アプリの「＋」→「QR コードをスキャン」でカメラを向けます。</p>
+            <img src={qr} alt={L("二段階認証の QR コード")} className="mx-auto size-48 rounded-md bg-white p-2" />
+            <p className="text-xs text-slate-300">{L("アプリの「＋」→「QR コードをスキャン」でカメラを向けます。")}</p>
           </>
         ) : (
           <>
             <Button type="button" variant="secondary" className="w-full" onClick={copy}>
-              {copied ? "コピーしました" : "キーをコピーする"}
+              {copied ? L("コピーしました") : L("キーをコピーする")}
             </Button>
             <p className="break-all rounded-md bg-black/20 p-2 font-mono text-xs text-slate-100">{secret}</p>
-            <p className="text-xs text-slate-300">
-              iPhone:「パスワード」アプリで TrackTalk の項目(なければ「＋」で作る。Web サイトは track-talk.netlify.app)を開き、「確認コードを設定」→「セットアップキーを入力」でキーを貼り付けます。
-            </p>
-            <p className="text-xs text-slate-300">
-              Google Authenticator など: アプリの「＋」→「セットアップキーを入力」で、アカウント名に「TrackTalk」、キーに貼り付けます。
-            </p>
+            <p className="text-xs text-slate-300">{L("iPhone:「パスワード」アプリで TrackTalk の項目(なければ「＋」で作る。Web サイトは track-talk.netlify.app)を開き、「確認コードを設定」→「セットアップキーを入力」でキーを貼り付けます。")}</p>
+            <p className="text-xs text-slate-300">{L("Google Authenticator など: アプリの「＋」→「セットアップキーを入力」で、アカウント名に「TrackTalk」、キーに貼り付けます。")}</p>
           </>
         )}
         <button type="button" onClick={() => setShowOther((v) => !v)} className="text-xs text-blue-300 underline">
-          {useQr ? "QR コードを読み取れない・この端末で設定している" : "別の端末のカメラで QR コードを読み取る"}
+          {useQr ? L("QR コードを読み取れない・この端末で設定している") : L("別の端末のカメラで QR コードを読み取る")}
         </button>
       </Step>
 
-      <Step n={3} title="アプリに出た6桁の数字を入れる">
+      <Step n={3} title={L("アプリに出た6桁の数字を入れる")}>
         <Input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={8} value={code} onChange={(e) => onCode(e.target.value)} />
-        <Button type="submit" className="w-full" disabled={pending}>
-          設定する
-        </Button>
+        <Button type="submit" className="w-full" disabled={pending}>{L("設定する")}</Button>
       </Step>
     </form>
   );

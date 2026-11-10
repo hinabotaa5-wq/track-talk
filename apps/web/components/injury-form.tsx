@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { loginPathFrom } from "@/lib/safe-next";
@@ -37,11 +38,11 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
     }
     setError("");
     if (!isInjuryBodyPart(part)) {
-      setError("ケガを選んでください");
+      setError(L("ケガを選んでください"));
       return;
     }
     if (body.trim() === "") {
-      setError("いまの気持ちや状況を入力してください");
+      setError(L("いまの気持ちや状況を入力してください"));
       return;
     }
     if (!acquire()) return;
@@ -56,7 +57,7 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
         initial ? (returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`) : groupPart ? injuryGroupPath(groupPart) : "/injury",
       );
     } catch (e) {
-      setError(apiErrorText(e, "保存に失敗しました"));
+      setError(apiErrorText(e, L("保存に失敗しました")));
       release();
     }
   }
@@ -64,12 +65,10 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {groupPart ? (
-        <p className="text-sm font-medium">ケガ: {injuryBodyPartLabel(groupPart)}</p>
+        <p className="text-sm font-medium">{L("ケガ: {v0}", { v0: injuryBodyPartLabel(groupPart) })}</p>
       ) : (
-        <label className="block text-sm font-medium">
-          ケガ
-          <select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
-            <option value="">選んでください</option>
+        <label className="block text-sm font-medium">{L("ケガ")}<select className={selectClass} value={part} onChange={(e) => setPart(e.target.value)}>
+            <option value="">{L("選んでください")}</option>
             {injuryBodyParts.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
@@ -78,31 +77,27 @@ export function InjuryForm({ initial, returnTo, groupPart }: { initial?: Post; r
           </select>
         </label>
       )}
-      <label className="block text-sm font-medium">
-        タイトル(任意)
-        <Input
+      <label className="block text-sm font-medium">{L("タイトル(任意)")}<Input
           className="mt-1"
           maxLength={120}
-          placeholder="空欄なら詳細の冒頭が表示されます"
+          placeholder={L("空欄なら詳細の冒頭が表示されます")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
       </label>
-      <label className="block text-sm font-medium">
-        詳細
-        <Textarea
+      <label className="block text-sm font-medium">{L("詳細")}<Textarea
           rows={8}
           className="mt-1"
           maxLength={5000}
-          placeholder="いまの気持ちをそのまま書いてOKです"
+          placeholder={L("いまの気持ちをそのまま書いてOKです")}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
       </label>
-      {pending ? <SubmittingProgress label={initial ? "投稿を更新しています" : "投稿を送信しています"} /> : null}
+      {pending ? <SubmittingProgress label={initial ? L("投稿を更新しています") : L("投稿を送信しています")} /> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? (initial ? "更新しています" : "送っています") : initial ? "更新する" : "投稿する"}
+        {pending ? (initial ? L("更新しています") : L("送っています")) : initial ? L("更新する") : L("投稿する")}
       </Button>
     </form>
   );

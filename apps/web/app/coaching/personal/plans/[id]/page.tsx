@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
 import { PublicAvailability } from "@/components/coach-availability";
@@ -65,7 +66,7 @@ export default function ApplyCoachingPlanPage() {
         if (!cancelled) setData(d);
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof ApiRequestError ? err.message : "読み込みに失敗しました");
+        if (!cancelled) setLoadError(err instanceof ApiRequestError ? err.message : L("読み込みに失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -76,7 +77,7 @@ export default function ApplyCoachingPlanPage() {
     if (!token) return;
     apiFetch<CoachingMe>("/v1/me/coaching", { token })
       .then(setMe)
-      .catch(() => setLoadError("読み込みに失敗しました"));
+      .catch(() => setLoadError(L("読み込みに失敗しました")));
   }, [token]);
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function ApplyCoachingPlanPage() {
         if (!cancelled) setMe(d);
       })
       .catch(() => {
-        if (!cancelled) setLoadError("読み込みに失敗しました");
+        if (!cancelled) setLoadError(L("読み込みに失敗しました"));
       });
     return () => {
       cancelled = true;
@@ -115,13 +116,13 @@ export default function ApplyCoachingPlanPage() {
           setAvailabilityRevision((value) => value + 1);
         }
       }
-      else setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+      else setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
       release();
     }
   }
 
   if (loadError) return <p className="text-sm text-red-400">{loadError}</p>;
-  if (loading || !session || !data || !me) return <PageLoading screen label="読み込み中..." />;
+  if (loading || !session || !data || !me) return <PageLoading screen label={L("読み込み中...")} />;
 
   const { plan, coach } = data;
   const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);
@@ -130,11 +131,9 @@ export default function ApplyCoachingPlanPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
         {data.payments ? null : (
-          <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
-            デモ版
-          </p>
+          <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
-        <h1 className="text-2xl font-bold">パーソナル指導に申し込む</h1>
+        <h1 className="text-2xl font-bold">{L("パーソナル指導に申し込む")}</h1>
         <SellerNote coachName={coach.nickname} />
         {data.commerce ? <CoachCommerceDisclosure commerce={data.commerce} /> : null}
       </div>
@@ -143,7 +142,7 @@ export default function ApplyCoachingPlanPage() {
         <div className="flex items-center gap-3">
           <CoachAvatar url={coach.photo_url} name={coach.nickname} />
           <div>
-            <p className="font-bold text-white">{coach.nickname ?? "名前なし"}</p>
+            <p className="font-bold text-white">{coach.nickname ?? L("名前なし")}</p>
             <p className="text-xs text-slate-300">{coachTierLabels[coach.tier]}</p>
           </div>
         </div>
@@ -154,7 +153,7 @@ export default function ApplyCoachingPlanPage() {
           <PlanIncludesList plan={plan} />
           <p className="whitespace-pre-wrap text-slate-200">{plan.description}</p>
           {plan.kind === "trial" ? (
-            <p className="text-xs text-slate-300">このコーチの指導を前に受けたことがある人は、お試しには申し込めません。</p>
+            <p className="text-xs text-slate-300">{L("このコーチの指導を前に受けたことがある人は、お試しには申し込めません。")}</p>
           ) : null}
         </div>
       </section>
@@ -162,32 +161,26 @@ export default function ApplyCoachingPlanPage() {
       {hasAvailability(plan.service_type) && (plan.full || !me.demo || !me.birth_month) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
 
       {plan.full ? (
-        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
-          このプランはいま満員です。空いたらまた申し込めます。
-        </p>
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">{L("このプランはいま満員です。空いたらまた申し込めます。")}</p>
       ) : !me.demo ? (
         <DemoCodeForm
-          intro="パーソナル指導は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが申し込めます。"
+          intro={L("パーソナル指導は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが申し込めます。")}
           token={token}
           onJoined={loadMe}
         />
       ) : !me.birth_month ? (
         <div className="space-y-3">
-          <p className="text-sm text-slate-200">
-            先に生まれた年月を登録してください。18歳未満の人は、コーチが引き受けたあとに保護者の同意が必要です。
-          </p>
+          <p className="text-sm text-slate-200">{L("先に生まれた年月を登録してください。18歳未満の人は、コーチが引き受けたあとに保護者の同意が必要です。")}</p>
           <Link
             href="/me/coaching"
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-          >
-            生まれた年月を登録する
-          </Link>
+          >{L("生まれた年月を登録する")}</Link>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
           {hasAvailability(plan.service_type) ? <div className="space-y-2"><PublicAvailability key={`${coach.id}-${availabilityRevision}`} coachID={coach.id} selected={preferredDates} onChange={setPreferredDates} />{fieldError("preferred_dates")}</div> : null}
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold">種目</legend>
+            <legend className="text-sm font-semibold">{L("種目")}</legend>
             <div className="flex flex-wrap gap-2">
               {coach.events.map((ev) => (
                 <button key={ev} type="button" aria-pressed={event === ev} onClick={() => setEvent(ev)} className={chip(event === ev)}>
@@ -198,23 +191,23 @@ export default function ApplyCoachingPlanPage() {
             {fieldError("event")}
           </fieldset>
           <label className="block space-y-1.5 text-sm">
-            <span className="font-semibold">目標（200文字まで）</span>
-            <Input value={goal} maxLength={200} onChange={(e) => setGoal(e.target.value)} placeholder="例: 秋の大会で12秒台を出したい" />
+            <span className="font-semibold">{L("目標（200文字まで）")}</span>
+            <Input value={goal} maxLength={200} onChange={(e) => setGoal(e.target.value)} placeholder={L("例: 秋の大会で12秒台を出したい")} />
             {fieldError("goal")}
           </label>
           <label className="block space-y-1.5 text-sm">
-            <span className="font-semibold">いまの記録（100文字まで）</span>
-            <Input value={record} maxLength={100} onChange={(e) => setRecord(e.target.value)} placeholder="例: 100m 13秒20" />
+            <span className="font-semibold">{L("いまの記録（100文字まで）")}</span>
+            <Input value={record} maxLength={100} onChange={(e) => setRecord(e.target.value)} placeholder={L("例: 100m 13秒20")} />
             {fieldError("current_record")}
           </label>
           <label className="block space-y-1.5 text-sm">
-            <span className="font-semibold">相談したいこと（1000文字まで）</span>
+            <span className="font-semibold">{L("相談したいこと（1000文字まで）")}</span>
             <Textarea
               rows={5}
               value={message}
               maxLength={1000}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="例: スタートの出遅れが気になっています。練習は週4回です。"
+              placeholder={L("例: スタートの出遅れが気になっています。練習は週4回です。")}
             />
             <ContactNotice className="block" />
             {guard.warning}
@@ -223,19 +216,17 @@ export default function ApplyCoachingPlanPage() {
           <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
           <p className="text-xs text-slate-300">
             {!data.payments
-              ? "コーチが48時間以内に引き受けると、その時から期間が始まります。デモ版なので支払いはありません。"
+              ? L("コーチが48時間以内に引き受けると、その時から期間が始まります。デモ版なので支払いはありません。")
               : me.is_minor
-                ? "コーチが48時間以内に引き受けたら、そのあとの画面で保護者のメールアドレスを入れてください。保護者が72時間以内に同意してお支払いをすると、その時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"
-                : "コーチが48時間以内に引き受けたら、72時間以内にお支払いください（カード・Apple Pay・Google Pay）。支払った時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。"}
+                ? L("コーチが48時間以内に引き受けたら、そのあとの画面で保護者のメールアドレスを入れてください。保護者が72時間以内に同意してお支払いをすると、その時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。")
+                : L("コーチが48時間以内に引き受けたら、72時間以内にお支払いください（カード・Apple Pay・Google Pay）。支払った時から期間が始まります。始まってから72時間コーチの書き込みがなければ、全額を返金します。")}
           </p>
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           <Button
             type="submit"
             className="w-full"
             disabled={pending || !event || !consents.agree_report || !consents.agree_detection}
-          >
-            申し込む
-          </Button>
+          >{L("申し込む")}</Button>
         </form>
       )}
     </div>

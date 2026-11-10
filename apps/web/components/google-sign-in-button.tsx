@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { authErrorMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
@@ -31,7 +32,7 @@ function GoogleLogo() {
 
 export function GoogleSignInButton({
   nextPath,
-  label = "Googleでログイン",
+  label = L("Googleでログイン"),
   disabled = false,
   onStart,
 }: {
@@ -47,7 +48,7 @@ export function GoogleSignInButton({
   async function signIn() {
     const supabase = createClient();
     if (!supabase) {
-      setError("Supabase の公開設定がありません。");
+      setError(L("Supabase の公開設定がありません。"));
       return;
     }
     if (!acquire()) return;

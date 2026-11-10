@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -26,7 +27,7 @@ const loginPath = "/login?next=/memo";
 
 export default function MySenseNotesPage() {
   return (
-    <Suspense fallback={<PageLoading screen label="読み込み中..." />}>
+    <Suspense fallback={<PageLoading screen label={L("読み込み中...")} />}>
       <MySenseNotes />
     </Suspense>
   );
@@ -115,20 +116,20 @@ function MySenseNotes() {
   const notesLoading = !failed && (shownNotes === null || shownStats === null);
   const recordsLoading = !guest && !raceData && !raceFailed;
   if (loading || (tab === "records" ? recordsLoading : notesLoading)) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   const needsOlderNotes = Boolean(cursor && shownNotes?.length && shownNotes[shownNotes.length - 1].day >= `${month}-01`);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="sr-only">メモ</h1>
+      <h1 className="sr-only">{L("メモ")}</h1>
       <ViewSwitch
-        label="感覚と記録の切り替え"
+        label={L("感覚と記録の切り替え")}
         layoutId="memo-view-pill"
         views={[
-          { id: "sense", label: "感覚" },
-          { id: "records", label: "記録" },
+          { id: "sense", label: L("感覚") },
+          { id: "records", label: L("記録") },
         ]}
         current={tab}
         onSelect={setTab}
@@ -141,15 +142,13 @@ function MySenseNotes() {
         onSubmitCapture={guest ? toLogin : undefined}
       >
         {guest ? (
-          <p className="rounded-xl border border-sky-300/30 bg-sky-950/40 p-3 text-sm text-sky-100">
-            ログインすると、感覚や記録をためて、あとからふりかえれます。
-          </p>
+          <p className="rounded-xl border border-sky-300/30 bg-sky-950/40 p-3 text-sm text-sky-100">{L("ログインすると、感覚や記録をためて、あとからふりかえれます。")}</p>
         ) : null}
         {tab === "records" ? (
-          raceFailed ? <ErrorState message="記録の取得に失敗しました。下のカレンダーから再読み込みできます。" /> :
+          raceFailed ? <ErrorState message={L("記録の取得に失敗しました。下のカレンダーから再読み込みできます。")} /> :
           <RaceRecordsPanel token={guest ? null : token} data={raceData} onRecordsChanged={setRaceData} selectedDay={selectedDay} />
         ) : failed ? (
-          <ErrorState message="感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。" />
+          <ErrorState message={L("感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。")} />
         ) : shownStats && (
           <>
             <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">

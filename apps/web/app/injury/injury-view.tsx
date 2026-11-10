@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -38,21 +39,21 @@ export function InjuryView() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-200">同じ怪我をしている人たちと気持ちを共有して復帰を目指そう！</p>
+      <p className="text-sm text-slate-200">{L("同じ怪我をしている人たちと気持ちを共有して復帰を目指そう！")}</p>
       <InjuryMeCards token={token} />
 
       {failed ? (
-        <ErrorState message="グループの取得に失敗しました。時間をおいて、もう一度開いてください。" />
+        <ErrorState message={L("グループの取得に失敗しました。時間をおいて、もう一度開いてください。")} />
       ) : groups === null ? (
         <div role="status" aria-busy="true" className="space-y-3">
-          <p className="sr-only">グループを読み込んでいます</p>
+          <p className="sr-only">{L("グループを読み込んでいます")}</p>
           <div className="mx-auto h-60 w-64 animate-pulse rounded-2xl glass bg-white/12" />
           {Array.from({ length: 3 }, (_, i) => (
             <div key={i} className="h-16 animate-pulse rounded-2xl glass bg-white/12" />
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <EmptyState title="グループがありません" body="しばらくしてからもう一度開いてください。" />
+        <EmptyState title={L("グループがありません")} body={L("しばらくしてからもう一度開いてください。")} />
       ) : (
         <InjuryGroupPicker groups={groups} />
       )}
@@ -79,10 +80,10 @@ export function InjuryGroupPicker({ groups }: { groups: InjuryGroupSummary[] }) 
   }
 
   return (
-    <section aria-label="体の場所からグループを選ぶ" className="space-y-3">
-      <p className="text-center text-sm text-slate-300">痛いところをタップ</p>
+    <section aria-label={L("体の場所からグループを選ぶ")} className="space-y-3">
+      <p className="text-center text-sm text-slate-300">{L("痛いところをタップ")}</p>
       <InjuryBodyMap members={members} selected={selected} onSelect={selectRegion} />
-      <div role="group" aria-label="体の場所" className="flex flex-wrap justify-center gap-2">
+      <div role="group" aria-label={L("体の場所")} className="flex flex-wrap justify-center gap-2">
         {regions.map((region) => (
           <button
             key={region.value}
@@ -99,9 +100,9 @@ export function InjuryGroupPicker({ groups }: { groups: InjuryGroupSummary[] }) 
       </div>
       <div ref={results} className="scroll-mt-24">
         {current.groups.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-300">この場所のグループはまだありません。</p>
+          <p className="py-4 text-center text-sm text-slate-300">{L("この場所のグループはまだありません。")}</p>
         ) : (
-          <ul className="space-y-2" aria-label={`${current.label}のグループ`}>
+          <ul className="space-y-2" aria-label={L("{label}のグループ", { label: current.label })}>
             {current.groups.map((group) => (
               <li key={group.body_part}>
                 <Link
@@ -111,11 +112,11 @@ export function InjuryGroupPicker({ groups }: { groups: InjuryGroupSummary[] }) 
                   }`}
                 >
                   <InjuryPartIcon part={group.body_part} className="h-16 w-9 shrink-0" />
-                  <span className="min-w-0 flex-1 text-base font-bold">{group.body_part_label}</span>
+                  <span className="min-w-0 flex-1 text-base font-bold">{L(group.body_part_label)}</span>
                   <span className="shrink-0 text-right">
-                    <span className="block text-sm text-slate-200">{group.members}人</span>
+                    <span className="block text-sm text-slate-200">{L("{members}人", { members: group.members })}</span>
                     <span className={`block text-xs font-semibold ${group.me ? "text-blue-200" : "text-slate-300"}`}>
-                      {group.me ? `参加中 · ${group.me.stage_label}` : "グループに入る"}
+                      {group.me ? L("参加中 · {stage_label}", { stage_label: L(group.me.stage_label) }) : L("グループに入る")}
                     </span>
                   </span>
                 </Link>

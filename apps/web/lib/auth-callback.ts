@@ -1,3 +1,4 @@
+import { L } from "./i18n";
 // /auth/callback に来たときの失敗の種類。ログイン画面の ?error= に入れて、出す文言を選ぶ。
 // メールのリンク(登録の確認・メールアドレスの変更)も Google ログインも、同じ /auth/callback に戻ってくる。
 export type CallbackError = "google" | "link-expired" | "other-browser";
@@ -16,9 +17,8 @@ export function callbackParamsError(params: URLSearchParams): CallbackError | nu
 export const callbackExchangeError: CallbackError = "other-browser";
 
 export const callbackErrorMessages: Record<string, string> = {
-  config: "Supabase の公開設定がありません。",
-  google: "Googleログインに失敗しました。",
-  "link-expired": "メールのリンクの有効期限が切れているか、すでに使われています。ログインできないときは、もう一度登録するか、パスワードを再設定してください。",
-  "other-browser":
-    "このブラウザではログインを完了できませんでした。メールのリンクから来た場合、メールアドレスの確認は済んでいます。メールアドレスとパスワードでログインしてください。",
+  get config() { return L("Supabase の公開設定がありません。"); },
+  get google() { return L("Googleログインに失敗しました。"); },
+  get "link-expired"() { return L("メールのリンクの有効期限が切れているか、すでに使われています。ログインできないときは、もう一度登録するか、パスワードを再設定してください。"); },
+  get "other-browser"() { return L("このブラウザではログインを完了できませんでした。メールのリンクから来た場合、メールアドレスの確認は済んでいます。メールアドレスとパスワードでログインしてください。"); },
 };

@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +9,10 @@ import { useActionLock } from "@/lib/use-action-lock";
 import { useEffect, useState, type FormEvent } from "react";
 
 const guardianLabels: Record<CoachingGuardian["status"], string> = {
-  pending: "保護者の同意待ち",
-  consented: "保護者が同意済み",
-  declined: "保護者が同意しませんでした",
-  revoked: "保護者が同意を取り消しました",
+  get pending() { return L("保護者の同意待ち"); },
+  get consented() { return L("保護者が同意済み"); },
+  get declined() { return L("保護者が同意しませんでした"); },
+  get revoked() { return L("保護者が同意を取り消しました"); },
 };
 
 // 18歳未満の人が、保護者に同意のリンクをメールで送る。パーソナル指導は、コーチが引き受けたあとのここで初めて聞く。
@@ -48,12 +49,12 @@ export function GuardianLinkForm({ token }: { token: string | null }) {
       });
       setGuardian(next);
       setEmail("");
-      setMessage(`${next.guardian_email ?? "保護者"} にメールを送りました。届いたメールのリンクから、保護者が同意してお支払いをします。`);
+      setMessage(L("{v0} にメールを送りました。届いたメールのリンクから、保護者が同意してお支払いをします。", { v0: next.guardian_email ?? L("保護者") }));
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields?.guardian_email) {
         setEmailError(err.fields.guardian_email);
       } else {
-        setMessage(err instanceof ApiRequestError ? err.message : "メールを送れませんでした");
+        setMessage(err instanceof ApiRequestError ? err.message : L("メールを送れませんでした"));
       }
     } finally {
       release();
@@ -62,37 +63,33 @@ export function GuardianLinkForm({ token }: { token: string | null }) {
 
   return (
     <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4 text-sm">
-      <h2 className="font-bold text-white">保護者に知らせる</h2>
+      <h2 className="font-bold text-white">{L("保護者に知らせる")}</h2>
       <p className="text-slate-200">
-        {guardian ? guardianLabels[guardian.status] : "まだ保護者にメールを送っていません"}
+        {guardian ? guardianLabels[guardian.status] : L("まだ保護者にメールを送っていません")}
       </p>
-      {guardian?.guardian_email ? <p className="text-slate-300">送り先: {guardian.guardian_email}</p> : null}
+      {guardian?.guardian_email ? <p className="text-slate-300">{L("送り先: {guardian_email}", { guardian_email: guardian.guardian_email })}</p> : null}
       {guardian?.status === "consented" ? null : (
         <form onSubmit={onSend} className="space-y-2">
           {emailLocked ? (
-            <p className="text-xs text-slate-400">
-              保護者が一度答えたあとは、送り先のアドレスは変えられません。変えたいときはお問い合わせください。
-            </p>
+            <p className="text-xs text-slate-400">{L("保護者が一度答えたあとは、送り先のアドレスは変えられません。変えたいときはお問い合わせください。")}</p>
           ) : (
             <>
-              <p className="text-slate-300">
-                保護者のメールアドレスに、同意とお支払いのページのリンクを TrackTalk から送ります。自分のアドレスではなく、保護者のアドレスを入力してください。
-              </p>
+              <p className="text-slate-300">{L("保護者のメールアドレスに、同意とお支払いのページのリンクを TrackTalk から送ります。自分のアドレスではなく、保護者のアドレスを入力してください。")}</p>
               <Input
                 type="email"
                 autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={guardian?.guardian_email ?? "parent@example.com"}
-                aria-label="保護者のメールアドレス"
+                aria-label={L("保護者のメールアドレス")}
               />
               {emailError ? <p className="text-red-400">{emailError}</p> : null}
             </>
           )}
           <Button type="submit" className="w-full" disabled={pending || (!emailLocked && !email.trim())}>
-            {guardian?.guardian_email ? "保護者にメールを送り直す" : "保護者にメールを送る"}
+            {guardian?.guardian_email ? L("保護者にメールを送り直す") : L("保護者にメールを送る")}
           </Button>
-          {guardian ? <p className="text-xs text-slate-400">送り直すと、前に送ったリンクは使えなくなります。メールは1日5回まで送れます。</p> : null}
+          {guardian ? <p className="text-xs text-slate-400">{L("送り直すと、前に送ったリンクは使えなくなります。メールは1日5回まで送れます。")}</p> : null}
         </form>
       )}
       {message ? <p className="text-slate-300">{message}</p> : null}

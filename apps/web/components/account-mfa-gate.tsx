@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -56,7 +57,7 @@ function MfaVerify() {
   async function verify(e: React.FormEvent) {
     e.preventDefault();
     if (!isTotpCode(code)) {
-      setError("認証アプリに出ている6桁の数字を入れてください。");
+      setError(L("認証アプリに出ている6桁の数字を入れてください。"));
       return;
     }
     const { createClient } = await import("@/lib/supabase");
@@ -96,7 +97,7 @@ function MfaVerify() {
       });
       router.replace("/login");
     } catch {
-      setError("ログアウトできませんでした。もう一度お試しください。");
+      setError(L("ログアウトできませんでした。もう一度お試しください。"));
     } finally {
       release();
     }
@@ -105,10 +106,8 @@ function MfaVerify() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="flex items-center gap-2 text-2xl font-bold">
-        <ShieldCheck className="size-6 text-blue-300" aria-hidden />
-        二段階認証
-      </h1>
-      <p className="text-sm text-slate-300">認証アプリに出ている6桁のコードを入れてください。</p>
+        <ShieldCheck className="size-6 text-blue-300" aria-hidden />{L("二段階認証")}</h1>
+      <p className="text-sm text-slate-300">{L("認証アプリに出ている6桁のコードを入れてください。")}</p>
       <form method="post" onSubmit={verify} className="space-y-3">
         <Input
           inputMode="numeric"
@@ -120,18 +119,10 @@ function MfaVerify() {
           autoFocus
         />
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
-          確認する
-        </Button>
+        <Button type="submit" className="w-full" disabled={pending}>{L("確認する")}</Button>
       </form>
-      <p className="text-sm text-slate-300">
-        認証アプリを使えなくなったときは、
-        <Link href="/contact" className="inline-block text-blue-400 transition active:scale-[0.98]">お問い合わせ</Link>
-        から運営に連絡してください。
-      </p>
-      <button type="button" onClick={signOut} className="text-sm text-slate-400 underline transition active:scale-[0.98]">
-        ログアウトする
-      </button>
+      <p className="text-sm text-slate-300">{L("認証アプリを使えなくなったときは、")}<Link href="/contact" className="inline-block text-blue-400 transition active:scale-[0.98]">{L("お問い合わせ")}</Link>{L("から運営に連絡してください。")}</p>
+      <button type="button" onClick={signOut} className="text-sm text-slate-400 underline transition active:scale-[0.98]">{L("ログアウトする")}</button>
     </div>
   );
 }
@@ -140,18 +131,12 @@ function MfaSetupRequired({ pathname }: { pathname: string }) {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="flex items-center gap-2 text-2xl font-bold">
-        <ShieldCheck className="size-6 text-blue-300" aria-hidden />
-        二段階認証の設定が必要です
-      </h1>
-      <p className="text-sm text-slate-300">
-        管理者の画面は、アカウントの乗っ取りを防ぐため、二段階認証を設定してから使えます。認証アプリ(Google Authenticator など)を用意して、設定してください。
-      </p>
+        <ShieldCheck className="size-6 text-blue-300" aria-hidden />{L("二段階認証の設定が必要です")}</h1>
+      <p className="text-sm text-slate-300">{L("管理者の画面は、アカウントの乗っ取りを防ぐため、二段階認証を設定してから使えます。認証アプリ(Google Authenticator など)を用意して、設定してください。")}</p>
       <Link
         href={`/me/security?next=${encodeURIComponent(pathname)}`}
         className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98]"
-      >
-        二段階認証を設定する
-      </Link>
+      >{L("二段階認証を設定する")}</Link>
     </div>
   );
 }

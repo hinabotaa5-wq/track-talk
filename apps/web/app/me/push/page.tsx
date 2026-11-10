@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -17,14 +18,14 @@ function errorMessage(err: unknown, fallback: string) {
 }
 
 const categoryLabels: Record<NotificationCategory, { title: string; detail: string }> = {
-  comment: { title: "コメント・返信", detail: "自分の投稿へのコメントと、自分のコメントへの返信" },
-  practice: { title: "練習の参加", detail: "参加申請、承認、解散したあとの評価のお願い" },
-  recruitment: { title: "新しい募集", detail: "ほかの人がチームの仲間や練習相手の募集を投稿したとき" },
-  injury: { title: "ケガの経過報告", detail: "「わかる」か保存をしたケガの投稿に経過報告があったとき" },
-  review: { title: "フォーム添削", detail: "返答、補足、期限切れ、「役に立ちましたか」" },
-  coaching: { title: "パーソナル指導・コーチ", detail: "申し込み、承諾、開始、終了、メッセージ、コーチの応募の結果" },
-  monthly: { title: "月1回の記録のお知らせ", detail: "毎月1日に、大会の記録を残すお知らせ" },
-  announcement: { title: "運営からのお知らせ", detail: "新しい機能が使えるようになったときなど、運営から全員へのお知らせ" },
+  comment: { get title() { return L("コメント・返信"); }, get detail() { return L("自分の投稿へのコメントと、自分のコメントへの返信"); } },
+  practice: { get title() { return L("練習の参加"); }, get detail() { return L("参加申請、承認、解散したあとの評価のお願い"); } },
+  recruitment: { get title() { return L("新しい募集"); }, get detail() { return L("ほかの人がチームの仲間や練習相手の募集を投稿したとき"); } },
+  injury: { get title() { return L("ケガの経過報告"); }, get detail() { return L("「わかる」か保存をしたケガの投稿に経過報告があったとき"); } },
+  review: { get title() { return L("フォーム添削"); }, get detail() { return L("返答、補足、期限切れ、「役に立ちましたか」"); } },
+  coaching: { get title() { return L("パーソナル指導・コーチ"); }, get detail() { return L("申し込み、承諾、開始、終了、メッセージ、コーチの応募の結果"); } },
+  monthly: { get title() { return L("月1回の記録のお知らせ"); }, get detail() { return L("毎月1日に、大会の記録を残すお知らせ"); } },
+  announcement: { get title() { return L("運営からのお知らせ"); }, get detail() { return L("新しい機能が使えるようになったときなど、運営から全員へのお知らせ"); } },
 };
 
 function Switch({ checked, label, disabled, onChange }: { checked: boolean; label: string; disabled: boolean; onChange: (next: boolean) => void }) {
@@ -53,7 +54,7 @@ function NotificationSettings({ token }: { token: string | null }) {
     if (!token) return;
     apiFetch<{ settings: NotificationSetting[] }>("/v1/me/notification-settings", { token })
       .then((data) => setSettings(data.settings))
-      .catch(() => setError("通知の設定を読み込めませんでした"));
+      .catch(() => setError(L("通知の設定を読み込めませんでした")));
   }, [token]);
 
   async function update(next: NotificationSetting) {
@@ -70,7 +71,7 @@ function NotificationSettings({ token }: { token: string | null }) {
       });
     } catch (err) {
       setSettings(before);
-      setError(errorMessage(err, "設定を保存できませんでした"));
+      setError(errorMessage(err, L("設定を保存できませんでした")));
     } finally {
       setSaving(null);
     }
@@ -78,19 +79,15 @@ function NotificationSettings({ token }: { token: string | null }) {
 
   return (
     <section aria-labelledby="notification-kinds" className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
-      <h2 id="notification-kinds" className="text-base font-semibold text-slate-100">
-        通知の種類
-      </h2>
-      <p className="text-sm text-slate-200">
-        種類ごとに、アプリ内(ベルの一覧)とプッシュ(この画面でオンにした端末)を選べます。
-      </p>
-      {settings === null && !error ? <PageLoading label="読み込み中..." /> : null}
+      <h2 id="notification-kinds" className="text-base font-semibold text-slate-100">{L("通知の種類")}</h2>
+      <p className="text-sm text-slate-200">{L("種類ごとに、アプリ内(ベルの一覧)とプッシュ(この画面でオンにした端末)を選べます。")}</p>
+      {settings === null && !error ? <PageLoading label={L("読み込み中...")} /> : null}
       {settings ? (
         <ul className="divide-y divide-white/15">
           <li className="flex items-center gap-3 pb-2 text-xs text-slate-300" aria-hidden>
             <span className="flex-1" />
-            <span className="w-12 text-center">アプリ内</span>
-            <span className="w-12 text-center">プッシュ</span>
+            <span className="w-12 text-center">{L("アプリ内")}</span>
+            <span className="w-12 text-center">{L("プッシュ")}</span>
           </li>
           {settings.map((item) => {
             const label = categoryLabels[item.category] ?? { title: item.category, detail: "" };
@@ -102,13 +99,13 @@ function NotificationSettings({ token }: { token: string | null }) {
                 </div>
                 <Switch
                   checked={item.in_app}
-                  label={`${label.title}: アプリ内`}
+                  label={L("{title}: アプリ内", { title: label.title })}
                   disabled={saving !== null}
                   onChange={(next) => void update({ ...item, in_app: next })}
                 />
                 <Switch
                   checked={item.push}
-                  label={`${label.title}: プッシュ`}
+                  label={L("{title}: プッシュ", { title: label.title })}
                   disabled={saving !== null}
                   onChange={(next) => void update({ ...item, push: next })}
                 />
@@ -117,9 +114,7 @@ function NotificationSettings({ token }: { token: string | null }) {
           })}
         </ul>
       ) : null}
-      <p className="text-xs text-slate-300">
-        お支払い・返金・送金、保護者の同意、運営からの連絡、受付中のコーチへの添削の依頼は、大事な知らせなのでオフにできません。
-      </p>
+      <p className="text-xs text-slate-300">{L("お支払い・返金・送金、保護者の同意、運営からの連絡、受付中のコーチへの添削の依頼は、大事な知らせなのでオフにできません。")}</p>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </section>
   );
@@ -146,9 +141,9 @@ export default function PushSettingsPage() {
       if (!userId) return;
       await disablePushSubscription(userId);
       setPushEnabled(false);
-      setMessage("この端末では通知を受け取りません");
+      setMessage(L("この端末では通知を受け取りません"));
     } catch (err) {
-      setMessage(errorMessage(err, "通知をオフにできませんでした"));
+      setMessage(errorMessage(err, L("通知をオフにできませんでした")));
     } finally {
       release();
     }
@@ -159,37 +154,31 @@ export default function PushSettingsPage() {
     setMessage("");
     try {
       const { sent } = await apiFetch<{ sent: number }>("/v1/me/push-subscriptions/test", { method: "POST", token });
-      setMessage(sent > 0 ? "テストの通知を送りました" : "通知を送れる端末がありません。もう一度オンにしてください。");
+      setMessage(sent > 0 ? L("テストの通知を送りました") : L("通知を送れる端末がありません。もう一度オンにしてください。"));
     } catch (err) {
-      setMessage(errorMessage(err, "テストの通知を送れませんでした"));
+      setMessage(errorMessage(err, L("テストの通知を送れませんでした")));
     } finally {
       release();
     }
   }
 
   if (loading || !userId || !token) {
-    return <PageLoading screen label="読み込み中..." />;
+    return <PageLoading screen label={L("読み込み中...")} />;
   }
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">通知</h1>
+      <h1 className="text-2xl font-bold">{L("通知")}</h1>
       <div className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
-        <h2 className="text-base font-semibold text-slate-100">この端末のプッシュ通知</h2>
-        <p className="text-sm text-slate-200">
-          オンにすると、下で選んだ種類の通知をこの端末へ送ります。オン・オフは端末ごとです。
-        </p>
+        <h2 className="text-base font-semibold text-slate-100">{L("この端末のプッシュ通知")}</h2>
+        <p className="text-sm text-slate-200">{L("オンにすると、下で選んだ種類の通知をこの端末へ送ります。オン・オフは端末ごとです。")}</p>
         <p className="text-sm font-medium text-slate-100">
-          {enabled === null ? "確かめています..." : enabled ? "この端末: オン" : "この端末: オフ"}
+          {enabled === null ? L("確かめています...") : enabled ? L("この端末: オン") : L("この端末: オフ")}
         </p>
         {enabled ? (
           <>
-            <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void test()}>
-              テストの通知を送る
-            </Button>
-            <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={() => void disable()}>
-              この端末の通知をオフにする
-            </Button>
+            <Button type="button" variant="ghost" className="w-full" disabled={pending} onClick={() => void test()}>{L("テストの通知を送る")}</Button>
+            <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={() => void disable()}>{L("この端末の通知をオフにする")}</Button>
           </>
         ) : (
           <PushPermissionGuide
@@ -197,7 +186,7 @@ export default function PushSettingsPage() {
             userId={userId}
             onEnabled={() => {
               setPushEnabled(true);
-              setMessage("この端末で通知を受け取れるようになりました");
+              setMessage(L("この端末で通知を受け取れるようになりました"));
             }}
             renderControl={(status, activate, busy) => (
               <Button
@@ -209,16 +198,16 @@ export default function PushSettingsPage() {
                   activate();
                 }}
               >
-                {status === "denied" ? "通知がオフになっています"
-                  : status === "unsupported" ? "このブラウザは通知に対応していません"
-                  : status === "granted" ? "この端末で通知をオンにする"
-                  : "通知を受け取る"}
+                {status === "denied" ? L("通知がオフになっています")
+                  : status === "unsupported" ? L("このブラウザは通知に対応していません")
+                  : status === "granted" ? L("この端末で通知をオンにする")
+                  : L("通知を受け取る")}
               </Button>
             )}
           />
         )}
         {message ? <p className="text-sm text-slate-300">{message}</p>
-          : pushStatus === "failed" && !enabled ? <p className="text-sm text-slate-300">通知を登録できませんでした。この端末で通知をもう一度オンにしてください。</p>
+          : pushStatus === "failed" && !enabled ? <p className="text-sm text-slate-300">{L("通知を登録できませんでした。この端末で通知をもう一度オンにしてください。")}</p>
           : null}
       </div>
       <NotificationSettings token={token} />

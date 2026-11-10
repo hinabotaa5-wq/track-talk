@@ -883,3 +883,9 @@ select:-webkit-autofill {
   height: 100%;
   object-fit: cover;
 }
+
+/* 英語の人は、英語の辞書を当て終えるまで中身を隠す（日本語が一瞬見えるのを防ぐ。本体 #530）。
+   起動画面のロゴは見せたまま。lib/i18n の localeStartupScript が付け、LocaleProvider が外す（3秒で必ず外れる）。 */
+html.locale-pending body > :not(#startup-splash):not(script) {
+  visibility: hidden;
+}

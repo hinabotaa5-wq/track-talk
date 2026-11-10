@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 // 競技会の記録: 日付・種目・記録・風・感想を本人だけが残し、種目ごとの推移をグラフで見る。感覚メモの延長。
 
 import { appEvents } from "./practice-events";
@@ -84,7 +85,7 @@ export function parseRaceMark(text: string, kind: RaceMarkKind): number | null {
 
 // 保存した整数を、見せる形にする。
 export function formatRaceMark(mark: number, kind: RaceMarkKind) {
-  if (kind === "points") return `${mark.toLocaleString("ja-JP")}点`;
+  if (kind === "points") return L("{v0}点", { v0: mark.toLocaleString("ja-JP") });
   if (kind === "distance") return `${Math.floor(mark / 100)}.${String(mark % 100).padStart(2, "0")}m`;
   const whole = Math.floor(mark / 100);
   const fraction = String(mark % 100).padStart(2, "0");

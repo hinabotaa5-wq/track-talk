@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -31,7 +32,7 @@ export function useCursorPosts(base: string | null, token: string | null | undef
         if (!controller.signal.aborted) setState({ base, token, posts: data.posts ?? [], next: data.meta.has_more ? data.meta.next_cursor ?? "" : "", error: "", expired: false });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ base, token, posts: [], next: "", error: "投稿の取得に失敗しました", expired: false });
+        if (!controller.signal.aborted) setState({ base, token, posts: [], next: "", error: L("投稿の取得に失敗しました"), expired: false });
       });
     return () => controller.abort();
   }, [base, token, reloadKey]);
@@ -52,7 +53,7 @@ export function useCursorPosts(base: string | null, token: string | null | undef
       });
     } catch (error) {
       const expired = error instanceof ApiRequestError && error.code === "invalid_cursor";
-      setState((value) => value && value.base === from && value.token === token ? { ...value, error: "続きの読み込みに失敗しました", expired } : value);
+      setState((value) => value && value.base === from && value.token === token ? { ...value, error: L("続きの読み込みに失敗しました"), expired } : value);
     } finally {
       pending.current = false;
       setLoadingMore(false);

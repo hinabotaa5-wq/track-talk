@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -15,12 +16,12 @@ type InjuryData = { min_people: number; overall: InjuryPublicGroup; groups: Inju
 // 質問ごとの見出し。何を聞いた答えなのかが一目でわかるよう、質問の形にする。
 function questionsOf(group: InjuryPublicGroup) {
   return [
-    { title: "ケガの前に、何か変わった？", short: "ケガの前の変化", tally: group.pre_changes },
-    { title: "そのとき何をしていた？", short: "していたこと", tally: group.activities },
-    { title: "どこでケガをした？", short: "場所", tally: group.places },
-    { title: "種目は？", short: "種目", tally: group.events },
-    { title: "いま思うと、どうすればよかった？", short: "どうすればよかったか", tally: group.hindsight },
-    { title: "復帰までに何をした？", short: "復帰までにやったこと", tally: group.actions },
+    { title: L("ケガの前に、何か変わった？"), short: L("ケガの前の変化"), tally: group.pre_changes },
+    { title: L("そのとき何をしていた？"), short: L("していたこと"), tally: group.activities },
+    { title: L("どこでケガをした？"), short: L("場所"), tally: group.places },
+    { title: L("種目は？"), short: L("種目"), tally: group.events },
+    { title: L("いま思うと、どうすればよかった？"), short: L("どうすればよかったか"), tally: group.hindsight },
+    { title: L("復帰までに何をした？"), short: L("復帰までにやったこと"), tally: group.actions },
   ];
 }
 
@@ -47,12 +48,12 @@ function OverallCard({ group }: { group: InjuryPublicGroup }) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-bold">{group.body_part_label}</h2>
+        <h2 className="text-lg font-bold">{L(group.body_part_label)}</h2>
       </div>
       {hasData(group) ? (
         <Details group={group} />
       ) : (
-        <p className="text-sm text-slate-400">データが集まると表示します</p>
+        <p className="text-sm text-slate-400">{L("データが集まると表示します")}</p>
       )}
     </section>
   );
@@ -66,9 +67,9 @@ function GroupCard({ group }: { group: InjuryPublicGroup }) {
     <details className="group rounded-2xl border border-white/20 glass bg-white/10 p-4">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <span className="min-w-0">
-          <span className="block font-bold">{group.body_part_label}</span>
+          <span className="block font-bold">{L(group.body_part_label)}</span>
           <span className="mt-0.5 block text-xs text-slate-300">
-            {ready ? (first ? `多かったのは「${first.label}」` : "データを見る") : `$データが集まると表示します`}
+            {ready ? (first ? L("多かったのは「{label}」", { label: L(first.label) }) : L("データを見る")) : L("データが集まると表示します")}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1 text-sm text-slate-300">
@@ -77,9 +78,7 @@ function GroupCard({ group }: { group: InjuryPublicGroup }) {
       </summary>
       <div className="mt-4 space-y-4">
         {ready ? <Details group={group} /> : null}
-        <Link href={injuryGroupPath(group.body_part)} className="block text-sm text-blue-300 underline-offset-2 hover:underline">
-          このグループを見る →
-        </Link>
+        <Link href={injuryGroupPath(group.body_part)} className="block text-sm text-blue-300 underline-offset-2 hover:underline">{L("このグループを見る →")}</Link>
       </div>
     </details>
   );
@@ -103,19 +102,19 @@ export function DataView() {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <p className="text-sm text-slate-200">みんなの経験を自分のケガ対策に活かそう！</p>
+        <p className="text-sm text-slate-200">{L("みんなの経験を自分のケガ対策に活かそう！")}</p>
       </div>
 
       {failed ? (
-        <ErrorState message="データの取得に失敗しました。時間をおいて、もう一度開いてください。" />
+        <ErrorState message={L("データの取得に失敗しました。時間をおいて、もう一度開いてください。")} />
       ) : data === null ? (
-        <PageLoading label="読み込み中..." />
+        <PageLoading label={L("読み込み中...")} />
       ) : data.groups.length === 0 ? (
-        <EmptyState title="まだデータがありません" body="共有のグループに参加する人が増えると、ここに集計が出ます。" />
+        <EmptyState title={L("まだデータがありません")} body={L("共有のグループに参加する人が増えると、ここに集計が出ます。")} />
       ) : (
         <>
           <OverallCard group={data.overall} />
-          <h2 className="pt-2 text-base font-bold">ケガごとのデータ</h2>
+          <h2 className="pt-2 text-base font-bold">{L("ケガごとのデータ")}</h2>
           <ul className="grid items-start gap-3 sm:grid-cols-2">
             {data.groups.map((group) => (
               <li key={group.body_part}>

@@ -1,9 +1,11 @@
 "use client";
+import { L } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 
 import { MainTabLink } from "./main-tab-link";
 import { useSyncExternalStore } from "react";
 import { readAccountOrigin } from "@/lib/account-origin";
-import { mainTabLabel, parseLocale, t } from "@/lib/i18n";
+import { mainTabLabel, t } from "@/lib/i18n";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
 import { usePathname } from "next/navigation";
 import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
@@ -24,17 +26,17 @@ const MemoIcon = createLucideIcon("memo", [
 ]);
 
 export const mainTabs = [
-  { id: "home", href: "/", label: "ホーム", icon: Home },
-  { id: "competitions", href: "/competitions", label: "大会", icon: Trophy },
-  { id: "coaching", href: "/coaching", label: "コーチ", icon: GraduationCap },
-  { id: "memo", href: "/memo", label: "メモ", icon: MemoIcon },
-  { id: "injury", href: "/injury", label: "ケガ", icon: HeartPulse },
+  { id: "home", href: "/", get label() { return L("ホーム"); }, icon: Home },
+  { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
+  { id: "coaching", href: "/coaching", get label() { return L("コーチ"); }, icon: GraduationCap },
+  { id: "memo", href: "/memo", get label() { return L("メモ"); }, icon: MemoIcon },
+  { id: "injury", href: "/injury", get label() { return L("ケガ"); }, icon: HeartPulse },
 ] as const;
 
 // mainTabs の label は日本語のまま（互換のため）。表示は mainTabLabel(id, locale) を使う（本体 #521）。
 
 // マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
-const meTab = { id: "me", href: "/me", label: "マイページ", icon: UserRound } as const;
+const meTab = { id: "me", href: "/me", get label() { return L("マイページ"); }, icon: UserRound } as const;
 
 export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
   const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);
@@ -190,8 +192,8 @@ export function hidesBottomNav(pathname: string) {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { session, profile } = useAuth();
-  const locale = parseLocale(profile?.locale);
+  const { session } = useAuth();
+  const locale = useLocale();
   const guardedClick = useGuardedLinkClick();
   const current = useCurrentMainTab(pathname);
   if (hidesBottomNav(pathname)) return null;
@@ -203,6 +205,7 @@ export function BottomNav() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden [body[data-comment-typing]_&]:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label={t(locale, "nav.main")}
+        data-main-nav=""
       >
         <ul className="mx-auto grid h-14 max-w-5xl grid-cols-5">
           {mainTabs.map((tab) => {

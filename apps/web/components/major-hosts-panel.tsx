@@ -1,4 +1,5 @@
 "use client";
+import { L, localizeJaDate } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -27,7 +28,7 @@ export function MajorHostsPanel({ initialHosts = null }: { initialHosts?: MajorH
         setError("");
       })
       .catch(() => {
-        if (active) setError("開催地を取得できませんでした。");
+        if (active) setError(L("開催地を取得できませんでした。"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -39,8 +40,8 @@ export function MajorHostsPanel({ initialHosts = null }: { initialHosts?: MajorH
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-100">今後の世界陸上・オリンピック</h1>
-      {loading ? <PageLoading label="読み込み中..." /> : <MajorHostList hosts={hosts ?? []} error={error} />}
+      <h1 className="text-2xl font-bold text-slate-100">{L("今後の世界陸上・オリンピック")}</h1>
+      {loading ? <PageLoading label={L("読み込み中...")} /> : <MajorHostList hosts={hosts ?? []} error={error} />}
     </div>
   );
 }
@@ -57,34 +58,30 @@ export function BackButton() {
   }
   return (
     <Button type="button" variant="secondary" className="h-11 w-full md:w-fit" onClick={goBack}>
-      <ChevronLeft className="size-5" aria-hidden />
-      戻る
-    </Button>
+      <ChevronLeft className="size-5" aria-hidden />{L("戻る")}</Button>
   );
 }
 
 function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) {
   if (error) return <ErrorState message={error} />;
   if (hosts.length === 0) {
-    return <EmptyState title="今後の開催地はまだありません" body="開催地が決まると、ここに表示されます。" />;
+    return <EmptyState title={L("今後の開催地はまだありません")} body={L("開催地が決まると、ここに表示されます。")} />;
   }
   return (
     <div className="space-y-10">
       {hosts.map((host) => {
         const rows = [
-          { label: "日程", value: scheduleRange(host.schedule_label) },
-          host.venue ? { label: "会場", value: host.venue } : null,
-          host.country ? { label: "開催国", value: host.country } : null,
+          { label: L("日程"), value: scheduleRange(localizeJaDate(host.schedule_label)) },
+          host.venue ? { label: L("会場"), value: host.venue } : null,
+          host.country ? { label: L("開催国"), value: host.country } : null,
         ].filter((row) => row !== null);
         return (
           <article key={`${host.kind}-${host.year}`} className="space-y-6">
             <HostPhoto url={host.image_url} alt={cityName(host)} />
             <h2 className="text-3xl font-bold text-slate-100">{cityName(host)}</h2>
-            <p className="text-sm text-slate-200">
-              {host.year}年・{kindLabel(host.kind)}
-            </p>
+            <p className="text-sm text-slate-200">{L("{year}年・{v1}", { year: host.year, v1: kindLabel(host.kind) })}</p>
             <div>
-              <h3 className="mb-2 text-xl font-semibold text-slate-100">詳細</h3>
+              <h3 className="mb-2 text-xl font-semibold text-slate-100">{L("詳細")}</h3>
               <dl className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-4">
                 {rows.map((row) => (
                   <div key={row.label}>
@@ -94,7 +91,7 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
                 ))}
                 {host.page_url ? (
                   <div>
-                    <dt className="text-sm text-slate-200">関連ページ</dt>
+                    <dt className="text-sm text-slate-200">{L("関連ページ")}</dt>
                     <dd className="mt-1">
                       <a href={host.page_url} target="_blank" rel="noopener noreferrer" className="inline-block text-blue-400 transition active:scale-[0.98]">
                         Wikipedia
@@ -113,15 +110,15 @@ function MajorHostList({ hosts, error }: { hosts: MajorHost[]; error: string }) 
 
 function cityName(host: MajorHost) {
   const name = host.city || host.country;
-  if (name.endsWith("市") && name.length > 1) return name.slice(0, -1);
+  if (name.endsWith("市") && name.length > 1) return name.slice(0, -1); // i18n-data
   return name;
 }
 
 function scheduleRange(label: string) {
   const rest = label.replace(/^\d{4}年/, "");
-  if (rest.includes("日")) return rest;
-  if (/^\d{1,2}月$/.test(rest)) return `${rest}（日にち未定）`;
-  return "日程未定";
+  if (rest.includes("日")) return rest; // i18n-data
+  if (/^\d{1,2}月$/.test(rest)) return L("{rest}（日にち未定）", { rest });
+  return L("日程未定");
 }
 
 function HostPhoto({ url, alt }: { url: string; alt: string }) {
@@ -148,9 +145,7 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
               setFailed(true);
             }}
           />
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-pure-white">
-            写真: Wikimedia Commons
-          </p>
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 pb-2 pt-8 text-xs text-pure-white">{L("写真: Wikimedia Commons")}</p>
         </>
       ) : null}
     </div>
@@ -158,5 +153,5 @@ function HostPhoto({ url, alt }: { url: string; alt: string }) {
 }
 
 function kindLabel(kind: MajorHost["kind"]) {
-  return kind === "olympics" ? "オリンピック" : "世界陸上";
+  return kind === "olympics" ? L("オリンピック") : L("世界陸上");
 }

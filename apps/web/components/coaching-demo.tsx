@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ export function DemoCodeForm({ intro, token, onJoined }: { intro: string; token:
       await apiFetch("/v1/coaching/demo", { method: "POST", token, body: JSON.stringify({ code }) });
       onJoined();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.fields?.code || err.message : "送信に失敗しました");
+      setError(err instanceof ApiRequestError ? err.fields?.code || err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -33,15 +34,13 @@ export function DemoCodeForm({ intro, token, onJoined }: { intro: string; token:
       <Input
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        placeholder="招待コード(8文字)"
+        placeholder={L("招待コード(8文字)")}
         autoCapitalize="characters"
         autoComplete="off"
-        aria-label="招待コード"
+        aria-label={L("招待コード")}
       />
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending || code.trim() === ""}>
-        デモに参加する
-      </Button>
+      <Button type="submit" className="w-full" disabled={pending || code.trim() === ""}>{L("デモに参加する")}</Button>
     </form>
   );
 }

@@ -6,7 +6,9 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { parseLocale, readStoredLocale, storeLocale, t, type Locale } from "@/lib/i18n";
+import { t, L } from "@/lib/i18n";
+import { useLocale, useLocaleControls } from "@/components/locale-provider";
+import { LanguageSelect } from "@/components/language-select";
 import { appEvents } from "@/lib/practice-events";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { trackEvent } from "@/lib/analytics";
@@ -14,23 +16,16 @@ import { isReservedNickname, reservedNicknameMessage } from "@/lib/reserved-nick
 import { nicknameSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 
 export default function ProfilePage() {
   const { session, token, profile, loading, refreshProfile } = useAuth();
-  // 言語の選択は選んだそばから画面に反映し、保存で確定する（本体 #521）。
-  // 初期値は登録時の選択（端末保存）。本人の保存値が読めたらそちらに寄せるが、選び直しは上書きしない。
-  const [locale, setLocale] = useState<Locale>(() => readStoredLocale());
-  const touched = useRef(false);
-  useEffect(() => {
-    if (!profile || touched.current) return;
-    const saved = parseLocale(profile.locale);
-    if (saved === locale) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLocale(saved);
-  }, [profile, locale]);
+  // 表示言語（本体 #521・#530）。いつもの変更はマイページ本体の「表示言語」で行う。
+  // 登録直後（オンボーディング中）だけここでも選べるようにし、選んだ言語（端末保存）をアカウントの初期値として保存する。
+  const locale = useLocale();
+  const { chooseDeviceLocale } = useLocaleControls();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -68,22 +63,21 @@ export default function ProfilePage() {
       await apiFetch("/v1/me", {
         method: "PATCH",
         token,
-        body: JSON.stringify({ ...values, locale }),
+        body: JSON.stringify(firstTime ? { ...values, locale } : values),
       });
       if (firstTime) trackEvent("onboarding_completed");
-      storeLocale(locale);
       await refreshProfile();
       if (firstTime) {
         router.replace("/");
         return;
       }
-      setMessage(t(parseLocale(locale), "profile.saved"));
+      setMessage(t(locale, "profile.saved"));
     } catch (e) {
       if (e instanceof ApiRequestError && e.code === "nickname_reserved") {
         form.setError("nickname", { type: "reserved", message: e.message });
         return;
       }
-      setError(e instanceof ApiRequestError ? e.message : "更新に失敗しました。");
+      setError(e instanceof ApiRequestError ? e.message : L("更新に失敗しました。"));
     }
   }
 
@@ -97,10 +91,11 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{incomplete ? t(locale, "profile.onboardingTitle") : t(locale, "profile.settingsTitle")}</h1>
       {incomplete ? <p className="text-sm text-slate-200">{t(locale, "profile.onboardingHint")}</p> : null}
+      {incomplete ? <LanguageSelect value={locale} onChange={chooseDeviceLocale} hint="register.languageHint" /> : null}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input placeholder={t(locale, "profile.nickname")} aria-label={t(locale, "profile.nickname")} {...form.register("nickname")} />
         {overLimit ? (
-          <p className="text-sm text-red-400">10文字以内で入力してください</p>
+          <p className="text-sm text-red-400">{L("10文字以内で入力してください")}</p>
         ) : form.formState.errors.nickname ? (
           <p role="alert" className="text-sm text-red-400">{form.formState.errors.nickname.message}</p>
         ) : null}
@@ -124,21 +119,6 @@ export default function ProfilePage() {
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
           {t(locale, "profile.nicknamePublic")}
-        </label>
-        <label className="block text-sm font-medium">
-          {t(locale, "profile.language")}
-          <select
-            className="mt-1 w-full rounded-md border border-white/25 glass bg-white/10 px-3 py-2 text-base text-slate-100 outline-none focus:border-blue-400"
-            value={locale}
-            onChange={(e) => {
-              touched.current = true;
-              setLocale(parseLocale(e.target.value));
-            }}
-          >
-            <option value="ja" className="text-slate-900">{t(locale, "register.language.ja")}</option>
-            <option value="en" className="text-slate-900">{t(locale, "register.language.en")}</option>
-          </select>
-          <span className="mt-1 block text-xs font-normal text-slate-300">{t(locale, "profile.languageHint")}</span>
         </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}

@@ -1,3 +1,4 @@
+import { L } from "@/lib/i18n";
 import { apiFetch } from "./api";
 
 // Web Push の購読まわり。通知はブラウザが対応していて、ホーム画面のアプリかブラウザで許可したときだけ届く。
@@ -26,7 +27,7 @@ export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 export async function ensurePushWorker(): Promise<ServiceWorkerRegistration> {
   const registration = await navigator.serviceWorker.register("/sw.js?v=2", { scope: "/" });
   const worker = registration.installing ?? registration.waiting ?? registration.active;
-  if (!worker) throw new Error("通知を準備できませんでした");
+  if (!worker) throw new Error(L("通知を準備できませんでした"));
   if (worker.state !== "activated") {
     await new Promise<void>((resolve, reject) => {
       function finish(error?: Error) {
@@ -37,9 +38,9 @@ export async function ensurePushWorker(): Promise<ServiceWorkerRegistration> {
       }
       function check() {
         if (worker?.state === "activated") finish();
-        if (worker?.state === "redundant") finish(new Error("通知を準備できませんでした"));
+        if (worker?.state === "redundant") finish(new Error(L("通知を準備できませんでした")));
       }
-      const timer = setTimeout(() => finish(new Error("通知を準備できませんでした")), 5000);
+      const timer = setTimeout(() => finish(new Error(L("通知を準備できませんでした"))), 5000);
       worker.addEventListener("statechange", check);
       check();
     });
@@ -121,7 +122,7 @@ async function savePushBinding(token: string, userId: string, sub: PushSubscript
     "/v1/me/push-subscriptions?return_subscription_id=1",
     { method: "POST", token, body: JSON.stringify(sub), signal: AbortSignal.timeout(5000) },
   );
-  if (!subscriptionId) throw new Error("通知の登録を確認できませんでした");
+  if (!subscriptionId) throw new Error(L("通知の登録を確認できませんでした"));
   await (await caches.open(bindingCache)).put(bindingPath, Response.json({ userId, subscriptionId }));
 }
 
@@ -131,7 +132,7 @@ export async function currentPushSession(userId: string | null) {
   const result = await createClient()?.auth.getSession();
   if (result?.error) throw result.error;
   const session = result?.data.session ?? null;
-  if ((session?.user.id ?? null) !== userId) throw new Error("アカウントが切り替わりました");
+  if ((session?.user.id ?? null) !== userId) throw new Error(L("アカウントが切り替わりました"));
   return session;
 }
 
@@ -181,7 +182,7 @@ async function registerCurrentPushSubscription(token: string, userId: string) {
 export async function registerPushSubscription(userId: string): Promise<void> {
   await withPushDeviceLock(async () => {
     const session = await currentPushSession(userId);
-    if (!session) throw new Error("ログインしてください");
+    if (!session) throw new Error(L("ログインしてください"));
     if ((await readPushBinding())?.userId !== userId) await clearPushBinding();
     await registerCurrentPushSubscription(session.access_token, userId);
   });

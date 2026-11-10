@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect, useRef } from "react";
 
@@ -19,9 +20,7 @@ export function LoadMore({ onLoad, loading, error, expired }: { onLoad: () => vo
   }, [error, loading]);
   if (expired) {
     return (
-      <button type="button" className="block w-full py-3 text-center text-sm text-slate-300" onClick={() => window.location.reload()}>
-        一覧の有効期限が切れました。更新する
-      </button>
+      <button type="button" className="block w-full py-3 text-center text-sm text-slate-300" onClick={() => window.location.reload()}>{L("一覧の有効期限が切れました。更新する")}</button>
     );
   }
   return (
@@ -33,7 +32,7 @@ export function LoadMore({ onLoad, loading, error, expired }: { onLoad: () => vo
       aria-live="polite"
       className="block w-full rounded-full border border-white/20 glass bg-white/10 py-3 text-center text-sm font-semibold text-slate-200 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-[0.98] disabled:opacity-60"
     >
-      {loading ? "読み込み中…" : error ? "読み込みに失敗しました。再試行" : "続きを読み込む"}
+      {loading ? L("読み込み中…") : error ? L("読み込みに失敗しました。再試行") : L("続きを読み込む")}
     </button>
   );
 }

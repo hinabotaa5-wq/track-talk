@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useEffect } from "react";
 import { minorPurchaseDeclarationLabel, minorPurchaseDeclarationNote } from "@/lib/minor-purchase";
@@ -12,7 +13,7 @@ export function MinorPurchaseDeclaration({ checked, onChange, onShown, disabled 
   }, [onShown]);
   return (
     <div className="space-y-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm">
-      <p className="text-slate-200">{minorPurchaseDeclarationNote}</p>
+      <p className="text-slate-200">{L(minorPurchaseDeclarationNote)}</p>
       <label className="flex items-start gap-2 font-semibold text-slate-100">
         <input
           type="checkbox"
@@ -21,7 +22,7 @@ export function MinorPurchaseDeclaration({ checked, onChange, onShown, disabled 
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <span>{minorPurchaseDeclarationLabel}</span>
+        <span>{L(minorPurchaseDeclarationLabel)}</span>
       </label>
     </div>
   );

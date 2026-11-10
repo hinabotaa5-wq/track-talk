@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { CoachAvatar } from "@/components/coach-photo";
 import { ProposalCard } from "@/components/support-consult-detail";
@@ -23,7 +24,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
   const { pending, acquire, release } = useActionLock();
 
   async function answer(action: "consent" | "decline") {
-    if (action === "decline" && !confirm("同意しない場合、このパーソナル指導は始まりません。よろしいですか？")) return;
+    if (action === "decline" && !confirm(L("同意しない場合、このパーソナル指導は始まりません。よろしいですか？"))) return;
     if (!acquire()) return;
     setError("");
     setFields({});
@@ -39,7 +40,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
       onDone();
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
-      else setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+      else setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -54,7 +55,7 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
       });
       window.location.href = d.checkout_url;
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "お支払いの画面を開けませんでした");
+      setError(err instanceof ApiRequestError ? err.message : L("お支払いの画面を開けませんでした"));
       release();
     }
   }
@@ -64,10 +65,8 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
     return (
       <div className="space-y-3">
         <ContractDetails contract={contract} />
-        <p className="text-sm font-semibold text-white">同意は済んでいます。{by}までにお支払いを済ませると、その時から期間が始まります。</p>
-        <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>
-          お支払いへ進む（{formatYen(contract.price_yen)}）
-        </Button>
+        <p className="text-sm font-semibold text-white">{L("同意は済んでいます。{by}までにお支払いを済ませると、その時から期間が始まります。", { by })}</p>
+        <Button type="button" className="w-full" disabled={pending} onClick={() => void pay()}>{L("お支払いへ進む（{v0}）", { v0: formatYen(contract.price_yen) })}</Button>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </div>
     );
@@ -79,19 +78,17 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
       {by ? (
         <p className="text-sm font-semibold text-white">
           {contract.payment_required
-            ? `${by}までに同意してお支払いを済ませると、その時から期間が始まります。`
-            : `${by}までに同意すると、その時から期間が始まります。`}
+            ? L("{by}までに同意してお支払いを済ませると、その時から期間が始まります。", { by })
+            : L("{by}までに同意すると、その時から期間が始まります。", { by })}
         </p>
       ) : null}
       <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
-        <li>期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。新しいメッセージの通知は届きません。</li>
-        <li>連絡先の交換と、直接会う約束は禁止です。気になるメッセージは「通報する」から運営に知らせてください。</li>
+        <li>{L("期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。新しいメッセージの通知は届きません。")}</li>
+        <li>{L("連絡先の交換と、直接会う約束は禁止です。気になるメッセージは「通報する」から運営に知らせてください。")}</li>
         {contract.payment_required ? (
-          <li>
-            料金は{formatYen(contract.price_yen)}で、同意のあとお支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。
-          </li>
+          <li>{L("料金は{v0}で、同意のあとお支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。始まってから72時間コーチの書き込みがなければ、全額を返金します。", { v0: formatYen(contract.price_yen) })}</li>
         ) : (
-          <li>いまはお試し期間のため、お支払いはありません。</li>
+          <li>{L("いまはお試し期間のため、お支払いはありません。")}</li>
         )}
       </ul>
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
@@ -102,16 +99,14 @@ function ConsentCard({ contract, token, onDone }: { contract: CoachingContract; 
           disabled={pending || !consents.agree_report || !consents.agree_detection}
           onClick={() => void answer("consent")}
         >
-          {contract.payment_required ? "同意してお支払いへ進む" : "同意して始める"}
+          {contract.payment_required ? L("同意してお支払いへ進む") : L("同意して始める")}
         </Button>
         <button
           type="button"
           disabled={pending}
           onClick={() => void answer("decline")}
           className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50"
-        >
-          同意しない
-        </button>
+        >{L("同意しない")}</button>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
@@ -136,7 +131,7 @@ export function GuardianPersonalSection({ token }: { token: string }) {
         if (!cancelled) setContracts(d.contracts);
       })
       .catch(() => {
-        if (!cancelled) setError("パーソナル指導を読み込めませんでした");
+        if (!cancelled) setError(L("パーソナル指導を読み込めませんでした"));
       });
     return () => {
       cancelled = true;
@@ -149,10 +144,8 @@ export function GuardianPersonalSection({ token }: { token: string }) {
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h2 className="text-lg font-bold">パーソナル指導</h2>
-        <p className="text-sm text-slate-300">
-          コーチが期間中にお子さんの練習を見る指導です。コーチが引き受けたあと、申し込みごとに保護者の同意が必要です。
-        </p>
+        <h2 className="text-lg font-bold">{L("パーソナル指導")}</h2>
+        <p className="text-sm text-slate-300">{L("コーチが期間中にお子さんの練習を見る指導です。コーチが引き受けたあと、申し込みごとに保護者の同意が必要です。")}</p>
       </div>
       <ul className="space-y-3">
         {contracts.map((c) => (
@@ -160,7 +153,7 @@ export function GuardianPersonalSection({ token }: { token: string }) {
             <div className="flex items-center gap-3">
               {c.coach ? <CoachAvatar url={c.coach.photo_url} name={c.coach.nickname} size={44} /> : null}
               <div className="min-w-0">
-                <p className="font-semibold text-white">{c.coach?.nickname ?? "コーチ"}</p>
+                <p className="font-semibold text-white">{c.coach?.nickname ?? L("コーチ")}</p>
                 <p className="text-xs text-blue-300">{contractStatusLabel(c)}</p>
               </div>
             </div>
@@ -169,14 +162,12 @@ export function GuardianPersonalSection({ token }: { token: string }) {
             ) : (
               <>
                 <p className="text-sm text-slate-100">{c.plan_title}</p>
-                {c.starts_at ? <p className="text-xs text-slate-300">期間: {contractPeriod(c)}</p> : null}
+                {c.starts_at ? <p className="text-xs text-slate-300">{L("期間: {v0}", { v0: contractPeriod(c) })}</p> : null}
                 {c.status === "active" || c.status === "suspended" || c.status === "ended" || c.status === "refunded" ? (
                   <Link
                     href={`/guardian/${encodeURIComponent(token)}/personal/${c.id}`}
                     className="block text-sm text-blue-300 underline"
-                  >
-                    やりとりを見る
-                  </Link>
+                  >{L("やりとりを見る")}</Link>
                 ) : null}
               </>
             )}
@@ -197,7 +188,7 @@ function ConsultCard({ consult, token, onDone }: { consult: SupportConsult & { c
   const p = consult.proposal;
 
   async function answer(action: "consent" | "decline") {
-    if (action === "decline" && !confirm("同意しない場合、この提案では始まりません。費用はかかりません。よろしいですか？")) return;
+    if (action === "decline" && !confirm(L("同意しない場合、この提案では始まりません。費用はかかりません。よろしいですか？"))) return;
     if (!acquire()) return;
     setError("");
     setFields({});
@@ -213,7 +204,7 @@ function ConsultCard({ consult, token, onDone }: { consult: SupportConsult & { c
       onDone();
     } catch (err) {
       if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
-      else setError(err instanceof ApiRequestError ? err.message : "送信に失敗しました");
+      else setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
     } finally {
       release();
     }
@@ -223,20 +214,16 @@ function ConsultCard({ consult, token, onDone }: { consult: SupportConsult & { c
   return (
     <div className="space-y-3">
       <ProposalCard p={p} role="athlete" />
-      <p className="text-xs text-slate-200">{consultNotContractNote}</p>
+      <p className="text-xs text-slate-200">{L(consultNotContractNote)}</p>
       <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
-        <li>同意すると契約が成立し、お支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。</li>
-        <li>期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。連絡先の交換と、直接会う約束は禁止です。</li>
+        <li>{L("同意すると契約が成立し、お支払いの画面（クレジットカード。Apple Pay・Google Pay も使えます）に進みます。自動更新はありません。")}</li>
+        <li>{L("期間中は、お子さんとコーチのやりとりをこのページから読めて、書き込めます。連絡先の交換と、直接会う約束は禁止です。")}</li>
       </ul>
       <ContractConsentChecks value={consents} onChange={setConsents} errors={fields} />
       <div className="flex gap-2">
-        <Button type="button" className="flex-1" disabled={pending || p.expired || !consents.agree_report || !consents.agree_detection} onClick={() => void answer("consent")}>
-          同意してお支払いへ進む
-        </Button>
+        <Button type="button" className="flex-1" disabled={pending || p.expired || !consents.agree_report || !consents.agree_detection} onClick={() => void answer("consent")}>{L("同意してお支払いへ進む")}</Button>
         <button type="button" disabled={pending} onClick={() => void answer("decline")}
-          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50">
-          同意しない
-        </button>
+          className="min-h-11 flex-1 rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition active:scale-[0.98] disabled:opacity-50">{L("同意しない")}</button>
       </div>
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     </div>
@@ -256,17 +243,17 @@ export function GuardianSupportConsultSection({ token }: { token: string }) {
   const waiting = (consults ?? []).filter((c) => c.status === "sent_to_guardian");
   if (waiting.length === 0) return null;
   return (
-    <section className="space-y-3" aria-label="お子さんから届いた大会までプランの提案">
+    <section className="space-y-3" aria-label={L("お子さんから届いた大会までプランの提案")}>
       <div className="space-y-1">
-        <h2 className="text-lg font-bold">大会までプランの提案</h2>
-        <p className="text-sm text-slate-300">お子さんがコーチに無料で相談して、届いた提案です。内容を確認して、同意するかどうかを決めてください。</p>
+        <h2 className="text-lg font-bold">{L("大会までプランの提案")}</h2>
+        <p className="text-sm text-slate-300">{L("お子さんがコーチに無料で相談して、届いた提案です。内容を確認して、同意するかどうかを決めてください。")}</p>
       </div>
       <ul className="space-y-3">
         {waiting.map((c) => (
           <li key={c.id} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
             <div className="flex items-center gap-3">
               <CoachAvatar url={c.coach_photo_url ?? ""} name={c.coach_nickname ?? null} size={44} />
-              <p className="font-semibold text-white">{c.coach_nickname ?? "コーチ"}</p>
+              <p className="font-semibold text-white">{c.coach_nickname ?? L("コーチ")}</p>
             </div>
             <ConsultCard consult={c} token={token} onDone={() => setReload((n) => n + 1)} />
           </li>

@@ -1,27 +1,28 @@
+import { L } from "@/lib/i18n";
 // ケガ部のグループ。API とデータベースでは今も body_part と呼ぶが、1つのグループが1つのケガ(診断名)にあたる。
 // 11に当てはまらない人は「その他」に入り、ケガの名前を自由に書く。
 export const injuryBodyParts = [
-  { value: "hamstring-strain", label: "ハムストリングの肉離れ" },
-  { value: "sprain", label: "足首の捻挫" },
-  { value: "shin-splints", label: "シンスプリント" },
-  { value: "stress-fracture", label: "疲労骨折" },
-  { value: "calf-strain", label: "ふくらはぎの肉離れ" },
-  { value: "jumpers-knee", label: "ジャンパー膝" },
-  { value: "achilles-tendinitis", label: "アキレス腱炎" },
-  { value: "lower-back", label: "腰の痛み" },
-  { value: "quad-strain", label: "太もも前の肉離れ" },
-  { value: "shoulder", label: "肩の痛み" },
-  { value: "elbow", label: "肘の痛み" },
-  { value: "other", label: "その他" },
+  { value: "hamstring-strain", get label() { return L("ハムストリングの肉離れ"); } },
+  { value: "sprain", get label() { return L("足首の捻挫"); } },
+  { value: "shin-splints", get label() { return L("シンスプリント"); } },
+  { value: "stress-fracture", get label() { return L("疲労骨折"); } },
+  { value: "calf-strain", get label() { return L("ふくらはぎの肉離れ"); } },
+  { value: "jumpers-knee", get label() { return L("ジャンパー膝"); } },
+  { value: "achilles-tendinitis", get label() { return L("アキレス腱炎"); } },
+  { value: "lower-back", get label() { return L("腰の痛み"); } },
+  { value: "quad-strain", get label() { return L("太もも前の肉離れ"); } },
+  { value: "shoulder", get label() { return L("肩の痛み"); } },
+  { value: "elbow", get label() { return L("肘の痛み"); } },
+  { value: "other", get label() { return L("その他"); } },
 ] as const;
 
 export const injuryStages = [
-  { value: "resting", label: "安静中" },
-  { value: "rehab", label: "リハビリ中" },
-  { value: "jogging", label: "ジョグ再開" },
-  { value: "half", label: "50%を出せる" },
-  { value: "full", label: "全力を出せる" },
-  { value: "race", label: "大会に復帰した" },
+  { value: "resting", get label() { return L("安静中"); } },
+  { value: "rehab", get label() { return L("リハビリ中"); } },
+  { value: "jogging", get label() { return L("ジョグ再開"); } },
+  { value: "half", get label() { return L("50%を出せる"); } },
+  { value: "full", get label() { return L("全力を出せる"); } },
+  { value: "race", get label() { return L("大会に復帰した"); } },
 ] as const;
 
 export type InjuryStage = (typeof injuryStages)[number]["value"];
@@ -60,9 +61,9 @@ export type InjuryStats = { min_sample: number; parts: InjuryPartStat[] };
 // 中央値が出ている段階は日数、足りない段階はあと何人で目安が出るかを返す。
 export function injuryStageStatText(stage: InjuryStageStat, minSample: number) {
   if (stage.median_days === null) {
-    return `報告 ${stage.reached}人（あと${Math.max(minSample - stage.reached, 1)}人で目安を表示）`;
+    return L("報告 {reached}人（あと{v1}人で目安を表示）", { reached: stage.reached, v1: Math.max(minSample - stage.reached, 1) });
   }
-  return stage.median_days === 0 ? `投稿から当日（${stage.reached}人）` : `投稿から約${stage.median_days}日（${stage.reached}人）`;
+  return stage.median_days === 0 ? L("投稿から当日（{reached}人）", { reached: stage.reached }) : L("投稿から約{median_days}日（{reached}人）", { median_days: stage.median_days, reached: stage.reached });
 }
 
 // 指定した部位のうち、日数の目安が出ている段階だけを返す。部位のデータがなければ空。
@@ -82,7 +83,7 @@ export type InjuryHistoryItem = {
 
 // 履歴の1行に出す、段階ごとの日数。当日なら「当日」。
 export function injuryHistoryStageText(stage: { stage_label: string; days: number }) {
-  return stage.days === 0 ? `${stage.stage_label}（投稿の当日）` : `${stage.stage_label}（${stage.days}日後）`;
+  return stage.days === 0 ? L("{stage_label}（投稿の当日）", { stage_label: L(stage.stage_label) }) : L("{stage_label}（{days}日後）", { stage_label: L(stage.stage_label), days: stage.days });
 }
 
 export type InjuryProgressStage = {
@@ -104,16 +105,16 @@ export type InjuryProgress = { posts: InjuryProgressPost[]; min_sample: number }
 
 // 自分の経過の列。最初の段階(安静中)は投稿日そのもの。
 export function injuryProgressMyText(stage: InjuryProgressStage) {
-  if (stage.my_days === null) return "まだ";
-  if (stage.stage === injuryStages[0].value) return "投稿日（0日目）";
-  return stage.my_days === 0 ? "投稿の当日に到達" : `${stage.my_days}日目に到達`;
+  if (stage.my_days === null) return L("まだ");
+  if (stage.stage === injuryStages[0].value) return L("投稿日（0日目）");
+  return stage.my_days === 0 ? L("投稿の当日に到達") : L("{my_days}日目に到達", { my_days: stage.my_days });
 }
 
 // みんなの中央値の列。報告が足りない段階は日数を出さない(1人の日数が目安に見えないように)。
 export function injuryProgressMedianText(stage: InjuryProgressStage, minSample: number) {
   if (stage.stage === injuryStages[0].value) return "−";
-  if (stage.median_days === null) return `${minSample}人未満のため非表示`;
-  return stage.median_days === 0 ? "当日" : `${stage.median_days}日`;
+  if (stage.median_days === null) return L("{minSample}人未満のため非表示", { minSample });
+  return stage.median_days === 0 ? L("当日") : L("{median_days}日", { median_days: stage.median_days });
 }
 
 // 同じ部位のケガが複数あるとき、その部位名と件数を返す（再発の振り返り用）。
@@ -121,7 +122,7 @@ export function injuryRepeatedParts(items: { body_part: string; body_part_label:
   const counts = new Map<string, { label: string; count: number }>();
   for (const item of items) {
     const current = counts.get(item.body_part);
-    counts.set(item.body_part, { label: item.body_part_label, count: (current?.count ?? 0) + 1 });
+    counts.set(item.body_part, { label: L(item.body_part_label), count: (current?.count ?? 0) + 1 });
   }
   return [...counts.values()].filter((item) => item.count >= 2);
 }
@@ -175,53 +176,53 @@ export type InjuryGroup = {
 
 // 入るときの選択肢。予防や復帰の目安に集計するので、自由記述ではなく選んでもらう。
 export const injurySeverities = [
-  { value: "mild", label: "軽い", detail: "練習しながら様子を見ている" },
-  { value: "moderate", label: "中くらい", detail: "練習を数週間休む" },
-  { value: "severe", label: "重い", detail: "1か月以上休む、または手術" },
+  { value: "mild", get label() { return L("軽い"); }, get detail() { return L("練習しながら様子を見ている"); } },
+  { value: "moderate", get label() { return L("中くらい"); }, get detail() { return L("練習を数週間休む"); } },
+  { value: "severe", get label() { return L("重い"); }, get detail() { return L("1か月以上休む、または手術"); } },
 ] as const;
 export type InjurySeverity = (typeof injurySeverities)[number]["value"];
 
 export const injuryPlaces = [
-  { value: "tartan", label: "タータン" },
-  { value: "grass", label: "芝生" },
-  { value: "asphalt", label: "アスファルト" },
-  { value: "slope", label: "坂" },
-  { value: "stairs", label: "階段" },
-  { value: "weight-room", label: "ジム" },
+  { value: "tartan", get label() { return L("タータン"); } },
+  { value: "grass", get label() { return L("芝生"); } },
+  { value: "asphalt", get label() { return L("アスファルト"); } },
+  { value: "slope", get label() { return L("坂"); } },
+  { value: "stairs", get label() { return L("階段"); } },
+  { value: "weight-room", get label() { return L("ジム"); } },
 ] as const;
 export type InjuryPlace = (typeof injuryPlaces)[number]["value"];
 
 export const injuryActivities = [
-  { value: "jog", label: "ジョグ" },
-  { value: "start", label: "スタート・加速" },
-  { value: "sprint", label: "中間から後半を全力疾走" },
-  { value: "jump-hurdle", label: "ジャンプ・ハードル" },
-  { value: "throw", label: "投てき" },
-  { value: "weights", label: "ウエイト" },
-  { value: "outside", label: "練習以外" },
+  { value: "jog", get label() { return L("ジョグ"); } },
+  { value: "start", get label() { return L("スタート・加速"); } },
+  { value: "sprint", get label() { return L("中間から後半を全力疾走"); } },
+  { value: "jump-hurdle", get label() { return L("ジャンプ・ハードル"); } },
+  { value: "throw", get label() { return L("投てき"); } },
+  { value: "weights", get label() { return L("ウエイト"); } },
+  { value: "outside", get label() { return L("練習以外"); } },
 ] as const;
 export type InjuryActivity = (typeof injuryActivities)[number]["value"];
 
 export const injuryPreChanges = [
-  { value: "more-volume", label: "練習量を増やした" },
-  { value: "new-shoes", label: "シューズを替えた" },
-  { value: "comeback", label: "休み明け・久しぶりの再開" },
-  { value: "fatigue", label: "疲れがたまっていた" },
-  { value: "played-through-pain", label: "痛みを我慢していた" },
-  { value: "none", label: "とくになし" },
+  { value: "more-volume", get label() { return L("練習量を増やした"); } },
+  { value: "new-shoes", get label() { return L("シューズを替えた"); } },
+  { value: "comeback", get label() { return L("休み明け・久しぶりの再開"); } },
+  { value: "fatigue", get label() { return L("疲れがたまっていた"); } },
+  { value: "played-through-pain", get label() { return L("痛みを我慢していた"); } },
+  { value: "none", get label() { return L("とくになし"); } },
 ] as const;
 export type InjuryPreChange = (typeof injuryPreChanges)[number]["value"];
 
 // 「いま思うと、どうすればよかったか」。まだケガをしていない人の予防に使う。
 export const injuryHindsights = [
-  { value: "rest-early", label: "違和感の段階で休む" },
-  { value: "warmup", label: "ウォームアップを念入りにする" },
-  { value: "adjust-volume", label: "練習量や強度を調整する" },
-  { value: "see-doctor-early", label: "早めに病院へ行く" },
-  { value: "sleep-food", label: "睡眠や食事を整える" },
-  { value: "gear", label: "シューズや路面を見直す" },
-  { value: "tell-coach", label: "顧問やコーチに早めに伝える" },
-  { value: "none", label: "わからない・とくにない" },
+  { value: "rest-early", get label() { return L("違和感の段階で休む"); } },
+  { value: "warmup", get label() { return L("ウォームアップを念入りにする"); } },
+  { value: "adjust-volume", get label() { return L("練習量や強度を調整する"); } },
+  { value: "see-doctor-early", get label() { return L("早めに病院へ行く"); } },
+  { value: "sleep-food", get label() { return L("睡眠や食事を整える"); } },
+  { value: "gear", get label() { return L("シューズや路面を見直す"); } },
+  { value: "tell-coach", get label() { return L("顧問やコーチに早めに伝える"); } },
+  { value: "none", get label() { return L("わからない・とくにない"); } },
 ] as const;
 export type InjuryHindsight = (typeof injuryHindsights)[number]["value"];
 
@@ -298,28 +299,28 @@ export function injuryJoinStepError(step: InjuryJoinStep, answers: InjuryJoinAns
   switch (step) {
     case "diagnosis": {
       const length = [...answers.diagnosis.trim()].length;
-      if (length === 0) return "ケガの名前を入力してください(わからなければ「わからない」)";
-      if (length > injuryDiagnosisMaxLength) return `${injuryDiagnosisMaxLength}文字以内で入力してください`;
+      if (length === 0) return L("ケガの名前を入力してください(わからなければ「わからない」)");
+      if (length > injuryDiagnosisMaxLength) return L("{injuryDiagnosisMaxLength}文字以内で入力してください", { injuryDiagnosisMaxLength });
       return "";
     }
     case "severity":
-      return hasValue(injurySeverities, answers.severity) ? "" : "ケガの重さを選んでください";
+      return hasValue(injurySeverities, answers.severity) ? "" : L("ケガの重さを選んでください");
     case "sawDoctor":
-      return answers.sawDoctor === null ? "病院でみてもらったかを選んでください" : "";
+      return answers.sawDoctor === null ? L("病院でみてもらったかを選んでください") : "";
     case "injuredOn":
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.injuredOn)) return "ケガをした日を選んでください";
-      if (answers.injuredOn > today) return "これから先の日は選べません";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.injuredOn)) return L("ケガをした日を選んでください");
+      if (answers.injuredOn > today) return L("これから先の日は選べません");
       return "";
     case "place":
-      return hasValue(injuryPlaces, answers.place) ? "" : "ケガをした場所を選んでください";
+      return hasValue(injuryPlaces, answers.place) ? "" : L("ケガをした場所を選んでください");
     case "activity":
-      return hasValue(injuryActivities, answers.activity) ? "" : "そのとき何をしていたかを選んでください";
+      return hasValue(injuryActivities, answers.activity) ? "" : L("そのとき何をしていたかを選んでください");
     case "preChanges":
-      return answers.preChanges.length > 0 ? "" : "当てはまるものを選んでください(なければ「とくになし」)";
+      return answers.preChanges.length > 0 ? "" : L("当てはまるものを選んでください(なければ「とくになし」)");
     case "hindsight":
-      return answers.hindsight.length > 0 ? "" : "当てはまるものを選んでください(なければ「わからない・とくにない」)";
+      return answers.hindsight.length > 0 ? "" : L("当てはまるものを選んでください(なければ「わからない・とくにない」)");
     case "stage":
-      return isInjuryStage(answers.stage) ? "" : "いまの段階を選んでください";
+      return isInjuryStage(answers.stage) ? "" : L("いまの段階を選んでください");
   }
 }
 
@@ -340,15 +341,15 @@ export function injuryJoinPayload(part: string, answers: InjuryJoinAnswers) {
 
 // 段階を変えるときに聞く「意識的にやったこと」。復帰までに何をしたかを集計して、次の人のヒントにする。
 export const injuryActions = [
-  { value: "hospital-rehab", label: "病院のリハビリ" },
-  { value: "osteopath", label: "整骨院" },
-  { value: "stretch", label: "ストレッチ" },
-  { value: "bath", label: "入浴" },
-  { value: "strength", label: "筋トレ・補強" },
-  { value: "icing", label: "アイシング" },
-  { value: "taping", label: "テーピング" },
-  { value: "rest", label: "できるだけ動かなかった" },
-  { value: "nothing", label: "何もしなかった" },
+  { value: "hospital-rehab", get label() { return L("病院のリハビリ"); } },
+  { value: "osteopath", get label() { return L("整骨院"); } },
+  { value: "stretch", get label() { return L("ストレッチ"); } },
+  { value: "bath", get label() { return L("入浴"); } },
+  { value: "strength", get label() { return L("筋トレ・補強"); } },
+  { value: "icing", get label() { return L("アイシング"); } },
+  { value: "taping", get label() { return L("テーピング"); } },
+  { value: "rest", get label() { return L("できるだけ動かなかった"); } },
+  { value: "nothing", get label() { return L("何もしなかった"); } },
 ] as const;
 export type InjuryAction = (typeof injuryActions)[number]["value"];
 
@@ -373,11 +374,11 @@ export type InjuryStageChangeStep = (typeof injuryStageChangeSteps)[number];
 
 export function injuryStageChangeStepError(step: InjuryStageChangeStep, answers: InjuryStageChangeAnswers, current: InjuryStage) {
   if (step === "stage") {
-    if (!isInjuryStage(answers.stage)) return "新しい段階を選んでください";
-    if (answers.stage === current) return "いまと同じ段階です。変わった段階を選んでください";
+    if (!isInjuryStage(answers.stage)) return L("新しい段階を選んでください");
+    if (answers.stage === current) return L("いまと同じ段階です。変わった段階を選んでください");
   }
-  if (step === "actions" && answers.actions.length === 0) return "意識的にやったことを1つ以上選んでください(なければ「何もしなかった」)";
-  if (step === "note" && [...answers.note.trim()].length > injuryStageNoteMaxLength) return `一言は${injuryStageNoteMaxLength}文字以内で書いてください`;
+  if (step === "actions" && answers.actions.length === 0) return L("意識的にやったことを1つ以上選んでください(なければ「何もしなかった」)");
+  if (step === "note" && [...answers.note.trim()].length > injuryStageNoteMaxLength) return L("一言は{injuryStageNoteMaxLength}文字以内で書いてください", { injuryStageNoteMaxLength });
   return "";
 }
 
@@ -407,11 +408,11 @@ export function sortInjuryGroups(groups: InjuryGroupSummary[]) {
 
 // 共有タブで体のイラストからケガを探すときの、まとまり。体の上から順に並べる。
 const injuryRegions = [
-  { value: "upper", label: "上半身" },
-  { value: "thigh", label: "太もも" },
-  { value: "knee", label: "ひざ・すね" },
-  { value: "lower-leg", label: "ふくらはぎ・足首" },
-  { value: "bone", label: "骨・その他" },
+  { value: "upper", get label() { return L("上半身"); } },
+  { value: "thigh", get label() { return L("太もも"); } },
+  { value: "knee", get label() { return L("ひざ・すね"); } },
+  { value: "lower-leg", get label() { return L("ふくらはぎ・足首"); } },
+  { value: "bone", get label() { return L("骨・その他"); } },
 ] as const;
 
 export type InjuryRegion = (typeof injuryRegions)[number]["value"];
@@ -526,22 +527,22 @@ export function injuryFaceOverflow(members: number, faces: number) {
 
 // グループの公開ページ(ログインなしでも見られ、検索にも載る)に出す説明。診断や治療のかわりにならない、ふつうの説明だけにする。
 export const injuryGroupDescriptions: Record<string, string> = {
-  "hamstring-strain": "太もも裏の肉離れ。加速やスプリント後半に多い。",
-  "quad-strain": "太もも前の肉離れ。スタートや踏み切りに多い。",
-  sprain: "足首の捻挫。着地でひねって起きる。くり返しやすい。",
-  "stress-fracture": "骨にたまった疲れによる痛み。すねや足の甲に多い。",
-  "calf-strain": "ふくらはぎの肉離れ。ダッシュや急な加速で起きやすい。",
-  "lower-back": "腰の痛み。ジャンプや投てき、走りすぎで起きやすい。",
-  "achilles-tendinitis": "アキレス腱まわりの痛み。走る量が増えたときに多い。",
-  "jumpers-knee": "膝のお皿の下の痛み。ジャンプやダッシュに多い。",
-  "shin-splints": "すねの内側の痛み。練習量が急に増えたときに多い。",
-  shoulder: "肩の痛みやケガ。投てきや転倒で起きやすい。",
-  elbow: "肘の痛みやケガ。投てきの投げすぎに多い。",
-  other: "ここにないケガの人のグループ。",
+  get "hamstring-strain"() { return L("太もも裏の肉離れ。加速やスプリント後半に多い。"); },
+  get "quad-strain"() { return L("太もも前の肉離れ。スタートや踏み切りに多い。"); },
+  get sprain() { return L("足首の捻挫。着地でひねって起きる。くり返しやすい。"); },
+  get "stress-fracture"() { return L("骨にたまった疲れによる痛み。すねや足の甲に多い。"); },
+  get "calf-strain"() { return L("ふくらはぎの肉離れ。ダッシュや急な加速で起きやすい。"); },
+  get "lower-back"() { return L("腰の痛み。ジャンプや投てき、走りすぎで起きやすい。"); },
+  get "achilles-tendinitis"() { return L("アキレス腱まわりの痛み。走る量が増えたときに多い。"); },
+  get "jumpers-knee"() { return L("膝のお皿の下の痛み。ジャンプやダッシュに多い。"); },
+  get "shin-splints"() { return L("すねの内側の痛み。練習量が急に増えたときに多い。"); },
+  get shoulder() { return L("肩の痛みやケガ。投てきや転倒で起きやすい。"); },
+  get elbow() { return L("肘の痛みやケガ。投てきの投げすぎに多い。"); },
+  get other() { return L("ここにないケガの人のグループ。"); },
 };
 
 export function injuryGroupTitle(part: string) {
-  return part === "other" ? "その他のケガの仲間" : `${injuryBodyPartLabel(part)}の仲間`;
+  return part === "other" ? L("その他のケガの仲間") : L("{v0}の仲間", { v0: injuryBodyPartLabel(part) });
 }
 
 export type InjuryCount = { code: string; label: string; people: number };
@@ -572,8 +573,8 @@ export function injuryRecoveryRangeText(lowDays: number, highDays: number) {
   const unit = inWeeks ? 7 : 30;
   const low = Math.max(1, Math.round(lowDays / unit));
   const high = Math.max(low, Math.round(highDays / unit));
-  const suffix = inWeeks ? "週間" : "か月";
-  return low === high ? `約${low}${suffix}` : `約${low}〜${high}${suffix}`;
+  const suffix = inWeeks ? L("週間") : L("か月");
+  return low === high ? L("約{low}{suffix}", { low, suffix }) : L("約{low}〜{high}{suffix}", { low, high, suffix });
 }
 
 export function injuryPercent(people: number, total: number) {

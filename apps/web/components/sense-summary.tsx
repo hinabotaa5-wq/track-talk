@@ -1,4 +1,5 @@
 "use client";
+import { L } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Sparkles, X } from "lucide-react";
@@ -27,31 +28,31 @@ export function SenseSummaryEntry({ summary, open = false }: { summary: SenseSum
     <details open={open || undefined} className="group rounded-xl border border-white/15 bg-white/5">
       <summary className="flex cursor-pointer list-none items-start gap-3 p-4 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1 space-y-1">
-          <span className="block text-xs text-slate-300">{senseSummaryRangeLabel(summary)} · {summary.note_count}個の感覚</span>
+          <span className="block text-xs text-slate-300">{L("{v0} · {note_count}個の感覚", { v0: senseSummaryRangeLabel(summary), note_count: summary.note_count })}</span>
           <span className="line-clamp-2 text-sm leading-relaxed group-open:hidden">{summary.summary.overview}</span>
-          <span className="block text-xs text-sky-200 group-open:hidden">タップしてふりかえる</span>
+          <span className="block text-xs text-sky-200 group-open:hidden">{L("タップしてふりかえる")}</span>
         </div>
         <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="space-y-4 px-4 pb-4">
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary.summary.overview}</p>
-        <SummaryList title="つかめてきた感覚" items={summary.summary.good} />
-        <SummaryList title="気になる感覚" items={summary.summary.concerns} />
-        <SummaryList title="次に意識すること" items={summary.summary.next} />
+        <SummaryList title={L("つかめてきた感覚")} items={summary.summary.good} />
+        <SummaryList title={L("気になる感覚")} items={summary.summary.concerns} />
+        <SummaryList title={L("次に意識すること")} items={summary.summary.next} />
         <div className="space-y-3 border-t border-white/10 pt-4">
-          <h3 className="text-sm font-semibold">もとになった感覚</h3>
+          <h3 className="text-sm font-semibold">{L("もとになった感覚")}</h3>
           {summary.notes?.length ? (
             <ol className="space-y-3">
               {summary.notes.map((note) => (
                 <li key={note.id} className="rounded-lg bg-black/15 p-3">
-                  <p className="mb-1 text-xs text-slate-300">{senseDayLabel(note.day)}{note.event_label ? ` · ${note.event_label}` : ""}</p>
+                  <p className="mb-1 text-xs text-slate-300">{senseDayLabel(note.day)}{note.event_label ? ` · ${L(note.event_label)}` : ""}</p>
                   <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{note.body}</p>
                 </li>
               ))}
             </ol>
-          ) : <p className="text-xs text-slate-300">このまとめは、もとになった感覚を保存する前に作成されたものです。</p>}
+          ) : <p className="text-xs text-slate-300">{L("このまとめは、もとになった感覚を保存する前に作成されたものです。")}</p>}
         </div>
-        <p className="text-xs text-slate-400">AI がまとめた目安です。</p>
+        <p className="text-xs text-slate-400">{L("AI がまとめた目安です。")}</p>
       </div>
     </details>
   );
@@ -90,7 +91,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
       setError("");
       setLoadedToken(token);
     }).catch(() => {
-      if (!controller.signal.aborted && requestedVersion === version.current) setError("まとめを読み込めませんでした");
+      if (!controller.signal.aborted && requestedVersion === version.current) setError(L("まとめを読み込めませんでした"));
     });
     return () => { controller.abort(); invalidate(); };
   }, [token, total, reload, invalidate]);
@@ -113,7 +114,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
       setPendingNotes(d.pending_notes ?? 0);
     } catch (e) {
       if (requestedVersion !== version.current) return;
-      setError(e instanceof ApiRequestError ? e.message : "まとめを作れませんでした");
+      setError(e instanceof ApiRequestError ? e.message : L("まとめを作れませんでした"));
     } finally {
       release();
     }
@@ -131,7 +132,7 @@ export function useSenseSummaries(token: string | null, total: number, calendarM
       setSummaries((list) => [...list, ...d.summaries.filter((item) => !list.some((existing) => existing.id === item.id))]);
       setCursor(d.next_cursor);
     } catch {
-      if (requestedVersion === version.current) setError("過去のまとめを読み込めませんでした。もう一度お試しください");
+      if (requestedVersion === version.current) setError(L("過去のまとめを読み込めませんでした。もう一度お試しください"));
     } finally {
       moreRequest.current = false;
       setLoadingMore(false);
@@ -156,36 +157,34 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
   const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label="AI要約">
+    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label={L("AI要約")}>
       <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />
-          AI要約
-        </h2>
+          <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />{L("AI要約")}</h2>
         {loaded ? shortBy > 0 ? (
-          <span className="block text-xs text-slate-300">あと{shortBy}個でまとめられます</span>
+          <span className="block text-xs text-slate-300">{L("あと{shortBy}個でまとめられます", { shortBy })}</span>
         ) : (
           <Button variant="secondary" className="border-amber-300/50 bg-amber-300/20 px-3 py-1 text-xs text-amber-100 hover:bg-amber-300/30 hover:text-amber-50 active:bg-amber-300/40" onClick={create} disabled={busy}>
-            {busy ? "まとめています..." : `${minNotes}個の感覚をまとめる`}
+            {busy ? L("まとめています...") : L("{minNotes}個の感覚をまとめる", { minNotes })}
           </Button>
         ) : null}
       </div>
-      {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">感覚が{minNotes}個たまったらAIで要約できます</p> : null}
-      {!loaded && !error ? <p role="status" className="sr-only">読み込み中...</p> : null}
+      {!compact && loaded && summaries.length === 0 ? <p className="text-xs text-slate-300">{L("感覚が{minNotes}個たまったらAIで要約できます", { minNotes })}</p> : null}
+      {!loaded && !error ? <p role="status" className="sr-only">{L("読み込み中...")}</p> : null}
       {!compact ? <div className="space-y-2">
         {summaries.map((summary) => <SenseSummaryEntry key={summary.id} summary={summary} />)}
       </div> : null}
-      {!compact && cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "読み込み中..." : "過去のまとめをもっと見る"}</Button> : null}
+      {!compact && cursor ? <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>{loadingMore ? L("読み込み中...") : L("過去のまとめをもっと見る")}</Button> : null}
       {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
-      {!loaded && error ? <Button variant="secondary" onClick={retry}>もう一度読み込む</Button> : null}
+      {!loaded && error ? <Button variant="secondary" onClick={retry}>{L("もう一度読み込む")}</Button> : null}
     </section>
   );
 }
 
 // 作成後の本文だけを順に表示する。履歴は全文のまま。
 function AnimatedSummary({ summary }: { summary: SenseSummary }) {
-  const sections: [string, string[]][] = [["つかめてきた感覚", summary.summary.good], ["気になる感覚", summary.summary.concerns], ["次に意識すること", summary.summary.next]];
-  const text = [summary.summary.overview, ...sections.flatMap(([title, items]) => items.length ? [`${title}\n${items.map((item) => `・${item}`).join("\n")}`] : [])].join("\n\n");
+  const sections: [string, string[]][] = [[L("つかめてきた感覚"), summary.summary.good], [L("気になる感覚"), summary.summary.concerns], [L("次に意識すること"), summary.summary.next]];
+  const text = [summary.summary.overview, ...sections.flatMap(([title, items]) => items.length ? [`${title}\n${items.map((item) => L("・{item}", { item })).join("\n")}`] : [])].join("\n\n");
   const characters = Array.from(text);
   const [visible, setVisible] = useState(0);
   useEffect(() => {
@@ -204,9 +203,9 @@ function AnimatedSummary({ summary }: { summary: SenseSummary }) {
   }, [text]);
   const done = visible >= characters.length;
   return <>
-    <p className="text-xs text-slate-300">{senseSummaryRangeLabel(summary)} · {summary.note_count}個の感覚</p>
+    <p className="text-xs text-slate-300">{L("{v0} · {note_count}個の感覚", { v0: senseSummaryRangeLabel(summary), note_count: summary.note_count })}</p>
     <p aria-hidden="true" className="whitespace-pre-wrap break-words text-sm leading-7">{characters.slice(0, visible).join("")}{!done ? <span className="ml-0.5 text-amber-300">▍</span> : null}</p>
-    <p className="sr-only" role="status">{done ? text : "AI要約を表示しています"}</p>
+    <p className="sr-only" role="status">{done ? text : L("AI要約を表示しています")}</p>
   </>;
 }
 
@@ -240,13 +239,13 @@ export function SenseSummaryResult({ state, children }: { state: ReturnType<type
   }, [visible]);
   return <div ref={target} className="relative isolate scroll-mt-24">
     <div inert={visible || undefined}>{children}</div>
-    {visible ? <section role="dialog" tabIndex={-1} aria-label="新しいAI要約" onKeyDown={(event) => { if (event.key === "Escape") close(); }} className="absolute inset-0 z-20 flex min-h-0 flex-col rounded-2xl border border-amber-200/30 bg-slate-950/65 p-4 shadow-xl backdrop-blur-[1px]">
+    {visible ? <section role="dialog" tabIndex={-1} aria-label={L("新しいAI要約")} onKeyDown={(event) => { if (event.key === "Escape") close(); }} className="absolute inset-0 z-20 flex min-h-0 flex-col rounded-2xl border border-amber-200/30 bg-slate-950/65 p-4 shadow-xl backdrop-blur-[1px]">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-amber-200" aria-hidden />AI要約</h2>
-        <button ref={closeButton} type="button" disabled={busy} onClick={close} aria-label="AI要約を閉じる" className="flex size-9 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300 disabled:opacity-40"><X className="size-4" aria-hidden /></button>
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-amber-200" aria-hidden />{L("AI要約")}</h2>
+        <button ref={closeButton} type="button" disabled={busy} onClick={close} aria-label={L("AI要約を閉じる")} className="flex size-9 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300 disabled:opacity-40"><X className="size-4" aria-hidden /></button>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
-        {busy ? <p role="status" className="text-sm text-slate-300">まとめています…</p> : createdSummary ? <AnimatedSummary key={createdSummary.id} summary={createdSummary} /> : null}
+        {busy ? <p role="status" className="text-sm text-slate-300">{L("まとめています…")}</p> : createdSummary ? <AnimatedSummary key={createdSummary.id} summary={createdSummary} /> : null}
       </div>
     </section> : null}
   </div>;
