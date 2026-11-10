@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Article } from "@/components/legal-prose";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 
-const privacyUpdated = "2026年11月10日";
+const privacyUpdated = "2026年11月11日";
 
 export function PrivacyPolicy({ titleId }: { titleId?: string }) {
   return (
