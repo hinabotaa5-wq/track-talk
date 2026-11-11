@@ -109,7 +109,7 @@ func TestStripePaymentWebhooksCompleteExistingOrdersWhileClosed(t *testing.T) {
 			if kind == "tickets" {
 				var credited int
 				queryRowArgs(t, `SELECT sum(available_delta)::int FROM coaching_ticket_ledger WHERE lot_id=$1 AND kind='purchase'`, []any{id}, &credited)
-				if credited != 5 {
+				if credited != 6 {
 					t.Fatalf("duplicate ticket credit %d", credited)
 				}
 			}

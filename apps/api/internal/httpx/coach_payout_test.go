@@ -536,10 +536,11 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 			}
 		}
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", admin, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":2,"paid":2`) {
+	// 添削3本の1,050円（350円×3）は3,000円に届かないので繰り越し、サポートプランの分だけ送る。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", admin, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":1`) {
 		t.Fatalf("run: %d %s", rec.Code, rec.Body.String())
 	}
-	if transfers := f.transferList(); len(transfers) != 2 {
+	if transfers := f.transferList(); len(transfers) != 1 {
 		t.Fatalf("transfers: %d", len(transfers))
 	}
 }

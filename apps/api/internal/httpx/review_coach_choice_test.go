@@ -266,7 +266,7 @@ func TestReviewCoachChoiceWithTickets(t *testing.T) {
 	if len(offers) != 1 || offers[0].Request.ID != id || len(coachRequests(t, h, other).Offers) != 0 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if b := ticketSummary(t, h, tu).Balance; b.Available != 3 || b.Reserved != 2 {
+	if b := ticketSummary(t, h, tu).Balance; b.Available != 5 || b.Reserved != 1 {
 		t.Fatalf("balance %+v", b)
 	}
 }
@@ -325,7 +325,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 		t.Fatal(r.Body.String())
 	}
 	transfers := f.transferList()
-	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "7050" {
+	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "6350" {
 		t.Fatalf("transfers %v", transfers)
 	}
 }
