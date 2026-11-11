@@ -89,7 +89,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	form := f.lastSession()
 	if created.Status != "awaiting_payment" || form.Get("payment_method_types[0]") != "paypay" || form.Get("payment_method_types[1]") != "" ||
-		form.Get("payment_intent_data[capture_method]") != "" || form.Get("line_items[0][price_data][unit_amount]") != "1500" {
+		form.Get("payment_intent_data[capture_method]") != "" || form.Get("line_items[0][price_data][unit_amount]") != "500" {
 		t.Fatalf("created %+v session %v", created, form)
 	}
 	if offers := coachRequests(t, h, tc).Offers; len(offers) != 0 {

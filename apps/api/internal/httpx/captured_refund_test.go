@@ -31,6 +31,7 @@ func newCapturedFixture(t *testing.T) capturedFixture {
 	_, user := demoRequester(t, h, admin)
 	intent := "pi_captured_" + uuid.NewString()
 	request := paidReview(t, h, user, "card", intent)
+	legacyReviewAmount(t, request)
 	execSQLArgs(t, `UPDATE review_requests SET coach_id=$2,status='returned',returned_at=now() WHERE id=$1`, request, coach)
 	execSQLArgs(t, `UPDATE review_payments SET status='captured',captured_at=now() WHERE request_id=$1`, request)
 	var payment string
@@ -38,6 +39,14 @@ func newCapturedFixture(t *testing.T) capturedFixture {
 	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'review',$2,1500,70,1050, now())`, coach, request)
 	return capturedFixture{h, f, admin, user, coach, payment, request, intent}
 }
+// legacyReviewAmount は、返金・相殺の仕組みのテストで、支払いを旧料金（1,500円・報酬1,050円）の記録にする。
+// 料金を500円にした後も（本体 #569）、旧料金で払われた支払いの返金・相殺がそのまま動くことを確かめる。
+func legacyReviewAmount(t *testing.T, request string) {
+	t.Helper()
+	execSQLArgs(t, `UPDATE review_requests SET base_price_yen=1500 WHERE id=$1`, request)
+	execSQLArgs(t, `UPDATE review_payments SET amount_yen=1500 WHERE request_id=$1`, request)
+}
+
 func (x capturedFixture) refund(t *testing.T) {
 	t.Helper()
 	rec := doJSON(t, x.h, http.MethodPost, "/v1/admin/coaching/payments/"+x.payment+"/refund", x.admin, map[string]any{"source": "review", "reason": "運営確認済み"})

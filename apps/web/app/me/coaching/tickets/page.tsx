@@ -104,7 +104,7 @@ function TicketsPage() {
     <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
       {summary.sales_open === false ? <p role="status" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">{summary.purchase_block_reason}</p> : null}
-      <p className="text-sm text-slate-200">{L("動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。")}</p>
+      <p className="text-sm text-slate-200">{L("動画添削1回にチケット1枚を使います。依頼時に確保し、返却時に消費します。期限までに返却がなければ戻ります。有効期限は決済完了から6か月です。")}</p>
       <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
         <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
         {p.quantity > 1 ? <p className="text-xs text-slate-300">{L("1枚あたり{v0}", { v0: formatYen(p.amount_yen / p.quantity) })}</p> : null}

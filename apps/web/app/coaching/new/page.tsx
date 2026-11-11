@@ -28,6 +28,7 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { reviewPriceYen } from "@/lib/review-pricing";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -71,10 +72,10 @@ export default function NewReviewRequestPage() {
   const [coachesLoading, setCoachesLoading] = useState(true);
   const [coachesError, setCoachesError] = useState("");
   const coach = coaches.find((c) => c.id === coachID);
-  const totalPrice = estimate?.price_yen ?? 1500;
+  const totalPrice = estimate?.price_yen ?? reviewPriceYen;
   const cashPrice = method === "tickets" ? 0 : totalPrice;
-  // チケットの新規販売は止めた。購入済みのチケットが添削1本分（2枚）残っている人にだけ、チケットで払う選択肢を出す。
-  const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 2;
+  // チケットが1枚（添削1回分）以上残っている人にだけ、チケットで払う選択肢を出す。
+  const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 1;
   const cashPayment = !!estimate?.payments && cashPrice > 0;
   // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
   const needsDeclaration = !!me?.is_minor && cashPayment;
@@ -122,7 +123,7 @@ export default function NewReviewRequestPage() {
     if (!token) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
-      if (!cancelled) { setTicketSummary(data); if (data.balance.available >= 2) setMethod("tickets"); }
+      if (!cancelled) { setTicketSummary(data); if (data.balance.available >= 1) setMethod("tickets"); }
     }).catch(() => { if (!cancelled) setTicketSummary(null); });
     return () => { cancelled = true; };
   }, [token]);
@@ -170,7 +171,7 @@ export default function NewReviewRequestPage() {
       setError(L("100MB以内の動画にしてください"));
       return;
     }
-    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 2) {
+    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
       setError(L("チケットが不足しています。先に購入してから動画を選んでください。"));
       return;
     }
@@ -268,7 +269,7 @@ export default function NewReviewRequestPage() {
           </label>
 
           {ticketSummary && ticketsUsable ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
-            <p className="text-xs text-slate-300">{L("動画添削1本はチケット2枚です。")}</p>
+            <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
               {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
@@ -300,7 +301,7 @@ export default function NewReviewRequestPage() {
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い（合計 {v0}）", { v0: formatYen(totalPrice) })}</legend>
               <div className="flex flex-wrap gap-2">
-                {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>{L("チケット（2枚）")}</button> : null}
+                {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>{L("チケット（1枚）")}</button> : null}
                 {(estimate?.payments ? availableReviewPayMethods : []).map((m) => (
                   <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
                     {reviewPayMethodLabels[m]}
@@ -319,7 +320,7 @@ export default function NewReviewRequestPage() {
           )}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
-            {pending ? L("送っています") : cashPayment ? L("送ってお支払いへ（{v0}）", { v0: formatYen(cashPrice) }) : method === "tickets" ? L("チケット2枚を確保して送る") : L("送る")}
+            {pending ? L("送っています") : cashPayment ? L("送ってお支払いへ（{v0}）", { v0: formatYen(cashPrice) }) : method === "tickets" ? L("チケット1枚を使って送る") : L("送る")}
           </Button>
         </form>
       )}

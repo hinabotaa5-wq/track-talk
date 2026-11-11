@@ -90,7 +90,7 @@ it("チケットを持っていても申込画面に残高は出さず、チケ�
   expect(container.textContent).not.toContain("チケット残高");
   expect(container.textContent).not.toContain("残高・履歴");
   expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("コーチングチケット");
-  expect(container.textContent).toContain("チケット（2枚）");
+  expect(container.textContent).toContain("チケット（1枚）");
 });
 
 it("販売中のチケット持ちには購入・確認の入口を残す", async () => {

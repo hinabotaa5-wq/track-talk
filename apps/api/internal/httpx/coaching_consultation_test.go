@@ -49,7 +49,7 @@ func answeredTicketRoom(t *testing.T, h http.Handler) (owner, coach, root string
 	admin := adminToken(t, h)
 	_, coach = onDutyCoach(t, h, admin)
 	_, owner = demoRequester(t, h, admin)
-	buyFiveTickets(t, h, owner)
+	buySixTickets(t, h, owner)
 	root = ticketReview(t, h, owner)
 	offers := coachRequests(t, h, coach).Offers
 	if len(offers) != 1 {
@@ -87,12 +87,12 @@ func TestReviewConsultationTicketIsOneWay(t *testing.T) {
 	}
 	consultationAction(t, h, owner, c.ID, "submit", nil)
 	consultationAction(t, h, owner, c.ID, "submit", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 2 || b.Reserved != 1 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 || b.Reserved != 1 {
 		t.Fatalf("reserved %+v", b)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "前半の接地を意識してください"})
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 2 || b.Reserved != 0 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 || b.Reserved != 0 {
 		t.Fatalf("settled %+v", b)
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/answer", coach, map[string]any{"body": "二重回答"}); r.Code == 200 {
@@ -122,7 +122,7 @@ func TestReviewConsultationTicketIsOneWay(t *testing.T) {
 	if r := doJSON(t, h, "POST", path, owner, map[string]any{"request_key": uuid.NewString(), "body": "もう一度"}); r.Code != 422 || !strings.Contains(r.Body.String(), "consultation_limit") {
 		t.Fatalf("second purchase %d %s", r.Code, r.Body.String())
 	}
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 2 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 {
 		t.Fatalf("balance %+v", b)
 	}
 	if len(f.refunds) != 0 {
@@ -154,6 +154,10 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 	}
 	c0 := consultationDraft(t, h, owner, "/v1/coaching/requests/"+other+"/consultations", uuid.NewString(), "別の添削の相談")
 	consultationAction(t, h, owner, c0.ID, "submit", nil)
+	// 6枚つづりなので、残りの3枚は別の添削3本で使い切る（本体 #569）。
+	for range 3 {
+		ticketReview(t, h, owner)
+	}
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 2)
@@ -186,7 +190,7 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, c.ID, "decline", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 1 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 4 {
 		t.Fatalf("tickets touched %+v", b)
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
@@ -207,7 +211,7 @@ func TestConsultationTicketDeadlineReturnsReservationOnce(t *testing.T) {
 			t.Fatal(r.Body.String())
 		}
 	}
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 3 || b.Reserved != 0 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
 		t.Fatalf("expired %+v", b)
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
@@ -536,7 +540,7 @@ func TestConsultationReportHideStopsAndReleasesTicket(t *testing.T) {
 	if r := doJSON(t, h, "POST", "/v1/admin/coaching/consultations/"+c.ID+"/hide?report="+report, admin, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 3 || b.Reserved != 0 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
 		t.Fatalf("hide refund %+v", b)
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/accept", coach, nil); r.Code == 200 {
@@ -594,7 +598,7 @@ func TestConsultationGuardianCanFindRandomReviewRoom(t *testing.T) {
 	admin := adminToken(t, h)
 	_, coach := onDutyCoach(t, h, admin)
 	minor, g := guardianMinor(t, h)
-	buyFiveTickets(t, h, minor)
+	buySixTickets(t, h, minor)
 	root := ticketReview(t, h, minor)
 	offers := coachRequests(t, h, coach).Offers
 	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {

@@ -144,3 +144,9 @@ it("動画添削のあとの相談は専用のゲートで出し分け、届出�
  expect(container.textContent).toContain("追加相談の受付は準備中です");
  expect(container.textContent).not.toContain("回答を送る");
 });
+it("追加相談の販売を止めている間は、過去の相談がない添削に追加相談の欄を出さない（本体 #569）", async () => {
+ flags.consultation = false;
+ await render({ ...room, consultations: [draft] });
+ expect(container.textContent).not.toContain("追加相談");
+ expect(container.querySelector("textarea")).toBeNull();
+});

@@ -15,7 +15,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// ticketFaceYen は、追加相談（販売廃止。本体 #569）をチケットで払っていたときの1枚の額面。過去の記録の計算にだけ残す。
 const ticketFaceYen int32 = 600
+
+// 動画添削はチケット1枚で1回（本体 #569）。コーチの報酬は単発と同じく reviewPriceYen の70%（350円）に固定し、
+// まとめ買いの割引分は運営が負担する。
+const reviewTicketUnits int32 = 1
+
+// ticketValidity は、チケットの有効期限（決済完了から6か月）。SQL の CreateTicketLot と揃える。
+const ticketValidityMonths = 6
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
 const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください"
@@ -117,6 +125,14 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 残高と一緒に、いちばん早い失効日時とその枚数を出す（マイページ・購入画面に常に出す。本体 #569）。
+	var nextExpiry any
+	if next, err := s.q.NextTicketExpiry(r.Context(), &p.ID); err == nil {
+		nextExpiry = map[string]any{"expires_at": next.ExpiresAt, "available": next.Available}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	purchases, err := s.q.ListMyTicketPurchases(r.Context(), &p.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -127,7 +143,8 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	eligible := s.ticketEligibility(r.Context(), s.q, p)
+	// 18歳未満も保護者の同意なしに買える。購入のたびの宣言（minor_purchase.go）で確かめる（本体 #569）。
+	eligible := coachingEligibility(p)
 	reason := ""
 	if eligible != nil {
 		if !writeTicketEligibilityReason(eligible, &reason) {
@@ -144,9 +161,10 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		reason = ticketSalesClosedMessage
 	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
-	JSON(w, 200, map[string]any{"products": products, "balance": balance, "purchases": purchases, "ledger": ledger,
+	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "purchases": purchases, "ledger": ledger, "is_minor": profileIsMinor(p),
 		"can_purchase": eligible == nil && s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
-		"purchase_block_reason": reason, "unit_yen": ticketFaceYen})
+		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
+		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths})
 }
 
 func writeTicketEligibilityReason(err error, reason *string) bool {
@@ -175,6 +193,7 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		ProductID  string    `json:"product_id"`
 		RequestKey uuid.UUID `json:"request_key"`
 		ReturnPath string    `json:"return_path"`
+		minorDeclarationReq
 	}
 	if err := DecodeJSON(r, &req); err != nil || req.RequestKey == uuid.Nil {
 		FieldError(w, map[string]string{"product_id": "商品を選び直してください"})
@@ -185,7 +204,12 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			return err
 		}
-		if err := s.ticketEligibility(r.Context(), q, p); err != nil {
+		if err := coachingEligibility(p); err != nil {
+			return err
+		}
+		// 18歳未満は、単発の購入と同じく、購入のたびに「保護者に許可をもらいました」へのチェックが要る。
+		minor := profileIsMinor(p)
+		if err := requireMinorDeclaration(minor, req.GuardianPermission); err != nil {
 			return err
 		}
 		old, err := q.GetTicketPurchaseByKey(r.Context(), db.GetTicketPurchaseByKeyParams{OwnerID: &p.ID, RequestKey: req.RequestKey})
@@ -194,6 +218,9 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 				return &ticketRuleError{"purchase_conflict", "同じ購入操作の商品を変更できません。画面を更新してください"}
 			}
 			purchase = old
+			if minor && old.Status == "pending" {
+				return recordMinorDeclaration(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: old.ID, amount: old.AmountYen}, req.minorDeclarationReq)
+			}
 			return nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -206,18 +233,15 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if isMinor(*p.BirthMonth, time.Now()) {
-			msg, err := s.coachingMonthlyBlock(r.Context(), q, p.ID, uuid.Nil, uuid.Nil, uuid.Nil, product.AmountYen)
-			if err != nil {
-				return err
-			}
-			if msg != "" {
-				return &ticketRuleError{"monthly_limit", msg}
-			}
-		}
 		purchase, err = q.CreateTicketPurchase(r.Context(), db.CreateTicketPurchaseParams{ID: uuid.New(), OwnerID: &p.ID, RequestKey: req.RequestKey, ProductID: product.ID,
 			Quantity: product.Quantity, AmountYen: product.AmountYen, SessionExpiresAt: time.Now().Add(time.Hour), ReturnPath: ticketReturnPath(req.ReturnPath)})
-		return err
+		if err != nil {
+			return err
+		}
+		if minor {
+			return recordMinorDeclaration(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: purchase.ID, amount: purchase.AmountYen}, req.minorDeclarationReq)
+		}
+		return nil
 	})
 	if err != nil {
 		writeCheckoutError(w, err)
@@ -237,7 +261,7 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 	}
 	// 先に購入記録を確定。同じ操作を再送しても同じ購入・決済画面になり、通知が先着しても受け取れる。
 	page := s.cfg.WebBaseURL + "/me/coaching/tickets"
-	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("コーチングチケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
+	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("動画添削チケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
 		SuccessURL: page + "?purchase=" + purchase.ID.String(), CancelURL: page + "?cancelled=1&return_to=" + url.QueryEscape(purchase.ReturnPath), Reference: purchase.ID.String(),
 		Metadata: map[string]string{"kind": "tickets", "purchase_id": purchase.ID.String()}, ExpiresAt: purchase.SessionExpiresAt,
 		PaymentMethodTypes: []string{"card"}, IdempotencyKey: "ticket-checkout-" + purchase.ID.String()})
@@ -253,10 +277,42 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 }
 
 func moveTickets(ctx context.Context, q *db.Queries, lot uuid.UUID, key, kind string, a, r, c, f int32) error {
-	if err := q.MoveTicketLot(ctx, db.MoveTicketLotParams{ID: lot, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f}); err != nil {
+	return moveTicketsExpiring(ctx, q, lot, key, kind, a, r, c, f, 0)
+}
+
+// moveTicketsExpiring は moveTickets に失効した枚数（e）を足したもの。ロットの行も台帳の行も消さない。
+func moveTicketsExpiring(ctx context.Context, q *db.Queries, lot uuid.UUID, key, kind string, a, r, c, f, e int32) error {
+	if err := q.MoveTicketLot(ctx, db.MoveTicketLotParams{ID: lot, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f, ExpiredDelta: e}); err != nil {
 		return err
 	}
-	return q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lot, OperationKey: key, Kind: kind, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f})
+	return q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lot, OperationKey: key, Kind: kind, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f, ExpiredDelta: e})
+}
+
+// expireTickets は tick から呼ぶ。決済完了から6か月を過ぎたロットの未使用分を失効させる（延長・救済はしない）。
+// 予約中（添削の返却待ち）の枚数は、返却で消費するか、戻すときに失効に回す（settleReviewTickets）。
+func (s *Server) expireTickets(ctx context.Context) (int, error) {
+	ids, err := s.q.ListTicketLotsToExpire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, id := range ids {
+		err := s.tx(ctx, func(q *db.Queries) error {
+			l, err := q.LockTicketLot(ctx, id)
+			if err != nil {
+				return err
+			}
+			if l.Available == 0 || l.ExpiresAt == nil || l.ExpiresAt.After(time.Now()) {
+				return nil
+			}
+			n += int(l.Available)
+			return moveTicketsExpiring(ctx, q, l.ID, fmt.Sprintf("expire-%s-%d", l.ID, l.Expired+l.Available), "expire", -l.Available, 0, 0, 0, l.Available)
+		})
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
 }
 
 func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.CheckoutSession) error {
@@ -284,7 +340,7 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 		if err != nil {
 			return err
 		}
-		if err := q.CreateTicketLot(ctx, db.CreateTicketLotParams{ID: id, OwnerID: p.OwnerID, Quantity: p.Quantity}); err != nil {
+		if err := q.CreateTicketLot(ctx, db.CreateTicketLotParams{ID: id, OwnerID: p.OwnerID, Quantity: p.Quantity, PaidAt: *p.PaidAt}); err != nil {
 			return err
 		}
 		if err := q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: id, OperationKey: "purchase-" + id.String(), Kind: "purchase", AvailableDelta: p.Quantity}); err != nil {
@@ -304,12 +360,14 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 }
 
 // 呼び出し側は利用者のロックを持つ。依頼作成と予約を同じトランザクションにする。
+// 1回の添削にチケット1枚。報酬の元になる額（nominal_yen）は単発の料金と同じにし、報酬は350円に固定する。
+// 予約で使える枚数から外し（申込み時点で残高が減る）、返却で消費・報酬を計上し、返却されずに終わったら戻す。
 func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.Profile, rr db.ReviewRequest) error {
-	if err := s.ticketEligibility(ctx, q, p); err != nil {
+	if err := coachingEligibility(p); err != nil {
 		return err
 	}
-	const units int32 = 2
-	price := units * ticketFaceYen
+	units := reviewTicketUnits
+	price := reviewPriceYen
 	lots, err := q.ListTicketLots(ctx, &p.ID)
 	if err != nil {
 		return err
@@ -359,12 +417,25 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 		kind = "consume"
 	}
 	for _, a := range allocations {
-		available, consumed := a.Quantity, int32(0)
+		available, consumed, expired := a.Quantity, int32(0), int32(0)
 		if consume {
 			available = 0
 			consumed = a.Quantity
+		} else {
+			// 戻す時点でロットの期限を過ぎていたら、使える枚数には戻さず失効に回す。
+			l, err := q.LockTicketLot(ctx, a.LotID)
+			if err != nil {
+				return err
+			}
+			if l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now()) {
+				available, expired = 0, a.Quantity
+			}
 		}
-		if err := moveTickets(ctx, q, a.LotID, kind+"-"+t.ID.String()+"-"+a.LotID.String(), kind, available, -a.Quantity, consumed, 0); err != nil {
+		k := kind
+		if expired > 0 {
+			k = "expire"
+		}
+		if err := moveTicketsExpiring(ctx, q, a.LotID, kind+"-"+t.ID.String()+"-"+a.LotID.String(), k, available, -a.Quantity, consumed, 0, expired); err != nil {
 			return err
 		}
 	}
@@ -453,5 +524,33 @@ func (s *Server) myTicketPurchase(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, 200, map[string]any{"id": purchase.ID, "status": purchase.Status, "return_path": purchase.ReturnPath})
+	// 戻り画面は URL（?purchase=）だけで「購入済み」と決めない。支払い待ちの間は Stripe の支払い画面の状態を読み、
+	// 完了していれば Webhook と同じ処理で残高を付ける（何度通しても1回分。Webhook を正とする設計は変えない。本体 #569）。
+	checkout := ""
+	if purchase.Status == "pending" && purchase.CheckoutSessionID != nil && s.stripe.Configured() {
+		sess, err := s.stripe.GetCheckoutSession(r.Context(), *purchase.CheckoutSessionID)
+		if err != nil {
+			writeCheckoutError(w, fmt.Errorf("%w: %w", errStripe, err))
+			return
+		}
+		checkout = sess.Status
+		if sess.ID == *purchase.CheckoutSessionID && sess.Status == "complete" {
+			if err := s.completeTicketCheckout(r.Context(), sess); err != nil {
+				MapDBError(w, err)
+				return
+			}
+			if purchase, err = s.q.GetTicketPurchase(r.Context(), id); err != nil {
+				MapDBError(w, err)
+				return
+			}
+		}
+	}
+	out := map[string]any{"id": purchase.ID, "status": purchase.Status, "return_path": purchase.ReturnPath, "checkout_status": checkout,
+		"quantity": purchase.Quantity, "amount_yen": purchase.AmountYen, "paid_at": purchase.PaidAt, "expires_at": nil}
+	if purchase.Status != "pending" {
+		if l, err := s.q.GetTicketLot(r.Context(), id); err == nil {
+			out["expires_at"] = l.ExpiresAt
+		}
+	}
+	JSON(w, 200, out)
 }

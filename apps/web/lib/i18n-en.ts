@@ -2954,4 +2954,8 @@ export const en: Readonly<Record<string, string>> = {
   "ログインして登録する": "Log in to register",
   "登録できませんでした": "Couldn't register. Please try again later.",
   "登録を取り消せませんでした": "Couldn't cancel the registration. Please try again later.",
+  "動画添削1回はチケット1枚です。": "One video review uses 1 ticket.",
+  "チケット（1枚）": "Ticket (1)",
+  "チケット1枚を使って送る": "Use 1 ticket and send",
+  "動画添削1回にチケット1枚を使います。依頼時に確保し、返却時に消費します。期限までに返却がなければ戻ります。有効期限は決済完了から6か月です。": "Each video review uses 1 ticket. It is set aside when you send the request and used when the review is returned. If it isn't returned by the deadline, the ticket comes back. Tickets expire 6 months after payment.",
 };

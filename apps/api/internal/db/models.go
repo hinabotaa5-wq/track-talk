@@ -499,6 +499,7 @@ type CoachingTicketLedger struct {
 	ConsumedDelta  int32     `json:"consumed_delta"`
 	RefundedDelta  int32     `json:"refunded_delta"`
 	CreatedAt      time.Time `json:"created_at"`
+	ExpiredDelta   int32     `json:"expired_delta"`
 }
 
 type CoachingTicketLot struct {
@@ -510,6 +511,8 @@ type CoachingTicketLot struct {
 	Consumed  int32      `json:"consumed"`
 	Refunded  int32      `json:"refunded"`
 	CreatedAt time.Time  `json:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	Expired   int32      `json:"expired"`
 }
 
 type CoachingTicketProduct struct {

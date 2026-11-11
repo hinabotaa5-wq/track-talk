@@ -46,6 +46,19 @@ type fakeStripe struct {
 	refundDelay time.Duration
 	// 返金の Idempotency-Key ごとの中身。Stripe と同じく、同じキーなら前の返金を返し、中身が違えば断る。
 	refundKeys map[string]url.Values
+	// 支払い画面（Checkout Session）を読んだときに返す中身。入っていなければ支払い中（open）として答える。
+	checkoutStates map[string]map[string]any
+}
+
+// setCheckoutState は、支払い画面を読んだときに返す中身を決める（戻り画面での確認のテストに使う）。
+func (f *fakeStripe) setCheckoutState(id string, state map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.checkoutStates == nil {
+		f.checkoutStates = map[string]map[string]any{}
+	}
+	state["id"] = id
+	f.checkoutStates[id] = state
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -131,6 +144,13 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			}
 			f.canceled = append(f.canceled, id)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/checkout/sessions/"):
+			id := strings.TrimPrefix(r.URL.Path, "/v1/checkout/sessions/")
+			state, ok := f.checkoutStates[id]
+			if !ok {
+				state = map[string]any{"id": id, "status": "open", "payment_status": "unpaid"}
+			}
+			_ = json.NewEncoder(w).Encode(state)
 		case r.URL.Path == "/v1/checkout/sessions":
 			f.sessions = append(f.sessions, r.PostForm)
 			f.sessionVersions = append(f.sessionVersions, r.Header.Get("Stripe-Version"))

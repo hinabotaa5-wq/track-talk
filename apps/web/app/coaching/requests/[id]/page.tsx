@@ -17,6 +17,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
 import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
@@ -242,7 +243,19 @@ function ReviewRequestView() {
   useEffect(() => {
     if (!token || !id) return;
     let cancelled = false;
-    apiFetch<ReviewRequest>(`/v1/coaching/requests/${id}`, { token })
+    // お支払い待ちの間は、支払い画面から戻った URL（?paid=1）だけで成否を決めず、Stripe の実際の状態をサーバーで確かめる。
+    // 確かめられなかったときは、Webhook が届くのを待つ（読み直しは下の paidPolls）。
+    async function read() {
+      let d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${id}`, { token });
+      if (d.status === "awaiting_payment") {
+        try {
+          const synced = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${id}/payment/sync`, { method: "POST", token });
+          if (synced.status !== "awaiting_payment") d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${id}`, { token });
+        } catch { /* Webhook の到着を待つ。 */ }
+      }
+      return d;
+    }
+    read()
       .then((d) => {
         if (!cancelled) setRequest(d);
       })
@@ -286,7 +299,7 @@ function ReviewRequestView() {
         ) : null}
         {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
           <p className="font-semibold">{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
-          <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? 1500) })}</p>
+          <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>
           {request.status === "expired" ? <Link href="/coaching/new" className="mt-1 inline-block text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}
         </div> : null}
         {request.tickets ? <p className="text-sm text-slate-200">{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("添削のために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}

@@ -125,6 +125,7 @@ func TestCapturedRefundCompletionNotice(t *testing.T) {
 			_, payer := demoRequester(t, h, admin)
 			intent := "pi_card_captured_notice"
 			id := paidReview(t, h, payer, "card", intent)
+			legacyReviewAmount(t, id)
 			execSQLArgs(t, "UPDATE review_payments SET status='captured',captured_at=now() WHERE request_id=$1", id)
 			subscribeRefundNoticeTest(t, h, payer, endpoint)
 			title, url := "フォーム添削の返金が完了しました", "/coaching/requests/"+id
@@ -210,6 +211,7 @@ func TestPendingReviewPayPayRefundCompletionNotice(t *testing.T) {
 	_, payer := demoRequester(t, h, adminToken(t, h))
 	intent := "pi_paypay_notice"
 	id := paidReview(t, h, payer, "paypay", intent)
+	legacyReviewAmount(t, id)
 	subscribeRefundNoticeTest(t, h, payer, endpoint)
 	title, url := "フォーム添削の返金が完了しました", "/coaching/requests/"+id
 	f.mu.Lock()

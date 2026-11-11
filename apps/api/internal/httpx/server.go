@@ -381,6 +381,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/admin/coaching/reconciliation", s.adminReconciliation)
 				r.Post("/admin/coaching/tickets/{id}/refund", s.adminRefundTickets)
 				r.With(s.requireNewAcceptance).Post("/coaching/requests/{id}/checkout", s.checkoutReviewRequest)
+				// 支払い画面から戻ったときに、Stripe の実際の状態で支払いを確かめる（新規受付を止めていても使える）。
+				r.Post("/coaching/requests/{id}/payment/sync", s.syncReviewPayment)
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
 				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarify", s.clarifyReview)

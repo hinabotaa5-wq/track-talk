@@ -344,13 +344,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			writeCheckoutError(w, err)
 			return
 		}
-		// 購入済みのチケットで払うときは、これまでどおりチケットの利用条件（保護者の同意）を先に確かめる。
-		if useTickets {
-			if err := s.ticketEligibility(r.Context(), s.q, p); err != nil {
-				writeCheckoutError(w, err)
-				return
-			}
-		}
+		// チケットで払うときは、チケットを買った時に宣言済みなので、ここでは宣言を求めない（本体 #569）。
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
 		return

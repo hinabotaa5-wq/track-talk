@@ -85,17 +85,25 @@ func (q *Queries) CreateTicketAllocation(ctx context.Context, arg CreateTicketAl
 }
 
 const createTicketLot = `-- name: CreateTicketLot :exec
-INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available) VALUES ($1,$2,$3,$3)
+INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available, expires_at)
+VALUES ($1,$2,$3,$3,$4::timestamptz + interval '6 months')
 `
 
 type CreateTicketLotParams struct {
 	ID       uuid.UUID  `json:"id"`
 	OwnerID  *uuid.UUID `json:"owner_id"`
 	Quantity int32      `json:"quantity"`
+	PaidAt   time.Time  `json:"paid_at"`
 }
 
+// 有効期限は決済完了日時の6か月後（本体 #569）。
 func (q *Queries) CreateTicketLot(ctx context.Context, arg CreateTicketLotParams) error {
-	_, err := q.db.Exec(ctx, createTicketLot, arg.ID, arg.OwnerID, arg.Quantity)
+	_, err := q.db.Exec(ctx, createTicketLot,
+		arg.ID,
+		arg.OwnerID,
+		arg.Quantity,
+		arg.PaidAt,
+	)
 	return err
 }
 
@@ -254,6 +262,28 @@ func (q *Queries) GetPendingTicketRefund(ctx context.Context, purchaseID uuid.UU
 	return i, err
 }
 
+const getTicketLot = `-- name: GetTicketLot :one
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE id = $1
+`
+
+func (q *Queries) GetTicketLot(ctx context.Context, id uuid.UUID) (CoachingTicketLot, error) {
+	row := q.db.QueryRow(ctx, getTicketLot, id)
+	var i CoachingTicketLot
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Quantity,
+		&i.Available,
+		&i.Reserved,
+		&i.Consumed,
+		&i.Refunded,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Expired,
+	)
+	return i, err
+}
+
 const getTicketProduct = `-- name: GetTicketProduct :one
 SELECT id, title, quantity, amount_yen, active FROM coaching_ticket_products WHERE id = $1 AND active
 `
@@ -353,7 +383,7 @@ func (q *Queries) GetTicketReservationForReview(ctx context.Context, requestID *
 }
 
 const hasOpenTicketAccount = `-- name: HasOpenTicketAccount :one
-SELECT (EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.owner_id = $1 AND (l.available > 0 OR l.reserved > 0))
+SELECT (EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.owner_id = $1 AND ((l.available > 0 AND (l.expires_at IS NULL OR l.expires_at > now())) OR l.reserved > 0))
  OR EXISTS(SELECT 1 FROM coaching_ticket_purchases t WHERE t.owner_id = $1 AND t.status = 'pending' AND t.session_expires_at > now())
  OR EXISTS(SELECT 1 FROM coaching_ticket_refunds f JOIN coaching_ticket_purchases p ON p.id=f.purchase_id WHERE p.owner_id=$1 AND f.status='pending'))::boolean
 `
@@ -366,8 +396,8 @@ func (q *Queries) HasOpenTicketAccount(ctx context.Context, ownerID *uuid.UUID) 
 }
 
 const insertTicketLedger = `-- name: InsertTicketLedger :exec
-INSERT INTO coaching_ticket_ledger (id, lot_id, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO coaching_ticket_ledger (id, lot_id, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
 
 type InsertTicketLedgerParams struct {
@@ -379,6 +409,7 @@ type InsertTicketLedgerParams struct {
 	ReservedDelta  int32     `json:"reserved_delta"`
 	ConsumedDelta  int32     `json:"consumed_delta"`
 	RefundedDelta  int32     `json:"refunded_delta"`
+	ExpiredDelta   int32     `json:"expired_delta"`
 }
 
 func (q *Queries) InsertTicketLedger(ctx context.Context, arg InsertTicketLedgerParams) error {
@@ -391,12 +422,13 @@ func (q *Queries) InsertTicketLedger(ctx context.Context, arg InsertTicketLedger
 		arg.ReservedDelta,
 		arg.ConsumedDelta,
 		arg.RefundedDelta,
+		arg.ExpiredDelta,
 	)
 	return err
 }
 
 const listMyTicketLedger = `-- name: ListMyTicketLedger :many
-SELECT e.id, e.lot_id, e.operation_key, e.kind, e.available_delta, e.reserved_delta, e.consumed_delta, e.refunded_delta, e.created_at FROM coaching_ticket_ledger e JOIN coaching_ticket_lots l ON l.id = e.lot_id
+SELECT e.id, e.lot_id, e.operation_key, e.kind, e.available_delta, e.reserved_delta, e.consumed_delta, e.refunded_delta, e.created_at, e.expired_delta FROM coaching_ticket_ledger e JOIN coaching_ticket_lots l ON l.id = e.lot_id
 WHERE l.owner_id = $1 ORDER BY e.created_at DESC,e.id DESC LIMIT 100
 `
 
@@ -419,6 +451,7 @@ func (q *Queries) ListMyTicketLedger(ctx context.Context, ownerID *uuid.UUID) ([
 			&i.ConsumedDelta,
 			&i.RefundedDelta,
 			&i.CreatedAt,
+			&i.ExpiredDelta,
 		); err != nil {
 			return nil, err
 		}
@@ -433,6 +466,7 @@ func (q *Queries) ListMyTicketLedger(ctx context.Context, ownerID *uuid.UUID) ([
 const listMyTicketPurchases = `-- name: ListMyTicketPurchases :many
 SELECT p.id,p.request_key,p.quantity,p.amount_yen,p.status,p.refunded_yen,p.created_at,p.paid_at,
     COALESCE(l.available,0)::integer AS available,COALESCE(l.reserved,0)::integer AS reserved,
+    COALESCE(l.consumed,0)::integer AS consumed,COALESCE(l.expired,0)::integer AS expired,l.expires_at,
     EXISTS(SELECT 1 FROM coaching_ticket_refunds f WHERE f.purchase_id=p.id AND f.status='pending')::boolean AS refund_pending
 FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.id = p.id
 WHERE p.owner_id = $1 ORDER BY p.created_at DESC LIMIT 100
@@ -449,6 +483,9 @@ type ListMyTicketPurchasesRow struct {
 	PaidAt        *time.Time `json:"paid_at"`
 	Available     int32      `json:"available"`
 	Reserved      int32      `json:"reserved"`
+	Consumed      int32      `json:"consumed"`
+	Expired       int32      `json:"expired"`
+	ExpiresAt     *time.Time `json:"expires_at"`
 	RefundPending bool       `json:"refund_pending"`
 }
 
@@ -472,6 +509,9 @@ func (q *Queries) ListMyTicketPurchases(ctx context.Context, ownerID *uuid.UUID)
 			&i.PaidAt,
 			&i.Available,
 			&i.Reserved,
+			&i.Consumed,
+			&i.Expired,
+			&i.ExpiresAt,
 			&i.RefundPending,
 		); err != nil {
 			return nil, err
@@ -542,9 +582,11 @@ func (q *Queries) ListTicketAllocations(ctx context.Context, reservationID uuid.
 }
 
 const listTicketLots = `-- name: ListTicketLots :many
-SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 ORDER BY created_at,id FOR UPDATE
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND (expires_at IS NULL OR expires_at > now())
+ORDER BY expires_at NULLS LAST,created_at,id FOR UPDATE
 `
 
+// 失効の早いものから使う（期限のない旧ロットは最後）。
 func (q *Queries) ListTicketLots(ctx context.Context, ownerID *uuid.UUID) ([]CoachingTicketLot, error) {
 	rows, err := q.db.Query(ctx, listTicketLots, ownerID)
 	if err != nil {
@@ -563,10 +605,37 @@ func (q *Queries) ListTicketLots(ctx context.Context, ownerID *uuid.UUID) ([]Coa
 			&i.Consumed,
 			&i.Refunded,
 			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.Expired,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTicketLotsToExpire = `-- name: ListTicketLotsToExpire :many
+SELECT id FROM coaching_ticket_lots WHERE expires_at <= now() AND available > 0 ORDER BY expires_at LIMIT 100
+`
+
+// 期限を過ぎて、まだ使える枚数が残っているロット。
+func (q *Queries) ListTicketLotsToExpire(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listTicketLotsToExpire)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -641,7 +710,7 @@ func (q *Queries) ListTicketReservationsToRelease(ctx context.Context) ([]Coachi
 }
 
 const lockTicketLot = `-- name: LockTicketLot :one
-SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at FROM coaching_ticket_lots WHERE id = $1 FOR UPDATE
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketLot(ctx context.Context, id uuid.UUID) (CoachingTicketLot, error) {
@@ -656,6 +725,8 @@ func (q *Queries) LockTicketLot(ctx context.Context, id uuid.UUID) (CoachingTick
 		&i.Consumed,
 		&i.Refunded,
 		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Expired,
 	)
 	return i, err
 }
@@ -811,8 +882,9 @@ const moveTicketLot = `-- name: MoveTicketLot :exec
 UPDATE coaching_ticket_lots SET available = available + $1::integer,
     reserved = reserved + $2::integer,
     consumed = consumed + $3::integer,
-    refunded = refunded + $4::integer
-WHERE id = $5
+    refunded = refunded + $4::integer,
+    expired = expired + $5::integer
+WHERE id = $6
 `
 
 type MoveTicketLotParams struct {
@@ -820,6 +892,7 @@ type MoveTicketLotParams struct {
 	ReservedDelta  int32     `json:"reserved_delta"`
 	ConsumedDelta  int32     `json:"consumed_delta"`
 	RefundedDelta  int32     `json:"refunded_delta"`
+	ExpiredDelta   int32     `json:"expired_delta"`
 	ID             uuid.UUID `json:"id"`
 }
 
@@ -829,9 +902,29 @@ func (q *Queries) MoveTicketLot(ctx context.Context, arg MoveTicketLotParams) er
 		arg.ReservedDelta,
 		arg.ConsumedDelta,
 		arg.RefundedDelta,
+		arg.ExpiredDelta,
 		arg.ID,
 	)
 	return err
+}
+
+const nextTicketExpiry = `-- name: NextTicketExpiry :one
+SELECT expires_at::timestamptz AS expires_at, sum(available)::bigint AS available
+FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND expires_at > now()
+GROUP BY expires_at ORDER BY expires_at LIMIT 1
+`
+
+type NextTicketExpiryRow struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	Available int64     `json:"available"`
+}
+
+// 使える枚数のうち、いちばん早く失効するものの日時と枚数。なければ行なし。
+func (q *Queries) NextTicketExpiry(ctx context.Context, ownerID *uuid.UUID) (NextTicketExpiryRow, error) {
+	row := q.db.QueryRow(ctx, nextTicketExpiry, ownerID)
+	var i NextTicketExpiryRow
+	err := row.Scan(&i.ExpiresAt, &i.Available)
+	return i, err
 }
 
 const recordTicketReviewEarnings = `-- name: RecordTicketReviewEarnings :exec
@@ -938,7 +1031,8 @@ func (q *Queries) SumMonthlyCoachingSpend(ctx context.Context, arg SumMonthlyCoa
 }
 
 const ticketBalance = `-- name: TicketBalance :one
-SELECT COALESCE(sum(available),0)::bigint AS available, COALESCE(sum(reserved),0)::bigint AS reserved
+SELECT COALESCE(sum(available) FILTER (WHERE expires_at IS NULL OR expires_at > now()),0)::bigint AS available,
+    COALESCE(sum(reserved),0)::bigint AS reserved
 FROM coaching_ticket_lots WHERE owner_id = $1
 `
 
@@ -947,6 +1041,7 @@ type TicketBalanceRow struct {
 	Reserved  int64 `json:"reserved"`
 }
 
+// 期限を過ぎたロットは、失効の処理（tick）を待たずに使える枚数から外す。
 func (q *Queries) TicketBalance(ctx context.Context, ownerID *uuid.UUID) (TicketBalanceRow, error) {
 	row := q.db.QueryRow(ctx, ticketBalance, ownerID)
 	var i TicketBalanceRow
@@ -958,7 +1053,7 @@ const ticketReconciliation = `-- name: TicketReconciliation :many
 SELECT l.id FROM coaching_ticket_lots l LEFT JOIN coaching_ticket_ledger e ON e.lot_id = l.id
 GROUP BY l.id HAVING l.available <> COALESCE(sum(e.available_delta),0)
  OR l.reserved <> COALESCE(sum(e.reserved_delta),0) OR l.consumed <> COALESCE(sum(e.consumed_delta),0)
- OR l.refunded <> COALESCE(sum(e.refunded_delta),0)
+ OR l.refunded <> COALESCE(sum(e.refunded_delta),0) OR l.expired <> COALESCE(sum(e.expired_delta),0)
 `
 
 func (q *Queries) TicketReconciliation(ctx context.Context) ([]uuid.UUID, error) {

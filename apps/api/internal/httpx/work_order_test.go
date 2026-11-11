@@ -26,7 +26,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	admin := adminToken(t, h)
 	_, coach := onDutyCoach(t, h, admin)
 	_, owner := demoRequester(t, h, admin)
-	buyFiveTickets(t, h, owner)
+	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 
 	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
@@ -161,7 +161,7 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 			t.Fatalf("setting %s %d %s", category, rec.Code, rec.Body.String())
 		}
 	}
-	buyFiveTickets(t, h, owner)
+	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
 	var list struct {
