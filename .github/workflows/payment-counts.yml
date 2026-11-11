@@ -1,0 +1,64 @@
+name: Payment Counts
+
+# 決済件数確認ジョブのイメージを差し替える。マージしても自動では動かず、Actions の画面の Run workflow で手動で流す。
+# 認証は Deploy API と同じ Workload Identity（新規シークレットなし）。
+# 下の GCP_* は秘密ではない（鍵ではなく、どのプロジェクトに送るかの指定）。プロジェクトを変えたら書き換える。
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Artifact Registry に push する payment-counts イメージのタグ'
+        required: false
+        default: '20261111-1d603eb'
+      confirm_run:
+        description: '差し替え後に確認実行（execute --wait）を行うか（Issue #555 の「任意ステップ」に対応）'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: payment-counts
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_PROJECT_ID: refined-bolt-493709-a8
+      GCP_WORKLOAD_IDENTITY_PROVIDER: projects/274141774717/locations/global/workloadIdentityPools/github/providers/github
+      GCP_SERVICE_ACCOUNT: github-deploy@refined-bolt-493709-a8.iam.gserviceaccount.com
+      REGION: asia-northeast1
+      REGISTRY: asia-northeast1-docker.pkg.dev/refined-bolt-493709-a8/track-talk
+      IMAGE_TAG: ${{ inputs.image_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      # 想定版の値をログに出すだけにする。一致確認はジョブ実行側の設計に任せ、ここでは握り潰さない。
+      - name: Show expected migration
+        run: |
+          grep -n "EXPECTED_MIGRATION =" deploy/cloud-run/payment-counts/counts.py
+      - name: Build and push
+        run: |
+          IMAGE="$REGISTRY/payment-counts:$IMAGE_TAG"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE" deploy/cloud-run/payment-counts
+          docker push "$IMAGE"
+      - name: Update job
+        run: |
+          IMAGE="$REGISTRY/payment-counts:$IMAGE_TAG"
+          gcloud run jobs update track-talk-payment-counts --image "$IMAGE" --region "$REGION" --project "$GCP_PROJECT_ID" --quiet
+          gcloud run jobs describe track-talk-payment-counts --region "$REGION" --project "$GCP_PROJECT_ID" --format='value(spec.template.spec.template.spec.containers[0].image)'
+      # ジョブが非ゼロ終了したらこのステップが失敗し、run 全体も失敗になる。
+      - name: Confirm run
+        if: ${{ inputs.confirm_run }}
+        run: |
+          gcloud run jobs execute track-talk-payment-counts --region "$REGION" --project "$GCP_PROJECT_ID" --wait
