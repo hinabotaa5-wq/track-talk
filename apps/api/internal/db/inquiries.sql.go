@@ -86,7 +86,8 @@ func (q *Queries) CreateInquiry(ctx context.Context, arg CreateInquiryParams) (C
 }
 
 const listAdminInquiries = `-- name: ListAdminInquiries :many
-SELECT i.id, i.category, i.subject, i.body, i.source, i.contact_email, i.created_at, p.nickname AS user_nickname
+SELECT i.id, i.category, i.subject, i.body, i.source, i.contact_email, i.created_at,
+    i.responded_at, i.response_body, i.responder_id, p.nickname AS user_nickname
 FROM inquiries i
 JOIN profiles p ON p.id = i.user_id
 WHERE i.source = $1
@@ -101,14 +102,17 @@ type ListAdminInquiriesParams struct {
 }
 
 type ListAdminInquiriesRow struct {
-	ID           uuid.UUID `json:"id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
-	UserNickname *string   `json:"user_nickname"`
+	ID           uuid.UUID  `json:"id"`
+	Category     string     `json:"category"`
+	Subject      string     `json:"subject"`
+	Body         string     `json:"body"`
+	Source       string     `json:"source"`
+	ContactEmail *string    `json:"contact_email"`
+	CreatedAt    time.Time  `json:"created_at"`
+	RespondedAt  *time.Time `json:"responded_at"`
+	ResponseBody *string    `json:"response_body"`
+	ResponderID  *uuid.UUID `json:"responder_id"`
+	UserNickname *string    `json:"user_nickname"`
 }
 
 func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiriesParams) ([]ListAdminInquiriesRow, error) {
@@ -128,6 +132,9 @@ func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiries
 			&i.Source,
 			&i.ContactEmail,
 			&i.CreatedAt,
+			&i.RespondedAt,
+			&i.ResponseBody,
+			&i.ResponderID,
 			&i.UserNickname,
 		); err != nil {
 			return nil, err
@@ -141,7 +148,8 @@ func (q *Queries) ListAdminInquiries(ctx context.Context, arg ListAdminInquiries
 }
 
 const listMyInquiries = `-- name: ListMyInquiries :many
-SELECT id, user_id, category, subject, body, source, contact_email, created_at
+SELECT id, user_id, category, subject, body, source, contact_email, created_at,
+    responded_at, response_body
 FROM inquiries
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -155,14 +163,16 @@ type ListMyInquiriesParams struct {
 }
 
 type ListMyInquiriesRow struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	Category     string    `json:"category"`
-	Subject      string    `json:"subject"`
-	Body         string    `json:"body"`
-	Source       string    `json:"source"`
-	ContactEmail *string   `json:"contact_email"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           uuid.UUID  `json:"id"`
+	UserID       uuid.UUID  `json:"user_id"`
+	Category     string     `json:"category"`
+	Subject      string     `json:"subject"`
+	Body         string     `json:"body"`
+	Source       string     `json:"source"`
+	ContactEmail *string    `json:"contact_email"`
+	CreatedAt    time.Time  `json:"created_at"`
+	RespondedAt  *time.Time `json:"responded_at"`
+	ResponseBody *string    `json:"response_body"`
 }
 
 func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams) ([]ListMyInquiriesRow, error) {
@@ -183,6 +193,8 @@ func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams
 			&i.Source,
 			&i.ContactEmail,
 			&i.CreatedAt,
+			&i.RespondedAt,
+			&i.ResponseBody,
 		); err != nil {
 			return nil, err
 		}
@@ -192,4 +204,36 @@ func (q *Queries) ListMyInquiries(ctx context.Context, arg ListMyInquiriesParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordInquiryResponse = `-- name: RecordInquiryResponse :one
+UPDATE inquiries
+SET responded_at = now(), response_body = $2, responder_id = $3
+WHERE id = $1
+RETURNING id, responded_at, response_body, responder_id
+`
+
+type RecordInquiryResponseParams struct {
+	ID           uuid.UUID  `json:"id"`
+	ResponseBody *string    `json:"response_body"`
+	ResponderID  *uuid.UUID `json:"responder_id"`
+}
+
+type RecordInquiryResponseRow struct {
+	ID           uuid.UUID  `json:"id"`
+	RespondedAt  *time.Time `json:"responded_at"`
+	ResponseBody *string    `json:"response_body"`
+	ResponderID  *uuid.UUID `json:"responder_id"`
+}
+
+func (q *Queries) RecordInquiryResponse(ctx context.Context, arg RecordInquiryResponseParams) (RecordInquiryResponseRow, error) {
+	row := q.db.QueryRow(ctx, recordInquiryResponse, arg.ID, arg.ResponseBody, arg.ResponderID)
+	var i RecordInquiryResponseRow
+	err := row.Scan(
+		&i.ID,
+		&i.RespondedAt,
+		&i.ResponseBody,
+		&i.ResponderID,
+	)
+	return i, err
 }

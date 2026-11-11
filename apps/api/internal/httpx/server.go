@@ -234,6 +234,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/reports", s.listReports)
 			r.Post("/admin/reports/{id}/close", s.closeReport)
 			r.Get("/admin/inquiries", s.listInquiries)
+			r.Post("/admin/inquiries/{id}/response", s.respondInquiry)
 			r.Post("/admin/posts/{id}/hide", s.hidePost)
 			r.Post("/admin/comments/{id}/hide", s.hideComment)
 			r.Post("/admin/injury-notes/{id}/hide", s.hideInjuryNote)

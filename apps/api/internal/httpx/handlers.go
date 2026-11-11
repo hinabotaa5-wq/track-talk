@@ -1593,6 +1593,41 @@ func (s *Server) listInquiries(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// respondInquiry は、問い合わせ（特商法の開示請求を含む）への応答を記録する。
+// 請求と応答の日時の証跡のため、応答の内容・応答者・応答日時を残す。再応答は上書きする。
+func (s *Server) respondInquiry(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Response string `json:"response"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	body := strings.TrimSpace(req.Response)
+	if e := Body(body, 2000); e != "" {
+		FieldError(w, map[string]string{"response": e})
+		return
+	}
+	row, err := s.q.RecordInquiryResponse(r.Context(), db.RecordInquiryResponseParams{
+		ID:           id,
+		ResponseBody: &body,
+		ResponderID:  &admin.ID,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, row)
+}
+
 func (s *Server) hideComment(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
