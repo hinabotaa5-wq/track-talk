@@ -13,11 +13,14 @@ import (
 )
 
 // サポートプランの入口のコーチ一覧（本体 #486）。動画添削の指名一覧とは別のリストで、
-// 「大会まで」（無料相談の受付設定がある）か「対面」（対面プランを公開している）のコーチだけを出す。
+// 無料相談の受付設定があるコーチ（1ヶ月プラン）だけを出す。
 // 人気中立：★・件数・売上・契約件数・残り枠は返さない。並び順は日替わりの公平なローテーション。
-// 大会までの受け入れ状況はコーチの手動入力（受付設定）だけで決め、カレンダーとは連動しない。
-// 対面はカレンダーから自動で判定する。カレンダーは日ごとの「空き・相談・不可」しか持たないので、
-// 今後21日に「空き」の日があれば受付中とする（プランの所要時間ぶんの連続した空きでの判定は、カレンダーに時間帯が無いため未実装）。
+// 受け入れ状況はコーチの手動入力（受付設定）だけで決め、カレンダーとは連動しない。
+// 対面は表示しない（コード・データは削除せず、下の supportPlanShowInPerson で無効のまま残す）。
+
+// supportPlanShowInPerson は、入口の一覧に対面プランのコーチを出すか。2026-11-11 の運営者決定（ops #64）で
+// 対面は表示しない。無効化であり、対面の実装・データの削除ではない。
+const supportPlanShowInPerson = false
 
 // supportRotationKey は、日本時間の日付とコーチの ID から決まる並びの鍵。日ごとに順番が入れ替わり、特定のコーチが上に固定されない。
 func supportRotationKey(day string, id uuid.UUID) [32]byte {
@@ -80,7 +83,7 @@ func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) 
 	byID := map[uuid.UUID]db.ListPublicCoachesRow{}
 	ids := []uuid.UUID{}
 	for _, c := range rows {
-		if consults[c.ProfileID] == nil && len(inPerson[c.ProfileID]) == 0 {
+		if consults[c.ProfileID] == nil && (!supportPlanShowInPerson || len(inPerson[c.ProfileID]) == 0) {
 			continue
 		}
 		byID[c.ProfileID] = c
@@ -99,7 +102,7 @@ func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) 
 			kinds = append(kinds, "competition_support")
 			entry["competition_support"] = cs
 		}
-		if ps := inPerson[id]; len(ps) > 0 {
+		if ps := inPerson[id]; supportPlanShowInPerson && len(ps) > 0 {
 			kinds = append(kinds, "in_person")
 			days, err := s.q.ListCoachAvailability(ctx, db.ListCoachAvailabilityParams{CoachID: id, Today: today})
 			if err != nil {

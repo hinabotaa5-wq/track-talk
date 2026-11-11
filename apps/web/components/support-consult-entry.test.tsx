@@ -34,20 +34,19 @@ it("受付停止中は、再開の目安は出さず、相談の入口も出さ�
   expect(container.querySelector("a")).toBeNull();
 });
 
-it("コーチ詳細では、大会までプランが完成品のプランではなく無料相談の入口になる", async () => {
+it("コーチ詳細では、単一のサポートプランに無料相談の入口が出て、完成品のプランは出ない", async () => {
   const plan = { id: "p", title: "旧プラン", description: "旧プランの内容", kind: "period" as const, duration_days: 30, price_yen: 8000, capacity: 3, published: true, service_type: "competition_support" as const, video_reviews: 1, menu_updates: null, reply_formats: [] as ("text")[], start_on_first_video: false };
-  await act(async () => root.render(<CoachServicePlans services={["competition_support"]} plans={[plan]} coachID="c1" consult={open} />));
-  const button = container.querySelector("button")!;
-  expect(button.disabled).toBe(false);
-  await act(async () => button.click());
+  await act(async () => root.render(<CoachServicePlans plans={[plan]} coachID="c1" consult={open} />));
+  expect(container.textContent).toContain("サポートプラン");
   expect(container.textContent).toContain("無料相談をする");
+  expect(container.textContent).toContain("1ヶ月の間");
   expect(container.textContent).not.toContain("旧プランの内容");
   expect(container.textContent).not.toContain("8,000円");
 });
 
-it("相談の入口がないコーチは、これまでどおり公開中のプランを出す", async () => {
-  const plan = { id: "p", title: "旧プラン", description: "旧プランの内容", kind: "period" as const, duration_days: 30, price_yen: 8000, capacity: 3, published: true, service_type: "competition_support" as const, video_reviews: 1, menu_updates: null, reply_formats: [] as ("text")[], start_on_first_video: false };
-  await act(async () => root.render(<CoachServicePlans services={["competition_support"]} plans={[plan]} coachID="c1" consult={null} />));
-  await act(async () => container.querySelector("button")!.click());
+it("相談の入口がないコーチは受付停止の表示になり、分類のない既存プランだけ残す", async () => {
+  const plan = { id: "p", title: "旧プラン", description: "旧プランの内容", kind: "period" as const, duration_days: 30, price_yen: 8000, capacity: 3, published: true, service_type: null, video_reviews: 1, menu_updates: null, reply_formats: [] as ("text")[], start_on_first_video: false };
+  await act(async () => root.render(<CoachServicePlans plans={[plan]} coachID="c1" consult={null} />));
+  expect(container.textContent).toContain("このコーチは受付していません");
   expect(container.textContent).toContain("旧プランの内容");
 });

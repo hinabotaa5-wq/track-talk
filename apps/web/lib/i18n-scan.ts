@@ -11,7 +11,7 @@ export const japanese = /[぀-ヿ㐀-鿿、。「」『』（）：！？]/;
 // ほかに、どちらの言語でも同じに出すもの（言語選択のプロンプトは日英併記。言語名はその言語自身の表記で、行末の「// i18n-data」で外す）。
 export const exemptPatterns: readonly RegExp[] = [
   /^app\/admin\//,
-  /^components\/(admin-stats|announcements-admin|coaching-admin|menu-contest-admin|meet-sessions-admin|report-hide-actions)\.tsx$/,
+  /^components\/(admin-stats|announcements-admin|coaching-admin|menu-contest-admin|meet-sessions-admin|overseas-interest-admin|report-hide-actions)\.tsx$/,
   /^app\/terms\//,
   /^app\/legal\//,
   /^components\/(privacy-policy|overseas-consent-notice|support-plan-coach-terms)\.tsx$/,

@@ -5,14 +5,14 @@ import { coachEventLabels } from "@/lib/coach-recruit";
 import { priceHintLabel, type PublicSupportConsult } from "@/lib/support-consult";
 import Link from "next/link";
 
-// コーチ詳細の「大会までプラン」。価格の決まった完成品ではなく、無料相談の入口を出す。
+// コーチ詳細の「サポートプラン」（1ヶ月）。価格の決まった完成品ではなく、無料相談の入口を出す。
 // 受け入れ状況は、コーチが手で切り替える「受付中／受付停止中」だけ。件数や残り枠は出さない。
 export function SupportConsultEntry({ coachID, consult }: { coachID: string; consult: PublicSupportConsult }) {
   const open = consult.reception.status === "open";
   const hint = priceHintLabel(consult.price_min_yen, consult.price_max_yen);
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-200">{L("目標の大会まで、練習や調整を継続してサポートします。まず無料で相談し、大会の日や内容をふまえて、コーチが期間・内容・価格を提案します。")}</p>
+      <p className="text-sm text-slate-200">{L("1ヶ月の間、練習や調整を継続してサポートします。まず無料で相談し、目標や内容をふまえて、コーチが内容・価格を提案します。動画への返答は期間中は回数の制限なく受けられ、メニューは最初に作成し期間中は必要に応じて見直します。")}</p>
       <p className={`text-sm font-semibold ${open ? "text-emerald-300" : "text-amber-300"}`} role="status">
         {open ? L("受付中") : L("受付停止中")}
       </p>

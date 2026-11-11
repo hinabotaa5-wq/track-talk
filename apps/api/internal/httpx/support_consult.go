@@ -803,10 +803,15 @@ func (s *Server) askSupportConsult(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"consult": s.consultViewJSON(out)})
 }
 
+// supportConsultPeriodDays は、サポートプランの期間（1ヶ月）の日数。期間プランの既存の数え方
+// （validPlanDuration: 1か月＝30日）を使い、新しい日数計算は作らない。期間の終わりは開始日から数えて
+// 両端を含む30日目（開始日 +29日）で、目標大会の日に依存しない。
+const supportConsultPeriodDays = 30
+
 type proposalReq struct {
+	// CompetitionName は目標の大会の名前（目標としての記録で、期間を決めない）。
 	CompetitionName  string `json:"competition_name"`
 	SupportStartDate string `json:"support_start_date"`
-	CompetitionDate  string `json:"competition_date"`
 	CallCount        int    `json:"call_count"`
 	CallMinutes      int    `json:"call_minutes"`
 	PriceYen         int    `json:"price_yen"`
@@ -820,6 +825,7 @@ type proposalReq struct {
 }
 
 // validate は提案を確かめる。有効期限（valid_until）は日本時間のその日の終わりまで。
+// 期間の終わり（end）は開始日から1ヶ月（30日・両端を含む）で組み立て、サーバーが決める。
 func (p *proposalReq) validate(today time.Time, askedQuestion bool) (map[string]string, time.Time, time.Time, time.Time) {
 	f := map[string]string{}
 	p.CompetitionName = strings.TrimSpace(p.CompetitionName)
@@ -832,17 +838,7 @@ func (p *proposalReq) validate(today time.Time, askedQuestion bool) (map[string]
 	if e1 != nil || start.Before(today) {
 		f["support_start_date"] = "開始日を今日以降の日で選んでください"
 	}
-	end, e2 := time.Parse("2006-01-02", p.CompetitionDate)
-	if e2 != nil || end.Before(today) {
-		f["competition_date"] = "目標大会の日を今日以降の日で選んでください"
-	}
-	if e1 == nil && e2 == nil {
-		if end.Before(start) {
-			f["competition_date"] = "目標大会の日は開始日以降にしてください"
-		} else if int(end.Sub(start).Hours()/24)+1 > 90 {
-			f["competition_date"] = "支援期間は90日までです"
-		}
-	}
+	end := start.AddDate(0, 0, supportConsultPeriodDays-1)
 	if p.CallCount < 0 || p.CallCount > 12 {
 		f["call_count"] = "通話は0〜12回で設定してください"
 	}
@@ -877,8 +873,8 @@ func (p *proposalReq) validate(today time.Time, askedQuestion bool) (map[string]
 	switch {
 	case err != nil || day.Before(today):
 		f["valid_until"] = "提案の有効期限を今日以降の日で選んでください"
-	case e2 == nil && day.After(end):
-		f["valid_until"] = "提案の有効期限は目標大会の日までにしてください"
+	case e1 == nil && day.After(end):
+		f["valid_until"] = "提案の有効期限は期間の終わり（開始日から1ヶ月）までにしてください"
 	default:
 		validUntil = time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, jst.Zone)
 	}
@@ -986,8 +982,8 @@ func (s *Server) startConsultContract(ctx context.Context, q *db.Queries, c db.S
 	}
 	var a consultAnswers
 	_ = json.Unmarshal(c.Answers, &a)
-	desc := strings.TrimSpace("大会までプラン（無料相談の提案）。" + p.CompetitionName + "の日まで。" + supportStandardContent + p.ContentNote)
-	title := truncateRunes("大会までプラン: "+p.CompetitionName, 60)
+	desc := strings.TrimSpace("1ヶ月プラン（無料相談の提案）。" + p.CompetitionName + "に向けた1ヶ月のサポート。" + supportStandardContent + p.ContentNote)
+	title := truncateRunes("1ヶ月プラン: "+p.CompetitionName, 60)
 	zero := int16(0)
 	ct, err := q.CreateCoachingContract(ctx, db.CreateCoachingContractParams{
 		PreferredDates: []time.Time{}, ID: uuid.New(), PlanID: tpl.ID, CoachID: c.CoachID, RequesterID: requester,
@@ -1379,7 +1375,7 @@ func truncateRunes(s string, n int) string {
 }
 
 func consultGoalSummary(a consultAnswers, p db.SupportConsultProposal) string {
-	return truncateRunes(p.CompetitionName+"（"+p.CompetitionDate.Format("2006-01-02")+"）に向けたサポート", 200)
+	return truncateRunes(p.CompetitionName+"に向けた1ヶ月のサポート", 200)
 }
 
 // expireSupportConsults は、コーチが 48 時間返事をしなかった相談と、有効期限が過ぎた提案を閉じる。

@@ -244,7 +244,7 @@ func TestSupportUnprovidedRefundAndNetEarnings(t *testing.T) {
 	}
 	var amount int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE contract_id=$1`, []any{root}, &amount)
-	if amount != 2400 {
+	if amount != 2250 { // 提供済み3,000円分の75%
 		t.Fatalf("net earnings %d", amount)
 	}
 	// 保存期間で質問・回答が消えても提供数は会計情報として残す。

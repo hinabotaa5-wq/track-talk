@@ -55,9 +55,10 @@ func consultAnswersBody() map[string]any {
 	}
 }
 
+// 提案の期間は開始日から1ヶ月（30日・両端を含む）でサーバーが組み立てる。目標の大会は名前だけを目標として添える。
 func proposalBody() map[string]any {
 	return map[string]any{
-		"competition_name": "秋季記録会", "support_start_date": day(1), "competition_date": day(40),
+		"competition_name": "秋季記録会", "support_start_date": day(1),
 		"agree_report": true, "agree_detection": true,
 		"call_count": 1, "call_minutes": 30, "price_yen": 9000, "content_note": "週1回の返答とメニュー見直しです",
 		"answer_to_question": "週に1回で十分です", "valid_until": day(7),
@@ -147,7 +148,7 @@ func TestSupportConsultFullFlow(t *testing.T) {
 		t.Fatalf("propose %d %s", r.Code, r.Body.String())
 	}
 	v := decodeConsult(t, r.Body.Bytes())
-	if v.Consult.Status != "proposed" || v.Consult.Proposal == nil || v.Consult.Proposal.PriceYen != 9000 || v.Consult.Proposal.FeePercent != 20 || v.Consult.Proposal.CoachReceivesYen != 7200 || v.Consult.Proposal.DurationDays != 40 {
+	if v.Consult.Status != "proposed" || v.Consult.Proposal == nil || v.Consult.Proposal.PriceYen != 9000 || v.Consult.Proposal.FeePercent != 25 || v.Consult.Proposal.CoachReceivesYen != 6750 || v.Consult.Proposal.DurationDays != 30 {
 		t.Fatalf("proposal %+v", v.Consult)
 	}
 	// 他人は相談を読めない。
@@ -169,7 +170,7 @@ func TestSupportConsultFullFlow(t *testing.T) {
 	var compDate time.Time
 	var videos int
 	queryRowArgs(t, `SELECT price_yen, duration_days, service_type, competition_name, competition_date, plan_description, video_reviews FROM coaching_contracts WHERE id=$1`, []any{ct.ID}, &price, &days, &service, &name, &compDate, &desc, &videos)
-	if price != 9000 || days != 40 || service != "competition_support" || name != "秋季記録会" || compDate.Format("2006-01-02") != day(40) || videos != 0 {
+	if price != 9000 || days != 30 || service != "competition_support" || name != "秋季記録会" || compDate.Format("2006-01-02") != day(30) || videos != 0 {
 		t.Fatalf("snapshot %d %d %s %s %s %d", price, days, service, name, compDate, videos)
 	}
 	// 「何が返ってくるか」は標準形（動画への返答は無制限）が契約の説明に入る。
@@ -182,9 +183,9 @@ func TestSupportConsultFullFlow(t *testing.T) {
 		t.Fatalf("coach consent %d", coachConsent)
 	}
 	var endsOK bool
-	queryRowArgs(t, `SELECT ends_at IS NULL OR (ends_at AT TIME ZONE 'Asia/Tokyo')::date = ($2::date + 1) FROM coaching_contracts WHERE id=$1`, []any{ct.ID, day(40)}, &endsOK)
+	queryRowArgs(t, `SELECT ends_at IS NULL OR (ends_at AT TIME ZONE 'Asia/Tokyo')::date = ($2::date + 1) FROM coaching_contracts WHERE id=$1`, []any{ct.ID, day(30)}, &endsOK)
 	if !endsOK {
-		t.Fatal("ends_at is not the day after the competition")
+		t.Fatal("ends_at is not the day after the 1-month period end")
 	}
 	// 契約が進行中のコーチへは、新しい無料相談を起こせない。
 	if r := doJSON(t, h, "POST", "/v1/support-consults", ta, map[string]any{"coach_id": coach, "answers": consultAnswersBody()}); r.Code != 409 {
@@ -422,6 +423,12 @@ func TestSupportConsultProposalValidationAndExpiry(t *testing.T) {
 	noAnswer["answer_to_question"] = ""
 	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/propose", tc, noAnswer); r.Code != 422 {
 		t.Fatalf("no answer %d", r.Code)
+	}
+	// 期間は開始日から1ヶ月で決まり、有効期限は期間の終わりまで。開始日+30日より後の有効期限は受け付けない。
+	late := proposalBody()
+	late["valid_until"] = day(31)
+	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/propose", tc, late); r.Code != 422 {
+		t.Fatalf("valid_until after period end %d", r.Code)
 	}
 	if r := doJSON(t, h, "POST", "/v1/support-consults/"+id+"/propose", tc, proposalBody()); r.Code != 200 {
 		t.Fatalf("propose %d", r.Code)

@@ -72,27 +72,30 @@ func TestSupportEndPlayerRefundsUnelapsedAndFinalizesByDays(t *testing.T) {
 	}
 	var amount int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE contract_id=$1`, []any{contract}, &amount)
-	if amount != 2160 {
+	if amount != 2025 { // 経過3日分2,700円の75%
 		t.Fatalf("final earning %d", amount)
 	}
 	var earned, final int
 	queryRowArgs(t, `SELECT earned_yen, final_yen FROM support_coach_settlements WHERE contract_id=$1`, []any{contract}, &earned, &final)
-	if earned != 2160 || final != 2160 {
+	if earned != 2025 || final != 2025 {
 		t.Fatalf("settlement %d %d", earned, final)
 	}
 }
 
-func TestSupportEndCancelledUsesAnnouncementDay(t *testing.T) {
+// 大会の中止・延期での終了は、1ヶ月プランでは前提が消滅したため受け付けない（無効化。定数・列は残す）。
+func TestSupportEndCancelledIsDisabled(t *testing.T) {
 	h, f := setupStripe(t)
 	admin := adminToken(t, h)
 	_, _, contract := paidConsultContract(t, h, 2, 10)
-	// 未来の日・日付なしは受け付けない。
-	if r := doJSON(t, h, "POST", "/v1/admin/coaching/contracts/"+contract+"/support-end", admin, map[string]any{"cause": "competition_cancelled", "announced_on": day(1)}); r.Code != 400 {
-		t.Fatalf("future %d", r.Code)
+	if r := doJSON(t, h, "POST", "/v1/admin/coaching/contracts/"+contract+"/support-end", admin, map[string]any{"cause": "competition_cancelled", "announced_on": day(-1)}); r.Code != 400 {
+		t.Fatalf("cancelled end %d", r.Code)
 	}
-	// 発表は昨日（2日目）。未経過8日分＝7,200円を返金し、振り替えはしない。
-	supportEnd(t, h, admin, contract, map[string]any{"cause": "competition_cancelled", "announced_on": day(-1)})
-	if len(f.refundList()) != 1 || f.refundList()[0].Get("amount") != "7200" {
+	if len(f.refundList()) != 0 {
+		t.Fatalf("refund on disabled cause %+v", f.refundList())
+	}
+	// 同じ契約は通常の終わり方では終えられる。
+	supportEnd(t, h, admin, contract, map[string]any{"cause": "player"})
+	if len(f.refundList()) != 1 {
 		t.Fatalf("refund %+v", f.refundList())
 	}
 }
@@ -101,7 +104,7 @@ func TestSupportCoachFaultHoldsAdvancesAndClawsBackWithObjection(t *testing.T) {
 	h, f := setupStripe(t)
 	admin := adminToken(t, h)
 	_, tc, contract := paidConsultContract(t, h, 0, 30)
-	// 前の月の末日までに10日経過した形にする（30日間・9,000円 → 経過3,000円の80%＝2,400円が仮払い）。
+	// 前の月の末日までに10日経過した形にする（30日間・9,000円 → 経過3,000円の75%＝2,250円が仮払い）。
 	execSQLArgs(t, `UPDATE coaching_contracts SET
 		starts_at=(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 10 + time '09:00') AT TIME ZONE 'Asia/Tokyo',
 		competition_date=date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 10 + 29 WHERE id=$1`, contract)
@@ -114,14 +117,14 @@ func TestSupportCoachFaultHoldsAdvancesAndClawsBackWithObjection(t *testing.T) {
 	}
 	var advance, n int
 	queryRowArgs(t, `SELECT COALESCE(sum(amount_yen),0)::int, count(*)::int FROM support_coach_advances WHERE contract_id=$1`, []any{contract}, &advance, &n)
-	if advance != 2400 || n != 1 {
+	if advance != 2250 || n != 1 {
 		t.Fatalf("advance %d (%d rows)", advance, n)
 	}
 	// 仮払いは送金済みにする。
 	payout := uuid.New()
 	var coach string
 	queryRowArgs(t, `SELECT coach_id::text FROM coaching_contracts WHERE id=$1`, []any{contract}, &coach)
-	execSQLArgs(t, `INSERT INTO coach_payouts(id,coach_id,month,amount_yen,status,stripe_transfer_id,paid_at) VALUES($1,$2,date_trunc('month',now())::date,2400,'paid','tr_test_advance',now())`, payout, coach)
+	execSQLArgs(t, `INSERT INTO coach_payouts(id,coach_id,month,amount_yen,status,stripe_transfer_id,paid_at) VALUES($1,$2,date_trunc('month',now())::date,2250,'paid','tr_test_advance',now())`, payout, coach)
 	execSQLArgs(t, `UPDATE coach_earnings SET payout_id=$1 WHERE id IN (SELECT earning_id FROM support_coach_advances WHERE contract_id=$2)`, payout, contract)
 
 	// 理由なしのコーチ都合は受け付けない。
@@ -167,13 +170,13 @@ func TestSupportCoachFaultHoldsAdvancesAndClawsBackWithObjection(t *testing.T) {
 		t.Fatalf("review %d %s", r.Code, r.Body.String())
 	}
 	r = doJSON(t, h, "POST", "/v1/admin/coaching/contracts/"+contract+"/support-fault/finalize", admin, nil)
-	if r.Code != 200 || !strings.Contains(r.Body.String(), `"clawback_yen":2400`) {
+	if r.Code != 200 || !strings.Contains(r.Body.String(), `"clawback_yen":2250`) {
 		t.Fatalf("finalize %d %s", r.Code, r.Body.String())
 	}
 	// 返還は返金相殺の台帳に載り、翌月以降の報酬から差し引かれる（没収ではなく返還・精算）。
 	var claw int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_refund_adjustments WHERE contract_id=$1 AND kind='support_clawback'`, []any{contract}, &claw)
-	if claw != 2400 {
+	if claw != 2250 {
 		t.Fatalf("clawback %d", claw)
 	}
 	queryRowArgs(t, `SELECT count(*)::int FROM coach_earnings WHERE contract_id=$1`, []any{contract}, &n)
@@ -202,7 +205,7 @@ func TestSupportUnavoidableIsNormalSettlementWithReason(t *testing.T) {
 	}
 	var amount int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE contract_id=$1`, []any{contract}, &amount)
-	if amount != 3600 { // 経過5日分4,500円の80%
+	if amount != 3375 { // 経過5日分4,500円の75%
 		t.Fatalf("earning %d", amount)
 	}
 }
