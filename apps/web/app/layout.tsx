@@ -129,7 +129,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <CompetitionPrefetch />
           <LocaleProvider>
           <Header />
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 has-[>.home-layout]:max-w-none">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 has-[>.home-layout]:max-w-none max-md:has-[>.coach-launcher]:flex max-md:has-[>.coach-launcher]:flex-col">
             <AccountMfaGate>{children}</AccountMfaGate>
           </main>
           <ScreenLoader />
