@@ -287,9 +287,8 @@ func TestIdentityIsolation(t *testing.T) {
 	request("PUT", publish, coachToken, `{"confirm":false,"identity_revision":"`+own.Revision.String()+`"}`, 422)
 	request("GET", public, machine, "", 404)
 	request("PUT", publish, coachToken, consent, 204)
-	var legacyPhone *string
-	if err := vault.QueryRow(ctx, "SELECT phone FROM identity_vault.disclosures WHERE plan_id=$1", plan).Scan(&legacyPhone); err != nil || legacyPhone != nil {
-		t.Fatal("plaintext phone written to the disclosure grant")
+	if legacyPhoneColumn(t, vault) {
+		t.Fatal("plaintext phone column still exists on the disclosure grant")
 	}
 	if plans := request("GET", "/internal/disclosures?ids="+plan.String(), machine, "", 200); !strings.Contains(plans.Body.String(), plan.String()) {
 		t.Fatal("approved plan was hidden from the plan list")
@@ -380,6 +379,48 @@ func TestIdentityPhoneMigration(t *testing.T) {
 	if err := vault.QueryRow(ctx, "SELECT relrowsecurity FROM pg_class WHERE oid='identity_vault.identities'::regclass").Scan(&rls); err != nil || !rls {
 		t.Fatal("row level security was not kept")
 	}
+}
+
+// #514：旧方式の平文列 disclosures.phone を消す移行を、平文列が残る金庫（schema.sql＋002〜004 を当てた
+// 本番相当の形に、旧列を足したもの）に当てても、許可の行は残り、平文列だけが消えること。2回流しても同じ。
+func TestDropDisclosurePhoneMigration(t *testing.T) {
+	ctx := context.Background()
+	vault := testVault(t)
+	execTest(t, vault, readVaultFile(t, "schema.sql"))
+	for _, f := range []string{"002_identity_phone.sql", "003_synthetic_provision.sql", "004_app_role_policies.sql"} {
+		execTest(t, vault, readVaultFile(t, filepath.Join("migrations", f)))
+	}
+	execTest(t, vault, "ALTER TABLE identity_vault.disclosures ADD COLUMN phone text CHECK (phone IS NULL OR length(phone) BETWEEN 10 AND 20)")
+	coach, plan := uuid.New(), uuid.New()
+	execTest(t, vault, "INSERT INTO identity_vault.identities (coach_id,key_id,legal_name_enc,address_enc) VALUES ($1,'v1','\\x00','\\x00')", coach)
+	execTest(t, vault, "INSERT INTO identity_vault.disclosures (plan_id,coach_id,plan_epoch,coach_epoch,phone) VALUES ($1,$2,$3,$4,'0000000000')", plan, coach, uuid.New(), uuid.New())
+	if !legacyPhoneColumn(t, vault) {
+		t.Fatal("test setup did not create the legacy column")
+	}
+	migration := readVaultFile(t, filepath.Join("migrations", "005_drop_disclosure_phone.sql"))
+	execTest(t, vault, migration)
+	execTest(t, vault, migration)
+	if legacyPhoneColumn(t, vault) {
+		t.Fatal("plaintext phone column was not dropped")
+	}
+	var n int
+	if err := vault.QueryRow(ctx, "SELECT count(*) FROM identity_vault.disclosures WHERE plan_id=$1 AND coach_id=$2", plan, coach).Scan(&n); err != nil || n != 1 {
+		t.Fatal("disclosure grant rows changed")
+	}
+	var rls bool
+	if err := vault.QueryRow(ctx, "SELECT relrowsecurity FROM pg_class WHERE oid='identity_vault.disclosures'::regclass").Scan(&rls); err != nil || !rls {
+		t.Fatal("row level security was not kept")
+	}
+}
+
+func legacyPhoneColumn(t *testing.T, pool *pgxpool.Pool) bool {
+	t.Helper()
+	var exists bool
+	if err := pool.QueryRow(context.Background(), `SELECT EXISTS (SELECT 1 FROM information_schema.columns
+		WHERE table_schema='identity_vault' AND table_name='disclosures' AND column_name='phone')`).Scan(&exists); err != nil {
+		t.Fatal(err)
+	}
+	return exists
 }
 
 func execTest(t *testing.T, pool *pgxpool.Pool, sql string, args ...any) {

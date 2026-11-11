@@ -152,7 +152,7 @@ class DatabaseTest(unittest.TestCase):
             rows.append(f"INSERT INTO identity_vault.access_log (coach_id, viewer, purpose) "
                         f"VALUES ('{coach}', gen_random_uuid(), '合成試験');")
         rows.append("INSERT INTO identity_vault.disclosures VALUES (gen_random_uuid(), "
-                    "'00000000-0000-4000-8000-000000000000', gen_random_uuid(), gen_random_uuid(), NULL);")
+                    "'00000000-0000-4000-8000-000000000000', gen_random_uuid(), gen_random_uuid());")
         psql(env, "".join(rows))
 
     def export_env(self, role=None):
