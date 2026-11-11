@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 // コーチ画面。承認されたコーチの入口はタイルの1画面にし、中身はタイル先の個別画面で扱う。
 // 返答と補足は /coach/requests/{id} で書く。パーソナル指導の申し込みへの返事と、プランの作成は個別画面でする。
@@ -94,6 +94,29 @@ function Tile({
         <span aria-hidden className="absolute -right-1 -top-1 size-3 rounded-full bg-amber-400" />
       ) : null}
     </Link>
+  );
+}
+
+// タイルの枠（スマホ幅では残りの高さいっぱい）の幅と高さを測り、3列×4行に収まる正方形の一辺を決める（本体 #563）。
+// 枠の高さが中身で決まらない形なので、CSS のコンテナ単位ではなく実寸で測る。PC 幅は CSS の3等分のまま（globals.css の .coach-tiles）。
+const tileGap = 8;
+function CoachTiles({ label, children }: { label: string; children: ReactNode }) {
+  const [side, setSide] = useState<number | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const { width, height } = el.getBoundingClientRect();
+      setSide(Math.max(0, Math.floor(Math.min((width - tileGap * 2) / 3, (height - tileGap * 3) / 4))));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="coach-tiles">
+      <nav aria-label={label} className="grid gap-2" style={side ? ({ "--coach-tile": `${side}px` } as CSSProperties) : undefined}>
+        {children}
+      </nav>
+    </div>
   );
 }
 
@@ -214,7 +237,8 @@ export function CoachDashboard() {
 
   // スマホでは、ランチャーをヘッダーと下部ナビの間の高さいっぱいに広げる（本体 #563）。
   // main を縦の flex にし（app/layout.tsx の coach-launcher）、タイルの枠が残りの高さを占める。
-  // タイルは正方形のまま、余った高さは行の上下に均等に配る。収まらない低い画面ではページ全体が縦にスクロールする。
+  // タイルは3列の正方形で間を詰め、枠に収まる最大の大きさで中央に置く（CoachTiles と globals.css の .coach-tiles）。
+  // 収まらない低い画面では最小の高さを保ち、ページ全体が縦にスクロールする。
   return (
     <div className="coach-launcher mx-auto flex w-full max-w-md flex-col gap-3 max-md:flex-1">
       <section aria-label={t(locale, "coach.status")} className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
@@ -272,7 +296,7 @@ export function CoachDashboard() {
         </Link>
       ) : null}
 
-      <nav aria-label={t(locale, "coach.menu")} className="grid grid-cols-4 content-evenly gap-2 max-md:flex-1">
+      <CoachTiles label={t(locale, "coach.menu")}>
         <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
@@ -284,7 +308,7 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
-      </nav>
+      </CoachTiles>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">
         {earnings ? (

@@ -889,3 +889,25 @@ select:-webkit-autofill {
 html.locale-pending body > :not(#startup-splash):not(script) {
   visibility: hidden;
 }
+
+/* コーチ画面のタイル（本体 #563）。3列の正方形で、間は詰める（gap 0.5rem）。
+   スマホ幅では枠がヘッダーと下部ナビの間の残りの高さを占め、タイルは幅（3列）と高さ（4行）の両方に収まる
+   最大の大きさ（--coach-tile、coach-dashboard.tsx の CoachTiles が実寸から決める）で中央に置く。
+   枠の最小の高さは 19.5rem（タイル約72px）で、それより低い画面はページが縦にスクロールする。 */
+.coach-tiles > nav {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (width < 48rem) {
+  .coach-tiles {
+    position: relative;
+    flex: 1 1 0%;
+    min-height: 19.5rem;
+  }
+  .coach-tiles > nav {
+    position: absolute;
+    inset: 0;
+    align-content: center;
+    justify-content: center;
+    grid-template-columns: repeat(3, var(--coach-tile, minmax(0, 1fr)));
+  }
+}
