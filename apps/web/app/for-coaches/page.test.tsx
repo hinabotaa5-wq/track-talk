@@ -12,7 +12,7 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   expect(text).toContain("Coach Japanese sprinters online — monthly packages and video reviews");
   expect(text).toContain("Package: athletes pay $139 (¥22,000) per month — you receive $104 (¥16,500) of that, per athlete per month.");
   expect(text).toContain("Reviews: around $12 per review.");
-  expect(text).toContain("in Japan a single review costs the athlete ¥1,500 and the coach receives ¥1,050");
+  expect(text).toContain("in Japan a single review costs the athlete ¥500 and the coach receives ¥350");
   expect(text).toContain("up to about 28 videos");
   expect(text).toContain("aiming for about 48 hours per reply");
   expect(text).toContain("revise it each week");

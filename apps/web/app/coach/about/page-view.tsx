@@ -20,7 +20,7 @@ export function CoachAboutView() {
         <h2 id="coach-ways" className="text-lg font-bold">{L("関わり方は、大きく2つ")}</h2>
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("動画添削プラン：動画1本から支える")}</h3>
-          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容、動画を送ります。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1本1,500円で、コーチの報酬はその70％（1,050円）です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容、動画を送ります。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1本500円で、コーチの報酬はその70％（350円）です。利用者がチケットで申し込んだ添削も、報酬は同じ350円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
           <p className="text-sm leading-relaxed text-slate-200">{L("コーチは届いた依頼を確認し、対応できるものを引き受けます。動画を見て、良い点・直す点・おすすめのドリルを返し、選手が次の練習で試せる具体的な一歩を伝えます。")}</p>
         </article>
         <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">

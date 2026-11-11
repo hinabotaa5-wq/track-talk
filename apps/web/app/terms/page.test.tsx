@@ -18,7 +18,7 @@ function article(n: number): string {
 // 運営者が自ら提供するフォーム添削などには、代わりに受け取る仕組みの言葉を使わない。
 const agencyWords = ["収納代行", "代理受領", "預り金", "預かり金"];
 
-it("フォーム添削と追加相談は運営者が提供者で、料金・返金の責任と直接取引の禁止を定める", () => {
+it("フォーム添削とチケットは運営者が提供者で、料金・返金の責任と直接取引の禁止を定める", () => {
   const text = article(6);
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("運営者が利用者に提供するサービス");
@@ -27,16 +27,23 @@ it("フォーム添削と追加相談は運営者が提供者で、料金・返�
   expect(text).toContain("料金・キャンセル・返金は運営者が責任を負い");
   expect(text).toContain("本サービスを通さずに直接取引してはいけません");
   // 指名したコーチが辞退・未応答のときは特商法の表記と同じ扱い。
-  expect(text).toContain("クレジットカードは代金の確保を取り消し、PayPayは全額を返金します");
+  expect(text).toContain("クレジットカードは代金の確保を取り消し、PayPayは全額を返金し、チケットは使った1枚を戻します");
   expect(text).toContain("終了した依頼とは独立した新しい申込みとして、別のコーチに改めて申し込む");
-  // 動画添削のあとの追加相談は一方通行で、1つの添削につき1回。回答がないまま終わった場合だけ1回買い直せる。
-  expect(text).toContain("1つのフォーム添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です");
-  expect(text).toContain("回答への確認など、追加のやりとりはできません");
-  expect(text).toContain("この場合に限り、同じフォーム添削について、もう1回だけ改めて購入できます");
-  expect(text).not.toContain("回答への確認は7日以内に1回無料");
+  // 料金は1本500円。チケットは6枚2,500円の先払いで、有効期限・失効・原則払戻し不可と例外・本人限定を定める（本体 #569）。
+  expect(text).toContain("フォーム添削は1本500円（税込）");
+  expect(text).toContain("6枚を1組として2,500円（税込）で販売し、6枚をまとめて先に支払います");
+  expect(text).toContain("チケットの有効期限は、決済が完了した日時から6か月です");
+  expect(text).toContain("有効期限は延長しません");
+  expect(text).toContain("購入したチケットは、原則として払い戻しません");
+  expect(text).toContain("運営者がフォーム添削の提供を終了した場合");
+  expect(text).toContain("チケットは購入した本人だけが使えます");
+  // 追加相談の販売は終わった。購入済みの分だけ購入時の条件を残す。
+  expect(text).toContain("フォーム添削の追加相談の販売は終了しました");
+  expect(text).not.toContain("600円");
+  expect(text).not.toContain("1,500円");
   // 内容確認のための差し戻し（1回）と、再提出期限・返却期限の数え直し・再提出がないときの終了。
   expect(text).toContain("1つの依頼につき1回だけ、質問を付けて依頼を差し戻す");
-  expect(text).toContain("差し戻しの間に代金の確保の取消しや返金はしません");
+  expect(text).toContain("差し戻しの間に代金の確保の取消しや返金、チケットの戻しはしません");
   // 引受後・返却前のコーチ都合の辞退は、辞退の時点で終了する。
   expect(text).toContain("引き受けた後、返却の前の辞退を含みます。この場合は辞退の時点で終了します");
   expect(text).toContain("返却期限は再提出から24時間後に改めて設定し");
@@ -47,8 +54,10 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   const text = article(7);
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("業務委託の報酬");
-  expect(text).toContain("1,050円");
-  expect(text).toContain("420円");
+  expect(text).toContain("料金500円の70%にあたる350円（税込）");
+  expect(text).toContain("利用者がチケットで申し込んだフォーム添削も、1本につき350円です");
+  expect(text).not.toContain("1,050円");
+  expect(text).not.toContain("420円");
   expect(text).toContain("報酬の支払期日：報酬は、毎月末日をもって締め切り、翌月15日に支払います。支払対象額（各締切日時点で確定している報酬の合計額をいい、繰り越された額を含みます）が3,000円未満の場合は、その額を翌月に1回に限り繰り越し、翌々月15日に、金額にかかわらず支払います。");
   expect(text).not.toContain("15日ごろ");
   expect(text).toContain("3,000円に満たない場合");

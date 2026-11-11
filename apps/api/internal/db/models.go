@@ -503,16 +503,18 @@ type CoachingTicketLedger struct {
 }
 
 type CoachingTicketLot struct {
-	ID        uuid.UUID  `json:"id"`
-	OwnerID   *uuid.UUID `json:"owner_id"`
-	Quantity  int32      `json:"quantity"`
-	Available int32      `json:"available"`
-	Reserved  int32      `json:"reserved"`
-	Consumed  int32      `json:"consumed"`
-	Refunded  int32      `json:"refunded"`
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at"`
-	Expired   int32      `json:"expired"`
+	ID           uuid.UUID  `json:"id"`
+	OwnerID      *uuid.UUID `json:"owner_id"`
+	Quantity     int32      `json:"quantity"`
+	Available    int32      `json:"available"`
+	Reserved     int32      `json:"reserved"`
+	Consumed     int32      `json:"consumed"`
+	Refunded     int32      `json:"refunded"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ExpiresAt    *time.Time `json:"expires_at"`
+	Expired      int32      `json:"expired"`
+	Reminded30At *time.Time `json:"reminded_30_at"`
+	Reminded7At  *time.Time `json:"reminded_7_at"`
 }
 
 type CoachingTicketProduct struct {

@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
 )
@@ -55,12 +57,16 @@ func ticketReturnPath(path string) string {
 	return "/me/coaching/tickets"
 }
 
-// coachingEligibility は、招待された利用者で、生まれた年月を登録済みかを確かめる（保護者の同意は見ない）。
-// 18歳未満が自分で払う動画添削のあとの追加相談は、同意の代わりに購入のたびの宣言で確かめる（minor_purchase.go）。
+// reviewOpenTo は、動画添削（単発・チケット）を申し込めるか。支払いのある環境では誰でも、
+// 支払いのない検証用のデモ版では招待コードを入れた人だけ（本体 #569 で招待コードのゲートを正規の購入導線に置き換えた）。
+func (s *Server) reviewOpenTo(p db.Profile) bool {
+	return s.stripe.Configured() || p.CoachingDemo
+}
+
+// coachingEligibility は、生まれた年月を登録済みかを確かめる（保護者の同意は見ない）。
+// 18歳未満は、同意の代わりに購入のたびの宣言で確かめる（minor_purchase.go）。
+// 招待コードのゲートは外した（本体 #569）。チケットの購入は Stripe の鍵がある環境でだけ開く（checkoutTickets）。
 func coachingEligibility(p db.Profile) error {
-	if !p.CoachingDemo {
-		return &ticketRuleError{"tickets_unavailable", "チケットは招待された利用者のみ購入・利用できます"}
-	}
 	if p.BirthMonth == nil {
 		return &ticketRuleError{"birth_month_required", "先に生まれた年月を登録してください"}
 	}
@@ -553,4 +559,36 @@ func (s *Server) myTicketPurchase(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	JSON(w, 200, out)
+}
+
+// remindTicketExpiry は tick から呼ぶ。失効の7日前と30日前に、未使用の枚数と失効日時を本人に知らせる（本体 #569）。
+// 7日前を先に見るので、7日前を切ってから見つけたロットには7日前の知らせだけを送る。送る前に印を付け、二重に送らない。
+func (s *Server) remindTicketExpiry(ctx context.Context) (int, error) {
+	n := 0
+	for _, days := range []int32{7, 30} {
+		rows, err := s.q.ListTicketLotsToRemind(ctx, days)
+		if err != nil {
+			return n, err
+		}
+		for _, l := range rows {
+			if _, err := s.q.MarkTicketLotReminded(ctx, db.MarkTicketLotRemindedParams{ID: l.ID, Days: days}); errors.Is(err, pgx.ErrNoRows) {
+				continue
+			} else if err != nil {
+				return n, err
+			}
+			s.notify(ctx, *l.OwnerID, notifyImportant, ticketExpiryMessage(l.ID, l.Available, l.ExpiresAt, days), 24*time.Hour)
+			n++
+		}
+	}
+	return n, nil
+}
+
+// ticketExpiryMessage は、チケットの失効が近いことの知らせ。延長・救済はしないので、使い道だけを案内する。
+func ticketExpiryMessage(lot uuid.UUID, available int32, expiresAt time.Time, days int32) push.Message {
+	return push.Message{
+		Title: fmt.Sprintf("チケットの有効期限まであと%d日以内です", days),
+		Body:  fmt.Sprintf("未使用のチケット%d枚は %s に失効します。期限を過ぎると使えません", available, expiresAt.In(jst.Zone).Format("2006/01/02 15:04")),
+		URL:   "/me/coaching/tickets",
+		Tag:   fmt.Sprintf("ticket-expiry-%d-%s", days, lot),
+	}
 }

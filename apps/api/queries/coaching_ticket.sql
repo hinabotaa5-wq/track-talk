@@ -179,3 +179,22 @@ SELECT COALESCE(sum(x.amount),0)::bigint FROM (
  AND COALESCE(c.paid_at,c.updated_at)>=date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
  AND (c.payment_state IN ('paid','refund_pending') OR (c.status='awaiting_payment' AND c.expires_at>now() AND (c.session_expires_at IS NULL OR c.session_expires_at>now())))
 ) x;
+
+-- name: ListTicketLotsToRemind :many
+-- 失効まで sqlc.arg(days) 日を切った、未使用分のあるロットのうち、その段階の知らせをまだ送っていないもの。
+-- 7日前の知らせを送る時は30日前の知らせを送らない（7日前の段階に入ってから初めて見つけた場合も含む）。
+SELECT l.id, l.owner_id, l.available, l.expires_at::timestamptz AS expires_at FROM coaching_ticket_lots l
+WHERE l.owner_id IS NOT NULL AND l.available > 0 AND l.expires_at > now()
+  AND l.expires_at <= now() + make_interval(days => sqlc.arg(days)::int)
+  AND l.reminded_7_at IS NULL
+  AND (sqlc.arg(days)::int = 7 OR l.reminded_30_at IS NULL)
+ORDER BY l.expires_at LIMIT 100;
+
+-- name: MarkTicketLotReminded :one
+-- 送る前に印を付ける（同時に動いた tick が二重に送らない）。印を付けられたら true。
+UPDATE coaching_ticket_lots SET
+    reminded_30_at = COALESCE(reminded_30_at, now()),
+    reminded_7_at = CASE WHEN sqlc.arg(days)::int = 7 THEN now() ELSE reminded_7_at END
+WHERE id = sqlc.arg(id) AND reminded_7_at IS NULL
+  AND (sqlc.arg(days)::int = 7 OR reminded_30_at IS NULL)
+RETURNING id;

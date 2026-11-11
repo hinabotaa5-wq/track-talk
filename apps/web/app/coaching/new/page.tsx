@@ -10,6 +10,8 @@ import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { ReviewPayNotice } from "@/components/review-pay-notice";
+import { PurchaseConfirm } from "@/components/purchase-confirm";
+import { TicketBalance } from "@/components/ticket-balance";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -28,17 +30,19 @@ import {
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { reviewPriceYen } from "@/lib/review-pricing";
+import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity, ticketValidityMonths } from "@/lib/review-pricing";
+import { reviewConfirmRows } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
-// フォーム添削の依頼を送る。いまは招待コードを入れた人だけが使える。
+// フォーム添削の依頼を送る。支払いのある環境では誰でも申し込める（招待コードのゲートは外した。本体 #569）。
 // 依頼するコーチは選手が選ぶ（運営からの割り当てはしない）。料金はどのコーチでも同じ。
-// Stripe の鍵があるときは、送るとそのまま支払い画面へ進み、支払いが済んだら選んだコーチに依頼が届く。
-// 鍵がない間は支払いなしのデモ版。
+// 送る前に最終確認（分量・総額・確定のタイミング・チケットの有効期限・取消しの条件）を出し、
+// 確定を押してから動画を上げて、カードはそのまま支払い画面へ進む。支払いが済んだら選んだコーチに依頼が届く。
+// Stripe の鍵がない検証用の環境では、支払いなしのデモ版（招待コードを入れた人だけ）。
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -79,16 +83,21 @@ export default function NewReviewRequestPage() {
   const cashPayment = !!estimate?.payments && cashPrice > 0;
   // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
   const needsDeclaration = !!me?.is_minor && cashPayment;
+  // 申し込めるか。古い API（review_open を返さない）では、これまでどおり招待コードの有無で見る。
+  const reviewOpen = !!(me?.review_open ?? me?.demo);
+  // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。
+  const [confirming, setConfirming] = useState(false);
+  const needsConfirm = cashPayment || method === "tickets";
 
   useEffect(() => {
-    if (!token || !me?.demo) return;
+    if (!token || !reviewOpen) return;
     let cancelled = false;
     apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token })
       .then((data) => { if (!cancelled) setCoaches(data.coaches); })
       .catch(() => { if (!cancelled) setCoachesError(L("コーチの一覧を読み込めませんでした。ページを開き直してください。")); })
       .finally(() => { if (!cancelled) setCoachesLoading(false); });
     return () => { cancelled = true; };
-  }, [event, token, me?.demo]);
+  }, [event, token, reviewOpen]);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -130,7 +139,7 @@ export default function NewReviewRequestPage() {
 
   // 枠と種目を選ぶと、返却期限（送った時刻から24時間後）と、いま受付中のコーチがいるかを出す。
   useEffect(() => {
-    if (!token || !me?.demo) return;
+    if (!token || !reviewOpen) return;
     let cancelled = false;
     apiFetch<ReviewEstimate>(`/v1/coaching/estimate?tier=${tier}&event=${encodeURIComponent(event)}`, { token })
       .then((d) => {
@@ -142,7 +151,7 @@ export default function NewReviewRequestPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, tier, event, me?.demo]);
+  }, [token, tier, event, reviewOpen]);
 
   async function onPickFile(picked: File | null) {
     setError("");
@@ -154,32 +163,44 @@ export default function NewReviewRequestPage() {
     }
   }
 
-  async function onSubmit(e: FormEvent) {
+  // 入力を確かめて、最終確認を出す（確認のいらないデモ版はそのまま送る）。
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!estimate) { setError(L("料金と受付状況を確認してから送信してください。")); return; }
-    if (!coach) { setError(L("コーチを選んでください。")); return; }
-    if (question.trim() && !guard.allow(question)) return;
+    if (!validate()) return;
+    if (needsConfirm) { setConfirming(true); return; }
+    void send();
+  }
+
+  function validate(): boolean {
+    if (!estimate) { setError(L("料金と受付状況を確認してから送信してください。")); return false; }
+    if (!coach) { setError(L("コーチを選んでください。")); return false; }
+    if (question.trim() && !guard.allow(question)) return false;
     if (!question.trim()) {
       setError(L("相談内容を記入してください"));
-      return;
+      return false;
     }
     if (!file) {
       setError(L("動画を選んでください"));
-      return;
+      return false;
     }
     if (file.size > maxBytes) {
       setError(L("100MB以内の動画にしてください"));
-      return;
+      return false;
     }
     if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
       setError(L("チケットが不足しています。先に購入してから動画を選んでください。"));
-      return;
+      return false;
     }
     if (needsDeclaration && !declared) {
       setError(L("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"));
-      return;
+      return false;
     }
-    if (!acquire()) return;
+    setError("");
+    return true;
+  }
+
+  async function send() {
+    if (!file || !coach || !validate() || !acquire()) return;
     setError("");
     try {
       const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
@@ -205,6 +226,7 @@ export default function NewReviewRequestPage() {
         try { const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setCoaches(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
       }
       setUpload(null);
+      setConfirming(false);
       release();
     }
   }
@@ -224,10 +246,10 @@ export default function NewReviewRequestPage() {
         )}
         <h1 className="text-2xl font-bold">{L("動画添削を頼む")}</h1>
         <p className="text-sm text-slate-300">{L("コーチを選んで、動画を送ります。料金はどのコーチでも同じです。")}</p>
-        {me.demo ? <SellerNote /> : null}
+        {reviewOpen ? <SellerNote /> : null}
       </div>
 
-      {!me.demo ? (
+      {!reviewOpen ? (
         <DemoCodeForm
           intro={L("フォーム添削は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。")}
           token={token}
@@ -240,6 +262,20 @@ export default function NewReviewRequestPage() {
             href="/me/coaching"
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
           >{L("生まれた年月を登録する")}</Link>
+        </div>
+      ) : confirming ? (
+        <div className="space-y-3">
+          <PurchaseConfirm
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, dueAt: estimate?.due_at, nextExpiry: ticketSummary?.next_expiry })}
+            confirmLabel={method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
+            onConfirm={() => void send()}
+            onBack={() => { setConfirming(false); setError(""); }}
+            pending={pending}
+          />
+          {upload ? (
+            <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
+          ) : null}
+          {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
@@ -268,12 +304,18 @@ export default function NewReviewRequestPage() {
             <span className="block text-xs text-slate-300">{L("{length}/1000文字", { length: question.length })}</span>
           </label>
 
-          {ticketSummary && ticketsUsable ? <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3 text-sm">
+          {ticketSummary && ticketsUsable ? <div className="space-y-2 text-sm">
+            <TicketBalance summary={ticketSummary} />
             <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
             <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
               {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
             </Link>
-          </div> : null}
+          </div> : ticketSummary?.can_purchase ? (
+            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="block rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-100 transition hover:border-blue-400/50 hover:bg-white/10">
+              <span className="font-semibold">{L("チケット{q}枚 {v0}（税込）", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</span>
+              <span className="block text-xs text-slate-300">{L("1回あたり約{v0}（1回ずつ払うと{v1}）。先払い・{q}枚まとめての購入で、有効期限は決済から{m}か月です。", { v0: formatYen(Math.round(ticketPackPriceYen / ticketPackQuantity)), v1: formatYen(reviewPriceYen), q: ticketPackQuantity, m: ticketValidityMonths })}</span>
+            </Link>
+          ) : null}
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">{L("動画({maxReviewSeconds}秒まで)", { maxReviewSeconds })}</span>
             <input
@@ -320,7 +362,7 @@ export default function NewReviewRequestPage() {
           )}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
-            {pending ? L("送っています") : cashPayment ? L("送ってお支払いへ（{v0}）", { v0: formatYen(cashPrice) }) : method === "tickets" ? L("チケット1枚を使って送る") : L("送る")}
+            {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}
           </Button>
         </form>
       )}
