@@ -11,7 +11,7 @@ const events = new Set([
 const pages = new Set([
   "/", "/register", "/login", "/me", "/me/profile", "/me/posts", "/me/saved",
   "/memo", "/upload", "/competitions", "/competitions/major-hosts",
-  "/competitions/major-domestic", "/competitions/regional", "/menu-contest",
+  "/competitions/major-domestic", "/menu-contest",
   "/posts/new", "/posts/recruit", "/posts/practice", "/posts/video",
   "/posts/url", "/posts/youtube", "/posts/instagram", "/guide", "/guidelines",
   "/terms", "/privacy",

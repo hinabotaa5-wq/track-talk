@@ -22,10 +22,10 @@ describe("clearPersonalStorage", () => {
       "injury-celebrated:sprain": "1",
       "injury-celebrated:jumpers-knee": "1",
       "review-attrs": '{"size":"26.5"}',
-      "competition-prefecture": "13",
+      "tracktalk:locale-prompted": "1",
     });
     clearPersonalStorage(storage);
-    expect(storage.keys()).toEqual(["competition-prefecture"]);
+    expect(storage.keys()).toEqual(["tracktalk:locale-prompted"]);
   });
 });
 

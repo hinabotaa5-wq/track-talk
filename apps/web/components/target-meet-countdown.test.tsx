@@ -30,18 +30,18 @@ async function render(token: string | null) {
 }
 
 it("セットした大会まであと何日かを出し、タップで大会一覧へ", async () => {
-  fetch.mockResolvedValue({ target_meet: { source: "competition", ref: "x", name: "県選手権", starts_on: "2026-11-03", ends_on: null } });
+  fetch.mockResolvedValue({ target_meet: { source: "competition", ref: "x", name: "国際テスト大会", starts_on: "2026-11-03", ends_on: null } });
   await render("t");
   expect(fetch).toHaveBeenCalledWith("/v1/me/target-meet", { token: "t" });
-  expect(container.textContent).toContain("県選手権まであと 7 日");
-  expect(container.querySelector("a")!.getAttribute("href")).toBe("/competitions/regional");
+  expect(container.textContent).toContain("国際テスト大会まであと 7 日");
+  expect(container.querySelector("a")!.getAttribute("href")).toBe("/competitions?view=international");
 });
 
-it("セットしていなければ + で都道府県の大会一覧へ", async () => {
+it("セットしていなければ + で大会タブへ", async () => {
   fetch.mockResolvedValue({ target_meet: null });
   await render("t");
   expect(container.textContent).toContain("目標の大会をセット");
-  expect(container.querySelector("a")!.getAttribute("href")).toBe("/competitions/regional");
+  expect(container.querySelector("a")!.getAttribute("href")).toBe("/competitions");
 });
 
 it("未ログインでも + を出し、API は呼ばない", async () => {

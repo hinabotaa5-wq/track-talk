@@ -6,21 +6,12 @@ import { PageLoading } from "@/components/page-loading";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { EmptyState, ErrorState } from "@/components/empty-state";
+import { ErrorState } from "@/components/empty-state";
 import { BackButton } from "@/components/major-hosts-panel";
 import { apiFetch } from "@/lib/api";
-import { prefectureCompetitionsHref, type PrefecturePage } from "@/lib/prefecture-page";
+import { type PrefecturePage } from "@/lib/prefecture-page";
 import { prefectureName } from "@/lib/prefectures";
 import { practiceListPath, practicePagePath, type PracticeList } from "@/lib/practice-list";
-import { competitionDates } from "../../competitions/regional/regional-view";
-
-function MoreLink({ href, total, shown }: { href: string; total: number; shown: number }) {
-  return (
-    <Link href={href} className="inline-flex min-h-9 items-center text-sm text-blue-300 underline">
-      {total > shown ? L("もっと見る（全{total}件）", { total }) : L("一覧で見る")}
-    </Link>
-  );
-}
 
 // この県の練習相手募集。件数だけを取りに行き、一覧は /practice で見る。件数が取れなくてもリンクは出す。
 function PracticeSection({ code, name }: { code: string; name: string }) {
@@ -46,7 +37,7 @@ export function PrefectureView({ code, initialPage, titleJa = "" }: { code: stri
   const [page, setPage] = useState(initialPage);
   const [failed, setFailed] = useState(false);
   const name = prefectureName(code);
-  useTitleTranslation(titleJa, L("{name}の陸上競技の大会日程", { name }));
+  useTitleTranslation(titleJa, L("{name}のクラブチームの募集", { name }));
 
   useEffect(() => {
     if (initialPage) return;
@@ -63,7 +54,7 @@ export function PrefectureView({ code, initialPage, titleJa = "" }: { code: stri
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">{name}</h1>
-        <p className="mt-1 text-sm text-slate-200">{L("{name}のこれからの大会をまとめています。", { name })}</p>
+        <p className="mt-1 text-sm text-slate-200">{L("{name}のクラブチームの募集をまとめています。", { name })}</p>
       </div>
 
       {failed ? (
@@ -71,26 +62,7 @@ export function PrefectureView({ code, initialPage, titleJa = "" }: { code: stri
       ) : !page ? (
         <PageLoading label={L("読み込み中...")} />
       ) : (
-        <>
-          <section className="space-y-2">
-            <h2 className="text-lg font-semibold text-slate-100">{L("これからの大会")}</h2>
-            {page.competitions.length === 0 ? (
-              <EmptyState title={L("これからの大会はまだありません")} body={L("大会の日程は、都道府県の陸協のページから順次取り込みます。")} />
-            ) : (
-              <ul className="space-y-2">
-                {page.competitions.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-white/20 glass bg-white/10 p-3.5">
-                    <p className="text-xs text-slate-200">{competitionDates(c.starts_on, c.ends_on)}</p>
-                    <p className="font-semibold text-slate-100">{c.name}</p>
-                    {c.location ? <p className="text-sm text-slate-300">{c.location}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <MoreLink href={prefectureCompetitionsHref(code, page.competitions[0]?.starts_on)} total={page.competition_total} shown={page.competitions.length} />
-          </section>
-          <PracticeSection code={code} name={name} />
-        </>
+        <PracticeSection code={code} name={name} />
       )}
       <BackButton />
     </div>

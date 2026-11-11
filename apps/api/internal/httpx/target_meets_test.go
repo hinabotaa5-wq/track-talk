@@ -22,7 +22,7 @@ func TestTargetMeetSetReplaceAndClear(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO domestic_majors (slug,year,name,category,venue,starts_on,ends_on,schedule_label,site_url) VALUES ('target-check',2026,'目標確認大会','open','競技場','2026-11-20','2026-11-22','2026年','')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO competitions (id,name,starts_on,ends_on,location,prefecture,season_year,organizer_url,source_url) VALUES ($1,'県記録会','2026-12-01',NULL,'','13',2026,'https://example.jp/','https://example.jp/')`, compID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO competitions (id,name,starts_on,ends_on,location,prefecture,season_year,organizer_url,source_url) VALUES ($1,'国際テスト記録会','2026-12-01',NULL,'','00',2026,'https://example.jp/','https://example.jp/')`, compID); err != nil {
 		t.Fatal(err)
 	}
 	me, other := token(t, uuid.New()), token(t, uuid.New())
@@ -71,7 +71,7 @@ func TestTargetMeetSetReplaceAndClear(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/target-meet", me, map[string]string{"source": "competition", "ref": compID.String()}); rec.Code != http.StatusOK {
 		t.Fatalf("replace %d %s", rec.Code, rec.Body.String())
 	}
-	if got := read(me); got == nil || got.Name != "県記録会" || got.Ref != compID.String() || got.EndsOn != nil {
+	if got := read(me); got == nil || got.Name != "国際テスト記録会" || got.Ref != compID.String() || got.EndsOn != nil {
 		t.Fatalf("replaced %+v", got)
 	}
 	for _, body := range []map[string]string{
@@ -86,7 +86,7 @@ func TestTargetMeetSetReplaceAndClear(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/target-meet", me, map[string]string{"source": "world", "ref": "x"}); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad source %d", rec.Code)
 	}
-	if got := read(me); got == nil || got.Name != "県記録会" {
+	if got := read(me); got == nil || got.Name != "国際テスト記録会" {
 		t.Fatalf("kept after failures %+v", got)
 	}
 	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/target-meet", me, nil); rec.Code != http.StatusOK {

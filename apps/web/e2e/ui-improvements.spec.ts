@@ -63,11 +63,9 @@ test("大会のタイムテーブル導線を消し、実況スレッドは内�
 });
 
 test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({ page }) => {
-  for (const path of ["/competitions/regional", "/competitions/major-hosts"]) {
-    await page.goto(path);
-    await expect(page.getByRole("button", { name: "戻る", exact: true })).toHaveCount(1);
-    await expect(page.locator("main").getByRole("button", { name: /戻る/ })).toHaveCount(0);
-  }
+  await page.goto("/competitions/major-hosts");
+  await expect(page.getByRole("button", { name: "戻る", exact: true })).toHaveCount(1);
+  await expect(page.locator("main").getByRole("button", { name: /戻る/ })).toHaveCount(0);
 });
 
 test("投稿ボタンと4つのタブを幅320pxで1行に並べる", async ({ page }) => {

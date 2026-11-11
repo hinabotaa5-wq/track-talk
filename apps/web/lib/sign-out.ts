@@ -3,7 +3,7 @@ import { clearPushBinding, currentPushSession, deletePushBinding, ensurePushWork
 
 // ログアウト・退会のときに、この端末に残る前の人のものを片付ける。共有の端末で次の人に見えないようにする。
 
-// 人ごとの localStorage のキー(ケガの復帰のお祝いを出したか、レビューの足のサイズなど)。端末の設定(県など)は残す。
+// 人ごとの localStorage のキー(ケガの復帰のお祝いを出したか、レビューの足のサイズなど)。端末の設定(言語など)は残す。
 const personalKeyPrefixes = ["injury-celebrated:", "review-attrs"];
 
 export function clearPersonalStorage(storage: Pick<Storage, "length" | "key" | "removeItem">) {

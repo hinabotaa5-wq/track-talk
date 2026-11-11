@@ -33,6 +33,9 @@ func SeasonYear(now time.Time) int {
 	return t.Year() - 1
 }
 
+// InternationalRefreshAfter が短いのは、国際大会は外部 API だけを読んで取り込むから。
+const InternationalRefreshAfter = 7 * 24 * time.Hour
+
 // InternationalWindow は、今のシーズンと次のシーズン。
 func InternationalWindow(now time.Time) (from, to time.Time, seasons []int) {
 	year := SeasonYear(now)

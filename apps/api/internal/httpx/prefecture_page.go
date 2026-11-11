@@ -4,11 +4,13 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
-// 県ページ: その県のこれからの大会と、クラブチームの募集を1ページに集める。
+// 県ページ: その県のクラブチームの募集を1ページに集める。
 // 県ごとの掲示板は作らない(人のいない県が空のまま残るため)。
+// 県別の大会の一覧は #549 で廃止したため、ここには出さない。
 const prefecturePageItems = 10
 
 func prefectureNameOf(code string) string {
@@ -27,19 +29,6 @@ func (s *Server) getPrefecturePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	today := tokyoToday()
-	competitions, err := s.q.ListUpcomingPrefectureCompetitions(ctx, db.ListUpcomingPrefectureCompetitionsParams{
-		Prefecture: code, Today: today, RowLimit: prefecturePageItems,
-	})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	competitionTotal, err := s.q.CountUpcomingPrefectureCompetitions(ctx, db.CountUpcomingPrefectureCompetitionsParams{Prefecture: code, Today: today})
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
 	recruitments, err := s.q.ListPrefectureRecruitments(ctx, db.ListPrefectureRecruitmentsParams{Prefecture: code, RowLimit: prefecturePageItems})
 	if err != nil {
 		MapDBError(w, err)
@@ -50,16 +39,11 @@ func (s *Server) getPrefecturePage(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if competitions == nil {
-		competitions = []db.ListUpcomingPrefectureCompetitionsRow{}
-	}
 	if recruitments == nil {
 		recruitments = []db.ListPrefectureRecruitmentsRow{}
 	}
 	JSON(w, http.StatusOK, map[string]any{
 		"prefecture":        map[string]string{"code": code, "name": prefectureNameOf(code)},
-		"competitions":      competitions,
-		"competition_total": competitionTotal,
 		"recruitments":      recruitments,
 		"recruitment_total": recruitmentTotal,
 	})

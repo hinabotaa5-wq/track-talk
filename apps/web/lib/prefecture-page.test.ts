@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPrefecturePageCode, prefectureCompetitionsHref, prefecturePageHref, prefectureRecruitmentsHref } from "./prefecture-page";
+import { isPrefecturePageCode, prefecturePageHref, prefectureRecruitmentsHref } from "./prefecture-page";
 
 describe("prefecture page", () => {
   it("has a page for each of the 47 prefectures only", () => {
@@ -11,8 +11,6 @@ describe("prefecture page", () => {
   });
 
   it("links to the existing lists", () => {
-    expect(prefectureCompetitionsHref("39", "2026-11-03T00:00:00Z")).toBe("/competitions/regional?prefecture=39&month=11");
-    expect(prefectureCompetitionsHref("39")).toBe("/competitions/regional?prefecture=39");
     expect(prefectureRecruitmentsHref("高知県")).toBe(`/?sort=recruitment&q=${encodeURIComponent("高知県")}`);
   });
 });

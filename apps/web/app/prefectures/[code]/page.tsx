@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
   if (!isPrefecturePageCode(code)) return { title: L("都道府県") };
   const name = prefectureName(code);
   return {
-    title: L("{name}の陸上競技の大会日程", { name }),
-    description: L("{name}でこれから開かれる陸上競技の大会(記録会・選手権など)の日程をまとめています。", { name }),
+    title: L("{name}のクラブチームの募集", { name }),
+    description: L("{name}のクラブチームの募集をまとめています。", { name }),
     alternates: { canonical: `/prefectures/${code}` },
   };
 }
@@ -30,5 +30,5 @@ export default async function PrefectureRoute({ params }: { params: Promise<{ co
   const page = await apiFetch<PrefecturePage>(`/v1/prefectures/${code}`, { signal: AbortSignal.timeout(3000) }).catch(
     () => null,
   );
-  return <PrefectureView code={code} initialPage={page} titleJa={L("{name}の陸上競技の大会日程", { name: prefectureName(code) })} />;
+  return <PrefectureView code={code} initialPage={page} titleJa={L("{name}のクラブチームの募集", { name: prefectureName(code) })} />;
 }

@@ -157,7 +157,6 @@ export function showsBackButton(pathname: string, search = "") {
   if (isMeSubPage(pathname)) return true;
   if (pathname === "/guide" || pathname === "/guidelines" || pathname === "/terms" || pathname === "/privacy" || pathname === "/contact" || pathname === "/legal/commerce" || pathname === "/legal/platform" || pathname === "/legal/coach-privacy" || pathname === "/legal/coach-terms") return true;
   if (pathname === "/competitions/major-hosts") return true;
-  if (pathname === "/competitions/regional") return true;
   if (pathname === "/menu-contest") return true;
   if (/^\/injury\/[^/]+\/(new|stage)$/.test(pathname)) return true;
   if (isInjuryGroupPath(pathname)) return true;

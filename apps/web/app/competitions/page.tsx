@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
-import { legacyCompetitionsTarget } from "@/lib/competition-prefecture";
 import type { DomesticMajor } from "@/lib/types";
 import { CompetitionsHome } from "./competitions-home";
 
@@ -13,13 +12,23 @@ export const metadata: Metadata = {
   alternates: { canonical: "/competitions" },
 };
 
+// 県別の大会一覧は #549 で廃止した。?prefecture= が付いた古い URL は大会タブへ送る。
+// 国際大会（00）は国際タブ、それ以外（01〜47）は国内主要大会のタブへ。
+function legacyTarget(prefectureParam: string | undefined) {
+  if (!prefectureParam) return "";
+  const n = Number(prefectureParam);
+  if (!Number.isInteger(n) || n < 0 || n > 47) return "";
+  if (n === 0) return "/competitions?view=international";
+  return "/competitions";
+}
+
 export default async function CompetitionsPage({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string; prefecture?: string }>;
 }) {
   const sp = await searchParams;
-  const target = legacyCompetitionsTarget(sp.prefecture, sp.month);
+  const target = legacyTarget(sp.prefecture);
   if (target) redirect(target);
 
   // 国内主要大会の一覧をサーバーで描いておき、検索エンジンが中身を読めるようにする。取れなければ画面側で取り直す。

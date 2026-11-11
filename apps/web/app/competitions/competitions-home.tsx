@@ -3,7 +3,7 @@ import { L, localizeJaDate } from "@/lib/i18n";
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight, Globe, MapPin, MessageCircle } from "lucide-react";
+import { ChevronRight, Globe, MessageCircle } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
 import { ViewSwitch } from "@/components/view-switch";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +11,7 @@ import { EmptyState, ErrorState } from "@/components/empty-state";
 import { NowRunning } from "@/components/meet-now-running";
 import { CompetitionLoadingFrame } from "@/components/loading-frame";
 import { loadCompetitions, readCompetitions } from "@/lib/competition-list";
-import { regionalCompetitionsPath } from "@/lib/competition-prefecture";
+import { competitionDates, competitionDestination } from "@/lib/competition-display";
 import { loadDomesticMajors, peekDomesticMajors, undecidedDomesticMeets, type DomesticMeet } from "@/lib/domestic-majors";
 import { fetchTodayMeetThreads, meetThreadForCompetition, meetThreadForMajor } from "@/lib/meet-threads";
 import { fetchMeetResources, type MeetResources } from "@/lib/meet-resources";
@@ -21,7 +21,6 @@ import { todayInTokyo } from "@/lib/format";
 import { useNow } from "@/lib/use-now";
 import { TargetMeetButton } from "@/components/target-meet-button";
 import type { Competition, DomesticMajor, MeetThread } from "@/lib/types";
-import { competitionDates, destination } from "./regional/regional-view";
 
 type View = "domestic" | "international";
 
@@ -30,8 +29,8 @@ const views: { id: View; label: string }[] = [
   { id: "international", get label() { return L("国際大会"); } },
 ];
 
+// 県別の大会一覧は #549 で廃止した。今後の国際大会は、いちばん上から入れるようにする。
 const entries = [
-  { href: regionalCompetitionsPath, get label() { return L("都道府県の大会"); }, icon: MapPin },
   { href: "/competitions/major-hosts", get label() { return L("今後の国際大会"); }, icon: Globe },
 ];
 
@@ -65,7 +64,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
 
   return (
     <div className="space-y-5">
-      {/* 国内主要大会の一覧が主役。都道府県の大会と今後の国際大会は、いちばん上から入れるようにする。 */}
+      {/* 国内主要大会の一覧が主役。今後の国際大会は、いちばん上から入れるようにする。 */}
       <nav aria-label={L("ほかの大会")} className="grid grid-cols-2 gap-2 md:max-w-md">
         {entries.map((entry) => {
           const Icon = entry.icon;
@@ -305,7 +304,7 @@ function DomesticCard({ major, today, thread, timetableURL }: { major: DomesticM
 }
 
 function InternationalCard({ competition, today, thread, timetableURL }: { competition: Competition; today: string; thread?: MeetThread; timetableURL?: string }) {
-  const link = destination(competition, INTERNATIONAL);
+  const link = competitionDestination(competition);
   return (
     <ScheduleCard timetableURL={timetableURL} href={link.href} linkLabel={link.label} over={isOver(competition, today)} thread={thread}>
       <p className="text-xs text-slate-200">

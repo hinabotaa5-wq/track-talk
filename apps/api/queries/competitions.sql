@@ -39,31 +39,4 @@ SET ends_on = EXCLUDED.ends_on,
     updated_at = now();
 
 
--- name: DeleteCompetitionsBySeasonExcept :exec
--- 取り込んだ大会に含まれない行だけを消す。残る行は upsert で更新され、新着から補った要項が消えない。
-DELETE FROM competitions c
-WHERE c.prefecture = sqlc.arg(prefecture)
-  AND c.season_year = sqlc.arg(season_year)
-  AND (c.name || '|' || to_char(c.starts_on, 'YYYY-MM-DD')) <> ALL (sqlc.arg(keys)::text[]);
-
--- name: ListCompetitionsForNews :many
-SELECT id, name, starts_on, ends_on, location, link_label, organizer_url, source_url, guidelines_url
-FROM competitions
-WHERE prefecture = sqlc.arg(prefecture)
-  AND season_year = sqlc.arg(season_year)
-ORDER BY starts_on ASC, name ASC;
-
--- name: SetCompetitionGuidelines :exec
--- 要項の補完は年間日程の取り込み時刻(updated_at)を動かさない。新着の最新の要項で上書きする。
-UPDATE competitions
-SET guidelines_url = sqlc.arg(guidelines_url)
-WHERE id = sqlc.arg(id)
-  AND guidelines_url <> sqlc.arg(guidelines_url);
-
--- name: ListNewsCheckTimes :many
-SELECT prefecture, checked_at FROM competition_news_checks;
-
--- name: MarkNewsChecked :exec
-INSERT INTO competition_news_checks (prefecture, checked_at)
-VALUES (sqlc.arg(prefecture), now())
-ON CONFLICT (prefecture) DO UPDATE SET checked_at = now();
+-- 県別取り込み・県陸協ニュースの補完は #549 で廃止したため、県別の削除・参照・要項補完・確認時刻のクエリは置かない。
