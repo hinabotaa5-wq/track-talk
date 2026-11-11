@@ -463,7 +463,9 @@ func TestFullRefundAfterEndRemovesEarning(t *testing.T) {
 }
 
 // 3,000円に届かない報酬の繰り越しは1回まで。前の前の月の分が残っていれば、届かなくても送る。
-func TestCoachPayoutCarriesOverOnce(t *testing.T) {
+// 3,000円に届かない分は、回数に上限なく繰り越し、累積が届いた締切月の翌月に送る（累積型・#357）。
+// 取引が終わった（承認済みでなくなった）コーチには、届かなくても残りを全額送る。
+func TestCoachPayoutCarriesOverUntilAccumulated(t *testing.T) {
 	h, f := setupStripe(t)
 	tadmin := adminToken(t, h)
 	coach, _ := onDutyCoach(t, h, tadmin)
@@ -482,12 +484,41 @@ func TestCoachPayoutCarriesOverOnce(t *testing.T) {
 	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
 		t.Fatalf("carry over %s", out)
 	}
-	// 前の月に繰り越した分（ここでは前の前の月の報酬）が残っていれば、合計が届かなくても送る。
+	// 繰り越した分（前の前の月・さらに前の月の報酬）が残っていても、累積が届かなければ繰り越しを続ける。
 	earn(lastMonthJST + ` - interval '1 month'`)
-	if out := run(); !strings.Contains(out, `"created":1,"paid":1`) {
-		t.Fatalf("pay after one carry over %s", out)
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
+		t.Fatalf("carry over twice %s", out)
 	}
-	if got := f.transferList(); len(got) != 1 || got[0].Get("amount") != "1680" {
+	earn(lastMonthJST + ` - interval '2 month'`)
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
+		t.Fatalf("carry over three times %s", out)
+	}
+	// 今月の分は締切前なので、累積に入れない。
+	earn("now()")
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 0 {
+		t.Fatalf("open month counted %s", out)
+	}
+	// 締切済みの累積が3,000円に届いたら、まとめて送る（840円×4＝3,360円）。
+	earn(lastMonthJST)
+	if out := run(); !strings.Contains(out, `"created":1,"paid":1`) {
+		t.Fatalf("pay after accumulated %s", out)
+	}
+	if got := f.transferList(); len(got) != 1 || got[0].Get("amount") != "3360" {
+		t.Fatalf("transfers %v", got)
+	}
+
+	// 取引が終わったコーチには、累積が届かなくても残りを全額送る。
+	ended, _ := onDutyCoach(t, h, tadmin)
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
+		VALUES (gen_random_uuid(), $1, 'review', 1200, 70, 840, `+lastMonthJST+`)`, ended)
+	if out := run(); !strings.Contains(out, `"created":0`) || len(f.transferList()) != 1 {
+		t.Fatalf("approved coach below minimum %s", out)
+	}
+	execSQLArgs(t, `UPDATE coach_profiles SET status='ended', on_duty=false WHERE profile_id=$1`, ended)
+	if out := run(); !strings.Contains(out, `"created":1,"paid":1`) {
+		t.Fatalf("final payout for ended coach %s", out)
+	}
+	if got := f.transferList(); len(got) != 2 || got[1].Get("destination") != "acct_"+ended.String() || got[1].Get("amount") != "840" {
 		t.Fatalf("transfers %v", got)
 	}
 }
@@ -568,8 +599,10 @@ func TestCoachPayoutPreviewCases(t *testing.T) {
 		deferred, unlinked        bool
 	}{
 		{name: "A", confirmedAt: lastMonthJST, amount: 3150, expected: 3150},
-		{name: "B", confirmedAt: lastMonthJST, amount: 1050, expected: 1050, deferred: true},
-		{name: "C", confirmedAt: lastMonthJST + ` - interval '1 month'`, amount: 1050, expected: 1050},
+		// 累積が3,000円に届いていない分は、いつ支払うかが決まらないので予定日を出さない（累積型・#357）。
+		{name: "B", confirmedAt: lastMonthJST, amount: 1050},
+		{name: "C", confirmedAt: lastMonthJST + ` - interval '1 month'`, amount: 1050},
+		{name: "C2", confirmedAt: lastMonthJST + ` - interval '1 month'`, amount: 3150, expected: 3150},
 		{name: "D", confirmedAt: previousMonthEndJST, amount: 3150, expected: 3150},
 		{name: "open month", confirmedAt: "now()", amount: 3150},
 		{name: "no account", confirmedAt: lastMonthJST, amount: 3150, unlinked: true},

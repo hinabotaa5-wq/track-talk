@@ -562,7 +562,9 @@ func (s *Server) supportSettlementJSON(ctx context.Context, ct db.CoachingContra
 
 // supportPayoutDayText は、仮払いと確定分の支払期日。
 func supportPayoutDayText() string {
-	return fmt.Sprintf("前の月の末日までの仮払い・確定分を、翌月%d日（日本時間）にまとめて送金します（合計%d円未満は翌月へ繰越）", stripe.PayoutMonthlyAnchor, minPayoutYen)
+	a := stripe.PayoutMonthlyAnchor
+	return fmt.Sprintf("前の月の末日までの仮払い・確定分を、翌月%d日（日本時間）にまとめて送金します。ただし、各締切時点の支払額（税込）が%s円未満の場合は翌月以降に繰り越し、累積した支払額が%s円以上となった締切月の翌月%d日に送金します。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月%d日に未払額の全額を送金します",
+		a, formatYenNumber(minPayoutYen), formatYenNumber(minPayoutYen), a, a)
 }
 
 // issueSupportContractStatement は、契約ごとの取引条件をコーチへ電磁的に明示する（フリーランス法第3条に対応する形）。

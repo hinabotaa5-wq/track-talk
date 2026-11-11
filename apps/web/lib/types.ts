@@ -808,7 +808,8 @@ export type WorkOrderTerms = {
   amount_yen: number;
   deliver_by: string;
   payment_due: string;
-  carried_due: string;
+  // 版2以前の通知にだけある(繰越1回までだったころの翌々月15日)。
+  carried_due?: string;
   consigned_at: string;
 };
 

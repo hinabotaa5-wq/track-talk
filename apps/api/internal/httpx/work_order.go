@@ -23,7 +23,7 @@ import (
 // サポートプランはコーチが販売者なので、ここには入れない(要否は弁護士の回答 Q9 を待つ)。
 
 // 通知の文面の版。文面を変えたら上げる。書き留めた通知は、そのときの版のまま残る。
-const workOrderTermsVersion = 2
+const workOrderTermsVersion = 3
 
 // 運営者(委託する側)の名前。web の lib/operator.ts と揃える。
 const operatorName = "中窪日向"
@@ -38,7 +38,6 @@ type workOrderTerms struct {
 	AmountYen   int32           `json:"amount_yen"`
 	DeliverBy   time.Time       `json:"deliver_by"`
 	PaymentDue  time.Time       `json:"payment_due"`
-	CarriedDue  time.Time       `json:"carried_due"`
 	ConsignedAt time.Time       `json:"consigned_at"`
 }
 
@@ -50,16 +49,19 @@ func jstDateTime(t time.Time) string {
 	return t.In(jst.Zone).Format("2006年1月2日 15:04")
 }
 
-// payoutDates は、deliverBy までに確定した報酬を支払う日と、繰り越したときの支払日(どちらも日本時間の15日)。
-func payoutDates(deliverBy time.Time) (time.Time, time.Time) {
+// payoutDate は、deliverBy までに確定した報酬を支払う日(日本時間の翌月15日)。
+// 3,000円未満で繰り越したときの支払日は、累積が3,000円以上になる月で決まるので、ここでは出さない。
+func payoutDate(deliverBy time.Time) time.Time {
 	local := deliverBy.In(jst.Zone)
-	first := time.Date(local.Year(), local.Month()+1, 15, 0, 0, 0, 0, jst.Zone)
-	return first, first.AddDate(0, 1, 0)
+	return time.Date(local.Year(), local.Month()+1, 15, 0, 0, 0, 0, jst.Zone)
 }
+
+// workOrderPaymentDue は、3条の明示の「支払期日」。コーチ向け規約の支払期日と同じ文面にする(#357)。
+const workOrderPaymentDue = "毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。Stripe での本人確認と口座の登録が済んでいない間は、済んだ後の支払日に支払います"
 
 // buildWorkOrderTerms は、委託の内容から9項目を作る。consignedAt は引き受けた時(打診中は今)。
 func buildWorkOrderTerms(coachName, work string, amount int32, deliverBy, consignedAt time.Time) workOrderTerms {
-	due, carried := payoutDates(deliverBy)
+	due := payoutDate(deliverBy)
 	if strings.TrimSpace(coachName) == "" {
 		coachName = "（コーチとして登録した名前）"
 	}
@@ -67,7 +69,6 @@ func buildWorkOrderTerms(coachName, work string, amount int32, deliverBy, consig
 		AmountYen:   amount,
 		DeliverBy:   deliverBy,
 		PaymentDue:  due,
-		CarriedDue:  carried,
 		ConsignedAt: consignedAt,
 		Items: []workOrderItem{
 			{"委託する人・受ける人", fmt.Sprintf("委託する人: %s（TrackTalk の運営者）／受ける人: %s", operatorName, coachName)},
@@ -77,7 +78,7 @@ func buildWorkOrderTerms(coachName, work string, amount int32, deliverBy, consig
 			{"納める場所", "TrackTalk のコーチ専用画面から送信します"},
 			{"検査", "運営者は、納められた内容の検査をしません。送信した時に受け取ったものとします"},
 			{"報酬の額", fmt.Sprintf("%d円（税込）", amount)},
-			{"支払期日", "毎月末日締切、翌月15日支払い。ただし、支払対象額が3,000円未満の場合は翌月に繰り越し（繰り越しは1回まで）、翌々月15日に金額にかかわらず支払います。Stripe での本人確認と口座の登録が済んでいない間は、済んだ後の支払日に支払います"},
+			{"支払期日", workOrderPaymentDue},
 			{"支払方法", "Stripe を通じて、登録した銀行口座に振り込みます。振込の手数料は運営者が負担します"},
 		},
 	}
@@ -158,8 +159,8 @@ func workOrderNotice(kind string, roomID uuid.UUID, terms workOrderTerms) (title
 		what = "フォーム添削の追加相談"
 	}
 	title = "取引条件の通知（" + what + "）"
-	body = fmt.Sprintf("%s を、%s に委託しました。報酬 %d円（税込）、納める期日 %s まで、支払期日 %s（3,000円に満たないときは %s）。業務の内容・支払方法など9項目の全文は、この知らせから開く依頼の画面で確認できます。",
-		what, jstDateTime(terms.ConsignedAt), terms.AmountYen, jstDateTime(terms.DeliverBy), jstDate(terms.PaymentDue), jstDate(terms.CarriedDue))
+	body = fmt.Sprintf("%s を、%s に委託しました。報酬 %d円（税込）、納める期日 %s まで、支払期日 %s（3,000円に満たないときは、累積が3,000円以上になった締切月の翌月15日）。業務の内容・支払方法など9項目の全文は、この知らせから開く依頼の画面で確認できます。",
+		what, jstDateTime(terms.ConsignedAt), terms.AmountYen, jstDateTime(terms.DeliverBy), jstDate(terms.PaymentDue))
 	url = "/coach/requests/" + roomID.String() + "#work-order"
 	return title, body, url
 }

@@ -40,7 +40,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 		t.Fatalf("offers %d %s", rec.Code, rec.Body.String())
 	}
 	offer := list.Offers[0]
-	if got := offer.Terms.Items[7]; got.Label != "支払期日" || !strings.HasPrefix(got.Value, "毎月末日締切、翌月15日支払い。ただし、支払対象額が3,000円未満の場合は翌月に繰り越し（繰り越しは1回まで）、翌々月15日に金額にかかわらず支払います。") {
+	if got := offer.Terms.Items[7]; got.Label != "支払期日" || !strings.HasPrefix(got.Value, "毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。") || strings.Contains(got.Value, "1回まで") {
 		t.Fatalf("payment due terms: %+v", got)
 	}
 	// チケット2枚(割引前1,200円)の70%。
@@ -58,7 +58,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 2 || accepted.WorkOrder.Terms.AmountYen != 840 || len(accepted.WorkOrder.Terms.Items) != 9 {
+	if accepted.WorkOrder.TermsVersion != 3 || accepted.WorkOrder.Terms.AmountYen != 840 || len(accepted.WorkOrder.Terms.Items) != 9 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
