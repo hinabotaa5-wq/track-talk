@@ -6,7 +6,7 @@ import { PosterFallback } from "@/components/poster-card";
 
 // Instagram の投稿・リールのカードに出す写真。Instagram が返す表紙の画像を直接読み、
 // 読めなかった(非公開・削除・Instagram 側の制限)ときは、これまでどおりの文字のカードに戻す。
-export function InstagramThumb({ type, shortcode, title }: { type: InstagramType; shortcode: string; title: string }) {
+export function InstagramThumb({ type, shortcode, title, priority }: { type: InstagramType; shortcode: string; title: string; priority?: boolean }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -20,7 +20,8 @@ export function InstagramThumb({ type, shortcode, title }: { type: InstagramType
     <img
       src={instagramMediaUrl(type, shortcode)}
       alt=""
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
       className="block h-auto w-full bg-black/25"

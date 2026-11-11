@@ -124,7 +124,27 @@ it("投稿動画のサムネイルは再生せずに詳細を開く", () => {
   expect(html).toContain(`href="/posts/${post.id}"`);
   expect(html).toContain('src="https://example.com/thumb.jpg"');
   expect(html).toContain('loading="lazy"');
+  expect(html.toLowerCase()).not.toContain("fetchpriority");
   expect(html).toContain("h-auto w-full");
+});
+
+it("先頭のタイルは即時読み込み＋優先指定にできる", () => {
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", playback_url: "https://example.com/video.mp4", thumbnail_url: "https://example.com/thumb.jpg" }, priority: true }));
+  expect(html).toContain('src="https://example.com/thumb.jpg"');
+  expect(html).toContain('loading="eager"');
+  expect(html).toContain('fetchPriority="high"');
+  expect(html).not.toContain('loading="lazy"');
+});
+
+it("先頭のInstagramタイルも即時読み込み＋優先指定にできる", () => {
+  const html = renderToStaticMarkup(
+    createElement(FeedCard, {
+      post: { ...post, kind: "instagram", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e" },
+      priority: true,
+    }),
+  );
+  expect(html).toContain('loading="eager"');
+  expect(html).toContain('fetchPriority="high"');
 });
 
 it("YouTubeは縦横ともサムネイルから詳細を開く", () => {

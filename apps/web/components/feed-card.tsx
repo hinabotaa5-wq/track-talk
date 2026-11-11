@@ -49,7 +49,7 @@ function KindBadge({ children }: { children: string }) {
   );
 }
 
-export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
+export function FeedCard({ post, returnTo, priority }: { post: Post; returnTo?: "me"; priority?: boolean }) {
   const [landscapeSrc, setLandscapeSrc] = useState("");
   const title = feedTitle(post.title);
   const description = feedTitle(post.body ?? "") || feedTitle(post.excerpt ?? "") || title;
@@ -131,11 +131,11 @@ export function FeedCard({ post, returnTo }: { post: Post; returnTo?: "me" }) {
         ) : null}
         {thumbnail ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbnail} alt="" loading="lazy" decoding="async" className="block h-auto w-full"
+          <img src={thumbnail} alt="" loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : undefined} decoding="async" className="block h-auto w-full"
             ref={(image) => { if (image?.complete) markOrientation(image, setLandscapeSrc); }}
             onLoad={(event) => markOrientation(event.currentTarget, setLandscapeSrc)} />
         ) : post.kind === "instagram" && (post.instagram_type === "p" || post.instagram_type === "reel") && isInstagramShortcode(post.instagram_shortcode ?? "") ? (
-          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={description || "Instagram"} />
+          <InstagramThumb type={post.instagram_type} shortcode={post.instagram_shortcode ?? ""} title={description || "Instagram"} priority={priority} />
         ) : (
           <PosterFallback title={description} />
         )}
