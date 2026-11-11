@@ -119,3 +119,14 @@ test("PC 幅では広げず、3列の正方形のタイルを上から並べる"
   expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
   expect(m.rowTops[0] - m.gridTop).toBeLessThanOrEqual(1);
 });
+
+test("タイルの大きさは期限アラート帯の有無で変わらない（390×844）", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page, false);
+  const without = await measure(page);
+  const withAlertPage = await page.context().newPage();
+  await withAlertPage.setViewportSize({ width: 390, height: 844 });
+  await setup(withAlertPage, true);
+  const withAlert = await measure(withAlertPage);
+  expect(Math.abs(without.tileHeights[0] - withAlert.tileHeights[0])).toBeLessThanOrEqual(1);
+});

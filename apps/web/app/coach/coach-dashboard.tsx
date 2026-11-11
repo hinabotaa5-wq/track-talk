@@ -99,18 +99,21 @@ function Tile({
 
 // タイルの枠（スマホ幅では残りの高さいっぱい）の幅と高さを測り、3列×4行に収まる正方形の一辺を決める（本体 #563）。
 // 枠の高さが中身で決まらない形なので、CSS のコンテナ単位ではなく実寸で測る。PC 幅は CSS の3等分のまま（globals.css の .coach-tiles）。
+// タイルの大きさは期限アラート帯の有無で変えない（運営者指示 2026-11-12）。帯が出ていない時も、帯1行ぶん
+// （枠線つき p-3 の1行 46px ＋ 間 12px）を高さから差し引いて決める。帯が2行に折り返す狭い画面では、帯がある時のほうが少し小さくなる。
 const tileGap = 8;
-function CoachTiles({ label, children }: { label: string; children: ReactNode }) {
+const alertReserve = 58;
+function CoachTiles({ label, reserve, children }: { label: string; reserve: number; children: ReactNode }) {
   const [side, setSide] = useState<number | null>(null);
   const ref = useCallback((el: HTMLDivElement | null) => {
     if (!el || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       const { width, height } = el.getBoundingClientRect();
-      setSide(Math.max(0, Math.floor(Math.min((width - tileGap * 2) / 3, (height - tileGap * 3) / 4))));
+      setSide(Math.max(0, Math.floor(Math.min((width - tileGap * 2) / 3, (height - reserve - tileGap * 3) / 4))));
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [reserve]);
   return (
     <div ref={ref} className="coach-tiles">
       <nav aria-label={label} className="grid gap-2" style={side ? ({ "--coach-tile": `${side}px` } as CSSProperties) : undefined}>
@@ -296,7 +299,7 @@ export function CoachDashboard() {
         </Link>
       ) : null}
 
-      <CoachTiles label={t(locale, "coach.menu")}>
+      <CoachTiles label={t(locale, "coach.menu")} reserve={offerCount > 0 ? 0 : alertReserve}>
         <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
