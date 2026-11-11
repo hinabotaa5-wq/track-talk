@@ -236,3 +236,16 @@ it("言語が英語の利用者にはコーチ導線を英語で出す", async (
   expect(container.textContent).not.toContain("届いた依頼");
   expect(container.textContent).not.toContain("新しい依頼が");
 });
+
+it("ランチャーは高さいっぱいに広がる枠で描き、タイルの行は最小の高さを持って均等に広がる（#563）", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const launcher = container.querySelector(".coach-launcher");
+  expect(launcher).not.toBeNull();
+  expect(launcher!.className).toContain("max-md:flex-1");
+  const grid = container.querySelector("nav.grid")!;
+  expect(grid.parentElement).toBe(launcher);
+  expect(grid.className).toContain("auto-rows-[minmax(4.5rem,1fr)]");
+  expect(grid.className).toContain("max-md:flex-1");
+  expect(launcher!.lastElementChild?.tagName).toBe("FOOTER");
+});
