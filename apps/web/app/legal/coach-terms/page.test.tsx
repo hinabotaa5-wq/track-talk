@@ -22,6 +22,13 @@ it("海外コーチの業務委託条件：決定済みの金額・支払・相�
   expect(html).toContain("the date the order was agreed, the services, the service period or delivery deadline, the fee, and the payment due date");
   expect(html).toContain(`These Terms are issued by <span lang="ja">${operatorName}</span>, the operator of TrackTalk`);
   expect(html).toContain('href="/legal/coach-privacy"');
+  expect(html).toContain("11. Athlete data.");
+  expect(html).toContain("solely to perform the Services");
+  expect(html).toContain("without undue delay");
+  expect(html).toContain("12. Responsibility and liability between the parties.");
+  expect(html).toContain("Clause 12(b) does not affect clause 5");
+  expect(html).toContain("13. Governing law and jurisdiction.");
+  expect(html).toContain("Tokyo District Court shall have exclusive jurisdiction");
   expect(html.replace(/<[^>]*>/g, "").replace(operatorName, "")).not.toMatch(/\[|placeholder|TODO|[ぁ-んァ-ン一-龯]/);
   expect(showsBackButton("/legal/coach-terms")).toBe(true);
 });
