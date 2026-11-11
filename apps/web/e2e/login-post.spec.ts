@@ -5,8 +5,7 @@ test("login then publish a text post", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.goto("/login?next=/posts/new");
-  // 未ログイン時の言語選択プロンプト（必須）は日本語を選んで進める。
-  await page.getByRole("button", { name: "日本語", exact: true }).click();
+  // 未ログイン時の言語選択プロンプトは米国からのアクセス時だけ出る（本体 #565）。国の判定がない CI では出ない。
   await page.getByPlaceholder("メール").fill("runner@example.com");
   await page.getByPlaceholder("パスワード").fill("password1");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
