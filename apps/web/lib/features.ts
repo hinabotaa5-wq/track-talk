@@ -3,6 +3,11 @@ export function flagEnabled(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
 }
 
+// 明示OFFのときだけ隠すフラグ。未設定・空のときは表示する。
+export function flagEnabledDefaultOn(value: string | undefined): boolean {
+  return !["0", "false", "no", "off"].includes((value ?? "").trim().toLowerCase());
+}
+
 // 現在は募集のみ。利用者向け画面は準備中にし、/coaching・/coach・/coach/apply・/coach/about
 // から説明・応募・審査状況の確認を行える。APIのCOACHING_ENABLEDと揃えること。
 export const coachingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_ENABLED);
@@ -33,5 +38,7 @@ export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUM
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
 
 // 海外コーチの指導希望の集計カード（コーチタブの独立カード、本体 #542）。
-// 集計が目的なので、デプロイ後は表示される状態で出す。正式開始のタイミングで運営者が消せる。
-export const overseasInterestEnabled = flagEnabled(process.env.NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED);
+// 集計が目的なので、デプロイ後は表示される状態で出す（既定ON）。
+// 正式開始のタイミングで運営者が消すときは NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED に
+// 明示OFF（0/false/no/off）を設定する。
+export const overseasInterestEnabled = flagEnabledDefaultOn(process.env.NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED);
