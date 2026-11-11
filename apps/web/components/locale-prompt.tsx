@@ -7,6 +7,7 @@
 // 外し方：このファイルを消し、`app/layout.tsx` の `<LocalePrompt />` の1行を消す。
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { Languages } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { localePromptAnswered, markLocalePromptAnswered, type Locale } from "@/lib/i18n";
@@ -16,7 +17,11 @@ function subscribeToNothing() {
   return () => {};
 }
 
+// 英語固定の海外コーチ向け紹介ページ（本体 #538）は表示言語設定の対象外なので、DM から開いた人に重ねて出さない。
+const exemptPaths = new Set(["/for-coaches"]);
+
 export function LocalePrompt() {
+  const pathname = usePathname();
   const { session, sessionLoading } = useAuth();
   const { chooseDeviceLocale } = useLocaleControls();
   // サーバー描画とハイドレーションでは出さず、描画後に端末の記録を読む（食い違いで出そこねないように。本体 #530）。
@@ -25,7 +30,7 @@ export function LocalePrompt() {
   const answered = stored || answeredNow;
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const open = !sessionLoading && !session && !answered;
+  const open = !sessionLoading && !session && !answered && !exemptPaths.has(pathname ?? "");
 
   useEffect(() => {
     const element = dialog.current;
