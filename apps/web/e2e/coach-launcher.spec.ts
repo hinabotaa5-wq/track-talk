@@ -66,6 +66,8 @@ async function measure(page: Page) {
       gridTop: grid.top, gridBottom: grid.bottom, footerTop: footer.top, footerBottom: footer.bottom,
       navTop: bottomNav ? bottomNav.getBoundingClientRect().top : window.innerHeight,
       tileHeights: tiles.map((t) => Math.round(t.height)),
+      squareDiffs: tiles.map((t) => Math.abs(t.width - t.height)),
+      rowTops: [0, 4, 8].map((i) => tiles[i].top), lastRowBottom: tiles[8].bottom,
       scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight,
     };
   });
@@ -81,30 +83,36 @@ for (const withOffers of [false, true]) {
     expect(m.scrollHeight).toBeLessThanOrEqual(m.innerHeight);
     expect(m.footerBottom).toBeLessThanOrEqual(m.navTop);
     expect(m.navTop - m.footerBottom).toBeLessThanOrEqual(26);
-    // タイルの枠はフッターの直前まで届き（間は gap の 12px）、行は同じ高さで、従来（約70px）より高い。
+    // タイルの枠はフッターの直前まで届き（間は gap の 12px）、タイルは正方形のまま、
+    // 余った高さは行の上下に均等に配られる（上詰め＋下の大きな余白にならない）。
     expect(m.footerTop - m.gridBottom).toBeLessThanOrEqual(26);
-    expect(new Set(m.tileHeights).size).toBe(1);
-    expect(m.tileHeights[0]).toBeGreaterThan(100);
+    expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
+    const above = m.rowTops[0] - m.gridTop;
+    const below = m.gridBottom - m.lastRowBottom;
+    expect(above).toBeGreaterThan(20);
+    expect(Math.abs(above - below)).toBeLessThanOrEqual(2);
+    expect(Math.abs((m.rowTops[1] - m.rowTops[0]) - (m.rowTops[2] - m.rowTops[1]))).toBeLessThanOrEqual(2);
     await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 390);
     if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") await page.screenshot({ path: path.join(screenshotDir, `mobile-${name}.png`) });
   });
 }
 
-test("低い画面（390×560）ではタイルが最小の高さを保ち、ページが縦にスクロールする", async ({ page }) => {
+test("低い画面（390×560）ではタイルが正方形のまま潰れず、収まらない分はページが縦にスクロールする", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 560 });
   await setup(page, true);
   const m = await measure(page);
+  expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
   expect(Math.min(...m.tileHeights)).toBeGreaterThanOrEqual(72);
-  expect(m.scrollHeight).toBeGreaterThan(m.innerHeight);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const end = await measure(page);
   expect(end.footerBottom).toBeLessThanOrEqual(end.navTop);
   if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") await page.screenshot({ path: path.join(screenshotDir, "mobile-short.png") });
 });
 
-test("PC 幅では広げず、従来どおり上から並べる", async ({ page }) => {
+test("PC 幅では広げず、正方形のタイルを上から並べる", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await setup(page, false);
   const m = await measure(page);
-  expect(Math.max(...m.tileHeights)).toBeLessThanOrEqual(80);
+  expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
+  expect(m.rowTops[0] - m.gridTop).toBeLessThanOrEqual(1);
 });

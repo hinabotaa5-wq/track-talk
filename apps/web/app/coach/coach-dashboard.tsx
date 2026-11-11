@@ -78,7 +78,7 @@ function Tile({
     <Link
       href={href}
       aria-label={ariaLabel}
-      className="relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
+      className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
     >
       <Icon className="size-6" aria-hidden />
       <span className="text-[11px] font-semibold leading-tight">{label}</span>
@@ -213,8 +213,8 @@ export function CoachDashboard() {
   const [, payoutMonth, payoutDay] = earnings?.next_payout_date?.split("-") ?? [];
 
   // スマホでは、ランチャーをヘッダーと下部ナビの間の高さいっぱいに広げる（本体 #563）。
-  // main を縦の flex にし（app/layout.tsx の coach-launcher）、タイルの枠が残りの高さを占めて行を均等に配る。
-  // 行の高さは最小 4.5rem。それより低い画面では広げずに、ページ全体が縦にスクロールする。
+  // main を縦の flex にし（app/layout.tsx の coach-launcher）、タイルの枠が残りの高さを占める。
+  // タイルは正方形のまま、余った高さは行の上下に均等に配る。収まらない低い画面ではページ全体が縦にスクロールする。
   return (
     <div className="coach-launcher mx-auto flex w-full max-w-md flex-col gap-3 max-md:flex-1">
       <section aria-label={t(locale, "coach.status")} className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
@@ -272,7 +272,7 @@ export function CoachDashboard() {
         </Link>
       ) : null}
 
-      <nav aria-label={t(locale, "coach.menu")} className="grid grid-cols-4 auto-rows-[minmax(4.5rem,1fr)] gap-2 max-md:flex-1">
+      <nav aria-label={t(locale, "coach.menu")} className="grid grid-cols-4 content-evenly gap-2 max-md:flex-1">
         <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
