@@ -1,12 +1,21 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { Children, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createGridLayout, gridTilePosition, visibleGridIndices, type GridLayout } from "@/lib/home-feed-grid";
 import { BoundedCache } from "@/lib/bounded-cache";
+import { FeedCard } from "@/components/feed-card";
 
 type FeedPosition = { left: number; key?: string; offset: number };
 const positions = new BoundedCache<FeedPosition>(20, 30 * 60_000);
+
+// 先頭の画面に入る FeedCard だけ即時読み込みにする。それ以外の子(読み込み中の枠や
+// 続きボタンなど)や既に指定済みのものはそのまま返す。配置・取得・並びは変えない。
+function withPriority(node: ReactNode, eager: boolean): ReactNode {
+  if (!eager || !isValidElement<{ priority?: boolean }>(node) || node.type !== FeedCard) return node;
+  if (node.props.priority) return node;
+  return cloneElement(node as ReactElement<{ priority?: boolean }>, { priority: true });
+}
 
 export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storageKey }: {
   children: ReactNode; onEndReached?: () => void; onVisibleIndices?: (indices: number[]) => void; storageKey?: string;
@@ -128,9 +137,17 @@ export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storage
   }, [layout]);
 
   // サーバーでは最初の12件を表示し、端末のサイズが分かったら表示範囲に絞る。
+  // 画面外のタイルは描画自体を遅らせる(横方向にも幅の半分の先読み余白を付ける)ので、
+  // そこに載る画像は lazy のままでよい。
   const indices = layout
     ? visibleGridIndices(layout, viewport.left, viewport.width, viewport.width / 2).filter((index) => index < count)
     : items.slice(0, 12).map((_, i) => i);
+  // 開いた直後に画面内にある先頭のタイルだけは即時読み込み＋優先指定にする。
+  // 先読みの余白は付けず、画面の外のタイルは lazy のままにする。
+  // 計測前は最低1列分(3段)だけ先行させ、幅が分かったら最初の画面分に広げる。
+  const eager = new Set(layout && viewport.width > 0
+    ? visibleGridIndices(layout, 0, viewport.width, 0).filter((index) => index < count)
+    : items.slice(0, 3).map((_, i) => i).filter((i) => i < count));
   // フォーカス中のカードは、スクロールしても外さない。
   if (Number.isInteger(focusedIndex) && focusedIndex >= 0 && focusedIndex < items.length && !indices.includes(focusedIndex)) indices.push(focusedIndex);
   const visibleKey = indices.join(",");
@@ -143,7 +160,7 @@ export function HomeFeedGrid({ children, onEndReached, onVisibleIndices, storage
       {indices.sort((a, b) => a - b).map((index) => {
         const position = layout ? gridTilePosition(layout, index) : undefined;
         return <div key={keys[index]} data-key={keys[index]} data-index={index} data-position={index + 1} className="home-feed-grid-tile"
-          style={position ? { ...position, width: layout?.tileWidth } : undefined}>{items[index]}</div>;
+          style={position ? { ...position, width: layout?.tileWidth } : undefined}>{withPriority(items[index], eager.has(index))}</div>;
       })}
     </div>
   </div>;
