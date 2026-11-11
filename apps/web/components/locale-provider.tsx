@@ -1,20 +1,26 @@
 "use client";
 
-// 表示言語の決め方と切り替え（本体 #530）。
-// - ログイン済みでニックネーム・種目を決め終えた人：アカウントの設定（profiles.locale）
-// - それ以外（未ログイン・登録直後のオンボーディング中）：端末に保存した言語（プロンプト・登録画面・ログイン画面で選んだもの）
+// 表示言語の決め方と切り替え（本体 #530・#567）。
+// - ログイン済みでニックネーム・種目を決め終えた人：アカウントの設定（profiles.locale）。
+//   ただしログイン直前の端末での明示選択（プロンプト・登録画面・ログイン画面で選んだもの）があり保存値と
+//   違う場合は、その選択を勝たせてアカウントにも保存する（本体 #567）。明示選択が無ければ保存値のまま。
+// - それ以外（未ログイン・登録直後のオンボーディング中）：端末に保存した言語
 // - マイページで選び直した直後（保存前）：その選択（preview）。画面を移ると取り消す
 // 決まった言語は、画面全体（ヘッダー・下メニューを含む）を key で描き直して即時に反映する。
 
-import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./auth-provider";
 import { profileIncomplete } from "@/lib/profile-gate";
+import { apiFetch } from "@/lib/api";
 import {
+  clearLocaleExplicitChoice,
   englishLoaded,
+  hasLocaleExplicitChoice,
   loadEnglish,
   localeChangedEvent,
   localePendingClass,
+  markLocaleExplicitChoice,
   notifyLocaleChanged,
   parseLocale,
   readStoredLocale,
@@ -40,6 +46,7 @@ const LocaleContext = createContext<LocaleState>({
   locale: "ja",
   chooseDeviceLocale: (next) => {
     storeLocale(next);
+    markLocaleExplicitChoice();
     notifyLocaleChanged();
   },
   previewLocale: () => {},
@@ -68,13 +75,16 @@ export function accountLocale(session: unknown, profile: { locale?: string | nul
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const { session, profile } = useAuth();
+  const { session, profile, token, refreshProfile } = useAuth();
   const device = useDeviceLocale();
   const pathname = usePathname();
   const [preview, setPreview] = useState<{ locale: Locale; path: string } | null>(null);
+  // ログイン時の引き継ぎ（本体 #567）：明示選択と保存値が違うあいだ、保存が終わるまで選んだ言語で出し続ける。
+  const [handoff, setHandoff] = useState<Locale | null>(null);
+  const handoffAttempt = useRef<string | null>(null);
   const account = accountLocale(session, profile);
   const activePreview = preview && preview.path === pathname ? preview.locale : null;
-  const wanted: Locale = activePreview ?? account ?? device;
+  const wanted: Locale = activePreview ?? handoff ?? account ?? device;
   const [applied, setApplied] = useState<Locale>("ja");
 
   useEffect(() => {
@@ -97,12 +107,60 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     };
   }, [wanted]);
 
-  // アカウントの言語を端末にも写す。次に開いたとき、プロフィールを読む前から同じ言語で出せる。
+  // ログイン時の言語の引き継ぎ（本体 #567）と、アカウントの言語の端末への写し。
+  // - 明示選択があり保存値と違う場合：選択を勝たせたまま表示し、プロフィール（profiles.locale）にも保存する。
+  // - 明示選択が無い場合：従来どおりプロフィール保存値を採用し、端末へ写す。
   useEffect(() => {
-    if (!account || account === readStoredLocale()) return;
-    storeLocale(account);
-    notifyLocaleChanged();
-  }, [account]);
+    if (!session) {
+      // ログアウトで引き継ぎは終わり。明示選択の記録もここで消費する（別アカウントへの持ち越しを防ぐ）。
+      // 保存の失敗からの取り直しは、再読み込み・再訪（マウントし直し）では記録が残るので行われる。
+      handoffAttempt.current = null;
+      clearLocaleExplicitChoice();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (handoff !== null) setHandoff(null);
+      return;
+    }
+    if (!account || !token) return;
+    const stored = readStoredLocale();
+    if (!hasLocaleExplicitChoice()) {
+      if (handoff !== null || account === stored) return;
+      storeLocale(account);
+      notifyLocaleChanged();
+      return;
+    }
+    if (account === stored) {
+      clearLocaleExplicitChoice();
+      if (handoff !== null) setHandoff(null);
+      return;
+    }
+    const attemptKey = `${token}:${stored}`;
+    if (handoffAttempt.current === attemptKey) return;
+    handoffAttempt.current = attemptKey;
+    setHandoff(stored);
+    // 進行中の保存は、表示の切り替え（handoff の変化）による効果の再実行で取り消さない。
+    // ログアウト・再ログインで試行の記録が変わっていたら、その保存はもう今の人のものではないので捨てる。
+    void (async () => {
+      try {
+        await apiFetch("/v1/me/locale", {
+          method: "PATCH",
+          token,
+          body: JSON.stringify({ locale: stored }),
+        });
+      } catch {
+        // 保存に失敗しても、選んだ言語の表示はこの場では残す。記録は残るので再読み込みで取り直す。
+        return;
+      }
+      if (handoffAttempt.current !== attemptKey) return;
+      clearLocaleExplicitChoice();
+      try {
+        await refreshProfile();
+      } catch {
+        // 次にプロフィールを読み直したときに揃う（マイページの保存と同じ扱い）。
+      }
+      if (handoffAttempt.current !== attemptKey) return;
+      setHandoff(null);
+    })();
+  }, [session, account, token, refreshProfile, handoff]);
 
   // 描画の前に決める（子の L が新しい言語で引けるように）。
   setActiveLocale(applied);
@@ -133,8 +191,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     };
   }, [applied, pathname]);
 
+  // 未ログイン中の選択（プロンプト・登録画面・ログイン画面・登録直後の言語選択）は明示選択として記録する。
+  // ログイン時に保存値と違う場合は引き継ぐ（本体 #567）。アカウント側の同期やマイページの保存では立てない。
   const chooseDeviceLocale = useCallback((next: Locale) => {
     storeLocale(next);
+    markLocaleExplicitChoice();
     notifyLocaleChanged();
   }, []);
 

@@ -66,6 +66,37 @@ export function markLocalePromptAnswered(): void {
   }
 }
 
+// 未ログイン中の明示選択（プロンプト・登録画面・ログイン画面・登録直後の言語選択で選んだもの）の記録（本体 #567）。
+// ログイン時にプロフィール保存値と違う場合は、直前の明示選択を勝たせてプロフィールにも保存する。
+// アカウント側から端末へ写した値（ログイン中の同期）では立てない。引き継ぎの保存の確定・値の一致・ログアウトで消費する。
+// 保存に失敗したときは残るので、再読み込みで取り直す。
+const explicitKey = "tracktalk:locale-explicit";
+
+export function markLocaleExplicitChoice(): void {
+  try {
+    window.localStorage.setItem(explicitKey, "1");
+  } catch {
+    // 記録できなくても選択自体は残る（引き継ぎだけ行われない）。
+  }
+}
+
+export function hasLocaleExplicitChoice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(explicitKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function clearLocaleExplicitChoice(): void {
+  try {
+    window.localStorage.removeItem(explicitKey);
+  } catch {
+    // 消せなくても引き継ぎは値の一致で止まる。
+  }
+}
+
 const ja = {
   "nav.main": "メイン",
   "nav.home": "ホーム",
