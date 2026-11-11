@@ -4,7 +4,11 @@
 // 未ログインでアプリを開いたときの言語選択プロンプト。海外コーチが登録・ログイン画面に
 // 到達する前に表示言語を切り替えられるようにするための暫定実装。
 // 海外コーチとの DM でのやりとりが終わったら外す（言語設定の仕組み自体は残す）。
-// 外し方：このファイルを消し、`app/layout.tsx` の `<LocalePrompt />` の1行を消す。
+// 表示するのは米国（US）からのアクセスのときだけ（本体 #565・運営者決定 2026-11-12）。
+// 国コードは Netlify の端（`netlify/edge-functions/geo-country.ts`）が返す。US と確定しないとき
+// （US 以外・取れない・失敗）は出さず、従来どおり日本語のまま。切り替えは登録画面とマイページから。
+// 外し方：このファイルとテスト、`netlify/edge-functions/geo-country.ts` とそのテストを消し、
+// `app/layout.tsx` の `<LocalePrompt />` の1行を消す。
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
@@ -20,6 +24,19 @@ function subscribeToNothing() {
 // 英語固定の海外コーチ向け紹介ページ（本体 #538）は表示言語設定の対象外なので、DM から開いた人に重ねて出さない。
 const exemptPaths = new Set(["/for-coaches"]);
 
+// アクセス元の国コード（大文字2文字）。取れないときや失敗したときは null（＝出さない）。
+export async function fetchAccessCountry(): Promise<string | null> {
+  try {
+    const response = await fetch("/geo-country", { cache: "no-store", credentials: "omit" });
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    const code = (body as { country?: unknown } | null)?.country;
+    return typeof code === "string" && /^[A-Z]{2}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 export function LocalePrompt() {
   const pathname = usePathname();
   const { session, sessionLoading } = useAuth();
@@ -30,7 +47,21 @@ export function LocalePrompt() {
   const answered = stored || answeredNow;
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const open = !sessionLoading && !session && !answered && !exemptPaths.has(pathname ?? "");
+  const eligible = !sessionLoading && !session && !answered && !exemptPaths.has(pathname ?? "");
+  // undefined はまだ問い合わせていない。出す必要がありそうなときだけ1度問い合わせる。
+  const [country, setCountry] = useState<string | null | undefined>(undefined);
+  const open = eligible && country === "US";
+
+  useEffect(() => {
+    if (!eligible || country !== undefined) return;
+    let cancelled = false;
+    void fetchAccessCountry().then((code) => {
+      if (!cancelled) setCountry(code);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eligible, country]);
 
   useEffect(() => {
     const element = dialog.current;

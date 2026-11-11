@@ -18,6 +18,17 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// アクセス元の国コード（Netlify の端が /geo-country で返すもの）の差し替え。既定は US。
+const geo = vi.hoisted(() => ({ country: "US" as string | null, fail: false, calls: 0 }));
+function mockGeoFetch() {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input) !== "/geo-country") throw new Error(`unexpected fetch ${String(input)}`);
+    geo.calls += 1;
+    if (geo.fail) throw new TypeError("network");
+    return new Response(JSON.stringify({ country: geo.country }), { headers: { "Content-Type": "application/json" } });
+  }));
+}
+
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
@@ -31,6 +42,10 @@ beforeEach(() => {
   auth.session = null;
   auth.sessionLoading = false;
   nav.pathname = "/";
+  geo.country = "US";
+  geo.fail = false;
+  geo.calls = 0;
+  mockGeoFetch();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -39,12 +54,13 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   localStorage.clear();
+  vi.unstubAllGlobals();
   Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
 });
 
 describe("未ログイン時の言語選択プロンプト", () => {
-  it("未ログインの初回は出て、英語を選ぶと保存して閉じる", async () => {
+  it("US からの未ログインの初回は出て、英語を選ぶと保存して閉じる", async () => {
     await act(async () => root.render(<LocalePrompt />));
     expect(container.textContent).toContain("Choose your language");
     await act(async () => {
@@ -62,14 +78,45 @@ describe("未ログイン時の言語選択プロンプト", () => {
     expect(localStorage.getItem("tracktalk:locale-prompted")).toBeNull();
   });
 
-  it("答えたあとは出ない", async () => {
+  it("答えたあとは US でも出ない（国も問い合わせない）", async () => {
     localStorage.setItem("tracktalk:locale-prompted", "1");
     await act(async () => root.render(<LocalePrompt />));
     expect(container.textContent).not.toContain("Choose your language");
+    expect(geo.calls).toBe(0);
   });
 
-  it("ログイン中は出ない", async () => {
+  it("ログイン中は US でも出ない（国も問い合わせない）", async () => {
     auth.session = {};
+    await act(async () => root.render(<LocalePrompt />));
+    expect(container.textContent).not.toContain("Choose your language");
+    expect(geo.calls).toBe(0);
+  });
+
+  it.each(["JP", "GB", "CA"])("US 以外（%s）からは出さず、回答記録も付けない", async (country) => {
+    geo.country = country;
+    await act(async () => root.render(<LocalePrompt />));
+    expect(geo.calls).toBe(1);
+    expect(container.textContent).not.toContain("Choose your language");
+    expect(localStorage.getItem("tracktalk:locale-prompted")).toBeNull();
+    expect(localStorage.getItem("tracktalk-locale")).toBeNull();
+  });
+
+  it("国コードが取れないときは出さない", async () => {
+    geo.country = null;
+    await act(async () => root.render(<LocalePrompt />));
+    expect(geo.calls).toBe(1);
+    expect(container.textContent).not.toContain("Choose your language");
+  });
+
+  it("国の問い合わせに失敗したときは出さない", async () => {
+    geo.fail = true;
+    await act(async () => root.render(<LocalePrompt />));
+    expect(geo.calls).toBe(1);
+    expect(container.textContent).not.toContain("Choose your language");
+  });
+
+  it("国の問い合わせが 404 などのときは出さない", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("not found", { status: 404 })));
     await act(async () => root.render(<LocalePrompt />));
     expect(container.textContent).not.toContain("Choose your language");
   });
