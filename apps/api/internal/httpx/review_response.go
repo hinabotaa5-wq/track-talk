@@ -126,7 +126,7 @@ func (s *Server) requesterReview(w http.ResponseWriter, r *http.Request) (db.Rev
 }
 
 func (s *Server) notifyReview(ctx context.Context, to, requestID uuid.UUID, kind string, msg push.Message) {
-	if err := insertReviewNotification(ctx, s.q, to, kind, requestID); err != nil {
+	if err := s.insertCoachingReviewNotification(ctx, to, kind, requestID); err != nil {
 		slog.Warn("review notification", "kind", kind, "err", err)
 	}
 	s.pushQuietly(ctx, to, notifyReview, msg, 24*time.Hour)
@@ -297,7 +297,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	// 返却したので、仮押さえしていた代金を確定する。
 	s.captureReturnedReview(r.Context(), rr.ID)
-	if err := insertReviewNotification(r.Context(), s.q, rr.RequesterID, "review_returned", rr.ID); err != nil {
+	if err := s.insertCoachingReviewNotification(r.Context(), rr.RequesterID, "review_returned", rr.ID); err != nil {
 		slog.Warn("review notification", "kind", "review_returned", "err", err)
 	}
 	// 返却の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は24時間。

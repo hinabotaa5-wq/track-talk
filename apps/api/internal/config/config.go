@@ -59,6 +59,14 @@ type Config struct {
 	// （今はカードのみ）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
 	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
 	CoachingTicketSales bool
+	// CoachingNotificationsMuted が true の間は、コーチング系の通知（ベル記録の生成とプッシュ送信）
+	// を宛先ごとに抑止する。未設定／0 が既定＝通常動作。migration は作らず、決済・申込・引受・返却の
+	// 処理自体には一切触れない。一時的な運用窓のための環境変数。
+	CoachingNotificationsMuted bool
+	// CoachingNotificationAllowlist は、ミュート中も通常どおり通知する相手（小文字の UUID 文字列）。
+	// 空／未設定のままミュートした場合は全抑止に倒す（フェイルセーフ）。値そのものは秘密として扱い、
+	// Issue・PR・ログ・チャットに書かない。
+	CoachingNotificationAllowlist map[string]struct{}
 	// ReviewRandomAssign が false の間は、動画添削の「おまかせ」(運営が受付中のコーチへ順番に割り当てる)を止め、
 	// 選手が選んだコーチにだけ依頼を届ける。既定は停止。割り当てのコードと過去の打診・割り当ての記録は残す。
 	ReviewRandomAssign bool
@@ -136,61 +144,63 @@ func Load() (Config, error) {
 	_ = godotenv.Load("../../.env")
 
 	cfg := Config{
-		Addr:                       env("API_ADDR", ":8080"),
-		DatabaseURL:                os.Getenv("DATABASE_URL"),
-		SupabaseURL:                os.Getenv("SUPABASE_URL"),
-		SupabaseServiceRoleKey:     os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
-		JWTSecret:                  os.Getenv("SUPABASE_JWT_SECRET"),
-		JWTAUD:                     env("SUPABASE_JWT_AUD", "authenticated"),
-		LogLevel:                   env("LOG_LEVEL", "info"),
-		ShutdownTimeout:            10 * time.Second,
-		CloudName:                  os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:                os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:             os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:               os.Getenv("CLOUDINARY_API_BASE"),
-		CloudAuthTokenKey:          os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
-		VAPIDPublicKey:             os.Getenv("VAPID_PUBLIC_KEY"),
-		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
-		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
-		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
-		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
-		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
-		CoachingConsultation:       enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
-		CoachingCoachList:          enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
-		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
-		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
-		IdentityReaderURL:          os.Getenv("IDENTITY_READER_URL"),
-		IdentityReaderToken:        os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
-		IdentityEndToken:           os.Getenv("IDENTITY_END_TOKEN"),
-		DatabaseMigrationsExternal: enabled(os.Getenv("DATABASE_MIGRATIONS_EXTERNAL")),
-		CoachingTickSecret:         os.Getenv("COACHING_TICK_SECRET"),
-		StorageCleanupSecret:       os.Getenv("STORAGE_CLEANUP_SECRET"),
-		ReminderSecret:             os.Getenv("REMINDER_SECRET"),
-		SecurityCheckSecret:        os.Getenv("SECURITY_CHECK_SECRET"),
-		OpsAlertEmail:              strings.TrimSpace(os.Getenv("OPS_ALERT_EMAIL")),
-		OpsPayoutExpectedLast4:     strings.TrimSpace(os.Getenv("OPS_PAYOUT_EXPECTED_LAST4")),
-		StripeSecretKey:            os.Getenv("STRIPE_SECRET_KEY"),
-		StripeWebhookSecret:        os.Getenv("STRIPE_WEBHOOK_SECRET"),
-		StripeConnectWebhookSecret: os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),
-		StripeAPIBase:              os.Getenv("STRIPE_API_BASE"),
-		StripeAPIVersion:           os.Getenv("STRIPE_API_VERSION"),
-		WebBaseURL:                 strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
-		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
-		MailFrom:                   os.Getenv("MAIL_FROM"),
-		MailAPIBase:                os.Getenv("MAIL_API_BASE"),
-		SMTPHost:                   os.Getenv("SMTP_HOST"),
-		SMTPPort:                   os.Getenv("SMTP_PORT"),
-		SMTPUser:                   os.Getenv("SMTP_USER"),
-		SMTPPassword:               os.Getenv("SMTP_PASSWORD"),
-		MailDevLog:                 enabled(os.Getenv("MAIL_DEV_LOG")),
-		SenseSummaryEnabled:        enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
-		StaffMFARequired:           enabled(os.Getenv("STAFF_MFA_REQUIRED")),
-		LocalMediaBaseURL:          strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),
-		AnthropicAPIKey:            os.Getenv("ANTHROPIC_API_KEY"),
-		AnthropicEndpoint:          os.Getenv("ANTHROPIC_ENDPOINT"),
-		SenseSummaryModel:          strings.TrimSpace(os.Getenv("SENSE_SUMMARY_MODEL")),
-		SenseSummaryDailyLimit:     DefaultSenseSummaryDailyLimit,
-		SenseSummaryMinuteLimit:    DefaultSenseSummaryMinuteLimit,
+		Addr:                          env("API_ADDR", ":8080"),
+		DatabaseURL:                   os.Getenv("DATABASE_URL"),
+		SupabaseURL:                   os.Getenv("SUPABASE_URL"),
+		SupabaseServiceRoleKey:        os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		JWTSecret:                     os.Getenv("SUPABASE_JWT_SECRET"),
+		JWTAUD:                        env("SUPABASE_JWT_AUD", "authenticated"),
+		LogLevel:                      env("LOG_LEVEL", "info"),
+		ShutdownTimeout:               10 * time.Second,
+		CloudName:                     os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:                   os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:                os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:                  os.Getenv("CLOUDINARY_API_BASE"),
+		CloudAuthTokenKey:             os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
+		VAPIDPublicKey:                os.Getenv("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:               os.Getenv("VAPID_PRIVATE_KEY"),
+		VAPIDSubject:                  os.Getenv("VAPID_SUBJECT"),
+		CoachingEnabled:               enabled(os.Getenv("COACHING_ENABLED")),
+		CoachingNewAcceptance:         enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
+		CoachingMessaging:             enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
+		CoachingConsultation:          enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
+		CoachingCoachList:             enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
+		CoachingTicketSales:           enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
+		CoachingNotificationsMuted:    enabled(os.Getenv("COACHING_NOTIFICATIONS_MUTED")),
+		CoachingNotificationAllowlist: parseIDAllowlist(os.Getenv("COACHING_NOTIFICATION_ALLOWLIST_USER_IDS")),
+		ReviewRandomAssign:            enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
+		IdentityReaderURL:             os.Getenv("IDENTITY_READER_URL"),
+		IdentityReaderToken:           os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
+		IdentityEndToken:              os.Getenv("IDENTITY_END_TOKEN"),
+		DatabaseMigrationsExternal:    enabled(os.Getenv("DATABASE_MIGRATIONS_EXTERNAL")),
+		CoachingTickSecret:            os.Getenv("COACHING_TICK_SECRET"),
+		StorageCleanupSecret:          os.Getenv("STORAGE_CLEANUP_SECRET"),
+		ReminderSecret:                os.Getenv("REMINDER_SECRET"),
+		SecurityCheckSecret:           os.Getenv("SECURITY_CHECK_SECRET"),
+		OpsAlertEmail:                 strings.TrimSpace(os.Getenv("OPS_ALERT_EMAIL")),
+		OpsPayoutExpectedLast4:        strings.TrimSpace(os.Getenv("OPS_PAYOUT_EXPECTED_LAST4")),
+		StripeSecretKey:               os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:           os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeConnectWebhookSecret:    os.Getenv("STRIPE_CONNECT_WEBHOOK_SECRET"),
+		StripeAPIBase:                 os.Getenv("STRIPE_API_BASE"),
+		StripeAPIVersion:              os.Getenv("STRIPE_API_VERSION"),
+		WebBaseURL:                    strings.TrimRight(os.Getenv("WEB_BASE_URL"), "/"),
+		ResendAPIKey:                  os.Getenv("RESEND_API_KEY"),
+		MailFrom:                      os.Getenv("MAIL_FROM"),
+		MailAPIBase:                   os.Getenv("MAIL_API_BASE"),
+		SMTPHost:                      os.Getenv("SMTP_HOST"),
+		SMTPPort:                      os.Getenv("SMTP_PORT"),
+		SMTPUser:                      os.Getenv("SMTP_USER"),
+		SMTPPassword:                  os.Getenv("SMTP_PASSWORD"),
+		MailDevLog:                    enabled(os.Getenv("MAIL_DEV_LOG")),
+		SenseSummaryEnabled:           enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
+		StaffMFARequired:              enabled(os.Getenv("STAFF_MFA_REQUIRED")),
+		LocalMediaBaseURL:             strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),
+		AnthropicAPIKey:               os.Getenv("ANTHROPIC_API_KEY"),
+		AnthropicEndpoint:             os.Getenv("ANTHROPIC_ENDPOINT"),
+		SenseSummaryModel:             strings.TrimSpace(os.Getenv("SENSE_SUMMARY_MODEL")),
+		SenseSummaryDailyLimit:        DefaultSenseSummaryDailyLimit,
+		SenseSummaryMinuteLimit:       DefaultSenseSummaryMinuteLimit,
 	}
 	for name, target := range map[string]*int{
 		"SENSE_SUMMARY_DAILY_LIMIT":  &cfg.SenseSummaryDailyLimit,
@@ -290,4 +300,30 @@ func enabled(v string) bool {
 		return true
 	}
 	return false
+}
+
+// parseIDAllowlist は、カンマ区切りの ID 列を小文字の集合にする。不正な空要素は捨てる。
+// 値の正当性（UUID か）は呼び出し側で確かめる。空集合は「全抑止に倒す」の合図として区別する。
+func parseIDAllowlist(raw string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, part := range strings.Split(raw, ",") {
+		if v := strings.ToLower(strings.TrimSpace(part)); v != "" {
+			out[v] = struct{}{}
+		}
+	}
+	return out
+}
+
+// CoachingNotificationSuppressed は、ミュート中にその宛先へのコーチング通知を抑止するかを返す。
+// ミュート OFF なら常に false。ミュート ON かつ許可リストが空なら true（全抑止）。
+// id は UUID の文字列表現（大小文字は問わない）。
+func (c Config) CoachingNotificationSuppressed(id string) bool {
+	if !c.CoachingNotificationsMuted {
+		return false
+	}
+	if len(c.CoachingNotificationAllowlist) == 0 {
+		return true
+	}
+	_, ok := c.CoachingNotificationAllowlist[strings.ToLower(strings.TrimSpace(id))]
+	return !ok
 }

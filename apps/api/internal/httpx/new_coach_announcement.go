@@ -89,6 +89,18 @@ func (s *Server) maybeAnnounceNewCoach(ctx context.Context, coach uuid.UUID) {
 	if !s.isNewCoachNominatable(ctx, coach, disp.Events) {
 		return
 	}
+	// 一時ミュート中は送信の記録を一切残さない（1回限りの記録を消費しない）。
+	// 受付が開いていれば許可リスト内だけに送り、閉じていれば何もしない。
+	if s.cfg.CoachingNotificationsMuted {
+		if disp.IsAdmin {
+			return
+		}
+		if !s.cfg.CoachingNewAcceptance {
+			return
+		}
+		s.sendNewCoachAnnouncementMuted(ctx, coach, disp.DisplayName)
+		return
+	}
 	// 発火済み記録を原子的に取る。既にあれば（再開・再承認・編集・再試行）何もしない。
 	// 受付が閉じている間の初回もここで記録し、開放後にまとめて送らない。
 	id := newCoachAnnouncementID(coach)
@@ -182,4 +194,28 @@ func (s *Server) sendNewCoachAnnouncement(ctx context.Context, coach uuid.UUID, 
 		}
 	}
 	// 送り切れなかった分は待ちに残り、tick の送り直しで届く。ベルは既に入っている。
+}
+
+// sendNewCoachAnnouncementMuted は、一時ミュート中の新規コーチ通知を許可リスト内だけに送る。
+// announcements 行・ベルの一括挿入・new_coach_announcements の記録は作らない（1回限りの扱いを狂わせない）。
+// 許可リスト内の受信設定（ベル／プッシュ）は通常どおり尊重する。暫定リビジョン専用。
+func (s *Server) sendNewCoachAnnouncementMuted(ctx context.Context, coach uuid.UUID, display string) {
+	in := announcementInput{
+		title: newCoachAnnouncementTitle,
+		body:  newCoachAnnouncementBody(display),
+		url:   s.newCoachAnnouncementURL(coach),
+	}
+	if !announcementPath(in.url) {
+		slog.Warn("new coach: url")
+		return
+	}
+	id := newCoachAnnouncementID(coach)
+	msg := announcementMessage(id.String(), in)
+	for _, to := range s.coachingAllowlistedIDs() {
+		// コーチ本人には送らない（通常時と合わせる）。
+		if to == coach {
+			continue
+		}
+		s.notify(ctx, to, notifyAnnouncement, msg, announcementTTL)
+	}
 }

@@ -29,7 +29,11 @@ const (
 
 // enqueuePushOutbox は、送るべき Push を1件入れる。同じ出来事は1行だけで、二重に入れても増えない。
 // 設定で切っている人・通知が未設定の環境には入れない。
+// 一時ミュート中は、コーチング系の種類を許可リスト外の宛先には入れない。
 func (s *Server) enqueuePushOutbox(ctx context.Context, to uuid.UUID, category string, msg push.Message, ttl time.Duration, expiresAt time.Time, dedupKey string) {
+	if coachingMutedCategory(category) && s.coachingMutedFor(to) {
+		return
+	}
 	if !s.push.Configured() {
 		return
 	}

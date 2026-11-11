@@ -124,7 +124,11 @@ func insertReviewNotificationWithURL(ctx context.Context, q *db.Queries, recipie
 
 // notify は、投稿や依頼にひもづかない知らせを、ベルとプッシュの両方で送る(本人の設定に従う)。
 // どちらも補足の知らせなので、失敗は記録だけして呼び出し元の処理は止めない。
+// 一時ミュート中は、コーチング系の種類を許可リスト外の宛先には送らない（ベルも作らない）。
 func (s *Server) notify(ctx context.Context, to uuid.UUID, category string, msg push.Message, ttl time.Duration) {
+	if coachingMutedCategory(category) && s.coachingMutedFor(to) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	// 文面は受け手の表示言語に合わせ、未訳は日本語のまま出す（本体 #521）。

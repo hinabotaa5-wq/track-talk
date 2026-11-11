@@ -170,7 +170,11 @@ func (s *Server) dispatchQueuedReviews(ctx context.Context) int {
 
 // pushQuietly は Web プッシュを送る。その種類のプッシュを本人がオフにしていたら送らない。
 // 届かなくても画面で見られるので、失敗は記録だけする。
+// 一時ミュート中は、コーチング系の種類を許可リスト外の宛先には送らない。
 func (s *Server) pushQuietly(ctx context.Context, to uuid.UUID, category string, msg push.Message, ttl time.Duration) {
+	if coachingMutedCategory(category) && s.coachingMutedFor(to) {
+		return
+	}
 	if !s.push.Configured() {
 		return
 	}
@@ -298,7 +302,7 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 }
 
 func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueReviewRequestsRow) {
-	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
+	if err := s.insertCoachingReviewNotification(ctx, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review expired notification", "err", err)
 	}
 	body := "返却の目安までに引き受けるコーチが見つかりませんでした"
@@ -328,7 +332,7 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 }
 
 func (s *Server) notifyCoachNominationEnded(ctx context.Context, coachID, requestID uuid.UUID) {
-	if err := insertReviewNotification(ctx, s.q, coachID, "review_nomination_ended", requestID); err != nil {
+	if err := s.insertCoachingReviewNotification(ctx, coachID, "review_nomination_ended", requestID); err != nil {
 		slog.Warn("coach nomination ended notification", "err", err)
 	}
 	s.pushQuietly(ctx, coachID, notifyReview, push.Message{
@@ -346,7 +350,7 @@ func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID, notify
 	if err != nil || rr.RequestedCoachID == nil || rr.Status != "expired" {
 		return
 	}
-	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
+	if err := s.insertCoachingReviewNotification(ctx, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("nomination ended notification", "err", err)
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{

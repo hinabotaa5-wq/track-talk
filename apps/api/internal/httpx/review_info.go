@@ -346,7 +346,7 @@ func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, off
 }
 
 func (s *Server) sendReviewResubmissionNotice(ctx context.Context, rr db.ReviewRequest, kind string, msg push.Message, ttl time.Duration) {
-	if err := insertReviewNotificationWithURL(ctx, s.q, *rr.CoachID, kind, rr.ID, &msg.URL); err != nil {
+	if err := s.insertCoachingReviewNotificationWithURL(ctx, *rr.CoachID, kind, rr.ID, &msg.URL); err != nil {
 		slog.Warn("review resubmitted notification", "err", err)
 	}
 	s.pushQuietly(ctx, *rr.CoachID, kindCategory(kind), msg, ttl)
@@ -365,7 +365,7 @@ func (s *Server) expireUnresubmittedReviews(ctx context.Context) (int, error) {
 }
 
 func (s *Server) notifyUnresubmitted(ctx context.Context, rr db.ExpireUnresubmittedReviewRequestsRow) {
-	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
+	if err := s.insertCoachingReviewNotification(ctx, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review unresubmitted notification", "err", err)
 	}
 	body := "再提出の期限までに再提出がなかったため、依頼は終了しました"

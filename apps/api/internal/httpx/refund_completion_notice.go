@@ -76,6 +76,10 @@ func (s *Server) deliverRefundCompletionNotice(ctx context.Context, id uuid.UUID
 		}
 		recipient = notice.RecipientID
 		message = refundCompletionMessage(notice)
+		// 一時ミュート中は、許可リスト外の宛先にはベルを作らず予定だけ消す。返金自体は済んでいる。
+		if s.coachingMutedFor(recipient) {
+			return q.DeleteRefundCompletionNotice(ctx, id)
+		}
 		inserted, err = q.InsertRefundCompletionBell(ctx, db.InsertRefundCompletionBellParams{
 			ID: id, RecipientID: recipient, Title: &message.Title, Body: &message.Body, Url: &message.URL,
 		})

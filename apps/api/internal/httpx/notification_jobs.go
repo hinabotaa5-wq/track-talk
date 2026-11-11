@@ -98,8 +98,11 @@ func (s *Server) writeNotificationJob(ctx context.Context, q *db.Queries, job db
 			PostID: *job.PostID, AuthorID: job.RecipientID,
 		})
 	case "review_offer":
-		return insertReviewNotification(ctx, q, job.RecipientID, job.Kind, *job.ReviewRequestID)
+		return s.insertCoachingReviewNotification(ctx, job.RecipientID, job.Kind, *job.ReviewRequestID)
 	case coachRejectedJob:
+		if s.coachingMutedFor(job.RecipientID) {
+			return nil
+		}
 		wanted, err := notificationWanted(ctx, q, job.RecipientID, notifyCoaching, true)
 		if err != nil || !wanted {
 			return err
