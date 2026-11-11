@@ -24,6 +24,14 @@ WHERE id = $1
   AND (NOT sqlc.arg(reserved_nickname)::boolean OR is_admin OR nickname = $2)
 RETURNING *;
 
+-- name: UpdateProfileLocale :one
+-- 表示言語だけを変える（本体 #535）。ニックネームなど他の項目には触れない。
+UPDATE profiles
+SET locale = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdatePostMasterBadge :one
 UPDATE profiles
 SET post_master_badge_public = $2,

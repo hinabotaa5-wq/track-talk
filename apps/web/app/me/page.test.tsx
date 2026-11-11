@@ -218,3 +218,12 @@ it("認証エラー（401）では取り直しを繰り返さず、入口も出�
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
+it("表示言語は独立したカードではなく、設定一覧（nav）の中の1行として出す（#536）", async () => {
+  await renderSignedIn();
+  const group = container.querySelector('[role="radiogroup"][aria-labelledby="language-switch-title"]');
+  expect(group).not.toBeNull();
+  expect(group!.closest("nav")).not.toBeNull();
+  expect(container.querySelector("#language-switch-title")?.textContent).toBe("表示言語");
+  expect(container.querySelector('section[aria-labelledby="language-switch-title"]')).toBeNull();
+  expect([...group!.querySelectorAll('[role="radio"]')].map((b) => b.textContent)).toEqual(["日本語", "English"]);
+});

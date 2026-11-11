@@ -100,7 +100,6 @@ export default function MePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-xl font-bold text-slate-100">{t(locale, "mypage.title")}</h1>
-      <LanguageSwitch />
       <ThemeSwitch />
       <nav aria-label={L("アカウント")} className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
         {currentProfile?.is_admin ? (
@@ -115,6 +114,7 @@ export default function MePage() {
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
+        <LanguageSwitch />
         {token && userId ? (
           <PushPermissionGuide
             key={userId}
