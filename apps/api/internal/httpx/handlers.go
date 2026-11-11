@@ -196,6 +196,38 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, profileJSON(updated))
 }
 
+type localeReq struct {
+	Locale string `json:"locale"`
+}
+
+// updateLocale は、表示言語（profiles.locale）だけを変える（本体 #535）。
+// マイページの「表示言語」から使う。PATCH /v1/me はニックネームを必須とするため、
+// 言語だけを送ると 422 になり保存できなかった。
+func (s *Server) updateLocale(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req localeReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	if req.Locale != "ja" && req.Locale != "en" {
+		FieldError(w, map[string]string{"locale": "表示言語は日本語か英語で選んでください"})
+		return
+	}
+	updated, err := s.q.UpdateProfileLocale(r.Context(), db.UpdateProfileLocaleParams{
+		ID:     p.ID,
+		Locale: req.Locale,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, profileJSON(updated))
+}
+
 type badgeReq struct {
 	PostMasterBadgePublic *bool `json:"post_master_badge_public"`
 }

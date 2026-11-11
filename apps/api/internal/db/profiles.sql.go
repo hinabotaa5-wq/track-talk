@@ -154,3 +154,37 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (P
 	)
 	return i, err
 }
+
+const updateProfileLocale = `-- name: UpdateProfileLocale :one
+UPDATE profiles
+SET locale = $2,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, is_admin, created_at, updated_at, nickname, nickname_public, birth_month, coaching_demo, post_master_badge_public, event, push_ever_subscribed, locale
+`
+
+type UpdateProfileLocaleParams struct {
+	ID     uuid.UUID `json:"id"`
+	Locale string    `json:"locale"`
+}
+
+// 表示言語だけを変える（本体 #535）。ニックネームなど他の項目には触れない。
+func (q *Queries) UpdateProfileLocale(ctx context.Context, arg UpdateProfileLocaleParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, updateProfileLocale, arg.ID, arg.Locale)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Nickname,
+		&i.NicknamePublic,
+		&i.BirthMonth,
+		&i.CoachingDemo,
+		&i.PostMasterBadgePublic,
+		&i.Event,
+		&i.PushEverSubscribed,
+		&i.Locale,
+	)
+	return i, err
+}

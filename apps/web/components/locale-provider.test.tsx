@@ -143,7 +143,7 @@ describe("マイページの表示言語", () => {
     expect(probe()).toBe("en:Home");
     expect(radio("en").getAttribute("aria-checked")).toBe("true");
     await act(async () => saveButton()!.click());
-    expect(apiFetch).toHaveBeenCalledWith("/v1/me", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ locale: "en" }) }));
+    expect(apiFetch).toHaveBeenCalledWith("/v1/me/locale", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ locale: "en" }) }));
     expect(auth.refreshProfile).toHaveBeenCalled();
     expect(localStorage.getItem("tracktalk-locale")).toBe("en");
   });
@@ -155,5 +155,27 @@ describe("マイページの表示言語", () => {
     await render(<Probe />);
     expect(probe()).toBe("ja:ホーム");
     expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("保存に失敗したら赤字で知らせ、選んだ言語の試し表示は残す", async () => {
+    apiFetch.mockRejectedValue(new Error("422"));
+    await render(<LanguageSwitch />);
+    await act(async () => radio("en").click());
+    await render(<LanguageSwitch />);
+    await act(async () => saveButton()!.click());
+    expect(container.querySelector("[role=alert]")?.textContent).toBe("Could not save. Please try again.");
+    expect(radio("en").getAttribute("aria-checked")).toBe("true");
+    expect(saveButton()).toBeDefined();
+  });
+
+  it("保存できていれば、プロフィールの取り直しに失敗しても失敗表示は出さない", async () => {
+    auth.refreshProfile.mockRejectedValue(new Error("network"));
+    await render(<LanguageSwitch />);
+    await act(async () => radio("en").click());
+    await render(<LanguageSwitch />);
+    await act(async () => saveButton()!.click());
+    expect(apiFetch).toHaveBeenCalledWith("/v1/me/locale", expect.anything());
+    expect(container.querySelector("[role=alert]")).toBeNull();
+    expect(localStorage.getItem("tracktalk-locale")).toBe("en");
   });
 });

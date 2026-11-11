@@ -148,6 +148,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Patch("/me/badge", s.updateBadge)
+			r.Patch("/me/locale", s.updateLocale)
 			r.Delete("/me", s.deleteAccount)
 			r.Post("/me/consents/overseas", s.consentOverseas)
 			r.Get("/me/practice-reputation", s.practiceReputation)
