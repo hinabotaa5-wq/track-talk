@@ -258,6 +258,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/admin/coaching/coaches/{id}/suspend", s.suspendCoach)
 			r.Post("/admin/coaching/coaches/{id}/resume", s.resumeCoach)
 			r.Post("/admin/coaching/coaches/{id}/end", s.endCoachRegistration)
+			r.Post("/admin/coaching/coaches/{id}/identity-view-notice", s.notifyIdentityView)
 			r.Get("/admin/coaching/contracts", s.adminListCoachingContracts)
 			r.Get("/admin/coaching/contracts/{id}", s.adminOpenCoachingContract)
 			r.Post("/admin/coaching/contracts/{id}/suspend", s.adminSuspendCoachingContract)
