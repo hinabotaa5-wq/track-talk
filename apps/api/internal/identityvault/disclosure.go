@@ -216,10 +216,9 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request, coach uuid.UUI
 		}
 		// The second check is at read time. A main DB change concurrent with
 		// this approval can at most leave an approval for an obsolete epoch.
-		// disclosures.phone は旧方式の平文の列。書き込まず、上書きのたびに消す。
 		_, err = tx.Exec(ctx, `INSERT INTO identity_vault.disclosures (plan_id,coach_id,plan_epoch,coach_epoch)
 			VALUES ($1,$2,$3,$4) ON CONFLICT (plan_id) DO UPDATE
-			SET coach_id=EXCLUDED.coach_id,plan_epoch=EXCLUDED.plan_epoch,coach_epoch=EXCLUDED.coach_epoch,phone=NULL`,
+			SET coach_id=EXCLUDED.coach_id,plan_epoch=EXCLUDED.plan_epoch,coach_epoch=EXCLUDED.coach_epoch`,
 			id, coach, p.planVersion, p.coachVersion)
 		return err
 	}))

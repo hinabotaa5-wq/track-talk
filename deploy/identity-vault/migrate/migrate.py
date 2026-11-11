@@ -32,6 +32,7 @@ SYNTHETIC_FUNCTIONS = (
 CHECK_SQL = """
 SELECT json_build_object(
   'phone_column', EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='identity_vault' AND table_name='identities' AND column_name='phone_enc'),
+  'legacy_phone_column', EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='identity_vault' AND table_name='disclosures' AND column_name='phone'),
   'functions_present', (SELECT count(*) FROM unnest(ARRAY[{fns}, 'identity_vault.synthetic_subject(uuid)']) f WHERE to_regprocedure(f) IS NOT NULL),
   'functions_definer_pinned', (SELECT count(*) FROM pg_proc p WHERE p.oid IN (SELECT to_regprocedure(f) FROM unnest(ARRAY[{fns}, 'identity_vault.synthetic_subject(uuid)']) f)
                                 AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']),
@@ -118,7 +119,7 @@ def run(url, out=sys.stdout, environ=None, directory=MIGRATIONS):
         checks = json.loads(lines[-1])
         report["checks"] = {k: (v if isinstance(v, bool) else int(v)) for k, v in checks.items()}
         c = report["checks"]
-        ok = (c["phone_column"] and c["functions_present"] == len(SYNTHETIC_FUNCTIONS) + 1
+        ok = (c["phone_column"] and not c["legacy_phone_column"] and c["functions_present"] == len(SYNTHETIC_FUNCTIONS) + 1
               and c["functions_definer_pinned"] == len(SYNTHETIC_FUNCTIONS) + 1 and c["public_can_execute"] == 0
               and c["restricted_roles_can_execute"] == 0 and c["app_roles"] >= 1 and c["app_roles_can_execute_all"] == c["app_roles"]
               # アプリ用ロールが行を読めること（BYPASSRLS か、5表すべてに方針）。制限ロールに方針が付いていないこと。

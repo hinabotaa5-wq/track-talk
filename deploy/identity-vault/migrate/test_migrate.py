@@ -36,6 +36,7 @@ class UnitTests(unittest.TestCase):
         names = [p.name for p in migrate.migration_files()]
         self.assertEqual(names, sorted(names))
         self.assertIn("003_synthetic_provision.sql", names)
+        self.assertIn("005_drop_disclosure_phone.sql", names)
 
     def test_failed_statement_prints_no_detail(self):
         out = io.StringIO()
@@ -58,6 +59,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(line["checks"]["public_can_execute"], 0)
             self.assertEqual(line["checks"]["restricted_roles_can_execute"], 0)
             self.assertGreaterEqual(line["checks"]["app_roles"], 1)
+            self.assertFalse(line["checks"]["legacy_phone_column"])
 
 
 if __name__ == "__main__":

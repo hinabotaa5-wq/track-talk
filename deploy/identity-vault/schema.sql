@@ -30,15 +30,14 @@ CREATE TABLE identity_vault.commerce (
 );
 
 -- Holds only authorizations to publish specific versions of a plan. The phone
--- column is no longer written: since migrations/002_identity_phone.sql the
--- phone number is encrypted with the identity (identities.phone_enc).
+-- number is encrypted with the identity (identities.phone_enc, since
+-- migrations/002_identity_phone.sql); the old plaintext phone column was
+-- removed by migrations/005_drop_disclosure_phone.sql.
 CREATE TABLE identity_vault.disclosures (
     plan_id uuid PRIMARY KEY,
     coach_id uuid NOT NULL REFERENCES identity_vault.identities ON DELETE CASCADE,
     plan_epoch uuid NOT NULL,
-    coach_epoch uuid NOT NULL,
-    phone text,
-    CHECK (phone IS NULL OR length(phone) BETWEEN 10 AND 20)
+    coach_epoch uuid NOT NULL
 );
 CREATE INDEX identity_disclosures_coach ON identity_vault.disclosures (coach_id);
 
