@@ -16,9 +16,10 @@ it("プライバシーポリシー：終了時点で見られない・終わる�
   expect(html).toContain("第11条の手続きで受け付けます");
 });
 
-it("コーチ向け条件：大会までプランの報酬と精算の4項目を出す", () => {
-  expect(supportPlanCoachTerms.map((t) => t.title)).toEqual(["報酬の確定時期と仮払い", "コーチ都合の精算", "やむを得ない事情と判定の手続", "大会の中止・延期"]);
+it("コーチ向け条件：大会までプランの報酬と精算の3項目を出す（中止延期は出ない）", () => {
+  expect(supportPlanCoachTerms.map((t) => t.title)).toEqual(["報酬の確定時期と仮払い", "コーチ都合の精算", "やむを得ない事情と判定の手続"]);
   const html = renderToStaticMarkup(<SupportPlanCoachTerms />);
   expect(html).toContain("大会までプランの報酬と精算");
   expect(html).toContain("1回に限り異議を申し立てて再審査を求められます");
+  expect(html).not.toContain("中止");
 });

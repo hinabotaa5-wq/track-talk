@@ -454,7 +454,7 @@ function PlanForm({
           onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
           placeholder={draft.kind === "trial" ? "2500" : "8000"}
         />
-        <p className="text-xs text-slate-300">{L("TrackTalk の手数料（20%）を引いた分が報酬になります。")}</p>
+        <p className="text-xs text-slate-300">{L("TrackTalk の手数料（25%）を引いた分が報酬になります。")}</p>
         {fieldError("price_yen")}
       </label>
       {draft.service_type === "competition_support" ? null : <label className="block space-y-1.5 text-sm text-slate-200">

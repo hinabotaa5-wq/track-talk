@@ -282,7 +282,7 @@ func TestConsultationCashAnswerRecordsEarningsAndClarificationDeadline(t *testin
 	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "指名の回答"})
 	var amount int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE consultation_id=$1`, []any{c.ID}, &amount)
-	if amount != 960 {
+	if amount != 900 { // 追加相談1,200円の75%
 		t.Fatalf("cash earnings %d", amount)
 	}
 	execSQLArgs(t, `UPDATE coaching_consultations SET answered_at=now()-interval '8 days' WHERE id=$1`, c.ID)
@@ -311,13 +311,13 @@ func TestConsultationPayoutUsesAnswerMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	view := coachEarnings(t, h, coach)
-	if view.ThisMonthYen != 0 || len(view.Earnings) != 1 || view.Earnings[0].AmountYen != 960 {
+	if view.ThisMonthYen != 0 || len(view.Earnings) != 1 || view.Earnings[0].AmountYen != 900 {
 		t.Fatalf("earnings %+v", view)
 	}
 
 	// Query at the earning amount to isolate the cutoff from the 3,000 yen threshold.
-	payable, err := q.ListPayableCoachEarnings(ctx, db.ListPayableCoachEarningsParams{MinYen: 960})
-	if err != nil || len(payable) != 1 || payable[0].AmountYen != 960 {
+	payable, err := q.ListPayableCoachEarnings(ctx, db.ListPayableCoachEarningsParams{MinYen: 900})
+	if err != nil || len(payable) != 1 || payable[0].AmountYen != 900 {
 		t.Fatalf("payable %+v: %v", payable, err)
 	}
 }

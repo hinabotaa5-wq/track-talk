@@ -66,7 +66,7 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
     <section aria-label={L("大会までプランの相談の受付設定")} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <div className="space-y-1">
         <h3 className="font-bold">{L("大会までプラン: 相談の受付設定")}</h3>
-        <p className="text-xs text-slate-300">{L("大会までプランは、固定の期間・価格では出品しません。選手が無料で相談してから、あなたが期間（開始日〜目標大会の日）・内容・価格を提案して始まります。運営手数料は20%です。")}</p>
+        <p className="text-xs text-slate-300">{L("大会までプランは、固定の期間・価格では出品しません。選手が無料で相談してから、あなたが内容・価格を提案して始まります。期間は開始日から1ヶ月（30日間）で、目標の大会は目標として添えるだけです。運営手数料は25%です。")}</p>
       </div>
       {!canServe ? <p className="text-xs text-amber-300">{L("先に、上の「担当するサービス」で大会までプランを登録してください。")}</p> : null}
       {s ? (

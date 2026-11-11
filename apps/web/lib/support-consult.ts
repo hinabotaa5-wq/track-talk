@@ -223,7 +223,7 @@ export function supportTermsLines(priceYen: number, days: number): { label: stri
   return [
     {
       label: L("途中で終わる場合（日割り）"),
-      text: L("解約料・違約金はかかりません。まだ過ぎていない日数分を日割りで全額返金します（契約価格 ÷ 期間の日数 × 残りの日数、1円未満は切り捨て。期間は実際に始まった日から目標大会の日までで、終える日は過ぎた日に数えます）。例: {v0}・{total}日間の契約を{elapsed}日目に終えると、残り{remaining}日分の{v4}を返金します。始まる前に終えた場合は全額を返金します。", { v0: yen(priceYen), total: ex.total, elapsed: ex.elapsed, remaining: ex.remaining, v4: yen(ex.refund) }),
+      text: L("解約料・違約金はかかりません。まだ過ぎていない日数分を日割りで全額返金します（契約価格 ÷ 期間の日数 × 残りの日数、1円未満は切り捨て。期間は実際に始まった日から1ヶ月（両端を含む30日）で、終える日は過ぎた日に数えます）。例: {v0}・{total}日間の契約を{elapsed}日目に終えると、残り{remaining}日分の{v4}を返金します。始まる前に終えた場合は全額を返金します。", { v0: yen(priceYen), total: ex.total, elapsed: ex.elapsed, remaining: ex.remaining, v4: yen(ex.refund) }),
     },
     {
       label: L("コーチの都合で続けられない場合"),
@@ -232,10 +232,6 @@ export function supportTermsLines(priceYen: number, days: number): { label: stri
     {
       label: L("返金の時期と方法"),
       text: L("終了の手続きをした時点で、お支払いに使ったカードへ返金します。明細に反映されるまでの日数はカード会社によって異なります（通常は数日から2週間ほど）。"),
-    },
-    {
-      label: L("大会が中止・延期になった場合"),
-      text: L("主催者が中止・延期を正式に発表した日で契約を終えます。別の大会への振り替えや期間の延長はしません。発表の日までを過ぎた日として、残りの日数分を日割りで返金します。次の大会に向けては、あらためて無料相談ができます。"),
     },
     {
       label: L("契約後のチャット"),
