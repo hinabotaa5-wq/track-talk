@@ -44,6 +44,19 @@ it("公開文面に開発中の注記や販売終了したチケットを表示�
   expect(html).toContain("選んだコーチが辞退した場合（引き受けた後、返却の前の辞退を含みます）");
 });
 
+it("海外コーチ 1ヶ月コーチング（パイロット）の分を表示し、単発の動画添削は入れない（#539）", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  expect(html).toContain("運営者が販売する「海外コーチ 1ヶ月コーチング（パイロット）」についての表記です。");
+  expect(html).toContain("1ヶ月コーチング 22,000円（税込）");
+  expect(html).toContain("決済リンク経由。1回ごとのお支払いです");
+  expect(html).toContain("お申込み（決済リンクでのお支払い）の時に決済が完了します");
+  expect(html).toContain("お支払いの確認後、案内した期間（1ヶ月間）について指導を提供します");
+  expect(html).toContain("その月の料金の返金はなく、期間は月末までとなります");
+  expect(html).toContain("未提供分を返金します");
+  // 単発の海外動画添削は選手価格が未確定のため入れない。
+  expect(html).not.toContain("単発");
+});
+
 // 別言語の API 料金定数とのずれを検出する。決済実装自体は変更しない。
 it("掲載料金を API の決済用定数と一致させる", () => {
   const api = path.resolve(process.cwd(), "../api/internal/httpx");
