@@ -88,7 +88,7 @@ func supportAsOf(ct db.CoachingContract, now time.Time) time.Time {
 	return supportDay(now)
 }
 
-// supportCoachShare は、利用者が払った額（返金を引いたもの）のうちコーチの取り分（運営手数料20%を引く、円未満切り捨て）。
+// supportCoachShare は、利用者が払った額（返金を引いたもの）のうちコーチの取り分（運営手数料25%を引く、円未満切り捨て）。
 func supportCoachShare(gross int32) int32 {
 	if gross <= 0 {
 		return 0
@@ -122,7 +122,7 @@ func supportCoachEarned(ct db.CoachingContract, paid, refunded int32) int32 {
 
 // supportSettle は、確定した報酬と仮払いから、新しく記録する報酬（final）と返してもらう額（clawback）を決める。
 // まだ送金していない仮払いは消して差し引き（dropUnpaid）、送金済みの仮払いが確定額を超える分だけを返還とする。
-// 返還は、選手への返金額のコーチ報酬相当分（80%）が上限。それを超える分は求めない。
+// 返還は、選手への返金額のコーチ報酬相当分（75%）が上限。それを超える分は求めない。
 func supportSettle(earned, paidAdvances, unpaidAdvances, refunded int32) (final, clawback int32, dropUnpaid bool) {
 	if earned >= paidAdvances+unpaidAdvances {
 		return earned - paidAdvances - unpaidAdvances, 0, false
