@@ -86,6 +86,51 @@ export default function CoachTermsPage() {
         </p>
       </Rule>
 
+      <Rule title="11. Athlete data.">
+        <p>
+          (a) TrackTalk provides the Coach with access to athlete data (submitted videos, messages, profile information, and any health-related information an athlete enters in the designated fields) <strong>solely to perform the Services</strong> under these Terms and the applicable work order.
+        </p>
+        <p>
+          (b) The Coach must not use athlete data for any other purpose, and must not disclose, sell, or otherwise provide it to any third party. The Coach must not delegate or sub-contract any handling of athlete data to another person without TrackTalk&apos;s prior written consent.
+        </p>
+        <p>
+          (c) The Coach must access athlete data only through the Coach&apos;s own TrackTalk account and only within the TrackTalk app. The Coach must not download, copy, or store athlete data outside the app, except for temporary copies that are technically unavoidable while performing the Services; any such copy must be deleted promptly once it is no longer needed, and in any event when the relevant engagement ends.
+        </p>
+        <p>
+          (d) The Coach must take reasonable security measures for the devices and account the Coach uses (including keeping login credentials confidential and not sharing the account with any other person).
+        </p>
+        <p>
+          (e) If the Coach becomes aware of any loss, leakage, unauthorised access, or other incident involving athlete data, the Coach must notify TrackTalk <strong>without undue delay</strong> after becoming aware of it, and must cooperate with TrackTalk&apos;s response.
+        </p>
+        <p>
+          (f) When the Coach&apos;s engagement ends (or earlier, when TrackTalk so requests), the Coach must promptly stop all access to athlete data, delete any athlete data in the Coach&apos;s possession or control, and confirm the deletion to TrackTalk on request.
+        </p>
+        <p>
+          (g) The Coach must cooperate with TrackTalk&apos;s periodic checks on how athlete data is handled, and must provide the information TrackTalk reasonably requests to confirm the measures in this clause and to respond to athlete requests for explanation.
+        </p>
+        <p>
+          (h) This clause survives the end of the engagement.
+        </p>
+      </Rule>
+
+      <Rule title="12. Responsibility and liability between the parties.">
+        <p>
+          (a) TrackTalk is the contracting party vis-à-vis athletes and will respond to athletes&apos; claims in the first instance. Nothing in these Terms limits any liability that TrackTalk or the Coach owes to an athlete, and no term of the athlete-facing terms will state that TrackTalk bears no responsibility whatsoever for the Services.
+        </p>
+        <p>
+          (b) As between TrackTalk and the Coach, the Coach is not liable to TrackTalk for damages arising from an athlete&apos;s injury or other harm in connection with practising in accordance with the Coach&apos;s feedback, <strong>except</strong> to the extent the harm was caused by the Coach&apos;s wilful misconduct or gross negligence.
+        </p>
+        <p>
+          (c) Clause 12(b) does not affect clause 5 (refunds and offsets), which concerns fee adjustments for services not performed, not damages for injury or other harm.
+        </p>
+      </Rule>
+
+      <Rule title="13. Governing law and jurisdiction.">
+        <p>
+          These Terms, and each work order issued under them, are governed by the laws of Japan. The Tokyo District Court shall have exclusive jurisdiction as the court of first instance over any dispute arising out of or in connection with these Terms or any work order.
+        </p>
+      </Rule>
+
       <Rule title="Privacy">
         <p>
           How TrackTalk handles the Coach&apos;s personal data is explained in the{" "}
