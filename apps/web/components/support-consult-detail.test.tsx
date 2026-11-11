@@ -10,9 +10,9 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 
 const proposal = {
-  competition_name: "秋季記録会", support_start_date: "2026-11-20", competition_date: "2026-12-20", duration_days: 31,
-  call_count: 1, call_minutes: 30, price_yen: 9000, fee_percent: 20,
-  coach_receives_yen: 7200, content_note: "週1回の返答", answer_to_question: "週1回で十分です", valid_until: "2026-11-30T15:00:00Z", valid_until_date: "2026-11-30",
+  competition_name: "秋季記録会", support_start_date: "2026-11-20", competition_date: "2026-12-19", duration_days: 30,
+  call_count: 1, call_minutes: 30, price_yen: 9000, fee_percent: 25,
+  coach_receives_yen: 6750, content_note: "週1回の返答", answer_to_question: "週1回で十分です", valid_until: "2026-11-30T15:00:00Z", valid_until_date: "2026-11-30",
 };
 const base: SupportConsult = {
   id: "s1", status: "proposed", minor: false, event: "100m", answer_by: null, contract_id: null, created_at: "2026-11-09T00:00:00Z", updated_at: "2026-11-09T00:00:00Z",
@@ -34,7 +34,7 @@ const button = (text: string) => [...container.querySelectorAll("button")].find(
 it("選手は提案を1画面で確認できる（期間・内容・価格・開始日・有効期限）", async () => {
   await render(base, "athlete");
   const text = container.textContent!;
-  expect(text).toContain("2026-11-20 〜 2026-12-20（目標大会の日まで・31日間）");
+  expect(text).toContain("2026-11-20 〜 2026-12-19（1ヶ月・30日間）");
   expect(text).toContain("9,000円");
   expect(text).toContain("2026-11-30 の終わりまで");
   expect(text).toContain("週1回で十分です");
@@ -87,15 +87,15 @@ it("コーチの聞き直し中は、選手が答えを送れる", async () => {
   expect(ta).not.toBeNull();
 });
 
-it("コーチには相談の回答が区分ごとに見え、手数料20%を引いた受け取りが提案の入力中に見える", async () => {
+it("コーチには相談の回答が区分ごとに見え、手数料25%を引いた受け取りが提案の入力中に見える", async () => {
   await render({ ...base, status: "requested", proposal: null }, "coach");
   expect(container.textContent).toContain("相談フォームの回答");
   expect(container.textContent).toContain("提案を出す");
-  expect(container.textContent).toContain("運営手数料は20%です");
+  expect(container.textContent).toContain("運営手数料は25%です");
   const price = container.querySelector('input[aria-label="価格"]') as HTMLInputElement;
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
   await act(async () => { setter.call(price, "10000"); price.dispatchEvent(new Event("input", { bubbles: true })); });
-  expect(container.textContent).toContain("あなたの受け取り: 8,000円");
+  expect(container.textContent).toContain("あなたの受け取り: 7,500円");
   expect(container.textContent).toContain("選手の質問への回答「週に何回送る？」");
   expect(button("辞退する")).toBeDefined();
   expect(button("選手に聞き直す")).toBeDefined();
@@ -108,12 +108,12 @@ it("選手は提案前なら相談を取り下げられる", async () => {
   expect(button("相談を取り下げる")).toBeUndefined();
 });
 
-it("提案画面に、日割りの算定例・返金の時期と方法・中止延期の扱い・終了後のチャット閲覧期間が出る", async () => {
+it("提案画面に、日割りの算定例・返金の時期と方法・終了後のチャット閲覧期間が出る（中止延期の扱いは出ない）", async () => {
   await render(base, "athlete");
   const text = container.textContent!;
-  expect(text).toContain("9,000円・31日間の契約を10日目に終えると、残り21日分の6,096円を返金します");
+  expect(text).toContain("9,000円・30日間の契約を10日目に終えると、残り20日分の6,000円を返金します");
   expect(text).toContain("お支払いに使ったカードへ返金");
-  expect(text).toContain("主催者が中止・延期を正式に発表した日で契約を終えます");
+  expect(text).not.toContain("中止");
   expect(text).toContain("契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります");
   expect(text).toContain("動画のファイルは契約の終わりから30日で削除します");
 });

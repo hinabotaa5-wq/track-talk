@@ -28,7 +28,7 @@ func supportRemainingByDays(ct db.CoachingContract, now time.Time) int32 {
 
 func supportRemaining(ct db.CoachingContract, usage db.SupportUsageRow) int32 {
 	if supportUnlimited(ct) {
-		// 途中で終えた契約は終了の日（大会の中止・延期は主催者の発表の日）、それ以外は今日を経過扱いにする。
+		// 途中で終えた契約は終了の日、それ以外は今日を経過扱いにする。
 		return supportUnprovidedAsOf(ct, supportAsOf(ct, time.Now()))
 	}
 	total := int64(ct.CallCount)

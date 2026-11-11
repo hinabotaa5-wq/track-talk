@@ -49,7 +49,7 @@ function Answers({ consult }: { consult: SupportConsult }) {
 export function ProposalCard({ p, role }: { p: SupportConsultProposal; role: "athlete" | "coach" }) {
   const rows: [string, string][] = [
     [L("大会"), p.competition_name],
-    [L("期間"), L("{support_start_date} 〜 {competition_date}（目標大会の日まで・{duration_days}日間）", { support_start_date: p.support_start_date, competition_date: p.competition_date, duration_days: p.duration_days })],
+    [L("期間"), L("{support_start_date} 〜 {competition_date}（1ヶ月・{duration_days}日間）", { support_start_date: p.support_start_date, competition_date: p.competition_date, duration_days: p.duration_days })],
     [L("サポートの内容"), L(supportStandardContent)],
     [L("ビデオ通話"), p.call_count ? L("{call_count}回・1回{call_minutes}分", { call_count: p.call_count, call_minutes: p.call_minutes }) : L("なし")],
     [L("価格"), L("{v0}（カード払い）", { v0: formatYen(p.price_yen) })],
@@ -142,7 +142,6 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
   const a = consult.answers;
   const [d, setD] = useState({
     competition_name: a.goal_decided ? a.competition_name : "", support_start_date: a.start_timing === "date" ? a.start_date : today(),
-    competition_date: a.goal_decided ? a.competition_date : "",
     call_count: 0, call_minutes: 30, price: "", ...noConsents, content_note: "", answer_to_question: "", valid_until: "",
   });
   const { error, fields, pending, run } = useAction(token, onChange);
@@ -158,16 +157,15 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
     }
     void run(`/v1/support-consults/${consult.id}/propose`, { ...d, price_yen: Number.isFinite(price) ? Math.trunc(price) : 0, confirm_high_price: confirmHigh });
   }
-  const fee = Number.isFinite(price) && price > 0 ? price - Math.floor((price * 20) / 100) : null;
+  const fee = Number.isFinite(price) && price > 0 ? price - Math.floor((price * 25) / 100) : null;
   return (
     <form className="space-y-3 rounded-xl border border-white/20 p-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <h3 className="font-bold">{L("提案を出す")}</h3>
       <ContactNotice />
       {guard.warning}
-      <p className="text-xs text-slate-300">{L("期間は「開始日〜目標大会の日」です。開始日と提案の有効期限は、相談の内容をふまえてここで決めます。")}</p>
-      <FieldBlock label={L("大会名")} error={fields.competition_name}><Input aria-label={L("提案の大会名")} maxLength={100} value={d.competition_name} onChange={(e) => set({ competition_name: e.target.value })} /></FieldBlock>
+      <p className="text-xs text-slate-300">{L("期間は開始日から1ヶ月（30日間）です。開始日と提案の有効期限は、相談の内容をふまえてここで決めます。目標の大会は目標として添えるだけで、期間は大会の日に左右されません。")}</p>
+      <FieldBlock label={L("目標の大会名")} error={fields.competition_name}><Input aria-label={L("提案の大会名")} maxLength={100} value={d.competition_name} onChange={(e) => set({ competition_name: e.target.value })} /></FieldBlock>
       <FieldBlock label={L("開始日")} error={fields.support_start_date}><Input aria-label={L("開始日")} type="date" value={d.support_start_date} onChange={(e) => set({ support_start_date: e.target.value })} /></FieldBlock>
-      <FieldBlock label={L("目標大会の日（終了日）")} error={fields.competition_date}><Input aria-label={L("目標大会の日")} type="date" value={d.competition_date} onChange={(e) => set({ competition_date: e.target.value })} /></FieldBlock>
       <div className="rounded-lg border border-white/20 bg-white/5 p-2 text-xs text-slate-200">
         <p className="font-semibold">{L("サポートの内容（標準形・変更できません）")}</p>
         <p>{L(supportStandardContent)}</p>
@@ -177,7 +175,7 @@ function ProposalForm({ consult, token, onChange }: { consult: SupportConsult; t
         <select aria-label={L("通話の長さ")} className={selectClass} value={d.call_minutes} onChange={(e) => set({ call_minutes: Number(e.target.value) })}>{[15, 30, 45, 60].map((n) => <option key={n} value={n}>{L("{n}分", { n })}</option>)}</select>
       </FieldBlock> : null}
       <FieldBlock label={L("価格（円・2,000円以上）")} error={fields.price_yen}><Input aria-label={L("価格")} inputMode="numeric" value={d.price} onChange={(e) => set({ price: e.target.value })} /></FieldBlock>
-      {fee != null ? <p className="text-xs text-slate-300">{L("運営手数料20%を引いた、あなたの受け取り: {v0}", { v0: formatYen(fee) })}</p> : <p className="text-xs text-slate-300">{L("運営手数料は20%です。")}</p>}
+      {fee != null ? <p className="text-xs text-slate-300">{L("運営手数料25%を引いた、あなたの受け取り: {v0}", { v0: formatYen(fee) })}</p> : <p className="text-xs text-slate-300">{L("運営手数料は25%です。")}</p>}
       <FieldBlock label={L("内容の補足（任意）")} error={fields.content_note}><Textarea aria-label={L("内容の補足")} rows={3} maxLength={500} value={d.content_note} onChange={(e) => set({ content_note: e.target.value })} /></FieldBlock>
       {a.question_to_coach ? <FieldBlock label={L("選手の質問への回答「{question_to_coach}」", { question_to_coach: a.question_to_coach })} error={fields.answer_to_question}><Textarea aria-label={L("質問への回答")} rows={3} maxLength={1000} value={d.answer_to_question} onChange={(e) => set({ answer_to_question: e.target.value })} /></FieldBlock> : null}
       <FieldBlock label={L("提案の有効期限（この日の終わりまで）")} error={fields.valid_until}><Input aria-label={L("提案の有効期限")} type="date" value={d.valid_until} onChange={(e) => set({ valid_until: e.target.value })} /></FieldBlock>

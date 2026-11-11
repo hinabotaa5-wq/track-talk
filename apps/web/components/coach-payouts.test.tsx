@@ -20,7 +20,7 @@ it("links to the payout guide from the unregistered notice", async () => {
     this_month_yen: 0,
     unpaid_yen: 0,
     review_share: 70,
-    personal_fee: 20,
+    personal_fee: 25,
     min_payout_yen: 3000,
     payouts: [],
     next_payout_date: null,
@@ -46,7 +46,7 @@ async function renderEarnings(payouts_enabled: boolean, stripe_linked: boolean) 
     this_month_yen: 0,
     unpaid_yen: 0,
     review_share: 70,
-    personal_fee: 20,
+    personal_fee: 25,
     min_payout_yen: 3000,
     payouts: [],
     next_payout_date: null,
@@ -92,7 +92,7 @@ it.each([
     this_month_yen: 0,
     unpaid_yen: 1050,
     review_share: 70,
-    personal_fee: 20,
+    personal_fee: 25,
     min_payout_yen: 3000,
     payouts: [],
     next_payout_date: date,
@@ -104,7 +104,7 @@ it.each([
   try {
     await act(async () => root.render(<CoachEarningsSection token="test" onReady={() => {}} />));
     expect(container.textContent).toContain("動画添削の報酬は1本1,050円、添削後の追加相談は1件420円です");
-    expect(container.textContent).toContain("サポートプランの受取額は、代金から手数料20%を差し引いた額です。");
+    expect(container.textContent).toContain("サポートプランの受取額は、代金から手数料25%を差し引いた額です。");
     expect(container.textContent).toContain("翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。");
     expect(container.textContent).toContain("3,000円未満の場合は1回だけ繰り越し、翌々月15日に金額にかかわらず支払います。");
     expect(container.textContent).not.toContain("チケットのまとめ買い割引");

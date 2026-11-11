@@ -18,16 +18,18 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 大会までプラン（無料相談の提案から成立した、動画への返答が無制限の契約）の途中終了とコーチ報酬の精算。
+// 1ヶ月プラン（無料相談の提案から成立した、動画への返答が無制限の契約）の途中終了とコーチ報酬の精算。
 //
 //   - 解約料・違約金・手数料は取らない。未経過分は「契約価格 ÷ 期間日数 × 未経過日数」（円未満切り捨て）で全額返金する。
-//   - コーチ報酬は契約終了時に、経過日数の日割り（経過分の価格の80%）で確定する。月次送金はそれまでの「確定前の仮払い」。
-//   - コーチ都合（帰責事由あり）は選手へ全額返金する。コーチは、返金額の80%を上限に仮払いを返す（没収ではなく返還・精算）。
+//     期間日数は契約期間（1ヶ月）の日数で、#488 で確定した数え方（開始日の JST 日付・両端を含む）を流用する。
+//   - コーチ報酬は契約終了時に、経過日数の日割り（経過分の価格の75%）で確定する。月次送金はそれまでの「確定前の仮払い」。
+//   - コーチ都合（帰責事由あり）は選手へ全額返金する。コーチは、返金額の75%を上限に仮払いを返す（没収ではなく返還・精算）。
 //     返金が終わるまで、その契約のコーチ分は送金しない（留保）。
-//   - やむを得ない事情・選手の都合・大会の中止延期は、通常の精算（経過分は支払い、未経過分は返金）。
-//     大会の中止・延期は、主催者の正式発表の日で終える（振り替え・延長はしない）。
+//   - やむを得ない事情・選手の都合は、通常の精算（経過分は支払い、未経過分は返金）。
+//   - 大会の中止・延期での終了は、1ヶ月プランでは前提が消滅したため無効化する（下の supportEndCancelled は残すが、
+//     新規の終了理由としては受け付けない。既存データの解釈は変えない）。
 
-// 終わり方。
+// 終わり方。supportEndCancelled は無効化済み（受け付けない）のため、新規には使わない。削除はしない。
 const (
 	supportEndPlayer      = "player"
 	supportEndCoachFault  = "coach_fault"
@@ -101,8 +103,9 @@ func supportEarnedAsOf(ct db.CoachingContract, asOf time.Time) int32 {
 
 // supportCoachEarned は、契約終了時に確定するコーチ報酬。
 //   - コーチ都合: 0円（選手へ全額返金。仮払いは返還・精算する）
-//   - 選手の都合・やむを得ない事情・大会の中止延期: 終了の日までの経過日数の日割り（返金額によらない）
-//   - それ以外（目標大会の日まで終えた、運営の全額返金など）: 払われた額（返金を引いたもの）の80%
+//   - 選手の都合・やむを得ない事情: 終了の日までの経過日数の日割り（返金額によらない）
+//   - 大会の中止延期: 新規の終了理由としては受け付けないが、既存データの解釈は変えない（同じく経過日数の日割り）
+//   - それ以外（期間を終えた、運営の全額返金など）: 払われた額（返金を引いたもの）の75%
 func supportCoachEarned(ct db.CoachingContract, paid, refunded int32) int32 {
 	cause := ""
 	if ct.SupportEndCause != nil {
@@ -264,7 +267,11 @@ func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request)
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
 	switch req.Cause {
-	case supportEndPlayer, supportEndCoachFault, supportEndUnavoidable, supportEndCancelled:
+	case supportEndPlayer, supportEndCoachFault, supportEndUnavoidable:
+	case supportEndCancelled:
+		// 大会の中止・延期での終了は、1ヶ月プランでは前提が消滅したため受け付けない（無効化。定数・列・既存の解釈は残す）。
+		Error(w, http.StatusBadRequest, "validation_error", "大会の中止・延期による終了は1ヶ月プランでは扱いません")
+		return
 	default:
 		Error(w, http.StatusBadRequest, "validation_error", "終わり方が不正です")
 		return
@@ -569,27 +576,27 @@ func issueSupportContractStatement(ctx context.Context, q *db.Queries, ct db.Coa
 	}
 	period := ""
 	if ct.SupportStartDate != nil && ct.CompetitionDate != nil {
-		period = ct.SupportStartDate.Format("2006年1月2日") + "〜" + ct.CompetitionDate.Format("2006年1月2日") + "（目標大会の日まで）"
+		period = ct.SupportStartDate.Format("2006年1月2日") + "〜" + ct.CompetitionDate.Format("2006年1月2日") + "（1ヶ月・30日間）"
 	}
 	desc := ""
 	if ct.PlanDescription != nil {
 		desc = *ct.PlanDescription
 	}
 	body := map[string]any{
-		"title":           "取引条件の明示（大会までプラン）",
+		"title":           "取引条件の明示（1ヶ月プラン）",
 		"contract_id":     ct.ID.String(),
 		"contracted_on":   supportDay(time.Now()).Format(time.DateOnly),
 		"principal":       "TrackTalk 運営者（本サービスの運営者）",
-		"service":         "大会までプランのサポート（目標大会: " + competition + "）。" + desc + " 返答は24時間以内を目安とします。",
+		"service":         "1ヶ月プランのサポート（目標: " + competition + "）。" + desc + " 返答は24時間以内を目安とします。",
 		"period":          period,
 		"price_yen":       ct.PriceYen,
 		"fee_percent":     personalFeePercent,
 		"coach_share_yen": supportCoachShare(ct.PriceYen),
-		"pay_calculation": "報酬は契約終了時に、経過日数の日割り（契約価格 ÷ 期間日数 × 経過日数、円未満切り捨て）の80%で確定します。期間日数は実際の開始日から目標大会の日まで（両端を含む）。",
+		"pay_calculation": "報酬は契約終了時に、経過日数の日割り（契約価格 ÷ 期間日数 × 経過日数、円未満切り捨て）の75%で確定します。期間日数は契約期間（1ヶ月）の日数（実際の開始日から両端を含む30日）です。",
 		"advance":         "期間中は、毎月末日までの経過日数ぶんを確定前の仮払いとして送金します。確定額との差額は契約終了後に精算します。",
 		"payment_due":     supportPayoutDayText(),
-		"early_end":       "途中で終わった場合も解約料は取りません。選手へは未経過分を日割りで全額返金し、報酬は終了日までの経過分で確定します。大会の中止・延期は主催者の正式発表の日で終了します（振り替え・延長なし）。",
-		"coach_fault":     "コーチの責めに帰すべき事由で終わった場合は選手へ全額返金し、コーチは返金額の80%を上限に受け取った仮払いを返還します（それを超える賠償は求めません）。返金が終わるまで、この契約の報酬の送金を留めます。",
+		"early_end":       "途中で終わった場合も解約料は取りません。選手へは未経過分を日割りで全額返金し、報酬は終了日までの経過分で確定します。",
+		"coach_fault":     "コーチの責めに帰すべき事由で終わった場合は選手へ全額返金し、コーチは返金額の75%を上限に受け取った仮払いを返還します（それを超える賠償は求めません）。返金が終わるまで、この契約の報酬の送金を留めます。",
 		"unavoidable":     "本人の入院・死亡、災害による業務不能、法令による業務停止など、やむを得ない事情の場合は通常の精算とします。判定の理由は書面（電磁的記録）で通知し、異議申立て（再審査）を1回受け付けます。",
 		"payment_method":  "Stripe Connect の受け取り口座への送金",
 	}

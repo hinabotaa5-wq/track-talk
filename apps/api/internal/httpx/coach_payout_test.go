@@ -255,7 +255,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
 	}
 
-	// パーソナル指導: 8,000円の期間が終わった。手数料は20%。
+	// パーソナル指導: 8,000円の期間が終わった。手数料は25%。
 	tu, tc, contractID := adultAccepted(t, h)
 	var personalCoach string
 	queryRowArgs(t, `SELECT coach_id FROM coaching_contracts WHERE id = $1`, []any{contractID}, &personalCoach)
@@ -275,7 +275,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 1050 || e.UnpaidYen != 1050 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
 		t.Fatalf("review earnings %+v", e)
 	}
-	if e := coachEarnings(t, h, tc); e.UnpaidYen != 6400 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 80 {
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 6000 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 75 {
 		t.Fatalf("personal earnings %+v", e)
 	}
 
@@ -309,7 +309,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		}
 		got[tr.Get("destination")] = tr.Get("amount")
 	}
-	if got["acct_"+reviewCoach.String()] != "4200" || got["acct_"+personalCoach] != "6400" || len(got) != 2 {
+	if got["acct_"+reviewCoach.String()] != "4200" || got["acct_"+personalCoach] != "6000" || len(got) != 2 {
 		t.Fatalf("transfers %v", got)
 	}
 	// 済んだものは送り直さない。
@@ -323,7 +323,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"created":0,"paid":2,"failed":0`) || len(f.transferList()) != 2 {
 		t.Fatalf("run after lost update %s %d", rec.Body.String(), len(f.transferList()))
 	}
-	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 6400 || !e.Earnings[0].Paid {
+	if e := coachEarnings(t, h, tc); e.UnpaidYen != 0 || len(e.Payouts) != 1 || e.Payouts[0].Status != "paid" || e.Payouts[0].AmountYen != 6000 || !e.Earnings[0].Paid {
 		t.Fatalf("after payout %+v", e)
 	}
 
@@ -523,7 +523,7 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 	for _, tc := range []struct {
 		token string
 		total int
-	}{{coach, 3150}, {personalCoach, 6400}} {
+	}{{coach, 3150}, {personalCoach, 6000}} {
 		view := coachEarnings(t, h, tc.token)
 		if view.ThisMonthYen != 0 || view.UnpaidYen != tc.total || len(view.Earnings) == 0 {
 			t.Fatalf("earnings %+v", view)

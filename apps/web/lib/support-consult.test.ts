@@ -31,13 +31,13 @@ describe("大会までプランの途中終了の表示", () => {
     expect(supportProrationExample(10000, 3)).toEqual({ total: 3, elapsed: 1, remaining: 2, refund: 6666 });
     expect(supportProrationExample(5000, 1)).toEqual({ total: 1, elapsed: 1, remaining: 0, refund: 0 });
   });
-  it("算定例・返金の時期と方法・中止延期・チャットの閲覧期間をすべて出す", () => {
+  it("算定例・返金の時期と方法・チャットの閲覧期間を出す（中止延期の扱いは出ない）", () => {
     const text = supportTermsLines(9000, 30).map((l) => `${l.label} ${l.text}`).join("\n");
     expect(text).toContain("残り20日分の6,000円を返金");
     expect(text).toContain("解約料・違約金はかかりません");
     expect(text).toContain("お支払いに使ったカードへ返金");
-    expect(text).toContain("主催者が中止・延期を正式に発表した日");
-    expect(text).toContain("振り替えや期間の延長はしません");
+    expect(text).toContain("実際に始まった日から1ヶ月（両端を含む30日）");
+    expect(text).not.toContain("中止");
     expect(text).toContain("契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります");
     expect(text).toContain("終わるまでのあいだに、やりとり（文章とメニュー）をダウンロードできます");
     expect(text).not.toContain("90日");

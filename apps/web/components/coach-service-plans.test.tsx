@@ -3,9 +3,11 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CoachServicePlans } from "./coach-service-plans";
-import type { CoachingPlan, CoachingServiceType } from "@/lib/types";
+import type { CoachingPlan } from "@/lib/types";
+import type { PublicSupportConsult } from "@/lib/support-consult";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 const plan: CoachingPlan = { id: "support", title: "スタートを改善する", description: "改善点とドリルを返します", kind: "single", duration_days: 7, price_yen: 2000, capacity: 2, published: true, service_type: "competition_support", video_reviews: 1, menu_updates: null, reply_formats: ["text"], start_on_first_video: false };
+const consult: PublicSupportConsult = { events: ["100m"], description: "見ます", price_min_yen: 5000, price_max_yen: 12000, reception: { status: "open", resume_on: null } };
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
@@ -13,44 +15,35 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-async function render(plans = [plan], services: CoachingServiceType[] = ["competition_support"]) {
-  await act(async () => root.render(<CoachServicePlans plans={plans} services={services} />));
+async function render(plans: CoachingPlan[] = [plan], coachID = "c1", c: PublicSupportConsult | null = consult) {
+  await act(async () => root.render(<CoachServicePlans plans={plans} coachID={coachID} consult={c} />));
 }
-it("最初は大会と対面の2択だけを表示し、受付していないサービスは選べない", async () => {
+it("単一の「サポートプラン」セクションに、受付状況・価格目安・無料相談ボタンを出す。種別の切り分けはしない", async () => {
   await render();
-  const buttons = [...container.querySelectorAll("button")];
-  expect(buttons).toHaveLength(2);
-  expect(buttons.map((button) => button.disabled)).toEqual([false, true]);
-  expect(buttons[0].textContent).toContain("大会までプラン");
-  expect(container.textContent).not.toContain(plan.description);
-  await act(async () => buttons[0].click());
-  expect(buttons[0].getAttribute("aria-expanded")).toBe("true");
-  expect(container.textContent).toContain(plan.description);
-  expect(container.querySelector("a")?.getAttribute("href")).toBe("/coaching/personal/plans/support");
+  expect(container.querySelectorAll("button").length).toBe(0);
+  expect(container.textContent).toContain("サポートプラン");
+  expect(container.textContent).toContain("受付中");
+  expect(container.textContent).toContain("5,000円〜12,000円");
+  expect(container.querySelector("a")?.getAttribute("href")).toBe("/coaches/c1/consult");
+  expect(container.querySelector("a")?.textContent).toBe("無料相談をする");
+  // 価格の決まった完成品のプランは出さない。
+  expect(container.textContent).not.toContain("スタートを改善する");
 });
-it("別の種類へ切り替えると選択したプランだけを表示する", async () => {
-  await render([plan, { ...plan, id: "in-person", title: "競技場での指導", service_type: "in_person" }], ["competition_support", "in_person"]);
-  const buttons = [...container.querySelectorAll("button")];
-  await act(async () => buttons[0].click());
-  await act(async () => buttons[1].click());
-  expect(container.textContent).toContain("競技場での指導");
-  expect(container.textContent).not.toContain(plan.title);
+
+it("対面プランは出さない", async () => {
+  await render([{ ...plan, id: "in-person", title: "競技場での指導", service_type: "in_person" }]);
+  expect(container.textContent).not.toContain("競技場での指導");
+  expect(container.textContent).toContain("無料相談をする");
 });
-it("公開プランがないサービスは無効にし、分類のない既存プランは残す", async () => {
-  await render([{ ...plan, service_type: null }], ["video_review"]);
-  expect([...container.querySelectorAll("button")].every((button) => button.disabled)).toBe(true);
+
+it("相談の入口がないコーチは受付停止の表示になり、分類のない既存プランは残す", async () => {
+  await render([{ ...plan, service_type: null }], "c1", null);
+  expect(container.textContent).toContain("このコーチは受付していません");
   expect(container.textContent).toContain("従来のサポートプラン");
   expect(container.textContent).toContain(plan.title);
 });
-it("満員でも内容は確認でき、申し込みはできない", async () => {
-  await render([{ ...plan, full: true }]);
-  await act(async () => container.querySelector("button")!.click());
-  expect(container.textContent).toContain("いまは満員です");
-  expect(container.querySelector("a")).toBeNull();
-});
 
 it("従来の動画添削はサポートプランに表示しない", async () => {
- await render([{...plan,service_type:"video_review"}], ["video_review"]);
- expect(container.textContent).not.toContain(plan.title);
- expect([...container.querySelectorAll("button")].some(b=>b.textContent?.includes("動画添削"))).toBe(false);
+  await render([{ ...plan, service_type: "video_review" }], "c1", null);
+  expect(container.textContent).not.toContain(plan.title);
 });

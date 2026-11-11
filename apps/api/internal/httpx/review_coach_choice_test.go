@@ -289,7 +289,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 			t.Fatalf("mode %v", form)
 		}
 	}
-	// サポートプラン: 8,000円の期間が終わった。手数料は20%。
+	// サポートプラン: 8,000円の期間が終わった。手数料は25%。
 	tu, tc, contractID := adultAccepted(t, h)
 	var coach string
 	queryRowArgs(t, `SELECT coach_id FROM coaching_contracts WHERE id = $1`, []any{contractID}, &coach)
@@ -325,7 +325,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 		t.Fatal(r.Body.String())
 	}
 	transfers := f.transferList()
-	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "7450" {
+	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "7050" {
 		t.Fatalf("transfers %v", transfers)
 	}
 }
