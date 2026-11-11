@@ -939,6 +939,13 @@ type NotificationSetting struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type OverseasInterest struct {
+	ProfileID uuid.UUID `json:"profile_id"`
+	Kind      string    `json:"kind"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Post struct {
 	ID                  uuid.UUID  `json:"id"`
 	AuthorID            uuid.UUID  `json:"author_id"`

@@ -31,3 +31,7 @@ export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUM
 // 開始日に立てて一覧へ切り替える（日付を画面に直書きしない。開始日と開放の手順は運営者が決める）。
 // 一覧の API は /v1/coaches/support-plan（COACHING_COACH_LIST_ENABLED の側）。
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
+
+// 海外コーチの指導希望の集計カード（コーチタブの独立カード、本体 #542）。
+// 集計が目的なので、デプロイ後は表示される状態で出す。正式開始のタイミングで運営者が消せる。
+export const overseasInterestEnabled = flagEnabled(process.env.NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED);
