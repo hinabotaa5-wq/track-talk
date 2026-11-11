@@ -10,6 +10,7 @@ import { CoachingContractsAdmin } from "@/components/coaching-admin";
 import { PayoutsAdmin } from "@/components/coach-payouts";
 import { useAuth } from "@/components/auth-provider";
 import { MeetSessionsAdmin } from "@/components/meet-sessions-admin";
+import { OverseasInterestAdmin } from "@/components/overseas-interest-admin";
 import { MenuContestAdmin } from "@/components/menu-contest-admin";
 import { ReportHideActions, hideTargets } from "@/components/report-hide-actions";
 import { ViewSwitch } from "@/components/view-switch";
@@ -62,7 +63,7 @@ const targetLabels: Record<AdminReport["target_type"], string> = {
 
 const perPage = 20;
 
-type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats" | "announce";
+type Tab = "reports" | "feedback" | "contact" | "requests" | "products" | "coaches" | "personal" | "payouts" | "menu" | "meets" | "stats" | "announce" | "overseas";
 
 function useAdminList<T>(path: string, key: "reports" | "inquiries", enabled: boolean, token: string | null) {
   // ページごとに持つ。トークンの更新で同じページを読み直しても、行が二重に足されない。
@@ -646,7 +647,7 @@ export default function AdminPage() {
   }
 
   const lists = { reports, feedback, contact, requests };
-  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats" || tab === "announce";
+  const custom = tab === "products" || tab === "coaches" || tab === "personal" || tab === "payouts" || tab === "menu" || tab === "meets" || tab === "stats" || tab === "announce" || tab === "overseas";
   const list = custom ? contact : lists[tab];
   const tabs: { id: Tab; label: string; total: number }[] = [
     { id: "reports", label: "通報", total: visited.reports ? reports.total : -1 },
@@ -662,6 +663,7 @@ export default function AdminPage() {
     { id: "meets", label: "タイムテーブル", total: -1 },
     { id: "stats", label: "利用状況", total: -1 },
     { id: "announce", label: "お知らせ", total: -1 },
+    { id: "overseas", label: "海外希望", total: -1 },
   ];
 
   return (
@@ -692,6 +694,7 @@ export default function AdminPage() {
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
       {tab === "stats" ? <AdminStatsView token={token} /> : null}
       {tab === "announce" ? <AnnouncementsAdmin token={token} /> : null}
+      {tab === "overseas" ? <OverseasInterestAdmin token={token} /> : null}
       {custom ? null : list.error ? <p className="text-sm text-red-400">{list.error}</p> : null}
       {custom ? null : tab === "reports" ? (
         <ul className="space-y-3">
