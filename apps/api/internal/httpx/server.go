@@ -174,6 +174,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/me/target-meet", s.getTargetMeet)
 			r.Put("/me/target-meet", s.setTargetMeet)
 			r.Delete("/me/target-meet", s.deleteTargetMeet)
+			// 海外コーチの指導希望の集計（本体 #542）。ログイン必須、1ユーザー1件。
+			r.Get("/me/overseas-interest", s.getOverseasInterest)
+			r.Put("/me/overseas-interest", s.putOverseasInterest)
+			r.Delete("/me/overseas-interest", s.deleteOverseasInterest)
 			r.Put("/menu-contest/entry", s.saveMenuContestEntry)
 			r.Delete("/menu-contest/entry", s.deleteMenuContestEntry)
 			r.Put("/menu-contest/vote", s.voteMenuContest)
@@ -261,6 +265,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/menu-contest", s.adminMenuContest)
 			r.Get("/admin/stats", s.adminStats)
 			r.Get("/admin/stats/coaching", s.adminCoachingStats)
+			r.Get("/admin/overseas-interests", s.adminOverseasInterests)
 			r.Put("/admin/menu-contest/finalists", s.setMenuContestFinalists)
 			r.Get("/admin/announcements", s.adminListAnnouncements)
 			r.Get("/admin/announcements/recipients", s.adminAnnouncementRecipients)

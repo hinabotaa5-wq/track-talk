@@ -471,6 +471,16 @@ export type AdminCoachPayout = CoachPayout & {
   created_at: string;
 };
 
+// 海外コーチの指導希望（本体 #542）。1ユーザー1件。登録数は利用者に見せない。
+export type OverseasInterestKind = "monthly" | "single" | "both";
+export type OverseasInterest = { kind: OverseasInterestKind };
+export type AdminOverseasInterestItem = { kind: OverseasInterestKind; nickname: string; created_at: string };
+export type AdminOverseasInterests = {
+  total: number;
+  breakdown: Record<OverseasInterestKind, number>;
+  interests: AdminOverseasInterestItem[];
+};
+
 // パーソナル指導のプラン。period は2週間か1か月、single は7日以内に終わる単発、
 // trial はそのコーチの指導をはじめて受ける人だけが申し込める7日のお試し。
 export type CoachingServiceType = "video_review" | "competition_support" | "in_person";

@@ -108,7 +108,7 @@ type Config struct {
 	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
 	// 感覚メモを Claude(Anthropic)に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
 	SenseSummaryEnabled bool
-	// StaffMFARequired が true なら、管理者と承認済みコーチの API は二段階認証(aal2)を済ませたログインでしか使えない。
+	// StaffMFARequired が true なら、管理者の API は二段階認証(aal2)を済ませたログインでしか使えない。
 	// 管理者・コーチが二段階認証を設定し終えるまで、本番では立てない。
 	StaffMFARequired bool
 	// Anthropic の API キー。感覚メモのまとめに使う。空ならまとめは作れない。
