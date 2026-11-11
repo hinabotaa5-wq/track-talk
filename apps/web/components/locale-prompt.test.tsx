@@ -10,6 +10,8 @@ const auth = vi.hoisted(() => ({ session: null as unknown, sessionLoading: false
 vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({ session: auth.session, sessionLoading: auth.sessionLoading }),
 }));
+const nav = vi.hoisted(() => ({ pathname: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>{children}</a>
@@ -28,6 +30,7 @@ beforeEach(() => {
   localStorage.clear();
   auth.session = null;
   auth.sessionLoading = false;
+  nav.pathname = "/";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -50,6 +53,13 @@ describe("未ログイン時の言語選択プロンプト", () => {
     expect(localStorage.getItem("tracktalk-locale")).toBe("en");
     expect(localStorage.getItem("tracktalk:locale-prompted")).toBe("1");
     expect(container.textContent).not.toContain("Choose your language");
+  });
+
+  it("英語固定の海外コーチ向け紹介ページ（/for-coaches）では出さない", async () => {
+    nav.pathname = "/for-coaches";
+    await act(async () => root.render(<LocalePrompt />));
+    expect(container.textContent).not.toContain("Choose your language");
+    expect(localStorage.getItem("tracktalk:locale-prompted")).toBeNull();
   });
 
   it("答えたあとは出ない", async () => {
