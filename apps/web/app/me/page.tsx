@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { AtSign, Award, Bell, Languages, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
@@ -15,7 +15,6 @@ import { t, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { ThemeSwitch } from "@/components/theme-switch";
-import { LanguageSwitch } from "@/components/language-switch";
 
 const accountLinks = [
   { href: "/me/posts", get label() { return L("自分の投稿"); }, icon: LayoutGrid },
@@ -114,7 +113,7 @@ export default function MePage() {
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
-        <LanguageSwitch />
+        <MenuLink href="/me/language" label={t(locale, "profile.language")} icon={Languages} />
         {token && userId ? (
           <PushPermissionGuide
             key={userId}

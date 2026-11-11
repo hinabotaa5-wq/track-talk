@@ -40,7 +40,7 @@ describe("hasBackOnlyHeader", () => {
 
   it("マイページの中の画面は、どれも戻るボタンだけのヘッダーにする。マイページ本体は対象外", () => {
     expect(hasBackOnlyHeader("/me")).toBe(false);
-    for (const path of ["/me/profile", "/me/badge", "/me/push", "/me/sense", "/me/coaching/requests"]) {
+    for (const path of ["/me/profile", "/me/badge", "/me/language", "/me/push", "/me/sense", "/me/coaching/requests"]) {
       expect(hasBackOnlyHeader(path)).toBe(true);
       expect(showsBackButton(path)).toBe(true);
     }

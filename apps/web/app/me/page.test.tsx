@@ -218,12 +218,11 @@ it("認証エラー（401）では取り直しを繰り返さず、入口も出�
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
-it("表示言語は独立したカードではなく、設定一覧（nav）の中の1行として出す（#536）", async () => {
+it("表示言語は他の設定と同じく、設定一覧（nav）の1行から1つ奥の画面へ進む（#536）", async () => {
   await renderSignedIn();
-  const group = container.querySelector('[role="radiogroup"][aria-labelledby="language-switch-title"]');
-  expect(group).not.toBeNull();
-  expect(group!.closest("nav")).not.toBeNull();
-  expect(container.querySelector("#language-switch-title")?.textContent).toBe("表示言語");
-  expect(container.querySelector('section[aria-labelledby="language-switch-title"]')).toBeNull();
-  expect([...group!.querySelectorAll('[role="radio"]')].map((b) => b.textContent)).toEqual(["日本語", "English"]);
+  const link = container.querySelector<HTMLAnchorElement>('nav a[href="/me/language"]');
+  expect(link?.textContent).toBe("表示言語");
+  expect(container.querySelector('[role="radiogroup"][lang], [role="radio"][lang]')).toBeNull();
+  const links = [...container.querySelectorAll("nav a")].map((a) => a.getAttribute("href"));
+  expect(links.indexOf("/me/language")).toBe(links.indexOf("/me/badge") + 1);
 });
