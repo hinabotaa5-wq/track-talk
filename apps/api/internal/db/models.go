@@ -599,20 +599,6 @@ type Competition struct {
 	GuidelinesUrl string     `json:"guidelines_url"`
 }
 
-type CompetitionImportAttempt struct {
-	Prefecture          string    `json:"prefecture"`
-	AttemptedAt         time.Time `json:"attempted_at"`
-	Outcome             string    `json:"outcome"`
-	ConsecutiveFailures int32     `json:"consecutive_failures"`
-	FailedUrls          []string  `json:"failed_urls"`
-	RequestsMade        int32     `json:"requests_made"`
-}
-
-type CompetitionNewsCheck struct {
-	Prefecture string    `json:"prefecture"`
-	CheckedAt  time.Time `json:"checked_at"`
-}
-
 type DailyUsageCollection struct {
 	Singleton bool      `json:"singleton"`
 	StartedAt time.Time `json:"started_at"`

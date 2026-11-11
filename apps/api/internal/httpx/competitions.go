@@ -44,11 +44,13 @@ func (s *Server) listDomesticMajors(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"majors": rows})
 }
 
+// listCompetitions は国際大会（00）だけを返す。県別（01〜47）の取り込み・表示は
+// #549 で廃止したため、県の指定は受け付けない。
 func (s *Server) listCompetitions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	fields := map[string]string{}
 	prefecture, ok := parsePrefectureCode(q.Get("prefecture"))
-	if !ok {
+	if !ok || prefecture != "00" {
 		fields["prefecture"] = "地域を選んでください"
 	}
 	// month がなければシーズン全体を返す。メインタブの、月ごとに分けた一覧に使う。

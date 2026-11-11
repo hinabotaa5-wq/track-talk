@@ -8,7 +8,7 @@ const push = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ session: {} as object | null, token: "t" as string | null }));
 vi.mock("@/lib/api", () => ({ apiFetch: fetch, apiErrorText: () => "失敗" }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => auth }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/competitions/regional" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/competitions" }));
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
@@ -71,5 +71,5 @@ it("未ログインならログインへ案内する", async () => {
   const buttons = await render();
   await act(async () => buttons()[0].click());
   expect(fetch).not.toHaveBeenCalled();
-  expect(push).toHaveBeenCalledWith("/login?next=%2Fcompetitions%2Fregional");
+  expect(push).toHaveBeenCalledWith("/login?next=%2Fcompetitions");
 });

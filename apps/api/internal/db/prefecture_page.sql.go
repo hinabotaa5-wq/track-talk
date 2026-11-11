@@ -29,25 +29,6 @@ func (q *Queries) CountPrefectureRecruitments(ctx context.Context, prefecture st
 	return count, err
 }
 
-const countUpcomingPrefectureCompetitions = `-- name: CountUpcomingPrefectureCompetitions :one
-SELECT count(*)
-FROM competitions
-WHERE prefecture = $1
-  AND COALESCE(ends_on, starts_on) >= $2::date
-`
-
-type CountUpcomingPrefectureCompetitionsParams struct {
-	Prefecture string    `json:"prefecture"`
-	Today      time.Time `json:"today"`
-}
-
-func (q *Queries) CountUpcomingPrefectureCompetitions(ctx context.Context, arg CountUpcomingPrefectureCompetitionsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countUpcomingPrefectureCompetitions, arg.Prefecture, arg.Today)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const listPrefectureRecruitments = `-- name: ListPrefectureRecruitments :many
 SELECT p.id, p.title, p.created_at, d.venue, d.schedule
 FROM posts p
@@ -90,56 +71,6 @@ func (q *Queries) ListPrefectureRecruitments(ctx context.Context, arg ListPrefec
 			&i.CreatedAt,
 			&i.Venue,
 			&i.Schedule,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUpcomingPrefectureCompetitions = `-- name: ListUpcomingPrefectureCompetitions :many
-SELECT id, name, starts_on, ends_on, location
-FROM competitions
-WHERE prefecture = $1
-  AND COALESCE(ends_on, starts_on) >= $2::date
-ORDER BY starts_on ASC, name ASC
-LIMIT $3
-`
-
-type ListUpcomingPrefectureCompetitionsParams struct {
-	Prefecture string    `json:"prefecture"`
-	Today      time.Time `json:"today"`
-	RowLimit   int32     `json:"row_limit"`
-}
-
-type ListUpcomingPrefectureCompetitionsRow struct {
-	ID       uuid.UUID  `json:"id"`
-	Name     string     `json:"name"`
-	StartsOn time.Time  `json:"starts_on"`
-	EndsOn   *time.Time `json:"ends_on"`
-	Location string     `json:"location"`
-}
-
-// 県ページに出す、これからの大会(開催中を含む)。日付の近い順。
-func (q *Queries) ListUpcomingPrefectureCompetitions(ctx context.Context, arg ListUpcomingPrefectureCompetitionsParams) ([]ListUpcomingPrefectureCompetitionsRow, error) {
-	rows, err := q.db.Query(ctx, listUpcomingPrefectureCompetitions, arg.Prefecture, arg.Today, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListUpcomingPrefectureCompetitionsRow
-	for rows.Next() {
-		var i ListUpcomingPrefectureCompetitionsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.StartsOn,
-			&i.EndsOn,
-			&i.Location,
 		); err != nil {
 			return nil, err
 		}

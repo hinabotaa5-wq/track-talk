@@ -3,13 +3,13 @@ import { L, splitAround } from "@/lib/i18n";
 
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { regionalCompetitionsPath } from "@/lib/competition-prefecture";
 import { todayInTokyo } from "@/lib/format";
 import { targetMeetCountdown, useTargetMeet } from "@/lib/target-meet";
 import { useNow } from "@/lib/use-now";
 
 // メモタブの瓶の横。セットした大会まであと何日かを出し、タップでその大会の一覧へ(別の大会への変更・解除)。
-// セットしていなければ「+」で都道府県の大会一覧へ。
+// セットしていなければ「+」で大会タブへ。県別の大会一覧は #549 で廃止したため、
+// competition の目標は国際大会のタブで変更・解除する。
 export function TargetMeetCountdown({ token }: { token: string | null }) {
   const { target, loaded } = useTargetMeet(token);
   const now = useNow();
@@ -18,7 +18,7 @@ export function TargetMeetCountdown({ token }: { token: string | null }) {
   if (!target) {
     return (
       <Link
-        href={regionalCompetitionsPath}
+        href="/competitions"
         className="flex items-center gap-2 rounded-xl border border-dashed border-white/30 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
       >
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400/25 text-sky-100">
@@ -29,7 +29,7 @@ export function TargetMeetCountdown({ token }: { token: string | null }) {
 
   const countdown = targetMeetCountdown(target, todayInTokyo(new Date(now)));
   const daysLeft = splitAround("まであと {days} 日", "days");
-  const href = target.source === "major" ? "/competitions" : regionalCompetitionsPath;
+  const href = target.source === "major" ? "/competitions" : "/competitions?view=international";
   return (
     <Link
       href={href}

@@ -91,7 +91,6 @@ const nextConfig: NextConfig = {
         ],
       },
       // 大会の日程と県ページも、ログインに関係なく同じ中身なので端で短くキャッシュする(ホームと同じ理由)。
-      // 都道府県の大会(/competitions/regional)は Cookie で県を選ぶので、ここには入れない。
       {
         source: "/competitions",
         headers: [
