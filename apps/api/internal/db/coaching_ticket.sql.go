@@ -77,6 +77,155 @@ func (q *Queries) AdminTicketPurchases(ctx context.Context) ([]AdminTicketPurcha
 	return items, nil
 }
 
+const adminTicketRefundsNeedingAttention = `-- name: AdminTicketRefundsNeedingAttention :many
+SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at FROM coaching_ticket_refunds WHERE manual_yen > 0 OR status = 'needs_action'
+ORDER BY created_at DESC LIMIT 200
+`
+
+// 管理画面で見せる返金：Stripe の外で返す分があるもの、運営者の対応待ちのもの。
+func (q *Queries) AdminTicketRefundsNeedingAttention(ctx context.Context) ([]CoachingTicketRefund, error) {
+	rows, err := q.db.Query(ctx, adminTicketRefundsNeedingAttention)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoachingTicketRefund
+	for rows.Next() {
+		var i CoachingTicketRefund
+		if err := rows.Scan(
+			&i.ID,
+			&i.PurchaseID,
+			&i.Quantity,
+			&i.AmountYen,
+			&i.Status,
+			&i.StripeRefundID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PostExpiry,
+			&i.ManualYen,
+			&i.ManualMethod,
+			&i.ManualPaidOn,
+			&i.ManualCompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const completeTicketRefundManual = `-- name: CompleteTicketRefundManual :one
+UPDATE coaching_ticket_refunds SET manual_method = $1, manual_paid_on = $2,
+    manual_completed_at = now(), updated_at = now()
+WHERE id = $3 AND status = 'succeeded' AND manual_yen > 0 AND manual_completed_at IS NULL RETURNING id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at
+`
+
+type CompleteTicketRefundManualParams struct {
+	Method *string    `json:"method"`
+	PaidOn *time.Time `json:"paid_on"`
+	ID     uuid.UUID  `json:"id"`
+}
+
+// Stripe の外で返す分を、運営者が支払った後に完了として記録する。
+func (q *Queries) CompleteTicketRefundManual(ctx context.Context, arg CompleteTicketRefundManualParams) (CoachingTicketRefund, error) {
+	row := q.db.QueryRow(ctx, completeTicketRefundManual, arg.Method, arg.PaidOn, arg.ID)
+	var i CoachingTicketRefund
+	err := row.Scan(
+		&i.ID,
+		&i.PurchaseID,
+		&i.Quantity,
+		&i.AmountYen,
+		&i.Status,
+		&i.StripeRefundID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
+	)
+	return i, err
+}
+
+const convertTicketRefundToManual = `-- name: ConvertTicketRefundToManual :one
+UPDATE coaching_ticket_refunds SET manual_yen = amount_yen, status = 'succeeded', manual_method = $1,
+    manual_paid_on = $2, manual_completed_at = now(), updated_at = now()
+WHERE id = $3 AND status = 'needs_action' RETURNING id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at
+`
+
+type ConvertTicketRefundToManualParams struct {
+	Method *string    `json:"method"`
+	PaidOn *time.Time `json:"paid_on"`
+	ID     uuid.UUID  `json:"id"`
+}
+
+// Stripe が断った返金（needs_action）を、運営者が Stripe の外で全額を返したものとして完了にする。
+func (q *Queries) ConvertTicketRefundToManual(ctx context.Context, arg ConvertTicketRefundToManualParams) (CoachingTicketRefund, error) {
+	row := q.db.QueryRow(ctx, convertTicketRefundToManual, arg.Method, arg.PaidOn, arg.ID)
+	var i CoachingTicketRefund
+	err := row.Scan(
+		&i.ID,
+		&i.PurchaseID,
+		&i.Quantity,
+		&i.AmountYen,
+		&i.Status,
+		&i.StripeRefundID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
+	)
+	return i, err
+}
+
+const createPostExpiryTicketRefund = `-- name: CreatePostExpiryTicketRefund :one
+INSERT INTO coaching_ticket_refunds (id,purchase_id,quantity,amount_yen,post_expiry,manual_yen)
+VALUES ($1,$2,$3,$4,true,$5) RETURNING id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at
+`
+
+type CreatePostExpiryTicketRefundParams struct {
+	ID         uuid.UUID `json:"id"`
+	PurchaseID uuid.UUID `json:"purchase_id"`
+	Quantity   int32     `json:"quantity"`
+	AmountYen  int32     `json:"amount_yen"`
+	ManualYen  int32     `json:"manual_yen"`
+}
+
+// 失効後の返金（本体 #572）。amount_yen は合計、manual_yen はそのうち Stripe の外で返す分。
+func (q *Queries) CreatePostExpiryTicketRefund(ctx context.Context, arg CreatePostExpiryTicketRefundParams) (CoachingTicketRefund, error) {
+	row := q.db.QueryRow(ctx, createPostExpiryTicketRefund,
+		arg.ID,
+		arg.PurchaseID,
+		arg.Quantity,
+		arg.AmountYen,
+		arg.ManualYen,
+	)
+	var i CoachingTicketRefund
+	err := row.Scan(
+		&i.ID,
+		&i.PurchaseID,
+		&i.Quantity,
+		&i.AmountYen,
+		&i.Status,
+		&i.StripeRefundID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
+	)
+	return i, err
+}
+
 const createTicketAllocation = `-- name: CreateTicketAllocation :exec
 INSERT INTO coaching_ticket_allocations(reservation_id,lot_id,quantity) VALUES ($1,$2,$3)
 `
@@ -117,7 +266,7 @@ func (q *Queries) CreateTicketLot(ctx context.Context, arg CreateTicketLotParams
 
 const createTicketPurchase = `-- name: CreateTicketPurchase :one
 INSERT INTO coaching_ticket_purchases (id, owner_id, request_key, product_id, quantity, amount_yen, session_expires_at, return_path)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at, wording_version
 `
 
 type CreateTicketPurchaseParams struct {
@@ -159,12 +308,13 @@ func (q *Queries) CreateTicketPurchase(ctx context.Context, arg CreateTicketPurc
 		&i.PaidAt,
 		&i.RefundedYen,
 		&i.CreatedAt,
+		&i.WordingVersion,
 	)
 	return i, err
 }
 
 const createTicketRefund = `-- name: CreateTicketRefund :one
-INSERT INTO coaching_ticket_refunds (id,purchase_id,quantity,amount_yen) VALUES ($1,$2,$3,$4) RETURNING id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at
+INSERT INTO coaching_ticket_refunds (id,purchase_id,quantity,amount_yen) VALUES ($1,$2,$3,$4) RETURNING id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at
 `
 
 type CreateTicketRefundParams struct {
@@ -191,6 +341,11 @@ func (q *Queries) CreateTicketRefund(ctx context.Context, arg CreateTicketRefund
 		&i.StripeRefundID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
 	)
 	return i, err
 }
@@ -236,7 +391,7 @@ func (q *Queries) CreateTicketReservation(ctx context.Context, arg CreateTicketR
 
 const finishTicketPurchaseRefund = `-- name: FinishTicketPurchaseRefund :exec
 UPDATE coaching_ticket_purchases SET refunded_yen = refunded_yen + $1::integer,
-    status = CASE WHEN refunded_yen + $1::integer = amount_yen THEN 'refunded' ELSE 'partially_refunded' END
+    status = CASE WHEN refunded_yen + $1::integer >= amount_yen THEN 'refunded' ELSE 'partially_refunded' END
 WHERE id = $2
 `
 
@@ -251,7 +406,7 @@ func (q *Queries) FinishTicketPurchaseRefund(ctx context.Context, arg FinishTick
 }
 
 const getPendingTicketRefund = `-- name: GetPendingTicketRefund :one
-SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at FROM coaching_ticket_refunds WHERE purchase_id = $1 AND status = 'pending'
+SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at FROM coaching_ticket_refunds WHERE purchase_id = $1 AND status = 'pending'
 `
 
 func (q *Queries) GetPendingTicketRefund(ctx context.Context, purchaseID uuid.UUID) (CoachingTicketRefund, error) {
@@ -266,6 +421,11 @@ func (q *Queries) GetPendingTicketRefund(ctx context.Context, purchaseID uuid.UU
 		&i.StripeRefundID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
 	)
 	return i, err
 }
@@ -397,7 +557,7 @@ func (q *Queries) GetTicketReservationForReview(ctx context.Context, requestID *
 const hasOpenTicketAccount = `-- name: HasOpenTicketAccount :one
 SELECT (EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.owner_id = $1 AND ((l.available > 0 AND (l.expires_at IS NULL OR l.expires_at > now())) OR l.reserved > 0))
  OR EXISTS(SELECT 1 FROM coaching_ticket_purchases t WHERE t.owner_id = $1 AND t.status = 'pending' AND t.session_expires_at > now())
- OR EXISTS(SELECT 1 FROM coaching_ticket_refunds f JOIN coaching_ticket_purchases p ON p.id=f.purchase_id WHERE p.owner_id=$1 AND f.status='pending'))::boolean
+ OR EXISTS(SELECT 1 FROM coaching_ticket_refunds f JOIN coaching_ticket_purchases p ON p.id=f.purchase_id WHERE p.owner_id=$1 AND (f.status IN ('pending','needs_action') OR (f.manual_yen > 0 AND f.manual_completed_at IS NULL))))::boolean
 `
 
 func (q *Queries) HasOpenTicketAccount(ctx context.Context, ownerID *uuid.UUID) (bool, error) {
@@ -537,7 +697,7 @@ func (q *Queries) ListMyTicketPurchases(ctx context.Context, ownerID *uuid.UUID)
 }
 
 const listPendingTicketRefunds = `-- name: ListPendingTicketRefunds :many
-SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at FROM coaching_ticket_refunds WHERE status = 'pending' ORDER BY updated_at LIMIT 50
+SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at FROM coaching_ticket_refunds WHERE status = 'pending' ORDER BY updated_at LIMIT 50
 `
 
 func (q *Queries) ListPendingTicketRefunds(ctx context.Context) ([]CoachingTicketRefund, error) {
@@ -558,6 +718,11 @@ func (q *Queries) ListPendingTicketRefunds(ctx context.Context) ([]CoachingTicke
 			&i.StripeRefundID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PostExpiry,
+			&i.ManualYen,
+			&i.ManualMethod,
+			&i.ManualPaidOn,
+			&i.ManualCompletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -819,7 +984,7 @@ func (q *Queries) LockTicketPurchase(ctx context.Context, id uuid.UUID) (Coachin
 }
 
 const lockTicketRefund = `-- name: LockTicketRefund :one
-SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at FROM coaching_ticket_refunds WHERE id = $1 FOR UPDATE
+SELECT id, purchase_id, quantity, amount_yen, status, stripe_refund_id, created_at, updated_at, post_expiry, manual_yen, manual_method, manual_paid_on, manual_completed_at FROM coaching_ticket_refunds WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketRefund(ctx context.Context, id uuid.UUID) (CoachingTicketRefund, error) {
@@ -834,6 +999,11 @@ func (q *Queries) LockTicketRefund(ctx context.Context, id uuid.UUID) (CoachingT
 		&i.StripeRefundID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PostExpiry,
+		&i.ManualYen,
+		&i.ManualMethod,
+		&i.ManualPaidOn,
+		&i.ManualCompletedAt,
 	)
 	return i, err
 }
@@ -959,6 +1129,16 @@ func (q *Queries) MarkTicketPurchasePaid(ctx context.Context, arg MarkTicketPurc
 		&i.WordingVersion,
 	)
 	return i, err
+}
+
+const markTicketRefundNeedsAction = `-- name: MarkTicketRefundNeedsAction :exec
+UPDATE coaching_ticket_refunds SET status = 'needs_action', updated_at = now() WHERE id = $1 AND status = 'pending'
+`
+
+// Stripe が金額の超過で断った返金。再試行をやめ、運営者の対応待ちにする。
+func (q *Queries) MarkTicketRefundNeedsAction(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markTicketRefundNeedsAction, id)
+	return err
 }
 
 const moveTicketLot = `-- name: MoveTicketLot :exec
@@ -1109,6 +1289,19 @@ func (q *Queries) SumMonthlyCoachingSpend(ctx context.Context, arg SumMonthlyCoa
 		arg.ExcludeConsultationID,
 	)
 	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const sumTicketStripeRefunded = `-- name: SumTicketStripeRefunded :one
+SELECT COALESCE(sum(amount_yen - manual_yen),0)::integer FROM coaching_ticket_refunds
+WHERE purchase_id = $1 AND status = 'succeeded'
+`
+
+// この決済に Stripe で返し終えた額の合計（通常の返金・失効後の返金の両方。Stripe の外で返す分は含めない）。
+func (q *Queries) SumTicketStripeRefunded(ctx context.Context, purchaseID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, sumTicketStripeRefunded, purchaseID)
+	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
 }

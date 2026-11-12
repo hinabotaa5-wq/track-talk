@@ -110,6 +110,37 @@ ON CONFLICT (review_request_id) DO NOTHING;
 -- name: CreateTicketRefund :one
 INSERT INTO coaching_ticket_refunds (id,purchase_id,quantity,amount_yen) VALUES ($1,$2,$3,$4) RETURNING *;
 
+-- name: CreatePostExpiryTicketRefund :one
+-- 失効後の返金（本体 #572）。amount_yen は合計、manual_yen はそのうち Stripe の外で返す分。
+INSERT INTO coaching_ticket_refunds (id,purchase_id,quantity,amount_yen,post_expiry,manual_yen)
+VALUES ($1,$2,$3,$4,true,$5) RETURNING *;
+
+-- name: SumTicketStripeRefunded :one
+-- この決済に Stripe で返し終えた額の合計（通常の返金・失効後の返金の両方。Stripe の外で返す分は含めない）。
+SELECT COALESCE(sum(amount_yen - manual_yen),0)::integer FROM coaching_ticket_refunds
+WHERE purchase_id = $1 AND status = 'succeeded';
+
+-- name: MarkTicketRefundNeedsAction :exec
+-- Stripe が金額の超過で断った返金。再試行をやめ、運営者の対応待ちにする。
+UPDATE coaching_ticket_refunds SET status = 'needs_action', updated_at = now() WHERE id = $1 AND status = 'pending';
+
+-- name: CompleteTicketRefundManual :one
+-- Stripe の外で返す分を、運営者が支払った後に完了として記録する。
+UPDATE coaching_ticket_refunds SET manual_method = sqlc.arg(method), manual_paid_on = sqlc.arg(paid_on),
+    manual_completed_at = now(), updated_at = now()
+WHERE id = sqlc.arg(id) AND status = 'succeeded' AND manual_yen > 0 AND manual_completed_at IS NULL RETURNING *;
+
+-- name: ConvertTicketRefundToManual :one
+-- Stripe が断った返金（needs_action）を、運営者が Stripe の外で全額を返したものとして完了にする。
+UPDATE coaching_ticket_refunds SET manual_yen = amount_yen, status = 'succeeded', manual_method = sqlc.arg(method),
+    manual_paid_on = sqlc.arg(paid_on), manual_completed_at = now(), updated_at = now()
+WHERE id = sqlc.arg(id) AND status = 'needs_action' RETURNING *;
+
+-- name: AdminTicketRefundsNeedingAttention :many
+-- 管理画面で見せる返金：Stripe の外で返す分があるもの、運営者の対応待ちのもの。
+SELECT * FROM coaching_ticket_refunds WHERE manual_yen > 0 OR status = 'needs_action'
+ORDER BY created_at DESC LIMIT 200;
+
 -- name: LockTicketRefund :one
 SELECT * FROM coaching_ticket_refunds WHERE id = $1 FOR UPDATE;
 
@@ -121,7 +152,7 @@ UPDATE coaching_ticket_refunds SET stripe_refund_id = $2,status = $3,updated_at 
 
 -- name: FinishTicketPurchaseRefund :exec
 UPDATE coaching_ticket_purchases SET refunded_yen = refunded_yen + sqlc.arg(amount_yen)::integer,
-    status = CASE WHEN refunded_yen + sqlc.arg(amount_yen)::integer = amount_yen THEN 'refunded' ELSE 'partially_refunded' END
+    status = CASE WHEN refunded_yen + sqlc.arg(amount_yen)::integer >= amount_yen THEN 'refunded' ELSE 'partially_refunded' END
 WHERE id = sqlc.arg(id);
 
 -- name: ListPendingTicketRefunds :many
@@ -161,7 +192,7 @@ GROUP BY l.id HAVING l.available <> COALESCE(sum(e.available_delta),0)
 -- name: HasOpenTicketAccount :one
 SELECT (EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.owner_id = $1 AND ((l.available > 0 AND (l.expires_at IS NULL OR l.expires_at > now())) OR l.reserved > 0))
  OR EXISTS(SELECT 1 FROM coaching_ticket_purchases t WHERE t.owner_id = $1 AND t.status = 'pending' AND t.session_expires_at > now())
- OR EXISTS(SELECT 1 FROM coaching_ticket_refunds f JOIN coaching_ticket_purchases p ON p.id=f.purchase_id WHERE p.owner_id=$1 AND f.status='pending'))::boolean;
+ OR EXISTS(SELECT 1 FROM coaching_ticket_refunds f JOIN coaching_ticket_purchases p ON p.id=f.purchase_id WHERE p.owner_id=$1 AND (f.status IN ('pending','needs_action') OR (f.manual_yen > 0 AND f.manual_completed_at IS NULL))))::boolean;
 
 -- name: SumMonthlyCoachingSpend :one
 SELECT COALESCE(sum(x.amount),0)::bigint FROM (

@@ -7,10 +7,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -105,7 +107,16 @@ func (s *Server) preparePostExpiryTicketRefund(ctx context.Context, id uuid.UUID
 		if quantity < 1 || quantity > expired {
 			return &ticketRuleError{"invalid_refund_quantity", "返金できる枚数を確認してください"}
 		}
-		out, err = q.CreateTicketRefund(ctx, db.CreateTicketRefundParams{ID: uuid.New(), PurchaseID: id, Quantity: quantity, AmountYen: reviewPriceYen * quantity})
+		// 1枚500円の約束は変えない。ただし Stripe は元の決済額を超えて返金できないので、
+		// Stripe へはこの決済の返金できる残り（決済額 − Stripe で返し終えた額）までとし、
+		// 超えた分は運営者が Stripe の外（銀行振込など）で返す（運営者決定 2026-11-12）。
+		requested := reviewPriceYen * quantity
+		stripeRefunded, err := q.SumTicketStripeRefunded(ctx, id)
+		if err != nil {
+			return err
+		}
+		stripePart, manualPart := splitPostExpiryRefund(requested, p.AmountYen, stripeRefunded)
+		out, err = q.CreatePostExpiryTicketRefund(ctx, db.CreatePostExpiryTicketRefundParams{ID: uuid.New(), PurchaseID: id, Quantity: quantity, AmountYen: stripePart + manualPart, ManualYen: manualPart})
 		if err != nil {
 			return err
 		}
@@ -136,18 +147,33 @@ func (s *Server) processTicketRefund(ctx context.Context, id uuid.UUID) error {
 		if p.PaymentIntentID == nil {
 			return errors.New("ticket purchase missing payment intent")
 		}
+		// Stripe へ返すのは合計から Stripe の外で返す分を除いた額（本体 #572）。
+		stripeAmount := refund.AmountYen - refund.ManualYen
+		if stripeAmount <= 0 {
+			// 全額を Stripe の外で返す返金。Stripe には何も送らない。
+			// 購入の返金済み額には Stripe 外の分も含めて1回だけ足す（000162 の上限の判定に含める）。
+			if err := q.FinishTicketPurchaseRefund(ctx, db.FinishTicketPurchaseRefundParams{ID: p.ID, AmountYen: refund.AmountYen}); err != nil {
+				return err
+			}
+			return q.SaveTicketRefund(ctx, db.SaveTicketRefundParams{ID: id, Status: "succeeded"})
+		}
 		remote, err := s.stripe.FindTicketRefund(ctx, *p.PaymentIntentID, id.String())
 		if err != nil {
 			return err
 		}
 		if remote == nil {
-			created, err := s.stripe.CreateRefundWithMetadata(ctx, *p.PaymentIntentID, int(refund.AmountYen), id.String())
+			created, err := s.stripe.CreateRefundWithMetadata(ctx, *p.PaymentIntentID, int(stripeAmount), id.String())
 			if err != nil {
+				if refundAmountRejected(err) {
+					// 金額の超過で断られた返金は、送り直しても通らない。再試行をやめて運営者の対応待ちにする。
+					slog.Error("ticket refund rejected for amount; needs operator action", "refund", id, "err", err)
+					return q.MarkTicketRefundNeedsAction(ctx, id)
+				}
 				return err
 			}
 			remote = &created
 		}
-		if remote.ID == "" || remote.Amount != int(refund.AmountYen) {
+		if remote.ID == "" || remote.Amount != int(stripeAmount) {
 			return fmt.Errorf("ticket refund amount mismatch")
 		}
 		status := "pending"
@@ -159,12 +185,42 @@ func (s *Server) processTicketRefund(ctx context.Context, id uuid.UUID) error {
 			}
 		case "failed", "canceled":
 			status = "failed"
-			if err := moveTickets(ctx, q, p.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
+			if refund.PostExpiry {
+				// 失効後の返金が失敗したら、返金に回した枚数を失効に戻す（使える枚数には戻さない）。
+				if err := moveTicketsExpiring(ctx, q, p.ID, "refund-failed-"+id.String(), "refund_failed", 0, 0, 0, -refund.Quantity, refund.Quantity); err != nil {
+					return err
+				}
+			} else if err := moveTickets(ctx, q, p.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
 				return err
 			}
 		}
 		return q.SaveTicketRefund(ctx, db.SaveTicketRefundParams{ID: id, StripeRefundID: &remote.ID, Status: status})
 	})
+}
+
+// splitPostExpiryRefund は、失効後の返金の要求額を、Stripe で返す分と Stripe の外で返す分に分ける。
+// Stripe 分は min(要求額, 決済額 − Stripe で返し終えた額)。複数回に分けても累計で同じ計算になる。
+func splitPostExpiryRefund(requested, chargeYen, stripeRefunded int32) (stripePart, manualPart int32) {
+	room := chargeYen - stripeRefunded
+	if room < 0 {
+		room = 0
+	}
+	stripePart = min(requested, room)
+	return stripePart, requested - stripePart
+}
+
+// refundAmountRejected は、Stripe が返金を金額の超過（元の決済額を超える・返金済み）で断ったかどうか。
+// 通信の失敗や 429・5xx などの一時的な失敗は false（従来どおり tick が再試行する）。
+func refundAmountRejected(err error) bool {
+	var apiErr *stripe.APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusBadRequest {
+		return false
+	}
+	switch apiErr.Code {
+	case "amount_too_large", "charge_already_refunded":
+		return true
+	}
+	return apiErr.Type == "invalid_request_error" && strings.Contains(apiErr.Message, "greater than")
 }
 
 func (s *Server) settleTicketRefunds(ctx context.Context) (int, error) {
@@ -208,7 +264,13 @@ func (s *Server) adminTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, 200, map[string]any{"purchases": purchases, "balance_issues": issues, "pending_refunds": refunds, "single_price_yen": reviewPriceYen})
+	attention, err := s.q.AdminTicketRefundsNeedingAttention(r.Context())
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, 200, map[string]any{"purchases": purchases, "balance_issues": issues, "pending_refunds": refunds,
+		"attention_refunds": attention, "single_price_yen": reviewPriceYen})
 }
 
 func (s *Server) adminRefundTickets(w http.ResponseWriter, r *http.Request) {
@@ -234,12 +296,17 @@ func (s *Server) adminRefundTickets(w http.ResponseWriter, r *http.Request) {
 			writeCheckoutError(w, err)
 			return
 		}
-		// 失敗しても確保済みの返金記録は残し、tickが照合・再実行する。
+		// 一時的な失敗なら確保済みの返金記録は残し、tickが照合・再実行する。
 		if err := s.processTicketRefund(r.Context(), refund.ID); err != nil {
 			slog.Error("ticket post-expiry refund", "refund", refund.ID, "err", err)
 		}
-		JSON(w, http.StatusAccepted, map[string]any{"refund_id": refund.ID,
-			"message": "失効後の返金を受け付けました。処理状況は購入履歴で確認できます"})
+		// 受け付けただけの 202 で済ませず、Stripe 分・Stripe 外の分と今の状態を返す。
+		current, err := s.q.LockTicketRefund(r.Context(), refund.ID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		writeTicketRefundResult(w, current)
 		return
 	}
 	refund, err := s.prepareTicketRefund(r.Context(), id)
@@ -252,4 +319,91 @@ func (s *Server) adminRefundTickets(w http.ResponseWriter, r *http.Request) {
 		slog.Error("ticket refund", "refund", refund.ID, "err", err)
 	}
 	JSON(w, http.StatusAccepted, map[string]any{"refund_id": refund.ID, "message": "返金を受け付けました。処理状況は購入履歴で確認できます"})
+}
+
+// writeTicketRefundResult は、失効後の返金の結果を返す。
+// 返し終えた（Stripe 外の分は支払い待ちを含む）なら200、Stripe の結果待ちなら202、運営者の対応待ちなら409。
+func writeTicketRefundResult(w http.ResponseWriter, refund db.CoachingTicketRefund) {
+	body := map[string]any{"refund_id": refund.ID, "status": refund.Status, "amount_yen": refund.AmountYen,
+		"stripe_yen": refund.AmountYen - refund.ManualYen, "manual_yen": refund.ManualYen}
+	switch refund.Status {
+	case "succeeded":
+		body["message"] = "失効後の返金を行いました"
+		if refund.ManualYen > 0 {
+			body["message"] = fmt.Sprintf("失効後の返金を行いました。うち%d円は Stripe では返せないため、振込などで返してから完了を記録してください", refund.ManualYen)
+		}
+		JSON(w, http.StatusOK, body)
+	case "needs_action":
+		body["error"] = "refund_needs_action"
+		body["message"] = "Stripe が返金を断りました（金額の超過）。振込などで返してから完了を記録してください"
+		JSON(w, http.StatusConflict, body)
+	case "failed":
+		body["error"] = "refund_failed"
+		body["message"] = "返金に失敗しました。チケットは失効に戻しました"
+		JSON(w, http.StatusConflict, body)
+	default:
+		body["message"] = "失効後の返金を受け付けました。Stripe の処理を待っています"
+		JSON(w, http.StatusAccepted, body)
+	}
+}
+
+// adminCompleteManualTicketRefund は、Stripe の外で返した分（振込など）の支払いを運営者が記録する（本体 #572）。
+// Stripe 外の分が残っている返金はその分を、Stripe が断った返金（needs_action）は全額を、Stripe 外で返したものとして完了にする。
+func (s *Server) adminCompleteManualTicketRefund(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "refundID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Method string `json:"method"`
+		PaidOn string `json:"paid_on"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		FieldError(w, map[string]string{"method": "送り直してください"})
+		return
+	}
+	method := strings.TrimSpace(req.Method)
+	if method == "" || len([]rune(method)) > 40 {
+		FieldError(w, map[string]string{"method": "支払方法を40文字以内で入れてください"})
+		return
+	}
+	paidOn, err := time.Parse("2006-01-02", req.PaidOn)
+	if err != nil || paidOn.After(time.Now().Add(24*time.Hour)) {
+		FieldError(w, map[string]string{"paid_on": "支払った日を入れてください"})
+		return
+	}
+	var out db.CoachingTicketRefund
+	err = s.tx(r.Context(), func(q *db.Queries) error {
+		refund, err := q.LockTicketRefund(r.Context(), id)
+		if err != nil {
+			return err
+		}
+		if _, err := q.LockTicketPurchase(r.Context(), refund.PurchaseID); err != nil {
+			return err
+		}
+		date := &paidOn
+		switch {
+		case refund.Status == "needs_action":
+			out, err = q.ConvertTicketRefundToManual(r.Context(), db.ConvertTicketRefundToManualParams{ID: id, Method: &method, PaidOn: date})
+			if err != nil {
+				return err
+			}
+			// Stripe で返していないので、ここで初めて購入の返金済み額に足す。
+			return q.FinishTicketPurchaseRefund(r.Context(), db.FinishTicketPurchaseRefundParams{ID: refund.PurchaseID, AmountYen: refund.AmountYen})
+		case refund.Status == "succeeded" && refund.ManualYen > 0 && refund.ManualCompletedAt == nil:
+			// 返金済み額には Stripe 分と一緒に足し終えている。二重に足さない。
+			out, err = q.CompleteTicketRefundManual(r.Context(), db.CompleteTicketRefundManualParams{ID: id, Method: &method, PaidOn: date})
+			return err
+		default:
+			return &ticketRuleError{"no_manual_refund", "Stripe の外で返す分が残っていない返金です"}
+		}
+	})
+	if err != nil {
+		writeCheckoutError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"refund": out, "message": "Stripe の外で返した分を記録しました"})
 }
