@@ -61,7 +61,7 @@ export function OverseasInterestCard() {
 
   const heading = L("海外コーチ、近日開始");
   const body = L(
-    "海外在住のスプリントコーチから指導を受けられる機能を準備中です（2026年12月中旬開始予定）。受けてみたい方は、下のボタンで教えてください。開始の際にお知らせします。",
+    "海外のコーチから指導を受けられる機能を準備中です（2026年12月中旬開始予定）。受けてみたい方は、下のボタンを押すと開始の際にお知らせします。",
   );
 
   if (loginNeeded) {
@@ -98,30 +98,22 @@ export function OverseasInterestCard() {
     }
   }
 
-  async function cancel() {
-    setSaving(true);
-    setError("");
-    try {
-      await apiFetch<{ interest: null }>("/v1/me/overseas-interest", { method: "DELETE", token });
-      setInterest(null);
-      setSelected(null);
-    } catch (err) {
-      setError(apiErrorText(err, L("登録を取り消せませんでした")));
-    } finally {
-      setSaving(false);
-    }
+  // 本体 #581：登録は1回きりで確定する。登録済みの画面には変更・取消の導線を出さない。
+  if (interest !== null) {
+    return (
+      <section aria-label={heading} className="space-y-2 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4">
+        <h2 className="font-bold text-white">{heading}</h2>
+        <p className="text-sm text-slate-200">{body}</p>
+        <p className="text-sm font-semibold text-white">{L("登録済みです。開始時にお知らせします")}</p>
+        <p className="text-sm text-slate-200">{L("いまの選択：{v0}", { v0: kindLabel(interest) })}</p>
+      </section>
+    );
   }
 
   return (
     <section aria-label={heading} className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4">
       <h2 className="font-bold text-white">{heading}</h2>
       <p className="text-sm text-slate-200">{body}</p>
-      {interest !== null ? (
-        <>
-          <p className="text-sm font-semibold text-white">{L("登録済みです。開始時にお知らせします")}</p>
-          <p className="text-sm text-slate-200">{L("いまの選択：{v0}", { v0: kindLabel(interest) })}</p>
-        </>
-      ) : null}
       <fieldset className="space-y-1">
         <legend className="text-sm font-semibold text-slate-100">{L("受けたい形を選んでください")}</legend>
         {kinds.map((kind) => (
@@ -140,22 +132,12 @@ export function OverseasInterestCard() {
       <div className="flex gap-2">
         <button
           type="button"
-          disabled={saving || selected === null || selected === interest}
+          disabled={saving || selected === null}
           onClick={() => { if (selected !== null) void submit(selected); }}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {interest === null ? L("指導を受けたい") : L("変更する")}
+          {L("指導を受けたい")}
         </button>
-        {interest !== null ? (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void cancel()}
-            className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50"
-          >
-            {L("登録を取り消す")}
-          </button>
-        ) : null}
       </div>
     </section>
   );

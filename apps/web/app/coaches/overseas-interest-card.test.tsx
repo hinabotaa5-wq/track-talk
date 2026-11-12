@@ -39,12 +39,14 @@ it("未ログインは登録できず、ログイン導線だけを出す", asyn
   expect(container.querySelectorAll("button").length).toBe(0);
 });
 
-it("種別を選んで登録すると登録済みに変わり、変更・取り消しができる", async () => {
+it("種別を選んで登録すると登録済みの2行だけになり、変更・取消の導線が出ない", async () => {
   apiFetch.mockResolvedValueOnce({ interest: null });
   await render();
   expect(apiFetch).toHaveBeenCalledWith("/v1/me/overseas-interest", { token: "tok" });
   expect(container.querySelector("button")?.textContent).toBe("指導を受けたい");
   expect(container.querySelector("button")?.disabled).toBe(true);
+  expect(container.textContent).toContain("海外のコーチから指導を受けられる機能を準備中です");
+  expect(container.textContent).not.toContain("海外在住のスプリントコーチ");
 
   await choose("両方");
   apiFetch.mockResolvedValueOnce({ interest: { kind: "both" } });
@@ -52,18 +54,21 @@ it("種別を選んで登録すると登録済みに変わり、変更・取り�
   expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/overseas-interest", { method: "PUT", token: "tok", body: JSON.stringify({ kind: "both" }) });
   expect(container.textContent).toContain("登録済みです。開始時にお知らせします");
   expect(container.textContent).toContain("いまの選択：両方");
+  expect(container.querySelectorAll("input[type=radio]").length).toBe(0);
+  expect(container.querySelectorAll("button").length).toBe(0);
+  expect(container.textContent).not.toContain("変更する");
+  expect(container.textContent).not.toContain("登録を取り消す");
+  expect(container.textContent).not.toContain("受けたい形を選んでください");
+});
 
-  await choose("1ヶ月コーチング");
-  apiFetch.mockResolvedValueOnce({ interest: { kind: "monthly" } });
-  await click("変更する");
-  expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/overseas-interest", { method: "PUT", token: "tok", body: JSON.stringify({ kind: "monthly" }) });
-  expect(container.textContent).toContain("いまの選択：1ヶ月コーチング");
-
-  apiFetch.mockResolvedValueOnce({ interest: null });
-  await click("登録を取り消す");
-  expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/overseas-interest", { method: "DELETE", token: "tok" });
-  expect(container.textContent).not.toContain("登録済みです");
-  expect(container.querySelector("button")?.textContent).toBe("指導を受けたい");
+it("登録済みで開くと最初から2行だけで、読み直し以外の通信をしない", async () => {
+  apiFetch.mockResolvedValueOnce({ interest: { kind: "single" } });
+  await render();
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toContain("登録済みです。開始時にお知らせします");
+  expect(container.textContent).toContain("いまの選択：単発の動画添削");
+  expect(container.querySelectorAll("input[type=radio]").length).toBe(0);
+  expect(container.querySelectorAll("button").length).toBe(0);
 });
 
 it("登録数は利用者側に一切出さない", async () => {

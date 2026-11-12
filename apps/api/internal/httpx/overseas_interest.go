@@ -11,6 +11,7 @@ import (
 
 // 海外コーチの指導希望の集計（本体 #542）。コーチタブの独立カードから登録する。
 // 1ユーザー1件（サーバー側で一意）。登録数は利用者には見せない。
+// 本体 #581：登録は1回きりで確定し、登録後の変更・取消・再登録は受け付けない。
 const (
 	overseasInterestMonthly = "monthly"
 	overseasInterestSingle  = "single"
@@ -50,7 +51,8 @@ type overseasInterestReq struct {
 	Kind string `json:"kind"`
 }
 
-// 登録も種別の変更も同じ PUT で受ける。重複登録は作らず、選び直しは変更として置き換える。
+// 新規登録だけを同じ PUT で受ける（本体 #581）。登録済みの再登録・変更は 409 で拒否し、
+// 行には触れない。重複登録は作らない。
 func (s *Server) putOverseasInterest(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
@@ -65,6 +67,13 @@ func (s *Server) putOverseasInterest(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, map[string]string{"kind": "受けたい形は3つの中から選んでください"})
 		return
 	}
+	if _, err := s.q.GetOverseasInterest(r.Context(), me.ID); err == nil {
+		Error(w, http.StatusConflict, "conflict", "登録済みのため、種別は変えられません")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	row, err := s.q.UpsertOverseasInterest(r.Context(), db.UpsertOverseasInterestParams{
 		ProfileID: me.ID,
 		Kind:      req.Kind,
@@ -76,12 +85,17 @@ func (s *Server) putOverseasInterest(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"interest": overseasInterestJSON(row.Kind)})
 }
 
+// 登録の取り消しは受け付けない（本体 #581）。登録済みなら 409 で拒否し、行には触れない。
+// 未登録の取り消しは従来どおり何もない旨（null）を返す。
 func (s *Server) deleteOverseasInterest(w http.ResponseWriter, r *http.Request) {
 	me, ok := s.requireProfile(w, r)
 	if !ok {
 		return
 	}
-	if err := s.q.DeleteOverseasInterest(r.Context(), me.ID); err != nil {
+	if _, err := s.q.GetOverseasInterest(r.Context(), me.ID); err == nil {
+		Error(w, http.StatusConflict, "conflict", "登録済みのため、取り消しはできません")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		MapDBError(w, err)
 		return
 	}
