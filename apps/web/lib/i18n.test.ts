@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  clearLocaleExplicitChoice,
+  hasLocaleExplicitChoice,
   localePromptAnswered,
   mainTabLabel,
+  markLocaleExplicitChoice,
   markLocalePromptAnswered,
   parseLocale,
   readStoredLocale,
@@ -81,5 +84,20 @@ describe("言語プロンプトの記録", () => {
     expect(localePromptAnswered()).toBe(false);
     markLocalePromptAnswered();
     expect(localePromptAnswered()).toBe(true);
+  });
+});
+
+describe("未ログイン中の明示選択の記録（本体 #567）", () => {
+  it("選ぶまでは無し、選んだら残り、消したら無くなる", () => {
+    expect(hasLocaleExplicitChoice()).toBe(false);
+    markLocaleExplicitChoice();
+    expect(hasLocaleExplicitChoice()).toBe(true);
+    clearLocaleExplicitChoice();
+    expect(hasLocaleExplicitChoice()).toBe(false);
+  });
+
+  it("言語の保存だけでは明示選択にならない", () => {
+    storeLocale("en");
+    expect(hasLocaleExplicitChoice()).toBe(false);
   });
 });
