@@ -56,9 +56,14 @@ it("支払い方法はカードだけを出し、PayPay の案内は出さない
   const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
   const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
   expect(choices).toEqual(["カード・Apple Pay・Google Pay"]);
-  expect(container.textContent).toContain("販売者: 中窪日向（TrackTalk運営者）");
-  expect(container.querySelector('a[href="/legal/commerce"]')).not.toBeNull();
-  expect(container.textContent).toContain("送ると支払い画面に進みます。料金は返答が返ってきた時点で確定し、期限までに返答がなければ自動で取り消され、料金はかかりません。");
+  expect(payment?.querySelector("legend")?.textContent).toBe("お支払い方法");
+  expect(container.textContent).not.toContain("販売者:");
+  expect(container.querySelector('a[href="/terms"], a[href="/legal/commerce"]')).toBeNull();
+  expect(container.textContent).not.toContain("料金は返答が返ってきた時点で確定し");
+  expect(container.textContent).toContain("送ってから24時間以内に返ってきます。");
+  expect(container.textContent).not.toContain("2026/11/06");
+  expect(container.textContent).toContain("0/1000文字");
+  expect(container.querySelector("textarea")?.hasAttribute("placeholder")).toBe(false);
   expect(container.textContent).not.toContain("PayPay");
 });
 
@@ -142,11 +147,14 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
     await act(async () => { pick?.click(); });
   }
   const textarea = container.querySelector("textarea")!;
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
-    setter.call(textarea, "後半に失速します");
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  async function enterQuestion(value: string) {
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+      setter.call(textarea, value);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  await enterQuestion("こちらも見てください ｈｔｔｐｓ：／／example.com");
   const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
   const file = new File(["x"], "run.mp4", { type: "video/mp4" });
   Object.defineProperty(input, "files", { value: [file] });
@@ -155,10 +163,25 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   expect(submit.textContent).toBe("申込み内容を確認する");
+  const contactMessage = "外部の連絡先（URL・メール・SNS IDなど）は送れません。";
+  expect(container.textContent).not.toContain(contactMessage);
+  await act(async () => { submit.form!.requestSubmit(); });
+  expect(container.querySelector("[role=alert]")?.textContent).toBe(contactMessage);
+  expect(textarea.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(textarea);
+  expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
+  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
+
+  await enterQuestion("後半に失速します。200mのラップは12.1 12.3です");
+  expect(container.textContent).not.toContain(contactMessage);
   await act(async () => { submit.form!.requestSubmit(); });
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
   expect(confirm?.textContent).toContain("動画添削1回（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
+  expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
+  expect(confirm?.textContent).toContain("申込みから24時間以内");
+  expect(confirm?.textContent).not.toContain("2026/11/06");
+  expect(confirm?.querySelector('a[href="/legal/commerce"]')?.textContent).toBe("特定商取引法に基づく表記");
   expect(confirm?.textContent).toContain("コーチが返却した時に確定します");
   expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
   expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
