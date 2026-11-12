@@ -89,11 +89,19 @@ it("サポートプランの返金に伴う精算は、支払済みの報酬相�
   const text = article(9);
   expect(text).toContain("購入者への返金に伴う精算");
   expect(text).toContain("その返金に対応する報酬相当額を返還します");
-  // 大会までプラン：終了時に日割りで確定、月次は仮払い、コーチ都合は返金額の75%を上限に返還（没収ではなく精算）、返金まで留保。
-  expect(text).toContain("確定前の仮払いとします");
+  // 1ヶ月プラン：終了時に日割りで確定（経過分＝代金−返金額）、月次は仮払い、コーチ都合は返金額の75%を上限に返還（没収ではなく精算）、返金まで留保。
+  expect(text).toContain("1ヶ月プランのコーチへの支払額は、契約が終わった時に");
+  expect(text).toContain("経過分の代金は、代金から第8条第7の2項(2)の返金額を差し引いた額とし、1円未満は切り捨てます");
+  expect(text).toContain("確定前の仮払いとし、第8条第5項の支払日に支払います");
+  expect(text).not.toContain("大会までプラン");
   expect(text).toContain("債務不履行に基づく精算として、支払済みの仮払いを返還します");
   expect(text).toContain("（返金額の75%）を上限とし");
   expect(text).toContain("購入者への返金が終わるまで、その契約に係るコーチへの支払いを留めます");
+  // 4の2：やむを得ない事情は通常の精算、書面で通知、異議は1回・期限なし、判断が変わっても全額返金は取り消さない。
+  expect(text).toContain("4の2. コーチ本人の入院・死亡、災害による業務不能、法令による業務停止など");
+  expect(text).toContain("第3項は適用せず、第1項のとおり精算します");
+  expect(text).toContain("1回に限り、期限なく異議を申し立てて再審査を求めることができます");
+  expect(text).toContain("購入者への全額の返金は取り消さず、コーチには終わった日までの経過日数の日割りで第1項の支払額を支払います");
   expect(text).toContain("次回以降の報酬その他の支払額から控除することができます");
   expect(text).toContain("控除の対象と金額をコーチに通知します");
   expect(text).toContain("運営者に内訳の説明を求めることができます");
@@ -128,13 +136,20 @@ it("未成年者の購入は、購入の都度の法定代理人の許可の申�
   for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
 });
 
-it("第8条：大会までプランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
+it("第8条：1ヶ月プランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
   const text = article(8);
-  expect(text).toContain("返金とキャンセル（大会までプラン以外）：大会までプラン以外のサポートプランの返金は");
-  expect(text).toContain("7の2. 大会までプランを途中で終える場合");
-  expect(text).toContain("(1) 解約料・違約金・キャンセル手数料はいただきません。");
-  expect(text).toContain("終える日は過ぎた日に数えます");
-  expect(text).toContain("実際に指導が始まった日から1ヶ月（両方の日を含めた30日）");
+  expect(text).toContain("返金とキャンセル（1ヶ月プラン以外）：1ヶ月プラン以外のサポートプランの返金は");
+  expect(text).toContain("7の2. 1ヶ月プランを途中で終える場合");
+  expect(text).toContain("提案に示した開始日から1ヶ月（両方の日を含めた30日）とし、終了日は契約に記録された日とします");
+  expect(text).toContain("(1) 解約料・違約金・キャンセル手数料はいただきません。利用者は、いつでも途中で終えることができます。");
+  expect(text).toContain("契約に記録された開始日から終了日までの日数（両方の日を含めた30日）とし、提案と最終確認の画面に示した日数と同じです");
+  expect(text).toContain("終えることが決まった日は、過ぎた日に数えます");
+  expect(text).toContain("開始日の前に終える場合は全額を返金し、終了日以降に終える場合は返金はありません");
+  expect(text).toContain("動画への返答や通話の回数は、返金の額に関係しません");
+  expect(text).toContain("利用者に全額を返金した後は、その返金を取り消しません");
+  expect(text).toContain("(4) 目標にしていた大会が中止・延期になった場合も、1ヶ月プランは期間どおり続きます");
+  expect(text).toContain("(6) 返金の求めは、お問い合わせで受け付けます。");
+  expect(text).not.toContain("大会までプラン");
   expect(text).not.toContain("主催者が正式に発表した日をもって契約を終えます");
   expect(text).toContain("SNS・LINE などの本サービスの外の連絡手段へ誘うこと");
   expect(text).toContain("確認は通報があった場合などに限ります");
