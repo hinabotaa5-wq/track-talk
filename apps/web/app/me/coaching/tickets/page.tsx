@@ -148,7 +148,7 @@ function TicketsPage() {
             </li>
             <li>{L("購入した本人だけが使えます。譲ることはできません。")}</li>
           </ul>
-          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
+          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); declaration.reset(); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
         </div>;
       })}
       <p className="text-xs text-slate-300">{L("動画添削1回にチケット1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。")}</p>

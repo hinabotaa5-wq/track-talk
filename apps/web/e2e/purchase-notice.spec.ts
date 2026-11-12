@@ -37,5 +37,8 @@ for (const age of ["unregistered", "adult", "minor"]) {
   await expect(page.getByRole("button",{name:/確定してお支払いへ/})).toBeDisabled();
   await checkbox.check();
   await expect(page.getByRole("button",{name:/確定してお支払いへ/})).toBeEnabled();
+  await page.getByRole("button",{name:"戻って直す",exact:true}).click();
+  await page.getByRole("button",{name:"購入内容を確認する",exact:true}).click();
+  await expect(checkbox).not.toBeChecked();
  });
 }

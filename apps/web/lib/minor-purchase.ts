@@ -35,6 +35,10 @@ export function useMinorDeclaration() {
   const markShown = useCallback(() => {
     if (!log.current.shownAt) log.current = { ...log.current, shownAt: new Date().toISOString() };
   }, []);
+  const reset = useCallback(() => {
+    setCheckedState(false);
+    log.current = {};
+  }, []);
   const body = useCallback((required: boolean) => minorDeclarationBody(required, checked, log.current), [checked]);
-  return { checked, setChecked, markShown, body };
+  return { checked, setChecked, markShown, body, reset };
 }
