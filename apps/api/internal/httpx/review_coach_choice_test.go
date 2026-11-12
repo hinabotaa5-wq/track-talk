@@ -48,7 +48,7 @@ func payChosenReview(t *testing.T, h http.Handler, id, method string) {
 	}
 }
 
-// コーチを選んで申し込み、1,500円を払うと、選んだコーチにだけ依頼が届く。返却すると報酬は1,050円。
+// コーチを選んで申し込み、500円を払うと、選んだコーチにだけ依頼が届く。返却すると報酬は350円（本体 #569）。
 // webhook が2回届いても、依頼・打診・支払いは1つずつ。
 func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 	for _, method := range []string{"card", "paypay"} {
@@ -61,7 +61,7 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 			_, tu := demoRequester(t, h, admin)
 			id := chosenReview(t, h, tu, coach.String(), method, false)
 			form := f.lastSession()
-			if form.Get("line_items[0][price_data][unit_amount]") != "1500" || form.Get("line_items[0][price_data][product_data][name]") != "動画添削" ||
+			if form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("line_items[0][price_data][product_data][name]") != "動画添削" ||
 				form.Get("payment_method_types[0]") != method {
 				t.Fatalf("session %v", form)
 			}
@@ -80,7 +80,7 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 				t.Fatalf("duplicates requests=%d offers=%d payments=%d", requests, offerRows, payments)
 			}
 			list := doJSON(t, h, "GET", "/v1/coach/requests", tc, nil).Body.String()
-			if !strings.Contains(list, `"coach_reward_yen":1050`) || !strings.Contains(list, "1050円（税込）") {
+			if !strings.Contains(list, `"coach_reward_yen":350`) || !strings.Contains(list, "350円（税込）") {
 				t.Fatalf("offer terms %s", list)
 			}
 			if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != 200 {
@@ -95,7 +95,7 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 				}
 			}
 			e := coachEarnings(t, h, tc)
-			if e.UnpaidYen != 1050 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 1500 || e.Earnings[0].SharePercent != 70 {
+			if e.UnpaidYen != 350 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 500 || e.Earnings[0].SharePercent != 70 {
 				t.Fatalf("reward %+v", e)
 			}
 			if method == "card" {
@@ -184,7 +184,7 @@ func TestReviewChosenCoachDeclineAndTimeoutNeverReassign(t *testing.T) {
 				t.Fatalf("requester notified %d times", notified)
 			}
 			refunds := f.refundList()
-			if len(refunds) != 1 || refunds[0].Get("amount") != "1500" {
+			if len(refunds) != 1 || refunds[0].Get("amount") != "500" {
 				t.Fatalf("refunds %v", refunds)
 			}
 		})
@@ -208,7 +208,7 @@ func TestReviewCoachChoiceList(t *testing.T) {
 		Coaches  []map[string]any `json:"coaches"`
 	}
 	_ = json.Unmarshal(r.Body.Bytes(), &out)
-	if out.PriceYen != 1500 || len(out.Coaches) != 2 {
+	if out.PriceYen != 500 || len(out.Coaches) != 2 {
 		t.Fatalf("list %s", r.Body.String())
 	}
 	for _, c := range out.Coaches {
@@ -260,13 +260,13 @@ func TestReviewCoachChoiceWithTickets(t *testing.T) {
 	coach, tc := onDutyCoach(t, h, admin)
 	_, other := onDutyCoach(t, h, admin)
 	_, tu := demoRequester(t, h, admin)
-	buyFiveTickets(t, h, tu)
+	buySixTickets(t, h, tu)
 	id := chosenReview(t, h, tu, coach.String(), "tickets", true)
 	offers := coachRequests(t, h, tc).Offers
 	if len(offers) != 1 || offers[0].Request.ID != id || len(coachRequests(t, h, other).Offers) != 0 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if b := ticketSummary(t, h, tu).Balance; b.Available != 3 || b.Reserved != 2 {
+	if b := ticketSummary(t, h, tu).Balance; b.Available != 5 || b.Reserved != 1 {
 		t.Fatalf("balance %+v", b)
 	}
 }
@@ -325,7 +325,7 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 		t.Fatal(r.Body.String())
 	}
 	transfers := f.transferList()
-	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "7050" {
+	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "6350" {
 		t.Fatalf("transfers %v", transfers)
 	}
 }

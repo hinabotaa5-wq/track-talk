@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -34,6 +35,10 @@ func (s *Server) prepareTicketRefund(ctx context.Context, id uuid.UUID) (db.Coac
 		l, err := q.LockTicketLot(ctx, id)
 		if err != nil {
 			return err
+		}
+		if l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now()) {
+			// 有効期限を過ぎた分は失効させる（返金の対象にしない）。tick の失効処理を待たずに断る。
+			return &ticketRuleError{"tickets_expired", "有効期限を過ぎたチケットは返金できません"}
 		}
 		if l.Available == 0 {
 			return &ticketRuleError{"no_refundable_tickets", "未使用・未予約のチケットがありません"}

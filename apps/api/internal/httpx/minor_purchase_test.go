@@ -250,11 +250,11 @@ func TestMinorRefundSummary(t *testing.T) {
 	queryRowArgs(t, `SELECT id::text FROM review_payments WHERE request_id = $1`, []any{minorReview}, &minorPayment)
 	execSQLArgs(t, `UPDATE review_payments SET status = 'refunded', captured_at = now(), refunded_at = now() WHERE request_id IN ($1, $2)`, minorReview, adultReview)
 	execSQLArgs(t, `INSERT INTO captured_payment_refunds (id, source, payment_id, payment_intent_id, amount_yen, reason, origin, status)
-		VALUES (gen_random_uuid(), 'review', $1, 'pi_minor_refund', 1500, '保護者から許可のない購入との申立て', 'admin', 'succeeded')`, minorPayment)
+		VALUES (gen_random_uuid(), 'review', $1, 'pi_minor_refund', 500, '保護者から許可のない購入との申立て', 'admin', 'succeeded')`, minorPayment)
 
 	month, total := read()
-	if month.ReviewCount-base.ReviewCount != 1 || month.ReviewAmount-base.ReviewAmount != 1500 ||
-		month.AdminCount-base.AdminCount != 1 || month.AdminAmountYen-base.AdminAmountYen != 1500 ||
+	if month.ReviewCount-base.ReviewCount != 1 || month.ReviewAmount-base.ReviewAmount != 500 ||
+		month.AdminCount-base.AdminCount != 1 || month.AdminAmountYen-base.AdminAmountYen != 500 ||
 		total.ReviewCount-baseTotal.ReviewCount != 1 {
 		t.Fatalf("summary month=%+v total=%+v base=%+v", month, total, base)
 	}

@@ -57,7 +57,7 @@ export default function ForCoachesPage() {
           <li>
             <strong>Reviews: around $12 per review.</strong>
           </li>
-          <li>These are starting figures — we want to agree the final rates with you directly, not just set them. For reference, in Japan a single review costs the athlete ¥1,500 and the coach receives ¥1,050; the figures for overseas coaches are set higher.</li>
+          <li>These are starting figures — we want to agree the final rates with you directly, not just set them. For reference, in Japan a single review costs the athlete ¥500 and the coach receives ¥350; the figures for overseas coaches are set higher.</li>
           <li>
             Paid monthly via <strong>Wise</strong>, in USD: month-end close, paid by the 15th of the following month (during the pilot we aim to send it around the 7th). The package fee is set in yen and converted at the transfer rate, so the dollar amount moves slightly with the exchange rate. There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.
           </li>

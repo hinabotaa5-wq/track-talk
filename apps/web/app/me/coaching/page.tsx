@@ -6,6 +6,8 @@ import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TicketBalance } from "@/components/ticket-balance";
+import type { TicketSummary } from "@/lib/coaching-tickets";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { CoachingGuardian, CoachingMe } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -37,6 +39,17 @@ export default function CoachingSetupPage() {
   const [linkMessage, setLinkMessage] = useState("");
   const [pushMessage, setPushMessage] = useState("");
   const { pending, acquire, release } = useActionLock();
+  // チケットの残りと有効期限は、マイページに常に出す（本体 #569）。読めなかった時は出さない。
+  const [tickets, setTickets] = useState<TicketSummary | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
+      .then((data) => { if (!cancelled) setTickets(data); })
+      .catch(() => { if (!cancelled) setTickets(null); });
+    return () => { cancelled = true; };
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -127,7 +140,10 @@ export default function CoachingSetupPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-8">
-      <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">{L("コーチングチケット")}</Link>
+      <section className="space-y-2">
+        {tickets ? <TicketBalance summary={tickets} /> : null}
+        <Link href="/me/coaching/tickets" className="block text-sm text-blue-300 underline">{L("コーチングチケット")}</Link>
+      </section>
       <h1 className="text-2xl font-bold">{L("フォーム添削の準備")}</h1>
 
       <section className="space-y-3">
@@ -150,7 +166,7 @@ export default function CoachingSetupPage() {
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : L("まだ保護者にメールを送っていません")}
           </p>
-          <p className="text-sm text-slate-300">{L("動画添削・追加相談は、この手続きなしで購入できます。購入する前に保護者の許可を得て、購入の画面で毎回確認のチェックを入れてください。保護者の同意は、パーソナル指導など保護者の方が契約する指導に使います。同意は保護者だけが、メールで届くリンクから行えます。")}</p>
+          <p className="text-sm text-slate-300">{L("動画添削とチケットは、この手続きなしで購入できます。購入する前に保護者の許可を得て、購入の画面で毎回確認のチェックを入れてください。保護者の同意は、パーソナル指導など保護者の方が契約する指導に使います。同意は保護者だけが、メールで届くリンクから行えます。")}</p>
           {me.guardian?.guardian_email ? (
             <p className="text-sm text-slate-300">{L("送り先: {guardian_email}", { guardian_email: me.guardian.guardian_email })}</p>
           ) : null}

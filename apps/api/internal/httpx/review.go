@@ -266,7 +266,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !p.CoachingDemo {
+	// 招待コードのゲートは、支払いのない検証用（Stripe の鍵がない環境）のデモ版にだけ残す。
+	// 支払いがある環境では、正規の購入（単発・チケット）で誰でも申し込める（本体 #569）。
+	if !s.reviewOpenTo(p) {
 		Error(w, http.StatusForbidden, "forbidden", "フォーム添削は準備中です")
 		return
 	}
@@ -344,13 +346,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			writeCheckoutError(w, err)
 			return
 		}
-		// 購入済みのチケットで払うときは、これまでどおりチケットの利用条件（保護者の同意）を先に確かめる。
-		if useTickets {
-			if err := s.ticketEligibility(r.Context(), s.q, p); err != nil {
-				writeCheckoutError(w, err)
-				return
-			}
-		}
+		// チケットで払うときは、チケットを買った時に宣言済みなので、ここでは宣言を求めない（本体 #569）。
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
 		return

@@ -14,17 +14,18 @@ beforeEach(() => {
   flags.list = false;
   vi.setSystemTime(new Date("2026-11-14T00:00:00+09:00"));
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 vi.mock("next/link", () => ({
   default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
 }));
 
 describe("コーチタブ", () => {
-  it.each([false, true])("開始直前は一覧フラグが %s でも、上部には開始案内だけを出す", (list) => {
+  // 開始の告知は環境変数で文言ごと差し替え、既定は出さない（本体 #569）。
+  it.each([false, true])("告知の文言を入れている間は、一覧フラグが %s でも上部には告知だけを出す", (list) => {
     flags.coaching = true;
     flags.list = list;
-    vi.setSystemTime(new Date("2026-11-13T23:59:59+09:00"));
+    vi.stubEnv("NEXT_PUBLIC_VIDEO_REVIEW_NOTICE", "11/14(土)に開始します！");
     const html = renderToStaticMarkup(createElement(CoachingPage));
     expect(html.slice(0, html.indexOf("<nav"))).toContain("11/14(土)に開始します！");
     expect(html).not.toContain('id="coach-list-heading"');

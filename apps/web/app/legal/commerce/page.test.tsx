@@ -19,22 +19,24 @@ it("コーチングのフラグが閉じていても表示し、住所・電話�
   expect(showsBackButton("/legal/commerce")).toBe(true);
 });
 
-it("公開文面に開発中の注記や販売終了したチケットを表示しない", () => {
+it("公開文面に開発中の注記や販売を終えた追加相談を表示しない", () => {
   const html = renderToStaticMarkup(<CommercePage />);
-  expect(html).not.toMatch(/たたき台|下書き|未確定|要確認|TODO|確定していません|確定後|チケット/);
-  expect(html).toContain("1,500円（税込）");
-  expect(html).toContain("600円（税込）");
+  expect(html).not.toMatch(/たたき台|下書き|未確定|要確認|TODO|確定していません|確定後|追加相談/);
+  expect(html).toContain("フォーム添削 1本 500円（税込）");
+  expect(html).toContain("フォーム添削のチケット 6枚 2,500円（税込）");
   // 支払方法の欄は今使える方法だけ（PayPay は載せず、対応予定の案内も入れない）。
   expect(html).toContain("<p>クレジットカード（Apple Pay・Google Pay を含む）。1回ごとのお支払いです。</p>");
   expect(html).not.toContain("、PayPay。");
   expect(html).not.toContain("対応予定");
   // 支払時期・キャンセル・返金の欄にも PayPay の条件文を残さない（支払方法がカードのみのため）。
   expect(html).not.toContain("PayPay");
-  expect(html).toContain("フォーム添削の追加相談は、申込みの時に決済が済みます。");
-  expect(html).toContain("クレジットカードは代金の確保を取り消します。");
-  expect(html).toContain("申込みを終了し、全額を返金します。");
-  expect(html).toContain("決済完了後48時間以内に受諾しなかった場合");
-  expect(html).toContain("受諾後72時間以内に回答しなかった場合");
+  expect(html).toContain("購入の時に6枚分の代金をまとめて決済します。");
+  expect(html).toContain("クレジットカードは代金の確保を取り消し、チケットで申し込んだ場合は使った1枚を戻します。");
+  // チケットの条件（先払い・6枚一括・有効期限・原則払戻し不可と例外・本人限定。本体 #569）。
+  expect(html).toContain("有効期限は決済完了の日時から6か月");
+  expect(html).toContain("購入後の払い戻しを原則として行いません");
+  expect(html).toContain("運営者がフォーム添削の提供を終了した場合");
+  expect(html).toContain("購入した本人だけが使え、譲渡はできません");
   expect(html).not.toContain("添削・追加相談が返却された時に確定");
   // 内容確認のための差し戻しの例外（再提出から24時間・再提出がないときの終了と返金）。
   expect(html).toContain("再提出から24時間後が新しい返却期限です");
@@ -57,15 +59,16 @@ it("海外コーチ 1ヶ月コーチング（パイロット）の分を表示�
   expect(html).not.toContain("単発");
 });
 
-// 別言語の API 料金定数とのずれを検出する。決済実装自体は変更しない。
-it("掲載料金を API の決済用定数と一致させる", () => {
-  const api = path.resolve(process.cwd(), "../api/internal/httpx");
-  const review = readFileSync(path.join(api, "review_payment.go"), "utf8");
-  const consultation = readFileSync(path.join(api, "coaching_ticket.go"), "utf8");
+// 別言語の API 料金定数・チケットの商品とのずれを検出する。決済実装自体は変更しない。
+it("掲載料金を API の決済用定数とチケットの商品に一致させる", () => {
+  const api = path.resolve(process.cwd(), "../api");
+  const review = readFileSync(path.join(api, "internal/httpx/review_payment.go"), "utf8");
+  const migration = readFileSync(path.join(api, "migrations/000159_review_ticket_redesign.up.sql"), "utf8");
   const html = renderToStaticMarkup(<CommercePage />);
-  for (const [source, name] of [[review, "reviewPriceYen"], [consultation, "ticketFaceYen"]]) {
-    const value = source.match(new RegExp(`const ${name} int32 = (\\d+)`));
-    expect(value, name).not.toBeNull();
-    expect(html).toContain(`${Number(value![1]).toLocaleString("ja-JP")}円（税込）`);
-  }
+  const price = review.match(/const reviewPriceYen int32 = (\d+)/);
+  expect(price).not.toBeNull();
+  expect(html).toContain(`フォーム添削 1本 ${Number(price![1]).toLocaleString("ja-JP")}円（税込）`);
+  const six = migration.match(/\('six', '[^']*', (\d+), (\d+), true\)/);
+  expect(six).not.toBeNull();
+  expect(html).toContain(`フォーム添削のチケット ${six![1]}枚 ${Number(six![2]).toLocaleString("ja-JP")}円（税込）`);
 });

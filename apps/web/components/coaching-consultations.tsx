@@ -39,6 +39,8 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     return () => { live = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [roomPath, token]);
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
+  // 動画添削のあとの追加相談は販売を廃止した（本体 #569）。閉じている間は、過去の相談がある添削だけ記録として出す。
+  if (kind === "review" && !coachingConsultationEnabled && data.consultations.every((c) => c.status === "draft")) return null;
   const open = data.consultations.some((c) => ["draft", "awaiting_payment", "offered", "in_review"].includes(c.status));
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;

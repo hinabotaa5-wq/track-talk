@@ -195,7 +195,11 @@ type coachingTickResult struct {
 	ConsultationsPurged    int `json:"consultations_purged"`
 	TicketsReleased        int `json:"tickets_released"`
 	TicketRefundsProcessed int `json:"ticket_refunds_processed"`
-	Expired                int `json:"expired"`
+	// 決済完了から6か月を過ぎて失効させたチケットの枚数（本体 #569）。
+	TicketsExpired int `json:"tickets_expired"`
+	// 失効の30日前・7日前に送ったチケットの期限の知らせ（本体 #569）。
+	TicketExpiryReminders int `json:"ticket_expiry_reminders"`
+	Expired               int `json:"expired"`
 	// 再提出期限までに再提出がなく終わった差し戻し。
 	Unresubmitted int `json:"unresubmitted"`
 	Requeued      int `json:"requeued"`
@@ -264,6 +268,12 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.TicketRefundsProcessed, err = s.settleTicketRefunds(ctx); err != nil {
+		return out, err
+	}
+	if out.TicketsExpired, err = s.expireTickets(ctx); err != nil {
+		return out, err
+	}
+	if out.TicketExpiryReminders, err = s.remindTicketExpiry(ctx); err != nil {
 		return out, err
 	}
 	if out.ReviewPaymentsReleased, err = s.settleReviewPayments(ctx); err != nil {

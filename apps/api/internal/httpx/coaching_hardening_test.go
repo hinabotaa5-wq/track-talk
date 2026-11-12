@@ -103,7 +103,7 @@ func TestEveryReviewCheckoutPathDisablesManagedPayments(t *testing.T) {
 				}
 			}
 			// 動画添削は仮押さえ（返却時に確定）、追加相談は ¥600。
-			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "1500" || forms[2]["amount"] != "600" {
+			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "500" || forms[2]["amount"] != "600" {
 				t.Fatalf("sessions %+v", forms)
 			}
 		})

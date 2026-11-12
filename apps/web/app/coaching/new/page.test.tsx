@@ -62,7 +62,7 @@ it("支払い方法はカードだけを出し、PayPay は対応予定の案内
 });
 
 it("デモの招待コード画面には販売者の表記とリンクを出さない", async () => {
-  mocks.me = { demo: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.me = { demo: false, review_open: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("動画添削を頼む");
   expect(container.textContent).toContain("コーチを選んで、動画を送ります。料金はどのコーチでも同じです。");
@@ -78,23 +78,87 @@ async function renderWithTickets(canPurchase: boolean) {
   mocks.api.mockImplementation(async (path: string) => {
     if (path === "/v1/me/coaching") return mocks.me;
     if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
-    if (path === "/v1/me/coaching/tickets") return { balance: { available: 2, reserved: 0 }, can_purchase: canPurchase };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 2, reserved: 0 }, next_expiry: { expires_at: "2027-05-01T00:00:00Z", available: 2 }, can_purchase: canPurchase };
     if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 1500, payments: true, due_at: "2026-11-06T00:00:00Z" };
     throw new Error(`unexpected ${path}`);
   });
   await render();
 }
 
-it("チケットを持っていても申込画面に残高は出さず、チケット払いの選択肢は残す", async () => {
+it("チケットを持っている人には、申込画面に残りの枚数といちばん早い有効期限を出し、チケット払いを選べる（本体 #569）", async () => {
   await renderWithTickets(false);
-  expect(container.textContent).not.toContain("チケット残高");
-  expect(container.textContent).not.toContain("残高・履歴");
+  expect(container.textContent).toContain("チケットの残り 2枚");
+  expect(container.textContent).toContain("いちばん早い有効期限");
   expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("コーチングチケット");
-  expect(container.textContent).toContain("チケット（2枚）");
+  expect(container.textContent).toContain("チケット（1枚）");
 });
 
 it("販売中のチケット持ちには購入・確認の入口を残す", async () => {
   await renderWithTickets(true);
-  expect(container.textContent).not.toContain("チケット残高");
   expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("チケットを購入・確認する");
+});
+
+it("支払いのある環境では、招待コードなしで申込みの画面を出す（招待コードのゲートを外した。本体 #569）", async () => {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  await render();
+  expect(container.querySelector("form")).not.toBeNull();
+  expect(container.querySelector('input[aria-label="招待コード"]')).toBeNull();
+  expect(container.textContent).not.toContain("フォーム添削は準備中です");
+});
+
+it("チケットがなく販売中なら、6枚2,500円のチケットを単発の料金と並べて案内する（通常価格や打ち消し線は使わない）", async () => {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: true };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  const link = container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]');
+  expect(link?.textContent).toContain("チケット6枚 2,500円（税込）");
+  expect(link?.textContent).toContain("1回あたり約417円（1回ずつ払うと500円）");
+  expect(link?.textContent).toContain("有効期限は決済から6か月");
+  expect(container.textContent).not.toContain("通常価格");
+  expect(container.querySelector("s, del")).toBeNull();
+});
+
+it("送る前に最終確認を出し、確定を押すまで動画を上げない", async () => {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [{ id: "c1", nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 3, best_record: "", achievements: "" }] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: false };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  const radio = container.querySelector<HTMLInputElement>('input[type="radio"]');
+  if (radio) await act(async () => { radio.click(); });
+  else {
+    const pick = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("テストコーチ"));
+    await act(async () => { pick?.click(); });
+  }
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    setter.call(textarea, "後半に失速します");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const file = new File(["x"], "run.mp4", { type: "video/mp4" });
+  Object.defineProperty(input, "files", { value: [file] });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => {});
+  const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  expect(submit.textContent).toBe("申込み内容を確認する");
+  await act(async () => { submit.form!.requestSubmit(); });
+  const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
+  expect(confirm?.textContent).toContain("動画添削1回（動画1本・担当 テストコーチ）");
+  expect(confirm?.textContent).toContain("500円（税込）");
+  expect(confirm?.textContent).toContain("コーチが返却した時に確定します");
+  expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
+  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
+  expect([...confirm!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["確定してお支払いへ（500円）", "戻って直す"]);
 });
