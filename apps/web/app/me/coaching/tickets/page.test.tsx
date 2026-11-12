@@ -97,7 +97,7 @@ it("18歳未満は、確認のチェックを入れないと購入に進めず�
   mocks.api.mockImplementation(async (_path: string, options?: { method?: string }) => options?.method === "POST" ? { checkout_url: "" } : { ...initial, is_minor: true });
   await render();
   await buy();
-  expect(container.textContent).toContain("保護者に許可をもらいました");
+  expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   await act(async () => box.click());
@@ -116,7 +116,9 @@ it("購入通信の再試行では同じ操作IDを使い、二重購入を防�
     }
     return initial;
   });
-  await render(); await buy(); await buy();
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await buy(); await buy();
   const bodies = mocks.api.mock.calls.filter(([, options]) => options?.method === "POST").map(([, options]) => JSON.parse(options.body));
   expect(bodies).toHaveLength(2);
   expect(bodies[0].request_key).toBe(bodies[1].request_key);

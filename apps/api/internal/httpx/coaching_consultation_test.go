@@ -22,6 +22,9 @@ type consultationView struct {
 
 func consultationAction(t *testing.T, h http.Handler, tok, id, action string, body any) consultationView {
 	t.Helper()
+	if body == nil && (action == "submit" || action == "checkout") {
+		body = map[string]any{"guardian_permission": true}
+	}
 	r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+id+"/"+action, tok, body)
 	if r.Code != 200 {
 		t.Fatalf("consultation %s %d %s", action, r.Code, r.Body.String())
@@ -166,7 +169,7 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			codes[i] = doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, nil).Code
+			codes[i] = doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, map[string]any{"guardian_permission": true}).Code
 		}(i)
 	}
 	close(start)
@@ -609,6 +612,7 @@ func TestConsultationGuardianCanFindRandomReviewRoom(t *testing.T) {
 	}
 	c := consultationDraft(t, h, minor, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "保護者にも見える相談")
 	consultationAction(t, h, minor, c.ID, "submit", nil)
+	execSQLArgs(t, `UPDATE coaching_consultations SET minor=true WHERE id=$1`, c.ID) // 旧取引の保護者閲覧の回帰用
 	gp := "/v1/guardian/" + g
 	if r := doJSON(t, h, "GET", gp+"/consultation-reviews", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), root) {
 		t.Fatalf("guardian rooms %d %s", r.Code, r.Body.String())

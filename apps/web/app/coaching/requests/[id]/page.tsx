@@ -17,7 +17,7 @@ import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
-import type { CoachingMe, HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -147,23 +147,13 @@ function paymentText(p: ReviewPayment): string {
 // 18歳未満は、開き直すときも購入のたびの宣言にチェックが要る。
 function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
   const [error, setError] = useState("");
-  const [minor, setMinor] = useState<boolean | null>(null);
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
   const { pending, acquire, release } = useActionLock();
 
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<CoachingMe>("/v1/me/coaching", { token })
-      .then((d) => { if (!cancelled) setMinor(d.is_minor); })
-      .catch(() => { if (!cancelled) setMinor(false); });
-    return () => { cancelled = true; };
-  }, [token]);
-
   async function pay(method: ReviewPayMethod) {
-    if (minor && !declared) {
-      setError(L("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"));
+    if (!declared) {
+      setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
       return;
     }
     if (!acquire()) return;
@@ -172,7 +162,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
       const d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/checkout`, {
         method: "POST",
         token,
-        body: JSON.stringify({ method, ...declaration.body(!!minor) }),
+        body: JSON.stringify({ method, ...declaration.body(true) }),
       });
       if (d.checkout_url) window.location.assign(d.checkout_url);
     } catch (err) {
@@ -184,12 +174,12 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
   return (
     <section className="space-y-2">
       <p className="text-sm text-slate-200">{L("お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。")}</p>
-      {minor ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
+      <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} />
       {availableReviewPayMethods.map((m) => (
         <button
           key={m}
           type="button"
-          disabled={pending || minor === null || (minor && !declared)}
+          disabled={pending || !declared}
           onClick={() => void pay(m)}
           className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
         >{L("{v0}で払う", { v0: reviewPayMethodLabels[m] })}</button>

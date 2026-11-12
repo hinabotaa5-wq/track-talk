@@ -19,7 +19,7 @@ func TestTicketProductsAreSixForTwentyFiveHundred(t *testing.T) {
 		}
 	}
 	for _, old := range []string{"single", "five"} {
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", owner, map[string]any{"product_id": old, "request_key": uuid.NewString(), "return_path": "/coaching/new"})
+		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", owner, map[string]any{"guardian_permission": true, "product_id": old, "request_key": uuid.NewString(), "return_path": "/coaching/new"})
 		if rec.Code != 422 || !strings.Contains(rec.Body.String(), "product_unavailable") {
 			t.Fatalf("old product %s %d %s", old, rec.Code, rec.Body.String())
 		}

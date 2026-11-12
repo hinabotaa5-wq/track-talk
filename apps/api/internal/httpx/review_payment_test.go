@@ -141,12 +141,12 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 	var unpaid reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &unpaid)
 	// 今は PayPay を受け付けないので、支払い画面の作り直しでも PayPay は断る。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay", "guardian_permission": true}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
 		t.Fatalf("paypay checkout must be rejected %d %s", rec.Code, rec.Body.String())
 	}
 	// 以下は PayPay を再び使えるようにした時のふるまい。
 	allowPayPayForTest(t)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay", "guardian_permission": true}); rec.Code != http.StatusOK {
 		t.Fatalf("checkout again %d %s", rec.Code, rec.Body.String())
 	}
 

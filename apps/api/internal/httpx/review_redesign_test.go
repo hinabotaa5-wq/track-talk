@@ -219,7 +219,7 @@ func TestReviewCheckoutReopenIsSingleSession(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tu, map[string]any{"method": "card"})
+			rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true})
 			var out struct {
 				CheckoutURL string `json:"checkout_url"`
 			}

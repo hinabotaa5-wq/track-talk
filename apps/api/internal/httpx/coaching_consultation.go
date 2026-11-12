@@ -53,11 +53,6 @@ func (s *Server) consultationRoot(ctx context.Context, q *db.Queries, id uuid.UU
 		room.review = &r
 		room.owner = r.RequesterID
 		room.coach = r.CoachID
-		p, err := q.GetProfileByID(ctx, r.RequesterID)
-		if err != nil {
-			return room, err
-		}
-		room.minor = p.BirthMonth != nil && isMinor(*p.BirthMonth, time.Now())
 	} else {
 		c, err := q.GetCoachingContract(ctx, id)
 		if err != nil {
@@ -99,6 +94,19 @@ func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) 
 		minor, ok := s.guardianMinor(w, r)
 		if !ok {
 			return room, "", false
+		}
+		if room.review != nil {
+			records, err := s.q.ListRoomConsultations(r.Context(), db.ListRoomConsultationsParams{ReviewRequestID: &room.id})
+			if err != nil {
+				MapDBError(w, err)
+				return room, "", false
+			}
+			for _, record := range records {
+				if record.Minor {
+					room.minor = true
+					break
+				}
+			}
 		}
 		if room.owner != minor || !room.minor {
 			Error(w, 404, "not_found", "見つかりませんでした")
@@ -598,9 +606,9 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		if !s.stripe.Configured() {
 			return &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
 		}
-		if current.Minor && current.ContractID == nil {
-			// 18歳未満が自分で払う動画添削のあとの追加相談は、毎回の宣言が要る。記録は支払い画面を作る時に残す。
-			if err := requireMinorDeclaration(true, declared.GuardianPermission); err != nil {
+		if current.ContractID == nil {
+			// 販売停止中の(1)追加相談の残存経路も、全員の購入前チェックを記録する。
+			if err := requirePurchaseNotice(true, declared.GuardianPermission); err != nil {
 				return err
 			}
 		} else if current.Minor {

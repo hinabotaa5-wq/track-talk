@@ -45,12 +45,12 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		if err := s.consultationEligibility(ctx, q, owner, room.review != nil, current.Funding); err != nil {
 			return err
 		}
-		if current.Minor && current.ContractID == nil {
+		if current.ContractID == nil {
 			// 添削のあとの追加相談は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
-			if err := requireMinorDeclaration(true, decl.GuardianPermission); err != nil {
+			if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
 				return err
 			}
-			if err := recordMinorDeclaration(ctx, q, owner, minorPurchase{refType: "consultation", refID: current.ID, amount: current.PriceYen, coachID: current.CoachID}, decl); err != nil {
+			if err := recordPurchaseNotice(ctx, q, owner, minorPurchase{refType: "consultation", refID: current.ID, amount: current.PriceYen, coachID: current.CoachID}, decl); err != nil {
 				return err
 			}
 		} else if current.Minor {
@@ -184,14 +184,7 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 				valid = false
 			}
 		}
-		if valid && c.Minor && c.ContractID == nil {
-			// 18歳未満が自分で払う動画添削のあとの追加相談は、購入のときの宣言が残っているものだけ受け付ける。
-			declared, e := q.HasMinorPurchaseDeclaration(ctx, db.HasMinorPurchaseDeclarationParams{RefType: "consultation", RefID: c.ID})
-			if e != nil {
-				return e
-			}
-			valid = declared
-		} else if valid && c.Minor {
+		if valid && c.Minor && c.ContractID != nil {
 			consent, e := q.GetGuardianConsentByMinor(ctx, *c.RequesterID)
 			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 				return e
