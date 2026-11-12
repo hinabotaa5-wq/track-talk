@@ -3,15 +3,12 @@ import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 
-import { CoachingConsultations } from "@/components/coaching-consultations";
-
 import { useAuth } from "@/components/auth-provider";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
-import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
@@ -197,7 +194,6 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
           className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
         >{L("{v0}で払う", { v0: reviewPayMethodLabels[m] })}</button>
       ))}
-      <ReviewPayNotice />
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </section>
   );
@@ -338,8 +334,6 @@ function ReviewRequestView() {
           <ResponseActions request={request} token={token} onChange={setRequest} />
         </>
       ) : null}
-
-      <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
         <div>

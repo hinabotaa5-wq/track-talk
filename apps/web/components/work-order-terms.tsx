@@ -8,12 +8,12 @@ import { formatDateTime } from "@/lib/format";
 export function WorkOrderTermsView({ terms, recordedAt, deliveredAt }: { terms: WorkOrderTerms; recordedAt?: string; deliveredAt?: string }) {
   return (
     <details id="work-order" className="scroll-mt-20 rounded-lg border border-white/20 bg-white/5 p-2 text-sm" open={!recordedAt}>
-      <summary className="cursor-pointer font-semibold text-white">{L("取引条件の通知{v0}", { v0: recordedAt ? L("（{at} に引き受け）", { at: formatDateTime(recordedAt) }) : L("（引き受ける前に確認してください）") })}</summary>
-      <dl className="mt-2 space-y-2">
+      <summary className="cursor-pointer font-semibold text-white">{L("取引条件{v0}", { v0: recordedAt ? L("（{at}に引き受け）", { at: formatDateTime(recordedAt) }) : L("（引き受ける前に確認してください）") })}</summary>
+      <dl className="mt-2 space-y-1">
         {terms.items.map((item) => (
           <div key={item.label}>
-            <dt className="text-xs text-slate-300">{item.label}</dt>
-            <dd className="whitespace-pre-wrap text-slate-100">{item.value}</dd>
+            <dt className="sr-only">{item.label}</dt>
+            <dd className="whitespace-pre-wrap text-slate-100">{item.label}: {item.value}</dd>
           </div>
         ))}
       </dl>

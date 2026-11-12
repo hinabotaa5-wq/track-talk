@@ -302,6 +302,13 @@ func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment)
 		if err != nil || kind == "" || pay.PayerID == nil {
 			return err
 		}
+		if kind == "review_cancel" && pay.RequestID != nil {
+			// 期限切れ系の取り消しは期限切れ通知の1通に統合したため、別通知は出さない（本体 #573）。
+			// 実際の返金（review_refund）は資金の移動があるため従来どおり知らせる。
+			if rr, err := q.GetReviewRequest(ctx, *pay.RequestID); err == nil && rr.Status == "expired" {
+				return nil
+			}
+		}
 		notify = pendingRefundID == nil
 		return q.EnqueueReviewRefundNotice(ctx, db.EnqueueReviewRefundNoticeParams{
 			OperationID: pay.ID, PaymentID: pay.ID, Kind: kind, PendingStripeRefundID: pendingRefundID,

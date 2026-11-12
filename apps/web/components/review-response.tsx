@@ -9,8 +9,7 @@ import type { ReviewCoach, ReviewResponse } from "@/lib/types";
 // 返答と一緒に届く、見てくれたコーチのプロフィール。
 export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
   return (
-    <section className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-      <h2 className="text-xs font-semibold text-slate-300">{L("見てくれたコーチ")}</h2>
+    <section className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <div className="flex items-center gap-3">
         <CoachAvatar url={coach.photo_url} name={coach.nickname} />
         <p className="font-bold text-white">
@@ -18,20 +17,9 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
           <span className="ml-2 text-xs font-normal text-slate-300">{coachTierLabels[coach.tier]}</span>
         </p>
       </div>
-      <dl className="space-y-1.5">
-        <div>
-          <dt className="text-xs text-slate-300">{L("担当種目")}</dt>
-          <dd className="text-slate-100">{coach.events.map((e) => coachEventLabels[e]).join(L("、"))}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-300">{L("記録")}</dt>
-          <dd className="whitespace-pre-wrap text-slate-100">{coach.best_record}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-300">{L("成績や指導経験")}</dt>
-          <dd className="whitespace-pre-wrap text-slate-100">{coach.achievements}</dd>
-        </div>
-      </dl>
+      <p className="text-slate-100">{coach.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
+      <p className="whitespace-pre-wrap text-slate-100">{coach.best_record}</p>
+      <p className="whitespace-pre-wrap text-slate-300">{coach.achievements}</p>
       {/* コーチの詳細はコーチ一覧と一緒に公開する。一覧を閉じている間は準備中の画面へ案内しない。 */}
       {coach.id && coachingCoachListEnabled ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">{L("このコーチのプロフィールを見る")}</Link> : null}
     </section>

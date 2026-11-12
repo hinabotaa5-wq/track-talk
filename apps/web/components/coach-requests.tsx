@@ -94,9 +94,6 @@ export function CoachRequestsSection({ token, view, locale }: { token: string | 
   if (view === "offers") {
     return (
       <section className="space-y-2" id="offers">
-        <p className="text-sm text-slate-300">
-          {t(locale, "coach.offers.note")}
-        </p>
         {data.offers.length === 0 ? <p className="text-sm text-slate-300">{t(locale, "coach.offers.empty")}</p> : null}
         <ul className="space-y-2">
           {data.offers.map((offer) => (

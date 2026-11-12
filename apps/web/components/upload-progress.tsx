@@ -59,7 +59,6 @@ export function UploadProgress({
         </div>
       )}
       {sending ? <p className="mt-2 text-sm tabular-nums text-slate-200">{formatAmount(progress.loaded, progress.total)}</p> : null}
-      <p className="mt-1 text-sm text-slate-200">{L("自動でホームに移動します")}</p>
     </div>
   );
 }
