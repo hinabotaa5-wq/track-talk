@@ -178,11 +178,8 @@ func TestCapturedRefundNetBelowMinimumAndZero(t *testing.T) {
 			x.paid(t)
 			x.refund(t)
 			x.addEarning(t, n)
-			expected := 0
-			if n == 4000 {
-				expected = 2950
-			}
-			assertPayoutPreview(t, coachEarnings(t, x.h, token(t, x.coach)), expected, true)
+			// 差し引き後が3,000円未満なので繰り越し、累積が届くまで支払予定日は出さない（累積型・#357）。
+			assertPayoutPreview(t, coachEarnings(t, x.h, token(t, x.coach)), 0, false)
 			if scalar(t, `SELECT applied_yen FROM coach_refund_adjustments`) != 0 {
 				t.Fatal("preview applied debt")
 			}

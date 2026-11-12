@@ -67,9 +67,9 @@ SELECT pg_advisory_xact_lock(hashtext('coach_payouts'));
 
 -- name: ListPayableCoachEarnings :many
 -- 今月（日本時間）より前の、まだ送金していない報酬。受け取りの準備ができたコーチの分だけ。
--- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月に繰り越す。
--- 繰り越しは1回まで。前の前の月より前の報酬が残っていれば、届かなくても送る。
--- 活動を終えた（承認済みでなくなった）コーチにも、届かなくても残りを送る。
+-- 送金ごとに Stripe の費用がかかるので、合計が min_yen に届かない分は翌月以降に繰り越す（累積型）。
+-- 繰り越した分も合わせた累積が min_yen 以上になった締切月の翌月に送る。繰り越しの回数に上限はない。
+-- 活動を終えた（承認済みでなくなった）コーチには、届かなくても残りを送る。
 -- 運営が止めている（suspended）コーチには送らない。戻したあとの送金でまとめて送る。戻さずに登録を終えた（ended）コーチには、ここで残りを送る（最終精算）。
 WITH candidates AS (
     SELECT e.coach_id::uuid AS coach_id, cp.status, e.confirmed_at,
@@ -86,8 +86,7 @@ WITH candidates AS (
       AND cp.status <> 'suspended'
 ), batches AS (
     SELECT coach_id, sum(net_yen)::int AS amount_yen,
-           (sum(net_yen) >= sqlc.arg(min_yen)::int OR status <> 'approved'
-            OR min(confirmed_at) < (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '1 month') AT TIME ZONE 'Asia/Tokyo') AS payable_now
+           (sum(net_yen) >= sqlc.arg(min_yen)::int OR status <> 'approved') AS payable_now
     FROM candidates
     WHERE net_yen > 0
     GROUP BY coach_id, status

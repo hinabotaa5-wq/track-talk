@@ -35,7 +35,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
   - PayPayは一回払いで使い、課金は運営のアカウントで行う（separate charges and transfers）。利用可能な金額・決済と返金の制約は、公開前にStripeの現行条件を確認する
 - Connect を有効にする（コーチへの送金。コーチは Express アカウントで、国は日本）
   - コーチの銀行口座への入金は、アカウントを作るときに月1回・毎月15日に設定する。運営は毎月1〜14日に「送金」を押す
-  - 1回の送金は3,000円以上。前の月までの報酬が届かないコーチは翌月に1回だけ繰り越す（繰り越した翌月と、承認済みでなくなったコーチには届かなくても送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
+  - 1回の送金は3,000円以上。前の月までの報酬（繰り越した分を含む累積）が届かないコーチは、届くまで翌月以降に繰り越す（累積型。承認済みでなくなったコーチには届かなくても終了月の翌月に全額送る）。報酬の額と支払日はコーチに事前に示す（フリーランス保護法）
 - Webhook の送り先を作る。URL は `https://（API の URL）/webhooks/stripe`
   - 自分のアカウント用: `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`charge.dispute.created`、`charge.refunded`、`refund.created`、`refund.updated`、`refund.failed`、`transfer.created`、`transfer.reversed`、`payout.created` の10種類。署名の鍵は `STRIPE_WEBHOOK_SECRET` としてSecret Managerの承認した数値バージョンを参照する
   - 接続アカウント用: `account.updated`。専用URLは `/webhooks/stripe/connect`（通常決済用と分ける）。署名の鍵（別の値）は Secret Manager から `STRIPE_CONNECT_WEBHOOK_SECRET` に参照させる。[本番設定手順と通常Webhookの制約](stripe-connect-webhook.md)を確認する

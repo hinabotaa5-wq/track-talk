@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 
 // コーチへの報酬。コーチの画面の「報酬」と、運営の「送金」。
 // 支払いは TrackTalk が受け取り、月に1回、前の月までの報酬をまとめて Stripe でコーチのアカウントへ送金する。
-// 合計が最低送金額に届かない分は1回だけ翌月に繰り越す。
+// 合計が最低送金額に届かない分は、累積が届くまで翌月以降に繰り越す（取引が終わったコーチには届かなくても送る）。
 
 const payoutStatusLabels: Record<CoachPayoutStatus, string> = {
   get pending() { return L("送金待ち"); },
@@ -115,7 +115,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
       <div className="space-y-2 text-xs text-slate-300">
         <p>{L("動画添削の報酬は1本350円（税込）です。利用者がチケットで申し込んだ添削も同じ額です。返却した時に報酬が確定します。")}</p>
         <p>{L("サポートプランの受取額は、代金から手数料{personal_fee}%を差し引いた額です。プランの期間が終了した時に確定します。途中で返金して終了した場合は、その時点で確定します。", { personal_fee: data.personal_fee })}</p>
-        <p>{L("確定した報酬は月末で締め、翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。繰り越し分を含む支払対象額が{v0}未満の場合は1回だけ繰り越し、翌々月15日に金額にかかわらず支払います。", { v0: formatYen(data.min_payout_yen) })}</p>
+        <p>{L("確定した報酬は月末で締め、翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。各締切時点の支払額が{v0}未満の場合は翌月以降に繰り越し、累積した支払額が{v0}以上となった締切月の翌月15日に支払います。コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。", { v0: formatYen(data.min_payout_yen) })}</p>
       </div>
       {data.payouts.length > 0 ? (
         <ul className="space-y-1 text-sm">
@@ -187,7 +187,7 @@ export function PayoutsAdmin({ token }: { token: string | null }) {
         onClick={() => void run()}
         className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
       >{L("前の月までの報酬を送金する")}</button>
-      <p className="text-xs text-slate-300">{L("毎月1日から14日のあいだに押してください。コーチの銀行口座への入金は毎月15日です。前の月までの分が3,000円に届かないコーチは翌月に1回だけ繰り越します（繰り越した翌月と、承認済みでなくなったコーチには、届かなくても送ります）。")}</p>
+      <p className="text-xs text-slate-300">{L("毎月1日から14日のあいだに押してください。コーチの銀行口座への入金は毎月15日です。前の月までの分（繰り越した分を含む累積）が3,000円に届かないコーチは、届くまで翌月以降に繰り越します（承認済みでなくなったコーチには、届かなくても送ります）。")}</p>
       {message ? <p className="text-sm text-slate-100">{message}</p> : null}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">{L("コーチ")}</h2>

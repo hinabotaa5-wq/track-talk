@@ -27,7 +27,8 @@ const (
 	// 動画添削のコーチ取り分 70%（reviewSharePercent）とは別のもの。海外スタンダードは手動運用で既に 75/25 のため対象外。
 	personalFeePercent = 25
 	// 1回に送金する最低額（円）。送金のたびに Stripe の費用（月200円と入金ごとの250円+0.25%）がかかるので、
-	// 届かない分は翌月に繰り越す。繰り越しは1回までで、翌月は届かなくても送る。
+	// 届かない分は翌月以降に繰り越し、累積が届いた締切月の翌月に送る（累積型。繰り越しの回数に上限はない）。
+	// コーチとの取引が終わった（承認済みでなくなった）ときは、届かなくても終了月の翌月に残りを全額送る。
 	minPayoutYen = 3000
 )
 
@@ -263,7 +264,11 @@ func (s *Server) previewCoachPayout(ctx context.Context, coach db.CoachProfile) 
 		return nil, nil, err
 	}
 	row := rows[0]
-	date := nextCoachPayoutDate(row.EvaluatedAt, row.PayableNow && !row.BatchAlreadyPaid)
+	if !row.PayableNow {
+		// 累積が最低額に届いていない分は、いつ届くかが決まらないので支払予定日を出さない。
+		return nil, nil, nil
+	}
+	date := nextCoachPayoutDate(row.EvaluatedAt, !row.BatchAlreadyPaid)
 	return &date, &row.AmountYen, nil
 }
 
@@ -316,7 +321,7 @@ type payoutRunResult struct {
 }
 
 // runCoachPayouts は、前の月までの報酬をコーチごとにまとめ、まだ送っていない送金を Stripe で送る。
-// 合計が minPayoutYen に届かないコーチの分は、1回だけ送金にまとめずに残しておく。
+// 合計が minPayoutYen に届かないコーチの分は、届くまで送金にまとめずに残しておく（累積型）。
 func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	var out payoutRunResult
 	// 送金する前に、記録し損ねた報酬を拾う。

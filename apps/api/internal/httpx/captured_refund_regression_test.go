@@ -76,6 +76,13 @@ func TestCapturedLateFailureCompensation(t *testing.T) {
 					t.Fatal("historical payout changed")
 				}
 				execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at=now()-interval '3 months' WHERE source='refund_compensation'`)
+				// 3,000円未満なので、承認済みのあいだは何か月たっても繰り越す（累積型・#357）。
+				x.run(t)
+				if len(x.f.transferList()) != 0 {
+					t.Fatal("compensation below minimum paid while approved")
+				}
+				// 取引が終わったら、金額にかかわらず月次の送金で全額を送る。
+				execSQLArgs(t, `UPDATE coach_profiles SET status='ended', on_duty=false WHERE profile_id=$1`, x.coach)
 				x.run(t)
 				if len(x.f.transferList()) != 1 || x.f.transferList()[0].Get("amount") != "1050" {
 					t.Fatal("compensation not paid monthly")

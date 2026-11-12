@@ -151,7 +151,7 @@ func TestCoachWithdrawNeedsPayoutAccountForUnpaidEarnings(t *testing.T) {
 	}
 }
 
-// 最低額に届かない報酬は、承認済みのあいだは繰り越すが、コーチをやめると次の月次の送金で1回だけ全額を送る。
+// 最低額に届かない報酬は、承認済みのあいだは繰り越すが、コーチをやめる（取引が終わる）と次の月次の送金で1回だけ全額を送る。
 // 送金が済むまでは退会できず、送金を何度押しても二重には送らない。
 func TestCoachWithdrawPaysSmallBalanceOnceBeforeAccountDelete(t *testing.T) {
 	fakeCoachingCloudinary(t)

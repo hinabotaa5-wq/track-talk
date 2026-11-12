@@ -76,11 +76,13 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   expect(text).toContain("利用者がチケットで申し込んだフォーム添削も、1本につき350円です");
   expect(text).not.toContain("1,050円");
   expect(text).not.toContain("420円");
-  expect(text).toContain("報酬の支払期日：報酬は、毎月末日をもって締め切り、翌月15日に支払います。支払対象額（各締切日時点で確定している報酬の合計額をいい、繰り越された額を含みます）が3,000円未満の場合は、その額を翌月に1回に限り繰り越し、翌々月15日に、金額にかかわらず支払います。");
+  expect(text).toContain("報酬の支払期日：毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。");
   expect(text).not.toContain("15日ごろ");
   expect(text).toContain("3,000円に満たない場合");
-  expect(text).toContain("繰り越しは1回まで");
-  expect(text).toContain("金額にかかわらず次の支払日に支払います");
+  expect(text).not.toContain("繰り越しは1回まで");
+  expect(text).not.toContain("翌々月15日");
+  expect(text).toContain("累積が3,000円以上となるまで、翌月以降に繰り越します");
+  expect(text).toContain("まだ支払っていない報酬の全額を、金額にかかわらず終了月の翌月15日に支払います");
   expect(text).toContain("その後に支払う報酬から差し引きます");
   expect(text).toContain("第三者に開示せず");
 });
