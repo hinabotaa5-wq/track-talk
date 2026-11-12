@@ -77,7 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 一時的な失敗(通信できない・応答が返らない・サーバー側の失敗)のあとは、間をあけて取り直す。
   // 失敗のたびにプロフィールを捨てると、アプリの再起動(認証イベントの再発生)まで管理画面の入口が出なくなる(#504)。
   // ref と state の更新関数だけを使うので、描画をまたいで同じ関数でよい。
-  const loadProfile = useCallback(async function load(token: string | null, userId: string | null = userIdRef.current, attempt = 0): Promise<void> {
+  const loadProfile = useCallback(async function load(
+    token: string | null,
+    userId: string | null,
+    retryInitialUnauthorized = false,
+    attempt = 0,
+  ): Promise<void> {
     const seq = ++profileSeq.current;
     clearTimeout(retryTimer.current);
     profileStalled.current = false;
@@ -101,12 +106,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applyProfile(me);
     } catch (err) {
       if (seq !== profileSeq.current) return;
-      if (!isTransientProfileError(err)) {
+      // ログイン直後の未取得プロフィールに限り、最初の401を一度だけ取り直す。
+      const retryUnauthorized = retryInitialUnauthorized && attempt === 0 && !profileRef.current
+        && (err as { status?: unknown } | null)?.status === 401;
+      if (!retryUnauthorized && !isTransientProfileError(err)) {
         applyProfile(null);
       } else if (attempt < PROFILE_RETRY_DELAYS_MS.length) {
         // 取り直しの間は確認中のまま。同じアカウントの取得済みプロフィールは消さない。
         retryTimer.current = setTimeout(() => {
-          if (seq === profileSeq.current) void load(token, userId, attempt + 1);
+          if (seq === profileSeq.current) void load(token, userId, false, attempt + 1);
         }, PROFILE_RETRY_DELAYS_MS[attempt]);
         return;
       } else {
@@ -186,7 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // 保存領域が使えない端末では、消すものもない。
           }
         }
-        void loadProfile(next?.access_token ?? null, next?.user?.id ?? null).finally(() => {
+        const retryInitialUnauthorized = event === "INITIAL_SESSION" || event === "SIGNED_IN";
+        void loadProfile(next?.access_token ?? null, next?.user?.id ?? null, retryInitialUnauthorized).finally(() => {
           if (active) {
           setLoading(false);
           setSessionLoading(false);
