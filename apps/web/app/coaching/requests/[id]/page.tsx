@@ -99,7 +99,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
               aria-label={L("{n}つ星", { n })}
               disabled={pending}
               onClick={() => void post("rating", { stars: n })}
-              className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-50 ${n <= stars ? "text-amber-300" : "text-white/25"}`}
+              className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-50 ${n <= stars ? "text-star" : "text-white/25"}`}
             >
               ★
             </button>
