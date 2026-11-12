@@ -68,6 +68,8 @@ it("届いた依頼の画面は届いた依頼だけを出し、引き受け・�
   expect(container.textContent).toContain("※23:00–07:00はカウント停止");
   expect(container.textContent).toContain("引き受ける");
   expect(container.textContent).toContain("見送る");
+  // #592: 指名ありでも「あなたを選んだ依頼」行は出さない（両リスト共用）。
+  expect(container.textContent).not.toContain("あなたを選んだ依頼");
 
   await act(async () => container.querySelector("button")!.dispatchEvent(new Event("click", { bubbles: true })));
   expect(apiFetch.mock.calls.some(([path, options]) => path === "/v1/coach/offers/o1/accept" && options?.method === "POST")).toBe(true);
@@ -81,6 +83,8 @@ const reviewingRequest = {
   focus: [],
   status: "in_review",
   due_at: "2026-12-01T00:00:00Z",
+  requested_coach_id: "coach-1",
+  coach_reward_yen: 1050,
 };
 
 it("添削中の画面は添削中だけを出し、90分の説明文と引き受けボタンは出さない", async () => {
@@ -99,6 +103,8 @@ it("添削中の画面は添削中だけを出し、90分の説明文と引き�
   expect(container.textContent).not.toContain("新しい依頼が入ってから90分以内");
   expect(container.textContent).not.toContain("引き受ける");
   expect(container.textContent).not.toContain("いま届いている依頼はありません");
+  // #592: 添削中も指名ありで「あなたを選んだ依頼」行は出さない。
+  expect(container.textContent).not.toContain("あなたを選んだ依頼");
   expect(container.querySelector('a[href="/coach"]')).toBeNull();
 });
 
