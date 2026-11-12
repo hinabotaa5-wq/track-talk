@@ -15,86 +15,22 @@ export function parseLocale(value: unknown): Locale {
   return value === "en" ? "en" : "ja";
 }
 
-const storageKey = "tracktalk-locale";
-
-// 未ログイン時の言語プロンプト（本体 #521 追加要件・暫定）に答えた記録。答えるまで未ログインで開くたびに出す。
-const promptKey = "tracktalk:locale-prompted";
-
-// 言語が変わった合図。プロンプトで選んだ言語を、開いている登録・ログイン画面に反映するために使う。
-export const localeChangedEvent = "tracktalk:locale-changed";
-
-export function notifyLocaleChanged(): void {
+// 表示言語の唯一の決め方：ブラウザ言語の自動判定（運営者決定 2026-11-13）。
+// ログイン状態・端末保存・プロフィール locale は表示言語に使わない。
+// 対応言語は ja / en のみ。en で始まる値（en, en-US, en-GB 等）だけ英語にし、それ以外は日本語。
+export function detectBrowserLocale(): Locale {
+  if (typeof navigator === "undefined") return "ja";
+  let candidates: readonly unknown[] = [];
   try {
-    window.dispatchEvent(new Event(localeChangedEvent));
-  } catch {
-    // 送れなくても言語の保存自体は済んでいる。
-  }
-}
-
-// ログイン前（登録画面など）の表示言語。ブラウザにだけ置く。
-export function readStoredLocale(): Locale {
-  if (typeof window === "undefined") return "ja";
-  try {
-    return parseLocale(window.localStorage.getItem(storageKey));
+    candidates = [navigator.language, ...(Array.isArray(navigator.languages) ? navigator.languages : [])];
   } catch {
     return "ja";
   }
-}
-
-export function storeLocale(locale: Locale): void {
-  try {
-    window.localStorage.setItem(storageKey, locale);
-  } catch {
-    // 保存できなくても登録・設定は続ける。
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || candidate.length === 0) continue;
+    return candidate.toLowerCase().startsWith("en") ? "en" : "ja";
   }
-}
-
-export function localePromptAnswered(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return window.localStorage.getItem(promptKey) === "1";
-  } catch {
-    return true;
-  }
-}
-
-export function markLocalePromptAnswered(): void {
-  try {
-    window.localStorage.setItem(promptKey, "1");
-  } catch {
-    // 記録できなくても先へ進める（次回また出す）。
-  }
-}
-
-// 未ログイン中の明示選択（プロンプト・登録画面・ログイン画面・登録直後の言語選択で選んだもの）の記録（本体 #567）。
-// ログイン時にプロフィール保存値と違う場合は、直前の明示選択を勝たせてプロフィールにも保存する。
-// アカウント側から端末へ写した値（ログイン中の同期）では立てない。引き継ぎの保存の確定・値の一致・ログアウトで消費する。
-// 保存に失敗したときは残るので、再読み込みで取り直す。
-const explicitKey = "tracktalk:locale-explicit";
-
-export function markLocaleExplicitChoice(): void {
-  try {
-    window.localStorage.setItem(explicitKey, "1");
-  } catch {
-    // 記録できなくても選択自体は残る（引き継ぎだけ行われない）。
-  }
-}
-
-export function hasLocaleExplicitChoice(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(explicitKey) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function clearLocaleExplicitChoice(): void {
-  try {
-    window.localStorage.removeItem(explicitKey);
-  } catch {
-    // 消せなくても引き継ぎは値の一致で止まる。
-  }
+  return "ja";
 }
 
 const ja = {
@@ -492,8 +428,9 @@ export function hasEnglish(ja: string): boolean {
 }
 
 // 英語の人は、辞書を当てるまで画面を隠す（日本語が一瞬見えるのを防ぐ）。3秒で必ず見せる。
+// 判定はブラウザ言語だけを見る（運営者決定 2026-11-13）。描画前の同期実行でチラつきを避ける。
 export const localePendingClass = "locale-pending";
-export const localeStartupScript = `try{if(localStorage.getItem(${JSON.stringify(storageKey)})==="en"){var d=document.documentElement;d.lang="en";d.classList.add(${JSON.stringify(localePendingClass)});setTimeout(function(){d.classList.remove(${JSON.stringify(localePendingClass)})},3000)}}catch(e){}`;
+export const localeStartupScript = `try{var l=navigator.language||((navigator.languages||[])[0]||"");var e=/^en/i.test(l||"");var d=document.documentElement;d.lang=e?"en":"ja";if(e){d.classList.add(${JSON.stringify(localePendingClass)});setTimeout(function(){d.classList.remove(${JSON.stringify(localePendingClass)})},3000)}}catch(e){}`;
 
 // 曜日の短い表記（0 が日曜）。英語は1文字だと火・木などが区別できないので3文字にする。
 const weekdaysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;

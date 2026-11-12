@@ -8,7 +8,7 @@ import ts from "typescript";
 export const japanese = /[぀-ヿ㐀-鿿、。「」『』（）：！？]/;
 
 // 英語化の対象外（運営者決定 2026-11-11、本体 #530）：管理画面（運営者専用）と規約類の本文。
-// ほかに、どちらの言語でも同じに出すもの（言語選択のプロンプトは日英併記。言語名はその言語自身の表記で、行末の「// i18n-data」で外す）。
+// ほかに、どちらの言語でも同じに出すもの（言語名はその言語自身の表記で、行末の「// i18n-data」で外す）。
 export const exemptPatterns: readonly RegExp[] = [
   /^app\/admin\//,
   /^components\/(admin-stats|announcements-admin|coaching-admin|menu-contest-admin|meet-sessions-admin|overseas-interest-admin|report-hide-actions)\.tsx$/,
@@ -17,7 +17,6 @@ export const exemptPatterns: readonly RegExp[] = [
   /^components\/(privacy-policy|overseas-consent-notice|support-plan-coach-terms)\.tsx$/,
   // 規約の条の見出し（第n条）。Rule は見出しを呼び出し側で訳す。
   /^components\/legal-prose\.tsx$/,
-  /^components\/locale-prompt\.tsx$/,
   /^lib\/i18n(-en|-scan)?\.ts$/,
   // 画面の文言ではなくデータ：運営者の氏名（特商法の表記などに出す本名）と、ニックネームに使えない語の照合用の一覧。
   /^lib\/(operator|reserved-nickname)\.ts$/,

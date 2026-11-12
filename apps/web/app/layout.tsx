@@ -22,7 +22,6 @@ import { LeaveGuardProvider } from "@/components/leave-guard";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ThemeSync } from "@/components/theme-sync";
 import { InstallGuide } from "@/components/install-guide";
-import { LocalePrompt } from "@/components/locale-prompt";
 import { LocaleProvider } from "@/components/locale-provider";
 import { localeStartupScript } from "@/lib/i18n";
 import { CaretGuard } from "@/components/caret-guard";
@@ -93,7 +92,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* マイページで選んだ表示(ライト・ダーク)を、画面を描く前に当てる。 */}
         <script dangerouslySetInnerHTML={{ __html: themeStartupScript }} />
         <script dangerouslySetInnerHTML={{ __html: pendingLinkStartupScript }} />
-        {/* 英語を選んだ端末は、英語に切り替え終えるまで中身を隠す（本体 #530）。 */}
+        {/* ブラウザ言語が英語の端末は、英語に切り替え終えるまで中身を隠す。 */}
         <script dangerouslySetInnerHTML={{ __html: localeStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
@@ -137,8 +136,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ScrollTopOnTabChange />
           <CaretGuard />
           <InstallGuide />
-          {/* TEMPORARY（本体 #521 追加要件）：未ログイン時の言語選択プロンプト。外すときはこの1行と locale-prompt.tsx を消す。 */}
-          <LocalePrompt />
           </LocaleProvider>
           </ConfirmProvider>
           </LeaveGuardProvider>

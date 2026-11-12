@@ -258,13 +258,20 @@ const pushErrorEn = "Requests arrive as notifications, so turn on notifications 
 
 async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en") {
   const context = page.context();
+  // 表示言語はブラウザ言語の自動判定だけ（運営者決定 2026-11-13）。英語表示はブラウザ言語で再現する。
+  if (locale === "en") {
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, "language", { get: () => "en-US", configurable: true });
+      Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"], configurable: true });
+    });
+  }
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3000";
   const user = { id: userID, aud: "authenticated", role: "authenticated", email: "preview@example.com", app_metadata: {}, user_metadata: {}, identities: [], created_at: new Date().toISOString() };
   const payload = { sub: userID, aud: "authenticated", role: "authenticated", aal: "aal1", exp: Math.floor(Date.now() / 1000) + 3600, iat: Math.floor(Date.now() / 1000) };
   const accessToken = `${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString("base64url")}.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.preview`;
   const session = { access_token: accessToken, token_type: "bearer", refresh_token: "preview", expires_in: 3600, expires_at: payload.exp, user };
   await context.addCookies([{ name: "sb-127-auth-token", value: `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`, url: baseURL }]);
-  // 英語表示はアカウントの言語設定（profiles.locale）の実物経路で再現する。
+  // プロフィール locale は表示言語に使わない。期待と逆の値を入れて、表示が追従しないことを確かめる。
   const stopped = { ...application, on_duty: false };
   await page.route("**/auth/v1/**", (route) => route.fulfill({ json: user }));
   await page.route("**/api/v1/**", async (route) => {
@@ -281,7 +288,7 @@ async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en")
     }
     let body: unknown = {};
     if (pathname.endsWith("/coach/me")) body = { application: stopped, rating: { count: 3, average: 4.5, paused: false } };
-    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false, ...(locale === "en" ? { locale: "en" } : null) };
+    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false, locale: locale === "en" ? "ja" : "en" };
     else if (pathname.endsWith("/coach/requests")) {
       body = { offers: [], reviewing: [reviewRequest("r1")] };
     } else if (pathname.endsWith("/coach/consultations")) body = { consultations: [{ id: "c1", status: "open" }] };

@@ -8,8 +8,6 @@ const meet = {
 };
 
 test.beforeEach(async ({ page }) => {
-  // 言語選択プロンプト（未ログイン時・必須）は本 spec の対象外。回答済みにして出さない。
-  await page.addInitScript(() => localStorage.setItem("tracktalk:locale-prompted", "1"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;

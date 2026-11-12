@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
 test.use({ trace: "retain-on-failure" });
 
-test.beforeEach(async ({ page }) => {
-  // 言語選択プロンプト（未ログイン時・必須）は本 spec の対象外。回答済みにして出さない。
-  await page.addInitScript(() => localStorage.setItem("tracktalk:locale-prompted", "1"));
-});
+
 
 test("720件を読んでも描画を絞り、過去ページの再取得と戻る位置を保つ", async ({ page }) => {
   test.setTimeout(120_000);

@@ -5,18 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LocaleProvider } from "@/components/locale-provider";
 import LanguagePage from "./page";
 
-// マイページの設定一覧から開く「表示言語」の画面（本体 #536）。
-const auth = vi.hoisted(() => ({
-  session: {} as unknown,
-  loading: false,
-  profile: { locale: "ja", nickname: "ランナー", event: "100m" },
-  token: "token",
-  refreshProfile: vi.fn(),
-}));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => auth }));
+// 表示言語の手動選択は廃止（運営者決定 2026-11-13）。直接開いたら 404 にせずマイページへ送る。
 const nav = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/me/language", useRouter: () => ({ replace: nav.replace }) }));
-vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/lib/api")>()), apiFetch: vi.fn() }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -25,7 +16,6 @@ async function render() {
 }
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  auth.session = {};
   nav.replace.mockReset();
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -37,16 +27,9 @@ afterEach(async () => {
   localStorage.clear();
 });
 
-it("見出しと、日本語／English の選択を出す", async () => {
+it("言語の選択肢は出さず、マイページへ送る", async () => {
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("表示言語");
-  const group = container.querySelector('[role="radiogroup"]');
-  expect(group?.getAttribute("aria-labelledby")).toBe(container.querySelector("h1")?.id);
-  expect([...group!.querySelectorAll('[role="radio"]')].map((b) => b.textContent)).toEqual(["日本語", "English"]);
-});
-
-it("未ログインならログイン画面へ送る", async () => {
-  auth.session = null;
-  await render();
-  expect(nav.replace).toHaveBeenCalledWith("/login?next=/me/language");
+  expect(nav.replace).toHaveBeenCalledWith("/me");
+  expect(container.querySelector('[role="radiogroup"]')).toBeNull();
+  expect(container.textContent).not.toContain("表示言語");
 });

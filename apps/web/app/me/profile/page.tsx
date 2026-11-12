@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { t, L } from "@/lib/i18n";
-import { useLocale, useLocaleControls } from "@/components/locale-provider";
-import { LanguageSelect } from "@/components/language-select";
+import { useLocale } from "@/components/locale-provider";
 import { appEvents } from "@/lib/practice-events";
 import { profileIncomplete } from "@/lib/profile-gate";
 import { trackEvent } from "@/lib/analytics";
@@ -22,10 +21,9 @@ import type { z } from "zod";
 
 export default function ProfilePage() {
   const { session, token, profile, loading, refreshProfile } = useAuth();
-  // 表示言語（本体 #521・#530）。いつもの変更はマイページ本体の「表示言語」で行う。
-  // 登録直後（オンボーディング中）だけここでも選べるようにし、選んだ言語（端末保存）をアカウントの初期値として保存する。
+  // 表示言語はブラウザ言語の自動判定（運営者決定 2026-11-13）。UIからは変えられない。
+  // 登録直後（オンボーディング中）の確定時に、その時点の自動判定結果をアカウントの初期値として保存する。
   const locale = useLocale();
-  const { chooseDeviceLocale } = useLocaleControls();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -91,7 +89,6 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{incomplete ? t(locale, "profile.onboardingTitle") : t(locale, "profile.settingsTitle")}</h1>
       {incomplete ? <p className="text-sm text-slate-200">{t(locale, "profile.onboardingHint")}</p> : null}
-      {incomplete ? <LanguageSelect value={locale} onChange={chooseDeviceLocale} hint="register.languageHint" /> : null}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input placeholder={t(locale, "profile.nickname")} aria-label={t(locale, "profile.nickname")} {...form.register("nickname")} />
         {overLimit ? (
