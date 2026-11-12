@@ -7,7 +7,7 @@
 -- 読取専用はロールの既定＋接続時の PGOPTIONS＋トランザクションの三重で守る（USAGE＋SELECT のみ、SEQUENCE 不要）。
 -- この環境で BYPASSRLS を付けられない場合は、方式を変えずに止めて報告する。
 -- この環境で読み取り専用にできない場合は、方式を変えずに止めて報告する。
-CREATE ROLE identity_dbping LOGIN NOINHERIT;
+CREATE ROLE identity_dbping LOGIN BYPASSRLS NOINHERIT;
 ALTER ROLE identity_dbping SET default_transaction_read_only = on;
 GRANT USAGE ON SCHEMA identity_vault TO identity_dbping;
 GRANT SELECT ON ALL TABLES IN SCHEMA identity_vault TO identity_dbping;
