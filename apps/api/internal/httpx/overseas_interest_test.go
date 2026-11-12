@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// 海外コーチの指導希望（本体 #542）は1ユーザー1件。選び直しは変更になり、行は増えない。
-// 未認証は 401、種別が3択以外は 422。管理側は総数・内訳・一覧が見られる。
+// 海外コーチの指導希望（本体 #542・#581）は1ユーザー1件で登録後は変更・取消・再登録ができない。
+// 未認証は 401、種別が3択以外は 422、登録後の変更・取消・再登録は 409。管理側は総数・内訳・一覧が見られる。
 func TestOverseasInterestFlow(t *testing.T) {
 	h := setup(t)
 	pool := openPool(t)
@@ -76,28 +76,28 @@ func TestOverseasInterestFlow(t *testing.T) {
 	if got := read(me); got == nil || got.Kind != "monthly" {
 		t.Fatalf("after monthly %+v", got)
 	}
-	// 同じ種別の登録を繰り返しても行は増えない（重複登録不可）。
-	if code, body := put(me, "monthly"); code != http.StatusOK {
+	// 登録後の再登録（同じ種別でも）は 409 で、登録内容は変わらない。
+	if code, body := put(me, "monthly"); code != http.StatusConflict {
 		t.Fatalf("put monthly again %d %s", code, body)
 	}
-	// 別の種別を選ぶと変更として置き換わる。
-	if code, body := put(me, "both"); code != http.StatusOK {
+	// 別の種別への変更も 409 で、登録内容は変わらない（行も増えない）。
+	if code, body := put(me, "both"); code != http.StatusConflict {
 		t.Fatalf("put both %d %s", code, body)
 	}
-	if got := read(me); got == nil || got.Kind != "both" {
-		t.Fatalf("after both %+v", got)
+	if got := read(me); got == nil || got.Kind != "monthly" {
+		t.Fatalf("after rejected puts %+v", got)
 	}
 	if n := count(meID.String()); n != 1 {
 		t.Fatalf("rows for me = %d", n)
 	}
-	// 取り消しができる。取り消し済みの取り消しも 200。
-	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/overseas-interest", me, nil); rec.Code != http.StatusOK {
+	// 取り消しはできない。直接叩いても登録は残り、管理側の集計も変わらない。
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/overseas-interest", me, nil); rec.Code != http.StatusConflict {
 		t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 	}
-	if got := read(me); got != nil {
+	if got := read(me); got == nil || got.Kind != "monthly" {
 		t.Fatalf("after delete %+v", got)
 	}
-	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/overseas-interest", me, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/overseas-interest", me, nil); rec.Code != http.StatusConflict {
 		t.Fatalf("delete again %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -136,11 +136,24 @@ func TestOverseasInterestFlow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	// 自分は取り消し済み・管理者は未登録なので、残りは other の1件だけ。
-	if body.Total != 1 || body.Breakdown.Monthly != 0 || body.Breakdown.Single != 1 || body.Breakdown.Both != 0 {
+	// 自分の monthly（取り消し不可のため残る）と other の single の2件。管理者は未登録。
+	if body.Total != 2 || body.Breakdown.Monthly != 1 || body.Breakdown.Single != 1 || body.Breakdown.Both != 0 {
 		t.Fatalf("stats %+v", body)
 	}
-	if len(body.Interests) != 1 || body.Interests[0].Kind != "single" || body.Interests[0].Nickname != "希望者" || body.Interests[0].CreatedAt == "" {
+	if len(body.Interests) != 2 {
+		t.Fatalf("list %+v", body.Interests)
+	}
+	kinds := map[string]string{}
+	for _, item := range body.Interests {
+		if item.CreatedAt == "" {
+			t.Fatalf("list %+v", body.Interests)
+		}
+		kinds[item.Kind] = item.Nickname
+	}
+	if _, ok := kinds["monthly"]; !ok {
+		t.Fatalf("no monthly in %+v", body.Interests)
+	}
+	if kinds["single"] != "希望者" {
 		t.Fatalf("list %+v", body.Interests)
 	}
 	t.Cleanup(func() {
