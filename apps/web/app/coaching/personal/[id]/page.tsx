@@ -24,7 +24,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-// 無料相談の提案から成立した大会までプラン（動画への返答が無制限）か。
+// 無料相談の提案から成立した1ヶ月プラン（動画への返答が無制限）か。
 function supportConsultContract(c: CoachingContract): boolean {
   return c.service_type === "competition_support" && c.video_reviews === 0;
 }

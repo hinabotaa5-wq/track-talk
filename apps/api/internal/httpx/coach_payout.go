@@ -301,7 +301,7 @@ func recordCoachEarningsWith(ctx context.Context, q *db.Queries) (int, error) {
 	if err != nil {
 		return len(reviews), err
 	}
-	// 無料相談から成立した大会までプラン：期間中は月次の仮払い、終わったら日割りで確定して差額を精算する。
+	// 無料相談から成立した1ヶ月プラン：期間中は月次の仮払い、終わったら日割りで確定して差額を精算する。
 	advances, err := recordSupportAdvances(ctx, q, time.Now())
 	if err != nil {
 		return len(reviews) + len(personal), err

@@ -1,7 +1,7 @@
 import { L } from "@/lib/i18n";
 import { supportTermsLines } from "@/lib/support-consult";
 
-// 大会までプランの提案画面・最終確認画面に出す、途中で終わる場合のお金とチャットの扱い。
+// 1ヶ月プランの提案画面・最終確認画面に出す、途中で終わる場合のお金とチャットの扱い。
 export function SupportTermsNotice({ priceYen, days }: { priceYen: number; days: number }) {
   return (
     <section aria-label={L("途中で終わる場合と返金")} className="space-y-1.5 rounded-xl border border-slate-600 bg-slate-800/60 p-3 text-xs text-slate-200">

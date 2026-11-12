@@ -328,7 +328,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// パーソナル指導（利用者側）
 				r.With(s.requireNewAcceptance).Post("/coaching/contracts", s.createCoachingContract)
 				r.Get("/coaching/contracts/{id}", s.getCoachingContract)
-				// 大会までプランの無料相談
+				// 1ヶ月プランの無料相談
 				r.Post("/support-consults", s.createSupportConsult)
 				r.Get("/me/support-consults", s.listMySupportConsults)
 				r.Get("/support-consults/{id}", s.getSupportConsult)

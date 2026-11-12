@@ -10,7 +10,7 @@ import (
 
 func jstDay(y int, m time.Month, d, h int) time.Time { return time.Date(y, m, d, h, 0, 0, 0, jst.Zone) }
 
-// 動画が無制限の大会までプランの未提供分は、期間の日割り（契約価格 ÷ 期間日数 × 未経過日数・円未満切り捨て）。
+// 動画が無制限の1ヶ月プランの未提供分は、期間の日割り（契約価格 ÷ 期間日数 × 未経過日数・円未満切り捨て）。
 func TestSupportRemainingByDays(t *testing.T) {
 	zero := int16(0)
 	start, comp := jstDay(2026, 11, 10, 9), jstDay(2026, 11, 19, 0) // 10日間（両端を含む）

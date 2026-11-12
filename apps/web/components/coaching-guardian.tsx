@@ -178,7 +178,7 @@ export function GuardianPersonalSection({ token }: { token: string }) {
   );
 }
 
-// GuardianSupportConsultSection は、お子さんが保護者に送った大会までプランの提案。
+// GuardianSupportConsultSection は、お子さんが保護者に送った1ヶ月プランの提案。
 // 保護者が内容を確認して同意し、お支払いをすると契約が成立して始まる（コーチの引き受けはもう挟まない）。
 function ConsultCard({ consult, token, onDone }: { consult: SupportConsult & { coach_nickname?: string }; token: string; onDone: () => void }) {
   const [consents, setConsents] = useState<ContractConsents>(noConsents);
@@ -243,9 +243,9 @@ export function GuardianSupportConsultSection({ token }: { token: string }) {
   const waiting = (consults ?? []).filter((c) => c.status === "sent_to_guardian");
   if (waiting.length === 0) return null;
   return (
-    <section className="space-y-3" aria-label={L("お子さんから届いた大会までプランの提案")}>
+    <section className="space-y-3" aria-label={L("お子さんから届いた1ヶ月プランの提案")}>
       <div className="space-y-1">
-        <h2 className="text-lg font-bold">{L("大会までプランの提案")}</h2>
+        <h2 className="text-lg font-bold">{L("1ヶ月プランの提案")}</h2>
         <p className="text-sm text-slate-300">{L("お子さんがコーチに無料で相談して、届いた提案です。内容を確認して、同意するかどうかを決めてください。")}</p>
       </div>
       <ul className="space-y-3">

@@ -263,7 +263,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 		return 0, 0, false, &ticketRuleError{"consultation_unavailable", "この契約では追加相談を購入できません"}
 	}
 	if c.ServiceType != nil && *c.ServiceType == "competition_support" {
-		return 0, 0, false, &ticketRuleError{"consultation_unavailable", "大会までプランに追加相談はありません。期間中のやりとりは通常のチャットをご利用ください"}
+		return 0, 0, false, &ticketRuleError{"consultation_unavailable", "1ヶ月プランに追加相談はありません。期間中のやりとりは通常のチャットをご利用ください"}
 	}
 	if c.AdditionalConsultationPriceYen == nil {
 		return 0, 0, false, &ticketRuleError{"consultation_unavailable", "この契約には追加相談の料金が設定されていません"}

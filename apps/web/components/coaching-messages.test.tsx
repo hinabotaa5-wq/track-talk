@@ -12,7 +12,7 @@ vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => async () => tr
 
 const base = {
   id: "c1", status: "active", role: "requester", minor: true, ends_at: "2026-12-20T15:00:00Z", messages_purged_at: null, messages_view_until: null,
-  plan_title: "大会までプラン", coach: { nickname: "コーチA" }, requester: { nickname: "選手" }, video_reviews: 0, reply_formats: [], menu_updates: null, start_on_first_video: false, clock_started_at: null,
+  plan_title: "1ヶ月プラン", coach: { nickname: "コーチA" }, requester: { nickname: "選手" }, video_reviews: 0, reply_formats: [], menu_updates: null, start_on_first_video: false, clock_started_at: null,
 } as unknown as CoachingContract;
 let root: Root;
 let container: HTMLDivElement;

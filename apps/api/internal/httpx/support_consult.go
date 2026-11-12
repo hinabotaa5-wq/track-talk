@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 大会までプランの無料相談。
+// 1ヶ月プランの無料相談。
 // 選手は構造化フォームで相談し、コーチは 48 時間以内に提案か辞退を返す。
 // 契約は選手が提案を受けたときに作り、以降は既存のサポートプランの流れ（コーチの引受・保護者同意・カード支払い）に接続する。
 // 相談の場はチャットにしない。フォームの往復だけで進める。
@@ -291,7 +291,7 @@ func (s *Server) saveMyConsultSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !slices.Contains(c.ServiceTypes, "competition_support") {
-			FieldError(w, map[string]string{"accepting": "先に担当するサービスに大会までプランを登録してください"})
+			FieldError(w, map[string]string{"accepting": "先に担当するサービスに1ヶ月プランを登録してください"})
 			return
 		}
 		if !s.cfg.CoachingMessaging {
@@ -495,7 +495,7 @@ func (s *Server) createSupportConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notify(r.Context(), c.CoachID, notifyCoaching, push.Message{
-		Title: "大会までプランの無料相談が届きました",
+		Title: "1ヶ月プランの無料相談が届きました",
 		Body:  "48時間以内に、提案か辞退を返してください",
 		URL:   "/coach/support-consults", Tag: "support-consult-" + c.ID.String(),
 	}, 24*time.Hour)
@@ -964,7 +964,7 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 
 // ---- 提案を受ける ----
 
-// supportStandardContent は、大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記し、契約の説明にも写す。
+// supportStandardContent は、1ヶ月プランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記し、契約の説明にも写す。
 // 返答の回数や形式は選ばせない（動画への返答は期間中は無制限。追加相談という別料金もない）。
 const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。"
 

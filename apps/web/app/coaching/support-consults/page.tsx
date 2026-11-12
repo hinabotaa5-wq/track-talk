@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// 自分が送った大会までプランの無料相談。
+// 自分が送った1ヶ月プランの無料相談。
 export default function MySupportConsultsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function MySupportConsultsPage() {
   if (loading || !session || (rows === null && !error)) return <PageLoading screen label={L("読み込み中...")} />;
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">{L("大会までプランの無料相談")}</h1>
+      <h1 className="text-2xl font-bold">{L("1ヶ月プランの無料相談")}</h1>
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
       {rows?.length === 0 ? <p className="text-sm text-slate-200">{L("まだ相談はありません。コーチのページから、無料で相談できます。")}</p> : null}
       <ul className="space-y-2">
