@@ -3,7 +3,7 @@ import { Article } from "@/components/legal-prose";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
-const privacyUpdated = "2026年11月11日";
+const privacyUpdated = "2026年11月13日";
 
 export function PrivacyPolicy({ titleId }: { titleId?: string }) {
   return (
