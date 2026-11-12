@@ -890,10 +890,15 @@ html.locale-pending body > :not(#startup-splash):not(script) {
   visibility: hidden;
 }
 
-/* コーチ画面のタイル（本体 #563）。3列の正方形で、間は詰める（gap 0.5rem）。
-   スマホ幅では枠がヘッダーと下部ナビの間の残りの高さを占め、タイルは幅（3列）と高さ（4行）の両方に収まる
-   最大の大きさ（--coach-tile、coach-dashboard.tsx の CoachTiles が実寸から決める）で中央に置く。
-   枠の最小の高さは 19.5rem（タイル約72px）で、それより低い画面はページが縦にスクロールする。 */
+/* コーチ画面のタイル（本体 #580）。3列×4行（最終行は2つ、左寄せ）で、タイルは横幅駆動の正方形。
+   横：コンテナ左右パディング clamp(16px, 4.5vw, 24px)、ギャップ（横・縦とも）clamp(12px, 3.2vw, 16px)。
+   main の px-4（1rem）はそのままにし、足りない分だけ nav 側で足して合計を式どおりにする。
+   列は repeat(3, 1fr) で残り幅いっぱいに広げ、最終行は左寄せのまま（中央寄せ・引き伸ばしなし）。
+   縦：メニュー領域が残りの高さいっぱいに広がり、JS（CoachTiles）が余りを行ギャップ拡大（最大 +8px）→
+   上下パディング拡大（最大 28px）の順で配分し、残りは中央寄せ（align-content: center）で吸収する。
+   上パディングの既定 12px はバッジのはみ出し分（約8px）を確保する。高さ不足の画面では基準値のまま
+   ページ全体でスクロールし、タイルを縮めない。タイル内部も比例して大きくする（文言・アイコン種・色・
+   バッジの位置と見た目・遷移は変えない）。PC 幅は従来どおり。 */
 .coach-tiles > nav {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -901,13 +906,31 @@ html.locale-pending body > :not(#startup-splash):not(script) {
   .coach-tiles {
     position: relative;
     flex: 1 1 0%;
-    min-height: 19.5rem;
+    display: flex;
+    flex-direction: column;
   }
   .coach-tiles > nav {
-    position: absolute;
-    inset: 0;
+    flex: 1 1 auto;
     align-content: center;
-    justify-content: center;
-    grid-template-columns: repeat(3, var(--coach-tile, minmax(0, 1fr)));
+    column-gap: clamp(12px, 3.2vw, 16px);
+    row-gap: var(--coach-row-gap, clamp(12px, 3.2vw, 16px));
+    padding-inline: max(0px, calc(clamp(16px, 4.5vw, 24px) - 1rem));
+    padding-block: var(--coach-pad-block, 12px);
+  }
+  /* タイル内部も比例して大きくする。文言・アイコン種・色・バッジは変えない。 */
+  .coach-tiles > nav > a {
+    gap: 8px;
+    padding: 10px;
+    border-radius: clamp(16px, 4.5vw, 20px);
+  }
+  .coach-tiles > nav > a > svg {
+    width: clamp(30px, 8.5vw, 36px);
+    height: clamp(30px, 8.5vw, 36px);
+  }
+  .coach-tiles > nav > a > .coach-tile-label {
+    font-size: clamp(13px, 3.6vw, 15px);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }

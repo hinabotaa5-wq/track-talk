@@ -1,8 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-// コーチ画面のランチャーが、ヘッダーと下部ナビの間の高さいっぱいに広がることを確かめる（本体 #563）。
+// コーチ向けメニューの11タイルを大きくし、画面にちょうど収める（本体 #580）。
 // NEXT_PUBLIC_COACHING_ENABLED=true のプレビューで実行する（起動手順は docs/coach-availability.md と同じ）。データと認証はテスト用。
+// #563 の高さ合わせ（JS で正方形の一辺を実測）は廃止し、タイルは横幅駆動（3列 1fr＋正方形）にする。
+// 縦の余りは行ギャップ拡大（最大 +8px）→上下パディング拡大（最大 28px）→中央寄せの順で吸収し、
+// 高さ不足の画面ではタイルを縮めずページ全体でスクロールする。
 test.skip(process.env.PLAYWRIGHT_COACHING_ENABLED !== "1", "コーチングを有効にしたローカルプレビューで実行します");
 const coachID = "22222222-2222-4222-8222-222222222222";
 const userID = "11111111-1111-4111-8111-111111111111";
@@ -55,78 +58,180 @@ async function setup(page: Page, withOffers: boolean) {
   await expect(page.locator(".screen-loader")).toBeHidden();
 }
 
+// Issue #580 の目標レイアウトから求まるタイル一辺。式の結果であり、個別の固定値で書かない。
+function expectedTile(viewportWidth: number) {
+  const pad = Math.min(24, Math.max(16, viewportWidth * 0.045));
+  const gap = Math.min(16, Math.max(12, viewportWidth * 0.032));
+  return { pad, gap, tile: (viewportWidth - pad * 2 - gap * 2) / 3 };
+}
+
 async function measure(page: Page) {
   return page.evaluate(() => {
     const rect = (el: Element | null) => el!.getBoundingClientRect();
-    const grid = rect(document.querySelector(".coach-tiles"));
+    const wrapper = document.querySelector(".coach-tiles") as HTMLElement;
+    const nav = document.querySelector(".coach-tiles > nav") as HTMLElement;
+    const grid = rect(wrapper);
+    const navBox = rect(nav);
     const footer = rect(document.querySelector(".coach-launcher > footer"));
     const bottomNav = [...document.querySelectorAll("nav")].find((n) => getComputedStyle(n).position === "fixed");
-    const tiles = [...document.querySelectorAll("nav.grid a")].map((a) => a.getBoundingClientRect());
+    const tiles = [...document.querySelectorAll("nav.grid a")];
+    const tileRects = tiles.map((a) => a.getBoundingClientRect());
+    const labels = tiles.map((a) => {
+      const s = a.querySelector(":scope > span:not([aria-hidden])") as HTMLElement | null;
+      if (!s) return null;
+      const cs = getComputedStyle(s);
+      return {
+        whiteSpace: cs.whiteSpace, fontSize: cs.fontSize,
+        scrollW: s.scrollWidth, clientW: s.clientWidth, scrollH: s.scrollHeight, clientH: s.clientHeight,
+      };
+    });
+    const badges = tiles.map((a) => {
+      const b = a.querySelector(":scope > span[aria-hidden]") as HTMLElement | null;
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      const cs = getComputedStyle(b);
+      const shown = cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0;
+      let clipped = false;
+      let p = b.parentElement;
+      while (p && p !== document.body) {
+        if (getComputedStyle(p).overflow !== "visible") {
+          const pr = p.getBoundingClientRect();
+          if (r.top < pr.top - 0.5 || r.bottom > pr.bottom + 0.5 || r.left < pr.left - 0.5 || r.right > pr.right + 0.5) clipped = true;
+        }
+        p = p.parentElement;
+      }
+      return { shown, clipped, w: r.width, h: r.height, top: r.top, tileTop: a.getBoundingClientRect().top };
+    });
     return {
-      gridTop: grid.top, gridBottom: grid.bottom, footerTop: footer.top, footerBottom: footer.bottom,
-      navTop: bottomNav ? bottomNav.getBoundingClientRect().top : window.innerHeight,
-      tileHeights: tiles.map((t) => Math.round(t.height)),
-      squareDiffs: tiles.map((t) => Math.abs(t.width - t.height)),
-      rowTops: [0, 3, 6, 9].map((i) => tiles[i].top), lastRowBottom: tiles[9].bottom, columnsInFirstRow: tiles.filter((t) => t.top === tiles[0].top).length,
+      gridTop: grid.top, gridBottom: grid.bottom, gridLeft: grid.left, gridWidth: grid.width,
+      navTop: navBox.top, navBottom: navBox.bottom,
+      footerTop: footer.top, footerBottom: footer.bottom,
+      bottomNavTop: bottomNav ? bottomNav.getBoundingClientRect().top : window.innerHeight,
+      tileWidths: tileRects.map((t) => t.width),
+      tileHeights: tileRects.map((t) => t.height),
+      tileLefts: tileRects.map((t) => t.left),
+      tileTops: tileRects.map((t) => t.top),
+      rowTops: [0, 3, 6, 9].map((i) => tileRects[i].top), lastRowBottom: tileRects[9].bottom,
+      labels, badges,
       scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight,
+      bodyScrollWidth: document.body.scrollWidth, innerWidth: window.innerWidth,
     };
   });
 }
 
-for (const withOffers of [false, true]) {
-  const name = withOffers ? "alert" : "no-alert";
-  test(`390×844 でタイルが下部ナビの手前まで広がり、スクロールせずに全部見える（${withOffers ? "期限アラートあり" : "アラートなし"}）`, async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await setup(page, withOffers);
+function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measure>>, withBadgeOnOffers: boolean) {
+  const exp = expectedTile(page.width);
+  // タイルは正方形で、想定値と ±2px 以内で一致する。
+  for (const w of m.tileWidths) expect(Math.abs(w - exp.tile)).toBeLessThanOrEqual(2);
+  for (let i = 0; i < m.tileWidths.length; i++) expect(Math.abs(m.tileWidths[i] - m.tileHeights[i])).toBeLessThanOrEqual(1);
+  // 3列のまま。最終行の2つは左寄せ（1行目と同じ左端、中央寄せや引き伸ばしをしない）。
+  expect(m.tileTops[1]).toBeCloseTo(m.tileTops[0], 0);
+  expect(m.tileTops[2]).toBeCloseTo(m.tileTops[0], 0);
+  expect(Math.abs(m.tileLefts[9] - m.tileLefts[0])).toBeLessThanOrEqual(1);
+  expect(Math.abs(m.tileLefts[10] - m.tileLefts[1])).toBeLessThanOrEqual(1);
+  // 横ギャップは基準値どおり（縦の吸収で横は広げない）。
+  expect(Math.abs(m.tileLefts[1] - m.tileLefts[0] - m.tileWidths[0] - exp.gap)).toBeLessThanOrEqual(2);
+  // 行ギャップは基準〜最大 +8px の範囲。
+  for (let i = 1; i < 4; i++) {
+    const rowGap = m.rowTops[i] - m.rowTops[i - 1] - m.tileHeights[0];
+    expect(rowGap).toBeGreaterThanOrEqual(exp.gap - 1);
+    expect(rowGap).toBeLessThanOrEqual(exp.gap + 8 + 1);
+  }
+  // 全ラベルが1行に収まり、折り返し・はみ出しがない。
+  expect(m.labels).toHaveLength(11);
+  for (const label of m.labels) {
+    expect(label).not.toBeNull();
+    expect(label!.whiteSpace).toBe("nowrap");
+    expect(label!.scrollW).toBeLessThanOrEqual(label!.clientW + 1);
+    expect(label!.scrollH).toBeLessThanOrEqual(label!.clientH + 2);
+  }
+  // バッジは切れていない。固定の5つ（添削中・追加相談・契約申込みの件数、特商法・報酬口座の点）に、
+  // 期限アラートありの時は届いた依頼の件数が加わる（モックの件数どおり）。
+  const badged = m.badges.filter((b) => b !== null);
+  if (withBadgeOnOffers) expect(m.badges[0]).not.toBeNull();
+  else expect(m.badges[0]).toBeNull();
+  expect(m.badges[1]).not.toBeNull();
+  expect(badged.length).toBe(withBadgeOnOffers ? 6 : 5);
+  for (let i = 0; i < m.badges.length; i++) {
+    const badge = m.badges[i];
+    if (badge === null) continue;
+    expect(badge.shown).toBe(true);
+    expect(badge.clipped).toBe(false);
+    // 件数バッジ（届いた依頼・添削中・追加相談・契約申込み）は h-5、注意の点（特商法・報酬口座）は size-3。
+    const expectedH = i === 7 || i === 8 ? 12 : 20;
+    expect(Math.abs(badge.h - expectedH)).toBeLessThanOrEqual(1);
+    expect(badge.top).toBeGreaterThanOrEqual(m.navTop - 1);
+  }
+  // 縦の余りは下に固まらない（上下パディング均等＋中央寄せ）。
+  const above = m.rowTops[0] - m.navTop;
+  const below = m.navBottom - m.lastRowBottom;
+  expect(above).toBeGreaterThanOrEqual(7);
+  expect(Math.abs(above - below)).toBeLessThanOrEqual(3);
+  // 横はみ出しはない。
+  expect(m.bodyScrollWidth).toBeLessThanOrEqual(page.width + 1);
+}
+
+async function expectFooterReachable(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const end = await measure(page);
+  expect(end.footerBottom).toBeLessThanOrEqual(end.bottomNavTop + 1);
+  return end;
+}
+
+for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
+  test(`${viewport.width}px 幅で11タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await setup(page, false);
     const m = await measure(page);
-    // スクロールなし。フッターは下部ナビに重ならず、その手前（main の下余白 24px 以内）に来る。
-    expect(m.scrollHeight).toBeLessThanOrEqual(m.innerHeight);
-    expect(m.footerBottom).toBeLessThanOrEqual(m.navTop);
-    expect(m.navTop - m.footerBottom).toBeLessThanOrEqual(26);
-    // タイルの枠はフッターの直前まで届き（間は gap の 12px）、タイルは3列の正方形で間を詰め（8px）、
-    // 枠の中央に置かれる（上詰め＋下の大きな余白にならない）。従来（約70px）より大きい。
-    expect(m.footerTop - m.gridBottom).toBeLessThanOrEqual(26);
-    expect(m.columnsInFirstRow).toBe(3);
-    expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
-    expect(m.tileHeights[0]).toBeGreaterThan(90);
-    for (let i = 1; i < 4; i++) expect(Math.abs(m.rowTops[i] - m.rowTops[i - 1] - m.tileHeights[0] - 8)).toBeLessThanOrEqual(1);
-    const above = m.rowTops[0] - m.gridTop;
-    const below = m.gridBottom - m.lastRowBottom;
-    expect(Math.abs(above - below)).toBeLessThanOrEqual(2);
-    await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 390);
-    if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") await page.screenshot({ path: path.join(screenshotDir, `mobile-${name}.png`) });
+    expectTiles(viewport, m, false);
+    await expectFooterReachable(page);
+    if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.join(screenshotDir, `tile-${viewport.width}.png`) });
+    }
   });
 }
 
-test("低い画面（390×560）ではタイルが正方形のまま潰れず、収まらない分はページが縦にスクロールする", async ({ page }) => {
+test("390×844 で期限アラートがあってもタイルの大きさは変わらず、バッジが切れない（#580）", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page, true);
+  const m = await measure(page);
+  expectTiles({ width: 390 }, m, true);
+  // アラートなしの時と同じ大きさ（横幅駆動なので高さの影響を受けない）。
+  const plainPage = await page.context().newPage();
+  await plainPage.setViewportSize({ width: 390, height: 844 });
+  await setup(plainPage, false);
+  const plain = await measure(plainPage);
+  expect(Math.abs(m.tileWidths[0] - plain.tileWidths[0])).toBeLessThanOrEqual(1);
+  await expectFooterReachable(page);
+  if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(screenshotDir, "tile-390-alert.png") });
+  }
+});
+
+test("低い画面（390×560）ではタイルを縮めず、収まらない分はページが縦にスクロールする（#580）", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 560 });
   await setup(page, true);
   const m = await measure(page);
-  expect(m.columnsInFirstRow).toBe(3);
-  expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
-  expect(Math.min(...m.tileHeights)).toBeGreaterThanOrEqual(70);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const end = await measure(page);
-  expect(end.footerBottom).toBeLessThanOrEqual(end.navTop);
-  if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") await page.screenshot({ path: path.join(screenshotDir, "mobile-short.png") });
+  const exp = expectedTile(390);
+  expect(Math.abs(m.tileWidths[0] - exp.tile)).toBeLessThanOrEqual(2);
+  for (let i = 0; i < m.tileWidths.length; i++) expect(Math.abs(m.tileWidths[i] - m.tileHeights[i])).toBeLessThanOrEqual(1);
+  expect(m.scrollHeight).toBeGreaterThan(m.innerHeight);
+  await expectFooterReachable(page);
+  if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(screenshotDir, "tile-390-short.png") });
+  }
 });
 
 test("PC 幅では広げず、3列の正方形のタイルを上から並べる", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await setup(page, false);
   const m = await measure(page);
-  expect(m.columnsInFirstRow).toBe(3);
-  expect(Math.max(...m.squareDiffs)).toBeLessThanOrEqual(1);
-  expect(m.rowTops[0] - m.gridTop).toBeLessThanOrEqual(1);
-});
-
-test("タイルの大きさは期限アラート帯の有無で変わらない（390×844）", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await setup(page, false);
-  const without = await measure(page);
-  const withAlertPage = await page.context().newPage();
-  await withAlertPage.setViewportSize({ width: 390, height: 844 });
-  await setup(withAlertPage, true);
-  const withAlert = await measure(withAlertPage);
-  expect(Math.abs(without.tileHeights[0] - withAlert.tileHeights[0])).toBeLessThanOrEqual(1);
+  const firstRowTops = m.tileTops.slice(0, 3);
+  for (const top of firstRowTops) expect(Math.abs(top - firstRowTops[0])).toBeLessThanOrEqual(1);
+  for (let i = 0; i < m.tileWidths.length; i++) expect(Math.abs(m.tileWidths[i] - m.tileHeights[i])).toBeLessThanOrEqual(1);
+  expect(m.rowTops[0] - m.navTop).toBeLessThanOrEqual(1);
 });

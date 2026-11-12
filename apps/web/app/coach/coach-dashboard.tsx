@@ -81,7 +81,7 @@ function Tile({
       className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
     >
       <Icon className="size-6" aria-hidden />
-      <span className="text-[11px] font-semibold leading-tight">{label}</span>
+      <span className="coach-tile-label whitespace-nowrap text-[11px] font-semibold leading-tight">{label}</span>
       {count > 0 ? (
         <span
           aria-hidden
@@ -97,26 +97,53 @@ function Tile({
   );
 }
 
-// タイルの枠（スマホ幅では残りの高さいっぱい）の幅と高さを測り、3列×4行に収まる正方形の一辺を決める（本体 #563）。
-// 枠の高さが中身で決まらない形なので、CSS のコンテナ単位ではなく実寸で測る。PC 幅は CSS の3等分のまま（globals.css の .coach-tiles）。
-// タイルの大きさは期限アラート帯の有無で変えない（運営者指示 2026-11-12）。帯が出ていない時も、帯1行ぶん
-// （枠線つき p-3 の1行 46px ＋ 間 12px）を高さから差し引いて決める。帯が2行に折り返す狭い画面では、帯がある時のほうが少し小さくなる。
-const tileGap = 8;
-const alertReserve = 58;
-function CoachTiles({ label, reserve, children }: { label: string; reserve: number; children: ReactNode }) {
-  const [side, setSide] = useState<number | null>(null);
+// タイルの枠（本体 #580）。タイルは横幅駆動（repeat(3, 1fr)＋正方形）で、大きさは CSS が決める。
+// JS は縦の余りだけ配分する：行ギャップを最大 +8px → 上下パディングを最大 28px → 残りは中央寄せ
+// （align-content: center、globals.css の .coach-tiles）。タイルの大きさは期限アラート帯の有無で変えない
+// （横幅駆動なので高さの影響を受けない）。高さ不足の画面では基準値のままにしてページ全体でスクロールする
+// （タイルを縮めない）。basePadBlock は CSS の --coach-pad-block の既定とそろえる。
+const basePadBlock = 12;
+const maxPadBlock = 28;
+const maxGapAdd = 8;
+function CoachTiles({ label, children }: { label: string; children: ReactNode }) {
+  const [vertical, setVertical] = useState<{ rowGap: number; padBlock: number } | null>(null);
   const ref = useCallback((el: HTMLDivElement | null) => {
     if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      const { width, height } = el.getBoundingClientRect();
-      setSide(Math.max(0, Math.floor(Math.min((width - tileGap * 2) / 3, (height - reserve - tileGap * 3) / 4))));
-    });
+    const compute = () => {
+      const nav = el.firstElementChild;
+      const tile = nav?.firstElementChild;
+      if (!nav || !tile) return;
+      const rowGapBase = Math.min(16, Math.max(12, window.innerWidth * 0.032));
+      const tileSide = tile.getBoundingClientRect().width;
+      if (!(tileSide > 0)) return;
+      const natural = tileSide * 4 + rowGapBase * 3 + basePadBlock * 2;
+      const leftover = el.clientHeight - natural;
+      if (!(leftover > 0)) {
+        setVertical((v) => (v === null ? v : null));
+        return;
+      }
+      const gapAdd = Math.min(maxGapAdd, leftover / 3);
+      const padAdd = Math.min(maxPadBlock - basePadBlock, (leftover - gapAdd * 3) / 2);
+      const next = { rowGap: rowGapBase + gapAdd, padBlock: basePadBlock + padAdd };
+      setVertical((v) =>
+        v !== null && Math.abs(v.rowGap - next.rowGap) < 0.05 && Math.abs(v.padBlock - next.padBlock) < 0.05 ? v : next,
+      );
+    };
+    const observer = new ResizeObserver(compute);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [reserve]);
+  }, []);
   return (
     <div ref={ref} className="coach-tiles">
-      <nav aria-label={label} className="grid gap-2" style={side ? ({ "--coach-tile": `${side}px` } as CSSProperties) : undefined}>
+      <nav
+        aria-label={label}
+        className="grid gap-2"
+        style={
+          vertical
+            ? ({ "--coach-row-gap": `${vertical.rowGap}px`, "--coach-pad-block": `${vertical.padBlock}px` } as CSSProperties)
+            : undefined
+        }
+      >
         {children}
       </nav>
     </div>
@@ -238,10 +265,10 @@ export function CoachDashboard() {
   const payoutsDot = !coach.payouts_ready;
   const [, payoutMonth, payoutDay] = earnings?.next_payout_date?.split("-") ?? [];
 
-  // スマホでは、ランチャーをヘッダーと下部ナビの間の高さいっぱいに広げる（本体 #563）。
+  // スマホでは、ランチャーをヘッダーと下部ナビの間の高さいっぱいに広げる（本体 #580）。
   // main を縦の flex にし（app/layout.tsx の coach-launcher）、タイルの枠が残りの高さを占める。
-  // タイルは3列の正方形で間を詰め、枠に収まる最大の大きさで中央に置く（CoachTiles と globals.css の .coach-tiles）。
-  // 収まらない低い画面では最小の高さを保ち、ページ全体が縦にスクロールする。
+  // タイルは3列の正方形で横幅いっぱいに広げ、縦の余りは行ギャップ→上下パディング→中央寄せの順で吸収する
+  // （CoachTiles と globals.css の .coach-tiles）。収まらない低い画面ではタイルを縮めず、ページ全体が縦にスクロールする。
   return (
     <div className="coach-launcher mx-auto flex w-full max-w-md flex-col gap-3 max-md:flex-1">
       <section aria-label={t(locale, "coach.status")} className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
@@ -299,7 +326,7 @@ export function CoachDashboard() {
         </Link>
       ) : null}
 
-      <CoachTiles label={t(locale, "coach.menu")} reserve={offerCount > 0 ? 0 : alertReserve}>
+      <CoachTiles label={t(locale, "coach.menu")}>
         <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
