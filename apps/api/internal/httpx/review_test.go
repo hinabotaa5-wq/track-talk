@@ -84,10 +84,11 @@ func signedCoachingVideo(t *testing.T, h http.Handler, tok string) string {
 func reviewBodyFor(t *testing.T, h http.Handler, tok string) map[string]any {
 	t.Helper()
 	return map[string]any{
-		"tier":            "coach",
-		"event":           "100m",
-		"focus":           []string{"rhythm", "start", "start"},
-		"video_public_id": signedCoachingVideo(t, h, tok),
+		"guardian_permission": true,
+		"tier":                "coach",
+		"event":               "100m",
+		"focus":               []string{"rhythm", "start", "start"},
+		"video_public_id":     signedCoachingVideo(t, h, tok),
 	}
 }
 
@@ -154,9 +155,9 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 		t.Fatalf("me demo %s", rec.Body.String())
 	}
 
-	// 生まれた年月がないと送れない。
+	// 生まれた年月がなくても送れる。
 	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "birth_month_required") {
+	if rec.Code != http.StatusCreated {
 		t.Fatalf("no birth month %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPut, "/v1/me/birth-month", tu, map[string]any{"birth_month": "1995-04"}); rec.Code != http.StatusOK {

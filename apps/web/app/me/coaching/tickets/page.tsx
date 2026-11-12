@@ -31,9 +31,9 @@ function TicketsPage() {
   const { pending, acquire, release } = useActionLock();
   // 支払い画面へ進む前の最終確認に出している商品。
   const [confirming, setConfirming] = useState<TicketProduct | null>(null);
-  // 18歳未満の購入のたびの宣言（動画添削の単発と同じ。毎回チェックなしから始める）。
+  // 全員の購入前チェック（単発と同じ。毎回未チェックから始める）。
   const declaration = useMinorDeclaration();
-  const needsDeclaration = !!summary?.is_minor;
+  const needsDeclaration = true;
 
   const load = useCallback(async () => {
     const data = await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token });
@@ -85,7 +85,7 @@ function TicketsPage() {
   async function buy(productID: string) {
     if (!session || !summary) return;
     if (needsDeclaration && !declaration.checked) {
-      setError(L("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"));
+      setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
       return;
     }
     if (!acquire()) return;
@@ -128,6 +128,7 @@ function TicketsPage() {
           onConfirm={() => void buy(confirming.id)}
           onBack={() => { setConfirming(null); setError(""); }}
           pending={pending}
+          confirmDisabled={!declaration.checked}
         >
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declaration.checked} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         </PurchaseConfirm>
@@ -147,7 +148,7 @@ function TicketsPage() {
             </li>
             <li>{L("購入した本人だけが使えます。譲ることはできません。")}</li>
           </ul>
-          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
+          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); declaration.reset(); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
         </div>;
       })}
       <p className="text-xs text-slate-300">{L("動画添削1回にチケット1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。")}</p>

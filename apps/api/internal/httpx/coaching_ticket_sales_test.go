@@ -104,7 +104,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 	if offers := coachRequests(t, h, tc).Offers; len(offers) != 0 {
 		t.Fatalf("offered while unpaid %+v", offers)
 	}
-	reopen := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tu, map[string]any{"method": "card"})
+	reopen := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true})
 	if reopen.Code != http.StatusOK || !strings.Contains(reopen.Body.String(), "checkout_url") {
 		t.Fatalf("reopen %d %s", reopen.Code, reopen.Body.String())
 	}
@@ -161,7 +161,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	if rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, map[string]any{"payment_method": "paypay"}); rec.Code != http.StatusBadRequest {
 		t.Fatalf("PayPay override must be rejected: %d", rec.Code)
 	}
-	rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, nil)
+	rec := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", owner, map[string]any{"guardian_permission": true})
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "checkout_url") {
 		t.Fatalf("submit %d %s", rec.Code, rec.Body.String())
 	}

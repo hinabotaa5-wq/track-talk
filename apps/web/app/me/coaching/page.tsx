@@ -128,7 +128,7 @@ export default function CoachingSetupPage() {
       <section className="space-y-2">
         {tickets ? <TicketBalance summary={tickets} /> : null}
       </section>
-      <h1 className="text-2xl font-bold">{L("フォーム添削の準備")}</h1>
+      <h1 className="text-2xl font-bold">{L("サポートプランの準備")}</h1>
 
       <section className="space-y-3">
         <h2 className="font-bold">{L("生まれた年月")}</h2>

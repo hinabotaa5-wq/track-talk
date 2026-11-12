@@ -67,21 +67,10 @@ func (s *Server) reviewOpenTo(p db.Profile) bool {
 	return s.stripe.Configured() || p.CoachingDemo
 }
 
-// coachingEligibility は、生まれた年月を登録済みかを確かめる（保護者の同意は見ない）。
-// 18歳未満は、同意の代わりに購入のたびの宣言で確かめる（minor_purchase.go）。
-// 招待コードのゲートは外した（本体 #569）。チケットの購入は Stripe の鍵がある環境でだけ開く（checkoutTickets）。
-func coachingEligibility(p db.Profile) error {
+// ticketEligibility はサポートプランの追加相談に使う既存の年齢・保護者同意確認。
+func (s *Server) ticketEligibility(ctx context.Context, q *db.Queries, p db.Profile) error {
 	if p.BirthMonth == nil {
 		return &ticketRuleError{"birth_month_required", "先に生まれた年月を登録してください"}
-	}
-	return nil
-}
-
-// ticketEligibility は、coachingEligibility に加えて、18歳未満は保護者の同意を確かめる。
-// チケットの購入・利用と、保護者が契約する指導の追加相談に使う。
-func (s *Server) ticketEligibility(ctx context.Context, q *db.Queries, p db.Profile) error {
-	if err := coachingEligibility(p); err != nil {
-		return err
 	}
 	if !isMinor(*p.BirthMonth, time.Now()) {
 		return nil
@@ -153,15 +142,7 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	// 18歳未満も保護者の同意なしに買える。購入のたびの宣言（minor_purchase.go）で確かめる（本体 #569）。
-	eligible := coachingEligibility(p)
 	reason := ""
-	if eligible != nil {
-		if !writeTicketEligibilityReason(eligible, &reason) {
-			MapDBError(w, eligible)
-			return
-		}
-	}
 	if !s.stripe.Configured() {
 		reason = "チケットの販売は準備中です"
 	}
@@ -171,8 +152,8 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		reason = ticketSalesClosedMessage
 	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
-	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "purchases": purchases, "ledger": ledger, "is_minor": profileIsMinor(p),
-		"can_purchase": eligible == nil && s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
+	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "purchases": purchases, "ledger": ledger,
+		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
 		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
 }
@@ -214,12 +195,8 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			return err
 		}
-		if err := coachingEligibility(p); err != nil {
-			return err
-		}
-		// 18歳未満は、単発の購入と同じく、購入のたびに「保護者に許可をもらいました」へのチェックが要る。
-		minor := profileIsMinor(p)
-		if err := requireMinorDeclaration(minor, req.GuardianPermission); err != nil {
+		// 単発と同じく、全員が購入のたびに注意事項のチェックを行う。
+		if err := requirePurchaseNotice(true, req.GuardianPermission); err != nil {
 			return err
 		}
 		old, err := q.GetTicketPurchaseByKey(r.Context(), db.GetTicketPurchaseByKeyParams{OwnerID: &p.ID, RequestKey: req.RequestKey})
@@ -228,8 +205,8 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 				return &ticketRuleError{"purchase_conflict", "同じ購入操作の商品を変更できません。画面を更新してください"}
 			}
 			purchase = old
-			if minor && old.Status == "pending" {
-				return recordMinorDeclaration(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: old.ID, amount: old.AmountYen}, req.minorDeclarationReq)
+			if old.Status == "pending" {
+				return recordPurchaseNotice(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: old.ID, amount: old.AmountYen}, req.minorDeclarationReq)
 			}
 			return nil
 		}
@@ -248,10 +225,7 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if minor {
-			return recordMinorDeclaration(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: purchase.ID, amount: purchase.AmountYen}, req.minorDeclarationReq)
-		}
-		return nil
+		return recordPurchaseNotice(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: purchase.ID, amount: purchase.AmountYen}, req.minorDeclarationReq)
 	})
 	if err != nil {
 		writeCheckoutError(w, err)
@@ -377,9 +351,6 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 // 1回の添削にチケット1枚。報酬の元になる額（nominal_yen）は単発の料金と同じにし、報酬は350円に固定する。
 // 予約で使える枚数から外し（申込み時点で残高が減る）、返却で消費・報酬を計上し、返却されずに終わったら戻す。
 func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.Profile, rr db.ReviewRequest) error {
-	if err := coachingEligibility(p); err != nil {
-		return err
-	}
 	units := reviewTicketUnits
 	price := reviewPriceYen
 	lots, err := q.ListTicketLots(ctx, &p.ID)

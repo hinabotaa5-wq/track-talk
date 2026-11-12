@@ -334,19 +334,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	if p.BirthMonth == nil {
-		Error(w, http.StatusUnprocessableEntity, "birth_month_required", "先に生まれた年月を登録してください")
+	if err := requirePurchaseNotice(payments, req.GuardianPermission); err != nil {
+		writeCheckoutError(w, err)
 		return
-	}
-	minor := isMinor(*p.BirthMonth, time.Now())
-	if minor {
-		// 18歳未満が自分で払うときは、購入のたびの宣言が要る（保護者同意の有無と月の上限では止めない）。
-		// 動画を受け取る前に一度確かめ、支払い画面を作る時にロックの中でもう一度確かめて記録する。
-		if err := requireMinorDeclaration(payments, req.GuardianPermission); err != nil {
-			writeCheckoutError(w, err)
-			return
-		}
-		// チケットで払うときは、チケットを買った時に宣言済みなので、ここでは宣言を求めない（本体 #569）。
 	}
 	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
 		return

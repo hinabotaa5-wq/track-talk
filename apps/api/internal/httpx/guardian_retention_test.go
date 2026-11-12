@@ -83,6 +83,8 @@ func TestGuardianRecordsKeptAfterWithdrawalUntilAge23(t *testing.T) {
 	}
 	review := chosenReview(t, h, tm, coach.String(), "paypay", false)
 	payChosenReview(t, h, review, "paypay")
+	execSQLArgs(t, `UPDATE minor_purchase_declarations SET text_version = 'minor-purchase-declaration-2026-11-05' WHERE ref_id = $1`, review)
+	execSQLArgs(t, `UPDATE review_payments SET minor = true WHERE request_id = $1`, review)
 	manage := guardianLinkPattern.FindStringSubmatch(lastMailTo(t, email).Text)[1]
 	for _, o := range coachRequests(t, h, tc).Offers {
 		if r := doJSON(t, h, "POST", "/v1/coach/offers/"+o.ID+"/accept", tc, nil); r.Code != 200 {

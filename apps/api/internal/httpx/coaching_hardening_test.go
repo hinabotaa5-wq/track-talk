@@ -72,7 +72,7 @@ func TestEveryReviewCheckoutPathDisablesManagedPayments(t *testing.T) {
 			root := chosenReview(t, h, tu, coach.String(), "card", false)
 			// 2. 支払い画面の開き直し（前の画面の期限が近いと作り直す）。
 			execSQLArgs(t, `UPDATE review_payments SET session_expires_at = now() WHERE request_id = $1`, root)
-			if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card"}); r.Code != 200 {
+			if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true}); r.Code != 200 {
 				t.Fatalf("reopen %d %s", r.Code, r.Body.String())
 			}
 			payChosenReview(t, h, root, "card")
@@ -80,12 +80,12 @@ func TestEveryReviewCheckoutPathDisablesManagedPayments(t *testing.T) {
 
 			// 3. 追加相談の送信。
 			c := consultationDraft(t, h, tu, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "次の大会ではどこを意識しますか")
-			if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, nil); r.Code != 200 || !strings.Contains(r.Body.String(), "checkout_url") {
+			if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, map[string]any{"guardian_permission": true}); r.Code != 200 || !strings.Contains(r.Body.String(), "checkout_url") {
 				t.Fatalf("submit %d %s", r.Code, r.Body.String())
 			}
 			// 4. 追加相談の支払い画面の開き直し（前の画面が残っていないとき＝送信時に作れなかったときに作る）。
 			execSQLArgs(t, `UPDATE coaching_consultations SET checkout_url = NULL, checkout_session_id = NULL WHERE id = $1`, c.ID)
-			if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, nil); r.Code != 200 || !strings.Contains(r.Body.String(), "checkout_url") {
+			if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, map[string]any{"guardian_permission": true}); r.Code != 200 || !strings.Contains(r.Body.String(), "checkout_url") {
 				t.Fatalf("consultation reopen %d %s", r.Code, r.Body.String())
 			}
 
@@ -288,6 +288,7 @@ func TestMinorWithoutDeclarationCreatesNothingOnAnyPath(t *testing.T) {
 	body["method"] = "card"
 	body["requested_coach_id"] = coach.String()
 	sessions := sessionCount(f)
+	delete(body, "guardian_permission")
 	refused("create", doJSON(t, h, "POST", "/v1/coaching/requests", tm, body))
 	body["guardian_permission"] = false
 	refused("create unchecked", doJSON(t, h, "POST", "/v1/coaching/requests", tm, body))
@@ -333,7 +334,7 @@ func TestMinorWithoutDeclarationCreatesNothingOnAnyPath(t *testing.T) {
 }
 
 // 項目3：生まれた年月が未登録だと、依頼の作成は 422 birth_month_required で止まり、依頼も支払い画面も作られない。
-func TestReviewWithoutBirthMonthCreatesNothing(t *testing.T) {
+func TestReviewWithoutBirthMonthRecordsNotice(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -345,19 +346,19 @@ func TestReviewWithoutBirthMonthCreatesNothing(t *testing.T) {
 	body["requested_coach_id"] = coach.String()
 	body["guardian_permission"] = true
 	sessions := sessionCount(f)
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, body); r.Code != http.StatusUnprocessableEntity || !strings.Contains(r.Body.String(), "birth_month_required") {
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, body); r.Code != http.StatusCreated {
 		t.Fatalf("no birth month %d %s", r.Code, r.Body.String())
 	}
 	var requests, declarations int
 	queryRowArgs(t, `SELECT count(*) FROM review_requests WHERE requester_id = $1`, []any{id}, &requests)
 	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{id}, &declarations)
-	if requests != 0 || declarations != 0 || sessionCount(f) != sessions {
+	if requests != 1 || declarations != 1 || sessionCount(f) != sessions+1 {
 		t.Fatalf("requests=%d declarations=%d sessions=%d", requests, declarations, sessionCount(f)-sessions)
 	}
 }
 
 // 項目3：18歳以上は、4経路のどれでも宣言なしで進め、宣言の記録も未成年の印も残らない（カードだけの設定）。
-func TestAdultNeedsNoDeclarationOnAnyPath(t *testing.T) {
+func TestAdultNeedsNoticeOnReviewPaths(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -374,24 +375,24 @@ func TestAdultNeedsNoDeclarationOnAnyPath(t *testing.T) {
 	var root string
 	queryRowArgs(t, `SELECT id::text FROM review_requests WHERE requester_id = $1`, []any{adult}, &root)
 	execSQLArgs(t, `UPDATE review_payments SET session_expires_at = now() WHERE request_id = $1`, root)
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card"}); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true}); r.Code != 200 {
 		t.Fatalf("reopen %d %s", r.Code, r.Body.String())
 	}
 	payChosenReview(t, h, root, "card")
 	answerOffer(t, h, tc, root)
 	c := consultationDraft(t, h, tu, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "次の大会ではどこを意識しますか")
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, map[string]any{"guardian_permission": true}); r.Code != 200 {
 		t.Fatalf("submit %d %s", r.Code, r.Body.String())
 	}
 	execSQLArgs(t, `UPDATE coaching_consultations SET checkout_url = NULL, checkout_session_id = NULL WHERE id = $1`, c.ID)
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, map[string]any{"guardian_permission": true}); r.Code != 200 {
 		t.Fatalf("consultation reopen %d %s", r.Code, r.Body.String())
 	}
 	var declarations, minorPayments, minorConsultations int
 	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{adult}, &declarations)
 	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE request_id = $1 AND minor`, []any{root}, &minorPayments)
 	queryRowArgs(t, `SELECT count(*) FROM coaching_consultations WHERE id = $1 AND minor`, []any{c.ID}, &minorConsultations)
-	if declarations != 0 || minorPayments != 0 || minorConsultations != 0 {
+	if declarations != 4 || minorPayments != 0 || minorConsultations != 0 {
 		t.Fatalf("adult declarations=%d minor payments=%d minor consultations=%d", declarations, minorPayments, minorConsultations)
 	}
 }

@@ -81,7 +81,7 @@ export default function NewReviewRequestPage() {
   const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 1;
   const cashPayment = !!estimate?.payments && cashPrice > 0;
   // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
-  const needsDeclaration = !!me?.is_minor && cashPayment;
+  const needsDeclaration = cashPayment;
   // 申し込めるか。古い API（review_open を返さない）では、これまでどおり招待コードの有無で見る。
   const reviewOpen = !!(me?.review_open ?? me?.demo);
   // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。
@@ -191,7 +191,7 @@ export default function NewReviewRequestPage() {
       return false;
     }
     if (needsDeclaration && !declared) {
-      setError(L("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。"));
+      setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
       return false;
     }
     setError("");
@@ -253,14 +253,6 @@ export default function NewReviewRequestPage() {
           token={token}
           onJoined={() => void loadMe()}
         />
-      ) : !me.birth_month ? (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-200">{L("先に生まれた年月を登録してください。18歳未満の方は、購入する前に保護者の許可を得てください。")}</p>
-          <Link
-            href="/me/coaching"
-            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-          >{L("生まれた年月を登録する")}</Link>
-        </div>
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm

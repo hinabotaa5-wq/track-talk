@@ -36,18 +36,18 @@ it("18歳未満は保護者の同意がなくても依頼の画面を開け、�
   await render();
   expect(container.querySelector("form")).not.toBeNull();
   expect(container.textContent).not.toContain("保護者の方の同意が必要です");
-  expect(container.textContent).toContain("未成年の方は、購入する前に保護者の許可を得てください。");
+  expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
   const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
   expect(box?.checked).toBe(false);
-  expect(box?.closest("label")?.textContent).toBe("保護者に許可をもらいました");
+  expect(box?.closest("label")?.textContent).toBe("未成年の方は保護者に許可を取ってください");
 });
 
-it("18歳以上には、保護者の許可のチェックを出さない", async () => {
+it("18歳以上にも購入前チェックを出す", async () => {
   mocks.me = { demo: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
   expect(container.querySelector("form")).not.toBeNull();
-  expect(container.querySelector('input[type="checkbox"]')).toBeNull();
-  expect(container.textContent).not.toContain("保護者に許可をもらいました");
+  expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();
+  expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
 });
 
 it("支払い方法はカードだけを出し、PayPay の案内は出さない", async () => {
@@ -152,6 +152,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   Object.defineProperty(input, "files", { value: [file] });
   await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
   await act(async () => {});
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   expect(submit.textContent).toBe("申込み内容を確認する");
   await act(async () => { submit.form!.requestSubmit(); });
