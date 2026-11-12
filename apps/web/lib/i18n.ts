@@ -225,7 +225,6 @@ const ja = {
   "coach.reviewing.writeFollowup": "補足を書く",
   "coach.reviewing.open": "依頼を開く",
   "coach.reviewing.due": "返却期限: {date}",
-  "coach.reviewing.picked": "あなたを選んだ依頼 · 報酬{amount}",
   "coach.reviewing.question": "相談内容: {text}",
 
   "coach.detail.notFound": "依頼が見つかりません",
@@ -383,7 +382,6 @@ const en: Record<I18nKey, string> = {
   "coach.reviewing.writeFollowup": "Write follow-up",
   "coach.reviewing.open": "Open request",
   "coach.reviewing.due": "Due: {date}",
-  "coach.reviewing.picked": "Requested you · Reward {amount}",
   "coach.reviewing.question": "Question: {text}",
 
   "coach.detail.notFound": "Request not found",

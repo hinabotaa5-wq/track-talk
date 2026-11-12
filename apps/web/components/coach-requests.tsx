@@ -6,7 +6,7 @@ import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-inf
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachingMessagingEnabled } from "@/lib/features";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { t, type Locale } from "@/lib/i18n";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
@@ -27,7 +27,6 @@ function RequestSummary({ request, locale }: { request: CoachReviewRequest; loca
       <p className="font-semibold text-white">
         {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
       </p>
-      {request.requested_coach_id ? <p className="text-sm font-semibold text-blue-300">{t(locale, "coach.reviewing.picked", { amount: formatYen(request.coach_reward_yen ?? 0) })}</p> : null}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.reviewing.question", { text: reviewQuestionText(request) })}</p>
       {request.status === "needs_info" ? null : <p className="text-xs text-slate-300">{t(locale, "coach.reviewing.due", { date: formatDateTime(request.due_at) })}</p>}
     </div>
