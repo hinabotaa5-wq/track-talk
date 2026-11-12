@@ -25,7 +25,7 @@ it("目標の大会が未定なら、時期の目安を出す", () => {
   expect(rows.find((r) => r.label === "大会")?.value).toBe("未定（3〜6か月先）");
 });
 
-describe("大会までプランの途中終了の表示", () => {
+describe("1ヶ月プランの途中終了の表示", () => {
   it("算定例は API と同じ日割り（円未満切り捨て・終える日は経過扱い）", () => {
     expect(supportProrationExample(9000, 30)).toEqual({ total: 30, elapsed: 10, remaining: 20, refund: 6000 });
     expect(supportProrationExample(10000, 3)).toEqual({ total: 3, elapsed: 1, remaining: 2, refund: 6666 });

@@ -15,7 +15,7 @@ import type {
 
 export const coachingServiceLabels: Record<CoachingServiceType, string> = {
   get video_review() { return L("動画添削"); },
-  get competition_support() { return L("大会までプラン"); },
+  get competition_support() { return L("1ヶ月プラン"); },
   get in_person() { return L("対面プラン"); },
 };
 

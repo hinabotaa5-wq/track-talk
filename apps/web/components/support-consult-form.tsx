@@ -17,7 +17,7 @@ import type { CoachEvent } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useState } from "react";
 
-// 大会までプランの無料相談フォーム。コーチが知りたいことを先に質問にしてあり、選ぶだけで答えられる。
+// 1ヶ月プランの無料相談フォーム。コーチが知りたいことを先に質問にしてあり、選ぶだけで答えられる。
 // 自由記述は、大会名・一番の悩み・怪我の状態・コーチに聞きたいことだけ。支払いもカード情報の入力もない。
 export function SupportConsultForm({
   coachID, consult, token, minor, onSent,

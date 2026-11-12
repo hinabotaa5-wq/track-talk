@@ -37,7 +37,7 @@ const (
 	supportEndCancelled   = "competition_cancelled"
 )
 
-// supportConsultContract は、無料相談の提案から成立した、動画への返答が無制限の大会までプランか。
+// supportConsultContract は、無料相談の提案から成立した、動画への返答が無制限の1ヶ月プランか。
 func supportConsultContract(ct db.CoachingContract) bool {
 	return ct.FulfillmentVersion == 1 && supportUnlimited(ct) && ct.ServiceType != nil && *ct.ServiceType == "competition_support"
 }
@@ -242,14 +242,14 @@ func finalizeSupportContract(ctx context.Context, q *db.Queries, ct db.CoachingC
 	})
 }
 
-// supportEndReq は、運営が大会までプランを途中で終えるときの入力。
+// supportEndReq は、運営が1ヶ月プランを途中で終えるときの入力。
 type supportEndReq struct {
 	Cause       string `json:"cause"`
 	Reason      string `json:"reason"`
 	AnnouncedOn string `json:"announced_on"`
 }
 
-// adminEndSupportContract は、運営が大会までプランを途中で終え、精算する。
+// adminEndSupportContract は、運営が1ヶ月プランを途中で終え、精算する。
 // コーチ都合・やむを得ない事情の判定は、理由をコーチに書面（この記録）で示し、コーチ都合には異議申立てを1回受ける。
 func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requireAdmin(w, r)
@@ -299,7 +299,7 @@ func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request)
 			return err
 		}
 		if !supportConsultContract(ct) {
-			return &ticketRuleError{"invalid_support", "無料相談から成立した大会までプランを選んでください"}
+			return &ticketRuleError{"invalid_support", "無料相談から成立した1ヶ月プランを選んでください"}
 		}
 		if ct.SupportEndCause != nil || ct.FulfillmentState != "open" || (ct.Status != "active" && ct.Status != "suspended") {
 			return &ticketRuleError{"conflict", "期間中の契約だけを途中で終えられます"}
@@ -339,7 +339,7 @@ func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request)
 		MapDBError(w, err)
 		return
 	}
-	msg := push.Message{Title: "大会までプランが終了しました", Body: "「" + ct.PlanTitle + "」が終了しました。返金と精算の内容を確認してください", URL: "/coaching/personal/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}
+	msg := push.Message{Title: "1ヶ月プランが終了しました", Body: "「" + ct.PlanTitle + "」が終了しました。返金と精算の内容を確認してください", URL: "/coaching/personal/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}
 	s.notify(r.Context(), ct.RequesterID, notifyImportant, msg, 24*time.Hour)
 	if needsReason {
 		msg.Body = "「" + ct.PlanTitle + "」の終了について、運営の判定と理由を確認してください"

@@ -1,7 +1,7 @@
 import { L } from "@/lib/i18n";
 import type { CoachEvent } from "./types";
 
-// 大会までプランの無料相談。API（support_consult.go）の値と合わせる。
+// 1ヶ月プランの無料相談。API（support_consult.go）の値と合わせる。
 // 相談はチャットにせず、運営が用意した質問への選択と、必要最小限の記入だけで行う。
 
 export type ReceptionStatus = "open" | "paused";
@@ -192,7 +192,7 @@ export type SupportConsultSettings = {
 
 // 契約と相談は提案ではまだ成立しない、という前置き（フォームの冒頭と提案画面に出す）。
 export const consultNotContractNote = "ここでの相談と提案は契約ではありません。契約は、提案を受けて申し込み（18歳未満は、保護者が提案の内容に同意して申し込みます）、お支払いが済んだ時点で成立します。コーチは提案を出した時に同意しているので、あらためて引き受ける操作はありません。相談だけなら費用はかからず、カード情報も入力しません。";
-// 大会までプランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記する（API の supportStandardContent と同じ文）。
+// 1ヶ月プランの「何が返ってくるか」の標準形。提案の内容欄にいつも明記する（API の supportStandardContent と同じ文）。
 export const supportStandardContent = "動画への返答は、期間中は回数の制限なく受けられます。メニューはコーチが先に作り、必要に応じて見直します。";
 export const consultMinorNote = "18歳未満の方は、あなたが申し込むのではなく、保護者に提案を送ります。契約には保護者の同意とお支払いが必要です。";
 
@@ -202,7 +202,7 @@ export function priceHintLabel(min: number | null, max: number | null): string {
   return L("{v0}〜{v1}", { v0: f(min), v1: f(max) });
 }
 
-// 大会までプランを途中で終えたときの日割りの算定例。API の supportUnprovidedAsOf と同じ計算
+// 1ヶ月プランを途中で終えたときの日割りの算定例。API の supportUnprovidedAsOf と同じ計算
 // （契約価格 ÷ 期間日数 × 未経過日数、円未満切り捨て。終える日は経過に数える）。
 export function supportProrationExample(priceYen: number, days: number) {
   const total = Math.max(1, Math.floor(days));

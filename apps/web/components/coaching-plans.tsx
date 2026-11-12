@@ -372,7 +372,7 @@ function PlanForm({
             </button>
           ))}
         </div>
-        {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).length === 0 ? <p className="text-xs text-slate-300">{L("対面指導を登録すると、ここからプランを出品できます。大会までプランは、上の「相談の受付設定」で受け付けます。")}</p> : null}
+        {services.filter((service) => service !== "video_review" && (plan !== null || service !== "competition_support")).length === 0 ? <p className="text-xs text-slate-300">{L("対面指導を登録すると、ここからプランを出品できます。1ヶ月プランは、上の「相談の受付設定」で受け付けます。")}</p> : null}
         {!serviceReady(draft.service_type) ? <p className="text-xs text-amber-300">{L("このサービスは準備中です。下書きとして保存されます。")}</p> : null}
         {fieldError("service_type")}
       </fieldset>
@@ -559,7 +559,7 @@ export function CoachPlansSection({
     <section className="space-y-3">
       <div className="space-y-1">
         <h2 className="font-bold">{L("サポートプラン")}</h2>
-        <p className="text-xs text-slate-300">{L("動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは、大会までプランの相談の受付設定と、対面指導のプランを管理します。")}</p>
+        <p className="text-xs text-slate-300">{L("動画添削はプランとして出品しません。受付中にすると、選手が申込み時にあなたを選べます。ここでは、1ヶ月プランの相談の受付設定と、対面指導のプランを管理します。")}</p>
         <p className="text-xs text-slate-300">{L("公開中のプランは、コーチ一覧に出て、申し込みを受け付けます。")}</p>
       </div>
       <CoachServicesForm key={(coach.service_types ?? []).join(",")} coach={coach} token={token} onSaved={onCoachChange} />

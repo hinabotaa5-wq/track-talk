@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// 大会までプランの無料相談フォーム。
+// 1ヶ月プランの無料相談フォーム。
 export default function CoachConsultPage() {
   const { id } = useParams<{ id: string }>();
   const { session, token, loading } = useAuth();
@@ -42,7 +42,7 @@ export default function CoachConsultPage() {
   if (loading || !session || consult === undefined) return <PageLoading screen label={L("読み込み中...")} />;
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">{L("大会までプランの無料相談")}</h1>
+      <h1 className="text-2xl font-bold">{L("1ヶ月プランの無料相談")}</h1>
       {consult === null ? (
         <p className="text-sm text-slate-200">{L("このコーチはいま相談を受け付けていません。")}<Link href={`/coaches/${id}`} className="underline">{L("コーチのページへ戻る")}</Link></p>
       ) : (

@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// supportUnlimited は、動画への返答に回数の上限がない契約（無料相談の提案から成立した大会までプラン）。
+// supportUnlimited は、動画への返答に回数の上限がない契約（無料相談の提案から成立した1ヶ月プラン）。
 // 契約の動画回数は 0（回数を決めない）で保存する。
 func supportUnlimited(ct db.CoachingContract) bool {
 	return ct.VideoReviews != nil && *ct.VideoReviews == 0
@@ -99,7 +99,7 @@ func (s *Server) prepareSupportSettlement(ctx context.Context, id uuid.UUID, kin
 		amount := supportRemaining(ct, usage)
 		reason := "support_unprovided"
 		if kind == "end" {
-			// 運営が途中で終えた大会までプラン。解約料は取らず、未経過分を日割りで全額返金する。
+			// 運営が途中で終えた1ヶ月プラン。解約料は取らず、未経過分を日割りで全額返金する。
 			// コーチ都合だけは、経過分も含めて全額を返金する。
 			if ct.SupportEndCause == nil {
 				return &ticketRuleError{"invalid_support", "終わり方が記録されていません"}

@@ -23,7 +23,7 @@ func day(offset int) string {
 	return time.Now().In(jst.Zone).AddDate(0, 0, offset).Format("2006-01-02")
 }
 
-// consultCoach は、大会までプランを担当し、無料相談を受け付けているコーチを作る。
+// consultCoach は、1ヶ月プランを担当し、無料相談を受け付けているコーチを作る。
 func consultCoach(t *testing.T, h http.Handler) (uuid.UUID, string) {
 	t.Helper()
 	id, tc, _ := planCoach(t, h, 5)
@@ -191,7 +191,7 @@ func TestSupportConsultFullFlow(t *testing.T) {
 	if r := doJSON(t, h, "POST", "/v1/support-consults", ta, map[string]any{"coach_id": coach, "answers": consultAnswersBody()}); r.Code != 409 {
 		t.Fatalf("consult during contract %d", r.Code)
 	}
-	// 追加相談は大会までプランにはない。
+	// 追加相談は1ヶ月プランにはない。
 	if r := doJSON(t, h, "GET", "/v1/coaching/contracts/"+ct.ID, ta, nil); r.Code != 200 {
 		t.Fatalf("contract get %d", r.Code)
 	}
@@ -460,7 +460,7 @@ func TestSupportConsultSettingsRules(t *testing.T) {
 	h := setup(t)
 	_, tc, _ := planCoach(t, h, 5)
 	body := map[string]any{"accepting": true, "events": []string{"100m"}, "description": "見ます"}
-	// 大会までプランを担当していなければ受け付けられない。
+	// 1ヶ月プランを担当していなければ受け付けられない。
 	if r := doJSON(t, h, "PUT", "/v1/coach/me/support-consult", tc, body); r.Code != 422 {
 		t.Fatalf("no service %d %s", r.Code, r.Body.String())
 	}

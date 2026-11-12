@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// paidConsultContract は、無料相談の提案（9,000円）から成立し、支払いが済んだ大会までプランを作る。
+// paidConsultContract は、無料相談の提案（9,000円）から成立し、支払いが済んだ1ヶ月プランを作る。
 // 期間は startOffset 日前に始まり、days 日間（両端を含む）になるように日付を合わせる。
 func paidConsultContract(t *testing.T, h http.Handler, startOffset, days int) (athlete, coach, contract string) {
 	t.Helper()
