@@ -93,6 +93,10 @@ WHERE r.status = 'awaiting_payment'
   AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured', 'refund_pending'))
 RETURNING r.id;
 
+-- name: ListPendingReviewPayments :many
+-- 支払い画面を開いたまま、まだ届いていない支払い（戻り画面で Stripe の状態を確かめる。本体 #569）。
+SELECT * FROM review_payments WHERE request_id = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 5;
+
 -- name: GetLatestReviewPayment :one
 -- 画面に出す支払い。支払い画面を開いただけのものは出さない。
 SELECT * FROM review_payments

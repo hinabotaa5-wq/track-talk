@@ -39,6 +39,8 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     return () => { live = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [roomPath, token]);
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
+  // 動画添削のあとの追加相談は販売を廃止した（本体 #569）。閉じている間は、過去の相談がある添削だけ記録として出す。
+  if (kind === "review" && !coachingConsultationEnabled && data.consultations.every((c) => c.status === "draft")) return null;
   const open = data.consultations.some((c) => ["draft", "awaiting_payment", "offered", "in_review"].includes(c.status));
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;
@@ -46,7 +48,7 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <h2 className="font-bold">{L("追加相談")}</h2>
     <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
     <p className="text-xs text-slate-300">{L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
-    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.minor && c.funding === "cash"} />)}
+    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
     {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} funding={data.funding} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
     {sendEnabled && !data.can_purchase && data.role === "requester" && !draft && !open ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
@@ -62,11 +64,11 @@ async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (uploaded.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
   return uploaded.public_id;
 }
-function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price, requiresVideo, returnPath, reload }: {
+function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requiresVideo, returnPath, reload }: {
   kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; minor: boolean; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
 }) {
   // 18歳未満が動画添削のあとの相談をその場で払うときは、購入のたびの宣言が要る。送るたびにチェックなしから始める。
-  const needsDeclaration = kind === "review" && minor && funding === "cash";
+  const needsDeclaration = kind === "review" && funding === "cash";
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
   const [body, setBody] = useState(draft?.question ?? "");
@@ -79,7 +81,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, minor, price
   const guard = useSolicitationGuard();
   async function submit() {
     if (!guard.allow(body)) return;
-    if (needsDeclaration && !declared) { setError(L("購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。")); return; }
+    if (needsDeclaration && !declared) { setError(L("購入前の注意事項を確認して、チェックを入れてください。")); return; }
     if (!acquire()) return;
     setError(""); setBuy(false);
     try {

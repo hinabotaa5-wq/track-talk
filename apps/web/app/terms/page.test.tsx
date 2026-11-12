@@ -18,7 +18,7 @@ function article(n: number): string {
 // 運営者が自ら提供するフォーム添削などには、代わりに受け取る仕組みの言葉を使わない。
 const agencyWords = ["収納代行", "代理受領", "預り金", "預かり金"];
 
-it("フォーム添削と追加相談は運営者が提供者で、料金・返金の責任と直接取引の禁止を定める", () => {
+it("フォーム添削とチケットは運営者が提供者で、料金・返金の責任と直接取引の禁止を定める", () => {
   const text = article(6);
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("運営者が利用者に提供するサービス");
@@ -27,16 +27,41 @@ it("フォーム添削と追加相談は運営者が提供者で、料金・返�
   expect(text).toContain("料金・キャンセル・返金は運営者が責任を負い");
   expect(text).toContain("本サービスを通さずに直接取引してはいけません");
   // 指名したコーチが辞退・未応答のときは特商法の表記と同じ扱い。
-  expect(text).toContain("クレジットカードは代金の確保を取り消し、PayPayは全額を返金します");
+  expect(text).toContain("クレジットカードは代金の確保を取り消し、PayPayは全額を返金し、チケットは使った1枚を戻します");
   expect(text).toContain("終了した依頼とは独立した新しい申込みとして、別のコーチに改めて申し込む");
-  // 動画添削のあとの追加相談は一方通行で、1つの添削につき1回。回答がないまま終わった場合だけ1回買い直せる。
-  expect(text).toContain("1つのフォーム添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です");
-  expect(text).toContain("回答への確認など、追加のやりとりはできません");
-  expect(text).toContain("この場合に限り、同じフォーム添削について、もう1回だけ改めて購入できます");
-  expect(text).not.toContain("回答への確認は7日以内に1回無料");
+  // 料金は1本500円。チケットは6枚2,500円の先払いで、有効期限・失効・原則払戻し不可と例外・本人限定を定める（本体 #569）。
+  expect(text).toContain("フォーム添削は1本500円（税込）");
+  expect(text).toContain("6枚を1組として2,500円（税込）で販売し、6枚をまとめて先に支払います");
+  expect(text).toContain("チケットの有効期限は、決済が完了した日時から6か月です");
+  expect(text).toContain("有効期限は延長しません");
+  expect(text).toContain("チケットは購入した本人だけが使えます");
+  // チケット条項 v3（本体 #572）。第1項：購入者都合は原則払戻し不可＋第3項〜第5項・法令の例外への相互参照。
+  expect(text).toContain("購入者の都合による払戻しは、原則として行いません");
+  expect(text).toContain("（2）から（4）までおよび法令に基づく場合は、この限りではありません");
+  // 第2項：失効。第3項〜第5項への留保＋運営・コーチ都合の失効後返金の例外。
+  expect(text).toContain("次項（2）から（4）までに定める払戻しは、有効期限を過ぎたチケットについても行います");
+  expect(text).toContain("当社またはコーチの都合により有効期限内に添削を受けることができなかったチケットについては、失効後であっても返金します");
+  // 第3項：サービス終了時の払戻し（購入金額 ÷ 6 × 未使用枚数、四捨五入）。
+  expect(text).toContain("運営者がフォーム添削の提供を終了した場合");
+  expect(text).toContain("購入金額を6で割った額に未使用の枚数を掛けた額（1円未満の端数は四捨五入します）");
+  // 第4項：法令上の取消し・解除（債務不履行・未成年者の取消し＋解除・損賠請求の非妨害）。
+  expect(text).toContain("当社の債務不履行に基づく解除および未成年者の取消しを含みます");
+  expect(text).toContain("この場合の契約の解除および損害賠償の請求は妨げられません");
+  // 第5項：提供不能時（著しい遅れを追加、単発価格500円、解除・損賠請求の非妨害）。
+  expect(text).toContain("または当社の都合により提供が著しく遅れた場合");
+  expect(text).toContain("単発価格（500円）に相当する額を返金します");
+  // 変更条項：購入済みチケットに不利益な変更を及ぼさない。
+  expect(text).toContain("購入済みのチケットについて、有効期限の短縮その他の不利益な変更を及ぼす規約の変更はしません");
+  // 絶対表現は使わない（本体 #572 項目9）。
+  expect(text).not.toContain("一切");
+  expect(text).not.toContain("いかなる理由があっても");
+  // 追加相談の販売は終わった。購入済みの分だけ購入時の条件を残す。
+  expect(text).toContain("フォーム添削の追加相談の販売は終了しました");
+  expect(text).not.toContain("600円");
+  expect(text).not.toContain("1,500円");
   // 内容確認のための差し戻し（1回）と、再提出期限・返却期限の数え直し・再提出がないときの終了。
   expect(text).toContain("1つの依頼につき1回だけ、質問を付けて依頼を差し戻す");
-  expect(text).toContain("差し戻しの間に代金の確保の取消しや返金はしません");
+  expect(text).toContain("差し戻しの間に代金の確保の取消しや返金、チケットの戻しはしません");
   // 引受後・返却前のコーチ都合の辞退は、辞退の時点で終了する。
   expect(text).toContain("引き受けた後、返却の前の辞退を含みます。この場合は辞退の時点で終了します");
   expect(text).toContain("返却期限は再提出から24時間後に改めて設定し");
@@ -47,8 +72,10 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   const text = article(7);
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("業務委託の報酬");
-  expect(text).toContain("1,050円");
-  expect(text).toContain("420円");
+  expect(text).toContain("料金500円の70%にあたる350円（税込）");
+  expect(text).toContain("利用者がチケットで申し込んだフォーム添削も、1本につき350円です");
+  expect(text).not.toContain("1,050円");
+  expect(text).not.toContain("420円");
   expect(text).toContain("報酬の支払期日：毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。");
   expect(text).not.toContain("15日ごろ");
   expect(text).toContain("3,000円に満たない場合");
@@ -82,11 +109,19 @@ it("サポートプランの返金に伴う精算は、支払済みの報酬相�
   const text = article(9);
   expect(text).toContain("購入者への返金に伴う精算");
   expect(text).toContain("その返金に対応する報酬相当額を返還します");
-  // 大会までプラン：終了時に日割りで確定、月次は仮払い、コーチ都合は返金額の75%を上限に返還（没収ではなく精算）、返金まで留保。
-  expect(text).toContain("確定前の仮払いとします");
+  // 1ヶ月プラン：終了時に日割りで確定（経過分＝代金−返金額）、月次は仮払い、コーチ都合は返金額の75%を上限に返還（没収ではなく精算）、返金まで留保。
+  expect(text).toContain("1ヶ月プランのコーチへの支払額は、契約が終わった時に");
+  expect(text).toContain("経過分の代金は、代金から第8条第7の2項(2)の返金額を差し引いた額とし、1円未満は切り捨てます");
+  expect(text).toContain("確定前の仮払いとし、第8条第5項の支払日に支払います");
+  expect(text).not.toContain("大会までプラン");
   expect(text).toContain("債務不履行に基づく精算として、支払済みの仮払いを返還します");
   expect(text).toContain("（返金額の75%）を上限とし");
   expect(text).toContain("購入者への返金が終わるまで、その契約に係るコーチへの支払いを留めます");
+  // 4の2：やむを得ない事情は通常の精算、書面で通知、異議は1回・期限なし、判断が変わっても全額返金は取り消さない。
+  expect(text).toContain("4の2. コーチ本人の入院・死亡、災害による業務不能、法令による業務停止など");
+  expect(text).toContain("第3項は適用せず、第1項のとおり精算します");
+  expect(text).toContain("1回に限り、期限なく異議を申し立てて再審査を求めることができます");
+  expect(text).toContain("購入者への全額の返金は取り消さず、コーチには終わった日までの経過日数の日割りで第1項の支払額を支払います");
   expect(text).toContain("次回以降の報酬その他の支払額から控除することができます");
   expect(text).toContain("控除の対象と金額をコーチに通知します");
   expect(text).toContain("運営者に内訳の説明を求めることができます");
@@ -113,21 +148,28 @@ it("追加相談の購入画面は、1回限りであることと契約の相手
   expect(contract).toContain("改めて購入してください");
 });
 
-it("未成年者の購入は、購入の都度の法定代理人の許可の申告と、申立てによる取消し・返金で定め、同意・上限・通知を前提にしない", () => {
+it("未成年者の購入は、全員への購入前チェックと、申立てによる取消し・返金で定め、同意・上限・通知を前提にしない", () => {
   const text = article(4);
-  expect(text).toContain("事前に親権者その他の法定代理人の許可を得るものとし、運営者は購入の都度、その申告を確認します");
+  expect(text).toContain("事前に親権者その他の法定代理人の許可を得るものとします。動画添削（単発・チケット）の購入では、年齢にかかわらず、購入の都度、決済に進む前に「未成年の方は保護者に許可を取ってください」の注意事項へのチェックを求めます");
   expect(text).toContain("当該購入を取り消し、代金を返金します");
   expect(text).toContain("保護者を契約および支払いの当事者として取り扱います");
   for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
 });
 
-it("第8条：大会までプランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
+it("第8条：1ヶ月プランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
   const text = article(8);
-  expect(text).toContain("返金とキャンセル（大会までプラン以外）：大会までプラン以外のサポートプランの返金は");
-  expect(text).toContain("7の2. 大会までプランを途中で終える場合");
-  expect(text).toContain("(1) 解約料・違約金・キャンセル手数料はいただきません。");
-  expect(text).toContain("終える日は過ぎた日に数えます");
-  expect(text).toContain("実際に指導が始まった日から1ヶ月（両方の日を含めた30日）");
+  expect(text).toContain("返金とキャンセル（1ヶ月プラン以外）：1ヶ月プラン以外のサポートプランの返金は");
+  expect(text).toContain("7の2. 1ヶ月プランを途中で終える場合");
+  expect(text).toContain("提案に示した開始日から1ヶ月（両方の日を含めた30日）とし、終了日は契約に記録された日とします");
+  expect(text).toContain("(1) 解約料・違約金・キャンセル手数料はいただきません。利用者は、いつでも途中で終えることができます。");
+  expect(text).toContain("契約に記録された開始日から終了日までの日数（両方の日を含めた30日）とし、提案と最終確認の画面に示した日数と同じです");
+  expect(text).toContain("終えることが決まった日は、過ぎた日に数えます");
+  expect(text).toContain("開始日の前に終える場合は全額を返金し、終了日以降に終える場合は返金はありません");
+  expect(text).toContain("動画への返答や通話の回数は、返金の額に関係しません");
+  expect(text).toContain("利用者に全額を返金した後は、その返金を取り消しません");
+  expect(text).toContain("(4) 目標にしていた大会が中止・延期になった場合も、1ヶ月プランは期間どおり続きます");
+  expect(text).toContain("(6) 返金の求めは、お問い合わせで受け付けます。");
+  expect(text).not.toContain("大会までプラン");
   expect(text).not.toContain("主催者が正式に発表した日をもって契約を終えます");
   expect(text).toContain("SNS・LINE などの本サービスの外の連絡手段へ誘うこと");
   expect(text).toContain("確認は通報があった場合などに限ります");

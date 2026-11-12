@@ -43,9 +43,9 @@ func TestMinorDeclarationRecordsEvidence(t *testing.T) {
 
 	var total, evidence, withTimes, partial int
 	queryRowArgs(t, `SELECT count(*),
-			count(*) FILTER (WHERE declaration_text = '保護者に許可をもらいました'
-				AND notice_text = '未成年の方は、購入する前に保護者の許可を得てください。'
-				AND amount_yen = 1500 AND coach_id = $3 AND to_char(declared_birth_month, 'YYYY-MM') = $4),
+			count(*) FILTER (WHERE declaration_text = '未成年の方は保護者に許可を取ってください'
+				AND notice_text IS NULL
+				AND amount_yen = 500 AND coach_id = $3 AND declared_birth_month IS NULL AND $4::text IS NOT NULL),
 			count(*) FILTER (WHERE client_shown_at = $5 AND client_checked_at = $6),
 			count(*) FILTER (WHERE (client_shown_at IS NULL) <> (client_checked_at IS NULL))
 		FROM minor_purchase_declarations WHERE minor_id = $1 AND ref_type = 'review' AND ref_id = $2`,
@@ -61,7 +61,7 @@ func TestMinorDeclarationTextMatchesWeb(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"保護者に許可をもらいました"`, `"未成年の方は、購入する前に保護者の許可を得てください。"`} {
+	for _, want := range []string{`"未成年の方は保護者に許可を取ってください"`} {
 		if !strings.Contains(string(src), want) {
 			t.Fatalf("web text %s not found", want)
 		}

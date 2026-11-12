@@ -195,7 +195,11 @@ type coachingTickResult struct {
 	ConsultationsPurged    int `json:"consultations_purged"`
 	TicketsReleased        int `json:"tickets_released"`
 	TicketRefundsProcessed int `json:"ticket_refunds_processed"`
-	Expired                int `json:"expired"`
+	// 決済完了から6か月を過ぎて失効させたチケットの枚数（本体 #569）。
+	TicketsExpired int `json:"tickets_expired"`
+	// 失効の30日前・7日前に送ったチケットの期限の知らせ（本体 #569）。
+	TicketExpiryReminders int `json:"ticket_expiry_reminders"`
+	Expired               int `json:"expired"`
 	// 再提出期限までに再提出がなく終わった差し戻し。
 	Unresubmitted int `json:"unresubmitted"`
 	Requeued      int `json:"requeued"`
@@ -266,6 +270,12 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.TicketRefundsProcessed, err = s.settleTicketRefunds(ctx); err != nil {
 		return out, err
 	}
+	if out.TicketsExpired, err = s.expireTickets(ctx); err != nil {
+		return out, err
+	}
+	if out.TicketExpiryReminders, err = s.remindTicketExpiry(ctx); err != nil {
+		return out, err
+	}
 	if out.ReviewPaymentsReleased, err = s.settleReviewPayments(ctx); err != nil {
 		return out, err
 	}
@@ -301,12 +311,10 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review expired notification", "err", err)
 	}
-	body := "返却の目安までに引き受けるコーチが見つかりませんでした"
-	if rr.OldStatus == "in_review" {
-		body = "返却の目安までにコーチの返答が届きませんでした"
-	}
+	// 期限切れ系の通知は1通に統合する（本体 #573）。取り消しの別通知は出さない。
+	body := "フォーム添削の依頼が期限切れになりました"
 	if s.stripe.Configured() {
-		body += "。お支払いは取り消します（PayPay は返金します）"
+		body += "。カードの仮押さえは取り消しました"
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",

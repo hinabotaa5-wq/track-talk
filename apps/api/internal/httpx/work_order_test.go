@@ -26,7 +26,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	admin := adminToken(t, h)
 	_, coach := onDutyCoach(t, h, admin)
 	_, owner := demoRequester(t, h, admin)
-	buyFiveTickets(t, h, owner)
+	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 
 	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
@@ -43,8 +43,8 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if got := offer.Terms.Items[7]; got.Label != "支払期日" || !strings.HasPrefix(got.Value, "毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。") || strings.Contains(got.Value, "1回まで") {
 		t.Fatalf("payment due terms: %+v", got)
 	}
-	// チケット2枚(割引前1,200円)の70%。
-	if offer.Terms.AmountYen != 840 || len(offer.Terms.Items) != 9 || offer.Terms.PaymentDue == "" || offer.Terms.DeliverBy == "" {
+	// チケット1枚。報酬は単発と同じ500円の70%（本体 #569）。
+	if offer.Terms.AmountYen != 350 || len(offer.Terms.Items) != 9 || offer.Terms.PaymentDue == "" || offer.Terms.DeliverBy == "" {
 		t.Fatalf("terms before accept: %+v", offer.Terms)
 	}
 
@@ -58,7 +58,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 3 || accepted.WorkOrder.Terms.AmountYen != 840 || len(accepted.WorkOrder.Terms.Items) != 9 {
+	if accepted.WorkOrder.TermsVersion != 3 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 9 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -69,10 +69,10 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 			Terms workOrderTermsView `json:"terms"`
 		} `json:"work_order"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 840 {
+	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 350 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "840円")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "350円")
 	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
 		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
 	}
@@ -161,7 +161,7 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 			t.Fatalf("setting %s %d %s", category, rec.Code, rec.Body.String())
 		}
 	}
-	buyFiveTickets(t, h, owner)
+	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
 	var list struct {
@@ -175,5 +175,5 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+list.Offers[0].ID+"/accept", coach, nil); rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "840円")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "350円")
 }

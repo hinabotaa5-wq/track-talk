@@ -22,28 +22,29 @@ beforeEach(() => {
 
 const page = <p>中身</p>;
 const preparing = "ただいま準備中です";
-const startNotice = "動画添削は 2026年11月14日（土）に開始予定です。";
+const startNotice = "11/14(土)に開始します！";
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => vi.unstubAllEnvs());
 
-it("11月14日午前0時（日本時間）の直前は3画面で動画添削の開始予定を案内する", () => {
-  vi.setSystemTime(new Date("2026-11-13T23:59:59.999+09:00"));
+// 開始の告知は日付で自動に出さず、環境変数で文言ごと差し替える。既定（未設定）は出さない（本体 #569）。
+it("告知の環境変数が空の間は、どの画面にも開始の告知を出さない", () => {
+  vi.stubEnv("NEXT_PUBLIC_VIDEO_REVIEW_NOTICE", "");
+  for (const html of [renderToStaticMarkup(<CoachingPage />), renderToStaticMarkup(<NewReviewRequestLayout>{page}</NewReviewRequestLayout>), renderToStaticMarkup(<CoachesLayout>{page}</CoachesLayout>)]) {
+    expect(html).not.toContain(startNotice);
+    expect(html).not.toContain("開始予定");
+  }
+});
+
+it("告知の環境変数に文言を入れると、その文言を3画面に出す", () => {
+  vi.stubEnv("NEXT_PUBLIC_VIDEO_REVIEW_NOTICE", startNotice);
   expect(renderToStaticMarkup(<CoachingPage />)).toContain(startNotice);
   expect(renderToStaticMarkup(<NewReviewRequestLayout>{page}</NewReviewRequestLayout>)).toContain(startNotice);
   expect(renderToStaticMarkup(<CoachesLayout>{page}</CoachesLayout>)).toContain(startNotice);
 });
 
-it("11月14日午前0時（日本時間）になると一覧の準備中表示から開始予定を外す", () => {
-  vi.setSystemTime(new Date("2026-11-14T00:00:00+09:00"));
-  const html = renderToStaticMarkup(<CoachesLayout>{page}</CoachesLayout>);
-  expect(html).toContain(preparing);
-  expect(html).not.toContain(startNotice);
-});
-
-it("開始予定日前でもコーチングが開いていればトップと申込みに開始予定を出さない", () => {
-  vi.setSystemTime(new Date("2026-11-13T12:00:00+09:00"));
+it("告知を出していても、コーチングが開いていれば申込みはそのまま開く", () => {
+  vi.stubEnv("NEXT_PUBLIC_VIDEO_REVIEW_NOTICE", startNotice);
   flags.coaching = true;
-  expect(renderToStaticMarkup(<CoachingPage />)).not.toContain(startNotice);
   expect(renderToStaticMarkup(<NewReviewRequestLayout>{page}</NewReviewRequestLayout>)).toBe("<p>中身</p>");
 });
 

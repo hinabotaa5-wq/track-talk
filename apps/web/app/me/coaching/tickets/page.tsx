@@ -2,13 +2,19 @@
 import { L } from "@/lib/i18n";
 
 import { SellerNote } from "@/components/seller-note";
+import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
+import { PurchaseConfirm } from "@/components/purchase-confirm";
+import { TicketBalance } from "@/components/ticket-balance";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { ticketReturnPath, type TicketSummary } from "@/lib/coaching-tickets";
-import { formatYen } from "@/lib/format";
+import { ticketReturnPath, ticketStatusLabels, type TicketProduct, type TicketSummary } from "@/lib/coaching-tickets";
+import { formatDateTime, formatYen } from "@/lib/format";
+import { useMinorDeclaration } from "@/lib/minor-purchase";
+import { ticketPackConfirmRows, ticketRefundExceptions } from "@/lib/purchase-confirm";
+import { reviewPriceYen, ticketValidityMonths } from "@/lib/review-pricing";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -23,6 +29,11 @@ function TicketsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const { pending, acquire, release } = useActionLock();
+  // 支払い画面へ進む前の最終確認に出している商品。
+  const [confirming, setConfirming] = useState<TicketProduct | null>(null);
+  // 全員の購入前チェック（単発と同じ。毎回未チェックから始める）。
+  const declaration = useMinorDeclaration();
+  const needsDeclaration = true;
 
   const load = useCallback(async () => {
     const data = await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token });
@@ -72,7 +83,12 @@ function TicketsPage() {
   }, [token, purchaseID, load, router]);
 
   async function buy(productID: string) {
-    if (!session || !summary || !acquire()) return;
+    if (!session || !summary) return;
+    if (needsDeclaration && !declaration.checked) {
+      setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
+      return;
+    }
+    if (!acquire()) return;
     setError("");
     const storageKey = `tracktalk-tickets:${session.user.id}:${productID}:${returnPath}`;
     try {
@@ -82,7 +98,7 @@ function TicketsPage() {
         sessionStorage.setItem(storageKey, key);
       }
       const result = await apiFetch<{ checkout_url?: string; paid?: boolean; return_path?: string }>("/v1/coaching/tickets/checkout", {
-        method: "POST", token, body: JSON.stringify({ product_id: productID, request_key: key, return_path: returnPath }),
+        method: "POST", token, body: JSON.stringify({ product_id: productID, request_key: key, return_path: returnPath, ...declaration.body(needsDeclaration) }),
       });
       if (result.paid) {
         sessionStorage.removeItem(storageKey);
@@ -103,13 +119,47 @@ function TicketsPage() {
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
+      <TicketBalance summary={summary} />
       {summary.sales_open === false ? <p role="status" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">{summary.purchase_block_reason}</p> : null}
-      <p className="text-sm text-slate-200">{L("動画添削は2枚、追加相談は1枚です。依頼時に確保し、回答時に消費します。期限までに回答がなければ戻ります。有効期限はありません。")}</p>
-      <div className="grid grid-cols-2 gap-3">{(summary.products ?? []).map((p) => <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-3">
-        <p className="font-semibold">{p.title}</p><p>{formatYen(p.amount_yen)}</p>
-        {p.quantity > 1 ? <p className="text-xs text-slate-300">{L("1枚あたり{v0}", { v0: formatYen(p.amount_yen / p.quantity) })}</p> : null}
-        <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => void buy(p.id)}>{L("購入する")}</Button>
-      </div>)}</div>
+      {confirming ? (
+        <PurchaseConfirm
+          rows={ticketPackConfirmRows({ quantity: confirming.quantity, amountYen: confirming.amount_yen, validityMonths: summary.validity_months ?? ticketValidityMonths })}
+          confirmLabel={L("確定してお支払いへ（{v0}）", { v0: formatYen(confirming.amount_yen) })}
+          onConfirm={() => void buy(confirming.id)}
+          onBack={() => { setConfirming(null); setError(""); }}
+          pending={pending}
+          confirmDisabled={!declaration.checked}
+        >
+          {needsDeclaration ? <MinorPurchaseDeclaration checked={declaration.checked} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
+        </PurchaseConfirm>
+      ) : (summary.products ?? []).map((p) => {
+        const single = summary.single_price_yen ?? reviewPriceYen;
+        return <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-4">
+          <p className="font-semibold">{p.title}</p>
+          <p className="text-lg font-bold">{L("{v0}（税込）", { v0: formatYen(p.amount_yen) })}</p>
+          {p.quantity > 1 ? <p className="text-sm text-slate-200">{L("1回あたり約{v0}。1回ずつ払うと{v1}×{q}回で{v2}です。", { v0: formatYen(Math.round(p.amount_yen / p.quantity)), v1: formatYen(single), q: p.quantity, v2: formatYen(single * p.quantity) })}</p> : null}
+          <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
+            <li>{L("{q}枚をまとめて先に支払います。1枚で動画添削1回を申し込めます。", { q: p.quantity })}</li>
+            <li>{L("有効期限は決済が完了した日時から{m}か月です。過ぎると未使用の分は失効し、延長はしません。", { m: summary.validity_months ?? ticketValidityMonths })}</li>
+            <li>{L("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします。")}
+              <ul className="list-disc space-y-1 pl-5 pt-1">
+                {ticketRefundExceptions().map((e) => <li key={e}>{e}</li>)}
+              </ul>
+            </li>
+            <li>{L("購入した本人だけが使えます。譲ることはできません。")}</li>
+          </ul>
+          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); declaration.reset(); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
+        </div>;
+      })}
+      <p className="text-xs text-slate-300">{L("動画添削1回にチケット1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。")}</p>
+      {(summary.purchases ?? []).filter((p) => p.status !== "pending").length > 0 ? <section className="space-y-2">
+        <h2 className="text-sm font-bold">{L("購入したチケット")}</h2>
+        <ul className="space-y-2">{(summary.purchases ?? []).filter((p) => p.status !== "pending").map((p) => <li key={p.id} className="rounded-xl border border-white/15 p-3 text-xs text-slate-200">
+          <p className="font-semibold text-slate-100">{L("{q}枚 {v0} · {status}", { q: p.quantity, v0: formatYen(p.amount_yen), status: ticketStatusLabels[p.status] })}</p>
+          <p>{L("未使用 {a}枚 · 確保中 {r}枚 · 使用済み {c}枚 · 失効 {e}枚", { a: p.available, r: p.reserved, c: p.consumed ?? 0, e: p.expired ?? 0 })}</p>
+          <p>{p.expires_at ? L("有効期限：{v0}", { v0: formatDateTime(p.expires_at) }) : L("有効期限：なし（以前に購入した分）")}</p>
+        </li>)}</ul>
+      </section> : null}
     </> : null}
   </div>;
 }

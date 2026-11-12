@@ -56,7 +56,8 @@ jobs:
 
   vault-export:
     # 金庫 DB の輸出（deploy/identity-vault/export）を合成データだけで確かめる。
-    runs-on: ubuntu-latest
+    # ubuntu-latest は 26.04 化で PG クライアントが 18 系になり、postgres:16 への pg_restore が壊れるため 24.04 に固定する。
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine

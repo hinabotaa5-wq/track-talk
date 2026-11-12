@@ -7,14 +7,11 @@ import { operatorName } from "@/lib/operator";
 export function SellerNote({ coachName }: { coachName?: string | null }) {
   if (coachName === undefined) {
     return (
-      <div className="space-y-1 text-xs leading-5 text-slate-300">
-        <p>{L("販売者: TrackTalk の運営者（{operatorName}）。フォーム添削の提供者は運営者で、添削は運営者がコーチに委託して行います。", { operatorName })}</p>
-        <p>{L("代金のお支払い先は運営者です。料金・キャンセル・返金は運営者が責任を持って対応します。")}</p>
-        <p>
-          <Link href="/terms" className="text-blue-300 underline">{L("利用規約")}</Link>
-          <Link href="/legal/commerce" className="ml-3 text-blue-300 underline">{L("特定商取引法に基づく表記")}</Link>
-        </p>
-      </div>
+      <p className="text-xs leading-5 text-slate-300">
+        {L("販売者: {operatorName}（TrackTalk運営者）", { operatorName })}
+        <Link href="/terms" className="ml-2 text-blue-300 underline">{L("利用規約")}</Link>
+        <Link href="/legal/commerce" className="ml-2 text-blue-300 underline">{L("特定商取引法に基づく表記")}</Link>
+      </p>
     );
   }
   return (

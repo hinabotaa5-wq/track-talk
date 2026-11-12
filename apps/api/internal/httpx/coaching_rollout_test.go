@@ -38,10 +38,10 @@ func TestAcceptanceClosedPreservesExistingFulfillmentAndLatePayments(t *testing.
 	admin := adminToken(t, open)
 	_, coach := onDutyCoach(t, open, admin)
 	_, owner := demoRequester(t, open, admin)
-	buyFiveTickets(t, open, owner)
+	buySixTickets(t, open, owner)
 	request := ticketReview(t, open, owner)
 	offer := coachRequests(t, open, coach).Offers[0].ID
-	late := startTicketPurchase(t, open, owner, "single", uuid.NewString(), "/coaching/new")
+	late := startTicketPurchase(t, open, owner, "six", uuid.NewString(), "/coaching/new")
 	closed := closedAcceptanceHandler(t, cfg)
 
 	id := uuid.NewString()
@@ -56,9 +56,9 @@ func TestAcceptanceClosedPreservesExistingFulfillmentAndLatePayments(t *testing.
 		}
 	}
 	// 停止前に開いた決済の遅延通知と再送を受け付ける。
-	payTicketPurchase(t, closed, late, 600)
-	payTicketPurchase(t, closed, late, 600)
-	if got := ticketSummary(t, closed, owner).Balance.Available; got != 4 {
+	payTicketPurchase(t, closed, late, 2500)
+	payTicketPurchase(t, closed, late, 2500)
+	if got := ticketSummary(t, closed, owner).Balance.Available; got != 11 {
 		t.Fatalf("balance %d", got)
 	}
 	if rec := doJSON(t, closed, "POST", "/v1/coach/offers/"+offer+"/accept", coach, nil); rec.Code != 200 {
@@ -106,7 +106,7 @@ func TestReconciliationDetectsAccountingIssuesAndProtectsAdminAccess(t *testing.
 			t.Fatalf("access %d %s", rec.Code, rec.Body.String())
 		}
 	}
-	lot := buyFiveTickets(t, h, owner)
+	lot := buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 	offer := coachRequests(t, h, coach).Offers[0].ID
 	if rec := doJSON(t, h, "POST", "/v1/coach/offers/"+offer+"/accept", coach, nil); rec.Code != 200 {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -46,6 +47,35 @@ type fakeStripe struct {
 	refundDelay time.Duration
 	// 返金の Idempotency-Key ごとの中身。Stripe と同じく、同じキーなら前の返金を返し、中身が違えば断る。
 	refundKeys map[string]url.Values
+	// 支払い画面（Checkout Session）を読んだときに返す中身。入っていなければ支払い中（open）として答える。
+	checkoutStates map[string]map[string]any
+	// PaymentIntent ごとの決済額。Stripe と同じく、1つの決済への返金の累計がこの額を超える返金は断る（本体 #572）。
+	// 入っていないチケットの決済（pi_ticket_…）は6枚つづりの2,500円として扱う。
+	chargeAmounts map[string]int
+	// 失敗・取り消しとして答えた返金（refunds の位置）。決済額の判定の累計に入れない。
+	failedRefunds map[int]bool
+}
+
+// chargeCap は、その PaymentIntent に返金できる累計の上限（分からなければ 0＝上限を見ない）。
+func (f *fakeStripe) chargeCap(intent string) int {
+	if v, ok := f.chargeAmounts[intent]; ok {
+		return v
+	}
+	if strings.HasPrefix(intent, "pi_ticket_") {
+		return 2500
+	}
+	return 0
+}
+
+// setCheckoutState は、支払い画面を読んだときに返す中身を決める（戻り画面での確認のテストに使う）。
+func (f *fakeStripe) setCheckoutState(id string, state map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.checkoutStates == nil {
+		f.checkoutStates = map[string]map[string]any{}
+	}
+	state["id"] = id
+	f.checkoutStates[id] = state
 }
 
 func (f *fakeStripe) transferList() []url.Values {
@@ -131,6 +161,13 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			}
 			f.canceled = append(f.canceled, id)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "canceled"})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/checkout/sessions/"):
+			id := strings.TrimPrefix(r.URL.Path, "/v1/checkout/sessions/")
+			state, ok := f.checkoutStates[id]
+			if !ok {
+				state = map[string]any{"id": id, "status": "open", "payment_status": "unpaid"}
+			}
+			_ = json.NewEncoder(w).Encode(state)
 		case r.URL.Path == "/v1/checkout/sessions":
 			f.sessions = append(f.sessions, r.PostForm)
 			f.sessionVersions = append(f.sessionVersions, r.Header.Get("Stripe-Version"))
@@ -174,6 +211,12 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			refunds := []map[string]any{}
 			for i, form := range f.refunds {
 				if form.Get("payment_intent") == r.URL.Query().Get("payment_intent") {
+					if refundStatus == "failed" || refundStatus == "canceled" {
+						if f.failedRefunds == nil {
+							f.failedRefunds = map[int]bool{}
+						}
+						f.failedRefunds[i] = true
+					}
 					refunds = append(refunds, map[string]any{"id": fmt.Sprintf("re_%d", i+1), "amount": json.Number(form.Get("amount")), "status": refundStatus, "metadata": map[string]string{"ticket_refund_id": form.Get("metadata[ticket_refund_id]")}})
 				}
 			}
@@ -194,6 +237,22 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 					return
 				}
 				f.refundKeys[key] = r.PostForm
+			}
+			if limit := f.chargeCap(r.PostForm.Get("payment_intent")); limit > 0 {
+				total, _ := strconv.Atoi(r.PostForm.Get("amount"))
+				for i, prev := range f.refunds {
+					if !f.failedRefunds[i] && prev.Get("payment_intent") == r.PostForm.Get("payment_intent") {
+						n, _ := strconv.Atoi(prev.Get("amount"))
+						total += n
+					}
+				}
+				if total > limit {
+					// 実際の Stripe と同じく、決済額を超える返金は断る。
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "invalid_request_error", "code": "amount_too_large", "param": "amount",
+						"message": fmt.Sprintf("Refund amount (¥%s) is greater than unrefunded amount on charge", r.PostForm.Get("amount"))}})
+					return
+				}
 			}
 			f.refunds = append(f.refunds, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("re_%d", len(f.refunds)), "status": refundStatus, "amount": json.Number(r.PostForm.Get("amount"))})

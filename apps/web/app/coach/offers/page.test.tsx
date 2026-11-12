@@ -64,7 +64,8 @@ it("届いた依頼の画面は届いた依頼だけを出し、引き受け・�
   expect(container.textContent).not.toContain("コーチ画面に戻る");
   expect(container.querySelector("h1")?.textContent).toBe("届いた依頼");
   expect(container.textContent).not.toContain("添削中の依頼はありません");
-  expect(container.textContent).toContain("新しい依頼が入ってから90分以内");
+  expect(container.textContent).not.toContain("新しい依頼が入ってから90分以内");
+  expect(container.textContent).toContain("※23:00–07:00はカウント停止");
   expect(container.textContent).toContain("引き受ける");
   expect(container.textContent).toContain("見送る");
 

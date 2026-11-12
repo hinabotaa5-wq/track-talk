@@ -1,13 +1,11 @@
 "use client";
 
-import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
+import { useSolicitationGuard } from "@/components/contact-notice";
 import { WorkOrderView } from "@/components/work-order-terms";
 import { PageLoading } from "@/components/page-loading";
 
-import { CoachingConsultations } from "@/components/coaching-consultations";
-
 import { useAuth } from "@/components/auth-provider";
-import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
+import { CoachInfoRequestForm, ReviewInfoHistory, SentBanner } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
 import { CoachWithdrawForm } from "@/components/review-withdraw";
 import { Button } from "@/components/ui/button";
@@ -132,9 +130,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       <p className="text-xs text-slate-300">
         {t(locale, "coach.detail.contactNote")}
       </p>
-      <ContactNotice />
       {guard.warning}
-      <p className="text-xs text-slate-300">{t(locale, "coach.detail.responseNote")}</p>
       <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} />
       <Field label={t(locale, "coach.detail.fix1")} value={fix1} onChange={setFix1} error={errors.fix_points} />
       <Field label={t(locale, "coach.detail.fix2")} value={fix2} onChange={setFix2} />
@@ -187,7 +183,7 @@ function ClarificationForm({ request, token, onSent, locale }: { request: CoachR
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <ContactNotice />
+      <p className="text-xs text-slate-300">{t(locale, "coach.detail.contactNote")}</p>
       {guard.warning}
       <Field label={t(locale, "coach.detail.followup")} value={text} onChange={setText} error={errors.clarification} />
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
@@ -205,6 +201,8 @@ export default function CoachReviewRequestPage() {
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<CoachReviewRequest | null>(null);
   const [error, setError] = useState("");
+  // 直前に送った種類。送った内容の先頭に完了バナーを出す（自動では消さない）。
+  const [sent, setSent] = useState<"response" | "clarification" | "info" | null>(null);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -258,29 +256,32 @@ export default function CoachReviewRequestPage() {
 
       {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
 
+      {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
+
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
 
-      {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={setRequest} locale={locale} /> : null}
+      {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} /> : null}
 
       {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
-        <CoachInfoRequestForm requestID={request.id} token={token} onSent={setRequest} />
+        <CoachInfoRequestForm requestID={request.id} token={token} onSent={(r) => { setSent("info"); setRequest(r); }} />
       ) : null}
 
       {request.status === "in_review" || (request.status === "needs_info" && request.info_request?.from_status === "in_review") ? (
         <CoachWithdrawForm requestID={request.id} token={token} onWithdrawn={() => router.push("/coach")} />
       ) : null}
 
+      {sent === "response" && response ? <SentBanner text={t(locale, "coach.detail.responseSent")} /> : null}
+
       {response ? <ReviewResponseView response={response} /> : null}
 
       {needsClarification && response.clarify_reason ? (
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
+          {sent === "clarification" ? <SentBanner text={t(locale, "coach.detail.clarificationSent")} /> : null}
           <p className="text-sm font-semibold text-white">{t(locale, "coach.detail.clarifiedAs", { reason: clarifyReasonLabels[response.clarify_reason] })}</p>
           {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
-          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
+          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={(r) => { setSent("clarification"); setRequest(r); }} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
         </section>
       ) : null}
-
-      <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
         {t(locale, "coach.detail.toCoach")}

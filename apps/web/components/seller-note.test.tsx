@@ -5,16 +5,13 @@ import type { ReactNode } from "react";
 import { SellerNote } from "./seller-note";
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 
-it("フォーム添削・チケットは運営者が提供者で、料金・返金の責任も運営者にあり、特商法の表記へ案内する", () => {
+it("フォーム添削・チケットは販売者1行と利用規約・特商法へのリンクだけを出す", () => {
   const html = renderToStaticMarkup(<SellerNote />);
-  expect(html).toContain("販売者: TrackTalk の運営者");
-  expect(html).toContain("提供者は運営者");
-  expect(html).toContain("運営者がコーチに委託");
-  expect(html).toContain("お支払い先は運営者");
-  expect(html).toContain("料金・キャンセル・返金は運営者が責任を持って対応");
+  expect(html).toContain("販売者: 中窪日向（TrackTalk運営者）");
+  expect(html).toContain('href="/terms"');
   expect(html).toContain('href="/legal/commerce"');
-  // 運営者が自ら提供するサービスなので、代わりに受け取る仕組みの言葉は使わない。
-  for (const word of ["収納代行", "代理受領", "預り金", "預かり"]) expect(html).not.toContain(word);
+  // 詳細は特商法ページ側に寄せるため、申込画面では2段落の説明を出さない。
+  for (const word of ["提供者は運営者", "運営者がコーチに委託", "お支払い先は運営者", "料金・キャンセル・返金は運営者が責任を持って対応", "収納代行", "代理受領", "預り金", "預かり"]) expect(html).not.toContain(word);
 });
 
 it("サポートプランはコーチが販売者で、代理受領と二重請求がないことを示し、運営者の表記へは案内しない", () => {

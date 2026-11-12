@@ -57,8 +57,8 @@ function button(text: string) { return [...container.querySelectorAll("button")]
 async function check() { const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]'); if (!box) throw new Error("missing checkbox"); await act(async () => box.click()); }
 it("未成年本人は、添削のあとの追加相談の支払いを開くたびに、保護者の許可のチェックが要る", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "requester", status: "awaiting_payment" }] });
- expect(container.textContent).toContain("保護者に許可をもらいました");
- expect(container.textContent).toContain("未成年の方は、購入する前に保護者の許可を得てください。");
+ expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
+ expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
  expect(container.textContent).not.toContain("保護者に、この契約のページから");
  expect(button("お支払いへ")?.disabled).toBe(true);
  await check();
@@ -78,10 +78,10 @@ it("未成年本人が新しい追加相談をその場で払うときは、チ�
  const submit = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/submit");
  expect(JSON.parse(submit?.[1].body)).toEqual({ guardian_permission: true, guardian_permission_shown_at: expect.any(String), guardian_permission_checked_at: expect.any(String) });
 });
-it("18歳以上には、保護者の許可のチェックを出さない", async () => {
+it("18歳以上にも購入前チェックを出す", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
- expect(container.querySelector('input[type="checkbox"]')).toBeNull();
- expect(button("お支払いへ")?.disabled).toBe(false);
+ expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();
+ expect(button("お支払いへ")?.disabled).toBe(true);
 });
 const payNotice = "現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。";
 it("動画添削のあとの追加相談をその場で払うときは、カードのみの案内を出す", async () => {
@@ -143,4 +143,10 @@ it("動画添削のあとの相談は専用のゲートで出し分け、届出�
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "in_review" }] });
  expect(container.textContent).toContain("追加相談の受付は準備中です");
  expect(container.textContent).not.toContain("回答を送る");
+});
+it("追加相談の販売を止めている間は、過去の相談がない添削に追加相談の欄を出さない（本体 #569）", async () => {
+ flags.consultation = false;
+ await render({ ...room, consultations: [draft] });
+ expect(container.textContent).not.toContain("追加相談");
+ expect(container.querySelector("textarea")).toBeNull();
 });

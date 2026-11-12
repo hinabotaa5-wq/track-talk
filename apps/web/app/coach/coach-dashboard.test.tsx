@@ -236,3 +236,26 @@ it("言語が英語の利用者にはコーチ導線を英語で出す", async (
   expect(container.textContent).not.toContain("届いた依頼");
   expect(container.textContent).not.toContain("新しい依頼が");
 });
+
+it("ランチャーは高さいっぱいに広がる枠で描き、タイルは3列の正方形で並べる（#580）", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const launcher = container.querySelector(".coach-launcher");
+  expect(launcher).not.toBeNull();
+  expect(launcher!.className).toContain("max-md:flex-1");
+  const grid = container.querySelector("nav.grid")!;
+  expect(grid.parentElement?.className).toBe("coach-tiles");
+  expect(grid.parentElement?.parentElement).toBe(launcher);
+  for (const tile of tileLinks()) expect(tile.className).toContain("aspect-square");
+  expect(launcher!.lastElementChild?.tagName).toBe("FOOTER");
+});
+
+it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折り返さない（#580）", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const grid = container.querySelector("nav.grid")!;
+  expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
+  const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
+  expect(labels).toHaveLength(11);
+  for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
+});

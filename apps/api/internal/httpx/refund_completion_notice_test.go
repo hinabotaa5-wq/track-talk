@@ -80,29 +80,28 @@ func TestReviewAuthorizationCancellationCompletionNotice(t *testing.T) {
 	_, payer := demoRequester(t, h, adminToken(t, h))
 	id := paidReview(t, h, payer, "card", "pi_card_notice")
 	subscribeRefundNoticeTest(t, h, payer, endpoint)
+	// 期限切れ通知のベルは受ける（プッシュは止めたまま）。
+	if rec := doJSON(t, h, "PUT", "/v1/me/notification-settings/review", payer, map[string]bool{
+		"in_app": true, "push": false,
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("settings %d %s", rec.Code, rec.Body.String())
+	}
 	title, url := "フォーム添削の仮押さえの取り消しが完了しました", "/coaching/requests/"+id
 	tickRefundNoticeTest(t, h)
 	assertRefundNotice(t, h, payer, title, url, pushes, 0)
 
 	execSQLArgs(t, "UPDATE review_requests SET due_at = now()-interval '1 minute' WHERE id=$1", id)
 	execSQLArgs(t, `UPDATE review_payments SET authorized_at=now()-interval '2 minutes' WHERE request_id=$1`, id)
-	installTrigger(t, `
-		CREATE FUNCTION fail_refund_completion_bell() RETURNS trigger LANGUAGE plpgsql AS $$
-		BEGIN RAISE EXCEPTION 'injected bell failure'; END $$;
-		CREATE TRIGGER fail_refund_completion_bell BEFORE INSERT ON notifications
-		FOR EACH ROW WHEN (NEW.title = 'フォーム添削の仮押さえの取り消しが完了しました')
-		EXECUTE FUNCTION fail_refund_completion_bell();
-	`, `DROP TRIGGER IF EXISTS fail_refund_completion_bell ON notifications; DROP FUNCTION IF EXISTS fail_refund_completion_bell();`)
 	tickRefundNoticeTest(t, h)
 	if got := reviewPaymentStatus(t, id); got != "canceled" {
 		t.Fatalf("cancellation did not commit: %s", got)
 	}
+	// 期限切れ系は1通に統合（本体 #573）：取り消しの別通知は届かず、期限切れ通知だけが届く。
 	assertRefundNotice(t, h, payer, title, url, pushes, 0)
-	execSQLArgs(t, "DROP TRIGGER fail_refund_completion_bell ON notifications")
-	execSQLArgs(t, "UPDATE refund_completion_notices SET next_attempt_at=now()")
-	for range 2 {
-		tickRefundNoticeTest(t, h)
-		assertRefundNotice(t, h, payer, title, url, pushes, 1)
+	var expired int
+	queryRowArgs(t, "SELECT count(*) FROM notifications WHERE review_request_id=$1 AND kind='review_expired'", []any{id}, &expired)
+	if expired != 1 {
+		t.Fatalf("review_expired bells = %d, want 1", expired)
 	}
 	if _, canceled := f.calls(); len(canceled) != 1 {
 		t.Fatalf("cancellation calls %d", len(canceled))
@@ -125,6 +124,7 @@ func TestCapturedRefundCompletionNotice(t *testing.T) {
 			_, payer := demoRequester(t, h, admin)
 			intent := "pi_card_captured_notice"
 			id := paidReview(t, h, payer, "card", intent)
+			legacyReviewAmount(t, id)
 			execSQLArgs(t, "UPDATE review_payments SET status='captured',captured_at=now() WHERE request_id=$1", id)
 			subscribeRefundNoticeTest(t, h, payer, endpoint)
 			title, url := "フォーム添削の返金が完了しました", "/coaching/requests/"+id
@@ -210,6 +210,7 @@ func TestPendingReviewPayPayRefundCompletionNotice(t *testing.T) {
 	_, payer := demoRequester(t, h, adminToken(t, h))
 	intent := "pi_paypay_notice"
 	id := paidReview(t, h, payer, "paypay", intent)
+	legacyReviewAmount(t, id)
 	subscribeRefundNoticeTest(t, h, payer, endpoint)
 	title, url := "フォーム添削の返金が完了しました", "/coaching/requests/"+id
 	f.mu.Lock()

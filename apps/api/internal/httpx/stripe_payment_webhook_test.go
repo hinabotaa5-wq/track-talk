@@ -88,9 +88,9 @@ func TestStripePaymentWebhooksCompleteExistingOrdersWhileClosed(t *testing.T) {
 				query, expected = `SELECT payment_state FROM coaching_consultations WHERE id=$1`, "paid"
 			case "tickets":
 				_, user := demoUser(t, before, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
-				id = startTicketPurchase(t, before, user, "five", uuid.NewString(), "/coaching/new")
+				id = startTicketPurchase(t, before, user, "six", uuid.NewString(), "/coaching/new")
 				queryRowArgs(t, `SELECT checkout_session_id FROM coaching_ticket_purchases WHERE id=$1`, []any{id}, &session)
-				object["client_reference_id"], object["amount_total"] = id, 2880
+				object["client_reference_id"], object["amount_total"] = id, 2500
 				object["metadata"] = map[string]string{"kind": "tickets", "purchase_id": id}
 				query, expected = `SELECT status FROM coaching_ticket_purchases WHERE id=$1`, "paid"
 			}
@@ -109,7 +109,7 @@ func TestStripePaymentWebhooksCompleteExistingOrdersWhileClosed(t *testing.T) {
 			if kind == "tickets" {
 				var credited int
 				queryRowArgs(t, `SELECT sum(available_delta)::int FROM coaching_ticket_ledger WHERE lot_id=$1 AND kind='purchase'`, []any{id}, &credited)
-				if credited != 5 {
+				if credited != 6 {
 					t.Fatalf("duplicate ticket credit %d", credited)
 				}
 			}

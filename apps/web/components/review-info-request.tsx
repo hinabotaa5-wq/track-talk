@@ -1,6 +1,7 @@
 "use client";
 import { L } from "@/lib/i18n";
 
+import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
@@ -10,7 +11,21 @@ import { formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, minInfoRequestChars, reviewInfoReasonLabels, tooLong, videoDuration } from "@/lib/review";
 import type { CoachReviewRequest, ReviewInfoReason, ReviewInfoRequest, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+
+// 送信直後の完了表示。フォームが閉じて高さが縮むので、完了の表示が画面の外に出ないようにする。
+export function SentBanner({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
+  return (
+    <div ref={ref} role="status" className="flex scroll-mb-24 items-start gap-2 rounded-lg border border-emerald-500/60 bg-emerald-950/50 p-3">
+      <CircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-300" aria-hidden />
+      <p className="text-sm font-semibold text-emerald-200">{text}</p>
+    </div>
+  );
+}
 
 // 返却前の「内容確認のための差し戻し」。コーチが1依頼につき1回だけ、質問を付けて依頼を返し、
 // 依頼者は24時間以内に相談内容を直して（動画も差し替えられる）再提出する。

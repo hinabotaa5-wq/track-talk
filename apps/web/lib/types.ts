@@ -352,6 +352,8 @@ export type CoachingMe = {
   guardian: CoachingGuardian | null;
   push_devices: number;
   demo: boolean;
+  // 動画添削を申し込めるか。支払いのある環境では誰でも true、支払いのない検証用では招待コードを入れた人だけ（本体 #569）。
+  review_open?: boolean;
 };
 
 export type GuardianPublic = CoachingGuardian & {

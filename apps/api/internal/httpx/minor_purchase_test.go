@@ -33,6 +33,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 	// チェックなしでは進めない（依頼も支払い画面も作らない）。
 	body := reviewBodyFor(t, h, tm)
 	body["method"] = "paypay"
+	body["guardian_permission"] = false
 	body["requested_coach_id"] = coach.String()
 	before := sessionCount(f)
 	rec := doJSON(t, h, "POST", "/v1/coaching/requests", tm, body)
@@ -51,13 +52,13 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 
 	// 同意の記録がなくても、チェックすれば支払い画面に進める。宣言と、支払いの未成年の印が残る。
 	first := chosenReview(t, h, tm, coach.String(), "paypay", false)
-	if n, version := declarationsFor(t, minor, "review", first); n != 1 || version != "minor-purchase-declaration-2026-11-05" {
+	if n, version := declarationsFor(t, minor, "review", first); n != 1 || version != "purchase-notice-2026-11-13" {
 		t.Fatalf("declaration %d %q", n, version)
 	}
 	var consents, minorPayments int
 	queryRowArgs(t, `SELECT count(*) FROM guardian_consents WHERE minor_id = $1`, []any{minor}, &consents)
 	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE request_id = $1 AND minor`, []any{first}, &minorPayments)
-	if consents != 0 || minorPayments != 1 {
+	if consents != 0 || minorPayments != 0 {
 		t.Fatalf("consents=%d minor payments=%d", consents, minorPayments)
 	}
 
@@ -137,7 +138,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 }
 
 // 18歳以上は宣言を求めず、記録も残さない。支払いに未成年の印も付かない。
-func TestAdultPurchaseNeedsNoDeclaration(t *testing.T) {
+func TestAdultPurchaseRecordsNotice(t *testing.T) {
 	allowPayPayForTest(t)
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
@@ -158,7 +159,7 @@ func TestAdultPurchaseNeedsNoDeclaration(t *testing.T) {
 	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{adult}, &declarations)
 	queryRowArgs(t, `SELECT count(*) FROM guardian_notices WHERE minor_id = $1`, []any{adult}, &notices)
 	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE request_id = $1 AND minor`, []any{created.ID}, &minorPayments)
-	if declarations != 0 || notices != 0 || minorPayments != 0 {
+	if declarations != 1 || notices != 0 || minorPayments != 0 {
 		t.Fatalf("adult declarations=%d notices=%d minor payments=%d", declarations, notices, minorPayments)
 	}
 	var me struct {
@@ -171,7 +172,7 @@ func TestAdultPurchaseNeedsNoDeclaration(t *testing.T) {
 }
 
 // 追加相談の支払いが届いた時に宣言の記録がなければ（宣言の前の支払い画面など）、相談を始めずに返金する。
-func TestMinorConsultationPaymentWithoutDeclarationIsRefunded(t *testing.T) {
+func TestReviewConsultationPaymentDoesNotRecheckLegacyDeclaration(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -197,13 +198,13 @@ func TestMinorConsultationPaymentWithoutDeclarationIsRefunded(t *testing.T) {
 	}
 	var status string
 	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id = $1`, []any{c.ID}, &status)
-	if status != "expired" {
+	if status != "offered" {
 		t.Fatalf("consultation without declaration %s", status)
 	}
 	// 返金は支払いと同じ処理で予約する（Stripe への依頼は tick が行う）。
 	var payment string
 	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id = $1`, []any{c.ID}, &payment)
-	if payment != "refund_pending" && payment != "refunded" {
+	if payment != "paid" {
 		t.Fatalf("payment state %s", payment)
 	}
 }
@@ -243,6 +244,7 @@ func TestMinorRefundSummary(t *testing.T) {
 
 	minorReview := chosenReview(t, h, tm, coach.String(), "card", false)
 	payChosenReview(t, h, minorReview, "card")
+	execSQLArgs(t, `UPDATE review_payments SET minor=true WHERE request_id=$1`, minorReview) // 旧方式の取引のみの集計を確認
 	adultReview := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, adultReview, "card")
 	// 未成年の分を管理画面から、大人の分を自動で返金した状態にする。大人の分は数えない。
@@ -250,11 +252,11 @@ func TestMinorRefundSummary(t *testing.T) {
 	queryRowArgs(t, `SELECT id::text FROM review_payments WHERE request_id = $1`, []any{minorReview}, &minorPayment)
 	execSQLArgs(t, `UPDATE review_payments SET status = 'refunded', captured_at = now(), refunded_at = now() WHERE request_id IN ($1, $2)`, minorReview, adultReview)
 	execSQLArgs(t, `INSERT INTO captured_payment_refunds (id, source, payment_id, payment_intent_id, amount_yen, reason, origin, status)
-		VALUES (gen_random_uuid(), 'review', $1, 'pi_minor_refund', 1500, '保護者から許可のない購入との申立て', 'admin', 'succeeded')`, minorPayment)
+		VALUES (gen_random_uuid(), 'review', $1, 'pi_minor_refund', 500, '保護者から許可のない購入との申立て', 'admin', 'succeeded')`, minorPayment)
 
 	month, total := read()
-	if month.ReviewCount-base.ReviewCount != 1 || month.ReviewAmount-base.ReviewAmount != 1500 ||
-		month.AdminCount-base.AdminCount != 1 || month.AdminAmountYen-base.AdminAmountYen != 1500 ||
+	if month.ReviewCount-base.ReviewCount != 1 || month.ReviewAmount-base.ReviewAmount != 500 ||
+		month.AdminCount-base.AdminCount != 1 || month.AdminAmountYen-base.AdminAmountYen != 500 ||
 		total.ReviewCount-baseTotal.ReviewCount != 1 {
 		t.Fatalf("summary month=%+v total=%+v base=%+v", month, total, base)
 	}

@@ -103,7 +103,7 @@ it.each([
   const root = createRoot(container);
   try {
     await act(async () => root.render(<CoachEarningsSection token="test" onReady={() => {}} />));
-    expect(container.textContent).toContain("動画添削の報酬は1本1,050円、添削後の追加相談は1件420円です");
+    expect(container.textContent).toContain("動画添削の報酬は1本350円（税込）です。");
     expect(container.textContent).toContain("サポートプランの受取額は、代金から手数料25%を差し引いた額です。");
     expect(container.textContent).toContain("翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。");
     expect(container.textContent).toContain("各締切時点の支払額が3,000円未満の場合は翌月以降に繰り越し、累積した支払額が3,000円以上となった締切月の翌月15日に支払います。");

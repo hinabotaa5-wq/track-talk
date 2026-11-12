@@ -260,7 +260,7 @@ func TestReviewInfoRequestExpiresWithoutResubmit(t *testing.T) {
 					t.Fatalf("card canceled=%v status=%s", canceled, reviewPaymentStatus(t, id))
 				}
 			case "paypay":
-				if refunds := f.refundList(); len(refunds) != 1 || refunds[0].Get("amount") != "1500" || reviewPaymentStatus(t, id) != "refunded" {
+				if refunds := f.refundList(); len(refunds) != 1 || refunds[0].Get("amount") != "500" || reviewPaymentStatus(t, id) != "refunded" {
 					t.Fatalf("paypay refunds=%v status=%s", refunds, reviewPaymentStatus(t, id))
 				}
 			}

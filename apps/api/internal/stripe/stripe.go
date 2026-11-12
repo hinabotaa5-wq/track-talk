@@ -177,7 +177,9 @@ type CheckoutParams struct {
 }
 
 type CheckoutSession struct {
-	ID                string            `json:"id"`
+	ID string `json:"id"`
+	// Status は open（支払い中）・complete（完了）・expired（期限切れ）。
+	Status            string            `json:"status"`
 	URL               string            `json:"url"`
 	ExpiresAt         int64             `json:"expires_at"`
 	PaymentStatus     string            `json:"payment_status"`
@@ -253,6 +255,22 @@ type PaymentIntent struct {
 	// requires_capture: 仮押さえ済み。succeeded: 確定済み。canceled: 取り消し済み。
 	Status string `json:"status"`
 	Amount int    `json:"amount"`
+}
+
+// GetCheckoutSession は、支払い画面（Checkout Session）の今の状態を Stripe から読む。
+// 戻り画面で、画面の遷移（success_url）だけで支払いの成否を決めないために使う（本体 #569）。
+func (c Client) GetCheckoutSession(ctx context.Context, id string) (CheckoutSession, error) {
+	if !c.Configured() {
+		return CheckoutSession{}, ErrNotConfigured
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/checkout/sessions/"+url.PathEscape(id), nil)
+	if err != nil {
+		return CheckoutSession{}, err
+	}
+	req.SetBasicAuth(c.Secret, "")
+	var sess CheckoutSession
+	err = c.do(req, &sess)
+	return sess, err
 }
 
 // GetPaymentIntent は、支払いの今の状態を読む。

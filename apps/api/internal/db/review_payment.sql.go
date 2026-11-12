@@ -234,6 +234,49 @@ func (q *Queries) GetReviewPaymentForRefund(ctx context.Context, id uuid.UUID) (
 	return i, err
 }
 
+const listPendingReviewPayments = `-- name: ListPendingReviewPayments :many
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor FROM review_payments WHERE request_id = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 5
+`
+
+// 支払い画面を開いたまま、まだ届いていない支払い（戻り画面で Stripe の状態を確かめる。本体 #569）。
+func (q *Queries) ListPendingReviewPayments(ctx context.Context, requestID *uuid.UUID) ([]ReviewPayment, error) {
+	rows, err := q.db.Query(ctx, listPendingReviewPayments, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReviewPayment
+	for rows.Next() {
+		var i ReviewPayment
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequestID,
+			&i.PayerID,
+			&i.Method,
+			&i.AmountYen,
+			&i.CheckoutSessionID,
+			&i.CheckoutUrl,
+			&i.SessionExpiresAt,
+			&i.PaymentIntentID,
+			&i.Status,
+			&i.AuthorizedAt,
+			&i.CapturedAt,
+			&i.CanceledAt,
+			&i.RefundedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Minor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReviewPaymentsToCapture = `-- name: ListReviewPaymentsToCapture :many
 SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.authorized_at, pay.captured_at, pay.canceled_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.minor FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id

@@ -80,7 +80,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	_, tu := demoRequester(t, h, tadmin)
 
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":1500`) {
+	if !strings.Contains(rec.Body.String(), `"payments":true`) || !strings.Contains(rec.Body.String(), `"price_yen":500`) {
 		t.Fatalf("estimate %s", rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
@@ -91,7 +91,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_intent_data[capture_method]") != "manual" ||
 		form.Get("managed_payments[enabled]") != "false" ||
-		form.Get("line_items[0][price_data][unit_amount]") != "1500" || form.Get("metadata[kind]") != "review" ||
+		form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("metadata[kind]") != "review" ||
 		form.Get("success_url") != "https://web.test/coaching/requests/"+id+"?paid=1" {
 		t.Fatalf("session %v", form)
 	}
@@ -117,7 +117,7 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 		t.Fatalf("captured %v", captured)
 	}
 	rec = doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil)
-	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":1500`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
+	if !strings.Contains(rec.Body.String(), `"payment":{"amount_yen":500`) || !strings.Contains(rec.Body.String(), `"status":"captured"`) {
 		t.Fatalf("detail %s", rec.Body.String())
 	}
 }
@@ -141,12 +141,12 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 	var unpaid reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &unpaid)
 	// 今は PayPay を受け付けないので、支払い画面の作り直しでも PayPay は断る。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay", "guardian_permission": true}); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"method"`) {
 		t.Fatalf("paypay checkout must be rejected %d %s", rec.Code, rec.Body.String())
 	}
 	// 以下は PayPay を再び使えるようにした時のふるまい。
 	allowPayPayForTest(t)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+unpaid.ID+"/checkout", tu, map[string]any{"method": "paypay", "guardian_permission": true}); rec.Code != http.StatusOK {
 		t.Fatalf("checkout again %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -160,7 +160,7 @@ func TestReviewPaymentReleasedWhenOverdue(t *testing.T) {
 		t.Fatalf("canceled %v", canceled)
 	}
 	refunds := f.refundList()
-	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "1500" {
+	if len(refunds) != 1 || refunds[0].Get("payment_intent") != "pi_paypay_2" || refunds[0].Get("amount") != "500" {
 		t.Fatalf("refunds %v", refunds)
 	}
 	if reviewPaymentStatus(t, card) != "canceled" || reviewPaymentStatus(t, paypay) != "refunded" {

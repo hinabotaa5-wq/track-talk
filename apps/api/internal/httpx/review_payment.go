@@ -20,8 +20,10 @@ import (
 // カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
 // PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する（今は受け付けていない。reviewPaymentMethods）。
 
-// 動画添削の料金。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。報酬はこの70%。
-const reviewPriceYen int32 = 1500
+// 動画添削の料金（単発1回）。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。
+// 報酬はこの70%（350円）。チケット（6枚2,500円）で払った回も報酬は同じ350円（本体 #569）。
+// 変えるときは migrations の review_requests.base_price_yen の既定値と、画面の lib/review-pricing.ts も揃える。
+const reviewPriceYen int32 = 500
 
 // 保護者が同意していない18歳未満の、保護者が払う契約の上限（design-review.md「18歳未満の支払い」）。
 // 本人が自分で払う動画添削・追加相談は、この上限ではなく購入のたびの宣言で確かめる（minor_purchase.go）。
@@ -139,14 +141,11 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
-// reviewCheckoutFor は、支払い画面の URL を返す。18歳未満は、購入のたびの宣言（decl）を確かめ、
+// reviewCheckoutFor は、全員の購入前チェック（decl）を確かめ、支払い画面の URL を返す。
 // 支払い画面を作るのと同じトランザクションで宣言を残す。保護者同意の有無と月の上限では止めない。
-// 年齢は、本人ごとのロックの中で確かめ直す。
+// 本人・依頼のロック内で記録し、年齢による分岐は置かない。
 func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string, decl minorDeclarationReq) (string, error) {
-	if !profileIsMinor(p) {
-		return s.reviewCheckoutURL(ctx, s.q, rr, method, false)
-	}
-	if err := requireMinorDeclaration(true, decl.GuardianPermission); err != nil {
+	if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
 		return "", err
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -155,6 +154,11 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	}
 	defer tx.Rollback(ctx)
 	q := s.q.WithTx(tx)
+	// 1つの申込みに支払い画面は1つ（本体 #569）。同時に開き直しても、依頼の行のロックで順に通し、
+	// 2つ目は1つ目が作った画面をそのまま返す（GetReusableReviewPayment）。
+	if _, err := q.LockTicketReview(ctx, rr.ID); err != nil {
+		return "", err
+	}
 	if err := q.LockReviewRequester(ctx, p.ID); err != nil {
 		return "", err
 	}
@@ -162,11 +166,11 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 	if coach == nil {
 		coach = rr.CoachID
 	}
-	if err := recordMinorDeclaration(ctx, q, p, minorPurchase{refType: "review", refID: rr.ID, amount: reviewCashPrice(rr), coachID: coach}, decl); err != nil {
+	if err := recordPurchaseNotice(ctx, q, p, minorPurchase{refType: "review", refID: rr.ID, amount: reviewCashPrice(rr), coachID: coach}, decl); err != nil {
 		return "", err
 	}
 	// 支払いの行もロックを持つ接続で作る。別の接続を待つと、同時に来たときに接続が尽きて止まる。
-	url, err := s.reviewCheckoutURL(ctx, q, rr, method, true)
+	url, err := s.reviewCheckoutURL(ctx, q, rr, method, false)
 	if err != nil {
 		return "", err
 	}
@@ -290,6 +294,13 @@ func (s *Server) releaseReviewPayment(ctx context.Context, pay db.ReviewPayment)
 		if err != nil || kind == "" || pay.PayerID == nil {
 			return err
 		}
+		if kind == "review_cancel" && pay.RequestID != nil {
+			// 期限切れ系の取り消しは期限切れ通知の1通に統合したため、別通知は出さない（本体 #573）。
+			// 実際の返金（review_refund）は資金の移動があるため従来どおり知らせる。
+			if rr, err := q.GetReviewRequest(ctx, *pay.RequestID); err == nil && rr.Status == "expired" {
+				return nil
+			}
+		}
 		notify = pendingRefundID == nil
 		return q.EnqueueReviewRefundNotice(ctx, db.EnqueueReviewRefundNoticeParams{
 			OperationID: pay.ID, PaymentID: pay.ID, Kind: kind, PendingStripeRefundID: pendingRefundID,
@@ -376,4 +387,48 @@ func (s *Server) settleReviewPayments(ctx context.Context) (released int, err er
 		return released, err
 	}
 	return released, nil
+}
+
+// syncReviewPayment は、支払い画面から戻ったとき（成功・キャンセルとも）に呼ぶ。戻った URL ではなく、
+// Stripe の支払い画面の今の状態を読み、完了していれば Webhook と同じ処理（completeReviewCheckout）を通す。
+// Webhook を正とする設計は変えない。同じ処理は何度通しても1回分しか効かないので、Webhook が先でも後でもよい（本体 #569）。
+func (s *Server) syncReviewPayment(w http.ResponseWriter, r *http.Request) {
+	rr, ok := s.requesterReview(w, r)
+	if !ok {
+		return
+	}
+	checkout := ""
+	if s.stripe.Configured() && rr.Status == "awaiting_payment" {
+		pending, err := s.q.ListPendingReviewPayments(r.Context(), &rr.ID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		for _, pay := range pending {
+			sess, err := s.stripe.GetCheckoutSession(r.Context(), pay.CheckoutSessionID)
+			if err != nil {
+				writeCheckoutError(w, fmt.Errorf("%w: %w", errStripe, err))
+				return
+			}
+			if checkout == "" || sess.Status == "complete" {
+				checkout = sess.Status
+			}
+			if sess.ID == pay.CheckoutSessionID && sess.Status == "complete" {
+				if err := s.completeReviewCheckout(r.Context(), sess); err != nil {
+					MapDBError(w, err)
+					return
+				}
+			}
+		}
+		if fresh, err := s.q.GetReviewRequest(r.Context(), rr.ID); err == nil {
+			rr = fresh
+		}
+	}
+	out := s.reviewRequestJSON(rr)
+	if err := s.attachReviewPayment(r.Context(), out, rr.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out["checkout_status"] = checkout
+	JSON(w, http.StatusOK, out)
 }

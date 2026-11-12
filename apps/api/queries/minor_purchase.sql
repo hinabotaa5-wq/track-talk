@@ -18,7 +18,7 @@ SELECT EXISTS (
 -- 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
 UPDATE minor_purchase_declarations d
 SET account_deleted_at = now(),
-    birth_month = (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id),
+    birth_month = CASE WHEN d.text_version = 'purchase-notice-2026-11-13' THEN NULL ELSE (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id) END,
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -26,6 +26,10 @@ SET account_deleted_at = now(),
             UNION ALL
             SELECT max(GREATEST(c.paid_at, CASE WHEN c.payment_state = 'refunded' THEN c.updated_at END)) FROM coaching_consultations c
             WHERE c.requester_id = d.minor_id AND c.contract_id IS NULL AND c.payment_state <> 'unpaid'
+            UNION ALL
+            SELECT max(GREATEST(t.paid_at, (SELECT max(r.updated_at) FROM coaching_ticket_refunds r WHERE r.purchase_id = t.id AND r.status = 'succeeded'))) FROM coaching_ticket_purchases t
+            WHERE t.owner_id = d.minor_id AND t.status IN ('paid', 'partially_refunded', 'refunded')
+              AND d.text_version = 'purchase-notice-2026-11-13'
         ) x
     )
 WHERE d.minor_id = sqlc.arg(user_id) AND d.account_deleted_at IS NULL;

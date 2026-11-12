@@ -60,6 +60,9 @@
   --tt-amber-800: #fde68a;
   --tt-amber-900: #fef3c7;
   --tt-amber-950: #fffbeb;
+
+  /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
+  --tt-star: #eab308;
 }
 
 :root[data-theme="dark"] {
@@ -115,6 +118,9 @@
   --tt-amber-800: #92400e;
   --tt-amber-900: #78350f;
   --tt-amber-950: #451a03;
+
+  /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
+  --tt-star: #facc15;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -171,6 +177,9 @@
     --tt-amber-800: #92400e;
     --tt-amber-900: #78350f;
     --tt-amber-950: #451a03;
+
+    /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
+    --tt-star: #facc15;
   }
 }
 
@@ -463,6 +472,7 @@ body {
   --color-yellow-800: var(--tt-amber-800);
   --color-yellow-900: var(--tt-amber-900);
   --color-yellow-950: var(--tt-amber-950);
+  --color-star: var(--tt-star);
   --font-sans: var(--font-geist-sans);
   /* 一番小さい文字が小さすぎるので、標準の 12px を 13px に上げる。11px 以下は使わない。 */
   --text-xs: 0.8125rem;
@@ -888,4 +898,49 @@ select:-webkit-autofill {
    起動画面のロゴは見せたまま。lib/i18n の localeStartupScript が付け、LocaleProvider が外す（3秒で必ず外れる）。 */
 html.locale-pending body > :not(#startup-splash):not(script) {
   visibility: hidden;
+}
+
+/* コーチ画面のタイル（本体 #580）。3列×4行（最終行は2つ、左寄せ）で、タイルは横幅駆動の正方形。
+   横：コンテナ左右パディング clamp(16px, 4.5vw, 24px)、ギャップ（横・縦とも）clamp(12px, 3.2vw, 16px)。
+   main の px-4（1rem）はそのままにし、足りない分だけ nav 側で足して合計を式どおりにする。
+   列は repeat(3, 1fr) で残り幅いっぱいに広げ、最終行は左寄せのまま（中央寄せ・引き伸ばしなし）。
+   縦：メニュー領域が残りの高さいっぱいに広がり、JS（CoachTiles）が余りを行ギャップ拡大（最大 +8px）→
+   上下パディング拡大（最大 28px）の順で配分し、残りは中央寄せ（align-content: center）で吸収する。
+   上パディングの既定 12px はバッジのはみ出し分（約8px）を確保する。高さ不足の画面では基準値のまま
+   ページ全体でスクロールし、タイルを縮めない。タイル内部も比例して大きくする（文言・アイコン種・色・
+   バッジの位置と見た目・遷移は変えない）。PC 幅は従来どおり。 */
+.coach-tiles > nav {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (width < 48rem) {
+  .coach-tiles {
+    position: relative;
+    flex: 1 1 0%;
+    display: flex;
+    flex-direction: column;
+  }
+  .coach-tiles > nav {
+    flex: 1 1 auto;
+    align-content: center;
+    column-gap: clamp(12px, 3.2vw, 16px);
+    row-gap: var(--coach-row-gap, clamp(12px, 3.2vw, 16px));
+    padding-inline: max(0px, calc(clamp(16px, 4.5vw, 24px) - 1rem));
+    padding-block: var(--coach-pad-block, 12px);
+  }
+  /* タイル内部も比例して大きくする。文言・アイコン種・色・バッジは変えない。 */
+  .coach-tiles > nav > a {
+    gap: 8px;
+    padding: 10px;
+    border-radius: clamp(16px, 4.5vw, 20px);
+  }
+  .coach-tiles > nav > a > svg {
+    width: clamp(30px, 8.5vw, 36px);
+    height: clamp(30px, 8.5vw, 36px);
+  }
+  .coach-tiles > nav > a > .coach-tile-label {
+    font-size: clamp(13px, 3.6vw, 15px);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

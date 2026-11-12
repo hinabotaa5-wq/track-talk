@@ -1,10 +1,12 @@
 "use client";
 
+import { useAuth } from "@/components/auth-provider";
 import { CoachingGate } from "@/components/coaching-gate";
 import { IdentitySession, identityFetch } from "@/components/identity-session";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { CoachIdentity } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -15,7 +17,16 @@ type Viewed = {
   access_logs: { id: number; viewer: string; purpose: string; created_at: string }[];
 };
 
+// 身元情報を表示したら、本体の API に対象コーチの識別子と表示時刻だけを渡し、運営者へ閲覧通知のメールを送る（#431）。
+// 身元情報の値は渡さない。通知は検知のための付随処理なので、失敗しても表示は止めない（API 側で失敗を記録する）。
+function notifyIdentityView(coachID: string, viewedAt: string, mainToken: string | null): Promise<void> {
+  return apiFetch<void>(`/v1/admin/coaching/coaches/${encodeURIComponent(coachID)}/identity-view-notice`, {
+    method: "POST", token: mainToken, body: JSON.stringify({ viewed_at: viewedAt }),
+  }).catch(() => undefined);
+}
+
 function IdentityAdmin({ token }: { token: string }) {
+  const { token: mainToken } = useAuth();
   const [coachID, setCoachID] = useState("");
   const [purpose, setPurpose] = useState("");
   const [viewed, setViewed] = useState<Viewed | null>(null);
@@ -32,7 +43,9 @@ function IdentityAdmin({ token }: { token: string }) {
     setMessage("");
     setError("");
     try {
-      setViewed(await identityFetch<Viewed>(`${path}/identity`, token, "POST", { purpose }));
+      const result = await identityFetch<Viewed>(`${path}/identity`, token, "POST", { purpose });
+      setViewed(result);
+      void notifyIdentityView(coachID.trim(), result.access_logs[0]?.created_at ?? new Date().toISOString(), mainToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込めませんでした");
     } finally {

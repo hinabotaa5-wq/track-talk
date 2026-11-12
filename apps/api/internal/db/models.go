@@ -499,17 +499,22 @@ type CoachingTicketLedger struct {
 	ConsumedDelta  int32     `json:"consumed_delta"`
 	RefundedDelta  int32     `json:"refunded_delta"`
 	CreatedAt      time.Time `json:"created_at"`
+	ExpiredDelta   int32     `json:"expired_delta"`
 }
 
 type CoachingTicketLot struct {
-	ID        uuid.UUID  `json:"id"`
-	OwnerID   *uuid.UUID `json:"owner_id"`
-	Quantity  int32      `json:"quantity"`
-	Available int32      `json:"available"`
-	Reserved  int32      `json:"reserved"`
-	Consumed  int32      `json:"consumed"`
-	Refunded  int32      `json:"refunded"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID           uuid.UUID  `json:"id"`
+	OwnerID      *uuid.UUID `json:"owner_id"`
+	Quantity     int32      `json:"quantity"`
+	Available    int32      `json:"available"`
+	Reserved     int32      `json:"reserved"`
+	Consumed     int32      `json:"consumed"`
+	Refunded     int32      `json:"refunded"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ExpiresAt    *time.Time `json:"expires_at"`
+	Expired      int32      `json:"expired"`
+	Reminded30At *time.Time `json:"reminded_30_at"`
+	Reminded7At  *time.Time `json:"reminded_7_at"`
 }
 
 type CoachingTicketProduct struct {
@@ -536,17 +541,23 @@ type CoachingTicketPurchase struct {
 	PaidAt            *time.Time `json:"paid_at"`
 	RefundedYen       int32      `json:"refunded_yen"`
 	CreatedAt         time.Time  `json:"created_at"`
+	WordingVersion    *string    `json:"wording_version"`
 }
 
 type CoachingTicketRefund struct {
-	ID             uuid.UUID `json:"id"`
-	PurchaseID     uuid.UUID `json:"purchase_id"`
-	Quantity       int32     `json:"quantity"`
-	AmountYen      int32     `json:"amount_yen"`
-	Status         string    `json:"status"`
-	StripeRefundID *string   `json:"stripe_refund_id"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	PurchaseID        uuid.UUID  `json:"purchase_id"`
+	Quantity          int32      `json:"quantity"`
+	AmountYen         int32      `json:"amount_yen"`
+	Status            string     `json:"status"`
+	StripeRefundID    *string    `json:"stripe_refund_id"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	PostExpiry        bool       `json:"post_expiry"`
+	ManualYen         int32      `json:"manual_yen"`
+	ManualMethod      *string    `json:"manual_method"`
+	ManualPaidOn      *time.Time `json:"manual_paid_on"`
+	ManualCompletedAt *time.Time `json:"manual_completed_at"`
 }
 
 type CoachingTicketReservation struct {

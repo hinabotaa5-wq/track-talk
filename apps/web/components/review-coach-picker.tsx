@@ -12,10 +12,9 @@ export function ReviewCoachPicker({ coaches, value, onChange, disabled, error, l
 }) {
   return <fieldset disabled={disabled} className="space-y-3 rounded-xl border border-white/20 bg-white/5 p-4">
     <legend className="px-1 text-sm font-semibold">{L("コーチを選ぶ")}</legend>
-    <p className="text-sm text-slate-200">{L("選んだコーチに依頼が届きます。料金はどのコーチでも同じです。並び順は毎日入れ替わります。")}</p>
     {loading ? <p className="text-sm" role="status">{L("受付中のコーチを確認中...")}</p>
       : error ? <p role="alert" className="text-sm text-red-400">{error}</p>
-      : coaches.length === 0 ? <p className="text-sm text-slate-300">{L("この種目でいま受付中のコーチはいません。時間をおいて開き直してください。")}</p>
+      : coaches.length === 0 ? <p className="text-sm text-slate-300">{L("この種目で受付中のコーチはいません。")}</p>
       : <ul className="space-y-2">
         {coaches.map((c) => {
           const picked = c.id === value;

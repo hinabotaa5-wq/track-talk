@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 // コーチ画面。承認されたコーチの入口はタイルの1画面にし、中身はタイル先の個別画面で扱う。
 // 返答と補足は /coach/requests/{id} で書く。パーソナル指導の申し込みへの返事と、プランの作成は個別画面でする。
@@ -78,10 +78,10 @@ function Tile({
     <Link
       href={href}
       aria-label={ariaLabel}
-      className="relative flex flex-col items-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
+      className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
     >
       <Icon className="size-6" aria-hidden />
-      <span className="text-[11px] font-semibold leading-tight">{label}</span>
+      <span className="coach-tile-label whitespace-nowrap text-[11px] font-semibold leading-tight">{label}</span>
       {count > 0 ? (
         <span
           aria-hidden
@@ -94,6 +94,59 @@ function Tile({
         <span aria-hidden className="absolute -right-1 -top-1 size-3 rounded-full bg-amber-400" />
       ) : null}
     </Link>
+  );
+}
+
+// タイルの枠（本体 #580）。タイルは横幅駆動（repeat(3, 1fr)＋正方形）で、大きさは CSS が決める。
+// JS は縦の余りだけ配分する：行ギャップを最大 +8px → 上下パディングを最大 28px → 残りは中央寄せ
+// （align-content: center、globals.css の .coach-tiles）。タイルの大きさは期限アラート帯の有無で変えない
+// （横幅駆動なので高さの影響を受けない）。高さ不足の画面では基準値のままにしてページ全体でスクロールする
+// （タイルを縮めない）。basePadBlock は CSS の --coach-pad-block の既定とそろえる。
+const basePadBlock = 12;
+const maxPadBlock = 28;
+const maxGapAdd = 8;
+function CoachTiles({ label, children }: { label: string; children: ReactNode }) {
+  const [vertical, setVertical] = useState<{ rowGap: number; padBlock: number } | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const compute = () => {
+      const nav = el.firstElementChild;
+      const tile = nav?.firstElementChild;
+      if (!nav || !tile) return;
+      const rowGapBase = Math.min(16, Math.max(12, window.innerWidth * 0.032));
+      const tileSide = tile.getBoundingClientRect().width;
+      if (!(tileSide > 0)) return;
+      const natural = tileSide * 4 + rowGapBase * 3 + basePadBlock * 2;
+      const leftover = el.clientHeight - natural;
+      if (!(leftover > 0)) {
+        setVertical((v) => (v === null ? v : null));
+        return;
+      }
+      const gapAdd = Math.min(maxGapAdd, leftover / 3);
+      const padAdd = Math.min(maxPadBlock - basePadBlock, (leftover - gapAdd * 3) / 2);
+      const next = { rowGap: rowGapBase + gapAdd, padBlock: basePadBlock + padAdd };
+      setVertical((v) =>
+        v !== null && Math.abs(v.rowGap - next.rowGap) < 0.05 && Math.abs(v.padBlock - next.padBlock) < 0.05 ? v : next,
+      );
+    };
+    const observer = new ResizeObserver(compute);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="coach-tiles">
+      <nav
+        aria-label={label}
+        className="grid gap-2"
+        style={
+          vertical
+            ? ({ "--coach-row-gap": `${vertical.rowGap}px`, "--coach-pad-block": `${vertical.padBlock}px` } as CSSProperties)
+            : undefined
+        }
+      >
+        {children}
+      </nav>
+    </div>
   );
 }
 
@@ -212,8 +265,12 @@ export function CoachDashboard() {
   const payoutsDot = !coach.payouts_ready;
   const [, payoutMonth, payoutDay] = earnings?.next_payout_date?.split("-") ?? [];
 
+  // スマホでは、ランチャーをヘッダーと下部ナビの間の高さいっぱいに広げる（本体 #580）。
+  // main を縦の flex にし（app/layout.tsx の coach-launcher）、タイルの枠が残りの高さを占める。
+  // タイルは3列の正方形で横幅いっぱいに広げ、縦の余りは行ギャップ→上下パディング→中央寄せの順で吸収する
+  // （CoachTiles と globals.css の .coach-tiles）。収まらない低い画面ではタイルを縮めず、ページ全体が縦にスクロールする。
   return (
-    <div className="mx-auto max-w-md space-y-3">
+    <div className="coach-launcher mx-auto flex w-full max-w-md flex-col gap-3 max-md:flex-1">
       <section aria-label={t(locale, "coach.status")} className="space-y-2 rounded-2xl border border-white/20 glass bg-white/10 p-3">
         <div className="flex items-center gap-3">
           <CoachAvatar url={coach.photo_url} name={coach.name || profile?.nickname || null} size={40} />
@@ -269,7 +326,7 @@ export function CoachDashboard() {
         </Link>
       ) : null}
 
-      <nav aria-label={t(locale, "coach.menu")} className="grid grid-cols-4 gap-2">
+      <CoachTiles label={t(locale, "coach.menu")}>
         <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
@@ -281,7 +338,7 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
-      </nav>
+      </CoachTiles>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">
         {earnings ? (
