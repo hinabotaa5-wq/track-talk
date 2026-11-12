@@ -26,11 +26,17 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
-it("添削のコーチからコーチ詳細へ直接進み、成績や指導経験と表示する", async () => {
+it("添削のコーチからコーチ詳細へ直接進み、種目・記録・実績を行並びで表示する", async () => {
   await act(async () => root.render(<ReviewCoachCard coach={coach} />));
   const link = [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("このコーチのプロフィールを見る"));
   expect(link?.getAttribute("href")).toBe("/coaches/coach-1");
-  expect(container.textContent).toContain("成績や指導経験");
+  expect(container.textContent).toContain("テストコーチ");
+  expect(container.textContent).toContain("100m");
+  expect(container.textContent).toContain("10秒台");
+  expect(container.textContent).toContain("全国大会出場");
+  expect(container.textContent).not.toContain("見てくれたコーチ");
+  expect(container.textContent).not.toContain("担当種目");
+  expect(container.textContent).not.toContain("成績や指導経験");
 });
 
 it("コーチ一覧を閉じている間は、準備中のコーチ詳細へ案内しない", async () => {

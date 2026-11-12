@@ -311,12 +311,10 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review expired notification", "err", err)
 	}
-	body := "返却の目安までに引き受けるコーチが見つかりませんでした"
-	if rr.OldStatus == "in_review" {
-		body = "返却の目安までにコーチの返答が届きませんでした"
-	}
+	// 期限切れ系の通知は1通に統合する（本体 #573）。取り消しの別通知は出さない。
+	body := "フォーム添削の依頼が期限切れになりました"
 	if s.stripe.Configured() {
-		body += "。お支払いは取り消します（PayPay は返金します）"
+		body += "。カードの仮押さえは取り消しました"
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",

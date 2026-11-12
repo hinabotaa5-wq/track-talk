@@ -1,10 +1,8 @@
 "use client";
 
-import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
+import { useSolicitationGuard } from "@/components/contact-notice";
 import { WorkOrderView } from "@/components/work-order-terms";
 import { PageLoading } from "@/components/page-loading";
-
-import { CoachingConsultations } from "@/components/coaching-consultations";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachInfoRequestForm, ReviewInfoHistory } from "@/components/review-info-request";
@@ -132,9 +130,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       <p className="text-xs text-slate-300">
         {t(locale, "coach.detail.contactNote")}
       </p>
-      <ContactNotice />
       {guard.warning}
-      <p className="text-xs text-slate-300">{t(locale, "coach.detail.responseNote")}</p>
       <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} />
       <Field label={t(locale, "coach.detail.fix1")} value={fix1} onChange={setFix1} error={errors.fix_points} />
       <Field label={t(locale, "coach.detail.fix2")} value={fix2} onChange={setFix2} />
@@ -187,7 +183,7 @@ function ClarificationForm({ request, token, onSent, locale }: { request: CoachR
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <ContactNotice />
+      <p className="text-xs text-slate-300">{L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}</p>
       {guard.warning}
       <Field label={t(locale, "coach.detail.followup")} value={text} onChange={setText} error={errors.clarification} />
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
@@ -279,8 +275,6 @@ export default function CoachReviewRequestPage() {
           {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={setRequest} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
         </section>
       ) : null}
-
-      <CoachingConsultations rootID={request.id} kind="review" token={token} />
 
       <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
         {t(locale, "coach.detail.toCoach")}

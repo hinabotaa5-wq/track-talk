@@ -1,7 +1,7 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
+import { useSolicitationGuard } from "@/components/contact-notice";
 import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { SellerNote } from "@/components/seller-note";
 import { PageLoading } from "@/components/page-loading";
@@ -9,7 +9,6 @@ import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { DemoCodeForm } from "@/components/coaching-demo";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
-import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { PurchaseConfirm } from "@/components/purchase-confirm";
 import { TicketBalance } from "@/components/ticket-balance";
 import { ArrowRight } from "lucide-react";
@@ -245,7 +244,6 @@ export default function NewReviewRequestPage() {
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
         <h1 className="text-2xl font-bold">{L("動画添削を頼む")}</h1>
-        <p className="text-sm text-slate-300">{L("コーチを選んで、動画を送ります。料金はどのコーチでも同じです。")}</p>
         {reviewOpen ? <SellerNote /> : null}
       </div>
 
@@ -288,7 +286,6 @@ export default function NewReviewRequestPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-300">{L("最初は100mだけです。コーチが増えしだい、種目を増やします。")}</p>
           </fieldset>
 
           <ReviewCoachPicker coaches={coaches} value={coachID} onChange={setCoachID} disabled={pending} error={coachesError} loading={coachesLoading} />
@@ -298,7 +295,7 @@ export default function NewReviewRequestPage() {
           </div>
           <label className="block space-y-2 text-sm">
             <span className="font-semibold">{L("相談内容")}</span>
-            <ContactNotice />
+            <span className="block text-xs text-slate-300">{L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}</span>
             {guard.warning}
             <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} maxLength={1000} required disabled={pending} placeholder={L("例：後半にスピードが落ちます。動画を見て、改善点や練習方法を教えてください。")} />
             <span className="block text-xs text-slate-300">{L("{length}/1000文字", { length: question.length })}</span>
@@ -351,11 +348,9 @@ export default function NewReviewRequestPage() {
                 ))}
               </div>
               <p className="text-xs text-slate-300">
-                {method === "tickets" ? L("依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。") : method === "card"
-                  ? L("送るとお支払いの画面に進みます。カードは送った時点では仮押さえだけで、返ってきた時に確定します。目安までに返ってこなければ取り消すので、代金はかかりません。")
-                  : L("送るとお支払いの画面に進み、その場でお支払いが済みます。目安までに返ってこなければ全額を返金します。")}
+                {method === "tickets" ? L("依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。")
+                  : L("送ると支払い画面に進みます。料金は返答が返ってきた時点で確定し、期限までに返答がなければ自動で取り消され、料金はかかりません。")}
               </p>
-              {estimate?.payments ? <ReviewPayNotice /> : null}
             </fieldset>
           ) : (
             <p className="text-xs text-slate-300">{L("デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。")}</p>

@@ -63,7 +63,7 @@ export function CoachWithdrawForm({
     <details className="rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <summary className="cursor-pointer font-semibold">{L("この依頼を辞退する")}</summary>
       <form onSubmit={onSubmit} className="mt-3 space-y-3">
-        <p className="text-xs text-slate-300">{L("体調不良などで返却できなくなったときに使います。辞退すると依頼はすぐに終了し、依頼者に知らせます。代金は取り消し（PayPay は返金）、別のコーチには回りません。")}</p>
+        <p className="text-xs text-slate-300">{L("辞退すると依頼はすぐに終了し、代金は取り消します（PayPayは返金）。別のコーチには回りません。")}</p>
         <label className="block space-y-1">
           <span className="text-xs text-slate-300">{L("依頼者へのひとこと（任意）")}</span>
           <Textarea

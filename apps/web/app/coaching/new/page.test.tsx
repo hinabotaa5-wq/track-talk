@@ -50,22 +50,23 @@ it("18歳以上には、保護者の許可のチェックを出さない", async
   expect(container.textContent).not.toContain("保護者に許可をもらいました");
 });
 
-it("支払い方法はカードだけを出し、PayPay は対応予定の案内だけを出す", async () => {
+it("支払い方法はカードだけを出し、PayPay の案内は出さない", async () => {
   mocks.me = { demo: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
   const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
   const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
   expect(choices).toEqual(["カード・Apple Pay・Google Pay"]);
-  expect(container.textContent).toContain("販売者: TrackTalk の運営者");
+  expect(container.textContent).toContain("販売者: 中窪日向（TrackTalk運営者）");
   expect(container.querySelector('a[href="/legal/commerce"]')).not.toBeNull();
-  expect(container.textContent).toContain("現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。");
+  expect(container.textContent).toContain("送ると支払い画面に進みます。料金は返答が返ってきた時点で確定し、期限までに返答がなければ自動で取り消され、料金はかかりません。");
+  expect(container.textContent).not.toContain("PayPay");
 });
 
 it("デモの招待コード画面には販売者の表記とリンクを出さない", async () => {
   mocks.me = { demo: false, review_open: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("動画添削を頼む");
-  expect(container.textContent).toContain("コーチを選んで、動画を送ります。料金はどのコーチでも同じです。");
+  expect(container.textContent).not.toContain("コーチを選んで、動画を送ります");
   expect(container.textContent).toContain("フォーム添削は準備中です");
   expect(container.querySelector('input[aria-label="招待コード"]')).not.toBeNull();
   expect(container.querySelector('button[type="submit"]')?.textContent).toBe("デモに参加する");
