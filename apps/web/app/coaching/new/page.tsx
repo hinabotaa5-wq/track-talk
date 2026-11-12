@@ -3,7 +3,6 @@ import { L } from "@/lib/i18n";
 
 import { useSolicitationGuard } from "@/components/contact-notice";
 import { ReviewCoachPicker } from "@/components/review-coach-picker";
-import { SellerNote } from "@/components/seller-note";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
@@ -28,10 +27,11 @@ import {
   videoDuration,
 } from "@/lib/review";
 import type { TicketSummary } from "@/lib/coaching-tickets";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatYen } from "@/lib/format";
 import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity, ticketValidityMonths } from "@/lib/review-pricing";
 import { reviewConfirmRows } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import { looksLikeContact } from "@/lib/solicitation";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -47,7 +47,7 @@ const maxBytes = 100 * 1024 * 1024;
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
-    on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
+    on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
 export default function NewReviewRequestPage() {
@@ -58,6 +58,7 @@ export default function NewReviewRequestPage() {
   const tier = "coach";
   const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
   const [question, setQuestion] = useState("");
+  const [contactBlocked, setContactBlocked] = useState(false);
   const guard = useSolicitationGuard();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
@@ -136,7 +137,7 @@ export default function NewReviewRequestPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // 枠と種目を選ぶと、返却期限（送った時刻から24時間後）と、いま受付中のコーチがいるかを出す。
+  // 枠と種目に対応する料金・支払い情報を取得する。
   useEffect(() => {
     if (!token || !reviewOpen) return;
     let cancelled = false;
@@ -163,8 +164,15 @@ export default function NewReviewRequestPage() {
   }
 
   // 入力を確かめて、最終確認を出す（確認のいらないデモ版はそのまま送る）。
-  function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (looksLikeContact(question)) {
+      setError("");
+      setContactBlocked(true);
+      const input = e.currentTarget.elements.namedItem("question");
+      if (input instanceof HTMLTextAreaElement) input.focus();
+      return;
+    }
     if (!validate()) return;
     if (needsConfirm) { setConfirming(true); return; }
     void send();
@@ -244,7 +252,6 @@ export default function NewReviewRequestPage() {
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
         <h1 className="text-2xl font-bold">{L("動画添削を頼む")}</h1>
-        {reviewOpen ? <SellerNote /> : null}
       </div>
 
       {!reviewOpen ? (
@@ -256,12 +263,16 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, dueAt: estimate?.due_at, nextExpiry: ticketSummary?.next_expiry })}
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, nextExpiry: ticketSummary?.next_expiry })}
             confirmLabel={method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
-          />
+          >
+            <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
+              {L("特定商取引法に基づく表記")}
+            </Link>
+          </PurchaseConfirm>
           {upload ? (
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
@@ -285,13 +296,28 @@ export default function NewReviewRequestPage() {
             <p>{L("動画添削（動画1本）")}</p>
             <p className="mt-1 text-lg font-bold">{L("{v0}／回", { v0: formatYen(totalPrice) })}</p>
           </div>
-          <label className="block space-y-2 text-sm">
-            <span className="font-semibold">{L("相談内容")}</span>
-            <span className="block text-xs text-slate-300">{L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}</span>
-            {guard.warning}
-            <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} maxLength={1000} required disabled={pending} placeholder={L("例：後半にスピードが落ちます。動画を見て、改善点や練習方法を教えてください。")} />
+          <div className="space-y-2 text-sm">
+            <label htmlFor="review-question" className="block font-semibold">{L("相談内容")}</label>
+            {!contactBlocked && guard.warning}
+            <Textarea
+              id="review-question"
+              name="question"
+              value={question}
+              onChange={(e) => { setQuestion(e.target.value); setContactBlocked(false); }}
+              aria-invalid={contactBlocked || undefined}
+              aria-describedby={contactBlocked ? "review-question-contact-error" : undefined}
+              rows={4}
+              maxLength={1000}
+              required
+              disabled={pending}
+            />
+            {contactBlocked ? (
+              <span id="review-question-contact-error" role="alert" className="block text-sm text-red-400">
+                {L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}
+              </span>
+            ) : null}
             <span className="block text-xs text-slate-300">{L("{length}/1000文字", { length: question.length })}</span>
-          </label>
+          </div>
 
           {ticketSummary && ticketsUsable ? <div className="space-y-2 text-sm">
             <TicketBalance summary={ticketSummary} />
@@ -322,15 +348,13 @@ export default function NewReviewRequestPage() {
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
           {estimate ? (
-            <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">{L("返却期限:")}{" "}{formatDateTime(estimate.due_at)}
-              <span className="block text-xs text-slate-300">
-                {coach ? L("選んだコーチが対応します。期限までに回答がなければ代金はかかりません。") : L("送ってから24時間以内に返ってきます。")}
-              </span>
+            <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
+              {L("送ってから24時間以内に返ってきます。")}
             </p>
           ) : null}
           {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
-              <legend className="text-sm font-semibold">{L("お支払い（合計 {v0}）", { v0: formatYen(totalPrice) })}</legend>
+              <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
               <div className="flex flex-wrap gap-2">
                 {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>{L("チケット（1枚）")}</button> : null}
                 {(estimate?.payments ? availableReviewPayMethods : []).map((m) => (
@@ -339,16 +363,12 @@ export default function NewReviewRequestPage() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-300">
-                {method === "tickets" ? L("依頼時にチケットを確保し、返答が届いた時点で消費します。期限内に返答がなければ自動で戻ります。")
-                  : L("送ると支払い画面に進みます。料金は返答が返ってきた時点で確定し、期限までに返答がなければ自動で取り消され、料金はかかりません。")}
-              </p>
             </fieldset>
           ) : (
             <p className="text-xs text-slate-300">{L("デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。")}</p>
           )}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-          <Button type="submit" className="w-full" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
+          <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}
           </Button>
         </form>

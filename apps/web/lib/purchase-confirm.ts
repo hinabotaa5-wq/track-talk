@@ -1,5 +1,6 @@
 import { L } from "@/lib/i18n";
 import { formatDateTime, formatYen } from "@/lib/format";
+import { reviewPayMethodLabels } from "@/lib/review";
 import type { TicketNextExpiry } from "@/lib/coaching-tickets";
 
 // チケットの払戻しの例外4項目（本体 #572 v3）。販売画面と最終確認画面に同じ順で箇条書きする。
@@ -26,15 +27,15 @@ export type ReviewConfirmInput = {
   method: "card" | "paypay" | "tickets";
   priceYen: number;
   coachName?: string;
-  dueAt?: string;
   // チケットで払うとき、確保される1枚の有効期限（いちばん早く失効する分から使う）。旧商品の分は期限なし。
   nextExpiry?: TicketNextExpiry | null;
 };
 
-export function reviewConfirmRows({ method, priceYen, coachName, dueAt, nextExpiry }: ReviewConfirmInput): ConfirmRow[] {
-  const due = dueAt ? formatDateTime(dueAt) : L("申込みから24時間後");
+export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry }: ReviewConfirmInput): ConfirmRow[] {
+  const due = L("申込みから24時間後");
   const rows: ConfirmRow[] = [
     { label: L("内容"), value: coachName ? L("動画添削1回（動画1本・担当 {coachName}）", { coachName }) : L("動画添削1回（動画1本）") },
+    { label: L("返却期限"), value: L("申込みから24時間以内") },
   ];
   if (method === "tickets") {
     rows.push(
@@ -45,11 +46,14 @@ export function reviewConfirmRows({ method, priceYen, coachName, dueAt, nextExpi
     );
     return rows;
   }
-  rows.push({ label: L("総額"), value: L("{v0}（税込）", { v0: formatYen(priceYen) }) });
+  rows.push(
+    { label: L("総額"), value: L("{v0}（税込）", { v0: formatYen(priceYen) }) },
+    { label: L("お支払い方法"), value: reviewPayMethodLabels[method] },
+  );
   if (method === "card") {
     rows.push(
       { label: L("確定のタイミング"), value: L("次の画面でカードの代金を確保（仮押さえ）し、コーチが返却した時に確定します。") },
-      { label: L("取消し・返金"), value: L("返却期限（{due}）までに返却がない場合や、コーチが辞退した場合は、確保を取り消すので代金はかかりません。返却された後の返金は、利用規約に定める場合に限ります。", { due }) },
+      { label: L("取消し・返金"), value: L("返却期限（{due}）までに返却がない場合や、コーチが辞退した場合は、自動で確保を取り消すので代金はかかりません。返却された後の返金は、利用規約に定める場合に限ります。", { due }) },
     );
   } else {
     rows.push(
