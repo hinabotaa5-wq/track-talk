@@ -21,7 +21,7 @@ export function CoachAboutView() {
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("動画添削プラン：動画1本から支える")}</h3>
           <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容、動画を送ります。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1本500円で、コーチの報酬はその70％（350円）です。利用者がチケットで申し込んだ添削も、報酬は同じ350円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
-          <p className="text-sm leading-relaxed text-slate-200">{L("コーチは届いた依頼を確認し、対応できるものを引き受けます。動画を見て、良い点・直す点・おすすめのドリルを返し、選手が次の練習で試せる具体的な一歩を伝えます。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください。")}</p>
         </article>
         <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><UserRound className="size-5 text-blue-300" aria-hidden />{L("サポートプラン：あなたに相談したい人を支える")}</h3>
@@ -35,7 +35,7 @@ export function CoachAboutView() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("自分のペースで、責任を持って")}</h2>
-        <p className="text-sm leading-relaxed text-slate-200">{L("動画添削は、受付のオン・オフと1日の上限で、受ける量を調整できます。受付中で上限に届いていないときだけ、選手の一覧に表示されます。サポートプランは対応できる内容と定員を自分で決めます。引き受けた依頼では期限を守り、選手の経験や目標に合わせて、分かりやすい言葉で伝えてください。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("動画添削は受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。サポートプランは対応できる内容と定員を自分で決めます。")}</p>
         <p className="text-sm leading-relaxed text-slate-200">{L("やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。")}</p>
       </section>
 

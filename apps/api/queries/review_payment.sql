@@ -29,8 +29,9 @@ RETURNING *;
 -- 支払いが届いたら、割り当ての待ち行列に入れる。目安を過ぎていたら入れない（行が返らない）。
 UPDATE review_requests
 SET status = 'queued',
+    due_at = now() + interval '24 hours',
     updated_at = now()
-WHERE id = $1 AND status = 'awaiting_payment' AND due_at > now()
+WHERE id = $1 AND status = 'awaiting_payment'
 RETURNING *;
 
 -- name: MarkReviewPaymentCaptured :one

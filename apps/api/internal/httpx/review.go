@@ -79,6 +79,8 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"event":              rr.Event,
 		"focus":              rr.Focus,
 		"question":           rr.Question,
+		"started_at":         rr.StartedAt,
+		"canceled_at":        rr.CanceledAt,
 		"status":             rr.Status,
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
@@ -418,6 +420,13 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if !payments {
+		rr, err = s.assignReview(r.Context(), q, rr)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
@@ -446,13 +455,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		JSON(w, http.StatusCreated, out)
 		return
 	}
-	if offered, err := s.offerReview(r.Context(), rr.ID); err != nil {
-		slog.Warn("review offer after create", "err", err)
-	} else if offered {
-		if fresh, err := s.q.GetReviewRequest(r.Context(), rr.ID); err == nil {
-			rr = fresh
-		}
-	}
+	s.sendPendingOutbox(r.Context(), pushOutboxBatch)
 	JSON(w, http.StatusCreated, s.reviewRequestJSON(rr))
 }
 
@@ -512,7 +515,7 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if overdue {
 		ctx := context.WithoutCancel(r.Context())
-		if overdue, err := s.q.ExpireOverdueReviewRequests(ctx); err != nil {
+		if overdue, err := s.expireOverdueReviews(ctx); err != nil {
 			slog.Warn("expire overdue reviews on read", "err", err)
 		} else {
 			for _, o := range overdue {

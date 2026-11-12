@@ -349,7 +349,7 @@ export default function NewReviewRequestPage() {
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
           {estimate ? (
             <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
-              {L("送ってから24時間以内に返ってきます。")}
+              {L("依頼がコーチの対応中一覧に表示されてから24時間以内に返却します。")}
             </p>
           ) : null}
           {estimate?.payments || ticketsUsable ? (

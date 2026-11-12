@@ -20,6 +20,7 @@ const base = {
   focus: [],
   question: "スタートが遅いです",
   status: "in_review",
+  started_at: "2026-11-13T12:01:00+09:00",
   due_at: "2026-11-14T12:00:00+09:00",
   created_at: "2026-11-13T12:00:00+09:00",
   info_request: null,
@@ -162,4 +163,15 @@ it("差し戻すと完了バナーが履歴の前に出る", async () => {
   expect(scroll).toHaveBeenCalled();
   const text = container.textContent!;
   expect(text.indexOf("差し戻しました")).toBeLessThan(text.indexOf("差し戻し中"));
+});
+
+it("添削をはじめると入力欄を表示する", async () => {
+  apiFetch.mockImplementation(async (_path: string, options?: { method?: string }) =>
+    options?.method === "POST" ? base : { ...base, started_at: null },
+  );
+  await renderPage();
+  expect(container.textContent).not.toContain("返答を送る");
+  await act(async () => submitButton("添削をはじめる").click());
+  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests/r1/start", { method: "POST", token: "t" });
+  expect(container.textContent).toContain("返答を送る");
 });

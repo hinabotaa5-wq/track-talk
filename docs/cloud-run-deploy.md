@@ -83,7 +83,7 @@ gcloud run services describe track-talk-api --region asia-northeast1 \
 
 ## フォーム添削の tick
 
-フォーム添削の打診（引受期限90分）と返却目安の期限切れは、Cloud Scheduler が1分ごとに API を呼んで片付けます。API は使われないときに0台まで縮むので、自分で時計を持てないためです。setup.sh のあと、Cloud Shell で一度だけ流します。
+フォーム添削の24時間の期限切れ・残り12時間と4時間のリマインドは、Cloud Scheduler が1分ごとに API を呼んで処理します。setup.sh のあと、Cloud Shell で一度だけ流します。
 
 ```bash
 PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
@@ -91,7 +91,7 @@ PROJECT_ID=<プロジェクトID> bash deploy/cloud-run/coaching-tick.sh
 
 秘密の値を作って API の `COACHING_TICK_SECRET` に入れ、同じ値をヘッダーに付けて `/internal/coaching/tick` を呼ぶジョブ `track-talk-coaching-tick` を作ります。Schedulerの料金・無料枠は作成前に確認してください。止めるときは `gcloud scheduler jobs pause track-talk-coaching-tick --location asia-northeast1`。
 
-tick が止まっていても、依頼した人が依頼を開いたときに期限切れの処理を行い、期限の過ぎた打診は引き受けられません。指名制では、辞退・打診期限切れの依頼は終了してカードの仮押さえ取消しまたはPayPayの全額返金を行い、別のコーチへ再割当てしません。利用者は独立した新規申込みとして改めて申し込めます。tick は期限処理に加え、決済の確定・取消し・返金の再試行も担うため、画面を開いたときの処理だけで代用しません。
+tick が遅れている場合、依頼を開いた時にも期限切れを処理します。期限切れで新規受付を自動でオフにし、決済の取消し・返金やチケットの返還は定期処理が担います。
 
 ## 見慣れない DB 接続の見回り
 

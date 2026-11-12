@@ -65,25 +65,25 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 				form.Get("payment_method_types[0]") != method {
 				t.Fatalf("session %v", form)
 			}
-			if len(coachRequests(t, h, tc).Offers) != 0 {
+			if len(coachRequests(t, h, tc).Reviewing) != 0 {
 				t.Fatal("offered before payment")
 			}
 			payChosenReview(t, h, id, method)
 			payChosenReview(t, h, id, method)
-			offers := coachRequests(t, h, tc).Offers
-			if len(offers) != 1 || offers[0].Request.ID != id || len(coachRequests(t, h, other).Offers) != 0 {
+			offers := coachRequests(t, h, tc).Reviewing
+			if len(offers) != 1 || offers[0].ID != id || len(coachRequests(t, h, other).Reviewing) != 0 {
 				t.Fatalf("wrong assignment %+v", offers)
 			}
 			var requests, offerRows, payments int
 			queryRowArgs(t, `SELECT (SELECT count(*) FROM review_requests), (SELECT count(*) FROM review_offers), (SELECT count(*) FROM review_payments)`, nil, &requests, &offerRows, &payments)
-			if requests != 1 || offerRows != 1 || payments != 1 {
+			if requests != 1 || offerRows != 0 || payments != 1 {
 				t.Fatalf("duplicates requests=%d offers=%d payments=%d", requests, offerRows, payments)
 			}
-			list := doJSON(t, h, "GET", "/v1/coach/requests", tc, nil).Body.String()
+			list := doJSON(t, h, "GET", "/v1/coach/requests/"+id, tc, nil).Body.String()
 			if !strings.Contains(list, `"coach_reward_yen":350`) || !strings.Contains(list, "350円（税込）") {
 				t.Fatalf("offer terms %s", list)
 			}
-			if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != 200 {
+			if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); r.Code != 200 {
 				t.Fatal(r.Body.String())
 			}
 			if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+id+"/response", tc, responseBody()); r.Code != 200 {
@@ -126,23 +126,19 @@ func TestReviewRandomAssignOff(t *testing.T) {
 	// 切り替える前に送られた、コーチを選んでいない依頼。
 	id := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, id, "card")
-	offers := coachRequests(t, h, tc).Offers
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/decline", tc, nil); r.Code != 204 {
-		t.Fatal(r.Body.String())
-	}
-	execSQLArgs(t, `UPDATE review_requests SET status='queued', requested_coach_id=NULL, requested_coach_name='' WHERE id=$1`, id)
-	execSQLArgs(t, `DELETE FROM review_offers WHERE request_id=$1`, id)
+
+	execSQLArgs(t, `UPDATE review_requests SET status='queued', coach_id=NULL, requested_coach_id=NULL, requested_coach_name='' WHERE id=$1`, id)
 	if r := tick(t, h, "tick-secret"); r.Code != 200 || !strings.Contains(r.Body.String(), `"offered":0`) {
 		t.Fatalf("tick %d %s", r.Code, r.Body.String())
 	}
-	if len(coachRequests(t, h, tc).Offers) != 0 || reviewStatus(t, h, tu, id) != "queued" {
+	if len(coachRequests(t, h, tc).Reviewing) != 0 || reviewStatus(t, h, tu, id) != "queued" {
 		t.Fatal("random assignment ran")
 	}
 }
 
 // 選んだコーチが辞退した・引受期限までに返事がないときは、別のコーチに回さずに終わり、代金を戻す。
 func TestReviewChosenCoachDeclineAndTimeoutNeverReassign(t *testing.T) {
-	for _, action := range []string{"decline", "timeout", "withdraw"} {
+	for _, action := range []string{"return", "timeout", "cancel"} {
 		t.Run(action, func(t *testing.T) {
 			fakeCoachingCloudinary(t)
 			h, f := setupCoachChoice(t)
@@ -152,20 +148,19 @@ func TestReviewChosenCoachDeclineAndTimeoutNeverReassign(t *testing.T) {
 			_, tu := demoRequester(t, h, admin)
 			id := chosenReview(t, h, tu, coach.String(), "paypay", false)
 			payChosenReview(t, h, id, "paypay")
-			offers := coachRequests(t, h, tc).Offers
+			offers := coachRequests(t, h, tc).Reviewing
 			if len(offers) != 1 {
 				t.Fatalf("offers %+v", offers)
 			}
 			switch action {
-			case "decline":
-				if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/decline", tc, nil); r.Code != 204 {
-					t.Fatal(r.Body.String())
-				}
+
+			case "return":
+				withdrawReview(t, h, tc, id, map[string]any{"reason_code": "video_unviewable"}, http.StatusOK)
 			case "timeout":
-				execSQLArgs(t, `UPDATE review_offers SET expires_at=now()-interval '1 minute' WHERE request_id=$1`, id)
-			case "withdraw":
-				if r := doJSON(t, h, "POST", "/v1/coach/me/withdraw", tc, map[string]string{"confirm": "コーチをやめる"}); r.Code != 200 {
-					t.Fatalf("withdraw %d %s", r.Code, r.Body.String())
+				execSQLArgs(t, `UPDATE review_requests SET due_at=now()-interval '1 minute' WHERE id=$1`, id)
+			case "cancel":
+				if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+id+"/cancel", tu, nil); r.Code != 200 {
+					t.Fatalf("cancel %d %s", r.Code, r.Body.String())
 				}
 			}
 			execSQLArgs(t, `UPDATE review_payments SET authorized_at=now()-interval '2 minutes' WHERE request_id=$1`, id)
@@ -175,13 +170,8 @@ func TestReviewChosenCoachDeclineAndTimeoutNeverReassign(t *testing.T) {
 			if status := reviewStatus(t, h, tu, id); status != "expired" {
 				t.Fatalf("status %s", status)
 			}
-			if len(coachRequests(t, h, other).Offers) != 0 {
+			if len(coachRequests(t, h, other).Reviewing) != 0 {
 				t.Fatal("reassigned")
-			}
-			var notified int
-			queryRowArgs(t, `SELECT count(*) FROM notifications WHERE kind='review_expired' AND review_request_id=$1`, []any{id}, &notified)
-			if notified != 1 {
-				t.Fatalf("requester notified %d times", notified)
 			}
 			refunds := f.refundList()
 			if len(refunds) != 1 || refunds[0].Get("amount") != "500" {
@@ -237,14 +227,14 @@ func TestReviewCoachChoiceList(t *testing.T) {
 	execSQLArgs(t, `UPDATE coach_profiles SET daily_cap=1 WHERE profile_id=$1`, busy)
 	id := chosenReview(t, h, tu, busy.String(), "card", false)
 	payChosenReview(t, h, id, "card")
-	if r := doJSON(t, h, "GET", "/v1/coaching/nominees?event=100m", tu, nil); strings.Contains(r.Body.String(), busy.String()) {
-		t.Fatal("full coach listed")
+	if r := doJSON(t, h, "GET", "/v1/coaching/nominees?event=100m", tu, nil); !strings.Contains(r.Body.String(), busy.String()) {
+		t.Fatal("busy coach should remain listed")
 	}
 	b := reviewBodyFor(t, h, tu)
 	b["method"] = "card"
 	b["requested_coach_id"] = busy
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, b); r.Code != 422 {
-		t.Fatalf("full coach %d %s", r.Code, r.Body.String())
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, b); r.Code != 201 {
+		t.Fatalf("busy coach %d %s", r.Code, r.Body.String())
 	}
 	execSQLArgs(t, `UPDATE coach_profiles SET on_duty=false WHERE profile_id=$1`, coach)
 	if r := doJSON(t, h, "GET", "/v1/coaching/nominees?event=100m", tu, nil); strings.Contains(r.Body.String(), coach.String()) {
@@ -262,8 +252,8 @@ func TestReviewCoachChoiceWithTickets(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 	buySixTickets(t, h, tu)
 	id := chosenReview(t, h, tu, coach.String(), "tickets", true)
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != id || len(coachRequests(t, h, other).Offers) != 0 {
+	offers := coachRequests(t, h, tc).Reviewing
+	if len(offers) != 1 || offers[0].ID != id || len(coachRequests(t, h, other).Reviewing) != 0 {
 		t.Fatalf("offers %+v", offers)
 	}
 	if b := ticketSummary(t, h, tu).Balance; b.Available != 5 || b.Reserved != 1 {
@@ -304,11 +294,11 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 	id := chosenReview(t, h, tr, coach, "card", false)
 	noSplit(f.lastSession())
 	payChosenReview(t, h, id, "card")
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+id+"/response", tc, responseBody()); r.Code != 200 {

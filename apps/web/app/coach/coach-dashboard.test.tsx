@@ -125,11 +125,10 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは11タイルの入口だけで、中身のセクションを出さない", async () => {
+it("ランチャーは10タイルの入口だけで、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
-    "/coach/offers",
     "/coach/reviewing",
     "/coach/consultations",
     "/coach/contracts",
@@ -149,39 +148,17 @@ it("ランチャーは11タイルの入口だけで、中身のセクション�
   expect(container.querySelector('a[href="/me/coaching"]')).toBeNull();
   // ステータスバーは従来どおり操作できる。
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
-  expect(container.querySelector("select")?.value).toBe("5");
+  expect(container.querySelector("select")).toBeNull();
   expect(container.textContent).toContain("★4.5（3件）");
   // フッターは要約1行とやめる導線だけ。
   expect(container.textContent).toContain("未払い1,050円");
   expect(container.querySelector('a[href="/coach/withdraw"]')).not.toBeNull();
 });
 
-it("期限アラートは依頼がある時だけ出て、件数と最短の残り分を示す", async () => {
-  mockAll();
-  await act(async () => root.render(<CoachDashboard />));
-  const band = container.querySelector('a[href="/coach/offers"]');
-  expect(band?.textContent).toContain("新しい依頼が2件あります");
-  expect(band?.textContent).toContain("あと");
-  expect(band?.textContent).toContain("分で終了");
-
-  apiFetch.mockImplementation((path: string) => {
-    if (path === "/v1/coach/me") return Promise.resolve({ application });
-    if (path === "/v1/coach/requests") return Promise.resolve({ offers: [], reviewing: [] });
-    if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [] });
-    if (path === "/v1/coach/contracts") return Promise.resolve({ contracts: [] });
-    if (path === "/v1/coach/me/earnings") return Promise.resolve({ unpaid_yen: 0 });
-    if (path === "/v1/coach/me/identity-status") return Promise.resolve({ registered: true, applies: true });
-    return Promise.reject(new Error(`unexpected ${path}`));
-  });
-  await renderFresh();
-  expect(container.textContent).not.toContain("新しい依頼が");
-});
-
 it("バッジは実件数と一致し、未登録の点は条件の時だけ出す", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
-  expect(tileLabels()).toContain("届いた依頼（2件）");
-  expect(tileLabels()).toContain("添削中（1件）");
+  expect(tileLabels()).toContain("対応中（1件）");
   expect(tileLabels()).toContain("追加相談（1件）");
   expect(tileLabels()).toContain("契約・申込み（1件）");
   expect(tileLabels()).toContain("特商法・身元（要確認）");
@@ -210,7 +187,7 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(11);
+  expect(tileHrefs()).toHaveLength(10);
 });
 
 it("未承認の表示は現行のまま変えない", async () => {
@@ -227,11 +204,7 @@ it("言語が英語の利用者にはコーチ導線を英語で出す", async (
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(container.querySelector('nav[aria-label="Coach menu"]')).not.toBeNull();
-  expect(tileLabels()).toContain("Incoming (2)");
   expect(tileLabels()).toContain("Reviewing (1)");
-  const band = container.querySelector('a[href="/coach/offers"]');
-  expect(band?.textContent).toContain("2 new request(s)");
-  expect(band?.textContent).toContain("closing in");
   // 日本語の文言は出ない。
   expect(container.textContent).not.toContain("届いた依頼");
   expect(container.textContent).not.toContain("新しい依頼が");
@@ -256,6 +229,6 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(11);
+  expect(labels).toHaveLength(10);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });

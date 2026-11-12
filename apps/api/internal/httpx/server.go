@@ -386,6 +386,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coaching/requests/{id}/payment/sync", s.syncReviewPayment)
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
+				r.Post("/coaching/requests/{id}/cancel", s.cancelUnstartedReview)
 				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarify", s.clarifyReview)
 				// 差し戻された依頼を直して再提出する。差し戻しの後でメッセージ機能を止めても、再提出はできるようにしておく。
 				r.Post("/coaching/requests/{id}/resubmit", s.resubmitReviewRequest)
@@ -415,8 +416,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.With(s.requireMessaging).Post("/coach/requests/{id}/info-request", s.requestReviewInfo)
 				// 引受後・返却前のコーチ都合の辞退。依頼の状態を変えるだけでメッセージではないので、メッセージ機能のフラグには入れない。
 				r.Post("/coach/requests/{id}/withdraw", s.withdrawReviewRequest)
-				r.Post("/coach/offers/{id}/accept", s.acceptReviewOffer)
-				r.Post("/coach/offers/{id}/decline", s.declineReviewOffer)
+				r.Post("/coach/requests/{id}/start", s.startReviewWork)
 				// 運営のお金の動き（送金と返金）
 				r.Get("/admin/coaching/payments", s.adminCapturedPayments)
 				r.Post("/admin/coaching/payments/{id}/refund", s.adminCapturedRefund)

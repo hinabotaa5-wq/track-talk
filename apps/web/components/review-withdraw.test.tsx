@@ -32,6 +32,11 @@ it("確認してから理由を添えて辞退を送り、終わった依頼を�
   apiFetch.mockResolvedValue(done);
   const onWithdrawn = vi.fn();
   await act(async () => root.render(<CoachWithdrawForm requestID="r1" token="tok" onWithdrawn={onWithdrawn} />));
+  const select = container.querySelector("select")!;
+  await act(async () => {
+    select.value = "other";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   const textarea = container.querySelector("textarea")!;
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
@@ -42,7 +47,7 @@ it("確認してから理由を添えて辞退を送り、終わった依頼を�
     container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
   expect(confirm).toHaveBeenCalledOnce();
-  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests/r1/withdraw", expect.objectContaining({ method: "POST", token: "tok", body: JSON.stringify({ reason: "体調不良のため" }) }));
+  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests/r1/withdraw", expect.objectContaining({ method: "POST", token: "tok", body: JSON.stringify({ reason_code: "other", reason: "体調不良のため" }) }));
   expect(onWithdrawn).toHaveBeenCalledWith(done);
 });
 

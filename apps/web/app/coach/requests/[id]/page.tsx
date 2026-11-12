@@ -201,6 +201,8 @@ export default function CoachReviewRequestPage() {
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<CoachReviewRequest | null>(null);
   const [error, setError] = useState("");
+  const [startError, setStartError] = useState("");
+  const { pending: starting, acquire: acquireStart, release: releaseStart } = useActionLock();
   // 直前に送った種類。送った内容の先頭に完了バナーを出す（自動では消さない）。
   const [sent, setSent] = useState<"response" | "clarification" | "info" | null>(null);
 
@@ -224,6 +226,18 @@ export default function CoachReviewRequestPage() {
       cancelled = true;
     };
   }, [token, id, locale]);
+
+  async function start() {
+    if (!acquireStart()) return;
+    setStartError("");
+    try {
+      setRequest(await apiFetch<CoachReviewRequest>(`/v1/coach/requests/${id}/start`, { method: "POST", token }));
+    } catch (err) {
+      setStartError(err instanceof ApiRequestError ? err.message : L("添削を開始できませんでした"));
+    } finally {
+      releaseStart();
+    }
+  }
 
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (loading || !session || !request) return <PageLoading screen label={t(locale, "common.loading")} />;
@@ -254,20 +268,27 @@ export default function CoachReviewRequestPage() {
         />
       ) : null}
 
-      {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
+      {request.work_order ? <WorkOrderView order={request.work_order} directReview /> : null}
 
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
 
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
 
-      {request.status === "in_review" ? <ResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} /> : null}
+      {request.status === "in_review" && !request.started_at ? (
+        <div className="space-y-2">
+          <Button type="button" className="w-full" disabled={starting} onClick={() => void start()}>{L("添削をはじめる")}</Button>
+          {startError ? <p role="alert" className="text-sm text-red-400">{startError}</p> : null}
+        </div>
+      ) : null}
+
+      {request.status === "in_review" && request.started_at ? <ResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} /> : null}
 
       {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
         <CoachInfoRequestForm requestID={request.id} token={token} onSent={(r) => { setSent("info"); setRequest(r); }} />
       ) : null}
 
       {request.status === "in_review" || (request.status === "needs_info" && request.info_request?.from_status === "in_review") ? (
-        <CoachWithdrawForm requestID={request.id} token={token} onWithdrawn={() => router.push("/coach")} />
+        <CoachWithdrawForm requestID={request.id} token={token} onWithdrawn={() => router.push("/coach/reviewing")} />
       ) : null}
 
       {sent === "response" && response ? <SentBanner text={t(locale, "coach.detail.responseSent")} /> : null}

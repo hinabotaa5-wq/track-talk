@@ -80,8 +80,7 @@ WHERE id = $1
 FOR UPDATE;
 
 -- name: PickCoachForRequest :one
--- 枠と種目が合う受付中のコーチのうち、最後に打診された時刻が一番古い人。
--- 同じ依頼をまだ打診しておらず、持っている依頼と今日の本数が上限に届いていない人だけ。
+-- 種目が合う受付中のコーチのうち、最後の割り当てが一番古い人。
 SELECT c.profile_id
 FROM coach_profiles c
 WHERE c.status = 'approved'
@@ -90,21 +89,6 @@ WHERE c.status = 'approved'
   AND (sqlc.narg(requested_coach_id)::uuid IS NULL OR c.profile_id = sqlc.narg(requested_coach_id)::uuid)
   AND sqlc.arg(event)::text = ANY (c.events)
   AND c.profile_id <> sqlc.arg(requester_id)
-  AND NOT EXISTS (
-    SELECT 1 FROM review_offers o
-    WHERE o.request_id = sqlc.arg(request_id)
-      AND o.coach_id = c.profile_id
-  )
-  AND (
-    SELECT count(*) FROM review_requests r
-    WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review', 'needs_info')
-  ) < sqlc.arg(max_active)::int
-  AND (
-    SELECT count(*) FROM review_offers o
-    WHERE o.coach_id = c.profile_id
-      AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= sqlc.arg(day_start)::timestamptz))
-  ) < c.daily_cap
   AND NOT EXISTS (
     -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
     SELECT 1 FROM review_ratings rt
@@ -115,96 +99,12 @@ WHERE c.status = 'approved'
        AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
   )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
-LIMIT 1;
-
--- name: CreateReviewOffer :one
-INSERT INTO review_offers (id, request_id, coach_id, expires_at)
-VALUES ($1, $2, $3, $4)
-RETURNING *;
-
--- name: MarkReviewRequestOffered :exec
-UPDATE review_requests
-SET status = 'offered',
-    coach_id = $2,
-    updated_at = now()
-WHERE id = $1
-  AND status = 'queued';
+LIMIT 1 FOR NO KEY UPDATE;
 
 -- name: TouchCoachOffered :exec
 UPDATE coach_profiles
 SET last_offered_at = now()
 WHERE profile_id = $1;
-
--- name: LockOpenReviewOffer :one
-SELECT * FROM review_offers
-WHERE id = $1
-  AND coach_id = $2
-  AND result IS NULL
-FOR UPDATE;
-
--- name: AnswerReviewOffer :exec
-UPDATE review_offers
-SET result = sqlc.arg(result)::text,
-    answered_at = now()
-WHERE id = sqlc.arg(id)
-  AND result IS NULL;
-
--- name: AcceptReviewRequest :one
-UPDATE review_requests
-SET status = 'in_review',
-    updated_at = now()
-WHERE id = $1
-  AND coach_id = $2
-  AND status = 'offered'
-  AND due_at > now()
-RETURNING *;
-
--- name: RequeueReviewRequest :exec
-UPDATE review_requests
-SET status = CASE WHEN requested_coach_id IS NULL THEN 'queued' ELSE 'expired' END,
-    coach_id = NULL,
-    updated_at = now()
-WHERE id = $1
-  AND status = 'offered';
-
--- name: ClaimReviewOfferReminders :many
--- Persist the one-time claim and its in-app notification together.
-WITH claimed AS (
-    UPDATE review_offers o
-    SET reminder_sent_at = sqlc.arg(checked_at)::timestamptz
-    FROM review_requests r
-    WHERE r.id = o.request_id
-      AND r.status = 'offered'
-      AND r.requested_coach_id = o.coach_id
-      AND o.result IS NULL
-      AND o.reminder_sent_at IS NULL
-      AND o.expires_at > sqlc.arg(checked_at)::timestamptz
-      AND o.expires_at <= sqlc.arg(remind_through)::timestamptz
-    RETURNING o.id, o.request_id, o.coach_id, o.expires_at
-), notices AS (
-    INSERT INTO notifications (id, recipient_id, kind, review_request_id)
-    SELECT gen_random_uuid(), coach_id, 'review_offer_reminder', request_id FROM claimed
-)
-SELECT id, coach_id, expires_at FROM claimed;
-
--- name: ExpireStaleReviewOffers :many
--- 引受期限（90分、夜間は数えない）までに返事がなかった打診を閉じ、依頼を待ちに戻す。
-WITH stale AS (
-    UPDATE review_offers
-    SET result = 'expired',
-        answered_at = now()
-    WHERE result IS NULL
-      AND expires_at <= now()
-    RETURNING request_id
-)
-UPDATE review_requests r
-SET status = CASE WHEN requested_coach_id IS NULL THEN 'queued' ELSE 'expired' END,
-    coach_id = NULL,
-    updated_at = now()
-FROM stale
-WHERE r.id = stale.request_id
-  AND r.status = 'offered'
-RETURNING r.id;
 
 -- name: ExpireOverdueReviewRequests :many
 -- 返却の目安を過ぎた依頼を expired にする。添削中だった依頼はコーチを残し、遵守率に使う。
@@ -218,6 +118,7 @@ WITH target AS (
     UPDATE review_requests r
     SET status = 'expired',
         coach_id = CASE WHEN target.old_status = 'in_review' THEN r.coach_id END,
+        timed_out_at = CASE WHEN target.old_status = 'in_review' THEN now() END,
         updated_at = now()
     FROM target
     WHERE r.id = target.id
@@ -249,17 +150,6 @@ WHERE c.status = 'approved'
        AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
   );
 
--- name: ListCoachOpenOffers :many
-SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, sqlc.embed(r)
-FROM review_offers o
-JOIN review_requests r ON r.id = o.request_id
-WHERE o.coach_id = $1
-  AND o.result IS NULL
-  AND o.expires_at > now()
-  -- 差し戻し中（needs_info）の打診は、再提出されるまで出さない。
-  AND r.status = 'offered'
-ORDER BY o.offered_at;
-
 -- name: ListCoachReviewing :many
 SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
@@ -273,7 +163,7 @@ ORDER BY due_at;
 SELECT pg_advisory_xact_lock(hashtext('review_requester:' || sqlc.arg(requester_id)::uuid::text));
 
 -- name: ListReviewNominees :many
--- 動画添削で選べるコーチ。受付中で、担当種目・受付上限・報酬口座の条件を満たす人。
+-- 動画添削で選べるコーチ。受付中で、担当種目・報酬口座の条件を満たす人。
 -- 並びは人気や実績によらず日替わり(コーチの ID と今日の日付から決める)にし、全員が上に来る日が同じように回る。
 SELECT c.profile_id, COALESCE(NULLIF(c.name, ''),p.nickname, 'コーチ')::text AS nickname, c.events, c.years, c.best_record, c.achievements, c.photo_public_id
 FROM coach_profiles c JOIN profiles p ON p.id = c.profile_id
@@ -284,16 +174,6 @@ WHERE c.status = 'approved'
   AND (sqlc.narg(requested_coach_id)::uuid IS NULL OR c.profile_id = sqlc.narg(requested_coach_id)::uuid)
   AND sqlc.arg(event)::text = ANY (c.events)
   AND c.profile_id <> sqlc.arg(requester_id)
-  AND (
-    SELECT count(*) FROM review_requests r
-    WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review', 'needs_info')
-  ) < sqlc.arg(max_active)::int
-  AND (
-    SELECT count(*) FROM review_offers o
-    WHERE o.coach_id = c.profile_id
-      AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= sqlc.arg(day_start)::timestamptz))
-  ) < c.daily_cap
   AND NOT EXISTS (
     -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
     SELECT 1 FROM review_ratings rt
@@ -307,7 +187,7 @@ ORDER BY md5(c.profile_id::text || extract(epoch FROM sqlc.arg(day_start)::times
 LIMIT 200;
 
 -- name: RequestReviewInfo :one
--- 担当のコーチが、内容確認のために依頼を1回だけ差し戻す。引受前（offered）でも引受後（in_review）でもよく、返却期限までに限る。
+-- 担当のコーチが、返却期限までに相談内容の補足を1回だけ求める。
 -- 差し戻す前の状態を info_from_status に残す（SET の右辺の status は更新前の値）。
 UPDATE review_requests
 SET status = 'needs_info',
@@ -319,39 +199,24 @@ SET status = 'needs_info',
     updated_at = now()
 WHERE id = sqlc.arg(id)
   AND coach_id = sqlc.arg(coach_id)::uuid
-  AND status IN ('offered', 'in_review')
+  AND status = 'in_review'
   AND info_requested_at IS NULL
   AND due_at > now()
 RETURNING *;
-
--- name: LockCoachOpenOfferForRequest :one
--- 差し戻す依頼の、まだ返事をしていない打診（引受前の差し戻しのとき）。
-SELECT * FROM review_offers
-WHERE request_id = $1
-  AND coach_id = $2
-  AND result IS NULL
-FOR UPDATE;
-
--- name: SetReviewOfferExpiry :one
--- 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
-UPDATE review_offers
-SET expires_at = sqlc.arg(expires_at)::timestamptz
-WHERE request_id = sqlc.arg(request_id)
-  AND coach_id = sqlc.arg(coach_id)
-  AND result IS NULL
-RETURNING id;
 
 -- name: ResubmitReviewRequest :one
 -- 依頼者が、差し戻された依頼の相談内容を直して（動画は差し替えてもよい）再提出する。再提出期限までに1回だけ。
 -- 返却期限は再提出から24時間に数え直し、差し戻す前の状態（引受前・引受後）に戻す。
 UPDATE review_requests
-SET status = info_from_status,
+SET status = 'in_review',
     original_question = question,
     question = sqlc.arg(question)::text,
     video_public_id = sqlc.arg(video_public_id)::text,
     video_replaced = (sqlc.arg(video_public_id)::text <> video_public_id),
-    due_at = sqlc.arg(due_at)::timestamptz,
+    due_at = statement_timestamp() + interval '24 hours',
     resubmitted_at = now(),
+    reminder_12h_at = NULL,
+    reminder_4h_at = NULL,
     updated_at = now()
 WHERE id = sqlc.arg(id)
   AND requester_id = sqlc.arg(requester_id)
@@ -395,9 +260,68 @@ SET status = 'expired',
     withdrawn_by = sqlc.arg(coach_id)::uuid,
     withdrawn_from_status = status,
     withdraw_reason = sqlc.narg(reason)::text,
+    return_reason = sqlc.arg(return_reason)::text,
     updated_at = now()
 WHERE id = sqlc.arg(id)
   AND coach_id = sqlc.arg(coach_id)::uuid
   AND (status = 'in_review' OR (status = 'needs_info' AND info_from_status = 'in_review'))
   AND returned_at IS NULL
+  AND due_at > statement_timestamp()
 RETURNING *;
+
+-- name: AssignReviewRequest :one
+-- The transaction that assigns the coach also makes the request visible in their queue.
+UPDATE review_requests r
+SET status = 'in_review',
+    coach_id = sqlc.arg(coach_id)::uuid,
+    assigned_at = statement_timestamp(),
+    due_at = statement_timestamp() + interval '24 hours',
+    updated_at = statement_timestamp()
+WHERE id = sqlc.arg(id) AND status = 'queued'
+  AND EXISTS (
+      SELECT 1 FROM coach_profiles c
+      WHERE c.profile_id = sqlc.arg(coach_id)::uuid AND c.status = 'approved'
+      FOR NO KEY UPDATE
+  )
+RETURNING *;
+
+-- name: StartReviewWork :one
+UPDATE review_requests
+SET started_at = COALESCE(started_at, statement_timestamp()),
+    updated_at = statement_timestamp()
+WHERE id = sqlc.arg(id)
+  AND coach_id = sqlc.arg(coach_id)::uuid
+  AND status = 'in_review'
+  AND due_at > statement_timestamp()
+RETURNING *;
+
+-- name: CancelUnstartedReview :one
+UPDATE review_requests
+SET status = 'expired', canceled_at = statement_timestamp(), updated_at = statement_timestamp()
+WHERE id = sqlc.arg(id)
+  AND requester_id = sqlc.arg(requester_id)::uuid
+  AND started_at IS NULL
+  AND ((status = 'in_review' AND due_at > statement_timestamp())
+    OR (status = 'needs_info' AND resubmit_by > statement_timestamp()))
+RETURNING *;
+
+-- name: PauseCoachAfterReviewTimeout :exec
+UPDATE coach_profiles SET on_duty = false, updated_at = now() WHERE profile_id = $1;
+
+-- name: ListRecentReviewOutcomes :many
+SELECT id, timed_out_at FROM review_requests
+WHERE coach_id = $1 AND (timed_out_at IS NOT NULL OR returned_at IS NOT NULL)
+ORDER BY COALESCE(timed_out_at, returned_at) DESC, id DESC
+LIMIT 4;
+
+-- name: ClaimReviewDueReminders :many
+UPDATE review_requests
+SET reminder_12h_at = CASE WHEN sqlc.arg(hours_left)::int = 12 THEN now() ELSE reminder_12h_at END,
+    reminder_4h_at = CASE WHEN sqlc.arg(hours_left)::int = 4 THEN now() ELSE reminder_4h_at END
+WHERE status = 'in_review' AND coach_id IS NOT NULL
+  AND due_at > now()
+  AND due_at <= now() + make_interval(hours => sqlc.arg(hours_left)::int)
+  AND CASE WHEN sqlc.arg(hours_left)::int = 12
+           THEN reminder_12h_at IS NULL AND due_at > now() + interval '4 hours'
+           ELSE reminder_4h_at IS NULL END
+RETURNING id, coach_id, due_at;

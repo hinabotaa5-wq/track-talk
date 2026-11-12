@@ -11,7 +11,7 @@ export default function CoachRequestsRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(window.location.hash === "#reviewing" ? "/coach/reviewing" : "/coach/offers");
+    router.replace("/coach/reviewing");
   }, [router]);
 
   return <PageLoading screen label={L("読み込み中...")} />;

@@ -3,7 +3,6 @@
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 import { PageLoading } from "@/components/page-loading";
-import { minutesLeft } from "@/components/coach-requests";
 
 import { useAuth } from "@/components/auth-provider";
 import { CoachPhotoForm } from "@/components/coach-photo";
@@ -41,7 +40,6 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 // コーチ画面。承認されたコーチの入口はタイルの1画面にし、中身はタイル先の個別画面で扱う。
 // 返答と補足は /coach/requests/{id} で書く。パーソナル指導の申し込みへの返事と、プランの作成は個別画面でする。
 
-const capOptions = [1, 2, 3, 5, 8, 10, 15, 20];
 
 type ConsultationRow = {
   id: string;
@@ -161,7 +159,6 @@ export function CoachDashboard() {
   const [appliedContracts, setAppliedContracts] = useState(0);
   const [earnings, setEarnings] = useState<CoachEarnings | null>(null);
   const [identity, setIdentity] = useState<CoachIdentityStatus | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
 
@@ -188,7 +185,6 @@ export function CoachDashboard() {
       .then((d) => {
         if (cancelled) return;
         setOffers(d);
-        setNow(Date.now());
       })
       .catch(() => {});
     apiFetch<{ consultations: ConsultationRow[] }>("/v1/coach/consultations", { token })
@@ -256,10 +252,6 @@ export function CoachDashboard() {
     </div>
   );
 
-  const offerCount = offers?.offers.length ?? 0;
-  const shortest = offers && offers.offers.length > 0
-    ? Math.min(...offers.offers.map((o) => minutesLeft(o.expires_at, now)))
-    : 0;
   const reviewingCount = offers?.reviewing.length ?? 0;
   const commerceDot = identity !== null && identity.registered === false && identity.applies === true;
   const payoutsDot = !coach.payouts_ready;
@@ -294,21 +286,6 @@ export function CoachDashboard() {
             />
           </button>
         </div>
-        <label className="flex items-center justify-between gap-3 text-sm">
-          <span>{t(locale, "coach.dailyCap")}</span>
-          <select
-            className="rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-base text-slate-100"
-            value={coach.daily_cap}
-            disabled={pending}
-            onChange={(e) => void save({ daily_cap: Number(e.target.value) })}
-          >
-            {capOptions.map((n) => (
-              <option key={n} value={n}>
-                {t(locale, "coach.perDay", { n })}
-              </option>
-            ))}
-          </select>
-        </label>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {rating?.paused ? (
           <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
@@ -317,17 +294,7 @@ export function CoachDashboard() {
         ) : null}
       </section>
 
-      {offerCount > 0 ? (
-        <Link
-          href="/coach/offers"
-          className="block rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm font-semibold text-white"
-        >
-          {t(locale, "coach.newOffers", { count: offerCount, minutes: shortest })}
-        </Link>
-      ) : null}
-
       <CoachTiles label={t(locale, "coach.menu")}>
-        <Tile locale={locale} href="/coach/offers" label={t(locale, "coach.tile.offers")} Icon={Inbox} badge={offerCount} />
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
         <Tile locale={locale} href="/coach/contracts" label={t(locale, "coach.tile.contracts")} Icon={FileText} badge={appliedContracts} />

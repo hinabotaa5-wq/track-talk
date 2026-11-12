@@ -209,6 +209,9 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 	}
 	var started *db.ReviewRequest
 	err = s.tx(ctx, func(q *db.Queries) error {
+		if err := q.LockReviewAssignment(ctx); err != nil {
+			return err
+		}
 		var err error
 		pay, err = q.MarkReviewPaymentPaid(ctx, db.MarkReviewPaymentPaidParams{
 			Status: status, PaymentIntentID: &sess.PaymentIntent, CheckoutSessionID: sess.ID,
@@ -223,6 +226,10 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
+		if err != nil {
+			return err
+		}
+		rr, err = s.assignReview(ctx, q, rr)
 		if err != nil {
 			return err
 		}
@@ -242,9 +249,7 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		}
 		return nil
 	}
-	if _, err := s.offerReview(ctx, started.ID); err != nil {
-		slog.Warn("review offer after payment", "err", err)
-	}
+	s.sendPendingOutbox(ctx, pushOutboxBatch)
 	return nil
 }
 

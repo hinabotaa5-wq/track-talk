@@ -1,0 +1,9 @@
+DROP INDEX review_requests_coach_outcomes_idx;
+ALTER TABLE review_requests
+    DROP COLUMN reminder_4h_at,
+    DROP COLUMN reminder_12h_at,
+    DROP COLUMN return_reason,
+    DROP COLUMN canceled_at,
+    DROP COLUMN timed_out_at,
+    DROP COLUMN started_at,
+    DROP COLUMN assigned_at;

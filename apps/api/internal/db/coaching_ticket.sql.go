@@ -1031,7 +1031,7 @@ func (q *Queries) LockTicketReservation(ctx context.Context, id uuid.UUID) (Coac
 }
 
 const lockTicketReview = `-- name: LockTicketReview :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests WHERE id = $1 FOR UPDATE
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketReview(ctx context.Context, id uuid.UUID) (ReviewRequest, error) {
@@ -1069,6 +1069,13 @@ func (q *Queries) LockTicketReview(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }

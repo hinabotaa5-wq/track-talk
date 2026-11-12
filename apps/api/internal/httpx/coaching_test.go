@@ -119,8 +119,8 @@ func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 		{http.MethodPost, "/v1/coach/contracts/" + id + "/decline", ta},
 		{http.MethodGet, "/v1/coach/requests", ta},
 		{http.MethodGet, "/v1/coach/requests/" + id, ta},
-		{http.MethodPost, "/v1/coach/offers/" + id + "/accept", ta},
-		{http.MethodPost, "/v1/coach/offers/" + id + "/decline", ta},
+		{http.MethodPost, "/v1/coach/requests/" + id + "/start", ta},
+		{http.MethodPost, "/v1/coach/requests/" + id + "/withdraw", ta},
 		// 運営のお金の動き（送金と返金）
 		{http.MethodGet, "/v1/admin/coaching/payouts", ta},
 		{http.MethodPost, "/v1/admin/coaching/payouts/run", ta},

@@ -23,7 +23,7 @@ it("おまかせはなく、受け取った順のままコーチを選べる", a
   expect([...radios].map((r) => r.value)).toEqual(["coach-b", "coach-a"]);
   await act(async () => radios[1].click());
   expect(container.querySelector("output")?.textContent).toBe("coach-a");
-  expect(container.textContent).toContain("別のコーチには回さず");
+  expect(container.textContent).toContain("受付中のコーチには決済の確認後に依頼が届きます");
 });
 it("料金や人気の指標は出さず、種目・競技歴・紹介文を出す", async () => {
   await act(async () => root.render(<Harness />));

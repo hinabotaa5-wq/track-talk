@@ -38,8 +38,8 @@ func sessionsSince(f *fakeStripe, n int) ([]map[string]string, []string) {
 // answerOffer は、コーチが届いた打診を引き受けて返却するところまで進める。
 func answerOffer(t *testing.T, h http.Handler, tc, root string) {
 	t.Helper()
-	for _, o := range coachRequests(t, h, tc).Offers {
-		if r := doJSON(t, h, "POST", "/v1/coach/offers/"+o.ID+"/accept", tc, nil); r.Code != 200 {
+	for _, o := range coachRequests(t, h, tc).Reviewing {
+		if r := doJSON(t, h, "POST", "/v1/coach/requests/"+o.ID+"/start", tc, nil); r.Code != 200 {
 			t.Fatalf("accept %d %s", r.Code, r.Body.String())
 		}
 	}
@@ -426,7 +426,7 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	}
 	offerPushes := func() int {
 		var n int
-		queryRowArgs(t, `SELECT count(*) FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_offer:%'`, []any{coach}, &n)
+		queryRowArgs(t, `SELECT count(*) FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_assigned:%'`, []any{coach}, &n)
 		return n
 	}
 
@@ -444,12 +444,12 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	base := gate.sent.Load()
 	payChosenReview(t, h, root, "card")
 	var offers int
-	queryRowArgs(t, `SELECT count(*) FROM review_offers WHERE request_id = $1 AND coach_id = $2`, []any{root, coach}, &offers)
+	queryRowArgs(t, `SELECT count(*) FROM review_requests WHERE id = $1 AND coach_id = $2`, []any{root, coach}, &offers)
 	if offers != 1 || offerNotes() != 1 || offerPushes() != 1 {
 		t.Fatalf("offers=%d bell=%d push=%d", offers, offerNotes(), offerPushes())
 	}
 	var dedup string
-	queryRowArgs(t, `SELECT dedup_key FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_offer:%'`, []any{coach}, &dedup)
+	queryRowArgs(t, `SELECT dedup_key FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_assigned:%'`, []any{coach}, &dedup)
 	if status, _ := outboxStatus(t, dedup); status != "pending" {
 		t.Fatalf("after failed send %s", status)
 	}

@@ -10,25 +10,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/cloudinary"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
 
-// 動画添削の「内容確認のための差し戻し」（運営者決定 2026-11-03）。
-//
-// 返却後に依頼者が聞く「ここがわからなかった」（/clarify と /clarification）とは別の仕組み。
-// こちらは返却の前に、担当のコーチが依頼の内容を確かめるためのもの。
-//
-//   - 使えるのは担当のコーチだけ。引受前（打診中）でも引受後（添削中）でもよく、返却期限までに1依頼1回だけ。
-//   - 「どこが・何が分からないか」の具体的な記述が要る。種類（任意）も選べる。
-//   - 差し戻し中は辞退でも終了でもない。支払いの取り消し・返金は起こさない。
-//   - 依頼者は差し戻しから24時間（夜間も止めない）以内に、相談内容を直して再提出する（動画も差し替えられる）。
-//     期限までに再提出がなければ依頼は終わり、既存の期限切れと同じく取り消し・返金する（別のコーチには回さない）。
-//   - 再提出すると、返却期限は再提出から24時間に数え直す。引受前に差し戻していたら、引受期限90分（夜間は数えない）も
-//     数え直す。引受後に差し戻していたら、引き受けたまま添削に戻る。
+// 補足返却は、動画を確認できるものの相談内容が不明瞭な場合に使う。
 const (
 	// 依頼者が再提出できる時間。差し戻しから数え、夜間も止めない。
 	reviewResubmitWindow = 24 * time.Hour
@@ -38,7 +26,7 @@ const (
 )
 
 // 差し戻しの種類。並びは画面に出す順。
-var infoReasons = []string{"focus", "scene", "goal", "mismatch", "other"}
+var infoReasons = []string{"focus", "scene", "goal", "other"}
 
 // meaningfulRunes は、空白と記号を除いた文字数。「？？？？」のような水増しを数えない。
 func meaningfulRunes(s string) int {
@@ -155,18 +143,6 @@ func (s *Server) requestReviewInfo(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "info_already_requested", "この依頼はもう差し戻しています。差し戻しは1回だけです")
 		return
 	}
-	if current.Status == "offered" {
-		// 引受前の差し戻しは、引受期限内の打診があるときだけ。差し戻し中は再提出期限まで打診を残しておく。
-		offer, err := q.LockCoachOpenOfferForRequest(r.Context(), db.LockCoachOpenOfferForRequestParams{RequestID: id, CoachID: p.ID})
-		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !now.Before(offer.ExpiresAt)) {
-			Error(w, http.StatusConflict, "offer_expired", "引き受けの期限が過ぎました")
-			return
-		}
-		if err != nil {
-			MapDBError(w, err)
-			return
-		}
-	}
 	rr, err := q.RequestReviewInfo(r.Context(), db.RequestReviewInfoParams{Body: body, Reason: reason, ResubmitBy: resubmitBy, ID: id, CoachID: p.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "この依頼はいま差し戻せません")
@@ -176,24 +152,13 @@ func (s *Server) requestReviewInfo(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if rr.InfoFromStatus != nil && *rr.InfoFromStatus == "offered" {
-		_, err := q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: resubmitBy, RequestID: id, CoachID: p.ID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			Error(w, http.StatusConflict, "offer_expired", "引き受けの期限が過ぎました")
-			return
-		}
-		if err != nil {
-			MapDBError(w, err)
-			return
-		}
-	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
 	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_info_request", push.Message{
 		Title: "コーチから依頼内容の確認が届きました",
-		Body:  offerDeadlineText(resubmitBy) + "までに相談内容を直して再提出してください。再提出がなければ依頼は終了し、お支払いは取り消します（PayPay は返金します）",
+		Body:  reviewDeadlineText(resubmitBy) + "までに相談内容を直して再提出してください。再提出がなければ依頼は終了し、お支払いは取り消します（PayPay は返金します）",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	})
@@ -260,7 +225,6 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 	} else {
 		video = rr.VideoPublicID
 	}
-	due := reviewDueAt(now)
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		MapDBError(w, err)
@@ -280,7 +244,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	updated, err := q.ResubmitReviewRequest(r.Context(), db.ResubmitReviewRequestParams{
-		Question: question, VideoPublicID: video, DueAt: due, ID: rr.ID, RequesterID: rr.RequesterID,
+		Question: question, VideoPublicID: video, ID: rr.ID, RequesterID: rr.RequesterID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "resubmit_expired", "再提出の期限が過ぎました")
@@ -289,28 +253,6 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
-	}
-	// 引受前に差し戻していたら、引受期限90分（夜間は数えない）を新しく数える。返却期限は越えない。
-	var offerExpires time.Time
-	var offerID uuid.UUID
-	if updated.Status == "offered" {
-		if updated.CoachID == nil {
-			Error(w, http.StatusConflict, "conflict", "この依頼はいま再提出できません")
-			return
-		}
-		offerExpires = offerExpiresAt(now, offerWindow)
-		if offerExpires.After(due) {
-			offerExpires = due
-		}
-		offerID, err = q.SetReviewOfferExpiry(r.Context(), db.SetReviewOfferExpiryParams{ExpiresAt: offerExpires, RequestID: rr.ID, CoachID: *updated.CoachID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			Error(w, http.StatusConflict, "resubmit_expired", "再提出の期限が過ぎました")
-			return
-		}
-		if err != nil {
-			MapDBError(w, err)
-			return
-		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
@@ -321,25 +263,16 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		s.purgeCoachingVideos([]string{rr.VideoPublicID})
 	}
 	if updated.CoachID != nil {
-		s.notifyResubmitted(r.Context(), updated, offerID, offerExpires)
+		s.notifyResubmitted(r.Context(), updated)
 	}
 	s.writeRequesterReview(w, r, updated)
 }
 
 // notifyResubmitted は、差し戻した依頼が再提出されたことをコーチに知らせる。
-func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest, offerID uuid.UUID, offerExpires time.Time) {
-	if rr.Status == "offered" {
-		s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted", push.Message{
-			Title: "差し戻した依頼が再提出されました",
-			Body:  offerDeadlineText(offerExpires) + "までに、引き受けるかどうか決めてください",
-			URL:   "/coach",
-			Tag:   reviewOfferTag(offerID),
-		}, time.Until(offerExpires))
-		return
-	}
+func (s *Server) notifyResubmitted(ctx context.Context, rr db.ReviewRequest) {
 	s.sendReviewResubmissionNotice(ctx, rr, "review_resubmitted_after_accept", push.Message{
 		Title: "差し戻した依頼が再提出されました",
-		Body:  "返却期限は" + offerDeadlineText(rr.DueAt) + "です",
+		Body:  "返却期限は" + reviewDeadlineText(rr.DueAt) + "です",
 		URL:   "/coach/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)

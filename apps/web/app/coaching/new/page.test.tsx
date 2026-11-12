@@ -60,7 +60,7 @@ it("支払い方法はカードだけを出し、PayPay の案内は出さない
   expect(container.textContent).not.toContain("販売者:");
   expect(container.querySelector('a[href="/terms"], a[href="/legal/commerce"]')).toBeNull();
   expect(container.textContent).not.toContain("料金は返答が返ってきた時点で確定し");
-  expect(container.textContent).toContain("送ってから24時間以内に返ってきます。");
+  expect(container.textContent).toContain("依頼がコーチの対応中一覧に表示されてから24時間以内に返却します。");
   expect(container.textContent).not.toContain("2026/11/06");
   expect(container.textContent).toContain("0/1000文字");
   expect(container.querySelector("textarea")?.hasAttribute("placeholder")).toBe(false);
@@ -179,7 +179,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("動画添削1回（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
   expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
-  expect(confirm?.textContent).toContain("申込みから24時間以内");
+  expect(confirm?.textContent).toContain("依頼がコーチの対応中一覧に表示されてから24時間以内");
   expect(confirm?.textContent).not.toContain("2026/11/06");
   expect(confirm?.querySelector('a[href="/legal/commerce"]')?.textContent).toBe("特定商取引法に基づく表記");
   expect(confirm?.textContent).toContain("コーチが返却した時に確定します");

@@ -8,7 +8,7 @@ const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 
 // 旧URLのブックマークや古いリンクは、ハッシュに応じて新しい画面へ送る。
-for (const [hash, target] of [["", "/coach/offers"], ["#offers", "/coach/offers"], ["#reviewing", "/coach/reviewing"]]) {
+for (const [hash, target] of [["", "/coach/reviewing"], ["#offers", "/coach/reviewing"], ["#reviewing", "/coach/reviewing"]]) {
   it(`/coach/requests${hash} は ${target} へ送る`, async () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     replace.mockClear();
