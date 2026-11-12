@@ -26,12 +26,12 @@ WHERE checkout_session_id = sqlc.arg(checkout_session_id) AND status = 'pending'
 RETURNING *;
 
 -- name: StartPaidReviewRequest :one
--- 支払いが届いたら、割り当ての待ち行列に入れる。目安を過ぎていたら入れない（行が返らない）。
+-- 支払い受付の期限内なら割り当てへ進む。添削期限はコーチへの割り当て時に設定する。
 UPDATE review_requests
 SET status = 'queued',
     due_at = now() + interval '24 hours',
     updated_at = now()
-WHERE id = $1 AND status = 'awaiting_payment'
+WHERE id = $1 AND status = 'awaiting_payment' AND due_at > now()
 RETURNING *;
 
 -- name: MarkReviewPaymentCaptured :one

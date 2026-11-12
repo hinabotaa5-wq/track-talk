@@ -503,11 +503,11 @@ UPDATE review_requests
 SET status = 'queued',
     due_at = now() + interval '24 hours',
     updated_at = now()
-WHERE id = $1 AND status = 'awaiting_payment'
+WHERE id = $1 AND status = 'awaiting_payment' AND due_at > now()
 RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
-// 支払いが届いたら、割り当ての待ち行列に入れる。目安を過ぎていたら入れない（行が返らない）。
+// 支払い受付の期限内なら割り当てへ進む。添削期限はコーチへの割り当て時に設定する。
 func (q *Queries) StartPaidReviewRequest(ctx context.Context, id uuid.UUID) (ReviewRequest, error) {
 	row := q.db.QueryRow(ctx, startPaidReviewRequest, id)
 	var i ReviewRequest

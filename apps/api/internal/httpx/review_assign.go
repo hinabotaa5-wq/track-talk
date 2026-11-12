@@ -128,7 +128,7 @@ func (s *Server) offerReview(ctx context.Context, id uuid.UUID) (bool, error) {
 			return err
 		}
 		rr, err = s.assignReview(ctx, q, rr)
-		assigned = err == nil && rr.AssignedAt != nil
+		assigned = err == nil && rr.Status == "in_review"
 		return err
 	})
 	return assigned, err
