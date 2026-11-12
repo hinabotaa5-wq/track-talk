@@ -53,7 +53,7 @@ def psql(env, sql):
 
 def fake_ciphertext():
     # Shaped like a field-encrypted value (nonce + sealed bytes); never decryptable.
-    return "\\\\x" + (secrets.token_bytes(12) + MARKER.encode() + secrets.token_bytes(16)).hex()
+    return "\\x" + (secrets.token_bytes(12) + MARKER.encode() + secrets.token_bytes(16)).hex()
 
 
 class UnitTest(unittest.TestCase):
