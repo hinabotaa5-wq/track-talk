@@ -298,7 +298,7 @@ function ReviewRequestView() {
 
   const active = request.status === "in_review" || request.status === "needs_info";
   const deadline = request.status === "needs_info" ? request.info_request?.resubmit_by : request.due_at;
-  const canCancel = active && !request.started_at && !!deadline && Date.parse(deadline) > now;
+  const canCancel = active && !request.started_at && !!deadline && now !== null && Date.parse(deadline) > now;
 
   return (
     <div className="mx-auto max-w-md space-y-5">
