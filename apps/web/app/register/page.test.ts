@@ -52,6 +52,16 @@ describe("RegisterPage", () => {
     router.replace.mockClear();
   });
 
+  it("表示言語の選択は出さない（運営者決定 2026-11-13）", async () => {
+    const view = await renderPage();
+    try {
+      expect(view.div.querySelector("select")).toBeNull();
+      expect(view.div.textContent).not.toContain("表示言語");
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it("同意するまで登録・Google登録を押せない", async () => {
     const view = await renderPage();
     try {

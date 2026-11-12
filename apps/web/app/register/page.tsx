@@ -1,9 +1,8 @@
 "use client";
 
 import { authErrorMessage } from "@/lib/auth-errors";
-import { t, type Locale, L } from "@/lib/i18n";
-import { useLocale, useLocaleControls } from "@/components/locale-provider";
-import { LanguageSelect } from "@/components/language-select";
+import { t, L } from "@/lib/i18n";
+import { useLocale } from "@/components/locale-provider";
 import { rememberNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase";
 import { isPwnedPassword, pwnedPasswordMessage } from "@/lib/pwned-password";
@@ -36,9 +35,8 @@ function saveDraft(next: Draft) {
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
-  // 登録時の表示言語。端末に保存し、選んだ瞬間に画面全体へ反映する。プロフィール作成のときに引き継ぐ（本体 #521・#530）。
+  // 表示言語はブラウザ言語の自動判定（運営者決定 2026-11-13）。登録画面の言語選択は廃止。
   const shown = useLocale();
-  const { chooseDeviceLocale } = useLocaleControls();
   const [agreed, setAgreed] = useState(draft.agreed);
   const { pending, acquire, release } = useActionLock();
   const captcha = useCaptcha();
@@ -115,14 +113,9 @@ export default function RegisterPage() {
     router.push("/register/sent");
   }
 
-  function chooseLocale(next: Locale) {
-    chooseDeviceLocale(next);
-  }
-
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{t(shown, "register.title")}</h1>
-      <LanguageSelect value={shown} onChange={chooseLocale} hint="register.languageHint" />
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder={t(shown, "register.email")} {...form.register("email")} />
         <Input type="password" placeholder={t(shown, "register.password")} {...form.register("password")} />

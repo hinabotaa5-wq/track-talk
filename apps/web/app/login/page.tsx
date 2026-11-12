@@ -3,8 +3,7 @@
 import { callbackErrorMessages } from "@/lib/auth-callback";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { t, L } from "@/lib/i18n";
-import { useLocale, useLocaleControls } from "@/components/locale-provider";
-import { LanguageSelect } from "@/components/language-select";
+import { useLocale } from "@/components/locale-provider";
 import { createClient } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/safe-next";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -40,9 +39,8 @@ function leaveLogin() {
 
 export default function LoginPage() {
   const [submitError, setError] = useState("");
-  // 端末に保存した表示言語（プロンプト・登録画面・この画面で選んだもの）で出す。選ぶと画面全体に即時反映（本体 #521・#530）。
+  // 表示言語はブラウザ言語の自動判定（運営者決定 2026-11-13）。ログイン画面の言語選択は廃止。
   const shown = useLocale();
-  const { chooseDeviceLocale } = useLocaleControls();
   const { pending, acquire, release } = useActionLock();
   const captcha = useCaptcha();
   const code = useSyncExternalStore(subscribeToNothing, callbackErrorCode, () => null);
@@ -98,7 +96,6 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{t(shown, "login.title")}</h1>
-      <LanguageSelect value={shown} onChange={chooseDeviceLocale} />
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder={t(shown, "login.email")} {...form.register("email")} />
         <Input type="password" placeholder={t(shown, "login.password")} {...form.register("password")} />

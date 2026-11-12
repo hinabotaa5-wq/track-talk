@@ -218,11 +218,9 @@ it("認証エラー（401）では取り直しを繰り返さず、入口も出�
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
-it("表示言語は他の設定と同じく、設定一覧（nav）の1行から1つ奥の画面へ進む（#536）", async () => {
+it("表示言語の項目はマイページの設定一覧に出さない（運営者決定 2026-11-13）", async () => {
   await renderSignedIn();
-  const link = container.querySelector<HTMLAnchorElement>('nav a[href="/me/language"]');
-  expect(link?.textContent).toBe("表示言語");
+  expect(container.querySelector('nav a[href="/me/language"]')).toBeNull();
   expect(container.querySelector('[role="radiogroup"][lang], [role="radio"][lang]')).toBeNull();
-  const links = [...container.querySelectorAll("nav a")].map((a) => a.getAttribute("href"));
-  expect(links.indexOf("/me/language")).toBe(links.indexOf("/me/badge") + 1);
+  expect(container.textContent).not.toContain("表示言語");
 });

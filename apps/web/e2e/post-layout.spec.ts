@@ -33,8 +33,6 @@ test("実況ルームは大会名、会場、配信、公式サイト、タイ�
   await page.screenshot({ path: test.info().outputPath("meet-room.png") });
 });
 test.beforeEach(async ({ page }) => {
-  // 言語選択プロンプト（未ログイン時・必須）は本 spec の対象外。回答済みにして出さない。
-  await page.addInitScript(() => localStorage.setItem("tracktalk:locale-prompted", "1"));
   await page.setViewportSize({ width: 320, height: 740 });
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;

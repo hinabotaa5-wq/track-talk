@@ -22,10 +22,10 @@ describe("clearPersonalStorage", () => {
       "injury-celebrated:sprain": "1",
       "injury-celebrated:jumpers-knee": "1",
       "review-attrs": '{"size":"26.5"}',
-      "tracktalk:locale-prompted": "1",
+      "tracktalk-theme": "dark",
     });
     clearPersonalStorage(storage);
-    expect(storage.keys()).toEqual(["tracktalk:locale-prompted"]);
+    expect(storage.keys()).toEqual(["tracktalk-theme"]);
   });
 });
 

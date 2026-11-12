@@ -1,9 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  // 言語選択プロンプト（未ログイン時・必須）は本 spec の対象外。回答済みにして出さない。
-  await page.addInitScript(() => localStorage.setItem("tracktalk:locale-prompted", "1"));
-});
+
 
 test("起動直後の通信が終わらなくても投稿ボタンが表示され、ホームのタブを切り替えられる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

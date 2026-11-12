@@ -1,9 +1,6 @@
 import { devices, expect, test } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  // 言語選択プロンプト（未ログイン時・必須）は本 spec の対象外。回答済みにして出さない。
-  await page.addInitScript(() => localStorage.setItem("tracktalk:locale-prompted", "1"));
-});
+
 
 test("top page shows branding", async ({ page }) => {
   await page.goto("/");

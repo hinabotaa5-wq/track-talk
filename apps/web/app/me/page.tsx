@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Award, Bell, Languages, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
@@ -113,7 +113,6 @@ export default function MePage() {
         {accountLinks.map((item) => (
           <MenuLink key={item.href} {...item} />
         ))}
-        <MenuLink href="/me/language" label={t(locale, "profile.language")} icon={Languages} />
         {token && userId ? (
           <PushPermissionGuide
             key={userId}

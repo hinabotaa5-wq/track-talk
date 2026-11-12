@@ -1,21 +1,27 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  clearLocaleExplicitChoice,
-  hasLocaleExplicitChoice,
-  localePromptAnswered,
+  detectBrowserLocale,
   mainTabLabel,
-  markLocaleExplicitChoice,
-  markLocalePromptAnswered,
   parseLocale,
-  readStoredLocale,
-  storeLocale,
   t,
 } from "./i18n";
 
+const realLanguage = Object.getOwnPropertyDescriptor(window.navigator, "language");
+const realLanguages = Object.getOwnPropertyDescriptor(window.navigator, "languages");
+
 afterEach(() => {
   localStorage.clear();
+  if (realLanguage) Object.defineProperty(window.navigator, "language", realLanguage);
+  if (realLanguages) Object.defineProperty(window.navigator, "languages", realLanguages);
 });
+
+function setBrowserLanguage(language: unknown, languages?: unknown) {
+  Object.defineProperty(window.navigator, "language", { value: language, configurable: true });
+  if (languages !== undefined) {
+    Object.defineProperty(window.navigator, "languages", { value: languages, configurable: true });
+  }
+}
 
 describe("parseLocale", () => {
   it("en だけ en、ほかは ja", () => {
@@ -53,12 +59,28 @@ describe("t", () => {
   });
 });
 
-describe("stored locale", () => {
-  it("保存と読み出しができる", () => {
-    storeLocale("en");
-    expect(readStoredLocale()).toBe("en");
-    storeLocale("ja");
-    expect(readStoredLocale()).toBe("ja");
+describe("detectBrowserLocale", () => {
+  it("en で始まる値（en, en-US, en-GB 等）だけ英語", () => {
+    for (const value of ["en", "en-US", "en-GB", "EN-us"]) {
+      setBrowserLanguage(value, []);
+      expect(detectBrowserLocale()).toBe("en");
+    }
+  });
+
+  it("ja・その他の言語・取れないときは日本語", () => {
+    for (const value of ["ja", "ja-JP", "fr-FR", "de", "", null, undefined]) {
+      setBrowserLanguage(value, []);
+      expect(detectBrowserLocale()).toBe("ja");
+    }
+  });
+
+  it("language が取れないときは languages[0] を見る", () => {
+    setBrowserLanguage("", ["en-US"]);
+    expect(detectBrowserLocale()).toBe("en");
+    setBrowserLanguage(undefined, ["fr-FR"]);
+    expect(detectBrowserLocale()).toBe("ja");
+    setBrowserLanguage(undefined, []);
+    expect(detectBrowserLocale()).toBe("ja");
   });
 });
 
@@ -79,25 +101,4 @@ describe("ログイン画面の文言", () => {
   });
 });
 
-describe("言語プロンプトの記録", () => {
-  it("答えるまでは未回答、答えたら記録される", () => {
-    expect(localePromptAnswered()).toBe(false);
-    markLocalePromptAnswered();
-    expect(localePromptAnswered()).toBe(true);
-  });
-});
 
-describe("未ログイン中の明示選択の記録（本体 #567）", () => {
-  it("選ぶまでは無し、選んだら残り、消したら無くなる", () => {
-    expect(hasLocaleExplicitChoice()).toBe(false);
-    markLocaleExplicitChoice();
-    expect(hasLocaleExplicitChoice()).toBe(true);
-    clearLocaleExplicitChoice();
-    expect(hasLocaleExplicitChoice()).toBe(false);
-  });
-
-  it("言語の保存だけでは明示選択にならない", () => {
-    storeLocale("en");
-    expect(hasLocaleExplicitChoice()).toBe(false);
-  });
-});
