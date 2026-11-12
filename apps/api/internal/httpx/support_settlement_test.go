@@ -46,8 +46,9 @@ func TestSupportEndPlayerRefundsUnelapsedAndFinalizesByDays(t *testing.T) {
 	admin := adminToken(t, h)
 	_, tc, contract := paidConsultContract(t, h, 2, 10) // 10日間の3日目
 	// 取引条件の明示（フリーランス法第3条）は契約の成立時にコーチへ出ている。
+	// やむを得ない事情の項目は規約第9条4の2と揃える（異議申立てに期限なし・再審査で判断が変わっても全額返金は維持し経過分を支払う）。
 	r := doJSON(t, h, "GET", "/v1/coach/support-contracts/"+contract, tc, nil)
-	if r.Code != 200 || !strings.Contains(r.Body.String(), `"statement":{`) || !strings.Contains(r.Body.String(), "経過日数の日割り") || !strings.Contains(r.Body.String(), "翌月15日") {
+	if r.Code != 200 || !strings.Contains(r.Body.String(), `"statement":{`) || !strings.Contains(r.Body.String(), "経過日数の日割り") || !strings.Contains(r.Body.String(), "翌月15日") || !strings.Contains(r.Body.String(), "期限なく") || !strings.Contains(r.Body.String(), "全額返金はそのまま") {
 		t.Fatalf("statement %d %s", r.Code, r.Body.String())
 	}
 	// 理由が要らない終わり方でも、判定の記録は作らない。
