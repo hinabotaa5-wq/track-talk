@@ -37,8 +37,11 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllEnvs();
 });
+async function showPage(page = <MePage />) {
+  await act(async () => root.render(<AuthProvider><ConfirmProvider>{page}</ConfirmProvider></AuthProvider>));
+}
 async function render() {
-  await act(async () => root.render(<AuthProvider><ConfirmProvider><MePage /></ConfirmProvider></AuthProvider>));
+  await showPage();
   await vi.waitFor(() => expect(mock.onAuthStateChange).toHaveBeenCalledOnce());
 }
 async function signIn(event = "INITIAL_SESSION", id = "user-1") {
@@ -114,6 +117,30 @@ const networkError = () => Object.assign(new Error("通信に失敗しました"
 const visible = async () => {
   await act(async () => document.dispatchEvent(new Event("visibilitychange")));
 };
+const unauthorized = () => Object.assign(new Error("unauthorized"), { status: 401 });
+
+it.each(["SIGNED_IN", "INITIAL_SESSION"])(
+  "ログイン直後のプロフィール取得が一度だけ401でも、再起動せず管理者の入口が出る (%s)",
+  async (event) => {
+    vi.useFakeTimers();
+    try {
+      mock.apiFetch.mockRejectedValueOnce(unauthorized()).mockResolvedValue({ id: "user-1", is_admin: true });
+      await showPage(<div />);
+      await vi.waitFor(() => expect(mock.onAuthStateChange).toHaveBeenCalledOnce());
+      await signIn(event);
+      await showPage();
+      expect(adminLink()).toBeNull();
+      const checking = profileStatus()?.textContent;
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+      expect(adminLink()?.textContent).toBe("アプリ管理");
+      expect(checking).toBe("プロフィールを確認中");
+      expect(profileStatus()).toBeNull();
+      expect(mock.apiFetch).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  },
+);
+
 it("初回のプロフィール取得が通信エラーで失敗しても、待てば管理者の入口が出る", async () => {
   vi.useFakeTimers();
   try {
@@ -187,14 +214,20 @@ it("マイページを開き直したときに、未取得のプロフィール�
     expect(adminLink()?.textContent).toBe("アプリ管理");
   } finally { vi.useRealTimers(); }
 });
-it("一般ユーザーには、失敗・再試行・復帰のどの時点でも管理画面の入口を出さない", async () => {
+it.each([
+  ["通信エラー", networkError],
+  ["401", unauthorized],
+])("一般ユーザーには、%s・再試行・復帰のどの時点でも管理画面の入口を出さない", async (_error, profileError) => {
   vi.useFakeTimers();
   try {
     const seen: boolean[] = [];
     const observer = new MutationObserver(() => seen.push(Boolean(adminLink())));
     observer.observe(container, { childList: true, subtree: true });
-    mock.apiFetch.mockRejectedValueOnce(networkError()).mockResolvedValue({ id: "user-1", is_admin: false });
-    await renderSignedIn();
+    mock.apiFetch.mockRejectedValueOnce(profileError()).mockResolvedValue({ id: "user-1", is_admin: false });
+    await render();
+    await signIn("SIGNED_IN");
+    expect(adminLink()).toBeNull();
+    expect(profileStatus()?.textContent).toBe("プロフィールを確認中");
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(profileStatus()).toBeNull();
     mock.apiFetch.mockRejectedValue(networkError());
@@ -207,13 +240,18 @@ it("一般ユーザーには、失敗・再試行・復帰のどの時点でも�
     expect(adminLink()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
-it("認証エラー（401）では取り直しを繰り返さず、入口も出さない", async () => {
+it("ログイン時に401が続く場合は1回で再試行を打ち切り、復帰や通信回復でも繰り返さない", async () => {
   vi.useFakeTimers();
   try {
-    mock.apiFetch.mockRejectedValue(Object.assign(new Error("unauthorized"), { status: 401 }));
+    mock.apiFetch.mockRejectedValue(unauthorized());
     await renderSignedIn();
+    expect(profileStatus()?.textContent).toBe("プロフィールを確認中");
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
-    expect(mock.apiFetch).toHaveBeenCalledOnce();
+    await visible();
+    await act(async () => window.dispatchEvent(new Event("pageshow")));
+    await act(async () => window.dispatchEvent(new Event("online")));
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(mock.apiFetch).toHaveBeenCalledTimes(2);
     expect(adminLink()).toBeNull();
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
