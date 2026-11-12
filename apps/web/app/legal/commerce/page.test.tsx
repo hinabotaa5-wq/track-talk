@@ -34,9 +34,19 @@ it("公開文面に開発中の注記や販売を終えた追加相談を表示�
   expect(html).toContain("クレジットカードは代金の確保を取り消し、チケットで申し込んだ場合は使った1枚を戻します。");
   // チケットの条件（先払い・6枚一括・有効期限・原則払戻し不可と例外・本人限定。本体 #569）。
   expect(html).toContain("有効期限は決済完了の日時から6か月");
-  expect(html).toContain("購入後の払い戻しを原則として行いません");
-  expect(html).toContain("運営者がフォーム添削の提供を終了した場合");
+  expect(html).toContain("購入者の都合による払戻しを原則として行いません");
+  expect(html).toContain("運営者がフォーム添削の提供を終了したとき");
   expect(html).toContain("購入した本人だけが使え、譲渡はできません");
+  // 例外4項目の箇条書きと払戻額の計算（購入金額 ÷ 6 × 未使用枚数、四捨五入。本体 #572）。
+  expect(html).toContain("（1）運営者がフォーム添削の提供を終了したとき");
+  expect(html).toContain("（2）法令に基づき契約の取消し・解除ができるとき");
+  expect(html).toContain("（3）当社またはコーチの責めに帰すべき事由によってフォーム添削を受けられなかったとき");
+  expect(html).toContain("（4）当社またはコーチの都合により有効期限内に添削を受けられなかったチケットは、失効後であっても");
+  expect(html).toContain("購入金額を6で割った額に未使用の枚数を掛けた額とし、1円未満の端数は四捨五入します");
+  expect(html).toContain("動画添削1回分の価格（500円）に相当する額を返金します");
+  expect(html).not.toContain("切り捨てます");
+  expect(html).not.toContain("一切");
+  expect(html).not.toContain("いかなる理由があっても");
   expect(html).not.toContain("添削・追加相談が返却された時に確定");
   // 内容確認のための差し戻しの例外（再提出から24時間・再提出がないときの終了と返金）。
   expect(html).toContain("再提出から24時間後が新しい返却期限です");

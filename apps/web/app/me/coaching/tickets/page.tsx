@@ -13,7 +13,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { ticketReturnPath, ticketStatusLabels, type TicketProduct, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
-import { ticketPackConfirmRows } from "@/lib/purchase-confirm";
+import { ticketPackConfirmRows, ticketRefundExceptions } from "@/lib/purchase-confirm";
 import { reviewPriceYen, ticketValidityMonths } from "@/lib/review-pricing";
 import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -140,7 +140,11 @@ function TicketsPage() {
           <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
             <li>{L("{q}枚をまとめて先に支払います。1枚で動画添削1回を申し込めます。", { q: p.quantity })}</li>
             <li>{L("有効期限は決済が完了した日時から{m}か月です。過ぎると未使用の分は失効し、延長はしません。", { m: summary.validity_months ?? ticketValidityMonths })}</li>
-            <li>{L("購入後の払い戻しは原則として行いません（運営者が動画添削の提供を終了した場合などを除きます）。")}</li>
+            <li>{L("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします。")}
+              <ul className="list-disc space-y-1 pl-5 pt-1">
+                {ticketRefundExceptions().map((e) => <li key={e}>{e}</li>)}
+              </ul>
+            </li>
             <li>{L("購入した本人だけが使えます。譲ることはできません。")}</li>
           </ul>
           <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
