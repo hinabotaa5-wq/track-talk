@@ -116,10 +116,18 @@ describe("ヘッダーの開閉", () => {
   });
 
   it("未読と既読を表示し、すべて既読で状態と件数が変わる", async () => {
-    apiFetch.mockResolvedValue({ unread_count: 1, notifications: [
-      { id: "unread", kind: "message", title: "新しいお知らせ", read: false, url: "/memo", created_at: "2026-10-23T00:00:00Z" },
-      { id: "read", kind: "message", title: "前のお知らせ", read: true, url: "/memo", created_at: "2026-10-22T00:00:00Z" },
-    ] });
+    // 既読化のあとは正本を取り直すので、サーバー側も既読化を反映する。
+    let readAll = false;
+    apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (options?.method === "POST") {
+        readAll = true;
+        return {};
+      }
+      return { unread_count: readAll ? 0 : 1, notifications: [
+        { id: "unread", kind: "message", title: "新しいお知らせ", read: readAll, url: "/memo", created_at: "2026-10-23T00:00:00Z" },
+        { id: "read", kind: "message", title: "前のお知らせ", read: true, url: "/memo", created_at: "2026-10-22T00:00:00Z" },
+      ] };
+    });
     await act(async () => root.render(<NotificationBell />));
     const bell = container.querySelector("button");
     expect(bell?.getAttribute("aria-label")).toContain("未読1件");

@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
+import { clearAppBadge } from "@/lib/app-badge";
 import { clearCompetitions } from "@/lib/competition-list";
 import { clearDomesticMajors } from "@/lib/domestic-majors";
 import { clearMajorHosts } from "@/lib/major-hosts";
@@ -173,6 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, 0);
         }
         if (!next) {
+          // 前のアカウントのバッジを残さない。未ログイン状態では付けない。
+          void clearAppBadge();
           clearCompetitions();
           clearMajorHosts();
           clearDomesticMajors();

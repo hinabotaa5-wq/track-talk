@@ -59,6 +59,10 @@ type Message struct {
 	// Tag が同じ通知は、端末上で1つにまとまる。
 	Tag            string `json:"tag,omitempty"`
 	SubscriptionID string `json:"subscription_id,omitempty"`
+	// UnreadCount は、その通知を送る時点の受け手の未読総数。端末のアプリアイコンに
+	// バッジを付けるために送る。送る側で数え直すので、DB の列は要らない。
+	// 付けなかったとき（数えられなかった・数えない経路）は省く。
+	UnreadCount *int64 `json:"unread_count,omitempty"`
 }
 
 // Send は1つの宛先に送る。宛先が使えなくなっていたら ErrGone を返す。
