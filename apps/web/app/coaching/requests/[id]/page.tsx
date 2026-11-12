@@ -19,6 +19,7 @@ import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
 import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -222,6 +223,7 @@ function ReviewRequestView() {
   const [error, setError] = useState("");
 
   const [cancelError, setCancelError] = useState("");
+  const now = useNow();
   const { pending: canceling, acquire: acquireCancel, release: releaseCancel } = useActionLock();
   const confirmDialog = useConfirm();
 
@@ -296,7 +298,7 @@ function ReviewRequestView() {
 
   const active = request.status === "in_review" || request.status === "needs_info";
   const deadline = request.status === "needs_info" ? request.info_request?.resubmit_by : request.due_at;
-  const canCancel = active && !request.started_at && !!deadline && Date.parse(deadline) > Date.now();
+  const canCancel = active && !request.started_at && !!deadline && Date.parse(deadline) > now;
 
   return (
     <div className="mx-auto max-w-md space-y-5">
