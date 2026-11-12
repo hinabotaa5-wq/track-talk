@@ -263,7 +263,7 @@ func (q *Queries) GetPendingTicketRefund(ctx context.Context, purchaseID uuid.UU
 }
 
 const getTicketLot = `-- name: GetTicketLot :one
-SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE id = $1
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired, reminded_30_at, reminded_7_at FROM coaching_ticket_lots WHERE id = $1
 `
 
 func (q *Queries) GetTicketLot(ctx context.Context, id uuid.UUID) (CoachingTicketLot, error) {
@@ -280,6 +280,8 @@ func (q *Queries) GetTicketLot(ctx context.Context, id uuid.UUID) (CoachingTicke
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.Expired,
+		&i.Reminded30At,
+		&i.Reminded7At,
 	)
 	return i, err
 }
@@ -582,7 +584,7 @@ func (q *Queries) ListTicketAllocations(ctx context.Context, reservationID uuid.
 }
 
 const listTicketLots = `-- name: ListTicketLots :many
-SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND (expires_at IS NULL OR expires_at > now())
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired, reminded_30_at, reminded_7_at FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND (expires_at IS NULL OR expires_at > now())
 ORDER BY expires_at NULLS LAST,created_at,id FOR UPDATE
 `
 
@@ -607,6 +609,8 @@ func (q *Queries) ListTicketLots(ctx context.Context, ownerID *uuid.UUID) ([]Coa
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.Expired,
+			&i.Reminded30At,
+			&i.Reminded7At,
 		); err != nil {
 			return nil, err
 		}
@@ -636,6 +640,49 @@ func (q *Queries) ListTicketLotsToExpire(ctx context.Context) ([]uuid.UUID, erro
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTicketLotsToRemind = `-- name: ListTicketLotsToRemind :many
+SELECT l.id, l.owner_id, l.available, l.expires_at::timestamptz AS expires_at FROM coaching_ticket_lots l
+WHERE l.owner_id IS NOT NULL AND l.available > 0 AND l.expires_at > now()
+  AND l.expires_at <= now() + make_interval(days => $1::int)
+  AND l.reminded_7_at IS NULL
+  AND ($1::int = 7 OR l.reminded_30_at IS NULL)
+ORDER BY l.expires_at LIMIT 100
+`
+
+type ListTicketLotsToRemindRow struct {
+	ID        uuid.UUID  `json:"id"`
+	OwnerID   *uuid.UUID `json:"owner_id"`
+	Available int32      `json:"available"`
+	ExpiresAt time.Time  `json:"expires_at"`
+}
+
+// 失効まで sqlc.arg(days) 日を切った、未使用分のあるロットのうち、その段階の知らせをまだ送っていないもの。
+// 7日前の知らせを送る時は30日前の知らせを送らない（7日前の段階に入ってから初めて見つけた場合も含む）。
+func (q *Queries) ListTicketLotsToRemind(ctx context.Context, days int32) ([]ListTicketLotsToRemindRow, error) {
+	rows, err := q.db.Query(ctx, listTicketLotsToRemind, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketLotsToRemindRow
+	for rows.Next() {
+		var i ListTicketLotsToRemindRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Available,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -710,7 +757,7 @@ func (q *Queries) ListTicketReservationsToRelease(ctx context.Context) ([]Coachi
 }
 
 const lockTicketLot = `-- name: LockTicketLot :one
-SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired FROM coaching_ticket_lots WHERE id = $1 FOR UPDATE
+SELECT id, owner_id, quantity, available, reserved, consumed, refunded, created_at, expires_at, expired, reminded_30_at, reminded_7_at FROM coaching_ticket_lots WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketLot(ctx context.Context, id uuid.UUID) (CoachingTicketLot, error) {
@@ -727,6 +774,8 @@ func (q *Queries) LockTicketLot(ctx context.Context, id uuid.UUID) (CoachingTick
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.Expired,
+		&i.Reminded30At,
+		&i.Reminded7At,
 	)
 	return i, err
 }
@@ -841,6 +890,28 @@ func (q *Queries) LockTicketReview(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.RetentionHoldAt,
 	)
 	return i, err
+}
+
+const markTicketLotReminded = `-- name: MarkTicketLotReminded :one
+UPDATE coaching_ticket_lots SET
+    reminded_30_at = COALESCE(reminded_30_at, now()),
+    reminded_7_at = CASE WHEN $1::int = 7 THEN now() ELSE reminded_7_at END
+WHERE id = $2 AND reminded_7_at IS NULL
+  AND ($1::int = 7 OR reminded_30_at IS NULL)
+RETURNING id
+`
+
+type MarkTicketLotRemindedParams struct {
+	Days int32     `json:"days"`
+	ID   uuid.UUID `json:"id"`
+}
+
+// 送る前に印を付ける（同時に動いた tick が二重に送らない）。印を付けられたら true。
+func (q *Queries) MarkTicketLotReminded(ctx context.Context, arg MarkTicketLotRemindedParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, markTicketLotReminded, arg.Days, arg.ID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const markTicketPurchasePaid = `-- name: MarkTicketPurchasePaid :one

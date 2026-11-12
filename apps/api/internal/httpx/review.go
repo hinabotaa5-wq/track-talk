@@ -266,7 +266,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !p.CoachingDemo {
+	// 招待コードのゲートは、支払いのない検証用（Stripe の鍵がない環境）のデモ版にだけ残す。
+	// 支払いがある環境では、正規の購入（単発・チケット）で誰でも申し込める（本体 #569）。
+	if !s.reviewOpenTo(p) {
 		Error(w, http.StatusForbidden, "forbidden", "フォーム添削は準備中です")
 		return
 	}

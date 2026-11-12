@@ -113,7 +113,7 @@ export function CoachEarningsSection({ token, onReady }: { token: string | null;
         </div>
       ) : null}
       <div className="space-y-2 text-xs text-slate-300">
-        <p>{L("動画添削の報酬は1本1,050円、添削後の追加相談は1件420円です（いずれも税込）。動画添削は返却時、追加相談は回答時に報酬が確定します。")}</p>
+        <p>{L("動画添削の報酬は1本350円（税込）です。利用者がチケットで申し込んだ添削も同じ額です。返却した時に報酬が確定します。")}</p>
         <p>{L("サポートプランの受取額は、代金から手数料{personal_fee}%を差し引いた額です。プランの期間が終了した時に確定します。途中で返金して終了した場合は、その時点で確定します。", { personal_fee: data.personal_fee })}</p>
         <p>{L("確定した報酬は月末で締め、翌月15日にStripeを通じて登録済みの銀行口座へ振り込みます。繰り越し分を含む支払対象額が{v0}未満の場合は1回だけ繰り越し、翌々月15日に金額にかかわらず支払います。", { v0: formatYen(data.min_payout_yen) })}</p>
       </div>

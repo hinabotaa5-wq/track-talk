@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CoachingView } from "./page-view";
 
-// 開始予定日の案内は、ビルド時ではなくアクセス時の日時で出し分ける。
+// 開始の告知は環境変数で出し分ける（lib/video-review-start.ts）。アクセスごとに描く設定は従来のまま残す。
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
