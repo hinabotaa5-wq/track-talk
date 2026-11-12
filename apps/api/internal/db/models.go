@@ -541,6 +541,7 @@ type CoachingTicketPurchase struct {
 	PaidAt            *time.Time `json:"paid_at"`
 	RefundedYen       int32      `json:"refunded_yen"`
 	CreatedAt         time.Time  `json:"created_at"`
+	WordingVersion    *string    `json:"wording_version"`
 }
 
 type CoachingTicketRefund struct {

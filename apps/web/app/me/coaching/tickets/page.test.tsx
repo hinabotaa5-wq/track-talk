@@ -63,7 +63,12 @@ it("6枚2,500円を、単発の料金との比較と条件（先払い・有効�
   expect(text).toContain("1回あたり約417円。1回ずつ払うと500円×6回で3,000円です。");
   expect(text).toContain("6枚をまとめて先に支払います");
   expect(text).toContain("有効期限は決済が完了した日時から6か月です");
-  expect(text).toContain("購入後の払い戻しは原則として行いません");
+  // 原則払戻し不可の単独表示にせず、例外4項目を同じ画面に箇条書きする（本体 #572）。
+  expect(text).toContain("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします。");
+  expect(text).toContain("サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）を払い戻します。");
+  expect(text).toContain("法令で認められる取消し・解除は、その定めに従います");
+  expect(text).toContain("当社・コーチの都合で提供できないときや著しく遅れたときは、チケットを戻すか返金します。");
+  expect(text).toContain("当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。");
   expect(text).toContain("購入した本人だけが使えます");
   expect(text).not.toContain("通常価格");
   expect(container.querySelector("s, del")).toBeNull();
@@ -79,7 +84,12 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめて先に支払います");
   expect(confirm.textContent).toContain("お支払いが済んだ時に購入が確定");
   expect(confirm.textContent).toContain("2027/05/20 10:00");
-  expect(confirm.textContent).toContain("未使用の分を払い戻します");
+  // 最終確認にも例外4項目を番号付きで出す（本体 #572）。
+  expect(confirm.textContent).toContain("購入者の都合による払戻しは原則として行いません");
+  expect(confirm.textContent).toContain("（1）サービス終了時は");
+  expect(confirm.textContent).toContain("（2）法令で認められる取消し・解除は");
+  expect(confirm.textContent).toContain("（3）当社・コーチの都合で提供できないとき");
+  expect(confirm.textContent).toContain("（4）当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。");
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 

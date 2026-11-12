@@ -14,7 +14,9 @@ import (
 
 const adminTicketPurchases = `-- name: AdminTicketPurchases :many
 SELECT p.id,p.owner_id,p.quantity,p.amount_yen,p.status,p.refunded_yen,p.created_at,p.paid_at,
+    p.wording_version,
     COALESCE(l.available,0)::integer AS available,COALESCE(l.reserved,0)::integer AS reserved,
+    COALESCE(l.expired,0)::integer AS expired,l.expires_at,
     pr.nickname,
     EXISTS(SELECT 1 FROM coaching_ticket_refunds r WHERE r.purchase_id = p.id AND r.status = 'pending')::boolean AS refund_pending
 FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.id = p.id
@@ -22,18 +24,21 @@ LEFT JOIN profiles pr ON pr.id = p.owner_id ORDER BY p.created_at DESC LIMIT 200
 `
 
 type AdminTicketPurchasesRow struct {
-	ID            uuid.UUID  `json:"id"`
-	OwnerID       *uuid.UUID `json:"owner_id"`
-	Quantity      int32      `json:"quantity"`
-	AmountYen     int32      `json:"amount_yen"`
-	Status        string     `json:"status"`
-	RefundedYen   int32      `json:"refunded_yen"`
-	CreatedAt     time.Time  `json:"created_at"`
-	PaidAt        *time.Time `json:"paid_at"`
-	Available     int32      `json:"available"`
-	Reserved      int32      `json:"reserved"`
-	Nickname      *string    `json:"nickname"`
-	RefundPending bool       `json:"refund_pending"`
+	ID             uuid.UUID  `json:"id"`
+	OwnerID        *uuid.UUID `json:"owner_id"`
+	Quantity       int32      `json:"quantity"`
+	AmountYen      int32      `json:"amount_yen"`
+	Status         string     `json:"status"`
+	RefundedYen    int32      `json:"refunded_yen"`
+	CreatedAt      time.Time  `json:"created_at"`
+	PaidAt         *time.Time `json:"paid_at"`
+	WordingVersion *string    `json:"wording_version"`
+	Available      int32      `json:"available"`
+	Reserved       int32      `json:"reserved"`
+	Expired        int32      `json:"expired"`
+	ExpiresAt      *time.Time `json:"expires_at"`
+	Nickname       *string    `json:"nickname"`
+	RefundPending  bool       `json:"refund_pending"`
 }
 
 func (q *Queries) AdminTicketPurchases(ctx context.Context) ([]AdminTicketPurchasesRow, error) {
@@ -54,8 +59,11 @@ func (q *Queries) AdminTicketPurchases(ctx context.Context) ([]AdminTicketPurcha
 			&i.RefundedYen,
 			&i.CreatedAt,
 			&i.PaidAt,
+			&i.WordingVersion,
 			&i.Available,
 			&i.Reserved,
+			&i.Expired,
+			&i.ExpiresAt,
 			&i.Nickname,
 			&i.RefundPending,
 		); err != nil {
@@ -304,7 +312,7 @@ func (q *Queries) GetTicketProduct(ctx context.Context, id string) (CoachingTick
 }
 
 const getTicketPurchase = `-- name: GetTicketPurchase :one
-SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at FROM coaching_ticket_purchases WHERE id = $1
+SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at, wording_version FROM coaching_ticket_purchases WHERE id = $1
 `
 
 func (q *Queries) GetTicketPurchase(ctx context.Context, id uuid.UUID) (CoachingTicketPurchase, error) {
@@ -326,12 +334,13 @@ func (q *Queries) GetTicketPurchase(ctx context.Context, id uuid.UUID) (Coaching
 		&i.PaidAt,
 		&i.RefundedYen,
 		&i.CreatedAt,
+		&i.WordingVersion,
 	)
 	return i, err
 }
 
 const getTicketPurchaseByKey = `-- name: GetTicketPurchaseByKey :one
-SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at FROM coaching_ticket_purchases WHERE owner_id = $1 AND request_key = $2
+SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at, wording_version FROM coaching_ticket_purchases WHERE owner_id = $1 AND request_key = $2
 `
 
 type GetTicketPurchaseByKeyParams struct {
@@ -358,6 +367,7 @@ func (q *Queries) GetTicketPurchaseByKey(ctx context.Context, arg GetTicketPurch
 		&i.PaidAt,
 		&i.RefundedYen,
 		&i.CreatedAt,
+		&i.WordingVersion,
 	)
 	return i, err
 }
@@ -781,7 +791,7 @@ func (q *Queries) LockTicketLot(ctx context.Context, id uuid.UUID) (CoachingTick
 }
 
 const lockTicketPurchase = `-- name: LockTicketPurchase :one
-SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at FROM coaching_ticket_purchases WHERE id = $1 FOR UPDATE
+SELECT id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at, wording_version FROM coaching_ticket_purchases WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTicketPurchase(ctx context.Context, id uuid.UUID) (CoachingTicketPurchase, error) {
@@ -803,6 +813,7 @@ func (q *Queries) LockTicketPurchase(ctx context.Context, id uuid.UUID) (Coachin
 		&i.PaidAt,
 		&i.RefundedYen,
 		&i.CreatedAt,
+		&i.WordingVersion,
 	)
 	return i, err
 }
@@ -917,7 +928,7 @@ func (q *Queries) MarkTicketLotReminded(ctx context.Context, arg MarkTicketLotRe
 const markTicketPurchasePaid = `-- name: MarkTicketPurchasePaid :one
 UPDATE coaching_ticket_purchases SET status = 'paid', payment_intent_id = $2,
     checkout_session_id = COALESCE(checkout_session_id, $3), paid_at = now()
-WHERE id = $1 AND status = 'pending' RETURNING id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at
+WHERE id = $1 AND status = 'pending' RETURNING id, owner_id, request_key, product_id, quantity, amount_yen, status, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, return_path, paid_at, refunded_yen, created_at, wording_version
 `
 
 type MarkTicketPurchasePaidParams struct {
@@ -945,6 +956,7 @@ func (q *Queries) MarkTicketPurchasePaid(ctx context.Context, arg MarkTicketPurc
 		&i.PaidAt,
 		&i.RefundedYen,
 		&i.CreatedAt,
+		&i.WordingVersion,
 	)
 	return i, err
 }
@@ -1153,5 +1165,20 @@ UPDATE coaching_ticket_refunds SET updated_at = now() WHERE id = $1
 
 func (q *Queries) TouchTicketRefund(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, touchTicketRefund, id)
+	return err
+}
+
+const updateTicketPurchaseWording = `-- name: UpdateTicketPurchaseWording :exec
+UPDATE coaching_ticket_purchases SET wording_version = $2 WHERE id = $1 AND wording_version IS NULL
+`
+
+type UpdateTicketPurchaseWordingParams struct {
+	ID             uuid.UUID `json:"id"`
+	WordingVersion *string   `json:"wording_version"`
+}
+
+// 購入の確定時に表示していた文面の版を残す（本体 #572 v3）。後から上書きしない。
+func (q *Queries) UpdateTicketPurchaseWording(ctx context.Context, arg UpdateTicketPurchaseWordingParams) error {
+	_, err := q.db.Exec(ctx, updateTicketPurchaseWording, arg.ID, arg.WordingVersion)
 	return err
 }

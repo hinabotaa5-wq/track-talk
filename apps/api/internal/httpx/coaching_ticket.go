@@ -27,6 +27,10 @@ const reviewTicketUnits int32 = 1
 // ticketValidity は、チケットの有効期限（決済完了から6か月）。SQL の CreateTicketLot と揃える。
 const ticketValidityMonths = 6
 
+// ticketWordingVersion は、チケットの購入画面・最終確認・規約に表示している文面の版（本体 #572 v3）。
+// 購入の確定時に購入ごとに残し、文面の版と購入を突き合わせられるようにする（証拠化）。
+const ticketWordingVersion = "v3"
+
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
 const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください"
 
@@ -170,7 +174,7 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "purchases": purchases, "ledger": ledger, "is_minor": profileIsMinor(p),
 		"can_purchase": eligible == nil && s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
-		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths})
+		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
 }
 
 func writeTicketEligibilityReason(err error, reason *string) bool {
@@ -344,6 +348,10 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 		}
 		p, err = q.MarkTicketPurchasePaid(ctx, db.MarkTicketPurchasePaidParams{ID: id, PaymentIntentID: &sess.PaymentIntent, CheckoutSessionID: &sess.ID})
 		if err != nil {
+			return err
+		}
+		version := ticketWordingVersion
+		if err := q.UpdateTicketPurchaseWording(ctx, db.UpdateTicketPurchaseWordingParams{ID: id, WordingVersion: &version}); err != nil {
 			return err
 		}
 		if err := q.CreateTicketLot(ctx, db.CreateTicketLotParams{ID: id, OwnerID: p.OwnerID, Quantity: p.Quantity, PaidAt: *p.PaidAt}); err != nil {

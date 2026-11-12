@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -371,6 +372,99 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 		t.Fatal("duplicate orphan refund")
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
+}
+
+// 失効後の返金（本体 #572 項目7）。運営者またはコーチの都合で有効期限内に受けられなかったことが
+// 確認できた失効済みチケットは、申出ベースで1枚500円を元の決済へ返金し、1枚ずつ記録する。
+func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	admin := adminToken(t, h)
+	_, tu := demoRequester(t, h, admin)
+	purchase := buySixTickets(t, h, tu)
+	// 文面の版を購入ごとに残す（本体 #572 項目10）。
+	var wording *string
+	queryRowArgs(t, `SELECT wording_version FROM coaching_ticket_purchases WHERE id=$1`, []any{purchase}, &wording)
+	if wording == nil || *wording != "v3" {
+		t.Fatalf("wording version %+v", wording)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil); !strings.Contains(rec.Body.String(), `"terms_version":"v3"`) {
+		t.Fatalf("terms version %s", rec.Body.String())
+	}
+	// 期限を過ぎたら、失効の tick を待たずに従来の返金では断る（既存の挙動を維持）。
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 422 || !strings.Contains(rec.Body.String(), "tickets_expired") {
+		t.Fatalf("legacy expired refund %d %s", rec.Code, rec.Body.String())
+	}
+	// 失効後の返金は、1枚500円に相当する額を元の決済へ返金し、台帳には1枚ずつ記録する。
+	rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, map[string]any{"post_expiry": true, "quantity": 6})
+	if rec.Code != 202 || !strings.Contains(rec.Body.String(), "失効後の返金を受け付けました") {
+		t.Fatalf("post-expiry refund %d %s", rec.Code, rec.Body.String())
+	}
+	if len(f.refundList()) != 1 {
+		t.Fatalf("remote refunds %d", len(f.refundList()))
+	}
+	amount, err := strconv.Atoi(f.refundList()[0].Get("amount"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if amount != 3000 {
+		t.Fatalf("remote refund total %d", amount)
+	}
+	state := ticketSummary(t, h, tu)
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 3000 {
+		t.Fatalf("post-expiry %+v", state)
+	}
+	var available, expired, refunded int
+	queryRowArgs(t, `SELECT available,expired,refunded FROM coaching_ticket_lots WHERE id=$1`, []any{purchase}, &available, &expired, &refunded)
+	if available != 0 || expired != 0 || refunded != 6 {
+		t.Fatalf("lot %d %d %d", available, expired, refunded)
+	}
+	var expireRows, refundRows int
+	queryRowArgs(t, `SELECT count(*) FILTER (WHERE kind='expire'),count(*) FILTER (WHERE kind='refund') FROM coaching_ticket_ledger WHERE lot_id=$1`, []any{purchase}, &expireRows, &refundRows)
+	if expireRows != 1 || refundRows != 6 {
+		t.Fatalf("ledger expire %d refund %d", expireRows, refundRows)
+	}
+	// 返し切った分はもう返金できない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, map[string]any{"post_expiry": true, "quantity": 1}); rec.Code != 422 || !strings.Contains(rec.Body.String(), "invalid_refund_quantity") {
+		t.Fatalf("over refund %d %s", rec.Code, rec.Body.String())
+	}
+	assertTicketAccounting(t, h, admin)
+}
+
+// サービス終了時の払戻しは、購入金額 ÷ 6 × 未使用枚数で、1円未満の端数は四捨五入する（本体 #572 v3）。
+func TestTicketServiceEndRefundRoundsHalfUp(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	admin := adminToken(t, h)
+	_, tc := onDutyCoach(t, h, admin)
+	_, tu := demoRequester(t, h, admin)
+	purchase := buySixTickets(t, h, tu)
+	for i := 0; i < 5; i++ {
+		review := ticketReview(t, h, tu)
+		offers := coachRequests(t, h, tc).Offers
+		if len(offers) != 1 {
+			t.Fatalf("offers %+v", offers)
+		}
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != 200 {
+			t.Fatal(rec.Body.String())
+		}
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+review+"/response", tc, responseBody()); rec.Code != 200 {
+			t.Fatal(rec.Body.String())
+		}
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 202 {
+		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
+	}
+	// 2500 ÷ 6 × 1 = 416.66… → 四捨五入で417。
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 417 {
+		t.Fatalf("rounded refund %d", got)
+	}
+	// 有効期限の前は失効後の返金を使えない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, map[string]any{"post_expiry": true, "quantity": 1}); rec.Code != 422 || !strings.Contains(rec.Body.String(), "tickets_not_expired") {
+		t.Fatalf("pre-expiry %d %s", rec.Code, rec.Body.String())
+	}
+	assertTicketAccounting(t, h, admin)
 }
 
 func TestTicketPendingRefundFailureRestoresBalance(t *testing.T) {

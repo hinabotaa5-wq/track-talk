@@ -26,6 +26,10 @@ UPDATE coaching_ticket_purchases SET status = 'paid', payment_intent_id = $2,
     checkout_session_id = COALESCE(checkout_session_id, $3), paid_at = now()
 WHERE id = $1 AND status = 'pending' RETURNING *;
 
+-- name: UpdateTicketPurchaseWording :exec
+-- 購入の確定時に表示していた文面の版を残す（本体 #572 v3）。後から上書きしない。
+UPDATE coaching_ticket_purchases SET wording_version = $2 WHERE id = $1 AND wording_version IS NULL;
+
 -- name: CreateTicketLot :exec
 -- 有効期限は決済完了日時の6か月後（本体 #569）。
 INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available, expires_at)
@@ -140,7 +144,9 @@ WHERE l.owner_id = $1 ORDER BY e.created_at DESC,e.id DESC LIMIT 100;
 
 -- name: AdminTicketPurchases :many
 SELECT p.id,p.owner_id,p.quantity,p.amount_yen,p.status,p.refunded_yen,p.created_at,p.paid_at,
+    p.wording_version,
     COALESCE(l.available,0)::integer AS available,COALESCE(l.reserved,0)::integer AS reserved,
+    COALESCE(l.expired,0)::integer AS expired,l.expires_at,
     pr.nickname,
     EXISTS(SELECT 1 FROM coaching_ticket_refunds r WHERE r.purchase_id = p.id AND r.status = 'pending')::boolean AS refund_pending
 FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.id = p.id

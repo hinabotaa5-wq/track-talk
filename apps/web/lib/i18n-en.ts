@@ -3008,5 +3008,12 @@ export const en: Readonly<Record<string, string>> = {
   "決済が完了した日時から{validityMonths}か月（いまお支払いが済むと {v0} ごろまで）。過ぎると未使用の分は失効し、延長はしません。": "{validityMonths} months from when payment completes (around {v0} if you pay now). Unused tickets expire after that, and the period can't be extended.",
   "払戻し": "Refunds",
   "購入後の払い戻しは原則として行いません。運営者が動画添削の提供を終了した場合などに限り、未使用の分を払い戻します（利用規約第6条）。": "As a rule, tickets are non-refundable. Unused tickets are refunded only in cases such as the team ending the video review service (Terms, Article 6).",
+  "サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）を払い戻します。": "If the service ends, unused tickets held at that time are refunded, even if they have expired.",
+  "法令で認められる取消し・解除は、その定めに従います（当社の債務不履行に基づく解除・未成年者の取消しを含みます）。": "Cancellations or terminations allowed by law follow those rules (including termination for our non-performance and cancellation by minors).",
+  "当社・コーチの都合で提供できないときや著しく遅れたときは、チケットを戻すか返金します。": "If we or the coach can't provide the review, or it is significantly delayed for our reasons, the ticket is returned or refunded.",
+  "当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。": "If you couldn't receive the review in time for our or the coach's reasons, the equivalent of ¥500 per ticket is refunded even after expiry.",
+  "購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします（利用規約第6条）。": "Refunds for the purchaser's own reasons are not given as a rule. Refunds are given in the following cases (Terms, Article 6).",
+  "購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします。": "Refunds for the purchaser's own reasons are not given as a rule. Refunds are given in the following cases.",
+  "返却期限（{due}）までに返却がない場合や、コーチが辞退した場合は、確保した1枚を戻します。有効期限を過ぎてから戻る分は失効します。当社・コーチの都合で期限内に受けられなかった場合の失効後の返金は、利用規約第6条のとおりです。": "If the review isn't returned by the deadline ({due}) or the coach declines, the held ticket is returned. A ticket returned after its expiry expires. Refunds after expiry for reviews not received in time for our or the coach's reasons follow Terms, Article 6.",
   "使える人": "Who can use them",
 };
