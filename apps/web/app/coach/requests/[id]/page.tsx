@@ -183,7 +183,7 @@ function ClarificationForm({ request, token, onSent, locale }: { request: CoachR
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <p className="text-xs text-slate-300">{L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}</p>
+      <p className="text-xs text-slate-300">{t(locale, "coach.detail.contactNote")}</p>
       {guard.warning}
       <Field label={t(locale, "coach.detail.followup")} value={text} onChange={setText} error={errors.clarification} />
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
