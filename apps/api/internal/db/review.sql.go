@@ -12,24 +12,30 @@ import (
 	"github.com/google/uuid"
 )
 
-const acceptReviewRequest = `-- name: AcceptReviewRequest :one
-UPDATE review_requests
+const assignReviewRequest = `-- name: AssignReviewRequest :one
+UPDATE review_requests r
 SET status = 'in_review',
-    updated_at = now()
-WHERE id = $1
-  AND coach_id = $2
-  AND status = 'offered'
-  AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
+    coach_id = $1::uuid,
+    assigned_at = statement_timestamp(),
+    due_at = statement_timestamp() + interval '24 hours',
+    updated_at = statement_timestamp()
+WHERE id = $2 AND status = 'queued'
+  AND EXISTS (
+      SELECT 1 FROM coach_profiles c
+      WHERE c.profile_id = $1::uuid AND c.status = 'approved'
+      FOR NO KEY UPDATE
+  )
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
-type AcceptReviewRequestParams struct {
-	ID      uuid.UUID  `json:"id"`
-	CoachID *uuid.UUID `json:"coach_id"`
+type AssignReviewRequestParams struct {
+	CoachID uuid.UUID `json:"coach_id"`
+	ID      uuid.UUID `json:"id"`
 }
 
-func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewRequestParams) (ReviewRequest, error) {
-	row := q.db.QueryRow(ctx, acceptReviewRequest, arg.ID, arg.CoachID)
+// The transaction that assigns the coach also makes the request visible in their queue.
+func (q *Queries) AssignReviewRequest(ctx context.Context, arg AssignReviewRequestParams) (ReviewRequest, error) {
+	row := q.db.QueryRow(ctx, assignReviewRequest, arg.CoachID, arg.ID)
 	var i ReviewRequest
 	err := row.Scan(
 		&i.ID,
@@ -63,70 +69,108 @@ func (q *Queries) AcceptReviewRequest(ctx context.Context, arg AcceptReviewReque
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
 
-const answerReviewOffer = `-- name: AnswerReviewOffer :exec
-UPDATE review_offers
-SET result = $1::text,
-    answered_at = now()
-WHERE id = $2
-  AND result IS NULL
+const cancelUnstartedReview = `-- name: CancelUnstartedReview :one
+UPDATE review_requests
+SET status = 'expired', canceled_at = statement_timestamp(), updated_at = statement_timestamp()
+WHERE id = $1
+  AND requester_id = $2::uuid
+  AND started_at IS NULL
+  AND ((status = 'in_review' AND due_at > statement_timestamp())
+    OR (status = 'needs_info' AND resubmit_by > statement_timestamp()))
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
-type AnswerReviewOfferParams struct {
-	Result string    `json:"result"`
-	ID     uuid.UUID `json:"id"`
+type CancelUnstartedReviewParams struct {
+	ID          uuid.UUID `json:"id"`
+	RequesterID uuid.UUID `json:"requester_id"`
 }
 
-func (q *Queries) AnswerReviewOffer(ctx context.Context, arg AnswerReviewOfferParams) error {
-	_, err := q.db.Exec(ctx, answerReviewOffer, arg.Result, arg.ID)
-	return err
+func (q *Queries) CancelUnstartedReview(ctx context.Context, arg CancelUnstartedReviewParams) (ReviewRequest, error) {
+	row := q.db.QueryRow(ctx, cancelUnstartedReview, arg.ID, arg.RequesterID)
+	var i ReviewRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.Tier,
+		&i.Event,
+		&i.Focus,
+		&i.VideoPublicID,
+		&i.Status,
+		&i.DueAt,
+		&i.CoachID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReturnedAt,
+		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.BasePriceYen,
+		&i.UseTickets,
+		&i.InfoRequest,
+		&i.InfoReason,
+		&i.InfoRequestedAt,
+		&i.InfoFromStatus,
+		&i.ResubmitBy,
+		&i.OriginalQuestion,
+		&i.VideoReplaced,
+		&i.ResubmittedAt,
+		&i.WithdrawnAt,
+		&i.WithdrawnBy,
+		&i.WithdrawnFromStatus,
+		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
+	)
+	return i, err
 }
 
-const claimReviewOfferReminders = `-- name: ClaimReviewOfferReminders :many
-WITH claimed AS (
-    UPDATE review_offers o
-    SET reminder_sent_at = $1::timestamptz
-    FROM review_requests r
-    WHERE r.id = o.request_id
-      AND r.status = 'offered'
-      AND r.requested_coach_id = o.coach_id
-      AND o.result IS NULL
-      AND o.reminder_sent_at IS NULL
-      AND o.expires_at > $1::timestamptz
-      AND o.expires_at <= $2::timestamptz
-    RETURNING o.id, o.request_id, o.coach_id, o.expires_at
-), notices AS (
-    INSERT INTO notifications (id, recipient_id, kind, review_request_id)
-    SELECT gen_random_uuid(), coach_id, 'review_offer_reminder', request_id FROM claimed
-)
-SELECT id, coach_id, expires_at FROM claimed
+const claimReviewDueReminders = `-- name: ClaimReviewDueReminders :many
+UPDATE review_requests
+SET reminder_12h_at = CASE WHEN $1::int = 12 THEN now() ELSE reminder_12h_at END,
+    reminder_4h_at = CASE WHEN $1::int = 4 THEN now() ELSE reminder_4h_at END
+WHERE status = 'in_review' AND coach_id IS NOT NULL
+  AND due_at > now()
+  AND due_at <= now() + make_interval(hours => $1::int)
+  AND CASE WHEN $1::int = 12
+           THEN reminder_12h_at IS NULL AND due_at > now() + interval '4 hours'
+           ELSE reminder_4h_at IS NULL END
+RETURNING id, coach_id, due_at
 `
 
-type ClaimReviewOfferRemindersParams struct {
-	CheckedAt     time.Time `json:"checked_at"`
-	RemindThrough time.Time `json:"remind_through"`
+type ClaimReviewDueRemindersRow struct {
+	ID      uuid.UUID  `json:"id"`
+	CoachID *uuid.UUID `json:"coach_id"`
+	DueAt   time.Time  `json:"due_at"`
 }
 
-type ClaimReviewOfferRemindersRow struct {
-	ID        uuid.UUID `json:"id"`
-	CoachID   uuid.UUID `json:"coach_id"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
-// Persist the one-time claim and its in-app notification together.
-func (q *Queries) ClaimReviewOfferReminders(ctx context.Context, arg ClaimReviewOfferRemindersParams) ([]ClaimReviewOfferRemindersRow, error) {
-	rows, err := q.db.Query(ctx, claimReviewOfferReminders, arg.CheckedAt, arg.RemindThrough)
+func (q *Queries) ClaimReviewDueReminders(ctx context.Context, hoursLeft int32) ([]ClaimReviewDueRemindersRow, error) {
+	rows, err := q.db.Query(ctx, claimReviewDueReminders, hoursLeft)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ClaimReviewOfferRemindersRow
+	var items []ClaimReviewDueRemindersRow
 	for rows.Next() {
-		var i ClaimReviewOfferRemindersRow
-		if err := rows.Scan(&i.ID, &i.CoachID, &i.ExpiresAt); err != nil {
+		var i ClaimReviewDueRemindersRow
+		if err := rows.Scan(&i.ID, &i.CoachID, &i.DueAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -220,44 +264,10 @@ func (q *Queries) CreateDemoCode(ctx context.Context, code string) (CoachingDemo
 	return i, err
 }
 
-const createReviewOffer = `-- name: CreateReviewOffer :one
-INSERT INTO review_offers (id, request_id, coach_id, expires_at)
-VALUES ($1, $2, $3, $4)
-RETURNING id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at
-`
-
-type CreateReviewOfferParams struct {
-	ID        uuid.UUID `json:"id"`
-	RequestID uuid.UUID `json:"request_id"`
-	CoachID   uuid.UUID `json:"coach_id"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
-func (q *Queries) CreateReviewOffer(ctx context.Context, arg CreateReviewOfferParams) (ReviewOffer, error) {
-	row := q.db.QueryRow(ctx, createReviewOffer,
-		arg.ID,
-		arg.RequestID,
-		arg.CoachID,
-		arg.ExpiresAt,
-	)
-	var i ReviewOffer
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.CoachID,
-		&i.OfferedAt,
-		&i.ExpiresAt,
-		&i.Result,
-		&i.AnsweredAt,
-		&i.ReminderSentAt,
-	)
-	return i, err
-}
-
 const createReviewRequest = `-- name: CreateReviewRequest :one
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
 type CreateReviewRequestParams struct {
@@ -326,6 +336,13 @@ func (q *Queries) CreateReviewRequest(ctx context.Context, arg CreateReviewReque
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
@@ -341,6 +358,7 @@ WITH target AS (
     UPDATE review_requests r
     SET status = 'expired',
         coach_id = CASE WHEN target.old_status = 'in_review' THEN r.coach_id END,
+        timed_out_at = CASE WHEN target.old_status = 'in_review' THEN now() END,
         updated_at = now()
     FROM target
     WHERE r.id = target.id
@@ -384,46 +402,6 @@ func (q *Queries) ExpireOverdueReviewRequests(ctx context.Context) ([]ExpireOver
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const expireStaleReviewOffers = `-- name: ExpireStaleReviewOffers :many
-WITH stale AS (
-    UPDATE review_offers
-    SET result = 'expired',
-        answered_at = now()
-    WHERE result IS NULL
-      AND expires_at <= now()
-    RETURNING request_id
-)
-UPDATE review_requests r
-SET status = CASE WHEN requested_coach_id IS NULL THEN 'queued' ELSE 'expired' END,
-    coach_id = NULL,
-    updated_at = now()
-FROM stale
-WHERE r.id = stale.request_id
-  AND r.status = 'offered'
-RETURNING r.id
-`
-
-// 引受期限（90分、夜間は数えない）までに返事がなかった打診を閉じ、依頼を待ちに戻す。
-func (q *Queries) ExpireStaleReviewOffers(ctx context.Context) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, expireStaleReviewOffers)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []uuid.UUID
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -491,7 +469,7 @@ func (q *Queries) ExpireUnresubmittedReviewRequests(ctx context.Context) ([]Expi
 }
 
 const getReviewRequest = `-- name: GetReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE id = $1
 `
 
@@ -530,84 +508,19 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
 
-const listCoachOpenOffers = `-- name: ListCoachOpenOffers :many
-SELECT o.id AS offer_id, o.expires_at AS offer_expires_at, r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason, r.videos_purged_at, r.retention_hold_at
-FROM review_offers o
-JOIN review_requests r ON r.id = o.request_id
-WHERE o.coach_id = $1
-  AND o.result IS NULL
-  AND o.expires_at > now()
-  -- 差し戻し中（needs_info）の打診は、再提出されるまで出さない。
-  AND r.status = 'offered'
-ORDER BY o.offered_at
-`
-
-type ListCoachOpenOffersRow struct {
-	OfferID        uuid.UUID     `json:"offer_id"`
-	OfferExpiresAt time.Time     `json:"offer_expires_at"`
-	ReviewRequest  ReviewRequest `json:"review_request"`
-}
-
-func (q *Queries) ListCoachOpenOffers(ctx context.Context, coachID uuid.UUID) ([]ListCoachOpenOffersRow, error) {
-	rows, err := q.db.Query(ctx, listCoachOpenOffers, coachID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListCoachOpenOffersRow
-	for rows.Next() {
-		var i ListCoachOpenOffersRow
-		if err := rows.Scan(
-			&i.OfferID,
-			&i.OfferExpiresAt,
-			&i.ReviewRequest.ID,
-			&i.ReviewRequest.RequesterID,
-			&i.ReviewRequest.Tier,
-			&i.ReviewRequest.Event,
-			&i.ReviewRequest.Focus,
-			&i.ReviewRequest.VideoPublicID,
-			&i.ReviewRequest.Status,
-			&i.ReviewRequest.DueAt,
-			&i.ReviewRequest.CoachID,
-			&i.ReviewRequest.CreatedAt,
-			&i.ReviewRequest.UpdatedAt,
-			&i.ReviewRequest.ReturnedAt,
-			&i.ReviewRequest.Question,
-			&i.ReviewRequest.RequestedCoachID,
-			&i.ReviewRequest.RequestedCoachName,
-			&i.ReviewRequest.BasePriceYen,
-			&i.ReviewRequest.UseTickets,
-			&i.ReviewRequest.InfoRequest,
-			&i.ReviewRequest.InfoReason,
-			&i.ReviewRequest.InfoRequestedAt,
-			&i.ReviewRequest.InfoFromStatus,
-			&i.ReviewRequest.ResubmitBy,
-			&i.ReviewRequest.OriginalQuestion,
-			&i.ReviewRequest.VideoReplaced,
-			&i.ReviewRequest.ResubmittedAt,
-			&i.ReviewRequest.WithdrawnAt,
-			&i.ReviewRequest.WithdrawnBy,
-			&i.ReviewRequest.WithdrawnFromStatus,
-			&i.ReviewRequest.WithdrawReason,
-			&i.ReviewRequest.VideosPurgedAt,
-			&i.ReviewRequest.RetentionHoldAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listCoachReviewing = `-- name: ListCoachReviewing :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE coach_id = $1::uuid
   AND (status IN ('in_review', 'clarifying')
        -- 差し戻し中の依頼も、再提出を待っていることが分かるように出す。
@@ -656,6 +569,13 @@ func (q *Queries) ListCoachReviewing(ctx context.Context, coachID uuid.UUID) ([]
 			&i.WithdrawReason,
 			&i.VideosPurgedAt,
 			&i.RetentionHoldAt,
+			&i.AssignedAt,
+			&i.StartedAt,
+			&i.TimedOutAt,
+			&i.CanceledAt,
+			&i.ReturnReason,
+			&i.Reminder12hAt,
+			&i.Reminder4hAt,
 		); err != nil {
 			return nil, err
 		}
@@ -708,7 +628,7 @@ func (q *Queries) ListDemoCodes(ctx context.Context) ([]ListDemoCodesRow, error)
 }
 
 const listMyReviewRequests = `-- name: ListMyReviewRequests :many
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE requester_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -761,6 +681,13 @@ func (q *Queries) ListMyReviewRequests(ctx context.Context, arg ListMyReviewRequ
 			&i.WithdrawReason,
 			&i.VideosPurgedAt,
 			&i.RetentionHoldAt,
+			&i.AssignedAt,
+			&i.StartedAt,
+			&i.TimedOutAt,
+			&i.CanceledAt,
+			&i.ReturnReason,
+			&i.Reminder12hAt,
+			&i.Reminder4hAt,
 		); err != nil {
 			return nil, err
 		}
@@ -800,6 +727,38 @@ func (q *Queries) ListQueuedReviewRequests(ctx context.Context) ([]uuid.UUID, er
 	return items, nil
 }
 
+const listRecentReviewOutcomes = `-- name: ListRecentReviewOutcomes :many
+SELECT id, timed_out_at FROM review_requests
+WHERE coach_id = $1 AND (timed_out_at IS NOT NULL OR returned_at IS NOT NULL)
+ORDER BY COALESCE(timed_out_at, returned_at) DESC, id DESC
+LIMIT 4
+`
+
+type ListRecentReviewOutcomesRow struct {
+	ID         uuid.UUID  `json:"id"`
+	TimedOutAt *time.Time `json:"timed_out_at"`
+}
+
+func (q *Queries) ListRecentReviewOutcomes(ctx context.Context, coachID *uuid.UUID) ([]ListRecentReviewOutcomesRow, error) {
+	rows, err := q.db.Query(ctx, listRecentReviewOutcomes, coachID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentReviewOutcomesRow
+	for rows.Next() {
+		var i ListRecentReviewOutcomesRow
+		if err := rows.Scan(&i.ID, &i.TimedOutAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReviewNominees = `-- name: ListReviewNominees :many
 SELECT c.profile_id, COALESCE(NULLIF(c.name, ''),p.nickname, 'コーチ')::text AS nickname, c.events, c.years, c.best_record, c.achievements, c.photo_public_id
 FROM coach_profiles c JOIN profiles p ON p.id = c.profile_id
@@ -810,26 +769,16 @@ WHERE c.status = 'approved'
   AND ($3::uuid IS NULL OR c.profile_id = $3::uuid)
   AND $4::text = ANY (c.events)
   AND c.profile_id <> $5
-  AND (
-    SELECT count(*) FROM review_requests r
-    WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review', 'needs_info')
-  ) < $6::int
-  AND (
-    SELECT count(*) FROM review_offers o
-    WHERE o.coach_id = c.profile_id
-      AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= $7::timestamptz))
-  ) < c.daily_cap
   AND NOT EXISTS (
     -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
       AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= $8::int
-       AND avg(rt.stars)::float8 < $9::float8
+    HAVING count(rt.stars) >= $6::int
+       AND avg(rt.stars)::float8 < $7::float8
   )
-ORDER BY md5(c.profile_id::text || extract(epoch FROM $7::timestamptz)::bigint::text)
+ORDER BY md5(c.profile_id::text || extract(epoch FROM $8::timestamptz)::bigint::text)
 LIMIT 200
 `
 
@@ -839,10 +788,9 @@ type ListReviewNomineesParams struct {
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	Event            string     `json:"event"`
 	RequesterID      uuid.UUID  `json:"requester_id"`
-	MaxActive        int32      `json:"max_active"`
-	DayStart         time.Time  `json:"day_start"`
 	MinRatings       int32      `json:"min_ratings"`
 	LowStars         float64    `json:"low_stars"`
+	DayStart         time.Time  `json:"day_start"`
 }
 
 type ListReviewNomineesRow struct {
@@ -855,7 +803,7 @@ type ListReviewNomineesRow struct {
 	PhotoPublicID *string   `json:"photo_public_id"`
 }
 
-// 動画添削で選べるコーチ。受付中で、担当種目・受付上限・報酬口座の条件を満たす人。
+// 動画添削で選べるコーチ。受付中で、担当種目・報酬口座の条件を満たす人。
 // 並びは人気や実績によらず日替わり(コーチの ID と今日の日付から決める)にし、全員が上に来る日が同じように回る。
 func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNomineesParams) ([]ListReviewNomineesRow, error) {
 	rows, err := q.db.Query(ctx, listReviewNominees,
@@ -864,10 +812,9 @@ func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNominees
 		arg.RequestedCoachID,
 		arg.Event,
 		arg.RequesterID,
-		arg.MaxActive,
-		arg.DayStart,
 		arg.MinRatings,
 		arg.LowStars,
+		arg.DayStart,
 	)
 	if err != nil {
 		return nil, err
@@ -895,67 +842,8 @@ func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNominees
 	return items, nil
 }
 
-const lockCoachOpenOfferForRequest = `-- name: LockCoachOpenOfferForRequest :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at FROM review_offers
-WHERE request_id = $1
-  AND coach_id = $2
-  AND result IS NULL
-FOR UPDATE
-`
-
-type LockCoachOpenOfferForRequestParams struct {
-	RequestID uuid.UUID `json:"request_id"`
-	CoachID   uuid.UUID `json:"coach_id"`
-}
-
-// 差し戻す依頼の、まだ返事をしていない打診（引受前の差し戻しのとき）。
-func (q *Queries) LockCoachOpenOfferForRequest(ctx context.Context, arg LockCoachOpenOfferForRequestParams) (ReviewOffer, error) {
-	row := q.db.QueryRow(ctx, lockCoachOpenOfferForRequest, arg.RequestID, arg.CoachID)
-	var i ReviewOffer
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.CoachID,
-		&i.OfferedAt,
-		&i.ExpiresAt,
-		&i.Result,
-		&i.AnsweredAt,
-		&i.ReminderSentAt,
-	)
-	return i, err
-}
-
-const lockOpenReviewOffer = `-- name: LockOpenReviewOffer :one
-SELECT id, request_id, coach_id, offered_at, expires_at, result, answered_at, reminder_sent_at FROM review_offers
-WHERE id = $1
-  AND coach_id = $2
-  AND result IS NULL
-FOR UPDATE
-`
-
-type LockOpenReviewOfferParams struct {
-	ID      uuid.UUID `json:"id"`
-	CoachID uuid.UUID `json:"coach_id"`
-}
-
-func (q *Queries) LockOpenReviewOffer(ctx context.Context, arg LockOpenReviewOfferParams) (ReviewOffer, error) {
-	row := q.db.QueryRow(ctx, lockOpenReviewOffer, arg.ID, arg.CoachID)
-	var i ReviewOffer
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.CoachID,
-		&i.OfferedAt,
-		&i.ExpiresAt,
-		&i.Result,
-		&i.AnsweredAt,
-		&i.ReminderSentAt,
-	)
-	return i, err
-}
-
 const lockQueuedReviewRequest = `-- name: LockQueuedReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE id = $1
   AND status = 'queued'
   AND due_at > now()
@@ -997,6 +885,13 @@ func (q *Queries) LockQueuedReviewRequest(ctx context.Context, id uuid.UUID) (Re
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
@@ -1021,22 +916,12 @@ func (q *Queries) LockReviewRequester(ctx context.Context, requesterID uuid.UUID
 	return err
 }
 
-const markReviewRequestOffered = `-- name: MarkReviewRequestOffered :exec
-UPDATE review_requests
-SET status = 'offered',
-    coach_id = $2,
-    updated_at = now()
-WHERE id = $1
-  AND status = 'queued'
+const pauseCoachAfterReviewTimeout = `-- name: PauseCoachAfterReviewTimeout :exec
+UPDATE coach_profiles SET on_duty = false, updated_at = now() WHERE profile_id = $1
 `
 
-type MarkReviewRequestOfferedParams struct {
-	ID      uuid.UUID  `json:"id"`
-	CoachID *uuid.UUID `json:"coach_id"`
-}
-
-func (q *Queries) MarkReviewRequestOffered(ctx context.Context, arg MarkReviewRequestOfferedParams) error {
-	_, err := q.db.Exec(ctx, markReviewRequestOffered, arg.ID, arg.CoachID)
+func (q *Queries) PauseCoachAfterReviewTimeout(ctx context.Context, profileID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, pauseCoachAfterReviewTimeout, profileID)
 	return err
 }
 
@@ -1050,31 +935,16 @@ WHERE c.status = 'approved'
   AND $3::text = ANY (c.events)
   AND c.profile_id <> $4
   AND NOT EXISTS (
-    SELECT 1 FROM review_offers o
-    WHERE o.request_id = $5
-      AND o.coach_id = c.profile_id
-  )
-  AND (
-    SELECT count(*) FROM review_requests r
-    WHERE r.coach_id = c.profile_id
-      AND r.status IN ('offered', 'in_review', 'needs_info')
-  ) < $6::int
-  AND (
-    SELECT count(*) FROM review_offers o
-    WHERE o.coach_id = c.profile_id
-      AND (o.result IS NULL OR (o.result = 'accepted' AND o.answered_at >= $7::timestamptz))
-  ) < c.daily_cap
-  AND NOT EXISTS (
     -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
     SELECT 1 FROM review_ratings rt
     JOIN review_responses rs ON rs.request_id = rt.request_id
     WHERE rs.coach_id = c.profile_id
       AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= $8::int
-       AND avg(rt.stars)::float8 < $9::float8
+    HAVING count(rt.stars) >= $5::int
+       AND avg(rt.stars)::float8 < $6::float8
   )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
-LIMIT 1
+LIMIT 1 FOR NO KEY UPDATE
 `
 
 type PickCoachForRequestParams struct {
@@ -1082,24 +952,17 @@ type PickCoachForRequestParams struct {
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	Event            string     `json:"event"`
 	RequesterID      uuid.UUID  `json:"requester_id"`
-	RequestID        uuid.UUID  `json:"request_id"`
-	MaxActive        int32      `json:"max_active"`
-	DayStart         time.Time  `json:"day_start"`
 	MinRatings       int32      `json:"min_ratings"`
 	LowStars         float64    `json:"low_stars"`
 }
 
-// 枠と種目が合う受付中のコーチのうち、最後に打診された時刻が一番古い人。
-// 同じ依頼をまだ打診しておらず、持っている依頼と今日の本数が上限に届いていない人だけ。
+// 種目が合う受付中のコーチのうち、最後の割り当てが一番古い人。
 func (q *Queries) PickCoachForRequest(ctx context.Context, arg PickCoachForRequestParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, pickCoachForRequest,
 		arg.Tier,
 		arg.RequestedCoachID,
 		arg.Event,
 		arg.RequesterID,
-		arg.RequestID,
-		arg.MaxActive,
-		arg.DayStart,
 		arg.MinRatings,
 		arg.LowStars,
 	)
@@ -1119,10 +982,10 @@ SET status = 'needs_info',
     updated_at = now()
 WHERE id = $4
   AND coach_id = $5::uuid
-  AND status IN ('offered', 'in_review')
+  AND status = 'in_review'
   AND info_requested_at IS NULL
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
 type RequestReviewInfoParams struct {
@@ -1133,7 +996,7 @@ type RequestReviewInfoParams struct {
 	CoachID    uuid.UUID `json:"coach_id"`
 }
 
-// 担当のコーチが、内容確認のために依頼を1回だけ差し戻す。引受前（offered）でも引受後（in_review）でもよく、返却期限までに限る。
+// 担当のコーチが、返却期限までに相談内容の補足を1回だけ求める。
 // 差し戻す前の状態を info_from_status に残す（SET の右辺の status は更新前の値）。
 func (q *Queries) RequestReviewInfo(ctx context.Context, arg RequestReviewInfoParams) (ReviewRequest, error) {
 	row := q.db.QueryRow(ctx, requestReviewInfo,
@@ -1176,45 +1039,39 @@ func (q *Queries) RequestReviewInfo(ctx context.Context, arg RequestReviewInfoPa
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
 
-const requeueReviewRequest = `-- name: RequeueReviewRequest :exec
-UPDATE review_requests
-SET status = CASE WHEN requested_coach_id IS NULL THEN 'queued' ELSE 'expired' END,
-    coach_id = NULL,
-    updated_at = now()
-WHERE id = $1
-  AND status = 'offered'
-`
-
-func (q *Queries) RequeueReviewRequest(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, requeueReviewRequest, id)
-	return err
-}
-
 const resubmitReviewRequest = `-- name: ResubmitReviewRequest :one
 UPDATE review_requests
-SET status = info_from_status,
+SET status = 'in_review',
     original_question = question,
     question = $1::text,
     video_public_id = $2::text,
     video_replaced = ($2::text <> video_public_id),
-    due_at = $3::timestamptz,
+    due_at = statement_timestamp() + interval '24 hours',
     resubmitted_at = now(),
+    reminder_12h_at = NULL,
+    reminder_4h_at = NULL,
     updated_at = now()
-WHERE id = $4
-  AND requester_id = $5
+WHERE id = $3
+  AND requester_id = $4
   AND status = 'needs_info'
   AND resubmit_by > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
 type ResubmitReviewRequestParams struct {
 	Question      string    `json:"question"`
 	VideoPublicID string    `json:"video_public_id"`
-	DueAt         time.Time `json:"due_at"`
 	ID            uuid.UUID `json:"id"`
 	RequesterID   uuid.UUID `json:"requester_id"`
 }
@@ -1225,7 +1082,6 @@ func (q *Queries) ResubmitReviewRequest(ctx context.Context, arg ResubmitReviewR
 	row := q.db.QueryRow(ctx, resubmitReviewRequest,
 		arg.Question,
 		arg.VideoPublicID,
-		arg.DueAt,
 		arg.ID,
 		arg.RequesterID,
 	)
@@ -1262,6 +1118,13 @@ func (q *Queries) ResubmitReviewRequest(ctx context.Context, arg ResubmitReviewR
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }
@@ -1278,27 +1141,66 @@ func (q *Queries) SetCoachingDemo(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const setReviewOfferExpiry = `-- name: SetReviewOfferExpiry :one
-UPDATE review_offers
-SET expires_at = $1::timestamptz
-WHERE request_id = $2
-  AND coach_id = $3
-  AND result IS NULL
-RETURNING id
+const startReviewWork = `-- name: StartReviewWork :one
+UPDATE review_requests
+SET started_at = COALESCE(started_at, statement_timestamp()),
+    updated_at = statement_timestamp()
+WHERE id = $1
+  AND coach_id = $2::uuid
+  AND status = 'in_review'
+  AND due_at > statement_timestamp()
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
-type SetReviewOfferExpiryParams struct {
-	ExpiresAt time.Time `json:"expires_at"`
-	RequestID uuid.UUID `json:"request_id"`
-	CoachID   uuid.UUID `json:"coach_id"`
+type StartReviewWorkParams struct {
+	ID      uuid.UUID `json:"id"`
+	CoachID uuid.UUID `json:"coach_id"`
 }
 
-// 打診の引受期限を置き直す。差し戻し中は再提出期限まで延ばしておき、再提出で引受期限90分を数え直す。
-func (q *Queries) SetReviewOfferExpiry(ctx context.Context, arg SetReviewOfferExpiryParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, setReviewOfferExpiry, arg.ExpiresAt, arg.RequestID, arg.CoachID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+func (q *Queries) StartReviewWork(ctx context.Context, arg StartReviewWorkParams) (ReviewRequest, error) {
+	row := q.db.QueryRow(ctx, startReviewWork, arg.ID, arg.CoachID)
+	var i ReviewRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.Tier,
+		&i.Event,
+		&i.Focus,
+		&i.VideoPublicID,
+		&i.Status,
+		&i.DueAt,
+		&i.CoachID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReturnedAt,
+		&i.Question,
+		&i.RequestedCoachID,
+		&i.RequestedCoachName,
+		&i.BasePriceYen,
+		&i.UseTickets,
+		&i.InfoRequest,
+		&i.InfoReason,
+		&i.InfoRequestedAt,
+		&i.InfoFromStatus,
+		&i.ResubmitBy,
+		&i.OriginalQuestion,
+		&i.VideoReplaced,
+		&i.ResubmittedAt,
+		&i.WithdrawnAt,
+		&i.WithdrawnBy,
+		&i.WithdrawnFromStatus,
+		&i.WithdrawReason,
+		&i.VideosPurgedAt,
+		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
+	)
+	return i, err
 }
 
 const touchCoachOffered = `-- name: TouchCoachOffered :exec
@@ -1394,25 +1296,33 @@ SET status = 'expired',
     withdrawn_by = $1::uuid,
     withdrawn_from_status = status,
     withdraw_reason = $2::text,
+    return_reason = $3::text,
     updated_at = now()
-WHERE id = $3
+WHERE id = $4
   AND coach_id = $1::uuid
   AND (status = 'in_review' OR (status = 'needs_info' AND info_from_status = 'in_review'))
   AND returned_at IS NULL
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at
+  AND due_at > statement_timestamp()
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
 type WithdrawReviewRequestParams struct {
-	CoachID uuid.UUID `json:"coach_id"`
-	Reason  *string   `json:"reason"`
-	ID      uuid.UUID `json:"id"`
+	CoachID      uuid.UUID `json:"coach_id"`
+	Reason       *string   `json:"reason"`
+	ReturnReason string    `json:"return_reason"`
+	ID           uuid.UUID `json:"id"`
 }
 
 // 担当のコーチが、引き受けた依頼を返却する前に辞退する。添削中か、引受後に差し戻して再提出を待っている間に限る。
 // その場で expired にし、支払いの取り消し・返金とチケットの返却は既存の期限切れと同じく tick が行う。別のコーチには回さない。
 // 辞退した時の状態を withdrawn_from_status に残す（SET の右辺の status は更新前の値）。
 func (q *Queries) WithdrawReviewRequest(ctx context.Context, arg WithdrawReviewRequestParams) (ReviewRequest, error) {
-	row := q.db.QueryRow(ctx, withdrawReviewRequest, arg.CoachID, arg.Reason, arg.ID)
+	row := q.db.QueryRow(ctx, withdrawReviewRequest,
+		arg.CoachID,
+		arg.Reason,
+		arg.ReturnReason,
+		arg.ID,
+	)
 	var i ReviewRequest
 	err := row.Scan(
 		&i.ID,
@@ -1446,6 +1356,13 @@ func (q *Queries) WithdrawReviewRequest(ctx context.Context, arg WithdrawReviewR
 		&i.WithdrawReason,
 		&i.VideosPurgedAt,
 		&i.RetentionHoldAt,
+		&i.AssignedAt,
+		&i.StartedAt,
+		&i.TimedOutAt,
+		&i.CanceledAt,
+		&i.ReturnReason,
+		&i.Reminder12hAt,
+		&i.Reminder4hAt,
 	)
 	return i, err
 }

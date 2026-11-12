@@ -24,11 +24,11 @@ func answeredCashReviewRoom(t *testing.T, mutate func(*config.Config)) (h http.H
 	_, coach = onDutyCoach(t, h, admin)
 	_, owner = demoRequester(t, h, admin)
 	root = paidReview(t, h, owner, "paypay", "pi_paypay_review_"+uuid.NewString())
-	offers := coachRequests(t, h, coach).Offers
+	offers := coachRequests(t, h, coach).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {

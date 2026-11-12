@@ -99,11 +99,11 @@ func TestReviewPaymentCapturedOnReturn(t *testing.T) {
 		t.Fatalf("authorized %s", reviewPaymentStatus(t, id))
 	}
 	// 支払いが届いたので、コーチに打診される。
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != id {
+	offers := coachRequests(t, h, tc).Reviewing
+	if len(offers) != 1 || offers[0].ID != id {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept %d", rec.Code)
 	}
 	if captured, _ := f.calls(); len(captured) != 0 {

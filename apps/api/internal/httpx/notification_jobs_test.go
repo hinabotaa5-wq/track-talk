@@ -98,7 +98,7 @@ func TestPostActionsCommitWhenNotificationInsertFails(t *testing.T) {
 	}
 }
 
-func TestReviewOfferCommitsWhenNotificationInsertFails(t *testing.T) {
+func TestReviewAssignmentRetriesWhenWorkOrderDeliveryFails(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -106,13 +106,23 @@ func TestReviewOfferCommitsWhenNotificationInsertFails(t *testing.T) {
 	_, requester := demoRequester(t, h, admin)
 	id := chosenReview(t, h, requester, coach.String(), "card", false)
 	remove := injectNotificationFailure(t, "notifications", "INSERT")
-	payChosenReview(t, h, id, "card")
-	if got := coachRequests(t, h, coachToken).Offers; len(got) != 1 || got[0].Request.ID != id {
-		t.Fatalf("offer did not commit: %+v", got)
+
+	var session string
+	queryRowArgs(t, `SELECT checkout_session_id FROM review_payments WHERE request_id=$1`, []any{id}, &session)
+	payload := map[string]any{"id": session, "payment_status": "unpaid", "payment_intent": "pi_card_retry_review", "metadata": map[string]string{"kind": "review"}}
+	if rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", payload); rec.Code == 200 {
+		t.Fatal("payment webhook succeeded before work order could be delivered")
+	}
+	if got := coachRequests(t, h, coachToken).Reviewing; len(got) != 0 {
+		t.Fatalf("incomplete assignment: %+v", got)
 	}
 	remove()
-	retryAllNotificationJobs(t, h)
-	retryAllNotificationJobs(t, h)
+	if rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", payload); rec.Code != 200 {
+		t.Fatal(rec.Body.String())
+	}
+	if got := coachRequests(t, h, coachToken).Reviewing; len(got) != 1 || got[0].ID != id {
+		t.Fatalf("retried assignment: %+v", got)
+	}
 	var count int
 	queryRowArgs(t, "SELECT count(*) FROM notifications WHERE review_request_id = $1 AND kind = 'review_offer'", []any{id}, &count)
 	if count != 1 {
@@ -432,7 +442,7 @@ func TestReviewResubmissionNotificationMatchesPushSettingsAndDestination(t *test
 		accept, inApp, push bool
 		wantBell, wantPush  bool
 	}{
-		{name: "before_accept_is_required", wantBell: true, wantPush: true},
+		{name: "before_start_both_disabled"},
 		{name: "after_accept_both_disabled", accept: true},
 		{name: "after_accept_bell_only", accept: true, inApp: true, wantBell: true},
 		{name: "after_accept_push_only", accept: true, push: true, wantPush: true},
@@ -460,16 +470,15 @@ func TestReviewResubmissionNotificationMatchesPushSettingsAndDestination(t *test
 			_, requester := demoRequester(t, h, admin)
 			id := chosenReview(t, h, requester, coach.String(), "card", false)
 			payChosenReview(t, h, id, "card")
-			kind, url := "review_resubmitted", "/coach"
+			kind, url := "review_resubmitted_after_accept", "/coach/requests/"+id
 			if tc.accept {
-				offers := coachRequests(t, h, coachToken).Offers
+				offers := coachRequests(t, h, coachToken).Reviewing
 				if len(offers) != 1 {
 					t.Fatalf("offers %+v", offers)
 				}
-				if rec := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coachToken, nil); rec.Code != 200 {
+				if rec := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coachToken, nil); rec.Code != 200 {
 					t.Fatal(rec.Body.String())
 				}
-				kind, url = "review_resubmitted_after_accept", "/coach/requests/"+id
 			}
 			if rec := doJSON(t, h, "PUT", "/v1/me/notification-settings/review", coachToken, map[string]bool{"in_app": tc.inApp, "push": tc.push}); rec.Code != 200 {
 				t.Fatal(rec.Body.String())

@@ -92,7 +92,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 		form.Get("payment_intent_data[capture_method]") != "" || form.Get("line_items[0][price_data][unit_amount]") != "500" {
 		t.Fatalf("created %+v session %v", created, form)
 	}
-	if offers := coachRequests(t, h, tc).Offers; len(offers) != 0 {
+	if offers := coachRequests(t, h, tc).Reviewing; len(offers) != 0 {
 		t.Fatalf("offered before payment %+v", offers)
 	}
 	// 承認せずに戻った（支払いが済んでいない知らせ）ときは、依頼は支払い待ちのまま開き直せる。
@@ -101,7 +101,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 	if rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", map[string]any{"id": session, "payment_status": "unpaid", "payment_intent": "pi_paypay_open", "metadata": map[string]any{"kind": "review"}}); rec.Code != http.StatusOK {
 		t.Fatalf("unpaid webhook %d", rec.Code)
 	}
-	if offers := coachRequests(t, h, tc).Offers; len(offers) != 0 {
+	if offers := coachRequests(t, h, tc).Reviewing; len(offers) != 0 {
 		t.Fatalf("offered while unpaid %+v", offers)
 	}
 	reopen := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+created.ID+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true})
@@ -118,7 +118,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 			t.Fatalf("paid webhook %d", rec.Code)
 		}
 	}
-	if offers := coachRequests(t, h, tc).Offers; len(offers) != 1 || offers[0].Request.ID != created.ID {
+	if offers := coachRequests(t, h, tc).Reviewing; len(offers) != 1 || offers[0].ID != created.ID {
 		t.Fatalf("offers %+v", offers)
 	}
 	var requests, payments int
@@ -137,11 +137,11 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	_, coach := onDutyCoach(t, h, tadmin)
 	_, owner := demoRequester(t, h, tadmin)
 	root := paidReview(t, h, owner, "paypay", "pi_paypay_review")
-	offers := coachRequests(t, h, coach).Offers
+	offers := coachRequests(t, h, coach).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {

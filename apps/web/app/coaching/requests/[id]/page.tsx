@@ -6,6 +6,7 @@ import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
+import { Button } from "@/components/ui/button";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
@@ -18,6 +19,7 @@ import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
 import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -220,6 +222,33 @@ function ReviewRequestView() {
   const [request, setRequest] = useState<ReviewRequest | null>(null);
   const [error, setError] = useState("");
 
+  const [cancelError, setCancelError] = useState("");
+  const now = useNow();
+  const { pending: canceling, acquire: acquireCancel, release: releaseCancel } = useActionLock();
+  const confirmDialog = useConfirm();
+
+  async function cancelReview() {
+    if (!await confirmDialog({
+      title: L("添削依頼をキャンセルしますか？"),
+      body: L("お支払いは全額返金・取消し、チケットは返還します。"),
+      confirmLabel: L("依頼をキャンセルする"),
+      cancelLabel: L("戻る"),
+    }) || !acquireCancel()) return;
+    setCancelError("");
+    const path = `/v1/coaching/requests/${id}`;
+    try {
+      setRequest(await apiFetch<ReviewRequest>(`${path}/cancel`, { method: "POST", token }));
+    } catch (err) {
+      setCancelError(err instanceof ApiRequestError ? err.message : L("依頼をキャンセルできませんでした"));
+      if (err instanceof ApiRequestError && err.status === 409) {
+        const latest = await apiFetch<ReviewRequest>(path, { token }).catch(() => null);
+        if (latest) setRequest(latest);
+      }
+    } finally {
+      releaseCancel();
+    }
+  }
+
   useEffect(() => {
     if (!loading && !session) {
       router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
@@ -267,6 +296,10 @@ function ReviewRequestView() {
   const completedPayment = request.payment?.status === "authorized" || request.payment?.status === "captured";
   const offerPushGuide = paid && request.id === id && completedPayment && (waiting || request.status === "needs_info");
 
+  const active = request.status === "in_review" || request.status === "needs_info";
+  const deadline = request.status === "needs_info" ? request.info_request?.resubmit_by : request.due_at;
+  const canCancel = active && !request.started_at && !!deadline && now !== null && Date.parse(deadline) > now;
+
   return (
     <div className="mx-auto max-w-md space-y-5">
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
@@ -276,13 +309,16 @@ function ReviewRequestView() {
       </div>
 
       <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{request.withdrawal ? L("コーチの都合で依頼は終了しました") : request.status === "expired" && request.requested_coach_id ? L("依頼は終了しました") : reviewStatusLabels[request.status]}</p>
-        {waiting || request.status === "awaiting_payment" ? (
+        <p className="text-sm font-semibold text-white">{request.canceled_at ? L("依頼をキャンセルしました") : request.withdrawal ? L("コーチが依頼を返却しました") : request.status === "expired" && request.requested_coach_id ? L("依頼は終了しました") : reviewStatusLabels[request.status]}</p>
+        {request.status === "in_review" ? (
           <p className="text-sm text-slate-100">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
         ) : null}
         {request.status === "needs_info" && request.info_request ? (
           <p className="text-sm text-slate-100">{L("再提出の期限: {v0}", { v0: formatDateTime(request.info_request.resubmit_by) })}</p>
         ) : null}
+        {active && request.started_at ? <p className="text-sm text-slate-100">{L("現在コーチが添削を行っています")}</p> : null}
+        {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
+        {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
         {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
           <p className="font-semibold">{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
           <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>

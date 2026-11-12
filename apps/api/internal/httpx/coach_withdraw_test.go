@@ -97,43 +97,16 @@ func TestCoachWithdrawBlockedByReviewing(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
 	rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody())
 	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "review_in_progress") {
 		t.Fatalf("withdraw while reviewing %d %s", rec.Code, rec.Body.String())
-	}
-}
-
-// 返事をしていない添削の打診は断った扱いになり、依頼は待ちに戻ってほかのコーチに回る。
-func TestCoachWithdrawHandsOffOpenOffers(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h := setup(t)
-	tadmin := adminToken(t, h)
-	_, tc := onDutyCoach(t, h, tadmin)
-	_, tu := demoRequester(t, h, tadmin)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusCreated {
-		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
-	}
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 {
-		t.Fatalf("offers %+v", offers)
-	}
-	if rec := doJSON(t, h, http.MethodPost, coachWithdrawPath, tc, withdrawCoachBody()); rec.Code != http.StatusOK {
-		t.Fatalf("withdraw with offer %d %s", rec.Code, rec.Body.String())
-	}
-	if status := reviewStatus(t, h, tu, offers[0].Request.ID); status != "queued" {
-		t.Fatalf("request after withdraw %s", status)
-	}
-	var result string
-	queryRowArgs(t, `SELECT result FROM review_offers WHERE id = $1`, []any{offers[0].ID}, &result)
-	if result != "declined" {
-		t.Fatalf("offer result %s", result)
 	}
 }
 

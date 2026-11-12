@@ -29,26 +29,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
 
-	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
-	var list struct {
-		Offers []struct {
-			ID    string             `json:"id"`
-			Terms workOrderTermsView `json:"terms"`
-		} `json:"offers"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Offers) != 1 {
-		t.Fatalf("offers %d %s", rec.Code, rec.Body.String())
-	}
-	offer := list.Offers[0]
-	if got := offer.Terms.Items[7]; got.Label != "支払期日" || !strings.HasPrefix(got.Value, "毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。") || strings.Contains(got.Value, "1回まで") {
-		t.Fatalf("payment due terms: %+v", got)
-	}
-	// チケット1枚。報酬は単発と同じ500円の70%（本体 #569）。
-	if offer.Terms.AmountYen != 350 || len(offer.Terms.Items) != 9 || offer.Terms.PaymentDue == "" || offer.Terms.DeliverBy == "" {
-		t.Fatalf("terms before accept: %+v", offer.Terms)
-	}
-
-	rec = doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offer.ID+"/accept", coach, nil)
+	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+request, coach, nil)
 	var accepted struct {
 		WorkOrder struct {
 			TermsVersion int                `json:"terms_version"`
@@ -62,6 +43,10 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
+	terms := accepted.WorkOrder.Terms
+	if got := terms.Items[7]; got.Label != "支払期日" || !strings.Contains(got.Value, "累積") || strings.Contains(got.Value, "1回まで") {
+		t.Fatalf("payment due terms: %+v", got)
+	}
 	// 後から依頼の画面で見返せる。
 	rec = doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+request, coach, nil)
 	var detail struct {
@@ -163,17 +148,5 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 	}
 	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
-	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", coach, nil)
-	var list struct {
-		Offers []struct {
-			ID string `json:"id"`
-		} `json:"offers"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Offers) != 1 {
-		t.Fatalf("offers %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+list.Offers[0].ID+"/accept", coach, nil); rec.Code != 200 {
-		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
-	}
 	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "350円")
 }

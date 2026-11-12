@@ -703,6 +703,7 @@ export type ReviewInfoRequest = {
 
 // 引受後・返却前にコーチが辞退した記録。辞退した依頼は終了（expired）になる。
 export type ReviewWithdrawal = {
+  reason_code?: string | null;
   withdrawn_at: string;
   from_status: "in_review" | "needs_info";
   reason: string | null;
@@ -740,6 +741,8 @@ export type ReviewCoachOption = {
 };
 
 export type ReviewRequest = {
+  started_at?: string | null;
+  canceled_at?: string | null;
   requested_coach_id?: string | null;
   requested_coach_name?: string;
   base_price_yen?: number;

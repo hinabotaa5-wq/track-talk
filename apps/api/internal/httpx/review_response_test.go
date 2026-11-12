@@ -19,11 +19,11 @@ func acceptedReview(t *testing.T, h http.Handler, tadmin, tc, tu string) string 
 	}
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) == 0 {
 		t.Fatal("no offer")
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
 	return created.ID
@@ -261,7 +261,7 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	if rec.Code != http.StatusCreated || created.Status != "queued" {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	if len(coachRequests(t, h, ta).Offers) != 0 {
+	if len(coachRequests(t, h, ta).Reviewing) != 0 {
 		t.Fatal("low-rated coach got an offer")
 	}
 
@@ -281,7 +281,7 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
 		t.Fatalf("still paused %s", body)
 	}
-	if offers := coachRequests(t, h, ta).Offers; len(offers) != 1 || offers[0].Request.ID != created.ID {
+	if offers := coachRequests(t, h, ta).Reviewing; len(offers) != 1 || offers[0].ID != created.ID {
 		t.Fatalf("A offers after reset %+v", offers)
 	}
 }
@@ -302,8 +302,8 @@ func TestReviewAuthorization(t *testing.T) {
 		{http.MethodGet, "/v1/coach/requests/" + id},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/response"},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification"},
-		{http.MethodPost, "/v1/coach/offers/" + id + "/accept"},
-		{http.MethodPost, "/v1/coach/offers/" + id + "/decline"},
+		{http.MethodPost, "/v1/coach/requests/" + id + "/start"},
+		{http.MethodPost, "/v1/coach/requests/" + id + "/withdraw"},
 	} {
 		if rec := doJSON(t, h, route.method, route.path, "", nil); rec.Code != http.StatusUnauthorized {
 			t.Fatalf("unauthenticated %s: %d", route.path, rec.Code)
@@ -359,14 +359,14 @@ func TestReviewRevokedCoachAuthorization(t *testing.T) {
 			if rec.Code != http.StatusCreated {
 				t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 			}
-			offers := coachRequests(t, h, tc).Offers
+			offers := coachRequests(t, h, tc).Reviewing
 			if len(offers) != 1 {
 				t.Fatalf("offers %+v", offers)
 			}
 			offer := offers[0]
-			id := offer.Request.ID
+			id := offer.ID
 			if operation != "list_offer" && operation != "decline" {
-				if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offer.ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offer.ID+"/start", tc, nil); rec.Code != http.StatusOK {
 					t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 				}
 			}
@@ -390,7 +390,7 @@ func TestReviewRevokedCoachAuthorization(t *testing.T) {
 			case "clarification":
 				method, path, body = http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", map[string]any{"clarification": "停止済みコーチからの補足"}
 			case "decline":
-				method, path = http.MethodPost, "/v1/coach/offers/"+offer.ID+"/decline"
+				method, path = http.MethodPost, "/v1/coach/requests/"+offer.ID+"/withdraw"
 			}
 			rec = doJSON(t, h, method, path, tc, body)
 			if rec.Code != http.StatusForbidden {

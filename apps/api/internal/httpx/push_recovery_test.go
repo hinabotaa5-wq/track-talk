@@ -145,8 +145,8 @@ func TestReviewOfferPushResentAfterFailure(t *testing.T) {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
 	var dedup string
-	queryRowArgs(t, `SELECT dedup_key FROM push_outbox WHERE dedup_key LIKE 'review_offer:%' ORDER BY created_at DESC LIMIT 1`, nil, &dedup)
-	if !strings.HasPrefix(dedup, "review_offer:") {
+	queryRowArgs(t, `SELECT dedup_key FROM push_outbox WHERE dedup_key LIKE 'review_assigned:%' ORDER BY created_at DESC LIMIT 1`, nil, &dedup)
+	if !strings.HasPrefix(dedup, "review_assigned:") {
 		t.Fatalf("dedup %q", dedup)
 	}
 	// その場の送信は失敗し、待ちが残る。

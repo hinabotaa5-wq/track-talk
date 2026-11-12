@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,18 +16,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 添削の依頼をコーチに回す（割り当てと打診）。
-// 依頼が来たとき、見送られたとき、打診が時間切れになったときに、受付中のコーチを1人選んで打診する。
-// 時間切れは Cloud Scheduler から1分ごとに呼ばれる tick が処理する（API は使われないと0台まで縮むため）。
-
+// 評価が低いコーチを候補から外す基準。
 const (
-	// 1人のコーチが同時に持てる依頼（打診中・添削中の合計）。
-	maxActiveReviews = 2
-	// 評価が低いコーチを順番から外す基準。★の評価が lowRatingMinCount 件以上たまり、
-	// 平均が lowRatingStars 未満なら打診しない。
-	lowRatingMinCount       = 5
-	lowRatingStars          = 3.0
-	reviewOfferReminderLead = 30 * time.Minute
+	lowRatingMinCount = 5
+	lowRatingStars    = 3.0
 )
 
 // dayStart は日本時間の今日の0時。1日の上限本数はこの時刻から数える。
@@ -51,103 +44,120 @@ func (s *Server) estimateReviewDue(ctx context.Context, requester uuid.UUID, tie
 	return reviewDueAt(now), coaches > 0, nil
 }
 
-// offerReview は、待ちの依頼を受付中のコーチ1人に打診する。打診する相手がいなければ待ちのまま。
-func (s *Server) offerReview(ctx context.Context, requestID uuid.UUID) (bool, error) {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return false, err
+// assignReview makes the paid request visible and records the work order in the same transaction.
+func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRequest) (db.ReviewRequest, error) {
+	coachID := uuid.Nil
+	if rr.RequestedCoachID != nil {
+		coachID = *rr.RequestedCoachID
+	} else {
+		if !s.cfg.ReviewRandomAssign {
+			return rr, nil
+		}
+		var err error
+		coachID, err = q.PickCoachForRequest(ctx, db.PickCoachForRequestParams{
+			Tier: rr.Tier, Event: rr.Event, RequesterID: rr.RequesterID,
+			MinRatings: lowRatingMinCount, LowStars: lowRatingStars,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return rr, nil
+		}
+		if err != nil {
+			return rr, err
+		}
 	}
-	defer tx.Rollback(ctx)
-	q := s.q.WithTx(tx)
-	if err := q.LockReviewAssignment(ctx); err != nil {
-		return false, err
-	}
-	rr, err := q.LockQueuedReviewRequest(ctx, requestID)
+	assigned, err := q.AssignReviewRequest(ctx, db.AssignReviewRequestParams{ID: rr.ID, CoachID: coachID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
+		return rr, nil
 	}
 	if err != nil {
-		return false, err
+		return rr, err
 	}
-	// おまかせを止めている間は、コーチを選んでいない依頼を誰にも割り当てない（返却の目安を過ぎたら期限切れにして代金を戻す）。
-	if rr.RequestedCoachID == nil && !s.cfg.ReviewRandomAssign {
-		return false, nil
-	}
-	now := time.Now()
-	coachID, err := q.PickCoachForRequest(ctx, db.PickCoachForRequestParams{
-		Tier:             rr.Tier,
-		RequestedCoachID: rr.RequestedCoachID,
-		Event:            rr.Event,
-		RequesterID:      rr.RequesterID,
-		RequestID:        rr.ID,
-		MaxActive:        maxActiveReviews,
-		DayStart:         dayStart(now),
-		MinRatings:       lowRatingMinCount,
-		LowStars:         lowRatingStars,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
+	name, err := coachDisplayName(ctx, q, coachID)
 	if err != nil {
-		return false, err
+		return rr, err
 	}
-	// 引受期限は90分（日本時間の23時〜翌7時は数えない）。
-	// 通常は返却期限よりずっと前に来るが、コーチが受付を止めていて打診が遅れた依頼でも返却期限は越えない。
-	expires := offerExpiresAt(now, offerWindow)
-	if expires.After(rr.DueAt) {
-		expires = rr.DueAt
-	}
-	offer, err := q.CreateReviewOffer(ctx, db.CreateReviewOfferParams{ID: uuid.New(), RequestID: rr.ID, CoachID: coachID, ExpiresAt: expires})
+	terms, err := s.reviewWorkOrderTerms(ctx, q, assigned, name, rr.CreatedAt)
 	if err != nil {
-		return false, err
+		return rr, err
 	}
-	if err := q.MarkReviewRequestOffered(ctx, db.MarkReviewRequestOfferedParams{ID: rr.ID, CoachID: &coachID}); err != nil {
-		return false, err
+	if _, err = saveWorkOrder(ctx, q, "review", &rr.ID, nil, coachID, rr.ID, terms); err != nil {
+		return rr, err
 	}
-	if err := q.TouchCoachOffered(ctx, coachID); err != nil {
-		return false, err
+	if err = q.TouchCoachOffered(ctx, coachID); err != nil {
+		return rr, err
 	}
-	jobID := uuid.New()
-	if err := q.EnqueueNotificationJob(ctx, db.EnqueueNotificationJobParams{ID: jobID, RecipientID: coachID, Kind: "review_offer", ReviewRequestID: &rr.ID}); err != nil {
-		return false, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return false, err
-	}
-	s.runNotificationJobs(ctx, []uuid.UUID{jobID})
-	// 新規打診の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は引受期限。
-	s.queuePush(ctx, coachID, notifyImportant, push.Message{
+	err = s.recordReviewNotice(ctx, q, coachID, rr.ID, "review_offer", push.Message{
 		Title: "フォーム添削の依頼が届きました",
-		Body:  offerDeadlineText(expires) + "までに、引き受けるかどうか決めてください",
-		URL:   "/coach",
-		Tag:   reviewOfferTag(offer.ID),
-	}, time.Until(expires), expires, "review_offer:"+offer.ID.String())
-	return true, nil
+		Body:  "対応中の一覧から依頼を確認してください。",
+		URL:   "/coach/requests/" + rr.ID.String(),
+	}, assigned.DueAt, "review_assigned:"+rr.ID.String())
+	return assigned, err
 }
 
-func reviewOfferTag(offerID uuid.UUID) string {
-	return "review-offer-" + offerID.String()
-}
-
-func (s *Server) remindReviewOffers(ctx context.Context, now time.Time) error {
-	offers, err := s.q.ClaimReviewOfferReminders(ctx, db.ClaimReviewOfferRemindersParams{
-		CheckedAt: now, RemindThrough: offerExpiresAt(now, reviewOfferReminderLead),
-	})
-	if err != nil {
+func (s *Server) recordReviewNotice(ctx context.Context, q *db.Queries, to, id uuid.UUID, kind string, msg push.Message, expires time.Time, key string) error {
+	if err := insertReviewNotificationWithURL(ctx, q, to, kind, id, &msg.URL); err != nil {
 		return err
 	}
-	for _, offer := range offers {
-		s.pushQuietly(ctx, offer.CoachID, notifyImportant, push.Message{
-			Title: "フォーム添削の引受期限が近づいています",
-			Body:  offerDeadlineText(offer.ExpiresAt) + "までに、引き受けるかどうか決めてください",
-			URL:   "/coach",
-			Tag:   reviewOfferTag(offer.ID),
-		}, time.Until(offer.ExpiresAt))
+	if !s.push.Configured() {
+		return nil
 	}
-	return nil
+	category := kindCategory(kind)
+	ok, err := notificationWanted(ctx, q, to, category, false)
+	if err != nil || !ok {
+		return err
+	}
+	return q.EnqueuePushOutbox(ctx, db.EnqueuePushOutboxParams{
+		ID: uuid.New(), ProfileID: to, Title: msg.Title, Body: msg.Body, Url: msg.URL,
+		Tag: key, Category: category, TtlSeconds: int32(max(1, time.Until(expires).Seconds())),
+		DedupKey: key, ExpiresAt: expires,
+	})
 }
 
-// dispatchQueuedReviews は、待ちの依頼を古い順に打診する。打診できなかった依頼は次の機会に回す。
+// offerReview retries assignment for paid work still in the queue.
+func (s *Server) offerReview(ctx context.Context, id uuid.UUID) (bool, error) {
+	var assigned bool
+	err := s.tx(ctx, func(q *db.Queries) error {
+		if err := q.LockReviewAssignment(ctx); err != nil {
+			return err
+		}
+		rr, err := q.LockQueuedReviewRequest(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		rr, err = s.assignReview(ctx, q, rr)
+		assigned = err == nil && rr.Status == "in_review"
+		return err
+	})
+	return assigned, err
+}
+
+func (s *Server) remindReviews(ctx context.Context) error {
+	return s.tx(ctx, func(q *db.Queries) error {
+		for _, hours := range []int32{12, 4} {
+			requests, err := q.ClaimReviewDueReminders(ctx, hours)
+			if err != nil {
+				return err
+			}
+			for _, rr := range requests {
+				msg := push.Message{
+					Title: fmt.Sprintf("フォーム添削の返却期限まであと%d時間", hours),
+					Body:  reviewDeadlineText(rr.DueAt) + "までに添削を返却してください。",
+					URL:   "/coach/requests/" + rr.ID.String(),
+				}
+				key := fmt.Sprintf("review_due:%s:%d:%d", rr.ID, hours, rr.DueAt.UnixMicro())
+				if err := s.recordReviewNotice(ctx, q, *rr.CoachID, rr.ID, "review_offer_reminder", msg, rr.DueAt, key); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// dispatchQueuedReviews は、待機中の依頼を古い順に割り当てる。
 func (s *Server) dispatchQueuedReviews(ctx context.Context) int {
 	ids, err := s.q.ListQueuedReviewRequests(ctx)
 	if err != nil {
@@ -223,11 +233,11 @@ type coachingTickResult struct {
 	PushResent int `json:"push_resent"`
 }
 
-// runCoachingTick は、返却目安を過ぎた依頼と、引受期限（90分、夜間は数えない）を過ぎた打診を片付け、待ちの依頼を打診する。
+// runCoachingTick は、返却期限の処理・リマインド・決済の再試行を行う。
 // 返却から7日たった返答には「役に立ちましたか」を聞く。パーソナル指導の申し込みの期限切れと、期間の終わりも片付ける。
 func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error) {
 	var out coachingTickResult
-	overdue, err := s.q.ExpireOverdueReviewRequests(ctx)
+	overdue, err := s.expireOverdueReviews(ctx)
 	if err != nil {
 		return out, err
 	}
@@ -238,16 +248,8 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	if out.Unresubmitted, err = s.expireUnresubmittedReviews(ctx); err != nil {
 		return out, err
 	}
-	requeued, err := s.q.ExpireStaleReviewOffers(ctx)
-	if err != nil {
-		return out, err
-	}
-	out.Requeued = len(requeued)
-	for _, id := range requeued {
-		s.notifyNominationEnded(ctx, id, true)
-	}
 	out.Offered = s.dispatchQueuedReviews(ctx)
-	if err := s.remindReviewOffers(ctx, time.Now()); err != nil {
+	if err := s.remindReviews(ctx); err != nil {
 		slog.Warn("review offer reminder", "err", err)
 	}
 	// 送れなかった Push を送り直す（本体 #421 F04）。期限切れの待ちは送らない。
@@ -314,7 +316,7 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	// 期限切れ系の通知は1通に統合する（本体 #573）。取り消しの別通知は出さない。
 	body := "フォーム添削の依頼が期限切れになりました"
 	if s.stripe.Configured() {
-		body += "。カードの仮押さえは取り消しました"
+		body += "。お支払いは取り消し・返金し、チケットは返還します"
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",
@@ -325,7 +327,7 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 	if rr.OldStatus == "in_review" && rr.CoachID != nil {
 		s.notify(ctx, *rr.CoachID, notifyReview, push.Message{
 			Title: "添削中の依頼が期限を過ぎました",
-			Body:  "返却の目安を過ぎたため、この依頼は終わりました",
+			Body:  "返却期限を過ぎたため依頼を終了し、新規受付をオフにしました",
 			URL:   "/coach",
 			Tag:   "review-" + rr.ID.String(),
 		}, 24*time.Hour)
@@ -341,7 +343,7 @@ func (s *Server) notifyCoachNominationEnded(ctx context.Context, coachID, reques
 	}
 	s.pushQuietly(ctx, coachID, notifyReview, push.Message{
 		Title: "指名されたフォーム添削の依頼が終了しました",
-		Body:  "この依頼の引受受付は終了しました",
+		Body:  "この依頼は終了しました",
 		URL:   "/coach",
 		Tag:   "review-ended-" + requestID.String(),
 	}, 24*time.Hour)
@@ -419,6 +421,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"focus":              rr.Focus,
 		"question":           rr.Question,
 		"status":             rr.Status,
+		"started_at":         rr.StartedAt,
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
 		"requested_coach_id": rr.RequestedCoachID,
@@ -434,15 +437,10 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 	return out
 }
 
-// listCoachRequests は、コーチに届いている打診と、引き受けて添削中の依頼。
+// listCoachRequests は、コーチの対応中一覧。
 func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
-		return
-	}
-	offers, err := s.q.ListCoachOpenOffers(r.Context(), p.ID)
-	if err != nil {
-		MapDBError(w, err)
 		return
 	}
 	reviewing, err := s.q.ListCoachReviewing(r.Context(), p.ID)
@@ -450,162 +448,9 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	name, err := coachDisplayName(r.Context(), s.q, p.ID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	now := time.Now()
-	offerOut := make([]map[string]any, 0, len(offers))
-	for _, o := range offers {
-		// 引き受ける前に、この案件の取引条件を見せる。委託した日は引き受けた時になる。
-		terms, err := s.reviewWorkOrderTerms(r.Context(), s.q, o.ReviewRequest, name, now)
-		if err != nil {
-			MapDBError(w, err)
-			return
-		}
-		offerOut = append(offerOut, map[string]any{
-			"id":         o.OfferID,
-			"expires_at": o.OfferExpiresAt,
-			"request":    s.coachRequestJSON(o.ReviewRequest, false),
-			"terms":      terms,
-		})
-	}
 	reviewOut := make([]map[string]any, 0, len(reviewing))
 	for _, rr := range reviewing {
 		reviewOut = append(reviewOut, s.coachRequestJSON(rr, coachSeesVideo(rr)))
 	}
-	JSON(w, http.StatusOK, map[string]any{"offers": offerOut, "reviewing": reviewOut})
-}
-
-func (s *Server) acceptReviewOffer(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireApprovedReviewCoach(w, r)
-	if !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	q := s.q.WithTx(tx)
-	offer, err := q.LockOpenReviewOffer(r.Context(), db.LockOpenReviewOfferParams{ID: id, CoachID: p.ID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusNotFound, "not_found", "この依頼はもう引き受けられません")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if !time.Now().Before(offer.ExpiresAt) {
-		Error(w, http.StatusConflict, "offer_expired", "引き受けの期限が過ぎました")
-		return
-	}
-	rr, err := q.AcceptReviewRequest(r.Context(), db.AcceptReviewRequestParams{ID: offer.RequestID, CoachID: &p.ID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusConflict, "offer_expired", "この依頼はもう引き受けられません")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := q.AnswerReviewOffer(r.Context(), db.AnswerReviewOfferParams{ID: offer.ID, Result: "accepted"}); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	// 引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
-	name, err := coachDisplayName(r.Context(), q, p.ID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	terms, err := s.reviewWorkOrderTerms(r.Context(), q, rr, name, time.Now())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	notice, err := saveWorkOrder(r.Context(), q, "review", &rr.ID, nil, p.ID, rr.ID, terms)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if notice != nil {
-		s.pushQuietly(r.Context(), p.ID, notifyImportant, *notice, 7*24*time.Hour)
-	}
-	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_accepted", push.Message{
-		Title: "コーチがフォーム添削の依頼を引き受けました",
-		Body:  "返答が届くまでお待ちください",
-		URL:   "/coaching/requests/" + rr.ID.String(),
-		Tag:   "review-" + rr.ID.String(),
-	})
-	out := s.coachRequestJSON(rr, true)
-	if wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID}); err == nil {
-		if order, err := workOrderWithDelivery(r.Context(), s.q, wo); err == nil {
-			out["work_order"] = order
-		}
-	}
-	JSON(w, http.StatusOK, out)
-}
-
-func (s *Server) declineReviewOffer(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireApprovedReviewCoach(w, r)
-	if !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	q := s.q.WithTx(tx)
-	offer, err := q.LockOpenReviewOffer(r.Context(), db.LockOpenReviewOfferParams{ID: id, CoachID: p.ID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusNotFound, "not_found", "この打診はもう終わっています")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	// 差し戻し中の打診は、再提出を待ってから決める（再提出期限を過ぎれば依頼は終わる）。
-	if rr, err := q.GetReviewRequest(r.Context(), offer.RequestID); err != nil {
-		MapDBError(w, err)
-		return
-	} else if rr.Status == "needs_info" {
-		Error(w, http.StatusConflict, "needs_info", "差し戻し中の依頼です。再提出されてから決めてください")
-		return
-	}
-	if err := q.AnswerReviewOffer(r.Context(), db.AnswerReviewOfferParams{ID: offer.ID, Result: "declined"}); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := q.RequeueReviewRequest(r.Context(), offer.RequestID); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if _, err := s.offerReview(r.Context(), offer.RequestID); err != nil {
-		slog.Warn("review offer after decline", "err", err)
-	}
-	s.notifyNominationEnded(r.Context(), offer.RequestID, false)
-	w.WriteHeader(http.StatusNoContent)
+	JSON(w, http.StatusOK, map[string]any{"offers": []any{}, "reviewing": reviewOut})
 }

@@ -82,11 +82,11 @@ func TestTicketReservedBeforeExpiryIsConsumedOnReturn(t *testing.T) {
 	purchase := buySixTickets(t, h, tu)
 	review := ticketReview(t, h, tu)
 	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != 200 {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+review+"/response", tc, responseBody()); rec.Code != 200 {
@@ -135,7 +135,7 @@ func TestReviewPaymentSyncUsesStripeState(t *testing.T) {
 	if out := sync(); out["status"] != "awaiting_payment" || out["checkout_status"] != "open" {
 		t.Fatalf("open %+v", out)
 	}
-	if offers := coachRequests(t, h, tc).Offers; len(offers) != 0 {
+	if offers := coachRequests(t, h, tc).Reviewing; len(offers) != 0 {
 		t.Fatal("offered before payment")
 	}
 	// ほかの人は確かめられない。
@@ -158,7 +158,7 @@ func TestReviewPaymentSyncUsesStripeState(t *testing.T) {
 	sync()
 	var payments, offers int
 	queryRowArgs(t, `SELECT (SELECT count(*) FROM review_payments WHERE request_id=$1), (SELECT count(*) FROM review_offers WHERE request_id=$1)`, []any{created.ID}, &payments, &offers)
-	if payments != 1 || offers != 1 {
+	if payments != 1 || offers != 0 {
 		t.Fatalf("payments %d offers %d", payments, offers)
 	}
 }

@@ -25,6 +25,13 @@ type withdrawnReviewView struct {
 
 func withdrawReview(t *testing.T, h http.Handler, tc, id string, body map[string]any, want int) withdrawnReviewView {
 	t.Helper()
+	if body == nil {
+		body = map[string]any{}
+	}
+	if _, exists := body["reason_code"]; !exists {
+		body["reason_code"] = "other"
+	}
+
 	rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+id+"/withdraw", tc, body)
 	if rec.Code != want {
 		t.Fatalf("withdraw want %d got %d %s", want, rec.Code, rec.Body.String())
@@ -47,11 +54,11 @@ func requesterWithdrawal(t *testing.T, h http.Handler, tu, id string) withdrawnR
 
 func acceptChosen(t *testing.T, h http.Handler, tc, id string) {
 	t.Helper()
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != id {
+	offers := coachRequests(t, h, tc).Reviewing
+	if len(offers) != 1 || offers[0].ID != id {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != http.StatusOK {
+	if r := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); r.Code != http.StatusOK {
 		t.Fatalf("accept %d %s", r.Code, r.Body.String())
 	}
 }
@@ -79,7 +86,7 @@ func assertReleased(t *testing.T, h http.Handler, f *fakeStripe, id, method stri
 	}
 	var offers int
 	queryRowArgs(t, `SELECT count(*) FROM review_offers WHERE request_id=$1`, []any{id}, &offers)
-	if offers != 1 {
+	if offers != 0 {
 		t.Fatalf("reassigned: %d offers", offers)
 	}
 }
@@ -184,26 +191,14 @@ func TestReviewWithdrawRejectedStates(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 
 	// 打診中（引受前）は見送りで断る。
-	offered := chosenReview(t, h, tu, coach.String(), "card", false)
-	payChosenReview(t, h, offered, "card")
-	withdrawReview(t, h, tc, offered, nil, http.StatusConflict)
-	// 引受前の差し戻し中も引き受けていないので辞退ではない。
-	askInfo(t, h, tc, offered, map[string]any{"body": infoQuestion}, http.StatusOK)
-	withdrawReview(t, h, tc, offered, nil, http.StatusConflict)
-	if reviewStatus(t, h, tu, offered) != "needs_info" {
-		t.Fatal("pre-accept needs_info changed")
-	}
-
-	// 返却済みは辞退できない。
-	_, tu2 := demoRequester(t, h, admin)
-	returned := chosenReview(t, h, tu2, coach.String(), "card", false)
+	returned := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, returned, "card")
 	acceptChosen(t, h, tc, returned)
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+returned+"/response", tc, responseBody()); r.Code != http.StatusOK {
 		t.Fatalf("response %d %s", r.Code, r.Body.String())
 	}
 	withdrawReview(t, h, tc, returned, nil, http.StatusConflict)
-	if reviewStatus(t, h, tu2, returned) != "returned" {
+	if reviewStatus(t, h, tu, returned) != "returned" {
 		t.Fatal("returned changed")
 	}
 

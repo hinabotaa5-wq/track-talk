@@ -58,6 +58,7 @@ func payTicketPurchase(t *testing.T, h http.Handler, id string, amount int) {
 		t.Fatalf("pay tickets %d %s", rec.Code, rec.Body.String())
 	}
 }
+
 // buySixTickets は、6枚つづり（2,500円）を買って支払いまで済ませる（本体 #569）。
 func buySixTickets(t *testing.T, h http.Handler, tok string) string {
 	t.Helper()
@@ -151,11 +152,11 @@ func TestTicketsReservedConsumedAndReleasedWithFixedEarnings(t *testing.T) {
 	if state.Balance.Available != 5 || state.Balance.Reserved != 1 {
 		t.Fatalf("reserve %+v", state.Balance)
 	}
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != 200 {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != 200 {
@@ -246,8 +247,8 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 	purchase := buySixTickets(t, h, tu)
 	request := ticketReview(t, h, tu)
-	offer := coachRequests(t, h, tc).Offers[0]
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offer.ID+"/accept", tc, nil); rec.Code != 200 {
+	offer := coachRequests(t, h, tc).Reviewing[0]
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offer.ID+"/start", tc, nil); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+request+"/response", tc, responseBody()); rec.Code != 200 {
@@ -471,11 +472,11 @@ func TestTicketServiceEndRefundRoundsHalfUp(t *testing.T) {
 	purchase := buySixTickets(t, h, tu)
 	for i := 0; i < 5; i++ {
 		review := ticketReview(t, h, tu)
-		offers := coachRequests(t, h, tc).Offers
+		offers := coachRequests(t, h, tc).Reviewing
 		if len(offers) != 1 {
 			t.Fatalf("offers %+v", offers)
 		}
-		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != 200 {
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != 200 {
 			t.Fatal(rec.Body.String())
 		}
 		if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+review+"/response", tc, responseBody()); rec.Code != 200 {

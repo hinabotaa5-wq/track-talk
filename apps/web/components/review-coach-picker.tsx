@@ -32,6 +32,6 @@ export function ReviewCoachPicker({ coaches, value, onChange, disabled, error, l
           </li>;
         })}
       </ul>}
-    {value ? <p className="text-xs text-slate-300">{L("選んだコーチが引き受けられない場合や、期限内に回答がない場合は、別のコーチには回さず依頼を終了し、代金を取り消すか返金します（チケットも戻します）。別のコーチを選んで申し込み直せます。")}</p> : null}
+    {value ? <p className="text-xs text-slate-300">{L("受付中のコーチには決済の確認後に依頼が届きます。期限までに添削が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
   </fieldset>;
 }

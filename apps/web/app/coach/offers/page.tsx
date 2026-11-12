@@ -1,5 +1,5 @@
-import { CoachRequestsPage } from "@/components/coach-requests-page";
+import { redirect } from "next/navigation";
 
-export default function CoachOffersPage() {
-  return <CoachRequestsPage view="offers" />;
+export default function CoachOffersPage(): never {
+  redirect("/coach/reviewing");
 }

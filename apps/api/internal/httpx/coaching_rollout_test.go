@@ -40,7 +40,7 @@ func TestAcceptanceClosedPreservesExistingFulfillmentAndLatePayments(t *testing.
 	_, owner := demoRequester(t, open, admin)
 	buySixTickets(t, open, owner)
 	request := ticketReview(t, open, owner)
-	offer := coachRequests(t, open, coach).Offers[0].ID
+	offer := coachRequests(t, open, coach).Reviewing[0].ID
 	late := startTicketPurchase(t, open, owner, "six", uuid.NewString(), "/coaching/new")
 	closed := closedAcceptanceHandler(t, cfg)
 
@@ -61,7 +61,7 @@ func TestAcceptanceClosedPreservesExistingFulfillmentAndLatePayments(t *testing.
 	if got := ticketSummary(t, closed, owner).Balance.Available; got != 11 {
 		t.Fatalf("balance %d", got)
 	}
-	if rec := doJSON(t, closed, "POST", "/v1/coach/offers/"+offer+"/accept", coach, nil); rec.Code != 200 {
+	if rec := doJSON(t, closed, "POST", "/v1/coach/requests/"+offer+"/start", coach, nil); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	if rec := doJSON(t, closed, "POST", "/v1/coaching/requests/"+request+"/response", coach, responseBody()); rec.Code != 200 {
@@ -108,8 +108,8 @@ func TestReconciliationDetectsAccountingIssuesAndProtectsAdminAccess(t *testing.
 	}
 	lot := buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
-	offer := coachRequests(t, h, coach).Offers[0].ID
-	if rec := doJSON(t, h, "POST", "/v1/coach/offers/"+offer+"/accept", coach, nil); rec.Code != 200 {
+	offer := coachRequests(t, h, coach).Reviewing[0].ID
+	if rec := doJSON(t, h, "POST", "/v1/coach/requests/"+offer+"/start", coach, nil); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	if rec := doJSON(t, h, "POST", "/v1/coaching/requests/"+request+"/response", coach, responseBody()); rec.Code != 200 {

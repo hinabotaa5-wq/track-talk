@@ -31,11 +31,13 @@ func withdrawalJSON(rr db.ReviewRequest) map[string]any {
 		"withdrawn_at": rr.WithdrawnAt,
 		"from_status":  rr.WithdrawnFromStatus,
 		"reason":       rr.WithdrawReason,
+		"reason_code":  rr.ReturnReason,
 	}
 }
 
 type withdrawReq struct {
-	Reason *string `json:"reason"`
+	Reason     *string `json:"reason"`
+	ReasonCode string  `json:"reason_code"`
 }
 
 // withdrawReviewRequest は、担当のコーチが引き受けた依頼を返却する前に辞退する。
@@ -51,6 +53,10 @@ func (s *Server) withdrawReviewRequest(w http.ResponseWriter, r *http.Request) {
 	var req withdrawReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	if !oneOf(req.ReasonCode, []string{"video_unviewable", "wrong_event", "medical", "other"}) {
+		FieldError(w, map[string]string{"reason_code": "返却理由を選んでください"})
 		return
 	}
 	var reason *string
@@ -79,13 +85,13 @@ func (s *Server) withdrawReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	rr, err := s.q.WithdrawReviewRequest(r.Context(), db.WithdrawReviewRequestParams{Reason: reason, ID: id, CoachID: p.ID})
+	rr, err := s.q.WithdrawReviewRequest(r.Context(), db.WithdrawReviewRequestParams{Reason: reason, ReturnReason: req.ReasonCode, ID: id, CoachID: p.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		if current.WithdrawnAt != nil {
-			Error(w, http.StatusConflict, "already_withdrawn", "この依頼はもう辞退しています")
+			Error(w, http.StatusConflict, "already_withdrawn", "この依頼はすでに返却済みです")
 			return
 		}
-		Error(w, http.StatusConflict, "conflict", "この依頼はいま辞退できません")
+		Error(w, http.StatusConflict, "conflict", "この依頼はいま返却できません")
 		return
 	}
 	if err != nil {
@@ -103,7 +109,7 @@ func reviewWithdrawalPush(requestID uuid.UUID, paymentConfigured bool) push.Mess
 		body += "。お支払いは取り消します（PayPay は返金します）"
 	}
 	return push.Message{
-		Title: "コーチが依頼を辞退しました",
+		Title: "コーチが依頼を返却しました",
 		Body:  body,
 		URL:   "/coaching/requests/" + requestID.String(),
 		Tag:   "review-" + requestID.String(),

@@ -37,7 +37,7 @@ function meaningfulLength(s: string) {
   return (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
 }
 
-// コーチが差し戻すフォーム。引き受ける前（打診中）でも、引き受けたあと（添削中）でも使える。
+// 動画を確認できる場合に、選手に相談内容の補足を求める。
 export function CoachInfoRequestForm({
   requestID,
   token,
@@ -79,7 +79,7 @@ export function CoachInfoRequestForm({
     <details className="rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <summary className="cursor-pointer font-semibold">{L("内容確認のため差し戻す（1回だけ）")}</summary>
       <form onSubmit={onSubmit} className="mt-3 space-y-3">
-        <p className="text-xs text-slate-300">{L("依頼の内容が分からないときに、依頼者に質問して直してもらえます。差し戻しは1つの依頼に1回だけです。依頼者は24時間以内に再提出し、再提出から24時間が新しい返却期限になります。再提出がなければ依頼は終了します。")}</p>
+        <p className="text-xs text-slate-300">{L("動画を確認でき、相談内容が分かりにくいときに質問できます。動画を確認できない場合は「この依頼を返却する」を使ってください。差し戻しは1つの依頼に1回だけです。依頼者は24時間以内に再提出し、再提出から24時間が新しい返却期限になります。再提出がなければ依頼は終了します。")}</p>
         <label className="block space-y-1">
           <span className="text-xs text-slate-300">{L("分からない点の種類（任意）")}</span>
           <select
@@ -89,7 +89,7 @@ export function CoachInfoRequestForm({
             className="w-full rounded-md border border-white/25 bg-white/10 px-3 py-2 text-base text-slate-100"
           >
             <option value="">{L("選ばない")}</option>
-            {(Object.keys(reviewInfoReasonLabels) as ReviewInfoReason[]).map((r) => (
+            {(Object.keys(reviewInfoReasonLabels) as ReviewInfoReason[]).filter((r) => r !== "mismatch").map((r) => (
               <option key={r} value={r}>
                 {reviewInfoReasonLabels[r]}
               </option>

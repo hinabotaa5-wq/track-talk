@@ -54,11 +54,11 @@ func answeredTicketRoom(t *testing.T, h http.Handler) (owner, coach, root string
 	_, owner = demoRequester(t, h, admin)
 	buySixTickets(t, h, owner)
 	root = ticketReview(t, h, owner)
-	offers := coachRequests(t, h, coach).Offers
+	offers := coachRequests(t, h, coach).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {
@@ -145,11 +145,11 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 	// 下書きのあとで残りの3枚を別の依頼とその追加相談で確保し、チケットが尽きた状態で送る。チケットの新規販売は
 	// 止めたので、送信時の残高で都度払いに切り替える。同時に送っても支払いは1件分。
 	other := ticketReview(t, h, owner)
-	offers := coachRequests(t, h, coach).Offers
+	offers := coachRequests(t, h, coach).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+other+"/response", coach, responseBody()); r.Code != 200 {
@@ -603,8 +603,8 @@ func TestConsultationGuardianCanFindRandomReviewRoom(t *testing.T) {
 	minor, g := guardianMinor(t, h)
 	buySixTickets(t, h, minor)
 	root := ticketReview(t, h, minor)
-	offers := coachRequests(t, h, coach).Offers
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); r.Code != 200 {
+	offers := coachRequests(t, h, coach).Reviewing
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {

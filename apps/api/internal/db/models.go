@@ -1231,6 +1231,13 @@ type ReviewRequest struct {
 	WithdrawReason      *string    `json:"withdraw_reason"`
 	VideosPurgedAt      *time.Time `json:"videos_purged_at"`
 	RetentionHoldAt     *time.Time `json:"retention_hold_at"`
+	AssignedAt          *time.Time `json:"assigned_at"`
+	StartedAt           *time.Time `json:"started_at"`
+	TimedOutAt          *time.Time `json:"timed_out_at"`
+	CanceledAt          *time.Time `json:"canceled_at"`
+	ReturnReason        *string    `json:"return_reason"`
+	Reminder12hAt       *time.Time `json:"reminder_12h_at"`
+	Reminder4hAt        *time.Time `json:"reminder_4h_at"`
 }
 
 type ReviewResponse struct {

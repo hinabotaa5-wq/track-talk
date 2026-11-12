@@ -116,7 +116,7 @@ func TestAdminSuspendCoachAuthorization(t *testing.T) {
 }
 
 // 止めたコーチに返事待ちの打診があれば、断った扱いにして依頼を待ちに戻す。
-func TestAdminSuspendCoachHandsOffOpenOffers(t *testing.T) {
+func TestAdminSuspendCoachBlocksStartingAssignedReview(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setup(t)
 	tadmin := adminToken(t, h)
@@ -125,23 +125,18 @@ func TestAdminSuspendCoachHandsOffOpenOffers(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
 	if rec := doJSON(t, h, http.MethodPost, coachSuspendPath(coach, "suspend"), tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("suspend %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusForbidden {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusForbidden {
 		t.Errorf("suspended coach accepted offer %d %s", rec.Code, rec.Body.String())
 	}
-	if status := reviewStatus(t, h, tu, offers[0].Request.ID); status != "queued" {
+	if status := reviewStatus(t, h, tu, offers[0].ID); status != "in_review" {
 		t.Errorf("request after suspend %s", status)
-	}
-	var result string
-	queryRowArgs(t, `SELECT result FROM review_offers WHERE id = $1`, []any{offers[0].ID}, &result)
-	if result != "declined" {
-		t.Errorf("offer result %s", result)
 	}
 }
 
@@ -303,11 +298,11 @@ func TestAdminEndCoachBlockers(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu)); rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	offers := coachRequests(t, h, tc).Offers
+	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := doJSON(t, h, http.MethodPost, coachSuspendPath(coach, "suspend"), tadmin, nil); rec.Code != http.StatusOK {

@@ -69,8 +69,8 @@ func TestReviewInfoRequestAfterAccept(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 	id := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, id, "card")
-	offers := coachRequests(t, h, tc).Offers
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != 200 {
+	offers := coachRequests(t, h, tc).Reviewing
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
 
@@ -152,75 +152,8 @@ func TestReviewInfoRequestAfterAccept(t *testing.T) {
 }
 
 // 引受前に差し戻すと、打診は再提出まで止まり、再提出で引受期限90分を数え直す。動画も差し替えられる。
-func TestReviewInfoRequestBeforeAccept(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, f := setupCoachChoice(t)
-	admin := adminToken(t, h)
-	coach, tc := onDutyCoach(t, h, admin)
-	_, tu := demoRequester(t, h, admin)
-	id := chosenReview(t, h, tu, coach.String(), "paypay", false)
-	payChosenReview(t, h, id, "paypay")
-	if len(coachRequests(t, h, tc).Offers) != 1 {
-		t.Fatal("no offer")
-	}
-	asked := askInfo(t, h, tc, id, map[string]any{"body": infoQuestion}, http.StatusOK)
-	if asked.Status != "needs_info" || asked.VideoURL != "" || *asked.InfoRequest.FromStatus != "offered" {
-		t.Fatalf("asked %+v", asked)
-	}
-	// 差し戻し中の打診は一覧に出さず、引き受け・見送りもできない。添削中の欄に動画なしで出る。
-	list := coachRequests(t, h, tc)
-	if len(list.Offers) != 0 || len(list.Reviewing) != 1 || list.Reviewing[0].Status != "needs_info" || list.Reviewing[0].VideoURL != "" {
-		t.Fatalf("coach list %+v", list)
-	}
-	var offerID string
-	queryRowArgs(t, `SELECT id::text FROM review_offers WHERE request_id=$1`, []any{id}, &offerID)
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offerID+"/accept", tc, nil); r.Code != http.StatusConflict {
-		t.Fatalf("accept while needs_info %d %s", r.Code, r.Body.String())
-	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offerID+"/decline", tc, nil); r.Code != http.StatusConflict {
-		t.Fatalf("decline while needs_info %d %s", r.Code, r.Body.String())
-	}
-	// 引受期限（90分）を過ぎても、差し戻し中は打診が切れない。
-	execSQLArgs(t, `UPDATE review_offers SET offered_at = now() - interval '3 hours' WHERE request_id=$1`, id)
-	execSQLArgs(t, `UPDATE review_payments SET authorized_at = now() - interval '2 minutes' WHERE request_id = $1`, id)
-	if r := tick(t, h, "tick-secret"); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	if reviewStatus(t, h, tu, id) != "needs_info" || len(f.refundList()) != 0 || reviewPaymentStatus(t, id) != "captured" {
-		t.Fatalf("ended while waiting: refunds=%v", f.refundList())
-	}
-
-	// 動画を差し替えて再提出すると、もう一度同じコーチに打診され、引受期限を新しく数える。
-	video := signedCoachingVideo(t, h, tu)
-	rec := doJSON(t, h, "POST", "/v1/coaching/requests/"+id+"/resubmit", tu, map[string]any{"question": "スタートから30mまでです", "video_public_id": video})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("resubmit %d %s", rec.Code, rec.Body.String())
-	}
-	var resubmitted infoReviewView
-	_ = json.Unmarshal(rec.Body.Bytes(), &resubmitted)
-	if resubmitted.Status != "offered" || !resubmitted.InfoRequest.VideoReplaced || !strings.Contains(resubmitted.VideoURL, strings.TrimPrefix(video, "track-talk-coaching/")) {
-		t.Fatalf("resubmitted %+v", resubmitted)
-	}
-	var fresh bool
-	queryRowArgs(t, `SELECT o.expires_at > now() + interval '89 minutes' AND o.expires_at <= r.due_at FROM review_offers o JOIN review_requests r ON r.id=o.request_id WHERE o.request_id=$1 AND o.result IS NULL`, []any{id}, &fresh)
-	if !fresh {
-		t.Fatal("offer window was not restarted")
-	}
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != id {
-		t.Fatalf("offers %+v", offers)
-	}
-	if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	if v := requesterReviewView(t, h, tu, id); v.Status != "in_review" || v.Question != "スタートから30mまでです" {
-		t.Fatalf("after accept %+v", v)
-	}
-}
-
-// 再提出期限までに再提出がなければ、依頼は終わり、既存の期限切れと同じく取り消し・返金する。
 func TestReviewInfoRequestExpiresWithoutResubmit(t *testing.T) {
-	for _, tc := range []struct{ method, origin string }{{"card", "offered"}, {"paypay", "in_review"}} {
+	for _, tc := range []struct{ method, origin string }{{"card", "in_review"}, {"paypay", "in_review"}} {
 		t.Run(tc.method+"_"+tc.origin, func(t *testing.T) {
 			fakeCoachingCloudinary(t)
 			h, f := setupCoachChoice(t)
@@ -230,8 +163,8 @@ func TestReviewInfoRequestExpiresWithoutResubmit(t *testing.T) {
 			id := chosenReview(t, h, tu, coach.String(), tc.method, false)
 			payChosenReview(t, h, id, tc.method)
 			if tc.origin == "in_review" {
-				offers := coachRequests(t, h, tcoach).Offers
-				if r := doJSON(t, h, "POST", "/v1/coach/offers/"+offers[0].ID+"/accept", tcoach, nil); r.Code != 200 {
+				offers := coachRequests(t, h, tcoach).Reviewing
+				if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", tcoach, nil); r.Code != 200 {
 					t.Fatal(r.Body.String())
 				}
 			}
@@ -267,7 +200,7 @@ func TestReviewInfoRequestExpiresWithoutResubmit(t *testing.T) {
 			// 別のコーチには回さない。
 			var offersCount int
 			queryRowArgs(t, `SELECT count(*) FROM review_offers WHERE request_id=$1`, []any{id}, &offersCount)
-			if offersCount != 1 {
+			if offersCount != 0 {
 				t.Fatalf("reassigned: %d offers", offersCount)
 			}
 		})

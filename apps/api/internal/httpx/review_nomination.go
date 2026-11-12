@@ -19,7 +19,7 @@ func reviewCashPrice(rr db.ReviewRequest) int32 {
 func (s *Server) reviewNominees(ctx context.Context, q *db.Queries, requester uuid.UUID, event string, coach *uuid.UUID) ([]db.ListReviewNomineesRow, error) {
 	return q.ListReviewNominees(ctx, db.ListReviewNomineesParams{
 		Payments: s.stripe.Configured(), Tier: "coach", Event: event, RequesterID: requester,
-		RequestedCoachID: coach, MaxActive: maxActiveReviews, DayStart: dayStart(time.Now()),
+		RequestedCoachID: coach, DayStart: dayStart(time.Now()),
 		MinRatings: lowRatingMinCount, LowStars: lowRatingStars,
 	})
 }

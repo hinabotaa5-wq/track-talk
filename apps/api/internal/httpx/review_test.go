@@ -321,8 +321,8 @@ func TestCoachDutyToggleStopsNewRequestsOnly(t *testing.T) {
 	}
 	id := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, id, "card")
-	offers := coachRequests(t, h, tc).Offers
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", tc, nil); rec.Code != http.StatusOK {
+	offers := coachRequests(t, h, tc).Reviewing
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept %d", rec.Code)
 	}
 
@@ -353,7 +353,7 @@ func TestCoachDutyToggleStopsNewRequestsOnly(t *testing.T) {
 	}
 	next := chosenReview(t, h, tu, coach.String(), "card", false)
 	payChosenReview(t, h, next, "card")
-	if offers := coachRequests(t, h, tc).Offers; len(offers) != 1 || offers[0].Request.ID != next {
+	if offers := coachRequests(t, h, tc).Reviewing; len(offers) != 1 || offers[0].ID != next {
 		t.Fatalf("offers after resuming %+v", offers)
 	}
 }

@@ -74,77 +74,32 @@ func TestNominatedReviewNotifications(t *testing.T) {
 			t.Fatalf("tick: %d %s", rec.Code, rec.Body)
 		}
 	}
-	reviewSetting := func(tok string, enabled bool) {
-		t.Helper()
-		rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/review", tok, map[string]bool{"in_app": enabled, "push": enabled})
-		if rec.Code != http.StatusOK {
-			t.Fatalf("setting: %d", rec.Code)
-		}
-	}
 
 	id := start()
-	reviewSetting(tc, false)
-	beforeCoach := coachPushes.Load()
-	// The offer is still open with at most 30 countable minutes remaining.
-	execSQLArgs(t, "UPDATE review_offers SET expires_at=$2 WHERE request_id=$1", id, time.Now().Add(20*time.Minute))
-	runTick()
-	runTick()
-	assertNotice(id, "review_offer_reminder", coach, 1)
-	assertNotice(id, "review_offer_reminder", requester, 0)
-	if got := coachPushes.Load() - beforeCoach; got != 1 {
-		t.Fatalf("reminder push attempts: %d", got)
+	assertNotice(id, "review_offer", coach, 1)
+	before := coachPushes.Load()
+	for _, lead := range []time.Duration{11 * time.Hour, 3 * time.Hour} {
+		execSQLArgs(t, "UPDATE review_requests SET due_at=$2 WHERE id=$1", id, time.Now().Add(lead))
+		runTick()
+		runTick()
 	}
+	assertNotice(id, "review_offer_reminder", coach, 2)
+	if coachPushes.Load()-before != 2 {
+		t.Fatal("expected one push per reminder")
+	}
+	execSQLArgs(t, "UPDATE review_requests SET due_at=now()-interval '1 second' WHERE id=$1", id)
 	beforeRequester := requesterPushes.Load()
-	acceptChosen(t, h, tc, id)
-	assertNotice(id, "review_accepted", requester, 1)
-	assertNotice(id, "review_accepted", coach, 0)
-	if got := requesterPushes.Load() - beforeRequester; got != 1 {
-		t.Fatalf("acceptance push attempts: %d", got)
-	}
-
-	reviewSetting(tu, false)
-	silent := start()
-	offers := coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != silent {
-		t.Fatalf("expected one open offer, got %+v", offers)
-	}
-	beforeRequester = requesterPushes.Load()
-	acceptChosen(t, h, tc, silent)
-	assertNotice(silent, "review_accepted", requester, 0)
-	if requesterPushes.Load() != beforeRequester {
-		t.Fatal("acceptance push bypassed requester preferences")
-	}
-	// Free a slot for the remaining offers.
-	execSQLArgs(t, "UPDATE review_requests SET status='expired' WHERE id=$1", silent)
-	reviewSetting(tu, true)
-	reviewSetting(tc, true)
-
-	expired := start()
-	beforeCoach = coachPushes.Load()
-	beforeRequester = requesterPushes.Load()
-	execSQLArgs(t, "UPDATE review_offers SET expires_at=now() - interval '1 second' WHERE request_id=$1", expired)
+	before = coachPushes.Load()
 	runTick()
 	runTick()
-	assertNotice(expired, "review_expired", requester, 1)
-	assertNotice(expired, "review_nomination_ended", coach, 1)
-	assertNotice(expired, "review_offer_reminder", coach, 0)
-	if coachPushes.Load()-beforeCoach != 1 || requesterPushes.Load()-beforeRequester != 1 {
+	assertNotice(id, "review_expired", requester, 1)
+	assertNotice(id, "review_accepted", requester, 0)
+	if coachPushes.Load()-before != 1 || requesterPushes.Load()-beforeRequester != 1 {
 		t.Fatal("expected one expiry push to each recipient")
 	}
-
-	declined := start()
-	offers = coachRequests(t, h, tc).Offers
-	if len(offers) != 1 || offers[0].Request.ID != declined {
-		t.Fatalf("expected one open offer, got %+v", offers)
-	}
-	beforeCoach = coachPushes.Load()
-	rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/decline", tc, nil)
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("decline: %d", rec.Code)
-	}
-	assertNotice(declined, "review_expired", requester, 1)
-	assertNotice(declined, "review_nomination_ended", coach, 0)
-	if coachPushes.Load() != beforeCoach {
-		t.Fatal("coach was notified of their own decline")
+	var onDuty bool
+	queryRowArgs(t, "SELECT on_duty FROM coach_profiles WHERE profile_id=$1", []any{coach}, &onDuty)
+	if onDuty {
+		t.Fatal("coach still accepting new reviews after timeout")
 	}
 }

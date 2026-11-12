@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-// コーチ向けメニューの11タイルを大きくし、画面にちょうど収める（本体 #580）。
+// コーチ向けメニューの10タイルを大きくし、画面にちょうど収める（本体 #580）。
 // NEXT_PUBLIC_COACHING_ENABLED=true のプレビューで実行する（起動手順は docs/coach-availability.md と同じ）。データと認証はテスト用。
 // #563 の高さ合わせ（JS で正方形の一辺を実測）は廃止し、タイルは横幅駆動（3列 1fr＋正方形）にする。
 // 縦の余りは行ギャップ拡大（最大 +8px）→上下パディング拡大（最大 28px）→中央寄せの順で吸収し、
@@ -35,10 +35,8 @@ async function setup(page: Page, withOffers: boolean) {
     else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false };
     else if (pathname.endsWith("/coach/requests")) {
       body = {
-        offers: withOffers
-          ? [{ id: "o1", expires_at: new Date(Date.now() + 50 * 60000).toISOString(), request: reviewRequest("r0") }]
-          : [],
-        reviewing: [reviewRequest("r1")],
+        offers: [],
+        reviewing: withOffers ? [reviewRequest("r0"), reviewRequest("r1")] : [reviewRequest("r1")],
       };
     } else if (pathname.endsWith("/coach/consultations")) body = { consultations: [{ id: "c1", status: "open" }] };
     else if (pathname.endsWith("/coach/contracts")) body = { contracts: [{ id: "k1", status: "applied" }] };
@@ -52,9 +50,9 @@ async function setup(page: Page, withOffers: boolean) {
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(11);
+  await expect(page.locator("nav.grid a")).toHaveCount(10);
   await expect(page.locator("footer").getByText("コーチをやめる")).toBeVisible();
-  if (withOffers) await expect(page.getByRole("link", { name: /新しい依頼/ })).toBeVisible();
+  if (withOffers) await expect(page.getByRole("link", { name: "対応中（2件）" })).toBeVisible();
   await expect(page.locator(".screen-loader")).toBeHidden();
 }
 
@@ -125,7 +123,7 @@ async function measure(page: Page) {
   });
 }
 
-function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measure>>, withBadgeOnOffers: boolean, strictLabels = true) {
+function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measure>>, strictLabels = true) {
   const exp = expectedTile(page.width);
   // タイルは正方形で、想定値と ±2px 以内で一致する。
   for (const w of m.tileWidths) expect(Math.abs(w - exp.tile)).toBeLessThanOrEqual(2);
@@ -134,7 +132,6 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
   expect(m.tileTops[1]).toBeCloseTo(m.tileTops[0], 0);
   expect(m.tileTops[2]).toBeCloseTo(m.tileTops[0], 0);
   expect(Math.abs(m.tileLefts[9] - m.tileLefts[0])).toBeLessThanOrEqual(1);
-  expect(Math.abs(m.tileLefts[10] - m.tileLefts[1])).toBeLessThanOrEqual(1);
   // 横ギャップは基準値どおり（縦の吸収で横は広げない）。
   expect(Math.abs(m.tileLefts[1] - m.tileLefts[0] - m.tileWidths[0] - exp.gap)).toBeLessThanOrEqual(2);
   // 行ギャップは基準〜最大 +8px の範囲。
@@ -145,7 +142,7 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
   }
   // 全ラベルが1行に収まり、折り返し・はみ出しがない。
   // 英語の長いラベルは ellipsis で見た目にはみ出さない設計（折り返しはしない）。
-  expect(m.labels).toHaveLength(11);
+  expect(m.labels).toHaveLength(10);
   for (const label of m.labels) {
     expect(label).not.toBeNull();
     expect(label!.whiteSpace).toBe("nowrap");
@@ -161,17 +158,15 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
   // バッジは切れていない。固定の5つ（添削中・追加相談・契約申込みの件数、特商法・報酬口座の点）に、
   // 期限アラートありの時は届いた依頼の件数が加わる（モックの件数どおり）。
   const badged = m.badges.filter((b) => b !== null);
-  if (withBadgeOnOffers) expect(m.badges[0]).not.toBeNull();
-  else expect(m.badges[0]).toBeNull();
-  expect(m.badges[1]).not.toBeNull();
-  expect(badged.length).toBe(withBadgeOnOffers ? 6 : 5);
+  expect(m.badges[0]).not.toBeNull();
+  expect(badged).toHaveLength(5);
   for (let i = 0; i < m.badges.length; i++) {
     const badge = m.badges[i];
     if (badge === null) continue;
     expect(badge.shown).toBe(true);
     expect(badge.clipped).toBe(false);
     // 件数バッジ（届いた依頼・添削中・追加相談・契約申込み）は h-5、注意の点（特商法・報酬口座）は size-3。
-    const expectedH = i === 7 || i === 8 ? 12 : 20;
+    const expectedH = i === 6 || i === 7 ? 12 : 20;
     expect(Math.abs(badge.h - expectedH)).toBeLessThanOrEqual(1);
     expect(badge.top).toBeGreaterThanOrEqual(m.navTop - 1);
   }
@@ -192,11 +187,11 @@ async function expectFooterReachable(page: Page) {
 }
 
 for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
-  test(`${viewport.width}px 幅で11タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
+  test(`${viewport.width}px 幅で10タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await setup(page, false);
     const m = await measure(page);
-    expectTiles(viewport, m, false);
+    expectTiles(viewport, m);
     await expectFooterReachable(page);
     if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") {
       await page.setViewportSize(viewport);
@@ -206,12 +201,12 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }
   });
 }
 
-test("390×844 で期限アラートがあってもタイルの大きさは変わらず、バッジが切れない（#580）", async ({ page }) => {
+test("390×844 で対応中の件数が増えてもタイルの大きさは変わらず、バッジが切れない（#580）", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page, true);
   const m = await measure(page);
-  expectTiles({ width: 390 }, m, true);
-  // アラートなしの時と同じ大きさ（横幅駆動なので高さの影響を受けない）。
+  expectTiles({ width: 390 }, m);
+  // 件数の少ないときと同じ大きさ（横幅駆動なので高さの影響を受けない）。
   const plainPage = await page.context().newPage();
   await plainPage.setViewportSize({ width: 390, height: 844 });
   await setup(plainPage, false);
@@ -303,7 +298,7 @@ async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en")
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(11);
+  await expect(page.locator("nav.grid a")).toHaveCount(10);
   await expect(page.locator(".screen-loader")).toBeHidden();
   const switchName = locale === "en" ? "Accepting" : "受付中";
   await page.getByRole("switch", { name: switchName }).click();
@@ -370,7 +365,7 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }
     const err = await measure(errPage);
     expectSameTiles(base, err);
     // 英語の長いラベルは ellipsis で見た目にはみ出さない設計。折り返しはしない。
-    expectTiles(viewport, err, false, false);
+    expectTiles(viewport, err, false);
     await expectFooterReachable(errPage);
     if (process.env.PLAYWRIGHT_SCREENSHOTS === "1") {
       await errPage.evaluate(() => window.scrollTo(0, 0));

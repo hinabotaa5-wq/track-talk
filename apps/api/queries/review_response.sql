@@ -12,6 +12,7 @@ SET status = 'returned',
 WHERE id = $1
   AND coach_id = $2
   AND status = 'in_review'
+  AND started_at IS NOT NULL
   AND due_at > now()
 RETURNING *;
 

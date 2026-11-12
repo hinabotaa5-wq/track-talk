@@ -244,11 +244,11 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	reviewCoach, trc := onDutyCoach(t, h, tadmin)
 	_, tr := demoRequester(t, h, tadmin)
 	reqID := paidReview(t, h, tr, "card", "pi_card_earn")
-	offers := coachRequests(t, h, trc).Offers
+	offers := coachRequests(t, h, trc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", trc, nil); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", trc, nil); rec.Code != http.StatusOK {
 		t.Fatalf("accept offer %d", rec.Code)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+reqID+"/response", trc, responseBody()); rec.Code != http.StatusOK {
@@ -531,11 +531,11 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 	_, owner := demoRequester(t, h, admin)
 	for range 3 {
 		id := paidReview(t, h, owner, "card", "pi_month_boundary_"+uuid.NewString())
-		offers := coachRequests(t, h, coach).Offers
+		offers := coachRequests(t, h, coach).Reviewing
 		if len(offers) != 1 {
 			t.Fatalf("offers %+v", offers)
 		}
-		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/offers/"+offers[0].ID+"/accept", coach, nil); rec.Code != http.StatusOK {
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); rec.Code != http.StatusOK {
 			t.Fatalf("accept: %d %s", rec.Code, rec.Body.String())
 		}
 		if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", coach, responseBody()); rec.Code != http.StatusOK {

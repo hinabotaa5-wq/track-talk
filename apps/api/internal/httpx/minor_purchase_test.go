@@ -83,8 +83,8 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 	}
 
 	// 1本目を返却してもらい、追加相談（600円）を頼む。送るときも、支払い画面を開き直すときも毎回チェックが要る。
-	for _, o := range coachRequests(t, h, tc).Offers {
-		if r := doJSON(t, h, "POST", "/v1/coach/offers/"+o.ID+"/accept", tc, nil); r.Code != 200 {
+	for _, o := range coachRequests(t, h, tc).Reviewing {
+		if r := doJSON(t, h, "POST", "/v1/coach/requests/"+o.ID+"/start", tc, nil); r.Code != 200 {
 			t.Fatal(r.Body.String())
 		}
 	}
@@ -180,8 +180,8 @@ func TestReviewConsultationPaymentDoesNotRecheckLegacyDeclaration(t *testing.T) 
 	_, tm := demoUser(t, h, time.Date(time.Now().Year()-15, 1, 1, 0, 0, 0, 0, time.UTC))
 	review := chosenReview(t, h, tm, coach.String(), "paypay", false)
 	payChosenReview(t, h, review, "paypay")
-	for _, o := range coachRequests(t, h, tc).Offers {
-		if r := doJSON(t, h, "POST", "/v1/coach/offers/"+o.ID+"/accept", tc, nil); r.Code != 200 {
+	for _, o := range coachRequests(t, h, tc).Reviewing {
+		if r := doJSON(t, h, "POST", "/v1/coach/requests/"+o.ID+"/start", tc, nil); r.Code != 200 {
 			t.Fatal(r.Body.String())
 		}
 	}
