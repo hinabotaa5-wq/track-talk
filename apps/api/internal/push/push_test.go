@@ -5,6 +5,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -38,6 +39,41 @@ func testSender(t *testing.T) Sender {
 	}
 	return Sender{PublicKey: pub, PrivateKey: priv, Subject: "mailto:test@example.com"}
 }
+
+func TestMessageUnreadCountJSON(t *testing.T) {
+	// 未読数は付けたときだけ送り、付けない経路では項目自体を出さない。
+	// 0 も「未読なし」の意味があるので省かない。
+	out, err := json.Marshal(Message{Title: "T", Body: "B", URL: "/", UnreadCount: ptrInt64(3)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"unread_count":3`) {
+		t.Fatalf("payload %s", out)
+	}
+	out, err = json.Marshal(Message{Title: "T", Body: "B", URL: "/", UnreadCount: ptrInt64(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"unread_count":0`) {
+		t.Fatalf("payload %s", out)
+	}
+	out, err = json.Marshal(Message{Title: "T", Body: "B", URL: "/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "unread_count") {
+		t.Fatalf("payload %s", out)
+	}
+	var back Message
+	if err := json.Unmarshal([]byte(`{"title":"T","body":"B","url":"/","subscription_id":"s","unread_count":3}`), &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.UnreadCount == nil || *back.UnreadCount != 3 {
+		t.Fatalf("decoded %+v", back)
+	}
+}
+
+func ptrInt64(v int64) *int64 { return &v }
 
 func TestSendReportsGoneSubscriptions(t *testing.T) {
 	status := http.StatusCreated

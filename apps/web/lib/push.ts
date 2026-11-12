@@ -25,7 +25,7 @@ export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 
 // 新しい購読を保存する前に、その紐付けを照合する版の worker を有効にする。
 export async function ensurePushWorker(): Promise<ServiceWorkerRegistration> {
-  const registration = await navigator.serviceWorker.register("/sw.js?v=2", { scope: "/" });
+  const registration = await navigator.serviceWorker.register("/sw.js?v=3", { scope: "/" });
   const worker = registration.installing ?? registration.waiting ?? registration.active;
   if (!worker) throw new Error(L("通知を準備できませんでした"));
   if (worker.state !== "activated") {

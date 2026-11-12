@@ -32,9 +32,35 @@ self.addEventListener("push", (event) => {
       tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,
       data: { url: typeof data.url === "string" ? data.url : "/" },
     };
-    await self.registration.showNotification(title, options);
+    // アイコンバッジは、推測で増やさず、送られてきた未読数だけを使う。
+    // 欠落・不正のときは触らない（次に開いたとき画面側の正本で直る）。
+    // 失敗で通知表示を止めないよう、通知とは別に構える。
+    const badgeWork = applyAppBadge(data);
+    try {
+      await self.registration.showNotification(title, options);
+    } finally {
+      await badgeWork;
+    }
   }));
 });
+
+// 送られてきた未読数をアプリアイコンのバッジに写す。検証と握りつぶしの方針は
+// 画面側の lib/app-badge.ts と同じ（単体ファイルのため処理をここに持つ）。
+// 安全な非負整数ならその値、0 ならクリア、それ以外は呼び出し自体をしない。
+// 未対応の環境では何もしない。決して投げない。
+async function applyAppBadge(data) {
+  try {
+    const count = data && data.unread_count;
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return;
+    if (count === 0) {
+      if (typeof self.navigator.clearAppBadge === "function") await self.navigator.clearAppBadge();
+      return;
+    }
+    if (typeof self.navigator.setAppBadge === "function") await self.navigator.setAppBadge(count);
+  } catch {
+    // バッジが出せなくても通知の表示は変えない。
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

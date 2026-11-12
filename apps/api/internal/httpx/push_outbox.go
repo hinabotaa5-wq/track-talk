@@ -152,6 +152,14 @@ func (s *Server) failOutboxRow(ctx context.Context, id uuid.UUID, result string)
 // 文面は受け手の表示言語に合わせ、未訳は日本語のまま出す（本体 #521）。
 func (s *Server) sendToSubscriptions(ctx context.Context, profileID uuid.UUID, msg push.Message, ttl time.Duration) (sent, subs, gone int, err error) {
 	msg = localizePushMessage(s.recipientLocale(ctx, profileID), msg)
+	// アイコンバッジ用に、その時点の受け手の未読総数を付ける。ベルと同じ数え方
+	//（CountUnreadNotifications）で、送る直前に数え直すので DB の変更は要らない。
+	// 読めなかったら付けずに送り、バッジは触らせない。抑止・照合の流れは変えない。
+	if unread, err := s.q.CountUnreadNotifications(ctx, profileID); err != nil {
+		slog.Warn("push: unread count", "err", err)
+	} else {
+		msg.UnreadCount = &unread
+	}
 	subscriptions, err := s.q.ListPushSubscriptions(ctx, profileID)
 	if err != nil {
 		return 0, 0, 0, err

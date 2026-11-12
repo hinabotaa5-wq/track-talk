@@ -3,6 +3,7 @@
 import { PageLoading } from "@/components/page-loading";
 
 import { apiFetch } from "@/lib/api";
+import { applyAppBadge, clearAppBadge } from "@/lib/app-badge";
 import { formatRelativeTime } from "@/lib/format";
 import { t, type I18nKey, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
@@ -86,6 +87,8 @@ export function NotificationBell() {
       )
         .then((data) => {
           setUnread(data.unread_count ?? 0);
+          // バッジはベルの未読数と同じ正本（unread_count）から写す。ローカルで増減を数えない。
+          void applyAppBadge(data.unread_count);
           if (list) {
             setItems(data.notifications ?? []);
             setError("");
@@ -102,14 +105,22 @@ export function NotificationBell() {
   );
 
   useEffect(() => {
-    if (!token) return;
+    // 未ログイン状態ではバッジを付けない。ログアウト時は消す。
+    if (!token) {
+      void clearAppBadge();
+      return;
+    }
     const refresh = () => {
       if (document.visibilityState === "visible") load(openRef.current);
     };
-    // 初回は即フェッチ、以降はタブ復帰時のみ
+    // 初回は即フェッチ、以降はフォアグラウンド復帰時
     load(openRef.current);
     document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -119,6 +130,8 @@ export function NotificationBell() {
       await apiFetch(`/v1/me/notifications/${id}/read`, { method: "POST", token });
       setItems((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
       setUnread((count) => Math.max(0, count - 1));
+      // バッジは正本の最新数で付け直す。
+      load(false);
     } catch {
       setError(t(locale, "notify.readError"));
     }
@@ -130,6 +143,8 @@ export function NotificationBell() {
       await apiFetch("/v1/me/notifications/read", { method: "POST", token });
       setItems((current) => current.map((item) => ({ ...item, read: true })));
       setUnread(0);
+      // バッジは正本の最新数で付け直す。
+      load(false);
     } catch {
       setError(t(locale, "notify.readError"));
     }
