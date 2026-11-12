@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import geoCountry, { config, countryCode } from "./geo-country";
+import geoCountry, { config, countryCode } from "./edge-functions/geo-country";
 
 // TEMPORARY（本体 #565）。言語選択プロンプトを外すときはこのファイルも消す。
 
