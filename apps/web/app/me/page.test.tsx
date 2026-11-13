@@ -14,6 +14,11 @@ vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: {
   signOut: mock.signOut, getSession: mock.getSession, onAuthStateChange: mock.onAuthStateChange,
 } }) }));
 vi.mock("@/lib/api", () => ({ apiFetch: mock.apiFetch }));
+const flags = { coaching: false };
+vi.mock("@/lib/features", async (original) => ({
+  ...await original<typeof import("@/lib/features")>(),
+  get coachingEnabled() { return flags.coaching; },
+}));
 vi.mock("@/lib/sign-out", () => ({
   signOutOnThisDevice: mock.unsubscribe,
   clearPersonalStorage: vi.fn(),
@@ -22,6 +27,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: mock.replace, r
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  flags.coaching = false;
   vi.clearAllMocks();
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
@@ -256,6 +262,25 @@ it("ログイン時に401が続く場合は1回で再試行を打ち切り、復
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
+it("コーチングが閉じている間はコーチングのセクションを出さない", async () => {
+  await renderSignedIn();
+  expect(container.textContent).not.toContain("コーチングチケット");
+  expect(container.querySelector('nav a[href="/me/coaching/tickets"]')).toBeNull();
+});
+
+it("コーチングを開けている間は旧ハブと同じ順で4リンクのセクションを出す", async () => {
+  flags.coaching = true;
+  await renderSignedIn();
+  const section = [...container.querySelectorAll("section")].find((s) => s.querySelector("h2")?.textContent === "コーチング");
+  expect(section).not.toBeUndefined();
+  expect([...section!.querySelectorAll("a")].map((a) => [a.getAttribute("href"), a.textContent])).toEqual([
+    ["/me/coaching/tickets", "コーチングチケット"],
+    ["/me/coaching/requests", "依頼した動画添削"],
+    ["/coaching/support-consults", "1ヶ月プランの無料相談"],
+    ["/me/coaching/personal", "申し込んだサポートプラン"],
+  ]);
+});
+
 it("表示言語の項目はマイページの設定一覧に出さない（運営者決定 2026-11-13）", async () => {
   await renderSignedIn();
   expect(container.querySelector('nav a[href="/me/language"]')).toBeNull();
