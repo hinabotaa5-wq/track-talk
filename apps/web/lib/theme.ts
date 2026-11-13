@@ -7,7 +7,7 @@ export type ThemePreference = "system" | "light" | "dark";
 export const themeStorageKey = "tracktalk-theme";
 
 // ヘッダーと同じ色。layout.tsx の themeColor と globals.css の --background に合わせる。
-export const themeColors = { light: "#ffffff", dark: "#1f1f1f" } as const;
+export const themeColors = { light: "#f2f2f7", dark: "#17171a" } as const;
 
 export function parseThemePreference(value: unknown): ThemePreference {
   return value === "light" || value === "dark" ? value : "system";

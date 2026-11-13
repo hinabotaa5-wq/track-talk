@@ -72,9 +72,11 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
             <Link
               key={entry.href}
               href={entry.href}
-              className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-white/25 glass bg-white/12 px-2 text-sm font-semibold text-slate-100 shadow-xs transition hover:bg-white/16 hover:text-white active:scale-[0.98]"
+              className="app-card flex h-12 items-center justify-center gap-2 px-2 text-sm font-semibold text-slate-100 transition-colors hover:text-white active:scale-[0.98]"
             >
-              <Icon className="size-4 shrink-0 text-blue-300" aria-hidden />
+              <span className="tile tile-purple" aria-hidden>
+                <Icon className="size-4" />
+              </span>
               <span className="truncate">{entry.label}</span>
               <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
             </Link>
@@ -230,7 +232,7 @@ function Schedule<T extends Scheduled>({
   );
 }
 
-const cardBase = "block h-full rounded-xl border border-white/20 glass bg-white/10 p-4";
+const cardBase = "app-card block h-full p-4";
 
 function StateBadge({ item, today }: { item: Scheduled; today: string }) {
   if (isOver(item, today)) return <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-slate-100">{L("終了")}</span>;
@@ -260,14 +262,14 @@ function ScheduleCard({
     <div className={`${cardBase} relative ${thread ? "border-amber-300/60" : ""} ${over ? "opacity-80" : ""}`}>
       {action}
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`block transition hover:text-blue-300 active:scale-[0.98] ${action ? "pr-10" : ""}`}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`block transition-colors hover:text-blue-300 ${action ? "pr-10" : ""}`}>
           {children}
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
       ) : <div className={action ? "pr-10" : ""}>{children}</div>}
       {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">{L("タイムテーブル")}</a> : null}
       {thread ? (
-        <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
+        <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-row bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
           <span className="min-w-0">
             <span className="block">{L("実況スレッドへ")}</span>
             <NowRunning events={thread.now_running} className="block truncate text-xs font-semibold text-emerald-200" />

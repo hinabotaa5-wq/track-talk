@@ -157,7 +157,7 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
   const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-white/15 bg-white/6 p-4"} aria-label={L("AI要約")}>
+    <section className={compact ? "min-w-0 space-y-2" : "app-card space-y-3 p-4"} aria-label={L("AI要約")}>
       <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />{L("AI要約")}</h2>

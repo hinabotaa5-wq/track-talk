@@ -3,8 +3,8 @@
 import { Check } from "lucide-react";
 
 const optionClass =
-  "w-full rounded-xl border px-4 py-3 text-left text-base font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
-const optionIdle = "border-white/20 glass bg-white/10 text-slate-100 hover:bg-white/16";
+  "w-full rounded-row border px-4 py-3 text-left text-base font-medium transition-colors active:bg-slate-500/15 disabled:cursor-not-allowed disabled:opacity-50";
+const optionIdle = "border-transparent app-card text-slate-100 hover:bg-white/16";
 const optionActive = "border-blue-400 bg-blue-950/60 text-white";
 
 // ケガ部の質問で使う、ボタンを並べた選択肢。1つ選ぶ質問にも、いくつでも選べる質問にも使う。

@@ -56,7 +56,7 @@ export function CoachList() {
             const price = coachPrice(c);
             return (
             <li id={`coach-${c.id}`} key={c.id} className="min-w-0">
-              <Link href={`/coaches/${encodeURIComponent(c.id)}`} onNavigate={() => rememberCoachDetailPreview(c, result.fetchedAt)} className="glass flex h-full flex-col items-center gap-3 rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-blue-400">
+              <Link href={`/coaches/${encodeURIComponent(c.id)}`} onNavigate={() => rememberCoachDetailPreview(c, result.fetchedAt)} className="app-card flex h-full flex-col items-center gap-3 border border-transparent p-4 text-center text-sm transition-all hover:border-blue-400/50 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-400">
                 <CoachAvatar url={c.photo_url} name={c.nickname} size={80} />
                 <div className="w-full min-w-0 space-y-1 break-words">
                   <p className="font-bold text-white">{c.nickname ?? L("名前なし")}</p>

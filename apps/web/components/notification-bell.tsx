@@ -185,7 +185,7 @@ export function NotificationBell() {
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
             <p className="text-sm font-semibold text-slate-100">{t(locale, "notify.title")}</p>
             {unread > 0 ? (
-              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:scale-[0.98]">
+              <button type="button" onClick={() => void markAll()} className="text-xs text-blue-400 transition hover:underline active:text-blue-300">
                 {t(locale, "notify.markAll")}
               </button>
             ) : null}
@@ -205,7 +205,7 @@ export function NotificationBell() {
                       setOpen(false);
                       if (!item.read) void markRead(item.id);
                     }}
-                    className="block px-3 py-3 transition hover:bg-white/16 active:scale-[0.98]"
+                    className="block px-3 py-3 transition-colors hover:bg-white/16 active:bg-slate-500/15"
                   >
                     <p className={`text-sm ${item.read ? "font-normal text-slate-300" : "font-bold text-white"}`}>
                       <span className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs ${item.read ? "bg-white/10 text-slate-400" : "bg-sky-300 text-slate-950"}`}>{item.read ? t(locale, "notify.read") : t(locale, "notify.unreadLabel")}</span>

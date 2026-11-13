@@ -200,7 +200,7 @@ export function BottomNav() {
     <>
       <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden [body[data-comment-typing]_&]:hidden" aria-hidden />
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 glass bg-white/8 backdrop-blur-md md:hidden [body[data-comment-typing]_&]:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-500/25 bg-surface/90 backdrop-blur-md md:hidden [body[data-comment-typing]_&]:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label={t(locale, "nav.main")}
         data-main-nav=""
@@ -216,7 +216,7 @@ export function BottomNav() {
                   pendingDelay={200}
                   href={href}
                   onClick={(event) => guardedClick(event, href)}
-                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-transform duration-150 active:scale-[0.98] ${
+                  className={`flex h-14 min-h-11 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-150 active:bg-slate-500/15 ${
                     active ? "font-semibold text-blue-400" : "text-slate-200 hover:text-white"
                   }`}
                   aria-current={active ? "page" : undefined}
