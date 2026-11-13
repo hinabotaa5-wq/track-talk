@@ -2,6 +2,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 import type { PublicCoach } from "@/lib/types";
 import { CoachList } from "./coach-list";
 import CoachDetailPage from "./[id]/page";
@@ -32,7 +34,7 @@ beforeEach(() => {
   routerBack.mockReset();
   routerPush.mockReset();
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
 it("一覧は2列で各コーチの詳細ページへリンクし、プランは一覧に出さない", async () => {
   apiFetch.mockResolvedValue({ coaches: [coach, { ...coach, id: "coach-2", nickname: "別のコーチ" }] });
@@ -72,6 +74,30 @@ it("非公開または存在しないコーチの詳細には案内を出す", a
   apiFetch.mockResolvedValue({ coaches: [] });
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("このコーチは現在公開されていません");
+});
+
+it("選手側のコーチ詳細の平均評価は件数を出さない（#628）", async () => {
+  apiFetch.mockResolvedValue({ coaches: [{ ...coach, rating_count: 3, rating_average: 4.5 }] });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.textContent).toContain("★4.5");
+  expect(container.textContent).not.toContain("3件");
+  expect(container.textContent).not.toContain("(3)");
+});
+
+it("選手側のコーチ詳細は英語でも平均評価の件数を出さない（#628）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockResolvedValue({ coaches: [{ ...coach, rating_count: 3, rating_average: 4.5 }] });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.textContent).toContain("★4.5");
+  expect(container.textContent).not.toContain("(3)");
+  expect(container.textContent).not.toContain("3件");
+});
+
+it("評価0件のときのコーチ詳細の表示は変えない（#628）", async () => {
+  apiFetch.mockResolvedValue({ coaches: [coach] });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.textContent).toContain("評価はまだありません");
 });
 
 it("動画添削の一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {

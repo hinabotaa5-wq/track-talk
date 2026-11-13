@@ -43,7 +43,7 @@ export default function CoachDetailPage() {
             <CoachAvatar url={coach.photo_url} name={coach.nickname} size={80} />
             <div className="min-w-0 space-y-1 break-words">
               <h1 className="text-xl font-bold text-white">{coach.nickname ?? L("名前なし")}</h1>
-              <p className="text-xs text-slate-200">{coach.rating_count > 0 ? L("★{v0}（{rating_count}件）", { v0: coach.rating_average.toFixed(1), rating_count: coach.rating_count }) : L("評価はまだありません")}</p>
+              <p className="text-xs text-slate-200">{coach.rating_count > 0 ? L("★{v0}", { v0: coach.rating_average.toFixed(1) }) : L("評価はまだありません")}</p>
             </div>
           </div>
           <dl className="space-y-3">
