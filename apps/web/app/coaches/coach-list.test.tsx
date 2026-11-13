@@ -108,7 +108,7 @@ it("公開プランのないコーチのカードには『プラン未公開』�
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));
   const card = container.querySelector('li[id="coach-coach-1"]')!;
-  expect(card.querySelectorAll("p")).toHaveLength(2);
+  expect(card.querySelectorAll("p")).toHaveLength(3);
   expect(container.textContent).not.toContain("プラン未公開");
 });
 
@@ -129,7 +129,7 @@ it("公開中のサポートプランがあるコーチのカードには価格�
   apiFetch.mockResolvedValue({ coaches: [{ ...coach, plans: [supportPlan] }, varied] });
   await act(async () => root.render(<CoachList />));
   const cards = [...container.querySelectorAll("li")];
-  expect(cards[0].querySelectorAll("p")).toHaveLength(3);
+  expect(cards[0].querySelectorAll("p")).toHaveLength(4);
   expect(cards[0].textContent).toContain("5,000円");
   expect(cards[0].textContent).not.toContain("プラン未公開");
   expect(cards[1].textContent).toContain("〜");
