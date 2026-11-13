@@ -72,11 +72,7 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 	if err != nil {
 		return rr, err
 	}
-	name, err := coachDisplayName(ctx, q, coachID)
-	if err != nil {
-		return rr, err
-	}
-	terms, err := s.reviewWorkOrderTerms(ctx, q, assigned, name, rr.CreatedAt)
+	terms, err := s.reviewWorkOrderTerms(ctx, q, assigned, rr.CreatedAt)
 	if err != nil {
 		return rr, err
 	}

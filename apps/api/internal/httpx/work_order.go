@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,10 +22,8 @@ import (
 
 // 通知の文面の版。文面を変えたら上げる。書き留めた通知は、そのときの版のまま残る。
 // 4: お知らせ(ベル)の文面を「依頼が届いた」の1行だけにし、9項目の全文は依頼の画面にだけ出す形にした(本体 #609)。
-const workOrderTermsVersion = 4
-
-// 運営者(委託する側)の名前。web の lib/operator.ts と揃える。
-const operatorName = "中窪日向"
+// 5: 極短文面(本体 #625)。委託者・受託者は役割表示のみで個人名を出さない。3条の9要素は8行にまとめる(支払期日と支払方法は「支払」1行)。
+const workOrderTermsVersion = 5
 
 type workOrderItem struct {
 	Label string `json:"label"`
@@ -52,36 +49,32 @@ func payoutDate(deliverBy time.Time) time.Time {
 	return time.Date(local.Year(), local.Month()+1, 15, 0, 0, 0, 0, jst.Zone)
 }
 
-// workOrderPaymentDue は、3条の明示の「支払期日」。コーチ向け規約の支払期日と同じ文面にする(#357)。
-const workOrderPaymentDue = "毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。Stripe での本人確認と口座の登録が済んでいない間は、済んだ後の支払日に支払います"
+// workOrderPaymentShort は、3条の明示の「支払期日」と「支払方法」を1行にまとめた極短文面(本体 #625)。
+const workOrderPaymentShort = "月末締・翌月15日、累積¥3,000未満は繰越。Stripe→登録口座、手数料運営負担。未登録分は登録後の支払日"
 
-// buildWorkOrderTerms は、委託の内容から9項目を作る。consignedAt は引き受けた時(打診中は今)。
-func buildWorkOrderTerms(coachName, work string, amount int32, deliverBy, consignedAt time.Time) workOrderTerms {
+// buildWorkOrderTerms は、委託の内容から極短の8行を作る(本体 #625)。個人名は入れない。consignedAt は引き受けた時(打診中は今)。
+func buildWorkOrderTerms(work string, amount int32, deliverBy, consignedAt time.Time) workOrderTerms {
 	due := payoutDate(deliverBy)
-	if strings.TrimSpace(coachName) == "" {
-		coachName = "（コーチとして登録した名前）"
-	}
 	return workOrderTerms{
 		AmountYen:   amount,
 		DeliverBy:   deliverBy,
 		PaymentDue:  due,
 		ConsignedAt: consignedAt,
 		Items: []workOrderItem{
-			{"委託する人・受ける人", fmt.Sprintf("委託する人: %s（TrackTalk の運営者）／受ける人: %s", operatorName, coachName)},
-			{"委託した日", jstDateTime(consignedAt) + "（引き受けた日時）"},
-			{"業務の内容", work},
-			{"納める期日", jstDateTime(deliverBy) + "まで"},
-			{"納める場所", "TrackTalk のコーチ専用画面から送信します"},
-			{"検査", "運営者は、納められた内容の検査をしません。送信した時に受け取ったものとします"},
-			{"報酬の額", fmt.Sprintf("%d円（税込）", amount)},
-			{"支払期日", workOrderPaymentDue},
-			{"支払方法", "Stripe を通じて、登録した銀行口座に振り込みます。振込の手数料は運営者が負担します"},
+			{"委託", "TrackTalk運営者／受託: 担当コーチ"},
+			{"日", jstDateTime(consignedAt)},
+			{"内容", work},
+			{"期限", jstDateTime(deliverBy)},
+			{"場所", "この画面"},
+			{"検査", "なし（送信で受領）"},
+			{"報酬", fmt.Sprintf("¥%d", amount)},
+			{"支払", workOrderPaymentShort},
 		},
 	}
 }
 
 // reviewWorkOrderTerms は、フォーム添削の依頼の通知。報酬は依頼のときに確定した割引前の価格と報酬率から出す。
-func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.ReviewRequest, coachName string, consignedAt time.Time) (workOrderTerms, error) {
+func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.ReviewRequest, consignedAt time.Time) (workOrderTerms, error) {
 	price, share := rr.BasePriceYen, int32(reviewSharePercent)
 	t, err := q.GetReviewTicketTerms(ctx, &rr.ID)
 	if err == nil {
@@ -89,41 +82,19 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return workOrderTerms{}, err
 	}
-	what := "見てほしい点: " + strings.Join(rr.Focus, "、")
-	if strings.TrimSpace(rr.Question) != "" {
-		what = "相談の内容に答える"
-	}
-	work := fmt.Sprintf("フォーム添削。利用者が送った動画1本（種目 %s、%s）を見て、文章で添削を返す。返却後に利用者から確認の質問が来たときは、補足を1回返す", rr.Event, what)
-	return buildWorkOrderTerms(coachName, work, price*share/100, rr.DueAt, consignedAt), nil
+	work := fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却。確認質問に補足1回", rr.Event)
+	return buildWorkOrderTerms(work, price*share/100, rr.DueAt, consignedAt), nil
 }
 
 // consultationWorkOrderTerms は、フォーム添削の追加質問の通知。回答の期限は引き受けてから72時間。
-func consultationWorkOrderTerms(c db.CoachingConsultation, coachName string, consignedAt time.Time) workOrderTerms {
+// 内容行は現行差分のまま(補足1回の文は入れない。本体 #625)。
+func consultationWorkOrderTerms(c db.CoachingConsultation, consignedAt time.Time) workOrderTerms {
 	deliverBy := consignedAt.Add(72 * time.Hour)
 	if c.AnswerBy != nil {
 		deliverBy = *c.AnswerBy
 	}
 	work := "フォーム添削の追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
-	return buildWorkOrderTerms(coachName, work, int32(int64(c.PriceYen)*int64(c.SharePercent)/100), deliverBy, consignedAt)
-}
-
-// coachDisplayName は、通知に書くコーチの名前。登録した名前がなければニックネーム。
-func coachDisplayName(ctx context.Context, q *db.Queries, coachID uuid.UUID) (string, error) {
-	cp, err := q.GetCoachProfile(ctx, coachID)
-	if err != nil {
-		return "", err
-	}
-	if strings.TrimSpace(cp.Name) != "" {
-		return cp.Name, nil
-	}
-	p, err := q.GetProfileByID(ctx, coachID)
-	if err != nil {
-		return "", err
-	}
-	if p.Nickname != nil {
-		return *p.Nickname, nil
-	}
-	return "", nil
+	return buildWorkOrderTerms(work, int32(int64(c.PriceYen)*int64(c.SharePercent)/100), deliverBy, consignedAt)
 }
 
 // saveWorkOrder は、引き受けた案件の通知を書き留め、同じトランザクションでコーチへ宛先付きで届ける。
@@ -203,11 +174,7 @@ func workOrderWithDelivery(ctx context.Context, q *db.Queries, w db.CoachWorkOrd
 // 引き受ける前は今の条件(terms)、引き受けた後は書き留めた通知(work_order)。
 func (s *Server) attachConsultationWorkOrder(ctx context.Context, out map[string]any, c db.CoachingConsultation) error {
 	if c.Status == "offered" {
-		name, err := coachDisplayName(ctx, s.q, *c.CoachID)
-		if err != nil {
-			return err
-		}
-		out["terms"] = consultationWorkOrderTerms(c, name, time.Now())
+		out["terms"] = consultationWorkOrderTerms(c, time.Now())
 		return nil
 	}
 	wo, err := s.q.GetConsultationWorkOrder(ctx, db.GetConsultationWorkOrderParams{ConsultationID: &c.ID, CoachID: c.CoachID})
