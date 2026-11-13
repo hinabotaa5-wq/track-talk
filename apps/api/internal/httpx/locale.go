@@ -31,7 +31,7 @@ func (s *Server) recipientLocale(ctx context.Context, id uuid.UUID) string {
 // 本文に名前・金額・日時が入るものは置き換えない（日本語フォールバック）。
 var pushTitleEN = map[string]string{
 	// 添削ワークフロー
-	"フォーム添削の依頼が届きました":             "New form-review request",
+	"動画添削の依頼が届きました":               "New video-review request",
 	"フォーム添削の引受期限が近づいています":           "Form-review request expiring soon",
 	"フォーム添削の依頼が期限を過ぎました":           "Form-review request expired",
 	"添削中の依頼が期限を過ぎました":              "In-progress review expired",
@@ -39,6 +39,7 @@ var pushTitleEN = map[string]string{
 	"選んだコーチが依頼を引き受けられませんでした":       "Chosen coach couldn't take the request",
 	"コーチがフォーム添削の依頼を引き受けました":        "Coach accepted the review request",
 	"コーチが依頼を辞退しました":                "Coach declined the request",
+	"コーチが依頼を返却しました":                "Coach returned the request",
 	"フォーム添削の返金が完了しました":             "Form-review refund completed",
 	"フォーム添削の仮押さえの取り消しが完了しました":      "Form-review hold voided",
 	"追加相談の返金が完了しました":               "Consultation refund completed",
@@ -58,11 +59,12 @@ var pushTitleEN = map[string]string{
 	"追加相談が届きました":                  "New consultation received",
 	"追加相談が更新されました":                 "Consultation updated",
 	"回答への確認質問が届きました":               "Follow-up question on the answer",
-	"追加相談の期限が過ぎました。未回答分は返却・返金します": "Consultation expired; unanswered items will be returned and refunded",
+	"追加相談の期限が過ぎました":                "Consultation expired",
 	// パーソナル指導
 	"パーソナル指導の申し込みが届きました":   "New personal-coaching application",
 	"パーソナル指導が始まりました":      "Personal coaching started",
 	"パーソナル指導の申し込みの結果":     "Personal-coaching application result",
+	"コーチが申し込みを承諾しました":     "Coach accepted your application",
 	"パーソナル指導は始まりませんでした":   "Personal coaching didn't start",
 	"パーソナル指導の申し込みの期限が過ぎました": "Personal-coaching application expired",
 	"パーソナル指導の期間がもうすぐ終わります":  "Personal coaching ending soon",
@@ -76,6 +78,13 @@ var pushTitleEN = map[string]string{
 	"お支払いを返金しました":          "Payment refunded",
 	"パーソナル指導を返金しました":       "Personal coaching refunded",
 	"無料相談の結果":                "Consultation result",
+	"相談が届きました":              "New consultation request",
+	"無料相談の聞き直しに答えが届きました":  "Answer to your consultation question",
+	"無料相談にコーチの提案が届きました":   "Coach sent a proposal",
+	"無料相談の期限が過ぎました":         "Consultation request expired",
+	"保護者が提案に同意しませんでした":     "Guardian declined the proposal",
+	"1ヶ月プランが終了しました":         "1-month plan ended",
+	"異議申立ての再審査が終わりました":     "Appeal review finished",
 	"18歳未満のパーソナル指導に通報":     "Report on under-18 coaching",
 	"パーソナル指導のやりとりを再開しました": "Personal-coaching chat resumed",
 	"パーソナル指導のやりとりを止めました":  "Personal-coaching chat paused",
@@ -91,37 +100,24 @@ var pushTitleEN = map[string]string{
 
 // pushBodyEN は、プッシュ・ベルの本文の日英対応。本文は固定文のものだけ置き換える。
 // 名前・金額・日時が入る本文はここに置かず、日本語のまま出す。
+// 通知は表題1行だけにして本文は原則空にした（本体 #609）。空の本文は置き換えずに空のまま出す。
 var pushBodyEN = map[string]string{
 	// 添削ワークフロー
 	"返答が届くまでお待ちください": "Please wait for the response",
 	"この依頼の引受受付は終了しました": "Accepting for this request has ended",
 	"返却の目安を過ぎたため、この依頼は終わりました": "The request ended because the response guideline passed",
-	"この依頼は終わりました。代金は取り消すか返金し、チケットはお戻しします。別のコーチを選んで申し込み直せます": "This request is closed. The charge will be voided or refunded and the ticket returned. You can choose another coach and apply again",
 	"コーチからのアドバイスを見てみましょう":                 "See the coach's advice",
 	"わからなかったところに、補足を1回返してください":            "Please send one follow-up on what was unclear",
 	"わからなかったところへの補足を見てみましょう":             "See the follow-up on what was unclear",
 	"1週間前のフォーム添削について教えてください":              "Tell us about the form review from a week ago",
-	"再提出の期限までに再提出がなかったため、この依頼は終わりました":    "This request ended because it was not resubmitted by the deadline",
-	"お支払いの状況は依頼画面で確認できます":                 "You can check the payment status on the request page",
-	"カードの仮押さえを取り消しました":                    "The card hold was voided",
-	"お支払いの状況は追加相談の画面で確認できます":              "You can check the payment status on the consultation page",
 	"フォーム添削の依頼が届くと、この端末に通知します":            "You'll be notified on this device when a review request arrives",
 	"依頼の受付を始める前の接続テストです":                   "This is a connection test before accepting requests",
-	"結果を応募の画面で確認してください":                    "Check the result on the application page",
-	"応募の画面から次の準備に進めます":                     "Continue with the next steps from the application page",
-	"今回はコーチの都合で提案をいただけませんでした。費用はかかっていません。ほかのコーチにも相談できます": "The coach couldn't propose this time. There's no charge. You can consult other coaches too",
 	// 追加相談
-	"追加相談の部屋を開いて確認してください": "Open the consultation room to check",
 	// パーソナル指導
+	"終わる前に、文章とメニューをダウンロードしてください": "Download your messages and menus before it ends",
 	"止めていた日数の分、期間を延ばしました":           "Extended by the paused days",
 	"運営が確認しています。終わるまで送れません":        "Under review by staff. You can't send until it's done",
-	"契約の対面欄で日時・場所を確認してください":        "Check the date and place in the contract's in-person section",
-	"契約の通話欄で日時・実施状況を確認してください":      "Check the date and status in the contract's call section",
-	"管理者画面のパーソナル指導から確認してください":      "Check in the admin personal-coaching page",
-	"48時間のうちにコーチから返事がありませんでした。ほかのコーチも探してみてください": "No coach replied within 48 hours. Please look for other coaches too",
-	"今回はコーチの都合で受けられませんでした。ほかのコーチも探してみてください":    "The coach couldn't take it this time. Please look for other coaches too",
 	// 共通
-	"先月の大会の記録を残しておくと、自己ベストの推移がグラフで見られます。": "Logging last month's meet results shows your personal-best trend in a graph.",
 	"TrackTalk を開いて確認してください": "Open TrackTalk to check",
 	"通知の設定ができました":      "Notifications are set up",
 }

@@ -39,7 +39,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 3 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 9 {
+	if accepted.WorkOrder.TermsVersion != 4 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 9 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -57,7 +57,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 350 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "350円")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "動画添削の依頼が届きました")
 	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
 		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
 	}
@@ -71,14 +71,15 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 }
 
 // assertWorkOrderDelivered は、取引条件がコーチのお知らせに宛先付きで1回だけ届き、届けた記録が残ったことを確かめる。
-func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, url, amount string) {
+// お知らせの文面は「届いた」の1行だけで本文は空。9項目の全文は開く先の依頼の画面に出す（本体 #609）。
+func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, url, wantTitle string) {
 	t.Helper()
 	var count int
 	var title, body, gotURL, channel string
 	queryRowArgs(t, `SELECT count(*), max(d.title), max(d.body), max(d.url), max(d.channel)
 		FROM coach_work_order_deliveries d JOIN coach_work_orders w ON w.id = d.work_order_id
 		WHERE w.`+column+`=$1 AND d.recipient_id = w.coach_id AND d.terms_version = w.terms_version`, []any{id}, &count, &title, &body, &gotURL, &channel)
-	if count != 1 || gotURL != url || channel != "in_app" || !strings.Contains(title, "取引条件の通知") || !strings.Contains(body, amount) {
+	if count != 1 || gotURL != url || channel != "in_app" || title != wantTitle || body != "" {
 		t.Fatalf("delivery %d %q %q %q %q", count, title, body, gotURL, channel)
 	}
 	items, _ := listNotifications(t, h, coach)
@@ -128,7 +129,7 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("work orders %d", count)
 	}
-	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "420円")
+	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "追加相談が届きました")
 	if !strings.Contains(string(room()["work_order"]), `"delivered_at"`) {
 		t.Fatalf("room work order has no delivered_at")
 	}
@@ -148,5 +149,5 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 	}
 	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "350円")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "動画添削の依頼が届きました")
 }

@@ -80,15 +80,14 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 	if err != nil {
 		return rr, err
 	}
-	if _, err = saveWorkOrder(ctx, q, "review", &rr.ID, nil, coachID, rr.ID, terms); err != nil {
+	if err = saveWorkOrder(ctx, q, "review", &rr.ID, nil, coachID, rr.ID, terms); err != nil {
 		return rr, err
 	}
 	if err = q.TouchCoachOffered(ctx, coachID); err != nil {
 		return rr, err
 	}
 	err = s.recordReviewNotice(ctx, q, coachID, rr.ID, "review_offer", push.Message{
-		Title: "フォーム添削の依頼が届きました",
-		Body:  "対応中の一覧から依頼を確認してください。",
+		Title: "動画添削の依頼が届きました",
 		URL:   "/coach/requests/" + rr.ID.String(),
 	}, assigned.DueAt, "review_assigned:"+rr.ID.String())
 	return assigned, err
@@ -314,13 +313,9 @@ func (s *Server) notifyReviewExpired(ctx context.Context, rr db.ExpireOverdueRev
 		slog.Warn("review expired notification", "err", err)
 	}
 	// 期限切れ系の通知は1通に統合する（本体 #573）。取り消しの別通知は出さない。
-	body := "フォーム添削の依頼が期限切れになりました"
-	if s.stripe.Configured() {
-		body += "。お支払いは取り消し・返金し、チケットは返還します"
-	}
+	// 文面は表題1行だけにし、取り消し・返金・チケットの返還は依頼の画面で見せる（本体 #609）。
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が期限を過ぎました",
-		Body:  body,
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
@@ -343,7 +338,6 @@ func (s *Server) notifyCoachNominationEnded(ctx context.Context, coachID, reques
 	}
 	s.pushQuietly(ctx, coachID, notifyReview, push.Message{
 		Title: "指名されたフォーム添削の依頼が終了しました",
-		Body:  "この依頼は終了しました",
 		URL:   "/coach",
 		Tag:   "review-ended-" + requestID.String(),
 	}, 24*time.Hour)
@@ -361,7 +355,6 @@ func (s *Server) notifyNominationEnded(ctx context.Context, id uuid.UUID, notify
 	}
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "選んだコーチが依頼を引き受けられませんでした",
-		Body:  "この依頼は終わりました。代金は取り消すか返金し、チケットはお戻しします。別のコーチを選んで申し込み直せます",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)

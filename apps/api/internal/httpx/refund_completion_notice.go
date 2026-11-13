@@ -102,17 +102,14 @@ func (s *Server) deliverRefundCompletionNotice(ctx context.Context, id uuid.UUID
 func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 	message := push.Message{
 		Title: "フォーム添削の返金が完了しました",
-		Body:  "お支払いの状況は依頼画面で確認できます",
 		URL:   notice.Url,
 		Tag:   "refund-complete-" + notice.ID.String(),
 	}
 	switch notice.Kind {
 	case "review_cancel":
 		message.Title = "フォーム添削の仮押さえの取り消しが完了しました"
-		message.Body = "カードの仮押さえを取り消しました"
 	case "consultation_refund":
 		message.Title = "追加相談の返金が完了しました"
-		message.Body = "お支払いの状況は追加相談の画面で確認できます"
 	}
 	return message
 }

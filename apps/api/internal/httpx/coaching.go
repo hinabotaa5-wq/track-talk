@@ -504,7 +504,6 @@ func (s *Server) consentGuardian(w http.ResponseWriter, r *http.Request) {
 func (s *Server) notifyGuardianConsented(ctx context.Context, consent db.GuardianConsent) {
 	s.notify(ctx, consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意しました",
-		Body:  "サポートプランは、コーチが引き受けたあと、保護者がプランごとに同意すると始まります（お支払いがあるプランはお支払いのあと）",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)

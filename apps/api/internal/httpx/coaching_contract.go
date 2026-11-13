@@ -280,7 +280,6 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	s.notify(r.Context(), ct.CoachID, notifyCoaching, push.Message{
 		Title: "パーソナル指導の申し込みが届きました",
-		Body:  "「" + ct.PlanTitle + "」に申し込みがありました。48時間以内に返事をしてください",
 		URL:   "/coach",
 		Tag:   "contract-" + ct.ID.String(),
 	}, 24*time.Hour)
@@ -502,15 +501,9 @@ func (s *Server) acceptCoachingContract(w http.ResponseWriter, r *http.Request) 
 		Tag:   "contract-" + ct.ID.String(),
 	}
 	if ct.Status == "accepted" {
+		// 始まるまでにすること（保護者の同意・お支払いと期限）は契約の画面で見せる（本体 #609）。
 		msg.Title = "コーチが申し込みを承諾しました"
-		switch {
-		case ct.Minor && ct.PaymentRequired:
-			msg.Body = "保護者が72時間以内に同意してお支払いをすると始まります。保護者に知らせてください"
-		case ct.Minor:
-			msg.Body = "保護者が72時間以内に同意すると始まります。保護者に知らせてください"
-		default:
-			msg.Body = "72時間以内にお支払いを済ませると始まります"
-		}
+		msg.Body = ""
 	}
 	s.notify(r.Context(), ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
@@ -536,7 +529,6 @@ func (s *Server) declineCoachingContract(w http.ResponseWriter, r *http.Request)
 	}
 	s.notify(r.Context(), ct.RequesterID, notifyCoaching, push.Message{
 		Title: "パーソナル指導の申し込みの結果",
-		Body:  "今回はコーチの都合で受けられませんでした。ほかのコーチも探してみてください",
 		URL:   "/coaching/personal/" + ct.ID.String(),
 		Tag:   "contract-" + ct.ID.String(),
 	}, 24*time.Hour)
@@ -585,6 +577,9 @@ func (s *Server) cancelCoachingContract(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, map[string]any{"contract": s.contractJSON(ct)})
 }
 
+// contractCloseNoticeBody は、期間が終わる3日前の知らせの本文。通知の本文を空にする原則の例外（本体 #609）。
+const contractCloseNoticeBody = "終わる前に、文章とメニューをダウンロードしてください"
+
 // closeCoachingContracts は、返事のないまま48時間たった申し込み、保護者が72時間同意しなかったもの、
 // 期間が終わったものを閉じる。
 func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int, err error) {
@@ -597,6 +592,8 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 		return len(ex), 0, err
 	}
 	for _, ct := range starts {
+		// 理由（同意なし・支払いなし・両方）は契約の画面では「期限が過ぎました」としか見えないので、
+		// 本文の1行を残す（本体 #609 の停止条件）。
 		body := "72時間のうちに保護者の同意がありませんでした"
 		switch {
 		case ct.Minor && ct.PaymentRequired:
@@ -613,18 +610,18 @@ func (s *Server) closeCoachingContracts(ctx context.Context) (expired, ended int
 	for _, ct := range ex {
 		s.notify(ctx, ct.RequesterID, notifyCoaching, push.Message{
 			Title: "パーソナル指導の申し込みの期限が過ぎました",
-			Body:  "48時間のうちにコーチから返事がありませんでした。ほかのコーチも探してみてください",
 			URL:   "/coaching/personal/" + ct.ID.String(),
 			Tag:   "contract-" + ct.ID.String(),
 		}, 24*time.Hour)
 	}
-	// 終わる3日前に、終わると見られなくなることと、文章とメニューのダウンロードを案内する（保護者はダウンロードできないので送らない）。
+	// 終わる3日前に、文章とメニューのダウンロードを案内する（保護者はダウンロードできないので送らない）。
+	// 本文はダウンロードの案内1行だけにし、プラン名・終了日時は契約の画面で見せる（本体 #609）。
 	notices, err := s.q.ClaimContractCloseNotices(ctx)
 	if err != nil {
 		return len(ex) + len(starts), 0, err
 	}
 	for _, ct := range notices {
-		msg := push.Message{Title: "パーソナル指導の期間がもうすぐ終わります", Body: "「" + ct.PlanTitle + "」は" + jstDateTime(*ct.EndsAt) + "に終わります。終わるとやりとりは見られなくなります。必要なら、文章とメニューを今のうちにダウンロードしてください", Tag: "contract-close-" + ct.ID.String()}
+		msg := push.Message{Title: "パーソナル指導の期間がもうすぐ終わります", Body: contractCloseNoticeBody, Tag: "contract-close-" + ct.ID.String()}
 		msg.URL = "/coaching/personal/" + ct.ID.String()
 		s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 		msg.URL = "/coach"

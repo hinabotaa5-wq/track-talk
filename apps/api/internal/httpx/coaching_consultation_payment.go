@@ -381,7 +381,7 @@ func (s *Server) expireConsultations(ctx context.Context) (int, error) {
 		}
 		if closed {
 			n++
-			s.notifyConsultation(ctx, initial, false, "追加相談の期限が過ぎました。未回答分は返却・返金します")
+			s.notifyConsultation(ctx, initial, false, "追加相談の期限が過ぎました")
 		}
 	}
 	return n, nil

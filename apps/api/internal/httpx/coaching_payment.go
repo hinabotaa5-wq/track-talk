@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -527,7 +526,6 @@ func (s *Server) refundUnstarted(ctx context.Context, pay db.CoachingPayment) er
 	}
 	s.notify(ctx, ct.RequesterID, notifyImportant, push.Message{
 		Title: "お支払いを返金しました",
-		Body:  "「" + ct.PlanTitle + "」は期限を過ぎていたなどの理由で始められなかったため、全額を返金しました",
 		URL:   "/coaching/personal/" + ct.ID.String(),
 		Tag:   "contract-" + ct.ID.String(),
 	}, 24*time.Hour)
@@ -566,13 +564,11 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 		n++
 		s.notify(ctx, ct.RequesterID, notifyImportant, push.Message{
 			Title: "パーソナル指導を返金しました",
-			Body:  "始まってから72時間、コーチから書き込みがなかったため、全額を返金して終了しました",
 			URL:   "/coaching/personal/" + ct.ID.String(),
 			Tag:   "contract-" + ct.ID.String(),
 		}, 24*time.Hour)
 		s.notify(ctx, ct.CoachID, notifyImportant, push.Message{
 			Title: "パーソナル指導が終了しました",
-			Body:  "「" + ct.PlanTitle + "」は始まってから72時間書き込みがなかったため、全額を返金して終了しました",
 			URL:   "/coach",
 			Tag:   "contract-" + ct.ID.String(),
 		}, 24*time.Hour)
@@ -690,7 +686,6 @@ func (s *Server) adminRefundCoachingContract(w http.ResponseWriter, r *http.Requ
 	}
 	msg := push.Message{
 		Title: "パーソナル指導を返金しました",
-		Body:  "「" + ct.PlanTitle + "」の " + strconv.Itoa(int(amount)) + "円を返金しました",
 		URL:   "/coaching/personal/" + ct.ID.String(),
 		Tag:   "contract-" + ct.ID.String(),
 	}

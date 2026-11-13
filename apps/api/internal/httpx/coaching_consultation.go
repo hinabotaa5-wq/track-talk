@@ -681,7 +681,7 @@ func (s *Server) notifyConsultation(ctx context.Context, c db.CoachingConsultati
 	if target == nil {
 		return
 	}
-	s.notify(ctx, *target, notifyCoaching, push.Message{Title: title, Body: "追加相談の部屋を開いて確認してください", URL: consultationNoticePath(c, toCoach), Tag: "consultation-" + c.ID.String()}, 24*time.Hour)
+	s.notify(ctx, *target, notifyCoaching, push.Message{Title: title, URL: consultationNoticePath(c, toCoach), Tag: "consultation-" + c.ID.String()}, 24*time.Hour)
 }
 func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	action := chi.URLParam(r, "action")
@@ -730,9 +730,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var saved db.CoachingConsultation
-	var notice *push.Message
 	err := s.tx(r.Context(), func(q *db.Queries) error {
-		notice = nil
 		current, room, err := s.lockConsultation(r.Context(), q, c)
 		if err != nil {
 			return err
@@ -759,7 +757,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 				if e != nil {
 					return e
 				}
-				notice, err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, *saved.ReviewRequestID, consultationWorkOrderTerms(saved, name, time.Now()))
+				err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, *saved.ReviewRequestID, consultationWorkOrderTerms(saved, name, time.Now()))
 			}
 		case "decline":
 			if current.Status != "offered" {
@@ -810,9 +808,6 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
-	}
-	if notice != nil && saved.CoachID != nil {
-		s.pushQuietly(r.Context(), *saved.CoachID, notifyImportant, *notice, 7*24*time.Hour)
 	}
 	if action == "answer" || action == "clarification" || action == "decline" {
 		s.notifyConsultation(r.Context(), saved, false, "追加相談が更新されました")

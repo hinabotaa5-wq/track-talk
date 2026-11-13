@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
-	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -23,7 +22,8 @@ import (
 // サポートプランはコーチが販売者なので、ここには入れない(要否は弁護士の回答 Q9 を待つ)。
 
 // 通知の文面の版。文面を変えたら上げる。書き留めた通知は、そのときの版のまま残る。
-const workOrderTermsVersion = 3
+// 4: お知らせ(ベル)の文面を「依頼が届いた」の1行だけにし、9項目の全文は依頼の画面にだけ出す形にした(本体 #609)。
+const workOrderTermsVersion = 4
 
 // 運営者(委託する側)の名前。web の lib/operator.ts と揃える。
 const operatorName = "中窪日向"
@@ -39,10 +39,6 @@ type workOrderTerms struct {
 	DeliverBy   time.Time       `json:"deliver_by"`
 	PaymentDue  time.Time       `json:"payment_due"`
 	ConsignedAt time.Time       `json:"consigned_at"`
-}
-
-func jstDate(t time.Time) string {
-	return t.In(jst.Zone).Format("2006年1月2日")
 }
 
 func jstDateTime(t time.Time) string {
@@ -131,57 +127,53 @@ func coachDisplayName(ctx context.Context, q *db.Queries, coachID uuid.UUID) (st
 }
 
 // saveWorkOrder は、引き受けた案件の通知を書き留め、同じトランザクションでコーチへ宛先付きで届ける。
-// すでにあれば最初のものを残し、届け直さない(戻り値は nil)。roomID は条件の全文を見られる依頼の画面の id。
-// 戻り値のプッシュは、コミットのあとに送る(届いたことの記録はお知らせの側で、プッシュは補足)。
-func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, consultation *uuid.UUID, coachID, roomID uuid.UUID, terms workOrderTerms) (*push.Message, error) {
+// すでにあれば最初のものを残し、届け直さない。roomID は条件の全文を見られる依頼の画面の id。
+// プッシュは送らない(依頼・追加相談が届いた知らせの側に一本化する。本体 #609)。
+func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, consultation *uuid.UUID, coachID, roomID uuid.UUID, terms workOrderTerms) error {
 	raw, err := json.Marshal(terms)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	wo, err := q.CreateCoachWorkOrder(ctx, db.CreateCoachWorkOrderParams{
 		ID: uuid.New(), Kind: kind, ReviewRequestID: review, ConsultationID: consultation,
 		CoachID: &coachID, TermsVersion: workOrderTermsVersion, Terms: raw,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return nil
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return deliverWorkOrder(ctx, q, wo, coachID, roomID, terms)
+	return deliverWorkOrder(ctx, q, wo, coachID, roomID)
 }
 
 // workOrderNotice は、取引条件を届けるお知らせの見出し・本文・開く先。
-// 本文には要点を書き、9項目の全文は開く先の依頼の画面(コーチ本人だけが見られる)に出す。
-func workOrderNotice(kind string, roomID uuid.UUID, terms workOrderTerms) (title, body, url string) {
-	what := "フォーム添削"
+// お知らせは「何が届いたか」の1行だけにして本文は空にし、9項目の全文は開く先の依頼の画面
+// (コーチ本人だけが見られる)にだけ出す(本体 #609)。
+func workOrderNotice(kind string, roomID uuid.UUID) (title, body, url string) {
+	title = "動画添削の依頼が届きました"
 	if kind == "consultation" {
-		what = "フォーム添削の追加相談"
+		title = "追加相談が届きました"
 	}
-	title = "取引条件の通知（" + what + "）"
-	body = fmt.Sprintf("%s を、%s に委託しました。報酬 %d円（税込）、納める期日 %s まで、支払期日 %s（3,000円に満たないときは、累積が3,000円以上になった締切月の翌月15日）。業務の内容・支払方法など9項目の全文は、この知らせから開く依頼の画面で確認できます。",
-		what, jstDateTime(terms.ConsignedAt), terms.AmountYen, jstDateTime(terms.DeliverBy), jstDate(terms.PaymentDue))
 	url = "/coach/requests/" + roomID.String() + "#work-order"
-	return title, body, url
+	return title, "", url
 }
 
 // deliverWorkOrder は、書き留めた通知をコーチのお知らせ(ベル)に入れ、届けた記録を残す。
 // フリーランス保護法3条の電磁的方法による明示(受信者を特定した送信)にあたるので、
 // 本人の通知の設定に関わらず届け、記録とあわせて引き受けと同じトランザクションで行う。
-func deliverWorkOrder(ctx context.Context, q *db.Queries, wo db.CoachWorkOrder, coachID, roomID uuid.UUID, terms workOrderTerms) (*push.Message, error) {
-	title, body, url := workOrderNotice(wo.Kind, roomID, terms)
+func deliverWorkOrder(ctx context.Context, q *db.Queries, wo db.CoachWorkOrder, coachID, roomID uuid.UUID) error {
+	title, body, url := workOrderNotice(wo.Kind, roomID)
 	if err := q.InsertWorkOrderNotification(ctx, db.InsertWorkOrderNotificationParams{
 		ID: uuid.New(), RecipientID: coachID, Title: &title, Body: &body, Url: &url,
 	}); err != nil {
-		return nil, err
+		return err
 	}
-	if _, err := q.CreateWorkOrderDelivery(ctx, db.CreateWorkOrderDeliveryParams{
+	_, err := q.CreateWorkOrderDelivery(ctx, db.CreateWorkOrderDeliveryParams{
 		ID: uuid.New(), WorkOrderID: wo.ID, RecipientID: &coachID, TermsVersion: wo.TermsVersion,
 		Title: title, Body: body, Url: url,
-	}); err != nil {
-		return nil, err
-	}
-	return &push.Message{Title: title, Body: "TrackTalk を開いて取引条件を確認してください", URL: url, Tag: "work-order-" + wo.ID.String()}, nil
+	})
+	return err
 }
 
 func workOrderJSON(w db.CoachWorkOrder) map[string]any {

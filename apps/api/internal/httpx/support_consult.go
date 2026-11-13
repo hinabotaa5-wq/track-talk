@@ -495,8 +495,7 @@ func (s *Server) createSupportConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notify(r.Context(), c.CoachID, notifyCoaching, push.Message{
-		Title: "1ヶ月プランの無料相談が届きました",
-		Body:  "48時間以内に、提案か辞退を返してください",
+		Title: "相談が届きました",
 		URL:   "/coach/support-consults", Tag: "support-consult-" + c.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusCreated, map[string]any{"consult": s.consultViewJSON(c)})
@@ -699,8 +698,8 @@ func (s *Server) answerSupportConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notify(r.Context(), out.CoachID, notifyCoaching, push.Message{
-		Title: "無料相談の聞き直しに答えが届きました", Body: "48時間以内に、提案か辞退を返してください",
-		URL: "/coach/support-consults", Tag: "support-consult-" + out.ID.String(),
+		Title: "無料相談の聞き直しに答えが届きました",
+		URL:   "/coach/support-consults", Tag: "support-consult-" + out.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"consult": s.consultViewJSON(out)})
 }
@@ -737,8 +736,8 @@ func (s *Server) declineSupportConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notify(r.Context(), out.AthleteID, notifyCoaching, push.Message{
-		Title: "無料相談の結果", Body: "今回はコーチの都合で提案をいただけませんでした。費用はかかっていません。ほかのコーチにも相談できます",
-		URL: "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
+		Title: "無料相談の結果",
+		URL:   "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"consult": s.consultViewJSON(out)})
 }
@@ -951,8 +950,8 @@ func (s *Server) proposeSupportConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notify(r.Context(), out.AthleteID, notifyCoaching, push.Message{
-		Title: "無料相談にコーチの提案が届きました", Body: "期間・内容・価格を確認してください。提案を受けるまで、お金はかかりません",
-		URL: "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
+		Title: "無料相談にコーチの提案が届きました",
+		URL:   "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
 	}, 24*time.Hour)
 	detail, err := s.consultDetail(r.Context(), out)
 	if err != nil {
@@ -1357,8 +1356,8 @@ func (s *Server) declineGuardianSupportConsult(w http.ResponseWriter, r *http.Re
 		return
 	}
 	s.notify(r.Context(), out.AthleteID, notifyCoaching, push.Message{
-		Title: "保護者が提案に同意しませんでした", Body: "費用はかかっていません。保護者と話してから、もう一度相談できます",
-		URL: "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
+		Title: "保護者が提案に同意しませんでした",
+		URL:   "/coaching/support-consults/" + out.ID.String(), Tag: "support-consult-" + out.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"consult": s.consultViewJSON(out)})
 }
@@ -1386,8 +1385,8 @@ func (s *Server) expireSupportConsults(ctx context.Context) (int, error) {
 	}
 	for _, c := range rows {
 		s.notify(ctx, c.AthleteID, notifyCoaching, push.Message{
-			Title: "無料相談の期限が過ぎました", Body: "費用はかかっていません。もう一度相談するか、ほかのコーチにも相談できます",
-			URL: "/coaching/support-consults/" + c.ID.String(), Tag: "support-consult-" + c.ID.String(),
+			Title: "無料相談の期限が過ぎました",
+			URL:   "/coaching/support-consults/" + c.ID.String(), Tag: "support-consult-" + c.ID.String(),
 		}, 24*time.Hour)
 	}
 	return len(rows), nil

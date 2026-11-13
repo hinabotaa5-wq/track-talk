@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
@@ -555,18 +554,18 @@ func (s *Server) remindTicketExpiry(ctx context.Context) (int, error) {
 			} else if err != nil {
 				return n, err
 			}
-			s.notify(ctx, *l.OwnerID, notifyImportant, ticketExpiryMessage(l.ID, l.Available, l.ExpiresAt, days), 24*time.Hour)
+			s.notify(ctx, *l.OwnerID, notifyImportant, ticketExpiryMessage(l.ID, days), 24*time.Hour)
 			n++
 		}
 	}
 	return n, nil
 }
 
-// ticketExpiryMessage は、チケットの失効が近いことの知らせ。延長・救済はしないので、使い道だけを案内する。
-func ticketExpiryMessage(lot uuid.UUID, available int32, expiresAt time.Time, days int32) push.Message {
+// ticketExpiryMessage は、チケットの失効が近いことの知らせ。表題1行だけにし、
+// 枚数と失効日時はマイページのチケットの画面で見せる（本体 #609）。
+func ticketExpiryMessage(lot uuid.UUID, days int32) push.Message {
 	return push.Message{
 		Title: fmt.Sprintf("チケットの有効期限まであと%d日以内です", days),
-		Body:  fmt.Sprintf("未使用のチケット%d枚は %s に失効します。期限を過ぎると使えません", available, expiresAt.In(jst.Zone).Format("2006/01/02 15:04")),
 		URL:   "/me/coaching/tickets",
 		Tag:   fmt.Sprintf("ticket-expiry-%d-%s", days, lot),
 	}
