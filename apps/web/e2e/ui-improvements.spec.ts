@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("今日の大会は自動で開かず、タップした時だけ表示する", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?sort=new");
   const trophy = page.getByRole("button", { name: "今日開催中の大会", exact: true });
   const dialog = page.getByRole("dialog", { name: "今日開催中の大会", exact: true });
   await expect(trophy).toBeVisible();
@@ -42,7 +42,7 @@ test("今日の大会は自動で開かず、タップした時だけ表示す�
 });
 
 test("ホームの大会をヘッダーに集約し、未ログインのマイページはログインへ移動する", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?sort=new");
   await expect(page.getByRole("button", { name: "今日開催中の大会", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今日開催中", exact: true })).toHaveCount(0);
   const account = page.getByRole("link", { name: "マイページ", exact: true });
@@ -95,7 +95,7 @@ test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({
 
 test("投稿ボタンと4つのタブを幅320pxで1行に並べる", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto("/");
+  await page.goto("/?sort=new");
   const nav = page.getByRole("navigation", { name: "投稿の並び替え" });
   const post = nav.getByRole("link", { name: "投稿する", exact: true });
   await expect(nav.getByRole("link")).toHaveCount(5);
@@ -202,7 +202,7 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
       })), meta: { page: current, per_page: 6, total: 12 },
     } });
   });
-  await page.goto("/");
+  await page.goto("/?sort=new");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track).toBeVisible();
   // 画面の空き具合によっては、最初の操作より前に2ページ目まで補う。
@@ -290,7 +290,7 @@ test("縦長・横長・写真・YouTubeを同じ4:3の枠で切り抜いて横�
     await bannerReady;
     await route.fulfill({ json: { round: { phase: "entry", entry_ends_at: new Date(Date.now() + 86_400_000).toISOString() } } });
   });
-  await page.goto("/");
+  await page.goto("/?sort=new");
 
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track.locator("img")).toHaveCount(8);
@@ -348,7 +348,7 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
     const rect = tile.getBoundingClientRect();
     return [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)];
   }));
-  await page.goto("/");
+  await page.goto("/?sort=new");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   await expect(track.locator("img")).toHaveCount(6);
   await expect.poll(() => track.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
@@ -377,7 +377,7 @@ test("均一グリッドでも新しい順・人気順・募集と固定タブ�
       created_at: "2026-10-23T00:00:00Z", updated_at: "2026-10-23T00:00:00Z",
     })), meta: { page: 1, per_page: 20, total: order.length } } });
   });
-  await page.goto("/");
+  await page.goto("/?sort=new");
   const track = page.getByRole("region", { name: "投稿一覧", exact: true });
   const nav = page.getByRole("navigation", { name: "投稿の並び替え" });
   await expect(track.locator('.home-feed-grid-canvas[data-ready="true"]')).toBeVisible();

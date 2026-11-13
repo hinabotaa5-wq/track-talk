@@ -116,7 +116,7 @@ test(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠�
     posts: [{ ...post, kind, body: undefined, excerpt: post.body }],
     meta: { page: 1, total: 1, total_pages: 1 },
   } }));
-  await page.goto("/");
+  await page.goto("/?sort=new");
   await page.getByRole("link", { name: "人気", exact: true }).click();
   const card = page.locator(`a[href="/posts/${post.id}"]`);
   await expect(card).toBeVisible();

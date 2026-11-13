@@ -26,9 +26,9 @@ const MemoIcon = createLucideIcon("memo", [
 ]);
 
 export const mainTabs = [
-  { id: "home", href: "/", get label() { return L("ホーム"); }, icon: Home },
-  { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
   { id: "coaching", href: "/coaching", get label() { return L("コーチ"); }, icon: GraduationCap },
+  { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
+  { id: "home", href: "/", get label() { return L("ホーム"); }, icon: Home },
   { id: "memo", href: "/memo", get label() { return L("メモ"); }, icon: MemoIcon },
   { id: "injury", href: "/injury", get label() { return L("ケガ"); }, icon: HeartPulse },
 ] as const;
@@ -64,17 +64,17 @@ function subscribeLastTab(callback: () => void) {
   window.addEventListener("storage", callback);
   return () => { window.removeEventListener(lastTabChangedEvent, callback); window.removeEventListener("storage", callback); };
 }
-const lastTabSnapshot = () => readLastTab() ?? "/";
+const lastTabSnapshot = () => readLastTab() ?? "/coaching";
 export function useCurrentMainTab(pathname: string) {
-  const origin = useSyncExternalStore(noSubscribe, () => pathname === "/login" ? new URLSearchParams(window.location.search).get("next") ?? readAccountOrigin() : readAccountOrigin(), () => "/");
-  const last = useSyncExternalStore(subscribeLastTab, lastTabSnapshot, () => "/");
+  const origin = useSyncExternalStore(noSubscribe, () => pathname === "/login" ? new URLSearchParams(window.location.search).get("next") ?? readAccountOrigin() : readAccountOrigin(), () => "/coaching");
+  const last = useSyncExternalStore(subscribeLastTab, lastTabSnapshot, () => "/coaching");
   const own = activeMainTab(pathname);
   if (own && own !== "me") return own;
   if (pathname === "/login" || pathname === "/me" || pathname.startsWith("/me/") || pathname.startsWith("/admin")) {
-    return activeMainTab(origin.split("?")[0]) || activeMainTab(last.split("?")[0]) || "home";
+    return activeMainTab(origin.split("?")[0]) || activeMainTab(last.split("?")[0]) || "coaching";
   }
   // 投稿などURLだけで所属を判断できない詳細は、最後に開いたタブの色を保つ。
-  return activeMainTab(last.split("?")[0]) || "home";
+  return activeMainTab(last.split("?")[0]) || "coaching";
 }
 
 const injuryGroupPathPattern = /^\/injury\/([^/]+)$/;
