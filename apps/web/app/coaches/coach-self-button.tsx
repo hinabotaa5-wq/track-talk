@@ -3,34 +3,10 @@ import { L } from "@/lib/i18n";
 
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
-import type { CoachApplication } from "@/lib/types";
-import { useAuth } from "@/components/auth-provider";
 
-// 一覧の右上に置く「コーチ」ボタン。コーチ本人と応募した人だけに出す（status は問わない）。
-// HeaderCoachLink（承認済みだけが対象）とは条件が違うので、流用せずここで判定する。
+// 一覧の右上に置く「コーチ」ボタン。運営者決定（2026-11-14）で、ログイン状態・応募有無によらず常時出す。
+// 未ログインで押した場合は /coach 側のガードでログイン画面へ出る。旧仕様（コーチ本人と応募した人だけに出す）の判定は廃止。
 export function CoachSelfButton() {
-  const { token } = useAuth();
-  const [result, setResult] = useState<{ token: string; applied: boolean } | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<{ application: CoachApplication | null }>("/v1/coach/me", { token })
-      .then(({ application }) => {
-        if (!cancelled) setResult({ token, applied: application !== null });
-      })
-      .catch(() => {
-        if (!cancelled) setResult({ token, applied: false });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  // 未ログイン・応募なし・読み込み中・取得失敗の間は出さない。判定前の一瞬表示もしない。
-  if (!token || result?.token !== token || !result.applied) return null;
   return (
     <Link
       href="/coach"

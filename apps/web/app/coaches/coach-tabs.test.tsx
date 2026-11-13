@@ -36,7 +36,6 @@ beforeEach(() => {
   navigation.tab = null; navigation.pathname = "/coaches";
   auth.token = "tok"; flags.supportList = true;
   apiFetch.mockImplementation(async (path: string) => {
-    if (path === "/v1/coach/me") return { application: null };
     if (path === "/v1/coaches") return { coaches: [] };
     if (path === "/v1/coaches/support-plan") return { coaches: [] };
     throw new Error(`unexpected ${path}`);
@@ -177,32 +176,27 @@ it("サポートプラン一覧のフラグが閉じている間は準備中だ�
 });
 
 it("狭い画面でも切り替えとコーチボタンは同じ行に収まる", async () => {
-  apiFetch.mockImplementation(async (path: string) => {
-    if (path === "/v1/coach/me") return { application: { status: "pending" } };
-    if (path === "/v1/coaches") return { coaches: [] };
-    if (path === "/v1/coaches/support-plan") return { coaches: [] };
-    throw new Error(`unexpected ${path}`);
-  });
   await render();
   const row = coachButton()?.closest("div.flex");
   expect(row).not.toBeNull();
   expect(row?.querySelector('[role="group"]')).not.toBeNull();
 });
 
-it("未ログインではコーチボタンを出さず、応募状態も取得しない", async () => {
+// 運営者決定（2026-11-14）：ログイン状態・応募有無によらず常時出す。
+it("未ログインでもコーチボタンを文言どおり『コーチ』で出し、/coach へ導く（応募状態を取得しない）", async () => {
   auth.token = null;
   await render();
-  expect(coachButton()).toBeUndefined();
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
-it("応募なしではコーチボタンを出さない", async () => {
+it("ログイン済み・応募なしでもコーチボタンを出す（応募状態を取得しない）", async () => {
   await render();
-  expect(coachButton()).toBeUndefined();
-  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/me", { token: "tok" });
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
-it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）はコーチボタンを文言どおり『コーチ』で出し、/coach へ導く", async (status) => {
+it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）でもコーチボタンを出す（応募状態を取得しない）", async (status) => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path === "/v1/coach/me") return { application: { status } };
     if (path === "/v1/coaches") return { coaches: [] };
@@ -211,24 +205,11 @@ it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status
   });
   await render();
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
-it("応募状態の取得に失敗したときはコーチボタンを出さない", async () => {
-  apiFetch.mockRejectedValue(new Error("offline"));
+it("応募状態の取得を待たず初回描画でコーチボタンを出す", async () => {
+  apiFetch.mockReturnValue(new Promise(() => {}));
   await render();
-  expect(coachButton()).toBeUndefined();
-});
-
-it("応募状態の読み込み中はコーチボタンを出さない（一瞬表示して消さない）", async () => {
-  let finish!: (value: unknown) => void;
-  apiFetch.mockImplementation((path: string) => {
-    if (path === "/v1/coach/me") return new Promise((resolve) => { finish = resolve; });
-    if (path === "/v1/coaches") return Promise.resolve({ coaches: [] });
-    if (path === "/v1/coaches/support-plan") return Promise.resolve({ coaches: [] });
-    throw new Error(`unexpected ${path}`);
-  });
-  await render();
-  expect(coachButton()).toBeUndefined();
-  await act(async () => finish({ application: { status: "approved" } }));
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
 });
