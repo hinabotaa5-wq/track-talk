@@ -65,7 +65,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
   return (
     <div className="space-y-5">
       {/* 国内主要大会の一覧が主役。今後の国際大会は、いちばん上から入れるようにする。 */}
-      <nav aria-label={L("ほかの大会")} className="grid grid-cols-2 gap-2 md:max-w-md">
+      <nav aria-label={L("ほかの大会")} className="grid gap-2">
         {entries.map((entry) => {
           const Icon = entry.icon;
           return (

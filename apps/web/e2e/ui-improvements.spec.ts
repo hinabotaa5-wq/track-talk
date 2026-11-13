@@ -60,6 +60,24 @@ test("大会のタイムテーブル導線を消し、実況スレッドは内�
   await expect(page.locator("a a")).toHaveCount(0);
 });
 
+test("今後の国際大会の入口を大会タブの横いっぱいに広げる", async ({ page }) => {
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/competitions");
+    const nav = page.getByRole("navigation", { name: "ほかの大会", exact: true });
+    const link = nav.getByRole("link", { name: "今後の国際大会", exact: true });
+    await expect(link).toHaveAttribute("href", "/competitions/major-hosts");
+    const linkBox = await link.boundingBox();
+    const containerWidth = await nav.evaluate((el) => {
+      const parent = el.parentElement!;
+      const style = getComputedStyle(parent);
+      return parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(linkBox).not.toBeNull();
+    expect(Math.abs(linkBox!.width - containerWidth)).toBeLessThanOrEqual(1);
+  }
+});
+
 test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({ page }) => {
   await page.goto("/competitions/major-hosts");
   await expect(page.getByRole("button", { name: "戻る", exact: true })).toHaveCount(1);
