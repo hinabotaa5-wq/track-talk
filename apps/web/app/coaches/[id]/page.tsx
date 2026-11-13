@@ -57,7 +57,7 @@ export default function CoachDetailPage() {
               <dd className="whitespace-pre-wrap break-words text-slate-100">{value}</dd>
             </div>)}
             {(coach.sns_urls ?? []).length ? <div>
-              <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
+              <dt className="text-xs text-slate-300">{L("SNS・ホームページ・ひとこと")}</dt>
               <dd className="space-y-1">
                 {coach.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>

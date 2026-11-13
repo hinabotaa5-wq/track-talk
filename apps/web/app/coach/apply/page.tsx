@@ -251,7 +251,7 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">{L("SNS・ホームページ")}</span>
+            <span className="font-semibold">{L("SNS・ホームページ・ひとこと")}</span>
             <Textarea
               rows={3}
               required
@@ -259,7 +259,7 @@ export default function CoachApplyPage() {
               placeholder={"@example\nhttps://example-club.jp/"}
               onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
             />
-            <span className="block text-xs text-slate-300">{L("SNSのアカウント名やホームページのURLなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。")}</span>
+            <span className="block text-xs text-slate-300">{L("SNSのアカウント名やホームページのURL、ひとことなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。")}</span>
             {fieldError("sns_urls")}
           </label>
 
@@ -315,7 +315,7 @@ export default function CoachApplyPage() {
           </div>
           {(application.sns_urls ?? []).length ? (
             <div>
-              <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
+              <dt className="text-xs text-slate-300">{L("SNS・ホームページ・ひとこと")}</dt>
               <dd className="space-y-1">
                 {application.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
