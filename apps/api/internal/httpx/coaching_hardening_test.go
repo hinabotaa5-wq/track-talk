@@ -102,8 +102,8 @@ func TestEveryReviewCheckoutPathDisablesManagedPayments(t *testing.T) {
 					t.Fatalf("session %d Stripe-Version %q", i, versions[i])
 				}
 			}
-			// 動画添削は仮押さえ（返却時に確定）、追加相談は ¥600。
-			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "500" || forms[2]["amount"] != "600" {
+			// 動画添削は仮押さえ（返却時に確定）、追加質問は ¥500。
+			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "500" || forms[2]["amount"] != "500" {
 				t.Fatalf("sessions %+v", forms)
 			}
 		})
@@ -448,8 +448,12 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	if offers != 1 || offerNotes() != 1 || offerPushes() != 1 {
 		t.Fatalf("offers=%d bell=%d push=%d", offers, offerNotes(), offerPushes())
 	}
-	var dedup string
-	queryRowArgs(t, `SELECT dedup_key FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_assigned:%'`, []any{coach}, &dedup)
+	var dedup, title, body string
+	queryRowArgs(t, `SELECT dedup_key, title, body FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_assigned:%'`, []any{coach}, &dedup, &title, &body)
+	// 到着の知らせは表題1行だけで、本文は空（本体 #609）。
+	if title != "動画添削の依頼が届きました" || body != "" {
+		t.Fatalf("offer push text %q %q", title, body)
+	}
 	if status, _ := outboxStatus(t, dedup); status != "pending" {
 		t.Fatalf("after failed send %s", status)
 	}

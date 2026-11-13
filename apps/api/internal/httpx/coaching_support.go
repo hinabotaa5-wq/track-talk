@@ -196,7 +196,7 @@ func supportAudit(ctx context.Context, q *db.Queries, ct db.CoachingContract, se
 	return err
 }
 func (s *Server) notifySupport(ctx context.Context, ct db.CoachingContract) {
-	msg := push.Message{Title: "大会サポートの通話が更新されました", Body: "契約の通話欄で日時・実施状況を確認してください", URL: "/coaching/personal/" + ct.ID.String(), Tag: "support-" + ct.ID.String()}
+	msg := push.Message{Title: "大会サポートの通話が更新されました", URL: "/coaching/personal/" + ct.ID.String(), Tag: "support-" + ct.ID.String()}
 	s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 	s.notify(ctx, ct.CoachID, notifyCoaching, msg, 24*time.Hour)
 }

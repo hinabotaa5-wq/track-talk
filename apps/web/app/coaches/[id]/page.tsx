@@ -1,8 +1,6 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { PublicAvailability } from "@/components/coach-availability";
-import { hasAvailability } from "@/lib/coach-availability";
 import { PageLoading } from "@/components/page-loading";
 
 import { CoachAvatar } from "@/components/coach-photo";
@@ -66,7 +64,6 @@ export default function CoachDetailPage() {
             </div> : null}
           </dl>
         </section>
-        {(coach.plans ?? []).some((plan) => hasAvailability(plan.service_type)) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
         <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
           <h2 id="coach-plans" className="text-lg font-bold">{L("サポートプラン")}</h2>
           <CoachServicePlans key={coach.id} plans={coach.plans ?? []} coachID={coach.id} consult={coach.support_consult} />

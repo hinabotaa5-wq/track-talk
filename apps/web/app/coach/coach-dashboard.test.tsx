@@ -125,7 +125,7 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは10タイルの入口だけで、中身のセクションを出さない", async () => {
+it("ランチャーは9タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
@@ -134,7 +134,6 @@ it("ランチャーは10タイルの入口だけで、中身のセクション�
     "/coach/contracts",
     "/coach/support-consults",
     "/coach/plans",
-    "/coach/availability",
     "/coach/commerce",
     "/coach/payouts",
     "/coach/profile",
@@ -187,7 +186,7 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(10);
+  expect(tileHrefs()).toHaveLength(9);
 });
 
 it("未承認の表示は現行のまま変えない", async () => {
@@ -229,6 +228,6 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(10);
+  expect(labels).toHaveLength(9);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });

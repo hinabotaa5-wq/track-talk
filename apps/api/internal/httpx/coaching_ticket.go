@@ -11,14 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
-	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/hinata/track-talk/apps/api/internal/push"
 	"github.com/hinata/track-talk/apps/api/internal/stripe"
 	"github.com/jackc/pgx/v5"
 )
 
-// ticketFaceYen は、追加相談（販売廃止。本体 #569）をチケットで払っていたときの1枚の額面。過去の記録の計算にだけ残す。
-const ticketFaceYen int32 = 600
+// reviewConsultationPriceYen は、動画添削のあとの追加質問の1回の料金。都度払いのみで、チケットは使えない
+// （チケットは添削本体専用）。コーチの取り分は coach_payout.go の reviewSharePercent（70%）で決まる。
+const reviewConsultationPriceYen int32 = 500
 
 // 動画添削はチケット1枚で1回（本体 #569）。コーチの報酬は単発と同じく reviewPriceYen の70%（350円）に固定し、
 // まとめ買いの割引分は運営が負担する。
@@ -32,7 +32,7 @@ const ticketValidityMonths = 6
 const ticketWordingVersion = "v3"
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください"
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加質問は申込み時にカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 
@@ -555,18 +555,18 @@ func (s *Server) remindTicketExpiry(ctx context.Context) (int, error) {
 			} else if err != nil {
 				return n, err
 			}
-			s.notify(ctx, *l.OwnerID, notifyImportant, ticketExpiryMessage(l.ID, l.Available, l.ExpiresAt, days), 24*time.Hour)
+			s.notify(ctx, *l.OwnerID, notifyImportant, ticketExpiryMessage(l.ID, days), 24*time.Hour)
 			n++
 		}
 	}
 	return n, nil
 }
 
-// ticketExpiryMessage は、チケットの失効が近いことの知らせ。延長・救済はしないので、使い道だけを案内する。
-func ticketExpiryMessage(lot uuid.UUID, available int32, expiresAt time.Time, days int32) push.Message {
+// ticketExpiryMessage は、チケットの失効が近いことの知らせ。表題1行だけにし、
+// 枚数と失効日時はマイページのチケットの画面で見せる（本体 #609）。
+func ticketExpiryMessage(lot uuid.UUID, days int32) push.Message {
 	return push.Message{
 		Title: fmt.Sprintf("チケットの有効期限まであと%d日以内です", days),
-		Body:  fmt.Sprintf("未使用のチケット%d枚は %s に失効します。期限を過ぎると使えません", available, expiresAt.In(jst.Zone).Format("2006/01/02 15:04")),
 		URL:   "/me/coaching/tickets",
 		Tag:   fmt.Sprintf("ticket-expiry-%d-%s", days, lot),
 	}

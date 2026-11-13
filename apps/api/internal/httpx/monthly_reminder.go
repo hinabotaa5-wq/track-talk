@@ -30,7 +30,6 @@ const (
 
 var monthlyReminderMessage = push.Message{
 	Title: "大会の記録を残せていますか？",
-	Body:  "先月の大会の記録を残しておくと、自己ベストの推移がグラフで見られます。",
 	URL:   "/memo?tab=records",
 	Tag:   "monthly-record-reminder",
 }

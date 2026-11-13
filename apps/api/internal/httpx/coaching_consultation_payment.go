@@ -15,11 +15,11 @@ import (
 )
 
 // 購入操作は相談ごとに固定する。通知が先に届いても同じレコードで照合できる。
-// 18歳未満が自分で払う動画添削のあとの追加相談は、decl（購入のたびの宣言）が要り、支払い画面を作る前に同じロックの中で記録する。
+// 18歳未満が自分で払う動画添削のあとの追加質問は、decl（購入のたびの宣言）が要り、支払い画面を作る前に同じロックの中で記録する。
 func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingConsultation, decl minorDeclarationReq) (string, error) {
 	var c db.CoachingConsultation
 	if !s.stripe.Configured() {
-		return "", &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
+		return "", &ticketRuleError{"payment_unavailable", "追加質問の決済は準備中です"}
 	}
 	err := s.tx(ctx, func(q *db.Queries) error {
 		if initial.RequesterID == nil {
@@ -46,7 +46,7 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 			return err
 		}
 		if current.ContractID == nil {
-			// 添削のあとの追加相談は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
+			// 添削のあとの追加質問は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
 			if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
 				return err
 			}
@@ -105,7 +105,7 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 		methods = []string{"card"}
 	}
 	page := s.cfg.WebBaseURL + path
-	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加相談（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: methods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
+	sess, err := s.stripe.CreateCheckoutSession(ctx, stripe.CheckoutParams{Name: "追加質問（質問1件と回答1件）", AmountYen: int(c.PriceYen), SuccessURL: page + "?consultation=" + c.ID.String(), CancelURL: page + "?cancelled=1", Reference: c.ID.String(), Metadata: map[string]string{"kind": "consultation", "consultation_id": c.ID.String()}, ExpiresAt: *c.SessionExpiresAt, PaymentMethodTypes: methods, IdempotencyKey: "consultation-checkout-" + c.ID.String()})
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errStripe, err)
 	}
@@ -208,12 +208,16 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		return nil
 	})
 	if err == nil && notify {
-		s.notifyConsultation(ctx, saved, true, "追加相談が届きました")
+		title := "追加相談が届きました"
+		if saved.ReviewRequestID != nil {
+			title = "追加質問が届きました"
+		}
+		s.notifyConsultation(ctx, saved, true, title)
 	}
 	return err
 }
 
-// consultationPayer は、追加相談を払う人。18歳未満のパーソナル指導（保護者が契約・支払いの当事者）の相談は保護者、
+// consultationPayer は、追加質問・追加相談を払う人。18歳未満のパーソナル指導（保護者が契約・支払いの当事者）の相談は保護者、
 // それ以外（大人の相談と、18歳未満の添削のあとの相談）は本人。
 func consultationPayer(c db.CoachingConsultation) string {
 	if c.Minor && c.ContractID != nil {
@@ -381,7 +385,11 @@ func (s *Server) expireConsultations(ctx context.Context) (int, error) {
 		}
 		if closed {
 			n++
-			s.notifyConsultation(ctx, initial, false, "追加相談の期限が過ぎました。未回答分は返却・返金します")
+			title := "追加相談の期限が過ぎました"
+			if _, review := consultationParent(initial); review {
+				title = "追加質問の期限が過ぎました"
+			}
+			s.notifyConsultation(ctx, initial, false, title)
 		}
 	}
 	return n, nil

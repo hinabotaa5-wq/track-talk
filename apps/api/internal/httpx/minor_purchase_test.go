@@ -82,7 +82,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 		t.Fatalf("second declaration %d", n)
 	}
 
-	// 1本目を返却してもらい、追加相談（600円）を頼む。送るときも、支払い画面を開き直すときも毎回チェックが要る。
+	// 1本目を返却してもらい、追加質問（500円）を頼む。送るときも、支払い画面を開き直すときも毎回チェックが要る。
 	for _, o := range coachRequests(t, h, tc).Reviewing {
 		if r := doJSON(t, h, "POST", "/v1/coach/requests/"+o.ID+"/start", tc, nil); r.Code != 200 {
 			t.Fatal(r.Body.String())
@@ -92,7 +92,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 		t.Fatal(r.Body.String())
 	}
 	c := consultationDraft(t, h, tm, "/v1/coaching/requests/"+first+"/consultations", uuid.NewString(), "次の大会ではどこを意識しますか")
-	if c.Funding != "cash" || c.Price != 600 {
+	if c.Funding != "cash" || c.Price != 500 {
 		t.Fatalf("draft %+v", c)
 	}
 	submit := "/v1/coaching/consultations/" + c.ID + "/submit"
@@ -121,7 +121,7 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 	if n, _ := declarationsFor(t, minor, "consultation", c.ID); n != 2 {
 		t.Fatalf("consultation declarations after reopen %d", n)
 	}
-	if code := payConsultation(t, h, c.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
 		t.Fatalf("pay consultation %d", code)
 	}
 	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id = $1`, []any{c.ID}, &status)
@@ -193,7 +193,7 @@ func TestReviewConsultationPaymentDoesNotRecheckLegacyDeclaration(t *testing.T) 
 		t.Fatalf("submit %d %s", rec.Code, rec.Body.String())
 	}
 	execSQLArgs(t, `DELETE FROM minor_purchase_declarations WHERE ref_type = 'consultation' AND ref_id = $1`, c.ID)
-	if code := payConsultation(t, h, c.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	var status string

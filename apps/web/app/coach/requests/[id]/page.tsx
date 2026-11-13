@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachInfoRequestForm, ReviewInfoHistory, SentBanner } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
 import { CoachWithdrawForm } from "@/components/review-withdraw";
+import { CoachingConsultations } from "@/components/coaching-consultations";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadProgress } from "@/components/upload-progress";
@@ -294,6 +295,8 @@ export default function CoachReviewRequestPage() {
       {sent === "response" && response ? <SentBanner text={t(locale, "coach.detail.responseSent")} /> : null}
 
       {response ? <ReviewResponseView response={response} /> : null}
+
+      {response && id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
 
       {needsClarification && response.clarify_reason ? (
         <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">

@@ -15,8 +15,11 @@ import { useEffect, useState } from "react";
 
 // 1ヶ月プランの「相談の受付設定」。固定期間のプランを出品する代わりに、受付中かどうか、担当できる種目、
 // 相談で聞きたいこと・サポートできる内容、価格の目安を設定する。期間・内容・価格は、相談のあとの提案で決める。
-// 受け入れ状況は、ここで手で切り替える「受付中／受付停止中」だけ（人数の上限は置かない。カレンダーとは連動しない）。
-export function CoachConsultSettings({ coach, token }: { coach: CoachApplication; token: string | null }) {
+// 受け入れ状況は、ここで手で切り替える「受付中／受付停止中」だけ（人数の上限は置かない）。
+// 担当サービスの選択欄は廃止したので、1ヶ月プランを未登録のコーチが受付中で保存したときは、既存の
+// PATCH /v1/coach/me/services で1ヶ月プランを担当サービスに足してから受付設定を保存する。
+// 動画添削（コーチ画面トップの受付中トグル）とは別物で、ここでは触らない。
+export function CoachConsultSettings({ coach, token, onCoachChange }: { coach: CoachApplication; token: string | null; onCoachChange?: (c: CoachApplication) => void }) {
   const [s, setS] = useState<SupportConsultSettings | null>(null);
   const [approved, setApproved] = useState(true);
   const [min, setMin] = useState("");
@@ -49,13 +52,19 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
     setSaved(false);
     const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(/[,，円\s]/g, "")));
     try {
+      if (s.accepting && !canServe) {
+        const services = [...(coach.service_types ?? []), "competition_support"];
+        const c = await apiFetch<{ application: CoachApplication }>("/v1/coach/me/services", { method: "PATCH", token, body: JSON.stringify({ service_types: services }) });
+        onCoachChange?.(c.application);
+      }
       const d = await apiFetch<{ settings: SupportConsultSettings }>("/v1/coach/me/support-consult", {
         method: "PUT", token, body: JSON.stringify({ ...s, price_min_yen: num(min), price_max_yen: num(max) }),
       });
       setS(d.settings);
       setSaved(true);
     } catch (e) {
-      if (e instanceof ApiRequestError && e.fields) setFields(e.fields);
+      if (e instanceof ApiRequestError && e.fields?.service_types) setError(e.fields.service_types);
+      else if (e instanceof ApiRequestError && e.fields) setFields(e.fields);
       else setError(e instanceof ApiRequestError ? e.message : L("保存できませんでした"));
     } finally {
       release();
@@ -63,17 +72,16 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
   }
 
   return (
-    <section aria-label={L("1ヶ月プランの相談の受付設定")} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
+    <section aria-label={L("受付設定")} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <div className="space-y-1">
-        <h3 className="font-bold">{L("1ヶ月プラン: 相談の受付設定")}</h3>
-        <p className="text-xs text-slate-300">{L("1ヶ月プランは、固定の期間・価格では出品しません。選手が無料で相談してから、あなたが内容・価格を提案して始まります。期間は開始日から1ヶ月（30日間）で、目標の大会は目標として添えるだけです。運営手数料は25%です。")}</p>
+        <h2 className="font-bold">{L("受付設定")}</h2>
+        <p className="text-xs text-slate-300">{L("受付中にすると、コーチ一覧に出て相談を受け付けます。")}</p>
       </div>
-      {!canServe ? <p className="text-xs text-amber-300">{L("先に、上の「担当するサービス」で1ヶ月プランを登録してください。")}</p> : null}
       {s ? (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={s.accepting} disabled={!canServe} onChange={(e) => setS({ ...s, accepting: e.target.checked })} />
-            <span className="font-semibold">{L("相談を受け付ける")}</span>
+            <input type="checkbox" checked={s.accepting} onChange={(e) => setS({ ...s, accepting: e.target.checked })} />
+            <span className="font-semibold">{L("受付中にする")}</span>
           </label>
           {fields.accepting ? <p className="text-sm text-red-400">{fields.accepting}</p> : null}
           <FieldBlock label={L("相談を受ける種目")} error={fields.events}>
@@ -98,11 +106,10 @@ export function CoachConsultSettings({ coach, token }: { coach: CoachApplication
               <Input aria-label={L("価格の目安の上限")} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
             </div>
           </FieldBlock>
-          <p className="text-xs text-slate-300">{L("新しい相談を受けない間は、上の「相談を受け付ける」のチェックを外してください。選手側には「受付停止中」と表示されます。対応可能カレンダーとは連動しません。人数の上限もありません。")}</p>
           {s.accepting && !approved ? <p className="text-xs text-amber-300">{L("特商法の表記が承認されるまで、選手側には公開されません。")}<Link href="/coach/commerce" className="underline">{L("特商法・身元")}</Link>{L("で、このサービスの表記を承認してください。")}</p> : null}
           {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
           {saved ? <p role="status" className="text-sm text-emerald-300">{L("保存しました")}</p> : null}
-          <Button type="submit" disabled={pending}>{L("受付設定を保存")}</Button>
+          <Button type="submit" disabled={pending}>{L("保存する")}</Button>
         </form>
       ) : error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
       <Link href="/coach/support-consults" className="block text-blue-300 underline">{L("届いた相談を見る")}</Link>

@@ -72,7 +72,8 @@ func TestTicketExpiryReminders(t *testing.T) {
 	}
 	var body string
 	queryRowArgs(t, `SELECT body FROM notifications WHERE recipient_id=$1 AND title='チケットの有効期限まであと7日以内です'`, []any{id}, &body)
-	if !strings.Contains(body, "未使用のチケット6枚") {
+	// 文面は表題1行だけ。枚数と失効日時はチケットの画面で見せる（本体 #609）。
+	if body != "" {
 		t.Fatalf("7-day body %s", body)
 	}
 	var r30, r7 int

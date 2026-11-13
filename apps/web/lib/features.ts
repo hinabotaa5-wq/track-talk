@@ -20,10 +20,11 @@ export const coachingMessagingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COAC
 // 動画添削の申込み(/coaching/new)は指名候補の API を使うので、このフラグでは止めない。APIのCOACHING_COACH_LIST_ENABLEDと揃えること。
 export const coachingCoachListEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED);
 
-// 動画添削のあとの追加相談は販売を廃止した（本体 #569）。環境変数を立てても開かない（API も同じ）。
-export const coachingConsultationEnabled = false;
+// 動画添削のあとの追加質問（1回500円の都度払いのみ）。開けるのは運営者の指示があってから。
+// API の COACHING_CONSULTATION_ENABLED と揃えること。空の間は送る欄を出さず、届いた内容と下書きは読める。
+export const coachingConsultationEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED);
 
-export const consultationClosedNote = "追加相談の受付は準備中です。届いた内容は読めます。";
+export const consultationClosedNote = "追加質問の受付は準備中です。届いた内容は読めます。";
 
 export const messagingClosedNote = "メッセージのやりとりは準備中です。届いた内容は読めます。";
 
@@ -35,9 +36,3 @@ export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUM
 // 開始日に立てて一覧へ切り替える（日付を画面に直書きしない。開始日と開放の手順は運営者が決める）。
 // 一覧の API は /v1/coaches/support-plan（COACHING_COACH_LIST_ENABLED の側）。
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
-
-// 海外コーチの指導希望の集計カード（コーチタブの独立カード、本体 #542）。
-// 集計が目的なので、デプロイ後は表示される状態で出す（既定ON）。
-// 正式開始のタイミングで運営者が消すときは NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED に
-// 明示OFF（0/false/no/off）を設定する。
-export const overseasInterestEnabled = flagEnabledDefaultOn(process.env.NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED);

@@ -424,7 +424,7 @@ func (s *Server) runCoachPayouts(ctx context.Context) (payoutRunResult, error) {
 	}
 	for _, p := range notices {
 		if p.CoachID != nil {
-			s.notify(ctx, *p.CoachID, notifyImportant, push.Message{Title: "報酬を送金しました", Body: fmt.Sprintf("%s分までの報酬 %d円を Stripe のアカウントに送金しました", p.Month.Format("2006年1月"), p.AmountYen), URL: "/coach", Tag: "payout-" + p.ID.String()}, 24*time.Hour)
+			s.notify(ctx, *p.CoachID, notifyImportant, push.Message{Title: "報酬を送金しました", URL: "/coach", Tag: "payout-" + p.ID.String()}, 24*time.Hour)
 		}
 	}
 	return out, nil

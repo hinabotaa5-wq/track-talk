@@ -204,6 +204,65 @@ func TestConsultationExpiryRefundCompletionNotice(t *testing.T) {
 	}
 }
 
+func TestReviewQuestionExpiryRefundCompletionNotice(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f, endpoint, pushes := setupRefundNoticeTest(t)
+	admin := adminToken(t, h)
+	_, coach := approvedReviewCoach(t, h, admin)
+	p256dh, auth := testPushKeys(t)
+	if rec := doJSON(t, h, "POST", "/v1/me/push-subscriptions", coach, map[string]any{
+		"endpoint": endpoint, "keys": map[string]string{"p256dh": p256dh, "auth": auth},
+	}); rec.Code != http.StatusNoContent {
+		t.Fatalf("coach subscribe %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", coach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
+		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
+	}
+	// 受付開始の接続テストが済んだらコーチの購読は外す。以後のプッシュ計数は依頼者だけにする。
+	if rec := doJSON(t, h, http.MethodDelete, "/v1/me/push-subscriptions", coach, map[string]any{"endpoint": endpoint}); rec.Code != http.StatusNoContent {
+		t.Fatalf("coach unsubscribe %d %s", rec.Code, rec.Body.String())
+	}
+	pushes.Store(0)
+	_, owner := demoRequester(t, h, admin)
+	root := paidReview(t, h, owner, "card", "pi_card_question_notice")
+	offers := coachRequests(t, h, coach).Reviewing
+	if len(offers) != 1 {
+		t.Fatalf("offers %+v", offers)
+	}
+	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/response", coach, responseBody()); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	c := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "追加質問の返金通知")
+	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("payment webhook %d", code)
+	}
+	consultationAction(t, h, coach, c.ID, "accept", nil)
+	subscribeRefundNoticeTest(t, h, owner, endpoint)
+	title, url := "追加質問の返金が完了しました", "/coaching/requests/"+root
+	execSQLArgs(t, "UPDATE coaching_consultations SET answer_by=now()-interval '1 minute' WHERE id=$1", c.ID)
+	f.mu.Lock()
+	f.ticketRefundStatus = "pending"
+	f.mu.Unlock()
+	tickRefundNoticeTest(t, h)
+	var state string
+	queryRowArgs(t, "SELECT payment_state FROM coaching_consultations WHERE id=$1", []any{c.ID}, &state)
+	if state != "refund_pending" {
+		t.Fatalf("pending payment %s", state)
+	}
+	assertRefundNotice(t, h, owner, title, url, pushes, 0)
+	f.mu.Lock()
+	f.ticketRefundStatus = "succeeded"
+	f.mu.Unlock()
+	for range 2 {
+		tickRefundNoticeTest(t, h)
+		assertRefundNotice(t, h, owner, title, url, pushes, 1)
+	}
+}
+
 func TestPendingReviewPayPayRefundCompletionNotice(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f, endpoint, pushes := setupRefundNoticeTest(t)
