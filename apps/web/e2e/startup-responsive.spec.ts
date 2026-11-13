@@ -1,6 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-
+// next dev の devtools オーバーレイ(nextjs-portal)は画面左下に出て、
+// #622 で左端に移ったコーチタブの中央を塞ぎクリックを妨げる。
+// 本番ビルドには存在しないものなのでテスト中は隠す(製品の挙動は変えない)。
+// hydration で head が掃除されるため、ページ表示後に足す。
+async function hideDevOverlay(page: Page) {
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+}
 
 test("起動直後の通信が終わらなくても投稿ボタンが表示され、ホームのタブを切り替えられる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -38,6 +44,7 @@ test("タブの移動に時間がかかるあいだは画面に読み込み表�
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("link", { name: "投稿する", exact: true })).toBeVisible();
+    await hideDevOverlay(page);
     const nav = page.getByRole("navigation", { name: "メイン", exact: true }).filter({ visible: true });
     const competitions = nav.getByRole("link", { name: "大会", exact: true });
     // 起動準備が終わった後でも、遅い移動だけを表示する。
@@ -66,6 +73,7 @@ test("投稿ボタンからの移動が遅くても、押した直後に待機�
   });
   try {
     await page.goto("/?sort=new", { waitUntil: "domcontentloaded" });
+    await hideDevOverlay(page);
     const post = page.getByRole("link", { name: "投稿する", exact: true });
     await expect(post).toHaveAttribute("href", "/login?next=/upload");
     await post.click();
