@@ -24,7 +24,6 @@ func (s *Server) notifyAdminsMinorReport(ctx context.Context) {
 	for _, id := range ids {
 		s.notify(ctx, id, notifyImportant, push.Message{
 			Title: "18歳未満のパーソナル指導に通報",
-			Body:  "管理者画面のパーソナル指導から確認してください",
 			URL:   "/admin",
 			Tag:   "coaching-minor-report",
 		}, 24*time.Hour)

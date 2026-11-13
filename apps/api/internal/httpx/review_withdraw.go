@@ -98,19 +98,16 @@ func (s *Server) withdrawReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_withdrawn", reviewWithdrawalPush(rr.ID, s.stripe.Configured()))
+	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_withdrawn", reviewWithdrawalPush(rr.ID))
 	out := s.coachRequestJSON(rr, false)
 	JSON(w, http.StatusOK, out)
 }
 
-func reviewWithdrawalPush(requestID uuid.UUID, paymentConfigured bool) push.Message {
-	body := "担当のコーチの都合で、この依頼は終了しました"
-	if paymentConfigured {
-		body += "。お支払いは取り消します（PayPay は返金します）"
-	}
+// reviewWithdrawalPush は、コーチが依頼を返却したときの知らせ。表題1行だけにし、
+// 終了の理由とお支払いの扱いは依頼の画面で見せる（本体 #609）。
+func reviewWithdrawalPush(requestID uuid.UUID) push.Message {
 	return push.Message{
 		Title: "コーチが依頼を返却しました",
-		Body:  body,
 		URL:   "/coaching/requests/" + requestID.String(),
 		Tag:   "review-" + requestID.String(),
 	}

@@ -693,7 +693,6 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 func (s *Server) notifyCoachApproved(ctx context.Context, id uuid.UUID) {
 	s.notify(ctx, id, notifyCoaching, push.Message{
 		Title: "コーチの応募が承認されました",
-		Body:  "応募の画面から次の準備に進めます",
 		URL:   "/coach/apply",
 		Tag:   "coach-review",
 	}, 24*time.Hour)

@@ -103,23 +103,19 @@ func (s *Server) deliverRefundCompletionNotice(ctx context.Context, id uuid.UUID
 func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 	message := push.Message{
 		Title: "フォーム添削の返金が完了しました",
-		Body:  "お支払いの状況は依頼画面で確認できます",
 		URL:   notice.Url,
 		Tag:   "refund-complete-" + notice.ID.String(),
 	}
 	switch notice.Kind {
 	case "review_cancel":
 		message.Title = "フォーム添削の仮押さえの取り消しが完了しました"
-		message.Body = "カードの仮押さえを取り消しました"
 	case "consultation_refund":
 		message.Title = "追加相談の返金が完了しました"
-		message.Body = "お支払いの状況は追加相談の画面で確認できます"
 		// 追加相談の返金は動画添削の追加質問とサポートプランの追加相談の両方で起きる。
 		// 通知の宛先 URL はサーバーが作る（添削は /coaching/requests/、契約は /coaching/personal/）ので、
 		// 宛先が添削のときだけ呼び名を「追加質問」にする。
 		if strings.HasPrefix(notice.Url, "/coaching/requests/") {
 			message.Title = "追加質問の返金が完了しました"
-			message.Body = "お支払いの状況は追加質問の画面で確認できます"
 		}
 	}
 	return message

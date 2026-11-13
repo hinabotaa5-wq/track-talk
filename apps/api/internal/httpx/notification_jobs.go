@@ -130,7 +130,6 @@ func (s *Server) writeNotificationJob(ctx context.Context, q *db.Queries, job db
 func coachRejectionMessage() push.Message {
 	return push.Message{
 		Title: "コーチの応募の審査が終わりました",
-		Body:  "結果を応募の画面で確認してください",
 		URL:   "/coach/apply",
 	}
 }

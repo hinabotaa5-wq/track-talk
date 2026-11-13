@@ -158,7 +158,6 @@ func (s *Server) requestReviewInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_info_request", push.Message{
 		Title: "コーチから依頼内容の確認が届きました",
-		Body:  reviewDeadlineText(resubmitBy) + "までに相談内容を直して再提出してください。再提出がなければ依頼は終了し、お支払いは取り消します（PayPay は返金します）",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	})
@@ -301,20 +300,15 @@ func (s *Server) notifyUnresubmitted(ctx context.Context, rr db.ExpireUnresubmit
 	if err := insertReviewNotification(ctx, s.q, rr.RequesterID, "review_expired", rr.ID); err != nil {
 		slog.Warn("review unresubmitted notification", "err", err)
 	}
-	body := "再提出の期限までに再提出がなかったため、依頼は終了しました"
-	if s.stripe.Configured() {
-		body += "。お支払いは取り消します（PayPay は返金します）"
-	}
+	// 文面は表題1行だけにし、終了の理由とお支払いの扱いは依頼の画面で見せる（本体 #609）。
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
 		Title: "フォーム添削の依頼が終了しました",
-		Body:  body,
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)
 	if rr.CoachID != nil {
 		s.notify(ctx, *rr.CoachID, notifyReview, push.Message{
 			Title: "差し戻した依頼が終了しました",
-			Body:  "再提出の期限までに再提出がなかったため、この依頼は終わりました",
 			URL:   "/coach",
 			Tag:   "review-" + rr.ID.String(),
 		}, 24*time.Hour)

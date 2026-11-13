@@ -339,11 +339,9 @@ func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request)
 		MapDBError(w, err)
 		return
 	}
-	msg := push.Message{Title: "1ヶ月プランが終了しました", Body: "「" + ct.PlanTitle + "」が終了しました。返金と精算の内容を確認してください", URL: "/coaching/personal/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}
+	msg := push.Message{Title: "1ヶ月プランが終了しました", URL: "/coaching/personal/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}
 	s.notify(r.Context(), ct.RequesterID, notifyImportant, msg, 24*time.Hour)
-	if needsReason {
-		msg.Body = "「" + ct.PlanTitle + "」の終了について、運営の判定と理由を確認してください"
-	}
+	// 運営の判定と理由は、コーチの契約の画面で見せる（本体 #609）。
 	msg.URL = "/coach/support-contracts/" + ct.ID.String()
 	s.notify(r.Context(), ct.CoachID, notifyImportant, msg, 24*time.Hour)
 	out, err := s.supportSettlementJSON(r.Context(), ct)
@@ -391,7 +389,7 @@ func (s *Server) adminReviewSupportFault(w http.ResponseWriter, r *http.Request)
 		MapDBError(w, err)
 		return
 	}
-	s.notify(r.Context(), ct.CoachID, notifyImportant, push.Message{Title: "異議申立ての再審査が終わりました", Body: "「" + ct.PlanTitle + "」の再審査の結果と理由を確認してください", URL: "/coach/support-contracts/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}, 24*time.Hour)
+	s.notify(r.Context(), ct.CoachID, notifyImportant, push.Message{Title: "異議申立ての再審査が終わりました", URL: "/coach/support-contracts/" + ct.ID.String(), Tag: "contract-" + ct.ID.String()}, 24*time.Hour)
 	JSON(w, http.StatusOK, map[string]any{"determination": determinationJSON(d)})
 }
 

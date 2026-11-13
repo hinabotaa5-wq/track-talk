@@ -155,7 +155,7 @@ func (s *Server) createInPersonSession(w http.ResponseWriter, r *http.Request) {
 	JSON(w, 200, map[string]any{"session": sess})
 }
 func (s *Server) notifyInPerson(ctx context.Context, ct db.CoachingContract) {
-	msg := push.Message{Title: "対面指導が更新されました", Body: "契約の対面欄で日時・場所を確認してください", URL: "/coaching/personal/" + ct.ID.String(), Tag: "in-person-" + ct.ID.String()}
+	msg := push.Message{Title: "対面指導が更新されました", URL: "/coaching/personal/" + ct.ID.String(), Tag: "in-person-" + ct.ID.String()}
 	s.notify(ctx, ct.RequesterID, notifyCoaching, msg, 24*time.Hour)
 	s.notify(ctx, ct.CoachID, notifyCoaching, msg, 24*time.Hour)
 }
