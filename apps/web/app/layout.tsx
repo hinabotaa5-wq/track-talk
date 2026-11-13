@@ -25,7 +25,7 @@ import { InstallGuide } from "@/components/install-guide";
 import { LocaleProvider } from "@/components/locale-provider";
 import { localeStartupScript } from "@/lib/i18n";
 import { CaretGuard } from "@/components/caret-guard";
-import { siteDescription, siteName, siteUrl } from "@/lib/site";
+import { siteDescription, siteName, siteNameKatakana, siteUrl } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
 import { umamiBeforeSendName, umamiBeforeSendScript } from "@/lib/analytics";
 import { ProductAnalytics } from "@/components/product-analytics";
@@ -38,10 +38,12 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+const siteTitle = `${siteName}（${siteNameKatakana}）｜陸上競技の匿名コミュニティ`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: `${siteName}｜陸上競技の匿名コミュニティ`,
+    default: siteTitle,
     template: `%s｜${siteName}`,
   },
   description: siteDescription,
@@ -50,7 +52,7 @@ export const metadata: Metadata = {
     type: "website",
     siteName,
     locale: "ja_JP",
-    title: `${siteName}｜陸上競技の匿名コミュニティ`,
+    title: siteTitle,
     description: siteDescription,
   },
   twitter: {
@@ -96,7 +98,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: localeStartupScript }} />
       </head>
       <body className="isolate flex min-h-full flex-col">
-        <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
+        <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: siteName, alternateName: siteNameKatakana, url: siteUrl, description: siteDescription, inLanguage: "ja" }} />
         {/* Umami より先に読み込ませる。送る URL から保護者のリンクのトークンを外す。 */}
         <script dangerouslySetInnerHTML={{ __html: umamiBeforeSendScript }} />
         <Script
