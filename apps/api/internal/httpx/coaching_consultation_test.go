@@ -79,31 +79,34 @@ func payConsultation(t *testing.T, h http.Handler, id string, amount int) int {
 	r := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", map[string]any{"id": session, "payment_status": "paid", "payment_intent": "pi_consult_" + id, "client_reference_id": id, "amount_total": amount, "currency": "jpy", "metadata": map[string]string{"kind": "consultation", "consultation_id": id}})
 	return r.Code
 }
-func TestReviewConsultationTicketIsOneWay(t *testing.T) {
+func TestReviewConsultationCashIsOneWay(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
 	path := "/v1/coaching/requests/" + root + "/consultations"
 	c := consultationDraft(t, h, owner, path, uuid.NewString(), "次の大会ではどこを意識しますか")
-	if c.Price != 600 || c.Funding != "ticket" {
+	if c.Price != 500 || c.Funding != "cash" {
 		t.Fatalf("snapshot %+v", c)
 	}
 	consultationAction(t, h, owner, c.ID, "submit", nil)
 	consultationAction(t, h, owner, c.ID, "submit", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 || b.Reserved != 1 {
-		t.Fatalf("reserved %+v", b)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
+		t.Fatalf("tickets touched %+v", b)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "前半の接地を意識してください"})
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 || b.Reserved != 0 {
-		t.Fatalf("settled %+v", b)
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
+		t.Fatalf("tickets touched %+v", b)
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/answer", coach, map[string]any{"body": "二重回答"}); r.Code == 200 {
 		t.Fatal("double answer")
 	}
 	var count, earnings int
 	queryRowArgs(t, `SELECT count(*),sum(amount_yen)::integer FROM coach_earnings WHERE consultation_id=$1`, []any{c.ID}, &count, &earnings)
-	if count != 1 || earnings != 420 {
+	if count != 1 || earnings != 350 {
 		t.Fatalf("earnings %d %d", count, earnings)
 	}
 	// 動画添削のあとの追加相談は一方通行。回答への確認・補足はなく、回答済みの添削では新しく買えない。
@@ -125,7 +128,7 @@ func TestReviewConsultationTicketIsOneWay(t *testing.T) {
 	if r := doJSON(t, h, "POST", path, owner, map[string]any{"request_key": uuid.NewString(), "body": "もう一度"}); r.Code != 422 || !strings.Contains(r.Body.String(), "consultation_limit") {
 		t.Fatalf("second purchase %d %s", r.Code, r.Body.String())
 	}
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 4 {
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 {
 		t.Fatalf("balance %+v", b)
 	}
 	if len(f.refunds) != 0 {
@@ -133,34 +136,33 @@ func TestReviewConsultationTicketIsOneWay(t *testing.T) {
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
 }
-func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
+func TestReviewConsultationIgnoresTicketBalance(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupStripe(t)
+	owner, _, root := answeredTicketRoom(t, h)
+	path := "/v1/coaching/requests/" + root + "/consultations"
+	c := consultationDraft(t, h, owner, path, uuid.NewString(), "チケットがあっても都度払いの質問")
+	if c.Funding != "cash" || c.Price != 500 {
+		t.Fatalf("cash only %+v", c)
+	}
+	c = consultationAction(t, h, owner, c.ID, "submit", nil)
+	if c.Status != "awaiting_payment" {
+		t.Fatalf("submit %+v", c)
+	}
+	if b := ticketSummary(t, h, owner).Balance; b.Reserved != 0 {
+		t.Fatalf("tickets touched %+v", b)
+	}
+}
+func TestConsultationConcurrentCashSubmitPaysOnce(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
 	path := "/v1/coaching/requests/" + root + "/consultations"
-	c := consultationDraft(t, h, owner, path, uuid.NewString(), "残高が変わっても残る質問")
-	if c.Funding != "ticket" {
+	c := consultationDraft(t, h, owner, path, uuid.NewString(), "同時に送る質問")
+	if c.Funding != "cash" || c.Price != 500 {
 		t.Fatalf("draft %+v", c)
 	}
-	// 下書きのあとで残りの3枚を別の依頼とその追加相談で確保し、チケットが尽きた状態で送る。チケットの新規販売は
-	// 止めたので、送信時の残高で都度払いに切り替える。同時に送っても支払いは1件分。
-	other := ticketReview(t, h, owner)
-	offers := coachRequests(t, h, coach).Reviewing
-	if len(offers) != 1 {
-		t.Fatalf("offers %+v", offers)
-	}
-	if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", coach, nil); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+other+"/response", coach, responseBody()); r.Code != 200 {
-		t.Fatal(r.Body.String())
-	}
-	c0 := consultationDraft(t, h, owner, "/v1/coaching/requests/"+other+"/consultations", uuid.NewString(), "別の添削の相談")
-	consultationAction(t, h, owner, c0.ID, "submit", nil)
-	// 6枚つづりなので、残りの3枚は別の添削3本で使い切る（本体 #569）。
-	for range 3 {
-		ticketReview(t, h, owner)
-	}
+	// 同時に送っても支払いは1件分。チケットの残高があっても都度払いにする。
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 2)
@@ -180,30 +182,40 @@ func TestConsultationDraftSwitchesToCashWhenTicketsRunOut(t *testing.T) {
 		}
 	}
 	var funding, status string
-	var reservations int
 	queryRowArgs(t, `SELECT funding,status FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &funding, &status)
-	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_reservations WHERE consultation_id=$1`, []any{c.ID}, &reservations)
-	if funding != "cash" || status != "awaiting_payment" || reservations != 0 {
-		t.Fatalf("switched %s %s %d", funding, status, reservations)
+	if funding != "cash" || status != "awaiting_payment" {
+		t.Fatalf("submitted %s %s", funding, status)
 	}
-	if form := f.lastSession(); form.Get("metadata[consultation_id]") != c.ID || form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" {
+	if form := f.lastSession(); form.Get("metadata[consultation_id]") != c.ID || form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" || form.Get("line_items[0][price_data][unit_amount]") != "500" {
 		t.Fatalf("session %v", form)
 	}
-	if code := payConsultation(t, h, c.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, c.ID, "decline", nil)
-	if b := ticketSummary(t, h, owner).Balance; b.Available != 0 || b.Reserved != 4 {
+	for i := 0; i < 2; i++ {
+		if r := tick(t, h, "tick-secret"); r.Code != 200 {
+			t.Fatal(r.Body.String())
+		}
+	}
+	refunds := f.refundList()
+	if len(refunds) != 1 || refunds[0].Get("amount") != "500" {
+		t.Fatalf("refunds %+v", refunds)
+	}
+	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
 		t.Fatalf("tickets touched %+v", b)
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
 }
-func TestConsultationTicketDeadlineReturnsReservationOnce(t *testing.T) {
+func TestConsultationCashDeadlineRefundsOnce(t *testing.T) {
 	fakeCoachingCloudinary(t)
-	h, _ := setupStripe(t)
+	h, f := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
 	c := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "期限付きの質問")
 	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	execSQLArgs(t, `UPDATE coaching_consultations SET answer_by=now()-interval '1 minute' WHERE id=$1`, c.ID)
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/answer", coach, map[string]any{"body": "遅い回答"}); r.Code == 200 {
@@ -213,6 +225,15 @@ func TestConsultationTicketDeadlineReturnsReservationOnce(t *testing.T) {
 		if r := tick(t, h, "tick-secret"); r.Code != 200 {
 			t.Fatal(r.Body.String())
 		}
+	}
+	refunds := f.refundList()
+	if len(refunds) != 1 || refunds[0].Get("amount") != "500" {
+		t.Fatalf("refunds %+v", refunds)
+	}
+	var state string
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &state)
+	if state != "refunded" {
+		t.Fatalf("state %s", state)
 	}
 	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
 		t.Fatalf("expired %+v", b)
@@ -343,6 +364,9 @@ func TestConsultationPrivateReportsAndRetention(t *testing.T) {
 		t.Fatalf("coach draft privacy %d", r.Code)
 	}
 	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	consultationAction(t, h, coach, c.ID, "answer", map[string]any{"body": "非公開の回答"})
 	adminPath := "/v1/admin/coaching/consultations/" + c.ID
@@ -527,13 +551,16 @@ func TestConsultationFailedRefundCanBeRetriedAndDraftPurges(t *testing.T) {
 		t.Fatal("expired draft not purged")
 	}
 }
-func TestConsultationReportHideStopsAndReleasesTicket(t *testing.T) {
+func TestConsultationReportHideStopsCashConsultation(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
 	owner, coach, root := answeredTicketRoom(t, h)
 	admin := adminToken(t, h)
 	c := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "通報で停止する相談")
 	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
 	r := doJSON(t, h, "POST", "/v1/reports", coach, map[string]any{"target_type": "coaching_consultation", "target_id": c.ID, "reason": "other", "detail": "対応をお願いします"})
 	if r.Code != 201 {
 		t.Fatal(r.Body.String())
@@ -543,8 +570,15 @@ func TestConsultationReportHideStopsAndReleasesTicket(t *testing.T) {
 	if r := doJSON(t, h, "POST", "/v1/admin/coaching/consultations/"+c.ID+"/hide?report="+report, admin, nil); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
+	var state string
+	var refundCount int
+	queryRowArgs(t, `SELECT count(*) FROM coaching_consultation_refunds WHERE consultation_id=$1`, []any{c.ID}, &refundCount)
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &state)
+	if refundCount != 1 || state != "refund_pending" {
+		t.Fatalf("hide refund %d %s", refundCount, state)
+	}
 	if b := ticketSummary(t, h, owner).Balance; b.Available != 5 || b.Reserved != 0 {
-		t.Fatalf("hide refund %+v", b)
+		t.Fatalf("tickets touched %+v", b)
 	}
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/accept", coach, nil); r.Code == 200 {
 		t.Fatal("hidden action")
@@ -612,6 +646,9 @@ func TestConsultationGuardianCanFindRandomReviewRoom(t *testing.T) {
 	}
 	c := consultationDraft(t, h, minor, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "保護者にも見える相談")
 	consultationAction(t, h, minor, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
 	execSQLArgs(t, `UPDATE coaching_consultations SET minor=true WHERE id=$1`, c.ID) // 旧取引の保護者閲覧の回帰用
 	gp := "/v1/guardian/" + g
 	if r := doJSON(t, h, "GET", gp+"/consultation-reviews", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), root) {

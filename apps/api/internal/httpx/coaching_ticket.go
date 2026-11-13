@@ -17,8 +17,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ticketFaceYen は、追加相談（販売廃止。本体 #569）をチケットで払っていたときの1枚の額面。過去の記録の計算にだけ残す。
-const ticketFaceYen int32 = 600
+// reviewConsultationPriceYen は、動画添削のあとの追加質問の1回の料金。都度払いのみで、チケットは使えない
+// （チケットは添削本体専用）。コーチの取り分は coach_payout.go の reviewSharePercent（70%）で決まる。
+const reviewConsultationPriceYen int32 = 500
 
 // 動画添削はチケット1枚で1回（本体 #569）。コーチの報酬は単発と同じく reviewPriceYen の70%（350円）に固定し、
 // まとめ買いの割引分は運営が負担する。
@@ -32,7 +33,7 @@ const ticketValidityMonths = 6
 const ticketWordingVersion = "v3"
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加相談は申込み時にカードでお支払いください"
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加質問は申込み時にカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 

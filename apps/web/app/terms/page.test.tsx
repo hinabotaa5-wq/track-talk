@@ -55,8 +55,15 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   // 絶対表現は使わない（本体 #572 項目9）。
   expect(text).not.toContain("一切");
   expect(text).not.toContain("いかなる理由があっても");
-  // 追加相談の販売は終わった。購入済みの分だけ購入時の条件を残す。
-  expect(text).toContain("フォーム添削の追加相談の販売は終了しました");
+  // 追加質問の販売（1回500円・都度払いのみ・動画1本可）。購入済みの追加相談は購入時の条件を残す。
+  expect(text).toContain("フォーム添削の追加質問は、返却された添削1件につき1回まで購入でき、料金は1回500円（税込、都度払いのみ）です");
+  expect(text).toContain("チケットは使えません");
+  expect(text).toContain("質問には動画を1本まで添えることができ、動画がなくても購入できます");
+  expect(text).toContain("コーチの受諾は48時間以内、受諾後の回答は72時間以内");
+  expect(text).toContain("辞退・回答のない期限切れは全額返金します");
+  expect(text).toContain("回答がないまま終わった場合に限り、もう1回だけ改めて購入できます");
+  expect(text).toContain("販売の終了前に購入した追加相談は、購入時の条件のとおり扱います");
+  expect(text).not.toContain("追加相談の販売は終了しました");
   expect(text).not.toContain("600円");
   expect(text).not.toContain("1,500円");
   // 内容確認のための差し戻し（1回）と、再提出期限・返却期限の数え直し・再提出がないときの終了。
@@ -73,6 +80,7 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   expect(text).toContain("業務委託の報酬");
   expect(text).toContain("料金500円の70%にあたる350円（税込）");
   expect(text).toContain("利用者がチケットで申し込んだフォーム添削も、1本につき350円です");
+  expect(text).toContain("フォーム添削の追加質問への回答の報酬は、1件につき350円（税込、料金500円の70%）です");
   expect(text).not.toContain("1,050円");
   expect(text).not.toContain("420円");
   expect(text).toContain("報酬の支払期日：毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。");
@@ -129,9 +137,10 @@ it("サポートプランの返金に伴う精算は、支払済みの報酬相�
   expect(renderToStaticMarkup(<TermsPage />)).toContain("第17条（規約の変更・準拠法・連絡）");
 });
 
-it("追加相談の購入画面は、1回限りであることと契約の相手を示す", () => {
+it("追加質問の購入画面は、1回限りであることと契約の相手を示す", () => {
   const review = renderToStaticMarkup(<ConsultationTermsNote kind="review" />);
   for (const word of agencyWords) expect(review).not.toContain(word);
+  expect(review).toContain("追加質問は、この添削を担当したコーチへの");
   expect(review).toContain("この添削について相談できるのは1回限り");
   expect(review).toContain("追加のやりとりはできません");
   expect(review).toContain("回答がないまま終わった場合に限り、もう1回だけ改めて購入できます");

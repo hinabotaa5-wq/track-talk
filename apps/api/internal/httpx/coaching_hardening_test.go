@@ -102,8 +102,8 @@ func TestEveryReviewCheckoutPathDisablesManagedPayments(t *testing.T) {
 					t.Fatalf("session %d Stripe-Version %q", i, versions[i])
 				}
 			}
-			// 動画添削は仮押さえ（返却時に確定）、追加相談は ¥600。
-			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "500" || forms[2]["amount"] != "600" {
+			// 動画添削は仮押さえ（返却時に確定）、追加質問は ¥500。
+			if forms[0]["capture"] != "manual" || forms[1]["capture"] != "manual" || forms[0]["amount"] != "500" || forms[2]["amount"] != "500" {
 				t.Fatalf("sessions %+v", forms)
 			}
 		})

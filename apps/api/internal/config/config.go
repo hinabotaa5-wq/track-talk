@@ -47,10 +47,10 @@ type Config struct {
 	// 添削の「わからなかった」と補足回答）の送信を止める。読む・通報・返金は止めない。
 	// 有料の1対1メッセージは電気通信事業の届出の対象なので、届出が受理されるまで本番では立てない。
 	CoachingMessaging bool
-	// CoachingConsultation が false の間は、動画添削のあとの追加相談（1つの添削につき質問1回・回答1回の
-	// 一方通行の相談）の送信系（質問の送信・支払い・コーチの回答）を止める。下書き・閲覧・通報・返金・取消しは止めない。
+	// CoachingConsultation が false の間は、動画添削のあとの追加質問（1つの添削につき質問1回・回答1回の
+	// 一方通行の相談、1回500円の都度払いのみ）の送信系（質問の送信・支払い・コーチの回答）を止める。下書き・閲覧・通報・返金・取消しは止めない。
 	// 契約の追加相談・やりとり欄・添削の確認質問は CoachingMessaging の側に残す。
-	// 販売を廃止したので（本体 #569）、COACHING_CONSULTATION_ENABLED は読まず常に停止にする。購入済みの相談の返金・閲覧は止めない。
+	// 開くのは運営者の指示があってから。閉じている間の購入済みの相談の返金・閲覧は止めない。
 	CoachingConsultation bool
 	// CoachingCoachList が false の間は、コーチ一覧 API（GET /v1/coaches）をフラグ OFF のときと同じ 404 にし、
 	// コーチの公開プロフィールを一覧から取れないようにする。CoachingEnabled が false なら値によらず閉じる。
@@ -137,27 +137,26 @@ func Load() (Config, error) {
 	_ = godotenv.Load("../../.env")
 
 	cfg := Config{
-		Addr:                   env("API_ADDR", ":8080"),
-		DatabaseURL:            os.Getenv("DATABASE_URL"),
-		SupabaseURL:            os.Getenv("SUPABASE_URL"),
-		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
-		JWTSecret:              os.Getenv("SUPABASE_JWT_SECRET"),
-		JWTAUD:                 env("SUPABASE_JWT_AUD", "authenticated"),
-		LogLevel:               env("LOG_LEVEL", "info"),
-		ShutdownTimeout:        10 * time.Second,
-		CloudName:              os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudAPIKey:            os.Getenv("CLOUDINARY_API_KEY"),
-		CloudAPISecret:         os.Getenv("CLOUDINARY_API_SECRET"),
-		CloudAPIBase:           os.Getenv("CLOUDINARY_API_BASE"),
-		CloudAuthTokenKey:      os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
-		VAPIDPublicKey:         os.Getenv("VAPID_PUBLIC_KEY"),
-		VAPIDPrivateKey:        os.Getenv("VAPID_PRIVATE_KEY"),
-		VAPIDSubject:           os.Getenv("VAPID_SUBJECT"),
-		CoachingEnabled:        enabled(os.Getenv("COACHING_ENABLED")),
-		CoachingNewAcceptance:  enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
-		CoachingMessaging:      enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
-		// 動画添削のあとの追加相談（600円）は販売を廃止した（本体 #569）。環境変数を立てても開かない。
-		CoachingConsultation:       false,
+		Addr:                       env("API_ADDR", ":8080"),
+		DatabaseURL:                os.Getenv("DATABASE_URL"),
+		SupabaseURL:                os.Getenv("SUPABASE_URL"),
+		SupabaseServiceRoleKey:     os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		JWTSecret:                  os.Getenv("SUPABASE_JWT_SECRET"),
+		JWTAUD:                     env("SUPABASE_JWT_AUD", "authenticated"),
+		LogLevel:                   env("LOG_LEVEL", "info"),
+		ShutdownTimeout:            10 * time.Second,
+		CloudName:                  os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		CloudAPIKey:                os.Getenv("CLOUDINARY_API_KEY"),
+		CloudAPISecret:             os.Getenv("CLOUDINARY_API_SECRET"),
+		CloudAPIBase:               os.Getenv("CLOUDINARY_API_BASE"),
+		CloudAuthTokenKey:          os.Getenv("CLOUDINARY_AUTH_TOKEN_KEY"),
+		VAPIDPublicKey:             os.Getenv("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:            os.Getenv("VAPID_PRIVATE_KEY"),
+		VAPIDSubject:               os.Getenv("VAPID_SUBJECT"),
+		CoachingEnabled:            enabled(os.Getenv("COACHING_ENABLED")),
+		CoachingNewAcceptance:      enabled(os.Getenv("COACHING_NEW_ACCEPTANCE_ENABLED")),
+		CoachingMessaging:          enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
+		CoachingConsultation:       enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
 		CoachingCoachList:          enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
 		CoachingTicketSales:        enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:         enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),

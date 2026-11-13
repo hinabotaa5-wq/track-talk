@@ -51,7 +51,7 @@ func TestLocalizePushMessageFallback(t *testing.T) {
 		t.Fatalf("unknown locale changed: %+v", got)
 	}
 	// en でも表にない本文（名前・金額・日時入り）は日本語のまま。表題だけ置き換える。
-	dynamic := push.Message{Title: "パーソナル指導の期間が終わりました", Body:  "「大会プラン」の期間が終わりました。やりとりは見られなくなりました"}
+	dynamic := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「大会プラン」の期間が終わりました。やりとりは見られなくなりました"}
 	got := localizePushMessage("en", dynamic)
 	if got.Title != "Personal coaching ended" {
 		t.Fatalf("title = %q", got.Title)

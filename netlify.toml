@@ -12,7 +12,7 @@
   NEXT_PUBLIC_COACHING_ENABLED = "1"
   # 有料の1対1のやりとり。電気通信事業の届出が受理されるまで "0" のまま
   NEXT_PUBLIC_COACHING_MESSAGING_ENABLED = "0"
-  # 動画添削のあとの追加相談は販売を終了した（本体 #569）。値にかかわらず開かない（Web・API とも固定で閉）
+  # 動画添削のあとの追加質問。開けるのは運営者の指示があってから（Web・API とも環境変数で開閉）
   NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED = "0"
   # 動画添削の開始告知（コーチタブ上部の枠と準備中画面の1文）。空の間は出さない。出すときは「11/14(土)に開始します！」のような短い1文を入れる
   NEXT_PUBLIC_VIDEO_REVIEW_NOTICE = ""

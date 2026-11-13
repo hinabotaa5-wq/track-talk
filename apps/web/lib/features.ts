@@ -20,10 +20,11 @@ export const coachingMessagingEnabled = flagEnabled(process.env.NEXT_PUBLIC_COAC
 // 動画添削の申込み(/coaching/new)は指名候補の API を使うので、このフラグでは止めない。APIのCOACHING_COACH_LIST_ENABLEDと揃えること。
 export const coachingCoachListEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED);
 
-// 動画添削のあとの追加相談は販売を廃止した（本体 #569）。環境変数を立てても開かない（API も同じ）。
-export const coachingConsultationEnabled = false;
+// 動画添削のあとの追加質問（1回500円の都度払いのみ）。開けるのは運営者の指示があってから。
+// API の COACHING_CONSULTATION_ENABLED と揃えること。空の間は送る欄を出さず、届いた内容と下書きは読める。
+export const coachingConsultationEnabled = flagEnabled(process.env.NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED);
 
-export const consultationClosedNote = "追加相談の受付は準備中です。届いた内容は読めます。";
+export const consultationClosedNote = "追加質問の受付は準備中です。届いた内容は読めます。";
 
 export const messagingClosedNote = "メッセージのやりとりは準備中です。届いた内容は読めます。";
 

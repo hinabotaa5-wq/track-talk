@@ -93,7 +93,7 @@ func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, u
 	}
 }
 
-// フォーム添削の追加相談も、引き受ける前に取引条件を見せ、引き受けたら書き留める。
+// フォーム添削の追加質問も、引き受ける前に取引条件を見せ、引き受けたら書き留める。
 func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripe(t)
@@ -101,6 +101,9 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	path := "/v1/coaching/requests/" + root + "/consultations"
 	c := consultationDraft(t, h, owner, path, uuid.NewString(), "次の大会ではどこを意識しますか")
 	consultationAction(t, h, owner, c.ID, "submit", nil)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
 
 	room := func() map[string]json.RawMessage {
 		rec := doJSON(t, h, http.MethodGet, path, coach, nil)
@@ -113,14 +116,14 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 		return out.Consultations[0]
 	}
 	var terms workOrderTermsView
-	if err := json.Unmarshal(room()["terms"], &terms); err != nil || terms.AmountYen != 420 || len(terms.Items) != 9 {
+	if err := json.Unmarshal(room()["terms"], &terms); err != nil || terms.AmountYen != 350 || len(terms.Items) != 9 {
 		t.Fatalf("terms before accept: %+v %v", terms, err)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	var wo struct {
 		Terms workOrderTermsView `json:"terms"`
 	}
-	if err := json.Unmarshal(room()["work_order"], &wo); err != nil || wo.Terms.AmountYen != 420 {
+	if err := json.Unmarshal(room()["work_order"], &wo); err != nil || wo.Terms.AmountYen != 350 {
 		t.Fatalf("work order after accept: %+v %v", wo, err)
 	}
 	var count int
@@ -128,7 +131,7 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("work orders %d", count)
 	}
-	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "420円")
+	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "350円")
 	if !strings.Contains(string(room()["work_order"]), `"delivered_at"`) {
 		t.Fatalf("room work order has no delivered_at")
 	}
