@@ -60,21 +60,30 @@ test("大会のタイムテーブル導線を消し、実況スレッドは内�
   await expect(page.locator("a a")).toHaveCount(0);
 });
 
-test("今後の国際大会の入口を大会タブの横いっぱいに広げる", async ({ page }) => {
+test("今後の国際大会の入口を、国内主要大会・国際大会の切替と同じ幅でその上に置く", async ({ page }) => {
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/competitions");
     const nav = page.getByRole("navigation", { name: "ほかの大会", exact: true });
     const link = nav.getByRole("link", { name: "今後の国際大会", exact: true });
+    const views = page.getByRole("group", { name: "表示する大会", exact: true });
     await expect(link).toHaveAttribute("href", "/competitions/major-hosts");
-    const linkBox = await link.boundingBox();
-    const containerWidth = await nav.evaluate((el) => {
-      const parent = el.parentElement!;
-      const style = getComputedStyle(parent);
-      return parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    });
-    expect(linkBox).not.toBeNull();
-    expect(Math.abs(linkBox!.width - containerWidth)).toBeLessThanOrEqual(1);
+    await expect(views).toBeVisible();
+    const linkBox = (await link.boundingBox())!;
+    const viewsBox = (await views.boundingBox())!;
+    // 切替と同じ左端・同じ幅で、切替の上にある。
+    expect(Math.abs(linkBox.x - viewsBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(linkBox.width - viewsBox.width)).toBeLessThanOrEqual(1);
+    expect(linkBox.y + linkBox.height).toBeLessThanOrEqual(viewsBox.y);
+    if (width === 390) {
+      // スマホでは左右の余白を除いた横いっぱい。
+      const containerWidth = await nav.evaluate((el) => {
+        const parent = el.parentElement!;
+        const style = getComputedStyle(parent);
+        return parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      });
+      expect(Math.abs(linkBox.width - containerWidth)).toBeLessThanOrEqual(1);
+    }
   }
 });
 
