@@ -53,7 +53,7 @@ export function SupportPlanList() {
   }, []);
 
   if (!supportPlanListEnabled) {
-    return <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">{L("サポートプランは12月開始予定です")}</p>;
+    return <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">{L("サポートプランは準備中です")}</p>;
   }
   // 種目の絞り込みだけが効く。並びは API の順のまま。
   const shown = filterCoachesByEvent(coaches ?? [], event);

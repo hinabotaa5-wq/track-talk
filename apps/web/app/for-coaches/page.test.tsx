@@ -18,8 +18,9 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   expect(text).toContain("revise it each week");
   expect(text).toContain("paid by the 15th of the following month (during the pilot we aim to send it around the 7th)");
   expect(text).toContain("There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.");
-  expect(text).toContain("Pilot: late November – December 2026");
-  expect(text).toContain("The full launch follows in mid-December.");
+  expect(text).toContain("Paid pilot");
+  expect(text).toContain("We start small with a paid pilot, run manually with a few athletes.");
+  expect(text).not.toMatch(/November|December/i);
   expect(html).toContain('href="/legal/coach-terms"');
   expect(html).toContain('href="/legal/coach-privacy"');
   expect(html).toContain('href="mailto:tracktalk.office@gmail.com"');

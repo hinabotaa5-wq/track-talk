@@ -224,7 +224,7 @@ export const en: Readonly<Record<string, string>> = {
   "受付停止中": "Paused",
   " · 目安 {v0}": " · About {v0}",
   " · 無料相談できます": " · Free consultation available",
-  "サポートプランは12月開始予定です": "Support plans are scheduled to start in December",
+  "サポートプランは準備中です": "Support plans are in preparation",
   "絞り込み": " Filter",
   "動画は{maxReviewSeconds}秒以内にしてください": "Please keep the video under {maxReviewSeconds} seconds",
   "料金と受付状況を確認してから送信してください。": "Please check the price and availability before sending.",

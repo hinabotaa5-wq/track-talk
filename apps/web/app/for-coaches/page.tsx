@@ -64,9 +64,9 @@ export default function ForCoachesPage() {
         </ul>
       </Rule>
 
-      <Rule title="Pilot: late November – December 2026">
+      <Rule title="Paid pilot">
         <ul className="list-disc space-y-2 pl-5">
-          <li>We start small: a paid pilot in late November to early December 2026, run manually, with a few athletes. The full launch follows in mid-December.</li>
+          <li>We start small with a paid pilot, run manually with a few athletes.</li>
           <li>You can decline any request.</li>
           <li>Pilot coaches are first in line when the full service opens.</li>
         </ul>
