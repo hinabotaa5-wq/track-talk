@@ -57,6 +57,7 @@ export function CoachList() {
                 <div className="w-full min-w-0 space-y-1 break-words">
                   <p className="font-bold text-white">{c.nickname ?? L("名前なし")}</p>
                   <p className="text-xs text-slate-200">{c.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
+                  {c.hitokoto ? <p className="truncate text-xs text-slate-200">{c.hitokoto}</p> : null}
                   <p className="font-semibold text-blue-300">{coachPrice(c)}</p>
                 </div>
               </Link>

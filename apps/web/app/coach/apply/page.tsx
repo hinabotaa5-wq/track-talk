@@ -30,9 +30,10 @@ type Draft = {
   best_record: string;
   achievements: string;
   sns_urls: string;
+  hitokoto: string;
 };
 
-const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: "", achievements: "", sns_urls: "" };
+const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: "", achievements: "", sns_urls: "", hitokoto: "" };
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
@@ -56,6 +57,7 @@ function draftFrom(a: CoachApplication): Draft {
     best_record: a.best_record,
     achievements: a.achievements,
     sns_urls: (a.sns_urls ?? []).join("\n"),
+    hitokoto: a.hitokoto ?? "",
   };
 }
 
@@ -251,7 +253,7 @@ export default function CoachApplyPage() {
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">{L("SNS・ホームページ・ひとこと")}</span>
+            <span className="font-semibold">{L("SNS・ホームページ")}</span>
             <Textarea
               rows={3}
               required
@@ -259,8 +261,19 @@ export default function CoachApplyPage() {
               placeholder={"@example\nhttps://example-club.jp/"}
               onChange={(e) => setDraft((d) => ({ ...d, sns_urls: e.target.value }))}
             />
-            <span className="block text-xs text-slate-300">{L("SNSのアカウント名やホームページのURL、ひとことなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。")}</span>
+            <span className="block text-xs text-slate-300">{L("SNSのアカウント名やホームページのURLなどを自由に入力できます。1行に1件ずつ、1〜3件（各300文字以内）入力してください。公開後はコーチの紹介に表示されます。")}</span>
             {fieldError("sns_urls")}
+          </label>
+
+          <label className="block space-y-1 text-sm">
+            <span className="font-semibold">{L("ひとこと")}</span>
+            <Input
+              value={draft.hitokoto}
+              maxLength={100}
+              onChange={(e) => setDraft((d) => ({ ...d, hitokoto: e.target.value }))}
+            />
+            <span className="block text-xs text-slate-300">{L("選手へのひとことを入力できます（任意・100文字以内）。公開後はコーチの紹介に表示されます。")}</span>
+            {fieldError("hitokoto")}
           </label>
 
           {!application?.photo_url ? (
@@ -315,10 +328,16 @@ export default function CoachApplyPage() {
           </div>
           {(application.sns_urls ?? []).length ? (
             <div>
-              <dt className="text-xs text-slate-300">{L("SNS・ホームページ・ひとこと")}</dt>
+              <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
               <dd className="space-y-1">
                 {application.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
+            </div>
+          ) : null}
+          {application.hitokoto ? (
+            <div>
+              <dt className="text-xs text-slate-300">{L("ひとこと")}</dt>
+              <dd className="whitespace-pre-wrap">{application.hitokoto}</dd>
             </div>
           ) : null}
         </dl>

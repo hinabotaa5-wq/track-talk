@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,7 @@ func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 		"achievements":  c.Achievements,
 		"years":         c.Years,
 		"sns_urls":      nonNilStrings(c.SnsUrls),
+		"hitokoto":      c.Hitokoto,
 		"status":        c.Status,
 		"applied_at":    c.AppliedAt,
 		"reviewed_at":   c.ReviewedAt,
@@ -199,6 +201,7 @@ type coachApplicationReq struct {
 	Achievements string   `json:"achievements"`
 	Years        *int     `json:"years"`
 	SnsUrls      []string `json:"sns_urls"`
+	Hitokoto     string   `json:"hitokoto"`
 }
 
 // normalizeCoachSnsEntries は、SNS・ホームページ欄の空行と重複を除く。
@@ -226,6 +229,28 @@ func normalizeCoachSnsEntries(entries []string) ([]string, string) {
 		return nil, "SNS・ホームページを1件以上入力してください"
 	}
 	return out, ""
+}
+
+// normalizeCoachHitokoto は、ひとこと専用欄（本体 #649）を確かめる。
+// 任意の1行・100文字以内で、空欄のまま保存できる。連絡先らしきものは書けない。
+func normalizeCoachHitokoto(raw string) (string, string) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", ""
+	}
+	if utf8.RuneCountInString(v) > 100 {
+		return "", "ひとことは100文字以内で入力してください"
+	}
+	if strings.ContainsRune(v, '\n') || strings.ContainsRune(v, '\r') {
+		return "", "ひとことは1行で入力してください"
+	}
+	if strings.ContainsRune(v, 0) {
+		return "", "ひとことに使用できない文字が含まれています"
+	}
+	if looksLikeContact(v) {
+		return "", "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
+	}
+	return v, ""
 }
 
 func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +290,10 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if snsError != "" {
 		fields["sns_urls"] = snsError
 	}
+	hitokoto, hitokotoError := normalizeCoachHitokoto(req.Hitokoto)
+	if hitokotoError != "" {
+		fields["hitokoto"] = hitokotoError
+	}
 	if req.Years == nil {
 		years := 0
 		req.Years = &years
@@ -285,6 +314,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		Achievements: req.Achievements,
 		Years:        int16(*req.Years),
 		SnsUrls:      snsEntries,
+		Hitokoto:     hitokoto,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "審査が済んでいるため、応募内容は変えられません")
@@ -295,6 +325,119 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.notifyCoachApplication(r.Context(), p.ID.String(), c.Name, c.Tier, c.Events, c.AppliedAt)
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
+}
+
+type coachProfileUpdateReq struct {
+	Name         *string  `json:"name"`
+	Events       []string `json:"events"`
+	BestRecord   string   `json:"best_record"`
+	Achievements string   `json:"achievements"`
+	SnsUrls      []string `json:"sns_urls"`
+	Hitokoto     *string  `json:"hitokoto"`
+}
+
+// changedCoachProfileFields は、自己編集で実際に変わった項目の名前を返す。運営者通知の本文に入れる。
+func changedCoachProfileFields(before, after db.CoachProfile) []string {
+	var out []string
+	if before.Name != after.Name {
+		out = append(out, "名前")
+	}
+	if !slices.Equal(before.Events, after.Events) {
+		out = append(out, "担当種目")
+	}
+	if before.BestRecord != after.BestRecord {
+		out = append(out, "記録")
+	}
+	if before.Achievements != after.Achievements {
+		out = append(out, "成績や指導経験")
+	}
+	if !slices.Equal(before.SnsUrls, after.SnsUrls) {
+		out = append(out, "SNS・ホームページ")
+	}
+	if before.Hitokoto != after.Hitokoto {
+		out = append(out, "ひとこと")
+	}
+	return out
+}
+
+// updateCoachProfile は、承認済みのコーチが自分のプロフィールを変える（本体 #649）。
+// 即時反映で、再審査には回さない。status・applied_at・reviewed_at は変えない。tier と years は対象外。
+func (s *Server) updateCoachProfile(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireProfile(w, r)
+	if !ok {
+		return
+	}
+	var req coachProfileUpdateReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	current, err := s.q.GetCoachProfile(r.Context(), p.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && current.Status != "approved") {
+		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけがプロフィールを変更できます")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	name := current.Name
+	if req.Name != nil {
+		name = strings.TrimSpace(*req.Name)
+	}
+	hitokotoRaw := current.Hitokoto
+	if req.Hitokoto != nil {
+		hitokotoRaw = *req.Hitokoto
+	}
+	req.BestRecord = strings.TrimSpace(req.BestRecord)
+	req.Achievements = strings.TrimSpace(req.Achievements)
+	fields := map[string]string{}
+	if e := coachPublicTextError("名前", name, 80); e != "" {
+		fields["name"] = e
+	}
+	events, known := normalizeCoachEvents(req.Events)
+	if !known || len(events) == 0 {
+		fields["events"] = "担当種目を1つ以上選んでください"
+	}
+	if e := coachPublicTextError("記録", req.BestRecord, 200); e != "" {
+		fields["best_record"] = e
+	}
+	if e := coachPublicTextError("成績や指導経験", req.Achievements, 500); e != "" {
+		fields["achievements"] = e
+	}
+	snsEntries, snsError := normalizeCoachSnsEntries(req.SnsUrls)
+	if snsError != "" {
+		fields["sns_urls"] = snsError
+	}
+	hitokoto, hitokotoError := normalizeCoachHitokoto(hitokotoRaw)
+	if hitokotoError != "" {
+		fields["hitokoto"] = hitokotoError
+	}
+	if len(fields) > 0 {
+		FieldError(w, fields)
+		return
+	}
+	c, err := s.q.UpdateCoachProfile(r.Context(), db.UpdateCoachProfileParams{
+		ProfileID:    p.ID,
+		Name:         name,
+		Events:       events,
+		BestRecord:   req.BestRecord,
+		Achievements: req.Achievements,
+		SnsUrls:      snsEntries,
+		Hitokoto:     hitokoto,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusForbidden, "forbidden", "承認されたコーチだけがプロフィールを変更できます")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	if changed := changedCoachProfileFields(current, c); len(changed) > 0 {
+		s.notifyCoachProfileUpdate(r.Context(), p.ID.String(), c.Name, changed, c.UpdatedAt)
+	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
@@ -589,6 +732,7 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 			"achievements":    c.Achievements,
 			"years":           c.Years,
 			"sns_urls":        nonNilStrings(c.SnsUrls),
+			"hitokoto":        c.Hitokoto,
 			"rating_count":    c.RatingCount,
 			"rating_average":  c.RatingAverage,
 			// パーソナル指導のプラン。安い順。

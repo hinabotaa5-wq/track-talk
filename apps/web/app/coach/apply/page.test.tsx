@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, replace, ...props }: { href: string; children: ReactNode; replace?: boolean }) => <a href={href} data-replace={replace} {...props}>{children}</a> }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("@/components/coach-photo", () => ({ CoachPhotoForm: () => null, uploadCoachPhoto: vi.fn() }));
-const application = { name: "コーチの名前", tier: "coach", events: ["100m"], best_record: "10秒95", achievements: "全国大会", sns_urls: ["@tracktalk.office", "https://example-club.jp/"], status: "pending", applied_at: "2026-10-24T00:00:00Z", photo_url: "photo", years: 8 };
+const application = { name: "コーチの名前", tier: "coach", events: ["100m"], best_record: "10秒95", achievements: "全国大会", sns_urls: ["@tracktalk.office", "https://example-club.jp/"], hitokoto: "よろしくお願いします", status: "pending", applied_at: "2026-10-24T00:00:00Z", photo_url: "photo", years: 8 };
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
@@ -33,8 +33,10 @@ it("名前を保存し、年数と公開説明文を外して専用の機能紹�
   expect(container.querySelector('a[href="/coach/about"]')?.getAttribute("data-replace")).toBe("true");
   await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   const submitted = apiFetch.mock.calls.find(([, options]) => options?.method === "POST");
-  expect(JSON.parse(submitted![1].body)).toMatchObject({ name: "コーチの名前", sns_urls: ["@tracktalk.office", "https://example-club.jp/"] });
+  expect(JSON.parse(submitted![1].body)).toMatchObject({ name: "コーチの名前", sns_urls: ["@tracktalk.office", "https://example-club.jp/"], hitokoto: "よろしくお願いします" });
   expect(JSON.parse(submitted![1].body)).not.toHaveProperty("years");
+  expect(container.textContent).toContain("選手へのひとことを入力できます（任意・100文字以内）");
+  expect(container.textContent).not.toContain("SNS・ホームページ・ひとこと");
 });
 
 it.each([
@@ -49,6 +51,15 @@ it.each([
   await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(container.textContent).toContain(message);
   expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+});
+
+it("承認済みの読み取り表示は「ひとこと」を行で分け、SNSの見出しを戻す", async () => {
+  apiFetch.mockResolvedValue({ application: { ...application, status: "approved" } });
+  await act(async () => root.render(<CoachApplyPage />));
+  expect(container.querySelector("form")).toBeNull();
+  expect(container.textContent).toContain("よろしくお願いします");
+  expect(container.textContent).toContain("SNS・ホームページ");
+  expect(container.textContent).not.toContain("SNS・ホームページ・ひとこと");
 });
 
 it("SNSやホームページが空なら応募を送らず、入力を案内する", async () => {

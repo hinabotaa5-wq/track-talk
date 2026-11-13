@@ -14,10 +14,11 @@ import (
 // 宛先は公開ページ掲載のサポート用アドレスで固定し、新しい環境変数・秘密・送信設定は作らない。
 // 問い合わせ本文・応募の実績文はメールに入れない。未ログインの /contact の mailto は対象外。
 const (
-	operatorNoticeTo              = "tracktalk.office@gmail.com"
-	coachApplicationNoticeSubject = "コーチ応募がありました"
-	inquiryNoticeSubject          = "お問い合わせがありました"
-	operatorNoticeTimeLayout      = "2006-01-02 15:04:05"
+	operatorNoticeTo                = "tracktalk.office@gmail.com"
+	coachApplicationNoticeSubject   = "コーチ応募がありました"
+	coachProfileUpdateNoticeSubject = "コーチがプロフィールを変更しました"
+	inquiryNoticeSubject            = "お問い合わせがありました"
+	operatorNoticeTimeLayout        = "2006-01-02 15:04:05"
 )
 
 // operatorAdminLink はメールに載せる管理画面リンク。直リンクが無ければ /admin。
@@ -90,6 +91,35 @@ func (s *Server) notifyCoachApplication(ctx context.Context, profileID, name, ti
 	s.notifyOperatorNotice(ctx,
 		coachApplicationNoticeMail(name, tier, events, appliedAt, s.operatorAdminLink()),
 		coachApplicationNoticeKey(profileID, appliedAt),
+		"profile_id", profileID)
+}
+
+// coachProfileUpdateNoticeMail は、承認済みコーチの自己編集の変更通知。
+// 変更した項目の名前だけを載せ、変更前後の内容（実績文など）はメールに入れない。
+func coachProfileUpdateNoticeMail(name string, fields []string, updatedAt time.Time, adminLink string) mail.Message {
+	return mail.Message{
+		To:      operatorNoticeTo,
+		Subject: coachProfileUpdateNoticeSubject,
+		Text: strings.Join([]string{
+			"コーチがプロフィールを変更しました。",
+			"コーチ名：" + name,
+			"変更した項目：" + strings.Join(fields, "、"),
+			"変更時刻：" + operatorNoticeTime(updatedAt),
+			"管理画面：" + adminLink,
+		}, "\n"),
+	}
+}
+
+// coachProfileUpdateNoticeKey の冪等キーはプロフィールID＋更新後の updated_at。
+func coachProfileUpdateNoticeKey(profileID string, updatedAt time.Time) string {
+	return "coach-profile-update-notice-" + profileID + "-" + updatedAt.UTC().Format(time.RFC3339Nano)
+}
+
+// notifyCoachProfileUpdate は自己編集の保存成功後、実際に変わった項目があるときだけ運営者へ1通送る。応答を失敗させない。
+func (s *Server) notifyCoachProfileUpdate(ctx context.Context, profileID, name string, fields []string, updatedAt time.Time) {
+	s.notifyOperatorNotice(ctx,
+		coachProfileUpdateNoticeMail(name, fields, updatedAt, s.operatorAdminLink()),
+		coachProfileUpdateNoticeKey(profileID, updatedAt),
 		"profile_id", profileID)
 }
 

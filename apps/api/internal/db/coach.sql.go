@@ -106,7 +106,7 @@ SET status = 'ended',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'suspended'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 // 運営が止めていたコーチを、戻さないまま登録を終えた状態にする。止めている間に留保していた報酬は消さず、
@@ -138,12 +138,13 @@ func (q *Queries) EndSuspendedCoach(ctx context.Context, profileID uuid.UUID) (C
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -174,6 +175,7 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -207,6 +209,7 @@ SELECT
     c.achievements,
     c.years,
     c.sns_urls,
+    c.hitokoto,
     c.status,
     c.applied_at,
     c.reviewed_at,
@@ -245,6 +248,7 @@ type ListCoachApplicationsRow struct {
 	Achievements   string     `json:"achievements"`
 	Years          int16      `json:"years"`
 	SnsUrls        []string   `json:"sns_urls"`
+	Hitokoto       string     `json:"hitokoto"`
 	Status         string     `json:"status"`
 	AppliedAt      time.Time  `json:"applied_at"`
 	ReviewedAt     *time.Time `json:"reviewed_at"`
@@ -273,6 +277,7 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.Achievements,
 			&i.Years,
 			&i.SnsUrls,
+			&i.Hitokoto,
 			&i.Status,
 			&i.AppliedAt,
 			&i.ReviewedAt,
@@ -304,6 +309,7 @@ SELECT
     c.achievements,
     c.years,
     c.sns_urls,
+    c.hitokoto,
     c.service_types,
     r.rating_count,
     r.rating_average
@@ -338,6 +344,7 @@ type ListPublicCoachesRow struct {
 	Achievements  string    `json:"achievements"`
 	Years         int16     `json:"years"`
 	SnsUrls       []string  `json:"sns_urls"`
+	Hitokoto      string    `json:"hitokoto"`
 	ServiceTypes  []string  `json:"service_types"`
 	RatingCount   int32     `json:"rating_count"`
 	RatingAverage float64   `json:"rating_average"`
@@ -363,6 +370,7 @@ func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow
 			&i.Achievements,
 			&i.Years,
 			&i.SnsUrls,
+			&i.Hitokoto,
 			&i.ServiceTypes,
 			&i.RatingCount,
 			&i.RatingAverage,
@@ -378,7 +386,7 @@ func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow
 }
 
 const lockCoachProfile = `-- name: LockCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto FROM coach_profiles
 WHERE profile_id = $1
 FOR UPDATE
 `
@@ -410,6 +418,7 @@ func (q *Queries) LockCoachProfile(ctx context.Context, profileID uuid.UUID) (Co
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -452,7 +461,7 @@ SET rating_reset_at = now(),
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 // 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
@@ -483,6 +492,7 @@ func (q *Queries) ResetCoachRating(ctx context.Context, profileID uuid.UUID) (Co
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -493,7 +503,7 @@ SET status = 'approved',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'suspended'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 // 運営が止めたコーチを承認済みに戻す。受付はコーチが自分で入れ直す。
@@ -524,6 +534,7 @@ func (q *Queries) ResumeCoach(ctx context.Context, profileID uuid.UUID) (CoachPr
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -536,7 +547,7 @@ SET status = $1,
 WHERE profile_id = $2
   AND status = 'pending'
   AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 type ReviewCoachApplicationParams struct {
@@ -572,6 +583,7 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -600,8 +612,8 @@ func (q *Queries) SetCoachPhoto(ctx context.Context, arg SetCoachPhotoParams) (*
 }
 
 const submitCoachApplication = `-- name: SubmitCoachApplication :one
-INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, hitokoto, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
     events = EXCLUDED.events,
@@ -609,13 +621,14 @@ SET tier = EXCLUDED.tier,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
     sns_urls = EXCLUDED.sns_urls,
+    hitokoto = EXCLUDED.hitokoto,
     name = COALESCE(NULLIF(EXCLUDED.name, ''), coach_profiles.name),
     status = 'pending',
     applied_at = now(),
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected', 'withdrawn')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 type SubmitCoachApplicationParams struct {
@@ -626,6 +639,7 @@ type SubmitCoachApplicationParams struct {
 	Achievements string    `json:"achievements"`
 	Years        int16     `json:"years"`
 	SnsUrls      []string  `json:"sns_urls"`
+	Hitokoto     string    `json:"hitokoto"`
 	Name         string    `json:"name"`
 }
 
@@ -640,6 +654,7 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		arg.Achievements,
 		arg.Years,
 		arg.SnsUrls,
+		arg.Hitokoto,
 		arg.Name,
 	)
 	var i CoachProfile
@@ -667,6 +682,7 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -678,7 +694,7 @@ SET status = 'suspended',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 // 運営が承認済みのコーチを止める。受付も止める。コーチの機能は毎回 status を見るので、次の操作から使えなくなる。
@@ -709,6 +725,73 @@ func (q *Queries) SuspendCoach(ctx context.Context, profileID uuid.UUID) (CoachP
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
+	)
+	return i, err
+}
+
+const updateCoachProfile = `-- name: UpdateCoachProfile :one
+UPDATE coach_profiles
+SET name = COALESCE(NULLIF($1::text, ''), name),
+    events = $2,
+    best_record = $3,
+    achievements = $4,
+    sns_urls = $5,
+    hitokoto = $6,
+    updated_at = now()
+WHERE profile_id = $7
+  AND status = 'approved'
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+`
+
+type UpdateCoachProfileParams struct {
+	Name         string    `json:"name"`
+	Events       []string  `json:"events"`
+	BestRecord   string    `json:"best_record"`
+	Achievements string    `json:"achievements"`
+	SnsUrls      []string  `json:"sns_urls"`
+	Hitokoto     string    `json:"hitokoto"`
+	ProfileID    uuid.UUID `json:"profile_id"`
+}
+
+// 承認済みのコーチが自分でプロフィールを変える（本体 #649）。即時反映で、再審査には回さない。
+// status・applied_at・reviewed_at は変えない。tier と years は対象外。
+func (q *Queries) UpdateCoachProfile(ctx context.Context, arg UpdateCoachProfileParams) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, updateCoachProfile,
+		arg.Name,
+		arg.Events,
+		arg.BestRecord,
+		arg.Achievements,
+		arg.SnsUrls,
+		arg.Hitokoto,
+		arg.ProfileID,
+	)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+		&i.PledgedAt,
+		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -717,7 +800,7 @@ const updateCoachServices = `-- name: UpdateCoachServices :one
 UPDATE coach_profiles
 SET service_types = $1::text[], updated_at = now()
 WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 type UpdateCoachServicesParams struct {
@@ -752,6 +835,7 @@ func (q *Queries) UpdateCoachServices(ctx context.Context, arg UpdateCoachServic
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }

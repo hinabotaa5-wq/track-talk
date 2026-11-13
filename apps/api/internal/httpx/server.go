@@ -389,6 +389,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				// コーチ側（プロフィール・報酬・プラン・契約・添削の返却）
 				// 顔写真（PUT /coach/me/photo）は応募の審査に使うので、閉じない方に置いてある。
 				r.Patch("/coach/me", s.updateCoachDuty)
+				r.Put("/coach/me/profile", s.updateCoachProfile)
 				r.Post("/coach/me/pledge", s.pledgeCoach)
 				r.Patch("/coach/me/services", s.updateCoachServices)
 				r.Get("/coach/me/earnings", s.coachEarnings)

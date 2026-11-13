@@ -147,6 +147,7 @@ type CoachProfile struct {
 	ServiceTypes    []string   `json:"service_types"`
 	SnsUrls         []string   `json:"sns_urls"`
 	Name            string     `json:"name"`
+	Hitokoto        string     `json:"hitokoto"`
 }
 
 type CoachRefundAdjustment struct {

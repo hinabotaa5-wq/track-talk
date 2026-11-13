@@ -405,6 +405,7 @@ export type CoachApplication = {
   achievements: string;
   years: number;
   sns_urls: string[];
+  hitokoto: string;
   status: CoachStatus;
   applied_at: string;
   reviewed_at: string | null;
@@ -870,6 +871,7 @@ export type PublicCoach = {
   achievements: string;
   years: number;
   sns_urls: string[];
+  hitokoto: string;
   rating_count: number;
   rating_average: number;
   // パーソナル指導の公開中のプラン。安い順。
