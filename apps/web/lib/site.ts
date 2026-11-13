@@ -3,7 +3,7 @@ export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:30
 
 export const siteName = "TrackTalk";
 export const siteDescription =
-  "陸上競技の練習・ケガ・大会・シューズのことを匿名で相談できるコミュニティ。練習動画へのアドバイスや合同練習の募集もできます。";
+  "トラックトーク（TrackTalk）は、陸上競技の練習・ケガ・大会・シューズのことを匿名で相談できるコミュニティ。練習動画へのアドバイスや合同練習の募集もできます。"; // i18n-data
 
 // 本文を検索結果の説明文として使える長さにそろえる。
 export function snippet(text: string | undefined, max = 120) {
