@@ -107,15 +107,35 @@ export default function LoginPage() {
       </form>
       {/* Google ログインも、パスワードのログインと同じ戻り先（next）に戻す。 */}
       <GoogleSignInButton nextPath={safeNextPath(next)} />
-      <p className="text-sm">
-        {t(shown, "login.noAccount")} <Link href="/register" className="inline-block text-blue-400 transition active:scale-[0.98]">{t(shown, "login.register")}</Link>
-      </p>
-      <p className="text-sm">
-        <Link href="/reset-password" className="inline-block text-blue-400 transition active:scale-[0.98]">
-          {t(shown, "login.forgot")}
+      {/* 初めての人向けの登録は、ログインの塊と区切ってボタンで出す。 */}
+      <div className="space-y-2 border-t border-white/15 pt-4">
+        <p className="text-sm">{t(shown, "login.noAccount")}</p>
+        <Link
+          href="/register"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/25 glass bg-white/12 px-4.5 py-2 text-sm font-semibold text-slate-200 shadow-xs transition-all duration-150 hover:bg-white/16 hover:text-white active:scale-[0.98] active:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          {t(shown, "register.title")}
         </Link>
-      </p>
-      <p className="text-sm"><Link href="/contact" className="text-blue-300 underline">{t(shown, "login.contact")}</Link></p>
+      </div>
+      {/* 困った人向けの2導線は、登録とは間を置いてテキストリンクのまま並べる。 */}
+      <div className="space-y-1 pt-1">
+        <p className="text-sm">
+          <Link
+            href="/reset-password"
+            className="flex min-h-[44px] w-full items-center justify-center px-4 py-2 text-center text-sm font-medium text-blue-400 transition hover:text-blue-300 hover:underline active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {t(shown, "login.forgot")}
+          </Link>
+        </p>
+        <p className="text-sm">
+          <Link
+            href="/contact"
+            className="flex min-h-[44px] w-full items-center justify-center px-4 py-2 text-center text-sm font-medium text-blue-400 transition hover:text-blue-300 hover:underline active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {t(shown, "login.contact")}
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
