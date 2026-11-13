@@ -20,12 +20,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // 下書きはサーバーに保存してから購入へ進む。購入後も同じ部屋で再開できる。
-// 動画添削のあとの相談（kind="review"）は、1つの添削につき質問1回・回答1回の一方通行で、回答への確認・補足はない。
+// 動画添削のあとの追加質問（kind="review"）は、1つの添削につき質問1回・回答1回の一方通行（1回500円の都度払いのみ、チケット不可）で、回答への確認・補足はない。
 // 送る欄は専用のゲート（coachingConsultationEnabled）で、サポートプランの相談はやりとりのゲートで出し分ける。
 export function CoachingConsultations({ rootID, kind, token, guardianToken }: { rootID: string; kind: "review" | "contract"; token: string | null; guardianToken?: string }) {
   const base = guardianToken ? `/v1/guardian/${encodeURIComponent(guardianToken)}` : "/v1/coaching";
   const roomPath = `${base}/${kind === "review" ? (guardianToken ? "reviews" : "requests") : "contracts"}/${rootID}/consultations`;
-  const returnPath = kind === "review" ? `/coaching/requests/${rootID}` : `/coaching/personal/${rootID}`;
   const [data, setData] = useState<ConsultationRoom | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -34,23 +33,24 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   }, [roomPath, token]);
   useEffect(() => {
     let live = true;
-    const refresh = () => { apiFetch<ConsultationRoom>(roomPath, { token }).then((d) => { if (live) setData(d); }).catch((e) => { if (live) setError(apiErrorText(e, L("追加相談を読み込めませんでした"))); }); };
+    const refresh = () => { apiFetch<ConsultationRoom>(roomPath, { token }).then((d) => { if (live) setData(d); }).catch((e) => { if (live) setError(apiErrorText(e, L(kind === "review" ? "追加質問を読み込めませんでした" : "追加相談を読み込めませんでした"))); }); };
     refresh(); const timer = window.setInterval(refresh, 30000); window.addEventListener("focus", refresh);
     return () => { live = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
-  }, [roomPath, token]);
+  }, [roomPath, token, kind]);
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
-  // 動画添削のあとの追加相談は販売を廃止した（本体 #569）。閉じている間は、過去の相談がある添削だけ記録として出す。
+  // ゲートが閉じている間は、過去の相談がある添削だけ記録として出す（送る欄は出さない）。
   if (kind === "review" && !coachingConsultationEnabled && data.consultations.every((c) => c.status === "draft")) return null;
   const open = data.consultations.some((c) => ["draft", "awaiting_payment", "offered", "in_review"].includes(c.status));
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;
-  return <section className="space-y-4 rounded-2xl border border-white/20 bg-white/5 p-4" aria-label={L("追加相談")}>
-    <h2 className="font-bold">{L("追加相談")}</h2>
+  const heading = kind === "review" ? L("追加質問") : L("追加相談");
+  return <section className="space-y-4 rounded-2xl border border-white/20 bg-white/5 p-4" aria-label={heading}>
+    <h2 className="font-bold">{heading}</h2>
     <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
-    <p className="text-xs text-slate-300">{L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
+    <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
-    {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} funding={data.funding} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} returnPath={returnPath} reload={load} /> : null}
+    {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}
     {sendEnabled && !data.can_purchase && data.role === "requester" && !draft && !open ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
@@ -64,18 +64,18 @@ async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (uploaded.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
   return uploaded.public_id;
 }
-function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requiresVideo, returnPath, reload }: {
-  kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; funding: "ticket" | "cash"; minor: boolean; price: number; requiresVideo: boolean; returnPath: string; reload: () => Promise<void>;
+function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo, reload }: {
+  kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; minor: boolean; price: number; requiresVideo: boolean; reload: () => Promise<void>;
 }) {
-  // 18歳未満が動画添削のあとの相談をその場で払うときは、購入のたびの宣言が要る。送るたびにチェックなしから始める。
-  const needsDeclaration = kind === "review" && funding === "cash";
+  // 18歳未満が動画添削のあとの追加質問をその場で払うときは、購入のたびの宣言が要る。送るたびにチェックなしから始める。
+  // 動画添削のあとの追加質問は都度払いのみ（チケット不可）なので funding はつねに cash。
+  const needsDeclaration = kind === "review";
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
   const [body, setBody] = useState(draft?.question ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [videoID, setVideoID] = useState(draft?.video_public_id ?? "");
   const [error, setError] = useState("");
-  const [buy, setBuy] = useState(false);
   const requestKey = useRef(draft?.request_key ?? crypto.randomUUID());
   const { pending, acquire, release } = useActionLock();
   const guard = useSolicitationGuard();
@@ -83,7 +83,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requi
     if (!guard.allow(body)) return;
     if (needsDeclaration && !declared) { setError(L("購入前の注意事項を確認して、チェックを入れてください。")); return; }
     if (!acquire()) return;
-    setError(""); setBuy(false);
+    setError("");
     try {
       let video = videoID;
       if (file) { video = await uploadVideo(file, token); setVideoID(video); setFile(null); }
@@ -93,22 +93,20 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requi
       await reload();
     } catch (e) {
       setError(apiErrorText(e, e instanceof Error ? e.message : L("送信できませんでした")));
-      if (e instanceof ApiRequestError && e.code === "insufficient_tickets") setBuy(true);
     } finally { release(); }
   }
   return <div className="space-y-3">
-    <p className="text-sm font-semibold">{L("{v0} / 質問1件と回答1件", { v0: funding === "ticket" ? L("チケット1枚（{price}相当）", { price: formatYen(price) }) : formatYen(price) })}</p>
+    <p className="text-sm font-semibold">{L("{v0} / 質問1件と回答1件", { v0: formatYen(price) })}</p>
     <ConsultationTermsNote kind={kind} />
     <ContactNotice />
     {guard.warning}
-    <Textarea aria-label={L("追加相談の質問")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder={L("新しく相談したいこと")} />
+    <Textarea aria-label={L(kind === "review" ? "追加質問の質問" : "追加相談の質問")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder={L("新しく相談したいこと")} />
     <label className="block text-xs text-slate-200">{L("動画（30秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">{L("保存済みの動画を添付します。")}<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">{L("外す")}</button></p> : null}
     <p className="text-xs text-slate-300">{L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: kind === "review" ? L("18歳未満の方は、購入する前に保護者の許可を得てください。") : L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
-    {kind === "review" && funding === "cash" ? <ReviewPayNotice /> : null}
+    {kind === "review" ? <ReviewPayNotice /> : null}
     {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-    <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? L("保存・送信中…") : funding === "ticket" ? L("質問する（チケット1枚）") : L("質問する（{v0}）", { v0: formatYen(price) })}</Button>
-    {buy ? <Link className="block text-sm text-blue-300 underline" href={`/me/coaching/tickets?return_to=${encodeURIComponent(returnPath)}`}>{L("チケットを購入して、この部屋へ戻る")}</Link> : null}
+    <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? L("保存・送信中…") : L("質問する（{v0}）", { v0: formatYen(price) })}</Button>
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </div>;
 }
@@ -116,7 +114,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, funding, price, requi
 export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" }) {
   if (kind === "review") {
     return <div className="space-y-1 text-xs leading-5 text-slate-300">
-      <p>{L("追加相談は、この添削を担当したコーチへの、添削の内容についての相談です。この添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です。回答への確認など、追加のやりとりはできません。コーチが辞退した場合など、回答がないまま終わった場合に限り、もう1回だけ改めて購入できます。")}</p>
+      <p>{L("追加質問は、この添削を担当したコーチへの、添削の内容についての相談です。この添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です。回答への確認など、追加のやりとりはできません。コーチが辞退した場合など、回答がないまま終わった場合に限り、もう1回だけ改めて購入できます。")}</p>
       <p>{L("提供者とお支払い先は TrackTalk の運営者で、相談への回答は運営者がコーチに委託して行います。料金・キャンセル・返金は運営者が責任を持って対応します。")}</p>
     </div>;
   }
@@ -144,7 +142,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
     } catch (e) { setError(apiErrorText(e, L("送信できませんでした"))); } finally { release(); }
   }
   async function report() {
-    if (!(await confirmDialog(reportConfirmOptions({ title: L("この追加相談を運営に通報しますか？"), body: L("通報すると、運営がこの相談の内容を確認できます。") }))) || !acquire()) return;
+    if (!(await confirmDialog(reportConfirmOptions({ title: L(kind === "review" ? "この追加質問を運営に通報しますか？" : "この追加相談を運営に通報しますか？"), body: L("通報すると、運営がこの相談の内容を確認できます。") }))) || !acquire()) return;
     try {
       await apiFetch(guardian ? `${base}/consultations/${c.id}/report` : "/v1/reports", { method: "POST", token, body: JSON.stringify({ target_type: "coaching_consultation", target_id: c.id, reason: "other", detail: "" }) });
       setReported(true);
@@ -155,7 +153,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   const clarify = kind === "contract" && role === "requester" && canClarify(c);
   const clarifyReply = kind === "contract" && role === "coach" && c.status === "answered" && !!c.clarify_body && !c.clarification;
   return <article className="space-y-3 border-t border-white/20 pt-3">
-    <p className="text-sm font-semibold">{consultationStatus[c.status]} · {c.funding === "ticket" ? L("チケット1枚") : formatYen(c.price_yen)}</p>
+    <p className="text-sm font-semibold">{consultationStatus[c.status]} · {formatYen(c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
       <p className="whitespace-pre-wrap text-sm">{L("質問：{question}", { question: c.question })}</p>
       {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="w-full rounded-lg" /> : null}
@@ -183,7 +181,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       </> : null}
       {c.status === "awaiting_payment" && c.payer === "guardian" && role === "requester" ? <p className="text-sm">{L("保護者に、この契約のページからお支払いをお願いしてください。保護者リンクはマイコーチングで確認できます。")}</p> : null}
       {c.status === "awaiting_payment" && role === "requester" ? <Button disabled={pending} onClick={() => void act("cancel")}>{L("支払い前の質問を取り下げる")}</Button> : null}
-      {((role === "coach" || role === "guardian") && !["draft", "awaiting_payment"].includes(c.status) || role === "requester" && c.answered_at) ? <button disabled={pending || reported} onClick={() => void report()} className="text-xs underline">{reported ? L("通報しました") : L("この追加相談を通報する")}</button> : null}
+      {((role === "coach" || role === "guardian") && !["draft", "awaiting_payment"].includes(c.status) || role === "requester" && c.answered_at) ? <button disabled={pending || reported} onClick={() => void report()} className="text-xs underline">{reported ? L("通報しました") : L(kind === "review" ? "この追加質問を通報する" : "この追加相談を通報する")}</button> : null}
     </>}
     {c.payment_state === "refund_pending" || c.payment_state === "refunded" ? <p className="text-sm text-slate-300">{c.payment_state === "refunded" ? L("全額返金済み") : L("全額返金を処理中")}</p> : null}
     {c.funding === "ticket" && ["declined", "expired", "cancelled"].includes(c.status) ? <p className="text-xs text-slate-300">{L("確保したチケットは残高に戻ります。")}</p> : null}
@@ -191,6 +189,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   </article>;
 }
 
+// コーチの対応待ち一覧は動画添削の追加質問とサポートプランの追加相談の両方を出すので、呼び名は共通の「追加相談」のままにする。
 export function CoachConsultationQueue({ token }: { token: string | null }) {
   const [rows, setRows] = useState<{ id: string; review_request_id: string | null; contract_id: string | null; nickname: string | null; status: Consultation["status"] }[]>([]);
   const [error, setError] = useState("");

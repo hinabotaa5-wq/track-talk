@@ -8,6 +8,7 @@ import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-request";
 import { Button } from "@/components/ui/button";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
+import { CoachingConsultations } from "@/components/coaching-consultations";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
@@ -112,7 +113,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
       {!coachingMessagingEnabled || response.clarify_reason || !response.created_at || now >= new Date(response.created_at).getTime() + 7 * 86400000 ? null : (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">{L("回答について確認する（1回無料）")}</h2>
-          <p className="text-xs text-slate-300">{L("返却から7日以内に、回答のわからなかった点を1回確認できます。新しい相談は下の「追加相談」から送れます。")}</p>
+          <p className="text-xs text-slate-300">{L("返却から7日以内に、回答のわからなかった点を1回確認できます。新しい相談は下の「追加質問」から送れます。")}</p>
           <textarea aria-label={L("回答のわからなかった点")} value={clarifyBody} onChange={(e) => setClarifyBody(e.target.value)} maxLength={2000} disabled={pending} className="w-full rounded-md border border-white/25 bg-white/10 p-2 text-sm" />
           <button type="button" disabled={pending || !clarifyBody.trim()} onClick={() => void post("clarify", { reason: "other", body: clarifyBody })} className={chip(false)}>{L("確認質問を送る（無料）")}</button>
         </section>
@@ -358,6 +359,7 @@ function ReviewRequestView() {
           {request.coach ? <ReviewCoachCard coach={request.coach} /> : null}
           <ReviewResponseView response={request.response} />
           <ResponseActions request={request} token={token} onChange={setRequest} />
+          {id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
         </>
       ) : null}
 

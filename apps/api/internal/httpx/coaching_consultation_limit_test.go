@@ -80,7 +80,7 @@ func TestReviewConsultationRebuyOnlyOnceAfterNoAnswer(t *testing.T) {
 	c3 := consultationDraft(t, h, owner, path, uuid.NewString(), "遅れて払った質問")
 	consultationAction(t, h, owner, c3.ID, "submit", nil)
 	execSQLArgs(t, `UPDATE coaching_consultations SET expires_at=now()-interval '1 minute' WHERE id=$1`, c3.ID)
-	if code := payConsultation(t, h, c3.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c3.ID, 500); code != 200 {
 		t.Fatalf("late pay %d", code)
 	}
 	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id=$1`, []any{c3.ID}, &status)
@@ -94,7 +94,7 @@ func TestReviewConsultationRebuyOnlyOnceAfterNoAnswer(t *testing.T) {
 	// 1回目：コーチが辞退した。回答がないので、もう1回だけ買い直せる。
 	first := consultationDraft(t, h, owner, path, uuid.NewString(), "1回目の質問")
 	consultationAction(t, h, owner, first.ID, "submit", nil)
-	if code := payConsultation(t, h, first.ID, 600); code != 200 {
+	if code := payConsultation(t, h, first.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, first.ID, "decline", nil)
@@ -105,7 +105,7 @@ func TestReviewConsultationRebuyOnlyOnceAfterNoAnswer(t *testing.T) {
 	// 2回目（買い直し）：引き受けた後、回答の期限が過ぎた。買い直しは1回だけなので、もう買えない。
 	second := consultationDraft(t, h, owner, path, uuid.NewString(), "買い直した質問")
 	consultationAction(t, h, owner, second.ID, "submit", nil)
-	if code := payConsultation(t, h, second.ID, 600); code != 200 {
+	if code := payConsultation(t, h, second.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, second.ID, "accept", nil)
@@ -131,7 +131,7 @@ func TestReviewConsultationLimitAppliesOnSubmit(t *testing.T) {
 	path := "/v1/coaching/requests/" + root + "/consultations"
 	first := consultationDraft(t, h, owner, path, uuid.NewString(), "回答をもらう質問")
 	consultationAction(t, h, owner, first.ID, "submit", nil)
-	if code := payConsultation(t, h, first.ID, 600); code != 200 {
+	if code := payConsultation(t, h, first.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, first.ID, "accept", nil)
@@ -139,7 +139,7 @@ func TestReviewConsultationLimitAppliesOnSubmit(t *testing.T) {
 	// 回答の前から残っていた下書きを再現する。
 	draft := uuid.NewString()
 	execSQLArgs(t, `INSERT INTO coaching_consultations (id,review_request_id,requester_id,coach_id,request_key,minor,funding,price_yen,share_percent,question)
-SELECT $1,review_request_id,requester_id,coach_id,gen_random_uuid(),minor,'cash',600,share_percent,'古い下書き' FROM coaching_consultations WHERE id=$2`, draft, first.ID)
+SELECT $1,review_request_id,requester_id,coach_id,gen_random_uuid(),minor,'cash',500,share_percent,'古い下書き' FROM coaching_consultations WHERE id=$2`, draft, first.ID)
 	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+draft+"/submit", owner, nil); r.Code != 422 || !strings.Contains(r.Body.String(), "consultation_limit") {
 		t.Fatalf("submit %d %s", r.Code, r.Body.String())
 	}
@@ -196,7 +196,7 @@ func TestReviewConsultationOpenWhileMessagingClosed(t *testing.T) {
 	})
 	c := consultationDraft(t, h, owner, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "届出前でも送れる質問")
 	consultationAction(t, h, owner, c.ID, "submit", nil)
-	if code := payConsultation(t, h, c.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
 		t.Fatal(code)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)

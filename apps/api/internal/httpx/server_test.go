@@ -74,7 +74,7 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		CoachingEnabled:       true,
 		CoachingNewAcceptance: true,
 		CoachingMessaging:     true,
-		// 動画添削のあとの追加相談の送信も、確かめるテストが多いので開けておく。閉じたときの動きは coaching_consultation_test.go で確かめる。
+		// 動画添削のあとの追加質問の送信も、確かめるテストが多いので開けておく。閉じたときの動きは coaching_consultation_test.go で確かめる。
 		CoachingConsultation: true,
 		// コーチ一覧も、一覧の中身を確かめるテストが多いので開けておく。閉じたときの動きは coach_list_flag_test.go で確かめる。
 		CoachingCoachList: true,

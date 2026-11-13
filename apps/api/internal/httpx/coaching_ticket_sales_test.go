@@ -129,7 +129,7 @@ func TestTicketSalesClosedReviewIsPayPerUse(t *testing.T) {
 	}
 }
 
-// チケットを持っていない人の、フォーム添削の追加相談は都度払い（カード・PayPay）。辞退されたら返金する。
+// チケットを持っていない人の、フォーム添削の追加質問は都度払い（カード）。辞退されたら返金する。
 func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupTicketSalesClosed(t)
@@ -154,7 +154,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	}
 
 	c := consultationDraft(t, h, owner, path, uuid.NewString(), "次の大会ではどこを意識しますか")
-	if c.Funding != "cash" || c.Price != 600 {
+	if c.Funding != "cash" || c.Price != 500 {
 		t.Fatalf("draft %+v", c)
 	}
 	// 支払い方法は選べない（カードのみ）。PayPay を指定して送っても受け付けない。
@@ -167,7 +167,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	}
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" ||
-		form.Get("line_items[0][price_data][unit_amount]") != "600" || form.Get("success_url") != "https://web.test/coaching/requests/"+root+"?consultation="+c.ID {
+		form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("success_url") != "https://web.test/coaching/requests/"+root+"?consultation="+c.ID {
 		t.Fatalf("session %v", form)
 	}
 	// 支払いが届くまでコーチには届かない。届いた知らせが2回来ても1回分。
@@ -177,7 +177,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 		t.Fatal(status)
 	}
 	for i := 0; i < 2; i++ {
-		if code := payConsultation(t, h, c.ID, 600); code != 200 {
+		if code := payConsultation(t, h, c.ID, 500); code != 200 {
 			t.Fatalf("pay %d", code)
 		}
 	}
@@ -189,7 +189,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 		}
 	}
 	refunds := f.refundList()
-	if len(refunds) != 1 || refunds[0].Get("amount") != "600" || refunds[0].Get("payment_intent") != "pi_consult_"+c.ID {
+	if len(refunds) != 1 || refunds[0].Get("amount") != "500" || refunds[0].Get("payment_intent") != "pi_consult_"+c.ID {
 		t.Fatalf("refunds %+v", refunds)
 	}
 	var state string
@@ -201,14 +201,14 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	// 回答がないまま終わったので、同じ添削でもう1回だけ買い直せる。回答すると報酬が確定する。
 	c2 := consultationDraft(t, h, owner, path, uuid.NewString(), "練習の量を相談したいです")
 	consultationAction(t, h, owner, c2.ID, "submit", nil)
-	if code := payConsultation(t, h, c2.ID, 600); code != 200 {
+	if code := payConsultation(t, h, c2.ID, 500); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
 	consultationAction(t, h, coach, c2.ID, "accept", nil)
 	consultationAction(t, h, coach, c2.ID, "answer", map[string]any{"body": "前半の接地を意識してください"})
 	var count, earnings int
 	queryRowArgs(t, `SELECT count(*),sum(amount_yen)::integer FROM coach_earnings WHERE consultation_id=$1`, []any{c2.ID}, &count, &earnings)
-	if count != 1 || earnings != 420 {
+	if count != 1 || earnings != 350 {
 		t.Fatalf("earnings %d %d", count, earnings)
 	}
 	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c2.ID}, &state)
