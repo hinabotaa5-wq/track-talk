@@ -43,7 +43,7 @@ it("種目を選ぶと、その種目を宣言したコーチだけを受け取�
   expect(filterCoachesByEvent(coaches, "javelin")).toEqual([]);
 });
 
-it("チップは1列で折り返さず横にスクロールし、先頭の「すべて」から全種目が並ぶ。選択中は色以外（✓）でも分かる", async () => {
+it("チップは1列で折り返さず横にスクロールし、先頭の「すべて」から全種目が並ぶ。選択中はaria-checkedと色で分かり、表示はラベルのみ", async () => {
   let value: CoachEventFilter = "all";
   const render = () => root.render(<CoachEventChips value={value} onChange={(v) => { value = v; render(); }} />);
   await act(async () => render());
@@ -52,11 +52,19 @@ it("チップは1列で折り返さず横にスクロールし、先頭の「す
   expect(group.className).toContain("overflow-x-auto");
   expect(group.className).not.toContain("sticky");
   const radios = [...group.querySelectorAll('[role="radio"]')];
-  expect(radios.map((r) => r.textContent?.replace("✓", ""))).toEqual(["すべて", ...coachEventFilterOrder.map((e) => coachEventLabels[e])]);
+  expect(radios.map((r) => r.textContent)).toEqual(["すべて", ...coachEventFilterOrder.map((e) => coachEventLabels[e])]);
   expect(radios.every((r) => r.className.includes("shrink-0") && r.className.includes("whitespace-nowrap"))).toBe(true);
-  expect(group.querySelector('[aria-checked="true"]')?.textContent).toBe("✓すべて");
+  expect(radios.every((r) => !r.textContent?.includes("✓"))).toBe(true);
+  const initialChecked = group.querySelector('[aria-checked="true"]')!;
+  expect(initialChecked.textContent).toBe("すべて");
+  expect(initialChecked.className).toContain("bg-blue-500/75");
+  expect(initialChecked.className).not.toContain("bg-blue-600");
+  expect([...group.querySelectorAll('[aria-checked="false"]')].every((r) => r.className.includes("glass"))).toBe(true);
   await act(async () => { (radios.find((r) => r.textContent === "走幅跳") as HTMLButtonElement).click(); });
   expect(value).toBe("long-jump");
   const checked = [...container.querySelectorAll('[aria-checked="true"]')];
-  expect(checked.map((r) => r.textContent)).toEqual(["✓走幅跳"]);
+  expect(checked.map((r) => r.textContent)).toEqual(["走幅跳"]);
+  expect(checked.every((r) => !r.textContent?.includes("✓"))).toBe(true);
+  expect(checked[0].className).toContain("bg-blue-500/75");
+  expect(checked[0].className).not.toContain("bg-blue-600");
 });

@@ -147,7 +147,7 @@ it("動画添削の一覧にも種目のチップが1列で並び、初期は「
   await act(async () => root.render(<CoachList />));
   const group = container.querySelector('[role="radiogroup"][aria-label="種目で絞り込む"]')!;
   expect(group.className).toContain("flex-nowrap");
-  expect(group.querySelector('[aria-checked="true"]')?.textContent).toBe("✓すべて");
+  expect(group.querySelector('[aria-checked="true"]')?.textContent).toBe("すべて");
   const hrefs = () => [...container.querySelectorAll("li a")].map((a) => a.getAttribute("href"));
   expect(hrefs()).toEqual(["/coaches/coach-2", "/coaches/coach-1", "/coaches/coach-3"]);
   const pick = (label: string) => act(async () => { ([...group.querySelectorAll("button")].find((b) => b.textContent?.replace("✓", "") === label) as HTMLButtonElement).click(); });

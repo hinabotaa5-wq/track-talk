@@ -60,7 +60,7 @@ it("種目のチップだけが効き、初期は「すべて」", async () => {
   await render();
   const groups = [...container.querySelectorAll('[role="radiogroup"]')].map((g) => g.getAttribute("aria-label"));
   expect(groups).toEqual(["種目で絞り込む"]);
-  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("✓すべて");
+  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("すべて");
   expect(ids()).toEqual(["support-coach-a", "support-coach-b", "support-coach-c"]);
 });
 
@@ -80,7 +80,7 @@ it("該当0人の種目では空状態と「すべて」へ戻る導線を出す
   expect(ids()).toEqual([]);
   expect(container.textContent).toContain("この種目のコーチはまだいません");
   await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "すべての種目のコーチを見る")!.click(); });
-  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("✓すべて");
+  expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("すべて");
   expect(ids()).toEqual(["support-coach-a", "support-coach-b"]);
 });
 
