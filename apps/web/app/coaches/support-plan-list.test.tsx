@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { loadEnglish, setActiveLocale } from "@/lib/i18n";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const apiFetch = vi.fn();
@@ -19,14 +20,19 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   apiFetch.mockReset(); flags.list = true;
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 const render = async () => { await act(async () => root.render(<SupportPlanList />)); await act(async () => { await Promise.resolve(); }); };
 const ids = () => [...container.querySelectorAll("li")].map((li) => li.id);
 
-it("開始前（フラグが閉じている間）は「12月開始予定」だけを出し、一覧を読みに行かない", async () => {
+it.each([
+  ["ja", "サポートプランは準備中です"],
+  ["en", "Support plans are in preparation"],
+] as const)("開始前は準備中だけを表示し、一覧を取得しない (%s)", async (locale, message) => {
   flags.list = false;
+  if (locale === "en") await loadEnglish();
+  setActiveLocale(locale);
   await render();
-  expect(container.textContent).toContain("12月開始予定");
+  expect(container.textContent).toBe(message);
   expect(apiFetch).not.toHaveBeenCalled();
 });
 

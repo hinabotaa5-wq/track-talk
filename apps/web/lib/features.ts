@@ -32,7 +32,7 @@ export const messagingClosedNote = "メッセージのやりとりは準備中�
 // API 側の SENSE_SUMMARY_ENABLED と揃えること。
 export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUMMARY_ENABLED);
 
-// サポートプランの入口の一覧（コーチタブの「サポートプラン」側）。空の間は「12月開始予定」を出す。
+// サポートプランの入口の一覧（コーチタブの「サポートプラン」側）。フラグがオフの間は準備中と表示する。
 // 開始日に立てて一覧へ切り替える（日付を画面に直書きしない。開始日と開放の手順は運営者が決める）。
 // 一覧の API は /v1/coaches/support-plan（COACHING_COACH_LIST_ENABLED の側）。
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
