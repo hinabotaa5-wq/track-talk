@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { PrivacyPolicy } from "./privacy-policy";
-import { SupportPlanCoachTerms, supportPlanCoachTerms } from "./support-plan-coach-terms";
+import { SupportPlanCoachTerms } from "./support-plan-coach-terms";
 
 it("プライバシーポリシー：終了時点で見られない・終わるまでにダウンロード・動画は添削7日／プラン30日・文章は1年・通報や紛争中は保全・開示は第11条", () => {
   const html = renderToStaticMarkup(<PrivacyPolicy />);
@@ -16,16 +16,13 @@ it("プライバシーポリシー：終了時点で見られない・終わる�
   expect(html).toContain("第11条の手続きで受け付けます");
 });
 
-it("コーチ向け条件：1ヶ月プランの報酬と精算の5項目を出す（中止延期は特別扱いせず期間どおり続く）", () => {
-  expect(supportPlanCoachTerms.map((t) => t.title)).toEqual(["報酬の確定時期と仮払い", "コーチ都合の精算", "やむを得ない事情と判定の手続", "大会の中止・延期", "契約ごとの取引条件"]);
+it("コーチ向けの報酬と精算を指定の3段落で表示する", () => {
   const html = renderToStaticMarkup(<SupportPlanCoachTerms />);
   expect(html).toContain("1ヶ月プランの報酬と精算");
-  expect(html).not.toContain("大会までプラン");
-  expect(html).toContain("経過分（契約価格から選手への日割りの返金額を差し引いた額）の75%（1円未満切り捨て）で確定します");
-  expect(html).toContain("両端を含む30日");
-  expect(html).toContain("これは債務不履行に基づく返還・精算で");
-  expect(html).toContain("1回に限り、期限なく異議を申し立てて再審査を求められます");
-  expect(html).toContain("選手への全額返金はそのままにし、あなたには終了日までの経過分を支払います");
-  expect(html).toContain("選手の目標の大会が中止・延期になっても、契約は期間どおり続きます");
-  expect(html).toContain("フリーランス・事業者間取引適正化等法第3条に対応");
+  expect(html).toContain("<p>報酬は経過分の75%です。月末までの分を翌月15日に仮払いし（3,000円未満は繰越し）、契約終了時に精算します。解約料はありません。</p>");
+  expect(html).toContain("<p>コーチ都合で終了した場合は選手へ全額返金し、受け取った仮払いはその75%まで返還いただきます。やむを得ない事情の場合は通常の精算です。</p>");
+  expect(html).toContain("<p>日割りの計算方法、異議申立て、契約ごとの条件などの詳細は、契約成立時の通知と利用規約をご確認ください。</p>");
+  expect(html).not.toContain("報酬の確定時期と仮払い");
+  expect(html).not.toContain("コーチ都合の精算");
+  expect(html).not.toContain("やむを得ない事情と判定の手続");
 });
