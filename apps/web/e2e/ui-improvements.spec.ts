@@ -142,25 +142,18 @@ test("リールの詳細は中央に小さく表示する", async ({ page }) => 
   expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(320);
 });
 
-test("コーチ画面は空き高さを使った3つの入口にまとめ、未ログインなら応募も案内する", async ({ page }) => {
+test("コーチ画面は一覧の着地になり、募集のみの間は準備中と応募を案内する", async ({ page }) => {
+  // 本体 #641：/coaching のハブ（3つの入口）は廃止し、/coaches と同じ一覧を出す。
+  // E2E 環境はフラグ閉なので、準備中のゲートが出る。
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/coaching");
-  const choices = page.getByRole("navigation", { name: "コーチングのプランを選ぶ" });
-  await expect(choices.locator("a")).toHaveCount(3);
-  await expect(choices.getByRole("link", { name: /コーチ専用画面/ })).toHaveAttribute("href", "/coach");
-  expect(await choices.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(["/coaching/new", "/coaches?tab=support", "/coach"]);
-  const boxes = await choices.locator("a").evaluateAll((links) => links.map((link) => {
-    const rect = link.getBoundingClientRect();
-    return { top: rect.top, bottom: rect.bottom, right: rect.right };
-  }));
-  expect(boxes[0].bottom).toBeLessThan(boxes[1].top);
-  expect(boxes[1].bottom).toBeLessThan(boxes[2].top);
-  expect(boxes[2].bottom).toBeLessThan(740);
-  expect(boxes.every((box) => box.bottom - box.top >= 100)).toBe(true);
-  expect(boxes[2].bottom).toBeGreaterThan(600);
-  expect(boxes.every((box) => box.right <= 320)).toBe(true);
+  await expect(page.getByRole("heading", { name: "ただいま準備中です" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveAttribute("href", "/coach/apply");
+  // ハブ時代の入口ナビ・見出しは出さない。
+  await expect(page.getByRole("navigation", { name: "コーチングのプランを選ぶ" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "コーチ一覧" })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath("coaching-recruitment.png") });
-  await choices.locator('a[href="/coach"]').click();
+  await page.goto("/coach");
   await expect(page).toHaveURL(/\/login\?next=%2Fcoach$/);
   // 本体 #471：ログイン画面の大きな「コーチに応募する」ボタンは出さない。
   await expect(page.getByRole("link", { name: "コーチに応募する", exact: true })).toHaveCount(0);

@@ -6,7 +6,8 @@ import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
+import { AtSign, Award, Bell, Bookmark, ChevronRight, ClipboardCheck, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, MessagesSquare, ScrollText, Shield, ShieldCheck, Smartphone, Ticket, UserRoundPen, Users, UserX, type LucideIcon } from "lucide-react";
+import { coachingEnabled } from "@/lib/features";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
@@ -37,6 +38,14 @@ const infoLinks = [
 
 const menuRowClass =
   "flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-100 transition hover:bg-white/12 active:scale-[0.98] active:bg-white/16 disabled:opacity-50";
+
+// 旧コーチタブのハブにあった「利用中の方」と同じ4項目の順番（本体 #641）。
+const coachingLinks = [
+  { href: "/me/coaching/tickets", get label() { return L("コーチングチケット"); }, icon: Ticket },
+  { href: "/me/coaching/requests", get label() { return L("依頼した動画添削"); }, icon: ClipboardCheck },
+  { href: "/coaching/support-consults", get label() { return L("1ヶ月プランの無料相談"); }, icon: MessagesSquare },
+  { href: "/me/coaching/personal", get label() { return L("申し込んだサポートプラン"); }, icon: Users },
+] as const;
 
 function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (
@@ -150,6 +159,16 @@ export default function MePage() {
           <span className="flex-1">{L("ログアウト")}</span>
         </button>
       </nav>
+      {coachingEnabled ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-100">{L("コーチング")}</h2>
+          <nav aria-label={L("コーチングの利用状況")} className="divide-y divide-white/15 overflow-hidden rounded-2xl border border-white/20 glass bg-white/10">
+            {coachingLinks.map((item) => (
+              <MenuLink key={item.href} {...item} />
+            ))}
+          </nav>
+        </section>
+      ) : null}
       {logoutError ? <p role="alert" className="text-sm text-red-400">{logoutError}</p> : null}
     </div>
   );

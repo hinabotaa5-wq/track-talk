@@ -120,6 +120,33 @@ it("動画添削の一覧にも種目のチップが1列で並び、初期は「
   expect(container.textContent).not.toMatch(/★|ランキング|人気/);
 });
 
+// 本体 #641：公開中の非・動画添削プランがないコーチには、価格の行自体を出さず、代替文言も置かない。
+for (const locale of ["ja", "en"] as const) {
+  it(`プランのないコーチのカードに価格の行も「プラン未公開」も出さない (${locale})`, async () => {
+    if (locale === "en") { installEnglish(en); setActiveLocale("en"); }
+    apiFetch.mockResolvedValue({ coaches: [coach] });
+    await act(async () => root.render(<CoachList />));
+    // 添付の coach は公開中プランが動画添削だけ＝価格の対象なし。
+    expect(container.textContent).not.toContain("プラン未公開");
+    expect(container.textContent).not.toContain("No published plans");
+    expect(container.querySelectorAll("li p")).toHaveLength(2);
+  });
+}
+
+it("公開中のサポート系プランがあるコーチには価格を従来どおり出す", async () => {
+  const priced = {
+    ...coach,
+    plans: [
+      { ...coach.plans[0], id: "plan-2", service_type: "competition_support", price_yen: 3000 },
+      { ...coach.plans[0], id: "plan-3", service_type: "competition_support", price_yen: 5000 },
+    ],
+  };
+  apiFetch.mockResolvedValue({ coaches: [priced] });
+  await act(async () => root.render(<CoachList />));
+  expect(container.textContent).toContain("3,000円〜");
+  expect(container.textContent).not.toContain("プラン未公開");
+});
+
 it("動画添削の一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));

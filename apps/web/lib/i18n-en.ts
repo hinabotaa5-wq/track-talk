@@ -211,7 +211,6 @@ export const en: Readonly<Record<string, string>> = {
   "担当サービス": "Services",
   "・": " · ",
   "サポートプラン": "Support plan",
-  "プラン未公開": "No published plans",
   "まだいません": "None yet",
   "動画添削": "Video review",
   "コーチの一覧を切り替える": "Switch coach list",

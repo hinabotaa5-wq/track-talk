@@ -1,98 +1,107 @@
-import { createElement, type ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+/** @vitest-environment jsdom */
+import { act, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import CoachingPage from "./page";
 
+const apiFetch = vi.fn();
+const routerReplace = vi.fn();
+const auth = { token: "tok" as string | null };
+const nav = { tab: null as string | null, pathname: "/coaching" };
 const flags = { coaching: false, list: false };
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: routerReplace }),
+  usePathname: () => nav.pathname,
+  useSearchParams: () => ({ get: (key: string) => (key === "tab" ? nav.tab : null) }),
+}));
+vi.mock("next/link", () => ({
+  default: ({ children, href, ...props }: { children: ReactNode; href: string }) => <a href={href} {...props}>{children}</a>,
+}));
+vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
+vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: auth.token }) }));
 vi.mock("@/lib/features", async (original) => ({
   ...await original<typeof import("@/lib/features")>(),
   get coachingEnabled() { return flags.coaching; },
   get coachingCoachListEnabled() { return flags.list; },
 }));
+vi.mock("@/components/coach-apply-link", () => ({ CoachApplyLink: () => <a href="/coach/apply">コーチに応募する</a> }));
+vi.mock("@/components/coach-photo", () => ({ CoachAvatar: ({ name }: { name: string }) => <span>{name}の顔写真</span> }));
+const { default: CoachingPage } = await import("./page");
+
+const coach = {
+  id: "coach-1", nickname: "テストコーチ", photo_url: "", tier: "coach", events: ["100m"],
+  best_record: "", achievements: "", years: 1, sns_urls: [], rating_count: 0, rating_average: 0,
+  service_types: ["video_review"],
+  plans: [{ id: "plan-1", title: "公開中の動画添削", kind: "single", description: "", duration_days: 7,
+    price_yen: 2000, capacity: 3, published: true, service_type: "video_review",
+    video_reviews: 1, menu_updates: null, reply_formats: [], start_on_first_video: false }],
+};
+
+let root: Root;
+let container: HTMLDivElement;
 beforeEach(() => {
-  flags.coaching = false;
-  flags.list = false;
-  vi.setSystemTime(new Date("2026-11-14T00:00:00+09:00"));
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+  apiFetch.mockReset(); routerReplace.mockReset();
+  apiFetch.mockImplementation((path: string) => {
+    if (path === "/v1/coaches") return Promise.resolve({ coaches: [coach] });
+    if (path === "/v1/coaches/support-plan") return Promise.resolve({ coaches: [] });
+    if (path === "/v1/coach/me") return Promise.resolve({ application: null });
+    return Promise.reject(new Error(`unexpected ${path}`));
+  });
+  auth.token = "tok"; nav.tab = null; nav.pathname = "/coaching";
+  flags.coaching = false; flags.list = false;
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+const render = async () => { await act(async () => root.render(<CoachingPage />)); await act(async () => { await Promise.resolve(); }); };
+const switchTo = async (label: string) => {
+  const el = [...container.querySelectorAll("a")].find((a) => a.textContent === label);
+  await act(async () => { (el as HTMLAnchorElement).click(); });
+};
 
-vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
-}));
-
-describe("コーチタブ", () => {
-  // 開始の告知は環境変数で文言ごと差し替え、既定は出さない（本体 #569）。
-  it.each([false, true])("告知の文言を入れている間は、一覧フラグが %s でも上部には告知だけを出す", (list) => {
+describe("コーチタブの着地 (/coaching)", () => {
+  it("一覧フラグが閉じている間は準備中だけを出し、一覧を取得しない", async () => {
     flags.coaching = true;
-    flags.list = list;
-    vi.stubEnv("NEXT_PUBLIC_VIDEO_REVIEW_NOTICE", "11/14(土)に開始します！");
-    const html = renderToStaticMarkup(createElement(CoachingPage));
-    expect(html.slice(0, html.indexOf("<nav"))).toContain("11/14(土)に開始します！");
-    expect(html).not.toContain('id="coach-list-heading"');
-    expect(html).not.toContain("登録しているコーチを見る");
+    await render();
+    expect(container.textContent).toContain("ただいま準備中です");
+    expect(apiFetch).not.toHaveBeenCalledWith("/v1/coaches");
+    expect(container.textContent).not.toContain("テストコーチ");
   });
 
-  it("一番上にコーチ一覧を準備中として出し、押しても先へ進まない", () => {
-    const html = renderToStaticMarkup(createElement(CoachingPage));
-    const listAt = html.indexOf("コーチ一覧");
-    expect(listAt).toBeGreaterThan(-1);
-    expect(listAt).toBeLessThan(html.indexOf("<nav"));
-    const section = html.slice(html.lastIndexOf("<section", listAt), html.indexOf("</section>", listAt));
-    expect(section).toContain("準備中です");
-    expect(section).not.toContain("<a");
+  it("両フラグを開けると /coaches と同じ一覧を出し、ハブのカードメニューは出さない", async () => {
+    flags.coaching = true; flags.list = true;
+    await render();
+    expect(container.textContent).toContain("テストコーチ");
+    // ハブ時代のChoice・利用中の方は出さない。
+    for (const word of ["コーチ専用画面", "利用中の方", "コーチングは準備中です", "登録しているコーチを見る"]) {
+      expect(container.textContent).not.toContain(word);
+    }
   });
 
-  // 一番上の「コーチ一覧」の枠（準備中の section か、/coaches へのリンク）を取り出す。
-  const topListBox = (html: string) => {
-    const listAt = html.indexOf("コーチ一覧");
-    const start = Math.max(html.lastIndexOf("<section", listAt), html.lastIndexOf("<a", listAt));
-    const end = html.indexOf(html.startsWith("<a", start) ? "</a>" : "</section>", listAt);
-    return html.slice(start, end);
-  };
-  for (const coaching of [false, true]) {
-    it(`一覧を閉じている間は、コーチング${coaching ? "を開けていても" : "が閉じていても"}上の枠は準備中のままでリンクにしない`, () => {
-      flags.coaching = coaching;
-      const html = renderToStaticMarkup(createElement(CoachingPage));
-      const box = topListBox(html);
-      expect(box.startsWith("<section")).toBe(true);
-      expect(box).toContain("準備中です");
-      expect(box).not.toContain("<a");
-      expect(box).not.toContain("登録しているコーチを見る");
-    });
-    it(`一覧を開けると、コーチング${coaching ? "を開けていても" : "が閉じていても"}上の枠は /coaches へのリンクになり、準備中と出さない`, () => {
-      flags.coaching = coaching;
-      flags.list = true;
-      const html = renderToStaticMarkup(createElement(CoachingPage));
-      const box = topListBox(html);
-      expect(html).not.toContain("11/14(土)に開始します！");
-      expect(html.indexOf("コーチ一覧")).toBeLessThan(html.indexOf("<nav"));
-      expect(box.startsWith('<a href="/coaches"')).toBe(true);
-      expect(box).toContain("登録しているコーチを見る");
-      expect(box).not.toContain("準備中");
-    });
-  }
+  it("見出し「コーチ一覧」と説明文を出さない", async () => {
+    flags.coaching = true; flags.list = true;
+    await render();
+    expect(container.querySelector("h1")).toBeNull();
+    expect(container.textContent).not.toContain("コーチ一覧");
+    expect(container.textContent).not.toContain("上のタブで、動画添削の指名とサポートプランを切り替えられます。");
+  });
 
-  // サポートプランの入口はコーチ一覧（/coaches）。一覧を閉じている間は、開いているように見せない。
-  const supportCard = (html: string) => {
-    const at = html.indexOf('href="/coaches?tab=support"', html.indexOf("<nav"));
-    return html.slice(at, html.indexOf("</a>", at));
-  };
-  it("コーチングを開けて一覧を閉じている間は、サポートプランを準備中と案内し、動画添削は案内どおり出す", () => {
-    flags.coaching = true;
-    const html = renderToStaticMarkup(createElement(CoachingPage));
-    expect(supportCard(html)).toContain("準備中・公開までお待ちください");
-    expect(html).toContain("コーチを選んで動画を送る");
+  it("切り替えは今のルートを保って tab だけを変える", async () => {
+    flags.coaching = true; flags.list = true;
+    await render();
+    await switchTo("サポートプラン");
+    expect(routerReplace).toHaveBeenCalledWith("/coaching?tab=support");
   });
-  it("コーチングと一覧の両方を開けると、サポートプランの説明を出す", () => {
-    flags.coaching = true;
-    flags.list = true;
-    expect(supportCard(renderToStaticMarkup(createElement(CoachingPage)))).toContain("大会サポート・対面指導を選ぶ");
+
+  it("?tab=support の直接表示でサポート側を開く", async () => {
+    flags.coaching = true; flags.list = true; nav.tab = "support";
+    await render();
+    expect(container.textContent).toContain("サポートプランは準備中です");
   });
-  it("コーチングを開けると、利用中の方には残高・履歴ではなくコーチングチケットへの案内を出す", () => {
-    flags.coaching = true;
-    const html = renderToStaticMarkup(createElement(CoachingPage));
-    expect(html).toContain("利用中の方");
-    expect(html).toContain("コーチングチケット");
-    expect(html).not.toContain("チケットの残高・履歴");
+
+  it("メタ説明はハブの準備中文ではなく一覧の実態に合わせる", async () => {
+    const coaching = (await import("./page")).metadata;
+    const coaches = (await import("../coaches/page")).metadata;
+    expect(coaching.description).toBe(coaches.description);
+    expect(coaching.description).not.toMatch(/準備中|募集/);
   });
 });

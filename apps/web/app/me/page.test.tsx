@@ -10,6 +10,11 @@ const mock = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   onAuthStateChange: vi.fn(),
 }));
+const flags = vi.hoisted(() => ({ coaching: false }));
+vi.mock("@/lib/features", async (original) => ({
+  ...await original<typeof import("@/lib/features")>(),
+  get coachingEnabled() { return flags.coaching; },
+}));
 vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: {
   signOut: mock.signOut, getSession: mock.getSession, onAuthStateChange: mock.onAuthStateChange,
 } }) }));
@@ -23,6 +28,7 @@ let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  flags.coaching = false;
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
   mock.apiFetch.mockResolvedValue({ id: "user-1", is_admin: false });
@@ -261,4 +267,30 @@ it("表示言語の項目はマイページの設定一覧に出さない（運�
   expect(container.querySelector('nav a[href="/me/language"]')).toBeNull();
   expect(container.querySelector('[role="radiogroup"][lang], [role="radio"][lang]')).toBeNull();
   expect(container.textContent).not.toContain("表示言語");
+});
+
+// 本体 #641：旧ハブの「利用中の方」をマイページの独立セクション「コーチング」に集約する。
+const coachingSection = () => container.querySelector('nav[aria-label="コーチングの利用状況"]');
+const coachingHrefs = () => [...(coachingSection()?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
+
+it("コーチングが閉じている間はコーチングのセクションを出さない", async () => {
+  flags.coaching = false;
+  await renderSignedIn();
+  expect(coachingSection()).toBeNull();
+  expect(container.textContent).not.toContain("コーチングチケット");
+});
+
+it("コーチングを開けている間は4リンクを旧ハブの順で出す", async () => {
+  flags.coaching = true;
+  await renderSignedIn();
+  expect(coachingHrefs()).toEqual([
+    "/me/coaching/tickets",
+    "/me/coaching/requests",
+    "/coaching/support-consults",
+    "/me/coaching/personal",
+  ]);
+  const text = coachingSection()?.textContent ?? "";
+  const order = ["コーチングチケット", "依頼した動画添削", "1ヶ月プランの無料相談", "申し込んだサポートプラン"];
+  expect(order.every((label) => text.includes(label))).toBe(true);
+  expect(order.map((label) => text.indexOf(label))).toEqual([...order.map((label) => text.indexOf(label))].sort((a, b) => a - b));
 });
