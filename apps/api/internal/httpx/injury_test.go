@@ -575,8 +575,11 @@ func TestInjuryUpdateNotifiesLikersAndSavers(t *testing.T) {
 			t.Fatalf("%s notifications %+v", name, got)
 		}
 	}
-	if got := notes(author); len(got) != 0 {
-		t.Fatalf("author must not be notified of their own update: %+v", got)
+	// 投稿者には見守りの人のいいね(post_like、本体 #608)は届くが、自分の経過報告は届かない。
+	for _, n := range notes(author) {
+		if n.Kind == "injury_update" {
+			t.Fatalf("author must not be notified of their own update: %+v", n)
+		}
 	}
 	if got := notes(bystander); len(got) != 0 {
 		t.Fatalf("bystander notified: %+v", got)
