@@ -1219,7 +1219,7 @@ SET on_duty = $1,
     updated_at = now()
 WHERE profile_id = $3
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
 `
 
 type UpdateCoachDutyParams struct {
@@ -1256,6 +1256,7 @@ func (q *Queries) UpdateCoachDuty(ctx context.Context, arg UpdateCoachDutyParams
 		&i.ServiceTypes,
 		&i.SnsUrls,
 		&i.Name,
+		&i.Hitokoto,
 	)
 	return i, err
 }

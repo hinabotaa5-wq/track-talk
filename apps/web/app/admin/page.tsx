@@ -522,9 +522,12 @@ function CoachesAdmin({ token }: { token: string | null }) {
             <p className="whitespace-pre-wrap">成績や指導経験: {a.achievements}</p>
             {(a.sns_urls ?? []).length ? (
               <p className="space-y-1">
-                <span className="block">SNS・ホームページ・ひとこと:</span>
+                <span className="block">SNS・ホームページ:</span>
                 {a.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </p>
+            ) : null}
+            {a.hitokoto ? (
+              <p className="whitespace-pre-wrap">ひとこと: {a.hitokoto}</p>
             ) : null}
             {a.status === "approved" ? (
               <p className="text-xs text-slate-200">

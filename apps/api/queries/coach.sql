@@ -5,8 +5,8 @@ WHERE profile_id = $1;
 -- name: SubmitCoachApplication :one
 -- 審査待ちのうちは書き直せる。却下されたら・自分でやめたら出し直せて、また審査待ちに戻る。
 -- 承認済み・停止中は変えられない（行が返らない）。
-INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO coach_profiles (profile_id, tier, events, best_record, achievements, years, sns_urls, hitokoto, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (profile_id) DO UPDATE
 SET tier = EXCLUDED.tier,
     events = EXCLUDED.events,
@@ -14,6 +14,7 @@ SET tier = EXCLUDED.tier,
     achievements = EXCLUDED.achievements,
     years = EXCLUDED.years,
     sns_urls = EXCLUDED.sns_urls,
+    hitokoto = EXCLUDED.hitokoto,
     name = COALESCE(NULLIF(EXCLUDED.name, ''), coach_profiles.name),
     status = 'pending',
     applied_at = now(),
@@ -35,6 +36,7 @@ SELECT
     c.achievements,
     c.years,
     c.sns_urls,
+    c.hitokoto,
     c.status,
     c.applied_at,
     c.reviewed_at,
@@ -124,6 +126,7 @@ SELECT
     c.achievements,
     c.years,
     c.sns_urls,
+    c.hitokoto,
     c.service_types,
     r.rating_count,
     r.rating_average
@@ -237,3 +240,18 @@ FROM (SELECT photo_public_id AS old_photo_public_id FROM coach_profiles WHERE pr
 WHERE c.profile_id = sqlc.arg('profile_id')
   AND c.status IN ('pending', 'approved')
 RETURNING o.old_photo_public_id;
+
+-- name: UpdateCoachProfile :one
+-- 承認済みのコーチが自分でプロフィールを変える（本体 #649）。即時反映で、再審査には回さない。
+-- status・applied_at・reviewed_at は変えない。tier と years は対象外。
+UPDATE coach_profiles
+SET name = COALESCE(NULLIF(sqlc.arg(name)::text, ''), name),
+    events = sqlc.arg(events),
+    best_record = sqlc.arg(best_record),
+    achievements = sqlc.arg(achievements),
+    sns_urls = sqlc.arg(sns_urls),
+    hitokoto = sqlc.arg(hitokoto),
+    updated_at = now()
+WHERE profile_id = sqlc.arg(profile_id)
+  AND status = 'approved'
+RETURNING *;

@@ -19,7 +19,7 @@ vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { pl
 
 const coach: PublicCoach = {
   id: "coach-1", nickname: "テストコーチ", photo_url: "", tier: "coach", events: ["100m"],
-  best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/", "@tracktalk.office", "javascript:alert(1)"], rating_count: 0, rating_average: 0,
+  best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/", "@tracktalk.office", "javascript:alert(1)"], hitokoto: "よろしくお願いします", rating_count: 0, rating_average: 0,
   service_types: ["video_review"],
   plans: [{ id: "plan-1", title: "公開中の動画添削", kind: "single", description: "説明", duration_days: 7,
     price_yen: 2000, capacity: 3, published: true, service_type: "video_review",
@@ -42,6 +42,7 @@ it("一覧は2列で各コーチの詳細ページへリンクし、プランは
   expect(container.querySelector("ul")?.classList.contains("grid-cols-2")).toBe(true);
   expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/coach-1", "/coaches/coach-2"]);
   expect(container.textContent).not.toContain("公開中の動画添削");
+  expect(container.textContent).toContain("よろしくお願いします");
 });
 
 it("詳細URLを直接開いても対象コーチのプロフィールと公開プランを取得する", async () => {
@@ -57,6 +58,9 @@ it("詳細URLを直接開いても対象コーチのプロフィールと公開�
   expect(container.textContent).not.toContain("公開中の動画添削");
   const sns = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "https://www.instagram.com/testcoach/");
   expect(sns?.getAttribute("target")).toBe("_blank");
+  expect(container.textContent).toContain("よろしくお願いします");
+  expect(container.textContent).toContain("SNS・ホームページ");
+  expect(container.textContent).not.toContain("SNS・ホームページ・ひとこと");
   for (const entry of ["@tracktalk.office", "javascript:alert(1)"]) {
     expect(container.textContent).toContain(entry);
     expect([...container.querySelectorAll("a")].some((a) => a.textContent === entry)).toBe(false);
@@ -104,7 +108,7 @@ it("公開プランのないコーチのカードには『プラン未公開』�
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));
   const card = container.querySelector('li[id="coach-coach-1"]')!;
-  expect(card.querySelectorAll("p")).toHaveLength(2);
+  expect(card.querySelectorAll("p")).toHaveLength(3);
   expect(container.textContent).not.toContain("プラン未公開");
 });
 
@@ -125,7 +129,7 @@ it("公開中のサポートプランがあるコーチのカードには価格�
   apiFetch.mockResolvedValue({ coaches: [{ ...coach, plans: [supportPlan] }, varied] });
   await act(async () => root.render(<CoachList />));
   const cards = [...container.querySelectorAll("li")];
-  expect(cards[0].querySelectorAll("p")).toHaveLength(3);
+  expect(cards[0].querySelectorAll("p")).toHaveLength(4);
   expect(cards[0].textContent).toContain("5,000円");
   expect(cards[0].textContent).not.toContain("プラン未公開");
   expect(cards[1].textContent).toContain("〜");
