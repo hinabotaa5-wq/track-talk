@@ -105,7 +105,6 @@ const coachChildPaths = new Set([
   "/coach/consultations",
   "/coach/contracts",
   "/coach/plans",
-  "/coach/availability",
   "/coach/commerce",
   "/coach/payouts",
   "/coach/profile",

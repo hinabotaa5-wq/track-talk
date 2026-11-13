@@ -10,7 +10,7 @@ import type { CoachApplication } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// サポートプランの管理。ランチャーのタイルから開く。
+// サポートプラン（1ヶ月プランの受付設定）。ランチャーのタイルから開く。
 export default function CoachPlansPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function CoachPlansPage() {
   if (loading || !session || coach === undefined) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title={L("プラン管理")}>
+    <CoachSubpageShell title={L("サポートプラン")}>
       {coach ? (
         <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
       ) : (

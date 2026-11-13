@@ -128,6 +128,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/about", destination: "/guidelines", permanent: false },
       { source: "/posts", destination: "/", permanent: false },
+      // コーチの空き日カレンダーは廃止（2026-11-13）。古いリンク・ブックマークはコーチ画面のトップへ。
+      { source: "/coach/availability", destination: "/coach", permanent: false },
     ];
   },
   turbopack: {

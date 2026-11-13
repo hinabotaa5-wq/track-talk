@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-// コーチ向けメニューの10タイルを大きくし、画面にちょうど収める（本体 #580）。
+// コーチ向けメニューのタイル（カレンダー廃止後は9タイル）を大きくし、画面にちょうど収める（本体 #580）。
 // NEXT_PUBLIC_COACHING_ENABLED=true のプレビューで実行する（起動手順は docs/coach-availability.md と同じ）。データと認証はテスト用。
 // #563 の高さ合わせ（JS で正方形の一辺を実測）は廃止し、タイルは横幅駆動（3列 1fr＋正方形）にする。
 // 縦の余りは行ギャップ拡大（最大 +8px）→上下パディング拡大（最大 28px）→中央寄せの順で吸収し、
@@ -50,7 +50,7 @@ async function setup(page: Page, withOffers: boolean) {
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(10);
+  await expect(page.locator("nav.grid a")).toHaveCount(9);
   await expect(page.locator("footer").getByText("コーチをやめる")).toBeVisible();
   if (withOffers) await expect(page.getByRole("link", { name: "対応中（2件）" })).toBeVisible();
   await expect(page.locator(".screen-loader")).toBeHidden();
@@ -115,7 +115,7 @@ async function measure(page: Page) {
       tileHeights: tileRects.map((t) => t.height),
       tileLefts: tileRects.map((t) => t.left),
       tileTops: tileRects.map((t) => t.top),
-      rowTops: [0, 3, 6, 9].map((i) => tileRects[i].top), lastRowBottom: tileRects[9].bottom,
+      rowTops: [0, 3, 6].map((i) => tileRects[i].top), lastRowBottom: tileRects[8].bottom,
       labels, badges, icons,
       scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight,
       bodyScrollWidth: document.body.scrollWidth, innerWidth: window.innerWidth,
@@ -128,21 +128,21 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
   // タイルは正方形で、想定値と ±2px 以内で一致する。
   for (const w of m.tileWidths) expect(Math.abs(w - exp.tile)).toBeLessThanOrEqual(2);
   for (let i = 0; i < m.tileWidths.length; i++) expect(Math.abs(m.tileWidths[i] - m.tileHeights[i])).toBeLessThanOrEqual(1);
-  // 3列のまま。最終行の2つは左寄せ（1行目と同じ左端、中央寄せや引き伸ばしをしない）。
+  // 3列のまま。最終行も1行目と同じ左端（中央寄せや引き伸ばしをしない）。
   expect(m.tileTops[1]).toBeCloseTo(m.tileTops[0], 0);
   expect(m.tileTops[2]).toBeCloseTo(m.tileTops[0], 0);
-  expect(Math.abs(m.tileLefts[9] - m.tileLefts[0])).toBeLessThanOrEqual(1);
+  expect(Math.abs(m.tileLefts[6] - m.tileLefts[0])).toBeLessThanOrEqual(1);
   // 横ギャップは基準値どおり（縦の吸収で横は広げない）。
   expect(Math.abs(m.tileLefts[1] - m.tileLefts[0] - m.tileWidths[0] - exp.gap)).toBeLessThanOrEqual(2);
   // 行ギャップは基準〜最大 +8px の範囲。
-  for (let i = 1; i < 4; i++) {
+  for (let i = 1; i < m.rowTops.length; i++) {
     const rowGap = m.rowTops[i] - m.rowTops[i - 1] - m.tileHeights[0];
     expect(rowGap).toBeGreaterThanOrEqual(exp.gap - 1);
     expect(rowGap).toBeLessThanOrEqual(exp.gap + 8 + 1);
   }
   // 全ラベルが1行に収まり、折り返し・はみ出しがない。
   // 英語の長いラベルは ellipsis で見た目にはみ出さない設計（折り返しはしない）。
-  expect(m.labels).toHaveLength(10);
+  expect(m.labels).toHaveLength(9);
   for (const label of m.labels) {
     expect(label).not.toBeNull();
     expect(label!.whiteSpace).toBe("nowrap");
@@ -166,7 +166,7 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
     expect(badge.shown).toBe(true);
     expect(badge.clipped).toBe(false);
     // 件数バッジ（届いた依頼・添削中・追加相談・契約申込み）は h-5、注意の点（特商法・報酬口座）は size-3。
-    const expectedH = i === 6 || i === 7 ? 12 : 20;
+    const expectedH = i === 5 || i === 6 ? 12 : 20;
     expect(Math.abs(badge.h - expectedH)).toBeLessThanOrEqual(1);
     expect(badge.top).toBeGreaterThanOrEqual(m.navTop - 1);
   }
@@ -187,7 +187,7 @@ async function expectFooterReachable(page: Page) {
 }
 
 for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
-  test(`${viewport.width}px 幅で10タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
+  test(`${viewport.width}px 幅で9タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await setup(page, false);
     const m = await measure(page);
@@ -298,7 +298,7 @@ async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en")
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(10);
+  await expect(page.locator("nav.grid a")).toHaveCount(9);
   await expect(page.locator(".screen-loader")).toBeHidden();
   const switchName = locale === "en" ? "Accepting" : "受付中";
   await page.getByRole("switch", { name: switchName }).click();
@@ -328,7 +328,8 @@ async function measureStable(page: Page) {
 
 function expectSameTiles(base: Awaited<ReturnType<typeof measure>>, err: Awaited<ReturnType<typeof measure>>) {
   // タイル・アイコン・ラベルの大きさはエラーあり／なしで変わらない。
-  for (let i = 0; i < 11; i++) {
+  expect(err.tileWidths).toHaveLength(base.tileWidths.length);
+  for (let i = 0; i < base.tileWidths.length; i++) {
     expect(Math.abs(err.tileWidths[i] - base.tileWidths[i])).toBeLessThanOrEqual(1);
     expect(Math.abs(err.tileHeights[i] - base.tileHeights[i])).toBeLessThanOrEqual(1);
     expect(err.labels[i]!.fontSize).toBe(base.labels[i]!.fontSize);

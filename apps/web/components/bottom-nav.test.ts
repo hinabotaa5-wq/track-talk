@@ -95,7 +95,7 @@ it("コーチやプランなどの詳細は共通ヘッダーに戻るを表示�
   expect(headerBackFallback("/coaches/coach-1")).toBe("/coaches");
   expect(headerBackFallback("/coaching/personal/plans/plan-1")).toBe("/coaches");
   expect(headerBackFallback("/coach/requests/request-1")).toBe("/coach");
-  for (const path of ["/coach/offers", "/coach/reviewing", "/coach/requests", "/coach/consultations", "/coach/contracts", "/coach/plans", "/coach/availability", "/coach/commerce", "/coach/payouts", "/coach/profile"]) {
+  for (const path of ["/coach/offers", "/coach/reviewing", "/coach/requests", "/coach/consultations", "/coach/contracts", "/coach/plans", "/coach/commerce", "/coach/payouts", "/coach/profile"]) {
     expect(headerBackFallback(path), path).toBe("/coach");
     expect(isCoachChildPage(path), path).toBe(true);
   }
