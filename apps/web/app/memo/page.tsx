@@ -151,7 +151,7 @@ function MySenseNotes() {
           <ErrorState message={L("感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。")} />
         ) : shownStats && (
           <>
-            <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
+            <section className="app-card space-y-3 p-4">
               <div className="flex items-center gap-4">
                 <SenseNoteJar total={shownStats.total} summarized={senseSummaryEnabled && !guest && summaryState.loaded && summaryState.pendingNotes === 0} dropLatest={dropped} className="h-32 w-24" />
                 <div className="min-w-0 flex-1 space-y-3">

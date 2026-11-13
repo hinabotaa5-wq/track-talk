@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
-/* 配色(白基調+ロゴの青だけをアクセントに)
+/* 配色(iOS grouped 式:背景グレー+白いカード。機能ごとに色を固定割当)
    画面のクラスは濃い背景の上に白い文字を置く前提で書かれている(text-white, bg-white/10, text-slate-300 など)。
    クラスを書き換えず、明るい表示では白と灰色の段階を裏返して、同じクラスが白地に濃い文字になるようにする。
-   背景は明るい表示では真っ白、暗い表示では黒に近いグレー(#1f1f1f)にする(色はのせない)。
+   背景はグループ化の灰色(明 #f2f2f7 / 暗 #17171a)。カードは一段明るい面(--surface: 明 #ffffff / 暗 #26262b)。
    どちらにするかは端末の設定に合わせるのが基本。マイページで選ぶと html の data-theme(light / dark)で固定する(lib/theme.ts)。
-   アクセントはロゴの青(#2ec5ff〜#0a5cff の真ん中あたりの水色寄りの青)だけ。水色・紫・緑などの別の色はすべて同じ青に寄せる。赤(エラー)と黄(注意)だけ残す。
+   機能割当:コーチ・主操作=青、大会=紫、メモ・進捗=緑、ケガ=オレンジ、赤は警告専用。
+   対象外の色名(空・水・藍・ライムなど)は従来どおり青に寄せたまま。薔薇系は赤、黄系は黄に寄せる。
+   タイルは size-7・角丸lg・薄い背景+その色のアイコンで全色同一(.tile-* を使う)。
    どちらの表示でも白のままにしたい文字(青いボタンや写真の上の文字)は text-pure-white を使う。 */
 :root {
-  --background: #ffffff;
+  --background: #f2f2f7;
   --foreground: #0f172a;
   --surface: #ffffff;
 
@@ -61,14 +63,51 @@
   --tt-amber-900: #fef3c7;
   --tt-amber-950: #fffbeb;
 
+  /* 機能割当の実パレット(メモ・進捗=緑、大会=紫、ケガ=オレンジ)。明るい表示では裏返し(50 が最も濃い)。 */
+  --tt-green-50: #052e16;
+  --tt-green-100: #14532d;
+  --tt-green-200: #166534;
+  --tt-green-300: #15803d;
+  --tt-green-400: #16a34a;
+  --tt-green-500: #22c55e;
+  --tt-green-600: #16a34a;
+  --tt-green-700: #15803d;
+  --tt-green-800: #bbf7d0;
+  --tt-green-900: #dcfce7;
+  --tt-green-950: #f0fdf4;
+
+  --tt-purple-50: #3b0764;
+  --tt-purple-100: #581c87;
+  --tt-purple-200: #6b21a8;
+  --tt-purple-300: #7e22ce;
+  --tt-purple-400: #9333ea;
+  --tt-purple-500: #a855f7;
+  --tt-purple-600: #9333ea;
+  --tt-purple-700: #7e22ce;
+  --tt-purple-800: #d8b4fe;
+  --tt-purple-900: #ede9fe;
+  --tt-purple-950: #faf5ff;
+
+  --tt-orange-50: #431407;
+  --tt-orange-100: #7c2d12;
+  --tt-orange-200: #9a3412;
+  --tt-orange-300: #c2410c;
+  --tt-orange-400: #ea580c;
+  --tt-orange-500: #f97316;
+  --tt-orange-600: #ea580c;
+  --tt-orange-700: #c2410c;
+  --tt-orange-800: #fed7aa;
+  --tt-orange-900: #ffedd5;
+  --tt-orange-950: #fff7ed;
+
   /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
   --tt-star: #eab308;
 }
 
 :root[data-theme="dark"] {
-  --background: #1f1f1f;
+  --background: #17171a;
   --foreground: #f1f5f9;
-  --surface: #2a2a2c;
+  --surface: #26262b;
 
   --tt-white: #ffffff;
   --tt-slate-50: #f8fafc;
@@ -80,8 +119,8 @@
   --tt-slate-600: #475569;
   --tt-slate-700: #334155;
   --tt-slate-800: #1e293b;
-  --tt-slate-900: #2a2a2c;
-  --tt-slate-950: #1f1f1f;
+  --tt-slate-900: #26262b;
+  --tt-slate-950: #17171a;
 
   --tt-blue-50: #ecf8ff;
   --tt-blue-100: #d4f0ff;
@@ -119,15 +158,52 @@
   --tt-amber-900: #78350f;
   --tt-amber-950: #451a03;
 
+  /* 機能割当の実パレット(暗い表示では通常の段階)。 */
+  --tt-green-50: #f0fdf4;
+  --tt-green-100: #dcfce7;
+  --tt-green-200: #bbf7d0;
+  --tt-green-300: #86efac;
+  --tt-green-400: #4ade80;
+  --tt-green-500: #22c55e;
+  --tt-green-600: #16a34a;
+  --tt-green-700: #15803d;
+  --tt-green-800: #166534;
+  --tt-green-900: #14532d;
+  --tt-green-950: #052e16;
+
+  --tt-purple-50: #faf5ff;
+  --tt-purple-100: #f3e8ff;
+  --tt-purple-200: #e9d5ff;
+  --tt-purple-300: #d8b4fe;
+  --tt-purple-400: #c084fc;
+  --tt-purple-500: #a855f7;
+  --tt-purple-600: #9333ea;
+  --tt-purple-700: #7e22ce;
+  --tt-purple-800: #6b21a8;
+  --tt-purple-900: #581c87;
+  --tt-purple-950: #3b0764;
+
+  --tt-orange-50: #fff7ed;
+  --tt-orange-100: #ffedd5;
+  --tt-orange-200: #fed7aa;
+  --tt-orange-300: #fdba74;
+  --tt-orange-400: #fb923c;
+  --tt-orange-500: #f97316;
+  --tt-orange-600: #ea580c;
+  --tt-orange-700: #c2410c;
+  --tt-orange-800: #9a3412;
+  --tt-orange-900: #7c2d12;
+  --tt-orange-950: #431407;
+
   /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
   --tt-star: #facc15;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #1f1f1f;
+    --background: #17171a;
     --foreground: #f1f5f9;
-    --surface: #2a2a2c;
+    --surface: #26262b;
 
     --tt-white: #ffffff;
     --tt-slate-50: #f8fafc;
@@ -139,8 +215,8 @@
     --tt-slate-600: #475569;
     --tt-slate-700: #334155;
     --tt-slate-800: #1e293b;
-    --tt-slate-900: #2a2a2c;
-    --tt-slate-950: #1f1f1f;
+    --tt-slate-900: #26262b;
+    --tt-slate-950: #17171a;
 
     --tt-blue-50: #ecf8ff;
     --tt-blue-100: #d4f0ff;
@@ -177,6 +253,43 @@
     --tt-amber-800: #92400e;
     --tt-amber-900: #78350f;
     --tt-amber-950: #451a03;
+
+    /* 機能割当の実パレット(端末連動の暗い表示でも通常の段階)。 */
+    --tt-green-50: #f0fdf4;
+    --tt-green-100: #dcfce7;
+    --tt-green-200: #bbf7d0;
+    --tt-green-300: #86efac;
+    --tt-green-400: #4ade80;
+    --tt-green-500: #22c55e;
+    --tt-green-600: #16a34a;
+    --tt-green-700: #15803d;
+    --tt-green-800: #166534;
+    --tt-green-900: #14532d;
+    --tt-green-950: #052e16;
+
+    --tt-purple-50: #faf5ff;
+    --tt-purple-100: #f3e8ff;
+    --tt-purple-200: #e9d5ff;
+    --tt-purple-300: #d8b4fe;
+    --tt-purple-400: #c084fc;
+    --tt-purple-500: #a855f7;
+    --tt-purple-600: #9333ea;
+    --tt-purple-700: #7e22ce;
+    --tt-purple-800: #6b21a8;
+    --tt-purple-900: #581c87;
+    --tt-purple-950: #3b0764;
+
+    --tt-orange-50: #fff7ed;
+    --tt-orange-100: #ffedd5;
+    --tt-orange-200: #fed7aa;
+    --tt-orange-300: #fdba74;
+    --tt-orange-400: #fb923c;
+    --tt-orange-500: #f97316;
+    --tt-orange-600: #ea580c;
+    --tt-orange-700: #c2410c;
+    --tt-orange-800: #9a3412;
+    --tt-orange-900: #7c2d12;
+    --tt-orange-950: #431407;
 
     /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
     --tt-star: #facc15;
@@ -226,7 +339,11 @@ body {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* 色の段階は上の :root で表示モードごとに決める。別の色名も同じ青・赤・黄に寄せる。 */
+  /* 色の段階は上の :root で表示モードごとに決める。機能割当の緑・紫・橙だけ実パレット。
+     対象外(空・水・藍・ライム・ Fuchsia 系)は青のまま、薔薇系は赤、黄系は黄に寄せる。 */
+  /* 角丸トークン:カードは 12〜16px に寄せる(rounded-card=14px)。行・小物は rounded-row=12px。 */
+  --radius-card: 0.875rem;
+  --radius-row: 0.75rem;
   --color-white: var(--tt-white);
   --color-pure-white: #ffffff;
   --color-surface: var(--surface);
@@ -329,28 +446,28 @@ body {
   --color-indigo-800: var(--tt-blue-800);
   --color-indigo-900: var(--tt-blue-900);
   --color-indigo-950: var(--tt-blue-950);
-  --color-violet-50: var(--tt-blue-50);
-  --color-violet-100: var(--tt-blue-100);
-  --color-violet-200: var(--tt-blue-200);
-  --color-violet-300: var(--tt-blue-300);
-  --color-violet-400: var(--tt-blue-400);
-  --color-violet-500: var(--tt-blue-500);
-  --color-violet-600: var(--tt-blue-600);
-  --color-violet-700: var(--tt-blue-700);
-  --color-violet-800: var(--tt-blue-800);
-  --color-violet-900: var(--tt-blue-900);
-  --color-violet-950: var(--tt-blue-950);
-  --color-purple-50: var(--tt-blue-50);
-  --color-purple-100: var(--tt-blue-100);
-  --color-purple-200: var(--tt-blue-200);
-  --color-purple-300: var(--tt-blue-300);
-  --color-purple-400: var(--tt-blue-400);
-  --color-purple-500: var(--tt-blue-500);
-  --color-purple-600: var(--tt-blue-600);
-  --color-purple-700: var(--tt-blue-700);
-  --color-purple-800: var(--tt-blue-800);
-  --color-purple-900: var(--tt-blue-900);
-  --color-purple-950: var(--tt-blue-950);
+  --color-violet-50: var(--tt-purple-50);
+  --color-violet-100: var(--tt-purple-100);
+  --color-violet-200: var(--tt-purple-200);
+  --color-violet-300: var(--tt-purple-300);
+  --color-violet-400: var(--tt-purple-400);
+  --color-violet-500: var(--tt-purple-500);
+  --color-violet-600: var(--tt-purple-600);
+  --color-violet-700: var(--tt-purple-700);
+  --color-violet-800: var(--tt-purple-800);
+  --color-violet-900: var(--tt-purple-900);
+  --color-violet-950: var(--tt-purple-950);
+  --color-purple-50: var(--tt-purple-50);
+  --color-purple-100: var(--tt-purple-100);
+  --color-purple-200: var(--tt-purple-200);
+  --color-purple-300: var(--tt-purple-300);
+  --color-purple-400: var(--tt-purple-400);
+  --color-purple-500: var(--tt-purple-500);
+  --color-purple-600: var(--tt-purple-600);
+  --color-purple-700: var(--tt-purple-700);
+  --color-purple-800: var(--tt-purple-800);
+  --color-purple-900: var(--tt-purple-900);
+  --color-purple-950: var(--tt-purple-950);
   --color-fuchsia-50: var(--tt-blue-50);
   --color-fuchsia-100: var(--tt-blue-100);
   --color-fuchsia-200: var(--tt-blue-200);
@@ -362,39 +479,39 @@ body {
   --color-fuchsia-800: var(--tt-blue-800);
   --color-fuchsia-900: var(--tt-blue-900);
   --color-fuchsia-950: var(--tt-blue-950);
-  --color-teal-50: var(--tt-blue-50);
-  --color-teal-100: var(--tt-blue-100);
-  --color-teal-200: var(--tt-blue-200);
-  --color-teal-300: var(--tt-blue-300);
-  --color-teal-400: var(--tt-blue-400);
-  --color-teal-500: var(--tt-blue-500);
-  --color-teal-600: var(--tt-blue-600);
-  --color-teal-700: var(--tt-blue-700);
-  --color-teal-800: var(--tt-blue-800);
-  --color-teal-900: var(--tt-blue-900);
-  --color-teal-950: var(--tt-blue-950);
-  --color-emerald-50: var(--tt-blue-50);
-  --color-emerald-100: var(--tt-blue-100);
-  --color-emerald-200: var(--tt-blue-200);
-  --color-emerald-300: var(--tt-blue-300);
-  --color-emerald-400: var(--tt-blue-400);
-  --color-emerald-500: var(--tt-blue-500);
-  --color-emerald-600: var(--tt-blue-600);
-  --color-emerald-700: var(--tt-blue-700);
-  --color-emerald-800: var(--tt-blue-800);
-  --color-emerald-900: var(--tt-blue-900);
-  --color-emerald-950: var(--tt-blue-950);
-  --color-green-50: var(--tt-blue-50);
-  --color-green-100: var(--tt-blue-100);
-  --color-green-200: var(--tt-blue-200);
-  --color-green-300: var(--tt-blue-300);
-  --color-green-400: var(--tt-blue-400);
-  --color-green-500: var(--tt-blue-500);
-  --color-green-600: var(--tt-blue-600);
-  --color-green-700: var(--tt-blue-700);
-  --color-green-800: var(--tt-blue-800);
-  --color-green-900: var(--tt-blue-900);
-  --color-green-950: var(--tt-blue-950);
+  --color-teal-50: var(--tt-green-50);
+  --color-teal-100: var(--tt-green-100);
+  --color-teal-200: var(--tt-green-200);
+  --color-teal-300: var(--tt-green-300);
+  --color-teal-400: var(--tt-green-400);
+  --color-teal-500: var(--tt-green-500);
+  --color-teal-600: var(--tt-green-600);
+  --color-teal-700: var(--tt-green-700);
+  --color-teal-800: var(--tt-green-800);
+  --color-teal-900: var(--tt-green-900);
+  --color-teal-950: var(--tt-green-950);
+  --color-emerald-50: var(--tt-green-50);
+  --color-emerald-100: var(--tt-green-100);
+  --color-emerald-200: var(--tt-green-200);
+  --color-emerald-300: var(--tt-green-300);
+  --color-emerald-400: var(--tt-green-400);
+  --color-emerald-500: var(--tt-green-500);
+  --color-emerald-600: var(--tt-green-600);
+  --color-emerald-700: var(--tt-green-700);
+  --color-emerald-800: var(--tt-green-800);
+  --color-emerald-900: var(--tt-green-900);
+  --color-emerald-950: var(--tt-green-950);
+  --color-green-50: var(--tt-green-50);
+  --color-green-100: var(--tt-green-100);
+  --color-green-200: var(--tt-green-200);
+  --color-green-300: var(--tt-green-300);
+  --color-green-400: var(--tt-green-400);
+  --color-green-500: var(--tt-green-500);
+  --color-green-600: var(--tt-green-600);
+  --color-green-700: var(--tt-green-700);
+  --color-green-800: var(--tt-green-800);
+  --color-green-900: var(--tt-green-900);
+  --color-green-950: var(--tt-green-950);
   --color-lime-50: var(--tt-blue-50);
   --color-lime-100: var(--tt-blue-100);
   --color-lime-200: var(--tt-blue-200);
@@ -450,17 +567,17 @@ body {
   --color-amber-800: var(--tt-amber-800);
   --color-amber-900: var(--tt-amber-900);
   --color-amber-950: var(--tt-amber-950);
-  --color-orange-50: var(--tt-amber-50);
-  --color-orange-100: var(--tt-amber-100);
-  --color-orange-200: var(--tt-amber-200);
-  --color-orange-300: var(--tt-amber-300);
-  --color-orange-400: var(--tt-amber-400);
-  --color-orange-500: var(--tt-amber-500);
-  --color-orange-600: var(--tt-amber-600);
-  --color-orange-700: var(--tt-amber-700);
-  --color-orange-800: var(--tt-amber-800);
-  --color-orange-900: var(--tt-amber-900);
-  --color-orange-950: var(--tt-amber-950);
+  --color-orange-50: var(--tt-orange-50);
+  --color-orange-100: var(--tt-orange-100);
+  --color-orange-200: var(--tt-orange-200);
+  --color-orange-300: var(--tt-orange-300);
+  --color-orange-400: var(--tt-orange-400);
+  --color-orange-500: var(--tt-orange-500);
+  --color-orange-600: var(--tt-orange-600);
+  --color-orange-700: var(--tt-orange-700);
+  --color-orange-800: var(--tt-orange-800);
+  --color-orange-900: var(--tt-orange-900);
+  --color-orange-950: var(--tt-orange-950);
   --color-yellow-50: var(--tt-amber-50);
   --color-yellow-100: var(--tt-amber-100);
   --color-yellow-200: var(--tt-amber-200);
@@ -492,7 +609,8 @@ body {
 /* 明るい表示では、すりガラスを白く半透明にし、青みの影で透明感を出す。
    層の外に書いて、bg-white/10 などの背景より優先させる。 */
 :root[data-theme="light"] .glass {
-  background-color: rgb(255 255 255 / 0.58);
+  /* 背景がグループ灰(#f2f2f7)なので、カード側は白を濃くして境界を出す。 */
+  background-color: rgb(255 255 255 / 0.85);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.9),
     0 1px 2px rgb(15 23 42 / 0.05),
@@ -500,7 +618,7 @@ body {
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .glass {
-    background-color: rgb(255 255 255 / 0.58);
+    background-color: rgb(255 255 255 / 0.85);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.9),
       0 1px 2px rgb(15 23 42 / 0.05),
@@ -642,6 +760,45 @@ select,
 [role="button"],
 [role="tab"] {
   touch-action: manipulation;
+  /* タップ時のグレーのハイライトを出さない(押下表現は背景色の変化で行う)。本文の選択は妨げない。 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* カードの土台(iOS grouped 式):枠線ではなく背景色と極薄の影で分ける。角丸は 14px。 */
+@layer utilities {
+  .app-card {
+    background-color: var(--surface);
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 1px 2px rgb(15 23 42 / 0.06),
+      0 8px 24px -16px rgb(15 23 42 / 0.25);
+  }
+  /* 機能別タイル:サイズ・角丸・濃さは全色同一(size-7・角丸lg・薄い背景+その色のアイコン)。 */
+  .tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-row);
+  }
+  .tile-blue {
+    background-color: color-mix(in oklab, var(--tt-blue-500) 16%, transparent);
+    color: var(--tt-blue-300);
+  }
+  .tile-purple {
+    background-color: color-mix(in oklab, var(--tt-purple-500) 16%, transparent);
+    color: var(--tt-purple-300);
+  }
+  .tile-green {
+    background-color: color-mix(in oklab, var(--tt-green-500) 16%, transparent);
+    color: var(--tt-green-300);
+  }
+  .tile-orange {
+    background-color: color-mix(in oklab, var(--tt-orange-500) 16%, transparent);
+    color: var(--tt-orange-300);
+  }
 }
 
 body {

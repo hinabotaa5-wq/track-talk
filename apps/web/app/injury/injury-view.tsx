@@ -107,8 +107,8 @@ export function InjuryGroupPicker({ groups }: { groups: InjuryGroupSummary[] }) 
               <li key={group.body_part}>
                 <Link
                   href={injuryGroupPath(group.body_part)}
-                  className={`flex items-center gap-3 rounded-2xl border py-2 pl-2 pr-4 transition active:scale-[0.98] ${
-                    group.me ? "border-blue-400 bg-blue-950/50 hover:bg-blue-950/70" : "border-white/20 glass bg-white/10 hover:bg-white/16"
+                  className={`flex items-center gap-3 rounded-card py-2 pl-2 pr-4 transition-colors ${
+                    group.me ? "border border-blue-400 bg-blue-950/50 hover:bg-blue-950/70 active:bg-blue-500/30" : "app-card hover:bg-white/16 active:bg-slate-500/15"
                   }`}
                 >
                   <InjuryPartIcon part={group.body_part} className="h-16 w-9 shrink-0" />
