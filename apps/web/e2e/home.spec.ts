@@ -4,7 +4,9 @@ import { devices, expect, test } from "@playwright/test";
 
 test("top page shows branding", async ({ page }) => {
   await page.goto("/?sort=new");
-  await expect(page.getByRole("link", { name: "TrackTalk" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "TrackTalk", exact: true })).toBeVisible();
+  // 本体 #629：ご意見の左の Instagram（別タブの外部リンク）。
+  await expect(page.getByRole("link", { name: "Instagram（@tracktalk.office）" })).toBeVisible();
   // 下のメニューから主な画面へ行ける。
   const nav = page.getByRole("navigation", { name: "メイン" });
   for (const name of ["ホーム", "大会", "メモ", "ケガ"]) {
