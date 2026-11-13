@@ -206,6 +206,7 @@ export const en: Readonly<Record<string, string>> = {
   "コーチのプロフィール": "Coach profile",
   "名前なし": "No name",
   "★{v0}（{rating_count}件）": "★{v0} ({rating_count})",
+  "★{v0}": "★{v0}",
   "評価はまだありません": "No ratings yet",
   "担当サービス": "Services",
   "・": " · ",
