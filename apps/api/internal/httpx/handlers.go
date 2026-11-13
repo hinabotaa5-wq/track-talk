@@ -971,7 +971,8 @@ func (s *Server) likePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, ok := s.getReadablePost(w, r, id); !ok {
+	post, ok := s.getReadablePost(w, r, id)
+	if !ok {
 		return
 	}
 	tx, err := s.pool.Begin(r.Context())
@@ -986,16 +987,29 @@ func (s *Server) likePost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 新しくいいねが入ったときだけ、投稿者へ post_like を通知する(本体 #608)。
+	// 再押しと自分の投稿への自分のいいねは通知しない。設定はコメントと同じ comment に従う。
+	var jobs []uuid.UUID
+	var pushes []postPush
 	if n > 0 {
 		if err := q.IncrementLikeCount(r.Context(), id); err != nil {
 			MapDBError(w, err)
 			return
+		}
+		if post.AuthorID != p.ID {
+			if err := enqueuePostNotification(r.Context(), q, &jobs, post.AuthorID, "post_like", id, nil, nil); err != nil {
+				MapDBError(w, err)
+				return
+			}
+			pushes = append(pushes, postPush{post.AuthorID, notifyComment, postPushMessage("いいねがありました", id)})
 		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return
 	}
+	s.runNotificationJobs(r.Context(), jobs)
+	s.sendPostPushes(r.Context(), pushes)
 	w.WriteHeader(http.StatusNoContent)
 }
 

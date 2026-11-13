@@ -84,6 +84,7 @@ var pushTitleEN = map[string]string{
 	"報酬を送金しました":            "Payout sent",
 	// 共通
 	"大会の記録を残せていますか？": "Have you logged your meet results?",
+	"いいねがありました":       "New like",
 	"参加申請がありました":      "New practice application",
 	"参加が承認されました":       "Participation approved",
 	"TrackTalk を開いて確認してください": "Open TrackTalk to check",

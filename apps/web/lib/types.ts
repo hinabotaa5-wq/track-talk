@@ -191,6 +191,7 @@ export type NotificationKind =
   | "recruitment_post"
   | "comment"
   | "comment_reply"
+  | "post_like"
   | "practice_application"
   | "practice_accepted"
   | "practice_rate"

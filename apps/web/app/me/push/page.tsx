@@ -18,7 +18,7 @@ function errorMessage(err: unknown, fallback: string) {
 }
 
 const categoryLabels: Record<NotificationCategory, { title: string; detail: string }> = {
-  comment: { get title() { return L("コメント・返信"); }, get detail() { return L("自分の投稿へのコメントと、自分のコメントへの返信"); } },
+  comment: { get title() { return L("コメント・返信・いいね"); }, get detail() { return L("自分の投稿へのコメント・いいねと、自分のコメントへの返信"); } },
   practice: { get title() { return L("練習の参加"); }, get detail() { return L("参加申請、承認、解散したあとの評価のお願い"); } },
   recruitment: { get title() { return L("新しい募集"); }, get detail() { return L("ほかの人がチームの仲間や練習相手の募集を投稿したとき"); } },
   injury: { get title() { return L("ケガの経過報告"); }, get detail() { return L("「わかる」か保存をしたケガの投稿に経過報告があったとき"); } },
