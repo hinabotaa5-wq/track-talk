@@ -39,12 +39,12 @@ func rotateCoaches(ids []uuid.UUID, now time.Time) []uuid.UUID {
 
 func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	rows, err := s.q.ListPublicCoaches(ctx)
+	rows, err := s.q.ListPublicCoaches(ctx, nil)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	plans, err := s.q.ListPublicCoachingPlans(ctx, coachPledgeListedVersion)
+	plans, err := s.q.ListPublicCoachingPlans(ctx, db.ListPublicCoachingPlansParams{PledgeVersion: coachPledgeListedVersion})
 	if err != nil {
 		MapDBError(w, err)
 		return

@@ -4,6 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
+import { ApiRequestError } from "@/lib/api";
+import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
 import type { PublicCoach } from "@/lib/types";
 import { CoachList } from "./coach-list";
 import CoachDetailPage from "./[id]/page";
@@ -11,9 +13,9 @@ import CoachDetailPage from "./[id]/page";
 const apiFetch = vi.fn();
 const routerBack = vi.fn();
 const routerPush = vi.fn();
-vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...args) }));
+vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "coach-1" }), useRouter: () => ({ back: routerBack, push: routerPush }) }));
-vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, onNavigate, ...props }: { href: string; children: ReactNode; onNavigate?: () => void }) => <a href={href} onClick={(event) => { event.preventDefault(); onNavigate?.(); }} {...props}>{children}</a> }));
 vi.mock("@/components/coach-photo", () => ({ CoachAvatar: ({ name }: { name: string }) => <span>{name}の顔写真</span> }));
 vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { plans: { title: string }[] }) => <div>{plans.map((plan) => plan.title).join("、")}</div> }));
 
@@ -31,6 +33,7 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   apiFetch.mockReset();
+  rememberCoachDetailPreview(coach, 0);
   routerBack.mockReset();
   routerPush.mockReset();
 });
@@ -46,9 +49,9 @@ it("一覧は2列で各コーチの詳細ページへリンクし、プランは
 });
 
 it("詳細URLを直接開いても対象コーチのプロフィールと公開プランを取得する", async () => {
-  apiFetch.mockResolvedValue({ coaches: [coach] });
+  apiFetch.mockResolvedValue(coach);
   await act(async () => root.render(<CoachDetailPage />));
-  expect(apiFetch).toHaveBeenCalledWith("/v1/coaches");
+  expect(apiFetch.mock.calls).toEqual([["/v1/coaches/coach-1"]]);
   expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
   expect(container.textContent).toContain("全国大会出場");
   expect(container.textContent).toContain("成績や指導経験");
@@ -68,20 +71,20 @@ it("詳細URLを直接開いても対象コーチのプロフィールと公開�
 });
 
 it("詳細内には戻るボタンを重複表示せず、ヘッダーに任せる", async () => {
-  apiFetch.mockResolvedValue({ coaches: [coach] });
+  apiFetch.mockResolvedValue(coach);
   await act(async () => root.render(<CoachDetailPage />));
   expect([...container.querySelectorAll("button")].some((b) => b.textContent === "戻る")).toBe(false);
   expect(container.textContent).not.toContain("競技年数");
 });
 
 it("非公開または存在しないコーチの詳細には案内を出す", async () => {
-  apiFetch.mockResolvedValue({ coaches: [] });
+  apiFetch.mockRejectedValue(new ApiRequestError(404, { error: { code: "coach_not_public", message: "非公開" } }));
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("このコーチは現在公開されていません");
 });
 
 it("選手側のコーチ詳細の平均評価は件数を出さない（#628）", async () => {
-  apiFetch.mockResolvedValue({ coaches: [{ ...coach, rating_count: 3, rating_average: 4.5 }] });
+  apiFetch.mockResolvedValue({ ...coach, rating_count: 3, rating_average: 4.5 });
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("★4.5");
   expect(container.textContent).not.toContain("3件");
@@ -91,7 +94,7 @@ it("選手側のコーチ詳細の平均評価は件数を出さない（#628）
 it("選手側のコーチ詳細は英語でも平均評価の件数を出さない（#628）", async () => {
   installEnglish(en);
   setActiveLocale("en");
-  apiFetch.mockResolvedValue({ coaches: [{ ...coach, rating_count: 3, rating_average: 4.5 }] });
+  apiFetch.mockResolvedValue({ ...coach, rating_count: 3, rating_average: 4.5 });
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("★4.5");
   expect(container.textContent).not.toContain("(3)");
@@ -99,7 +102,7 @@ it("選手側のコーチ詳細は英語でも平均評価の件数を出さな�
 });
 
 it("評価0件のときのコーチ詳細の表示は変えない（#628）", async () => {
-  apiFetch.mockResolvedValue({ coaches: [coach] });
+  apiFetch.mockResolvedValue(coach);
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.textContent).toContain("評価はまだありません");
 });
@@ -164,4 +167,37 @@ it("動画添削の一覧で該当0人の種目は空状態と「すべて」へ
   expect(container.textContent).toContain("この種目のコーチはまだいません");
   await act(async () => { ([...container.querySelectorAll("button")].find((b) => b.textContent === "すべての種目のコーチを見る") as HTMLButtonElement).click(); });
   expect([...container.querySelectorAll("li a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/coach-1"]);
+});
+
+it("古い一覧データでは、詳細を取得する間に中央の読み込み表示を出す", async () => {
+  apiFetch.mockReturnValue(new Promise(() => {}));
+  rememberCoachDetailPreview(coach, Date.now() - 60_000);
+
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.querySelector('[role="status"]')?.classList.contains("page-loading-screen")).toBe(true);
+  expect(container.querySelector("h1")).toBeNull();
+});
+
+it("カードで選んだコーチをすぐに表示し、単体 API の応答に差し替える", async () => {
+  apiFetch.mockResolvedValueOnce({ coaches: [coach] });
+  let finish!: (value: PublicCoach) => void;
+  apiFetch.mockReturnValueOnce(new Promise<PublicCoach>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<CoachList />));
+  await act(async () => container.querySelector("li a")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.querySelector("h1")?.textContent).toBe(coach.nickname);
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(apiFetch.mock.calls).toEqual([["/v1/coaches"], ["/v1/coaches/coach-1"]]);
+
+  await act(async () => finish({ ...coach, nickname: "更新後のコーチ" }));
+  expect(container.querySelector("h1")?.textContent).toBe("更新後のコーチ");
+});
+
+it("一覧の公開ゲートで取得に失敗すると、プレビューを取り下げて読み込みエラーを出す", async () => {
+  rememberCoachDetailPreview(coach, Date.now());
+  apiFetch.mockRejectedValue(new ApiRequestError(404, { error: { code: "not_found", message: "見つかりませんでした" } }));
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("コーチの詳細を読み込めませんでした");
+  expect(container.querySelector("h1")).toBeNull();
 });

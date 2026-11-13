@@ -6,6 +6,7 @@ import { PageLoading } from "@/components/page-loading";
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachEventChips, CoachEventEmpty, filterCoachesByEvent, type CoachEventFilter } from "@/components/coach-event-filter";
 import { apiFetch } from "@/lib/api";
+import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { formatYen } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import type { PublicCoach } from "@/lib/types";
@@ -21,7 +22,7 @@ function coachPrice(coach: PublicCoach): string | null {
 }
 
 export function CoachList() {
-  const [coaches, setCoaches] = useState<PublicCoach[] | null>(null);
+  const [result, setResult] = useState<{ coaches: PublicCoach[]; fetchedAt: number } | null>(null);
   const [error, setError] = useState("");
   const [event, setEvent] = useState<CoachEventFilter>("all");
 
@@ -29,7 +30,7 @@ export function CoachList() {
     let cancelled = false;
     apiFetch<{ coaches: PublicCoach[] }>("/v1/coaches")
       .then((d) => {
-        if (!cancelled) setCoaches(d.coaches);
+        if (!cancelled) setResult({ coaches: d.coaches, fetchedAt: Date.now() });
       })
       .catch(() => {
         if (!cancelled) setError(L("読み込みに失敗しました"));
@@ -40,9 +41,9 @@ export function CoachList() {
   }, []);
 
   if (error) return <p role="alert" className="text-sm text-red-400">{error}</p>;
-  if (!coaches) return <PageLoading screen label={L("読み込み中...")} />;
+  if (!result) return <PageLoading screen label={L("読み込み中...")} />;
   // 並びは API の公平なローテーションのまま。種目で絞っても並べ替えない。
-  const shown = filterCoachesByEvent(coaches, event);
+  const shown = filterCoachesByEvent(result.coaches, event);
 
   return (
     <div className="space-y-3">
@@ -55,7 +56,7 @@ export function CoachList() {
             const price = coachPrice(c);
             return (
             <li id={`coach-${c.id}`} key={c.id} className="min-w-0">
-              <Link href={`/coaches/${encodeURIComponent(c.id)}`} className="glass flex h-full flex-col items-center gap-3 rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-blue-400">
+              <Link href={`/coaches/${encodeURIComponent(c.id)}`} onNavigate={() => rememberCoachDetailPreview(c, result.fetchedAt)} className="glass flex h-full flex-col items-center gap-3 rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-blue-400">
                 <CoachAvatar url={c.photo_url} name={c.nickname} size={80} />
                 <div className="w-full min-w-0 space-y-1 break-words">
                   <p className="font-bold text-white">{c.nickname ?? L("名前なし")}</p>

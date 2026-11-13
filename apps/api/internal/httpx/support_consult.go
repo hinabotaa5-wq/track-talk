@@ -331,15 +331,16 @@ func (s *Server) saveMyConsultSettings(w http.ResponseWriter, r *http.Request) {
 
 // publicConsultEntries は、相談を受け付けているコーチごとの入口。特商法の表記が承認されたコーチだけ。
 func (s *Server) publicConsultEntries(ctx context.Context, only *uuid.UUID) (map[uuid.UUID]map[string]any, error) {
-	settings, err := s.q.ListPublicSupportConsultSettings(ctx, coachPledgeListedVersion)
+	settings, err := s.q.ListPublicSupportConsultSettings(ctx, db.ListPublicSupportConsultSettingsParams{
+		PledgeVersion: coachPledgeListedVersion,
+		CoachID:       only,
+	})
 	if err != nil {
 		return nil, err
 	}
 	ids := make([]uuid.UUID, 0, len(settings))
 	for _, st := range settings {
-		if only == nil || st.CoachID == *only {
-			ids = append(ids, st.CoachID)
-		}
+		ids = append(ids, st.CoachID)
 	}
 	out := map[uuid.UUID]map[string]any{}
 	if len(ids) == 0 {
@@ -360,7 +361,7 @@ func (s *Server) publicConsultEntries(ctx context.Context, only *uuid.UUID) (map
 		return nil, err
 	}
 	for _, st := range settings {
-		if !slices.Contains(ids, st.CoachID) || !approved[templateOf[st.CoachID]] {
+		if !approved[templateOf[st.CoachID]] {
 			continue
 		}
 		out[st.CoachID] = publicConsultJSON(st)

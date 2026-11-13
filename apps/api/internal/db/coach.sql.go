@@ -331,6 +331,7 @@ CROSS JOIN LATERAL (
     ) x
 ) r
 WHERE c.status = 'approved'
+  AND ($1::uuid IS NULL OR c.profile_id = $1)
 ORDER BY c.tier, c.reviewed_at, c.profile_id
 `
 
@@ -351,8 +352,8 @@ type ListPublicCoachesRow struct {
 }
 
 // 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
-func (q *Queries) ListPublicCoaches(ctx context.Context) ([]ListPublicCoachesRow, error) {
-	rows, err := q.db.Query(ctx, listPublicCoaches)
+func (q *Queries) ListPublicCoaches(ctx context.Context, profileID *uuid.UUID) ([]ListPublicCoachesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicCoaches, profileID)
 	if err != nil {
 		return nil, err
 	}

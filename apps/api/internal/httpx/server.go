@@ -282,6 +282,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			// コーチ一覧は COACHING_COACH_LIST_ENABLED でも別に閉じる（閉じている間は 404）。
 			r.With(s.requireCoachList).Get("/coaches", s.listCoaches)
 			r.With(s.requireCoachList).Get("/coaches/support-plan", s.listSupportPlanCoaches)
+			r.With(s.requireCoachList).Get("/coaches/{id}", s.getPublicCoach)
 			r.Get("/coaches/{id}/availability", s.getPublicCoachAvailability)
 			r.Get("/coaches/{id}/support-consult", s.getPublicCoachConsult)
 			r.Get("/coaching/plans/{id}", s.getPublicCoachingPlan)

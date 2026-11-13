@@ -148,6 +148,7 @@ CROSS JOIN LATERAL (
     ) x
 ) r
 WHERE c.status = 'approved'
+  AND (sqlc.narg(profile_id)::uuid IS NULL OR c.profile_id = sqlc.narg(profile_id))
 ORDER BY c.tier, c.reviewed_at, c.profile_id;
 
 -- name: SetCoachPhoto :one
