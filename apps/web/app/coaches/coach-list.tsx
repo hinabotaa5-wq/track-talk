@@ -12,9 +12,10 @@ import type { PublicCoach } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-function coachPrice(coach: PublicCoach) {
+// 公開中の非・動画添削プランがないコーチの価格行は出さない（「プラン未公開」の文言も代替文言も置かない）。
+function coachPrice(coach: PublicCoach): string | null {
   const prices = (coach.plans ?? []).filter((plan) => plan.published && plan.service_type !== "video_review").map((plan) => plan.price_yen);
-  if (prices.length === 0) return L("プラン未公開");
+  if (prices.length === 0) return null;
   const minimum = Math.min(...prices);
   return `${formatYen(minimum)}${prices.some((price) => price !== minimum) ? L("〜") : ""}`;
 }
@@ -50,7 +51,9 @@ export function CoachList() {
       {shown.length === 0 && event !== "all" ? <CoachEventEmpty onReset={() => setEvent("all")} /> : null}
       {shown.length > 0 ? (
         <ul className="grid grid-cols-2 gap-3">
-          {shown.map((c) => (
+          {shown.map((c) => {
+            const price = coachPrice(c);
+            return (
             <li id={`coach-${c.id}`} key={c.id} className="min-w-0">
               <Link href={`/coaches/${encodeURIComponent(c.id)}`} className="glass flex h-full flex-col items-center gap-3 rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-blue-400">
                 <CoachAvatar url={c.photo_url} name={c.nickname} size={80} />
@@ -58,11 +61,12 @@ export function CoachList() {
                   <p className="font-bold text-white">{c.nickname ?? L("名前なし")}</p>
                   <p className="text-xs text-slate-200">{c.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
                   {c.hitokoto ? <p className="truncate text-xs text-slate-200">{c.hitokoto}</p> : null}
-                  <p className="font-semibold text-blue-300">{coachPrice(c)}</p>
+                  {price ? <p className="font-semibold text-blue-300">{price}</p> : null}
                 </div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
     </div>
