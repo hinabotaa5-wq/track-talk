@@ -376,7 +376,7 @@ export const en: Readonly<Record<string, string>> = {
   "国内主要大会": "Major domestic meets",
   "公式サイト": "Official site",
   "国際大会": "International meets",
-  "今後の国際大会": "Upcoming international meets",
+  "世界陸上・オリンピック": "World Championships and Olympics",
   "ほかの大会": "Other meets",
   "表示する大会": "Meets to show",
   "今後の世界陸上・オリンピック": "Upcoming World Championships and Olympics",

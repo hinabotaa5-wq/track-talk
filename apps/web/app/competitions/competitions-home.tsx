@@ -29,9 +29,9 @@ const views: { id: View; label: string }[] = [
   { id: "international", get label() { return L("国際大会"); } },
 ];
 
-// 県別の大会一覧は #549 で廃止した。今後の国際大会は、いちばん上から入れるようにする。
+// 県別の大会一覧は #549 で廃止した。世界陸上・オリンピックは、いちばん上から入れるようにする。
 const entries = [
-  { href: "/competitions/major-hosts", get label() { return L("今後の国際大会"); }, icon: Globe },
+  { href: "/competitions/major-hosts", get label() { return L("世界陸上・オリンピック"); }, icon: Globe },
 ];
 
 export function CompetitionsHome({ initialMajors = null }: { initialMajors?: DomesticMajor[] | null }) {
@@ -64,7 +64,7 @@ export function CompetitionsHome({ initialMajors = null }: { initialMajors?: Dom
 
   return (
     <div className="space-y-5">
-      {/* 国内主要大会の一覧が主役。今後の国際大会は、いちばん上から入れるようにする。 */}
+      {/* 国内主要大会の一覧が主役。世界陸上・オリンピックは、いちばん上から入れるようにする。 */}
       <nav aria-label={L("ほかの大会")} className="grid gap-2 md:max-w-sm">
         {entries.map((entry) => {
           const Icon = entry.icon;

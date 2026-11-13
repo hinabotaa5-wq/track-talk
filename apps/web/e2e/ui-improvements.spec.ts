@@ -60,12 +60,12 @@ test("大会のタイムテーブル導線を消し、実況スレッドは内�
   await expect(page.locator("a a")).toHaveCount(0);
 });
 
-test("今後の国際大会の入口を、国内主要大会・国際大会の切替と同じ幅でその上に置く", async ({ page }) => {
+test("世界陸上・オリンピックの入口を、国内主要大会・国際大会の切替と同じ幅でその上に置く", async ({ page }) => {
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/competitions");
     const nav = page.getByRole("navigation", { name: "ほかの大会", exact: true });
-    const link = nav.getByRole("link", { name: "今後の国際大会", exact: true });
+    const link = nav.getByRole("link", { name: "世界陸上・オリンピック", exact: true });
     const views = page.getByRole("group", { name: "表示する大会", exact: true });
     await expect(link).toHaveAttribute("href", "/competitions/major-hosts");
     await expect(views).toBeVisible();
