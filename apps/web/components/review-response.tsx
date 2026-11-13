@@ -58,8 +58,14 @@ export function ReviewResponseView({ response }: { response: ReviewResponse }) {
       {response.clarify_reason ? (
         <div className="space-y-1 border-t border-white/15 pt-3">
           {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{L("確認質問：{clarify_body}", { clarify_body: response.clarify_body })}</p> : null}
-          <h2 className="text-xs font-semibold text-slate-300">{L("補足（「{v0}」への答え）", { v0: clarifyReasonLabels[response.clarify_reason] })}</h2>
-          <p className="whitespace-pre-wrap text-slate-100">{response.clarification ?? L("コーチの補足を待っています")}</p>
+          {response.clarification ? (
+            <>
+              <h2 className="text-xs font-semibold text-slate-300">{L("補足（「{v0}」への答え）", { v0: clarifyReasonLabels[response.clarify_reason] })}</h2>
+              <p className="whitespace-pre-wrap text-slate-100">{response.clarification}</p>
+            </>
+          ) : (
+            <p className="text-xs text-slate-300">{L("確認質問（{v0}）", { v0: clarifyReasonLabels[response.clarify_reason] })}</p>
+          )}
         </div>
       ) : null}
     </section>

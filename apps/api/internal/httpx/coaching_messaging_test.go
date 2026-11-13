@@ -20,8 +20,6 @@ func TestMessagingClosedBlocksPaidOneToOneSending(t *testing.T) {
 	for _, path := range []string{
 		"/v1/coaching/contracts/" + id + "/messages",
 		"/v1/guardian/secret/contracts/" + id + "/messages",
-		"/v1/coaching/requests/" + id + "/clarify",
-		"/v1/coaching/requests/" + id + "/clarification",
 	} {
 		rec := doJSON(t, h, http.MethodPost, path, owner, map[string]any{"body": "フォームについて"})
 		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "messaging_closed") {

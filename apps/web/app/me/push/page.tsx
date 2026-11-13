@@ -22,7 +22,7 @@ const categoryLabels: Record<NotificationCategory, { title: string; detail: stri
   practice: { get title() { return L("練習の参加"); }, get detail() { return L("参加申請、承認、解散したあとの評価のお願い"); } },
   recruitment: { get title() { return L("新しい募集"); }, get detail() { return L("ほかの人がチームの仲間や練習相手の募集を投稿したとき"); } },
   injury: { get title() { return L("ケガの経過報告"); }, get detail() { return L("「わかる」か保存をしたケガの投稿に経過報告があったとき"); } },
-  review: { get title() { return L("フォーム添削"); }, get detail() { return L("返答、補足、期限切れ、「役に立ちましたか」"); } },
+  review: { get title() { return L("フォーム添削"); }, get detail() { return L("返答、期限切れ、「役に立ちましたか」"); } },
   coaching: { get title() { return L("パーソナル指導・コーチ"); }, get detail() { return L("申し込み、承諾、開始、終了、メッセージ、コーチの応募の結果"); } },
   monthly: { get title() { return L("月1回の記録のお知らせ"); }, get detail() { return L("毎月1日に、大会の記録を残すお知らせ"); } },
   announcement: { get title() { return L("運営からのお知らせ"); }, get detail() { return L("新しい機能が使えるようになったときなど、運営から全員へのお知らせ"); } },

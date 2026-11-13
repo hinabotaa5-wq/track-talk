@@ -113,45 +113,24 @@ func TestReviewResponseFlow(t *testing.T) {
 		t.Fatalf("coach rating %s", body)
 	}
 
-	// 「わからなかった」は1回だけ。コーチに通知が届く。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "why"}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("bad reason %d", rec.Code)
+	// メッセージを開放しても、無料の確認質問と補足の送信先は存在しない。
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"}); rec.Code != http.StatusNotFound {
+		t.Fatalf("retired clarification request %d %s", rec.Code, rec.Body.String())
 	}
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"})
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"clarifying"`) {
-		t.Fatalf("clarify %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "term"}); rec.Code != http.StatusConflict {
-		t.Fatalf("second clarify %d", rec.Code)
-	}
-	if !strings.Contains(doJSON(t, h, http.MethodGet, "/v1/me/notifications", tc, nil).Body.String(), `"kind":"review_clarify"`) {
-		t.Fatal("no clarify notification")
-	}
-	reviewing := coachRequests(t, h, tc).Reviewing
-	if len(reviewing) != 1 || reviewing[0].Status != "clarifying" {
-		t.Fatalf("coach reviewing %+v", reviewing)
-	}
-	rec = doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+id, tc, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"clarify_reason":"drill"`) {
-		t.Fatalf("coach get %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+id, tother, nil); rec.Code != http.StatusNotFound {
-		t.Fatalf("other coach get %d", rec.Code)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "補足"}); rec.Code != http.StatusNotFound {
+		t.Fatalf("retired clarification response %d %s", rec.Code, rec.Body.String())
 	}
 
-	// 補足も連絡先は書けず、1回だけ。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "動画は youtube.com で"}); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("contact clarification %d", rec.Code)
-	}
-	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "1台ずつ、抜き脚だけを意識して歩いて越えます"})
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"returned"`) {
-		t.Fatalf("clarification %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "もう一度"}); rec.Code != http.StatusConflict {
-		t.Fatalf("second clarification %d", rec.Code)
-	}
-	if !strings.Contains(doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil).Body.String(), "抜き脚だけを意識") {
-		t.Fatal("clarification not shown")
+	// 廃止前に保存されたやりとりは双方の詳細画面で読める。
+	execSQLArgs(t, `UPDATE review_responses SET clarify_reason='drill', clarify_body='ドリルの確認', clarify_requested_at=now(), clarification='抜き脚だけを意識', clarified_at=now() WHERE request_id=$1`, id)
+	for _, viewer := range []struct{ path, token string }{
+		{"/v1/coaching/requests/" + id, tu},
+		{"/v1/coach/requests/" + id, tc},
+	} {
+		rec := doJSON(t, h, http.MethodGet, viewer.path, viewer.token, nil)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "ドリルの確認") || !strings.Contains(rec.Body.String(), "抜き脚だけを意識") {
+			t.Fatalf("historical clarification %d %s", rec.Code, rec.Body.String())
+		}
 	}
 
 	// 7日たつと「役に立ちましたか」を一度だけ聞く。
@@ -209,10 +188,6 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 	body := doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil).Body.String()
 	if !strings.Contains(body, `"hidden":true`) || strings.Contains(body, "1台目までの8歩") {
 		t.Fatalf("hidden response shown %s", body)
-	}
-	// 隠された返答には「わからなかった」を押せない。
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "term"}); rec.Code != http.StatusConflict {
-		t.Fatalf("clarify hidden %d", rec.Code)
 	}
 }
 
@@ -301,7 +276,6 @@ func TestReviewAuthorization(t *testing.T) {
 		{http.MethodGet, "/v1/coach/requests"},
 		{http.MethodGet, "/v1/coach/requests/" + id},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/response"},
-		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification"},
 		{http.MethodPost, "/v1/coach/requests/" + id + "/start"},
 		{http.MethodPost, "/v1/coach/requests/" + id + "/withdraw"},
 	} {
@@ -325,30 +299,12 @@ func TestReviewAuthorization(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
 		t.Fatalf("coach response %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"}); rec.Code != http.StatusOK {
-		t.Fatalf("request clarification %d", rec.Code)
-	}
-	// IDを知っていても、担当外のコーチと依頼者本人は補足を返せない。
-	for _, unauthorized := range []string{tother, tu} {
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", unauthorized, map[string]any{"clarification": "担当外からの補足"})
-		want := http.StatusConflict
-		if unauthorized == tu {
-			want = http.StatusForbidden
-		}
-		if rec.Code != want {
-			t.Fatalf("unauthorized clarification %d %s", rec.Code, rec.Body.String())
-		}
-	}
-
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", tc, map[string]any{"clarification": "1台ずつ歩いて越えます"}); rec.Code != http.StatusOK {
-		t.Fatalf("coach clarification %d %s", rec.Code, rec.Body.String())
-	}
 }
 
 // Approval must be checked on every request, even when an assignment still
 // belongs to the caller and their authentication token remains valid.
 func TestReviewRevokedCoachAuthorization(t *testing.T) {
-	for _, operation := range []string{"list_offer", "list_review", "read", "response", "clarification", "decline"} {
+	for _, operation := range []string{"list_offer", "list_review", "read", "response", "decline"} {
 		t.Run(operation, func(t *testing.T) {
 			fakeCoachingCloudinary(t)
 			h := setup(t)
@@ -370,14 +326,6 @@ func TestReviewRevokedCoachAuthorization(t *testing.T) {
 					t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 				}
 			}
-			if operation == "clarification" {
-				if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
-					t.Fatalf("response %d %s", rec.Code, rec.Body.String())
-				}
-				if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/clarify", tu, map[string]any{"reason": "drill"}); rec.Code != http.StatusOK {
-					t.Fatalf("clarify %d %s", rec.Code, rec.Body.String())
-				}
-			}
 			execSQLArgs(t, `UPDATE coach_profiles SET status = 'suspended', on_duty = false WHERE profile_id = $1`, coach)
 			before := reviewStatus(t, h, tu, id)
 			method, path := http.MethodGet, "/v1/coach/requests"
@@ -387,8 +335,6 @@ func TestReviewRevokedCoachAuthorization(t *testing.T) {
 				path += "/" + id
 			case "response":
 				method, path, body = http.MethodPost, "/v1/coaching/requests/"+id+"/response", responseBody()
-			case "clarification":
-				method, path, body = http.MethodPost, "/v1/coaching/requests/"+id+"/clarification", map[string]any{"clarification": "停止済みコーチからの補足"}
 			case "decline":
 				method, path = http.MethodPost, "/v1/coach/requests/"+offer.ID+"/withdraw"
 			}

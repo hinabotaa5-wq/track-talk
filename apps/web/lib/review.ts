@@ -27,7 +27,7 @@ export const reviewStatusLabels: Record<ReviewStatus, string> = {
   get in_review() { return L("添削中"); },
   get needs_info() { return L("コーチが内容の確認を求めています"); },
   get returned() { return L("返却済み"); },
-  get clarifying() { return L("補足を待っています"); },
+  get clarifying() { return L("返却済み"); },
   get expired() { return L("期限切れ"); },
 };
 

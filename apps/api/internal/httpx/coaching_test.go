@@ -101,11 +101,9 @@ func TestCoachingRoutesAreHiddenUntilEnabled(t *testing.T) {
 		{http.MethodGet, "/v1/coaching/requests/" + id, ta},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/checkout", ta},
 		{http.MethodGet, "/v1/me/coaching/requests", ta},
-		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarify", ta},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/rating", ta},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/helpful", ta},
 		{http.MethodPost, "/v1/coaching/requests/" + id + "/response", ta},
-		{http.MethodPost, "/v1/coaching/requests/" + id + "/clarification", ta},
 		// コーチ側（プロフィール・報酬・プラン・契約・打診）。顔写真は応募の審査に必要なので閉じない。
 		{http.MethodPatch, "/v1/coach/me", ta},
 		{http.MethodPost, "/v1/coach/me/pledge", ta},

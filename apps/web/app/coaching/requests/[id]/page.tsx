@@ -14,7 +14,6 @@ import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaratio
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
@@ -31,12 +30,10 @@ const chip = (on: boolean) =>
     on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
-// 返答が届いたあとの操作: ★の評価、「ここがわからなかった」（1回）、7日後の「役に立ちましたか」、通報。
+// 返答が届いたあとの操作: ★の評価、7日後の「役に立ちましたか」、通報。
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
-  const [clarifyBody, setClarifyBody] = useState("");
-  const [now] = useState(() => Date.now());
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
   const response = request.response;
@@ -109,15 +106,6 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
           ))}
         </div>
       </section>
-
-      {!coachingMessagingEnabled || response.clarify_reason || !response.created_at || now >= new Date(response.created_at).getTime() + 7 * 86400000 ? null : (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold">{L("回答について確認する（1回無料）")}</h2>
-          <p className="text-xs text-slate-300">{L("返却から7日以内に、回答のわからなかった点を1回確認できます。新しい相談は下の「追加質問」から送れます。")}</p>
-          <textarea aria-label={L("回答のわからなかった点")} value={clarifyBody} onChange={(e) => setClarifyBody(e.target.value)} maxLength={2000} disabled={pending} className="w-full rounded-md border border-white/25 bg-white/10 p-2 text-sm" />
-          <button type="button" disabled={pending || !clarifyBody.trim()} onClick={() => void post("clarify", { reason: "other", body: clarifyBody })} className={chip(false)}>{L("確認質問を送る（無料）")}</button>
-        </section>
-      )}
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       {reported ? (

@@ -19,7 +19,7 @@ type workOrderTermsView struct {
 	PaymentDue string `json:"payment_due"`
 }
 
-// フォーム添削を打診するときは、引き受ける前に極短の取引条件(8行・版5)を見せ、引き受けたら書き留める。
+// フォーム添削を打診するときは、引き受ける前に極短の取引条件(8行・版6)を見せ、引き受けたら書き留める。
 func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripeConfig(t, nil)
@@ -39,7 +39,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 5 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 8 {
+	if accepted.WorkOrder.TermsVersion != 6 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 8 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -47,7 +47,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if got := terms.Items[0]; got.Label != "委託" || !strings.Contains(got.Value, "TrackTalk運営者") || !strings.Contains(got.Value, "担当コーチ") || strings.Contains(got.Value, "中窪") {
 		t.Fatalf("parties must be role-only: %+v", got)
 	}
-	if got := terms.Items[2]; got.Label != "内容" || !strings.Contains(got.Value, "確認質問に補足1回") {
+	if got := terms.Items[2]; got.Label != "内容" || got.Value != "動画1本の添削（100m）。相談に答えて文章で返却" {
 		t.Fatalf("review content terms: %+v", got)
 	}
 	if got := terms.Items[6]; got.Label != "報酬" || got.Value != "¥350" {
