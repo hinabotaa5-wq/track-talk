@@ -20,6 +20,7 @@ const labelKeys: Record<NotificationKind, I18nKey> = {
   recruitment_post: "notify.recruitment_post",
   comment: "notify.comment",
   comment_reply: "notify.comment_reply",
+  post_like: "notify.post_like",
   practice_application: "notify.practice_application",
   practice_accepted: "notify.practice_accepted",
   practice_rate: "notify.practice_rate",

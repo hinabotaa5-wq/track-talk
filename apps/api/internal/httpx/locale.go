@@ -96,9 +96,11 @@ var pushTitleEN = map[string]string{
 	"大会サポートの通話が更新されました":     "Meet-support call updated",
 	"報酬を送金しました":             "Payout sent",
 	// 共通
-	"大会の記録を残せていますか？": "Have you logged your meet results?",
-	"参加申請がありました":     "New practice application",
-	"参加が承認されました":     "Participation approved",
+	"大会の記録を残せていますか？":         "Have you logged your meet results?",
+	"いいねがありました":              "New like",
+	"参加申請がありました":             "New practice application",
+	"参加が承認されました":             "Participation approved",
+	"TrackTalk を開いて確認してください": "Open TrackTalk to check",
 }
 
 // pushBodyEN は、プッシュ・ベルの本文の日英対応。本文は固定文のものだけ置き換える。

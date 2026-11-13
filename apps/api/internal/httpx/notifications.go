@@ -16,7 +16,7 @@ import (
 
 // 通知の種類。マイページの通知タブで、種類ごとにベル(アプリ内)とプッシュを切り替えられる。
 const (
-	notifyComment      = "comment"      // 自分の投稿へのコメント、自分のコメントへの返信
+	notifyComment      = "comment"      // 自分の投稿へのコメント・いいね、自分のコメントへの返信
 	notifyPractice     = "practice"     // 練習の参加申請・承認・解散後の評価
 	notifyRecruitment  = "recruitment"  // 新しい練習の募集
 	notifyInjury       = "injury"       // ケガの投稿の経過報告
@@ -60,7 +60,7 @@ func findNotificationCategory(key string) (notificationCategory, bool) {
 // kindCategory は、ベルの通知の kind がどの種類の設定に従うか。
 func kindCategory(kind string) string {
 	switch kind {
-	case "comment", "comment_reply":
+	case "comment", "comment_reply", "post_like":
 		return notifyComment
 	case "practice_application", "practice_accepted", "practice_rate":
 		return notifyPractice
