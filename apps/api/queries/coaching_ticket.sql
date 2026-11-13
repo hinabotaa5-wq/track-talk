@@ -32,8 +32,9 @@ UPDATE coaching_ticket_purchases SET wording_version = $2 WHERE id = $1 AND word
 
 -- name: CreateTicketLot :exec
 -- 有効期限は決済完了日時の6か月後（本体 #569）。
+-- ロットの id は購入の id とは別の固有値（000168）。購入との対応は purchase_id。
 INSERT INTO coaching_ticket_lots (id, purchase_id, owner_id, quantity, available, expires_at)
-VALUES ($1,$1,$2,$3,$3,sqlc.arg(paid_at)::timestamptz + interval '6 months');
+VALUES ($1,$2,$3,$4,$4,sqlc.arg(paid_at)::timestamptz + interval '6 months');
 
 -- name: TicketBalance :one
 -- 期限を過ぎたロットは、失効の処理（tick）を待たずに使える枚数から外す。
@@ -67,8 +68,10 @@ UPDATE coaching_ticket_lots SET available = available + sqlc.arg(available_delta
 WHERE id = sqlc.arg(id);
 
 -- name: InsertTicketLedger :exec
-INSERT INTO coaching_ticket_ledger (id, lot_id, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+-- 台帳はロット（lot_id）と購入（purchase_ref）の両方を指す（000168）。
+-- 紹介特典の行には購入がないため purchase_ref は NULL になる。
+INSERT INTO coaching_ticket_ledger (id, lot_id, purchase_ref, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
 -- name: ListTicketLotsToExpire :many
 -- 期限を過ぎて、まだ使える枚数が残っているロット。

@@ -518,16 +518,17 @@ type CoachingTicketAllocation struct {
 }
 
 type CoachingTicketLedger struct {
-	ID             uuid.UUID `json:"id"`
-	LotID          uuid.UUID `json:"lot_id"`
-	OperationKey   string    `json:"operation_key"`
-	Kind           string    `json:"kind"`
-	AvailableDelta int32     `json:"available_delta"`
-	ReservedDelta  int32     `json:"reserved_delta"`
-	ConsumedDelta  int32     `json:"consumed_delta"`
-	RefundedDelta  int32     `json:"refunded_delta"`
-	CreatedAt      time.Time `json:"created_at"`
-	ExpiredDelta   int32     `json:"expired_delta"`
+	ID             uuid.UUID  `json:"id"`
+	LotID          uuid.UUID  `json:"lot_id"`
+	OperationKey   string     `json:"operation_key"`
+	Kind           string     `json:"kind"`
+	AvailableDelta int32      `json:"available_delta"`
+	ReservedDelta  int32      `json:"reserved_delta"`
+	ConsumedDelta  int32      `json:"consumed_delta"`
+	RefundedDelta  int32      `json:"refunded_delta"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ExpiredDelta   int32      `json:"expired_delta"`
+	PurchaseRef    *uuid.UUID `json:"purchase_ref"`
 }
 
 type CoachingTicketLot struct {

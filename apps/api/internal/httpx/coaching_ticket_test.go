@@ -126,7 +126,7 @@ func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
 		t.Fatalf("credit %d", got)
 	}
 	var n int
-	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_ledger WHERE lot_id=$1`, []any{id}, &n)
+	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_ledger WHERE purchase_ref=$1`, []any{id}, &n)
 	if n != 1 {
 		t.Fatalf("duplicate credit ledger %d", n)
 	}
@@ -393,7 +393,7 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 		t.Fatalf("terms version %s", rec.Body.String())
 	}
 	// 期限を過ぎたら、失効の tick を待たずに従来の返金では断る（既存の挙動を維持）。
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 422 || !strings.Contains(rec.Body.String(), "tickets_expired") {
 		t.Fatalf("legacy expired refund %d %s", rec.Code, rec.Body.String())
 	}
@@ -419,12 +419,12 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 		t.Fatalf("post-expiry %+v", state)
 	}
 	var available, expired, refunded int
-	queryRowArgs(t, `SELECT available,expired,refunded FROM coaching_ticket_lots WHERE id=$1`, []any{purchase}, &available, &expired, &refunded)
+	queryRowArgs(t, `SELECT available,expired,refunded FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{purchase}, &available, &expired, &refunded)
 	if available != 0 || expired != 0 || refunded != 6 {
 		t.Fatalf("lot %d %d %d", available, expired, refunded)
 	}
 	var expireRows, refundRows int
-	queryRowArgs(t, `SELECT count(*) FILTER (WHERE kind='expire'),count(*) FILTER (WHERE kind='refund') FROM coaching_ticket_ledger WHERE lot_id=$1`, []any{purchase}, &expireRows, &refundRows)
+	queryRowArgs(t, `SELECT count(*) FILTER (WHERE kind='expire'),count(*) FILTER (WHERE kind='refund') FROM coaching_ticket_ledger WHERE purchase_ref=$1`, []any{purchase}, &expireRows, &refundRows)
 	if expireRows != 1 || refundRows != 6 {
 		t.Fatalf("ledger expire %d refund %d", expireRows, refundRows)
 	}
@@ -586,7 +586,7 @@ func TestPostExpiryTicketRefundWithinChargeIsAllStripe(t *testing.T) {
 	admin := adminToken(t, h)
 	_, tu := demoRequester(t, h, admin)
 	purchase := buySixTickets(t, h, tu)
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	res := postExpiryRefund(t, h, admin, purchase, 5, 200)
 	if res.StripeYen != 2500 || res.ManualYen != 0 || len(f.refundList()) != 1 || f.refundList()[0].Get("amount") != "2500" {
 		t.Fatalf("five tickets %+v %v", res, f.refundList())
@@ -621,13 +621,13 @@ func TestPostExpiryTicketRefundAfterOtherRefundUsesRemainingCharge(t *testing.T)
 		t.Fatalf("normal refund %d", got)
 	}
 	// 期限を過ぎてから申込みが引き受けられずに終わり、確保していた1枚は tick で失効に回る。
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	execSQLArgs(t, `UPDATE review_requests SET status='expired' WHERE id=$1`, request)
 	if rec := tick(t, h, "tick-secret"); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
 	var expired int
-	queryRowArgs(t, `SELECT expired FROM coaching_ticket_lots WHERE id=$1`, []any{purchase}, &expired)
+	queryRowArgs(t, `SELECT expired FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{purchase}, &expired)
 	if expired != 1 {
 		t.Fatalf("expired %d", expired)
 	}
@@ -656,7 +656,7 @@ func TestPostExpiryTicketRefundRejectedByStripeStopsRetrying(t *testing.T) {
 	f.mu.Lock()
 	f.chargeAmounts = map[string]int{"pi_ticket_" + purchase: 2000}
 	f.mu.Unlock()
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	res := postExpiryRefund(t, h, admin, purchase, 5, 409)
 	if res.Status != "needs_action" {
 		t.Fatalf("status %+v", res)

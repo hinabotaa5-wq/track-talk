@@ -270,11 +270,17 @@ func moveTickets(ctx context.Context, q *db.Queries, lot uuid.UUID, key, kind st
 }
 
 // moveTicketsExpiring は moveTickets に失効した枚数（e）を足したもの。ロットの行も台帳の行も消さない。
+// 台帳の purchase_ref はロットの purchase_id から写す（ロットと購入の分離、000168）。
+// 紹介特典のロットには購入がないため、その行の purchase_ref は NULL になる。
 func moveTicketsExpiring(ctx context.Context, q *db.Queries, lot uuid.UUID, key, kind string, a, r, c, f, e int32) error {
 	if err := q.MoveTicketLot(ctx, db.MoveTicketLotParams{ID: lot, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f, ExpiredDelta: e}); err != nil {
 		return err
 	}
-	return q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lot, OperationKey: key, Kind: kind, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f, ExpiredDelta: e})
+	l, err := q.GetTicketLot(ctx, lot)
+	if err != nil {
+		return err
+	}
+	return q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lot, PurchaseRef: l.PurchaseID, OperationKey: key, Kind: kind, AvailableDelta: a, ReservedDelta: r, ConsumedDelta: c, RefundedDelta: f, ExpiredDelta: e})
 }
 
 // expireTickets は tick から呼ぶ。決済完了から6か月を過ぎたロットの未使用分を失効させる（延長・救済はしない）。
@@ -333,10 +339,12 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 		if err := q.UpdateTicketPurchaseWording(ctx, db.UpdateTicketPurchaseWordingParams{ID: id, WordingVersion: &version}); err != nil {
 			return err
 		}
-		if err := q.CreateTicketLot(ctx, db.CreateTicketLotParams{ID: id, OwnerID: p.OwnerID, Quantity: p.Quantity, PaidAt: *p.PaidAt}); err != nil {
+		// ロットの id は購入の id とは別の固有値にする（000168）。購入との対応は purchase_id。
+		lotID := uuid.New()
+		if err := q.CreateTicketLot(ctx, db.CreateTicketLotParams{ID: lotID, PurchaseID: &id, OwnerID: p.OwnerID, Quantity: p.Quantity, PaidAt: *p.PaidAt}); err != nil {
 			return err
 		}
-		if err := q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: id, OperationKey: "purchase-" + id.String(), Kind: "purchase", AvailableDelta: p.Quantity}); err != nil {
+		if err := q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lotID, PurchaseRef: &id, OperationKey: "purchase-" + id.String(), Kind: "purchase", AvailableDelta: p.Quantity}); err != nil {
 			return err
 		}
 		orphan = p.OwnerID == nil

@@ -243,20 +243,23 @@ func (q *Queries) CreateTicketAllocation(ctx context.Context, arg CreateTicketAl
 
 const createTicketLot = `-- name: CreateTicketLot :exec
 INSERT INTO coaching_ticket_lots (id, purchase_id, owner_id, quantity, available, expires_at)
-VALUES ($1,$1,$2,$3,$3,$4::timestamptz + interval '6 months')
+VALUES ($1,$2,$3,$4,$4,$5::timestamptz + interval '6 months')
 `
 
 type CreateTicketLotParams struct {
-	ID       uuid.UUID  `json:"id"`
-	OwnerID  *uuid.UUID `json:"owner_id"`
-	Quantity int32      `json:"quantity"`
-	PaidAt   time.Time  `json:"paid_at"`
+	ID         uuid.UUID  `json:"id"`
+	PurchaseID *uuid.UUID `json:"purchase_id"`
+	OwnerID    *uuid.UUID `json:"owner_id"`
+	Quantity   int32      `json:"quantity"`
+	PaidAt     time.Time  `json:"paid_at"`
 }
 
 // 有効期限は決済完了日時の6か月後（本体 #569）。
+// ロットの id は購入の id とは別の固有値（000168）。購入との対応は purchase_id。
 func (q *Queries) CreateTicketLot(ctx context.Context, arg CreateTicketLotParams) error {
 	_, err := q.db.Exec(ctx, createTicketLot,
 		arg.ID,
+		arg.PurchaseID,
 		arg.OwnerID,
 		arg.Quantity,
 		arg.PaidAt,
@@ -601,26 +604,28 @@ func (q *Queries) HasOpenTicketAccount(ctx context.Context, ownerID *uuid.UUID) 
 }
 
 const insertTicketLedger = `-- name: InsertTicketLedger :exec
-INSERT INTO coaching_ticket_ledger (id, lot_id, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO coaching_ticket_ledger (id, lot_id, purchase_ref, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 `
 
 type InsertTicketLedgerParams struct {
-	ID             uuid.UUID `json:"id"`
-	LotID          uuid.UUID `json:"lot_id"`
-	OperationKey   string    `json:"operation_key"`
-	Kind           string    `json:"kind"`
-	AvailableDelta int32     `json:"available_delta"`
-	ReservedDelta  int32     `json:"reserved_delta"`
-	ConsumedDelta  int32     `json:"consumed_delta"`
-	RefundedDelta  int32     `json:"refunded_delta"`
-	ExpiredDelta   int32     `json:"expired_delta"`
+	ID             uuid.UUID  `json:"id"`
+	LotID          uuid.UUID  `json:"lot_id"`
+	PurchaseRef    *uuid.UUID `json:"purchase_ref"`
+	OperationKey   string     `json:"operation_key"`
+	Kind           string     `json:"kind"`
+	AvailableDelta int32      `json:"available_delta"`
+	ReservedDelta  int32      `json:"reserved_delta"`
+	ConsumedDelta  int32      `json:"consumed_delta"`
+	RefundedDelta  int32      `json:"refunded_delta"`
+	ExpiredDelta   int32      `json:"expired_delta"`
 }
 
 func (q *Queries) InsertTicketLedger(ctx context.Context, arg InsertTicketLedgerParams) error {
 	_, err := q.db.Exec(ctx, insertTicketLedger,
 		arg.ID,
 		arg.LotID,
+		arg.PurchaseRef,
 		arg.OperationKey,
 		arg.Kind,
 		arg.AvailableDelta,
@@ -633,7 +638,7 @@ func (q *Queries) InsertTicketLedger(ctx context.Context, arg InsertTicketLedger
 }
 
 const listMyTicketLedger = `-- name: ListMyTicketLedger :many
-SELECT e.id, e.lot_id, e.operation_key, e.kind, e.available_delta, e.reserved_delta, e.consumed_delta, e.refunded_delta, e.created_at, e.expired_delta FROM coaching_ticket_ledger e JOIN coaching_ticket_lots l ON l.id = e.lot_id
+SELECT e.id, e.lot_id, e.operation_key, e.kind, e.available_delta, e.reserved_delta, e.consumed_delta, e.refunded_delta, e.created_at, e.expired_delta, e.purchase_ref FROM coaching_ticket_ledger e JOIN coaching_ticket_lots l ON l.id = e.lot_id
 WHERE l.owner_id = $1 ORDER BY e.created_at DESC,e.id DESC LIMIT 100
 `
 
@@ -657,6 +662,7 @@ func (q *Queries) ListMyTicketLedger(ctx context.Context, ownerID *uuid.UUID) ([
 			&i.RefundedDelta,
 			&i.CreatedAt,
 			&i.ExpiredDelta,
+			&i.PurchaseRef,
 		); err != nil {
 			return nil, err
 		}
