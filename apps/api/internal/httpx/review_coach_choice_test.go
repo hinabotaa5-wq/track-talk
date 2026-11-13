@@ -80,7 +80,7 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 				t.Fatalf("duplicates requests=%d offers=%d payments=%d", requests, offerRows, payments)
 			}
 			list := doJSON(t, h, "GET", "/v1/coach/requests/"+id, tc, nil).Body.String()
-			if !strings.Contains(list, `"coach_reward_yen":350`) || !strings.Contains(list, "350円（税込）") {
+			if !strings.Contains(list, `"coach_reward_yen":350`) || !strings.Contains(list, `"label":"報酬","value":"¥350"`) {
 				t.Fatalf("offer terms %s", list)
 			}
 			if r := doJSON(t, h, "POST", "/v1/coach/requests/"+offers[0].ID+"/start", tc, nil); r.Code != 200 {

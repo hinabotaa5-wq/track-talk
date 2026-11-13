@@ -746,11 +746,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 			// フォーム添削の追加質問は、引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
 			// サポートプランの追加相談はコーチが販売者なので、要否は弁護士の回答(Q9)を待つ。
 			if err == nil && saved.ReviewRequestID != nil {
-				name, e := coachDisplayName(r.Context(), q, *saved.CoachID)
-				if e != nil {
-					return e
-				}
-				err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, *saved.ReviewRequestID, consultationWorkOrderTerms(saved, name, time.Now()))
+				err = saveWorkOrder(r.Context(), q, "consultation", nil, &saved.ID, *saved.CoachID, *saved.ReviewRequestID, consultationWorkOrderTerms(saved, time.Now()))
 			}
 		case "decline":
 			if current.Status != "offered" {

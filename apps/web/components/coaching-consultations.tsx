@@ -164,8 +164,6 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       {c.clarification ? <p className="whitespace-pre-wrap text-sm">{L("補足：{clarification}", { clarification: c.clarification })}</p> : null}
       {c.status === "offered" && c.respond_by ? <p className="text-xs text-slate-300">{L("受諾期限：{v0}", { v0: formatDateTime(c.respond_by) })}</p> : null}
       {c.status === "in_review" && c.answer_by ? <p className="text-xs text-slate-300">{L("回答期限：{v0}", { v0: formatDateTime(c.answer_by) })}</p> : null}
-      {role === "coach" && c.terms && c.status === "offered" ? <WorkOrderTermsView terms={c.terms} /> : null}
-      {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
       {role === "coach" && c.status === "offered" ? <div className="flex gap-3"><Button disabled={pending} onClick={() => void act("accept")}>{L("引き受ける")}</Button><Button disabled={pending} onClick={() => void act("decline")}>{L("辞退する")}</Button></div> : null}
       {sendEnabled && (reply || clarify || clarifyReply) ? <div className="space-y-2">
         <ContactNotice />
@@ -182,6 +180,8 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       {c.status === "awaiting_payment" && c.payer === "guardian" && role === "requester" ? <p className="text-sm">{L("保護者に、この契約のページからお支払いをお願いしてください。保護者リンクはマイコーチングで確認できます。")}</p> : null}
       {c.status === "awaiting_payment" && role === "requester" ? <Button disabled={pending} onClick={() => void act("cancel")}>{L("支払い前の質問を取り下げる")}</Button> : null}
       {((role === "coach" || role === "guardian") && !["draft", "awaiting_payment"].includes(c.status) || role === "requester" && c.answered_at) ? <button disabled={pending || reported} onClick={() => void report()} className="text-xs underline">{reported ? L("通報しました") : L(kind === "review" ? "この追加質問を通報する" : "この追加相談を通報する")}</button> : null}
+      {role === "coach" && c.terms && c.status === "offered" ? <WorkOrderTermsView terms={c.terms} offered /> : null}
+      {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
     </>}
     {c.payment_state === "refund_pending" || c.payment_state === "refunded" ? <p className="text-sm text-slate-300">{c.payment_state === "refunded" ? L("全額返金済み") : L("全額返金を処理中")}</p> : null}
     {c.funding === "ticket" && ["declined", "expired", "cancelled"].includes(c.status) ? <p className="text-xs text-slate-300">{L("確保したチケットは残高に戻ります。")}</p> : null}

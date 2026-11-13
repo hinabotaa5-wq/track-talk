@@ -269,8 +269,6 @@ export default function CoachReviewRequestPage() {
         />
       ) : null}
 
-      {request.work_order ? <WorkOrderView order={request.work_order} directReview /> : null}
-
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
 
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="coach" /> : null}
@@ -306,6 +304,8 @@ export default function CoachReviewRequestPage() {
           {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={(r) => { setSent("clarification"); setRequest(r); }} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
         </section>
       ) : null}
+
+      {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
 
       <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
         {t(locale, "coach.detail.toCoach")}

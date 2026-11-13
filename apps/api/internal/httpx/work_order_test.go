@@ -19,7 +19,7 @@ type workOrderTermsView struct {
 	PaymentDue string `json:"payment_due"`
 }
 
-// フォーム添削を打診するときは、引き受ける前に取引条件(9項目)を見せ、引き受けたら書き留める。
+// フォーム添削を打診するときは、引き受ける前に極短の取引条件(8行・版5)を見せ、引き受けたら書き留める。
 func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripeConfig(t, nil)
@@ -39,13 +39,22 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 4 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 9 {
+	if accepted.WorkOrder.TermsVersion != 5 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 8 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
 	terms := accepted.WorkOrder.Terms
-	if got := terms.Items[7]; got.Label != "支払期日" || !strings.Contains(got.Value, "累積") || strings.Contains(got.Value, "1回まで") {
-		t.Fatalf("payment due terms: %+v", got)
+	if got := terms.Items[0]; got.Label != "委託" || !strings.Contains(got.Value, "TrackTalk運営者") || !strings.Contains(got.Value, "担当コーチ") || strings.Contains(got.Value, "中窪") {
+		t.Fatalf("parties must be role-only: %+v", got)
+	}
+	if got := terms.Items[2]; got.Label != "内容" || !strings.Contains(got.Value, "確認質問に補足1回") {
+		t.Fatalf("review content terms: %+v", got)
+	}
+	if got := terms.Items[6]; got.Label != "報酬" || got.Value != "¥350" {
+		t.Fatalf("reward terms: %+v", got)
+	}
+	if got := terms.Items[7]; got.Label != "支払" || !strings.Contains(got.Value, "累積") {
+		t.Fatalf("payment terms: %+v", got)
 	}
 	// 後から依頼の画面で見返せる。
 	rec = doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+request, coach, nil)
@@ -71,7 +80,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 }
 
 // assertWorkOrderDelivered は、取引条件がコーチのお知らせに宛先付きで1回だけ届き、届けた記録が残ったことを確かめる。
-// お知らせの文面は「届いた」の1行だけで本文は空。9項目の全文は開く先の依頼の画面に出す（本体 #609）。
+// お知らせの文面は「届いた」の1行だけで本文は空。極短8行の全文は開く先の依頼の画面に出す（本体 #609・#625）。
 func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, url, wantTitle string) {
 	t.Helper()
 	var count int
@@ -117,8 +126,14 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 		return out.Consultations[0]
 	}
 	var terms workOrderTermsView
-	if err := json.Unmarshal(room()["terms"], &terms); err != nil || terms.AmountYen != 350 || len(terms.Items) != 9 {
+	if err := json.Unmarshal(room()["terms"], &terms); err != nil || terms.AmountYen != 350 || len(terms.Items) != 8 {
 		t.Fatalf("terms before accept: %+v %v", terms, err)
+	}
+	if got := terms.Items[0]; got.Label != "委託" || strings.Contains(got.Value, "中窪") {
+		t.Fatalf("consultation parties must be role-only: %+v", got)
+	}
+	if got := terms.Items[2]; got.Label != "内容" || strings.Contains(got.Value, "補足1回") {
+		t.Fatalf("consultation content must keep its own diff: %+v", got)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	var wo struct {

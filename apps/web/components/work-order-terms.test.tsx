@@ -5,28 +5,30 @@ import { WorkOrderTermsView, WorkOrderView } from "./work-order-terms";
 import type { WorkOrderTerms } from "@/lib/types";
 
 const terms: WorkOrderTerms = {
-  items: [{ label: "報酬の額", value: "840円（税込）" }, { label: "支払期日", value: "2026年12月15日" }],
-  amount_yen: 840, deliver_by: "2026-11-02T03:00:00Z", payment_due: "2026-12-15T00:00:00+09:00", carried_due: "2027-01-15T00:00:00+09:00", consigned_at: "2026-11-01T03:00:00Z",
+  items: [{ label: "報酬", value: "¥350" }, { label: "支払", value: "月末締・翌月15日" }],
+  amount_yen: 350, deliver_by: "2026-11-02T03:00:00Z", payment_due: "2026-12-15T00:00:00+09:00", consigned_at: "2026-11-01T03:00:00Z",
 };
 
-it("引き受ける前は、条件を開いた状態で見せ、引き受けると記録されることを伝える", () => {
-  const html = renderToStaticMarkup(<WorkOrderTermsView terms={terms} />);
-  expect(html).toContain("840円（税込）");
-  expect(html).toContain("引き受ける前に確認してください");
+it("引き受ける前は、折りたたみで条件を見せ、引き受けると記録されることを伝える", () => {
+  const html = renderToStaticMarkup(<WorkOrderTermsView terms={terms} offered />);
+  expect(html).toContain("¥350");
+  expect(html).toContain("取引条件");
   expect(html).toContain("<details");
-  expect(html).toMatch(/<details[^>]* open/);
-});
-
-it("引き受けた後は、書き留めた通知として畳んで見せる", () => {
-  const html = renderToStaticMarkup(<WorkOrderView order={{ id: "w", terms_version: 1, terms, created_at: "2026-11-01T03:00:00Z" }} />);
-  expect(html).toContain("に引き受け");
   expect(html).not.toMatch(/<details[^>]* open/);
+  expect(html).toContain("「引き受ける」を押すと");
 });
 
-it("お知らせで届けた通知には、届けた日時を添え、知らせから開く場所(work-order)を持つ", () => {
+it("引き受けた後は、折りたたみで書き留めた通知を見せ、受諾案内は出さない", () => {
+  const html = renderToStaticMarkup(<WorkOrderView order={{ id: "w", terms_version: 5, terms, created_at: "2026-11-01T03:00:00Z" }} />);
+  expect(html).toContain("¥350");
+  expect(html).not.toMatch(/<details[^>]* open/);
+  expect(html).not.toContain("「引き受ける」を押すと");
+});
+
+it("配信記録は表示に出さず、知らせから開く場所(work-order)を持つ", () => {
   const html = renderToStaticMarkup(
-    <WorkOrderView order={{ id: "w", terms_version: 1, terms, created_at: "2026-11-01T03:00:00Z", delivered_at: "2026-11-01T03:00:00Z" }} />,
+    <WorkOrderView order={{ id: "w", terms_version: 5, terms, created_at: "2026-11-01T03:00:00Z", delivered_at: "2026-11-01T03:00:00Z" }} />,
   );
   expect(html).toContain('id="work-order"');
-  expect(html).toContain("にお知らせで届けました");
+  expect(html).not.toContain("にお知らせで届けました");
 });
