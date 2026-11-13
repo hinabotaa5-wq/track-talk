@@ -2,9 +2,9 @@ const key = "account-origin";
 
 export function readAccountOrigin() {
   try {
-    const path = sessionStorage.getItem(key) ?? "/";
-    return path.startsWith("/") && !path.startsWith("//") && !/^\/(me|login)([/?]|$)/.test(path) ? path : "/";
-  } catch { return "/"; }
+    const path = sessionStorage.getItem(key) ?? "/coaching";
+    return path.startsWith("/") && !path.startsWith("//") && !/^\/(me|login)([/?]|$)/.test(path) ? path : "/coaching";
+  } catch { return "/coaching"; }
 }
 
 export function rememberAccountOrigin(path: string) {
