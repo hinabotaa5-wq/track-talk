@@ -153,7 +153,7 @@ it("種目チップで絞り込んだ状態が、タブを行き来しても保�
   expect(panels()[0].hidden).toBe(false);
   const panel = panels()[0];
   expect(
-    panel.contains(target),
+    panel.contains(target!),
     `radios=${container.querySelectorAll('[role="radio"]').length} panels=${panels().length} hidden=${panels().map((p) => p.hidden)} tab=${container.querySelector('[role="tabpanel"]')?.textContent?.slice(0, 160)}`,
   ).toBe(true);
   expect(target!.getAttribute("aria-checked")).toBe("true");
