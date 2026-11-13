@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 取引条件の通知(フリーランス保護法3条)。運営者がフォーム添削とその追加相談をコーチに委託するたびに、
+// 取引条件の通知(フリーランス保護法3条)。運営者がフォーム添削とその追加質問をコーチに委託するたびに、
 // その案件の9項目を、引き受ける前の打診の画面に出し、引き受けたら書き留め(coach_work_orders)、
 // 同時にコーチのお知らせへ宛先付きで届けて、届けた記録を残す(coach_work_order_deliveries)。
 // 公正取引委員会の Q&A(Q41)で認められている、受信者を特定した送信(アプリのメッセージ機能・URL の記載)に寄せるため。
@@ -97,13 +97,13 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	return buildWorkOrderTerms(coachName, work, price*share/100, rr.DueAt, consignedAt), nil
 }
 
-// consultationWorkOrderTerms は、フォーム添削の追加相談の通知。回答の期限は引き受けてから72時間。
+// consultationWorkOrderTerms は、フォーム添削の追加質問の通知。回答の期限は引き受けてから72時間。
 func consultationWorkOrderTerms(c db.CoachingConsultation, coachName string, consignedAt time.Time) workOrderTerms {
 	deliverBy := consignedAt.Add(72 * time.Hour)
 	if c.AnswerBy != nil {
 		deliverBy = *c.AnswerBy
 	}
-	work := "フォーム添削の追加相談。利用者の質問1件に、文章（実践動画は任意）で1回答える。回答への確認の質問が来たときは、補足を1回返す"
+	work := "フォーム添削の追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
 	return buildWorkOrderTerms(coachName, work, int32(int64(c.PriceYen)*int64(c.SharePercent)/100), deliverBy, consignedAt)
 }
 
@@ -153,7 +153,7 @@ func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, cons
 func workOrderNotice(kind string, roomID uuid.UUID) (title, body, url string) {
 	title = "動画添削の依頼が届きました"
 	if kind == "consultation" {
-		title = "追加相談が届きました"
+		title = "追加質問が届きました"
 	}
 	url = "/coach/requests/" + roomID.String() + "#work-order"
 	return title, "", url
@@ -199,7 +199,7 @@ func workOrderWithDelivery(ctx context.Context, q *db.Queries, w db.CoachWorkOrd
 	return out, nil
 }
 
-// attachConsultationWorkOrder は、コーチに見せる追加相談に取引条件を付ける。
+// attachConsultationWorkOrder は、コーチに見せる追加質問に取引条件を付ける。
 // 引き受ける前は今の条件(terms)、引き受けた後は書き留めた通知(work_order)。
 func (s *Server) attachConsultationWorkOrder(ctx context.Context, out map[string]any, c db.CoachingConsultation) error {
 	if c.Status == "offered" {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,6 +111,12 @@ func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 		message.Title = "フォーム添削の仮押さえの取り消しが完了しました"
 	case "consultation_refund":
 		message.Title = "追加相談の返金が完了しました"
+		// 追加相談の返金は動画添削の追加質問とサポートプランの追加相談の両方で起きる。
+		// 通知の宛先 URL はサーバーが作る（添削は /coaching/requests/、契約は /coaching/personal/）ので、
+		// 宛先が添削のときだけ呼び名を「追加質問」にする。
+		if strings.HasPrefix(notice.Url, "/coaching/requests/") {
+			message.Title = "追加質問の返金が完了しました"
+		}
 	}
 	return message
 }

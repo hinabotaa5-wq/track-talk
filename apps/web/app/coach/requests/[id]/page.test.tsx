@@ -46,6 +46,17 @@ const responded = {
   },
 } as unknown as CoachReviewRequest;
 
+// 追加質問の欄は返答後に出る。部屋の取得は空の履歴で答える。
+const emptyRoom = {
+  consultations: [],
+  role: "coach",
+  funding: "cash",
+  price_yen: 500,
+  can_purchase: false,
+  block_reason: "",
+  requires_video: false,
+};
+
 let root: Root;
 let container: HTMLDivElement;
 let scroll: ReturnType<typeof vi.fn>;
@@ -85,6 +96,7 @@ function submitButton(text: string): HTMLButtonElement {
 // 返答の送信成功で、送った返答カードの先頭に完了バナーが出てスクロールする。
 it("返答を送ると完了バナーが出てスクロールする", async () => {
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
     if (options?.method === "POST") return responded;
     return base;
   });
@@ -101,6 +113,7 @@ it("返答を送ると完了バナーが出てスクロールする", async () =
 // 返答の送信に失敗したら、バナーは出さない。
 it("返答の送信に失敗したらバナーは出ない", async () => {
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
     if (options?.method === "POST") throw new Error("送信に失敗しました");
     return base;
   });
@@ -123,6 +136,7 @@ it("補足を送ると完了バナーが出る", async () => {
     response: { ...(clarifying.response as object), clarification: "補足です" },
   } as unknown as CoachReviewRequest;
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
     if (options?.method === "POST") return clarified;
     return clarifying;
   });
@@ -149,6 +163,7 @@ it("差し戻すと完了バナーが履歴の前に出る", async () => {
     },
   } as unknown as CoachReviewRequest;
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
     if (options?.method === "POST") return sentBack;
     return base;
   });
@@ -166,9 +181,10 @@ it("差し戻すと完了バナーが履歴の前に出る", async () => {
 });
 
 it("添削をはじめると入力欄を表示する", async () => {
-  apiFetch.mockImplementation(async (_path: string, options?: { method?: string }) =>
-    options?.method === "POST" ? base : { ...base, started_at: null },
-  );
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    return options?.method === "POST" ? base : { ...base, started_at: null };
+  });
   await renderPage();
   expect(container.textContent).not.toContain("返答を送る");
   await act(async () => submitButton("添削をはじめる").click());

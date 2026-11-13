@@ -53,7 +53,7 @@ func TestLocalizePushMessageFallback(t *testing.T) {
 		t.Fatalf("unknown locale changed: %+v", got)
 	}
 	// en でも表にない本文（名前・金額・日時入り）は日本語のまま。表題だけ置き換える。
-	dynamic := push.Message{Title: "パーソナル指導の期間が終わりました", Body:  "「大会プラン」の期間が終わりました。やりとりは見られなくなりました"}
+	dynamic := push.Message{Title: "パーソナル指導の期間が終わりました", Body: "「大会プラン」の期間が終わりました。やりとりは見られなくなりました"}
 	got := localizePushMessage("en", dynamic)
 	if got.Title != "Personal coaching ended" {
 		t.Fatalf("title = %q", got.Title)
@@ -75,6 +75,10 @@ func TestLocalizeShortenedNotifications(t *testing.T) {
 		"追加相談が届きました":        "New consultation received",
 		"相談が届きました":          "New consultation request",
 		"追加相談の期限が過ぎました":     "Consultation expired",
+		"追加質問が届きました":        "New additional question received",
+		"追加質問が更新されました":      "Additional question updated",
+		"追加質問の期限が過ぎました":     "Additional question expired",
+		"追加質問の返金が完了しました":    "Additional question refund completed",
 		"コーチが申し込みを承諾しました":   "Coach accepted your application",
 		"コーチが依頼を返却しました":     "Coach returned the request",
 		"無料相談にコーチの提案が届きました": "Coach sent a proposal",

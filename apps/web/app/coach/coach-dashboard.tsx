@@ -23,7 +23,6 @@ import type {
 import { useActionLock } from "@/lib/use-action-lock";
 import {
   BellRing,
-  CalendarDays,
   FileText,
   Inbox,
   Landmark,
@@ -114,14 +113,15 @@ function CoachTiles({ label, children }: { label: string; children: ReactNode })
       const rowGapBase = Math.min(16, Math.max(12, window.innerWidth * 0.032));
       const tileSide = tile.getBoundingClientRect().width;
       if (!(tileSide > 0)) return;
-      const natural = tileSide * 4 + rowGapBase * 3 + basePadBlock * 2;
+      const rows = Math.ceil(nav.children.length / 3);
+      const natural = tileSide * rows + rowGapBase * (rows - 1) + basePadBlock * 2;
       const leftover = el.clientHeight - natural;
       if (!(leftover > 0)) {
         setVertical((v) => (v === null ? v : null));
         return;
       }
-      const gapAdd = Math.min(maxGapAdd, leftover / 3);
-      const padAdd = Math.min(maxPadBlock - basePadBlock, (leftover - gapAdd * 3) / 2);
+      const gapAdd = rows > 1 ? Math.min(maxGapAdd, leftover / (rows - 1)) : 0;
+      const padAdd = Math.min(maxPadBlock - basePadBlock, (leftover - gapAdd * (rows - 1)) / 2);
       const next = { rowGap: rowGapBase + gapAdd, padBlock: basePadBlock + padAdd };
       setVertical((v) =>
         v !== null && Math.abs(v.rowGap - next.rowGap) < 0.05 && Math.abs(v.padBlock - next.padBlock) < 0.05 ? v : next,
@@ -300,7 +300,6 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/contracts" label={t(locale, "coach.tile.contracts")} Icon={FileText} badge={appliedContracts} />
         <Tile locale={locale} href="/coach/support-consults" label={t(locale, "coach.tile.supportConsults")} Icon={MessagesSquare} />
         <Tile locale={locale} href="/coach/plans" label={t(locale, "coach.tile.plans")} Icon={Layers} />
-        <Tile locale={locale} href="/coach/availability" label={t(locale, "coach.tile.availability")} Icon={CalendarDays} />
         <Tile locale={locale} href="/coach/commerce" label={t(locale, "coach.tile.commerce")} Icon={Landmark} dot={commerceDot} />
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />

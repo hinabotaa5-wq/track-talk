@@ -66,17 +66,10 @@ func (s *Server) consultationRoot(ctx context.Context, q *db.Queries, id uuid.UU
 	return room, nil
 }
 
-// reviewConsultationFunding は、フォーム添削の追加相談の払い方を決める。購入済みのチケットが残っていれば
-// チケット1枚、なければ申込み時の都度払い（reviewPaymentMethods。今はカードのみ）。チケットの新規販売は止めた。
+// reviewConsultationFunding は、フォーム添削の追加質問の払い方を決める。都度払いのみで、チケットは使えない
+// （チケットは添削本体専用）。残高があっても都度払いにする。
 // 18歳未満の都度払いは本人が自分で払い、送る時と支払い画面を作る時に購入のたびの宣言を確かめる（minor_purchase.go）。
 func reviewConsultationFunding(ctx context.Context, q *db.Queries, room consultationRoom) (string, error) {
-	balance, err := q.TicketBalance(ctx, &room.owner)
-	if err != nil {
-		return "", err
-	}
-	if balance.Available > 0 {
-		return "ticket", nil
-	}
 	return "cash", nil
 }
 func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) (consultationRoom, string, bool) {
@@ -162,8 +155,8 @@ func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.C
 	return c, "", false
 }
 
-// consultationSendOpen は、この追加相談の送信系（質問の送信・支払い・コーチの回答）を開けているか。
-// 動画添削のあとの相談は一方通行の単発の相談なので専用の CoachingConsultation で、契約の相談は
+// consultationSendOpen は、この追加質問・追加相談の送信系（質問の送信・支払い・コーチの回答）を開けているか。
+// 動画添削のあとの追加質問は一方通行の単発の相談なので専用の CoachingConsultation で、契約の相談は
 // 有料の1対1のやりとりとして CoachingMessaging で切り替える。
 func (s *Server) consultationSendOpen(c db.CoachingConsultation) bool {
 	if c.ReviewRequestID != nil {
@@ -176,19 +169,19 @@ func (s *Server) requireConsultationSend(w http.ResponseWriter, c db.CoachingCon
 		return true
 	}
 	if c.ReviewRequestID != nil {
-		Error(w, http.StatusConflict, "consultation_closed_for_now", "追加相談の受付は準備中です")
+		Error(w, http.StatusConflict, "consultation_closed_for_now", "追加質問の受付は準備中です")
 	} else {
 		Error(w, http.StatusConflict, "messaging_closed", "メッセージのやりとりは準備中です")
 	}
 	return false
 }
 
-// consultationRespondWindow は、支払い（チケットなら送信）でコーチに届いてから受諾までの期限。
+// consultationRespondWindow は、支払いでコーチに届いてから受諾までの期限。
 // SQL の SubmitTicketConsultation・MarkConsultationPaid の interval '48 hours' と揃えること。
 const consultationRespondWindow = 48 * time.Hour
 
-// reviewConsultationAttempted は、動画添削のあとの追加相談が「試行」に数えるものか。
-// 支払い（チケットなら送信）を終えてコーチに届いたものだけを数え、下書き・支払い前の取り下げや期限切れは数えない。
+// reviewConsultationAttempted は、動画添削のあとの追加質問が「試行」に数えるものか。
+// 支払いを終えてコーチに届いたものだけを数え、下書き・支払い前の取り下げや期限切れは数えない。
 // 期限切れのうち、届いた後の受諾・回答の期限切れは数える。支払いが期限の後に届いて、そのまま返金で終わったもの
 // （届けた時刻と終了の時刻が同じ）はコーチに届いていないので数えない。
 func reviewConsultationAttempted(c db.CoachingConsultation) bool {
@@ -201,7 +194,7 @@ func reviewConsultationAttempted(c db.CoachingConsultation) bool {
 	return false
 }
 
-// reviewConsultationLimit は、動画添削のあとの追加相談の回数の上限を確かめる。1つの添削につき1回（質問1回と回答1回）。
+// reviewConsultationLimit は、動画添削のあとの追加質問の回数の上限を確かめる。1つの添削につき1回（質問1回と回答1回）。
 // 回答に至らず終わった（辞退・期限切れで返金した）ときだけ、もう1回まで買い直せる。回答が1件でもあれば買えない。
 // 部屋の表示・下書きの保存・送信のどれも consultationOffer を通るので、ここで3か所とも同じ判定になる。
 func reviewConsultationLimit(ctx context.Context, q *db.Queries, reviewID uuid.UUID) error {
@@ -212,14 +205,14 @@ func reviewConsultationLimit(ctx context.Context, q *db.Queries, reviewID uuid.U
 	attempts := 0
 	for _, c := range rows {
 		if c.Status == "answered" {
-			return &ticketRuleError{"consultation_limit", "この添削の追加相談は回答済みです。追加相談は1つの添削につき1回までです"}
+			return &ticketRuleError{"consultation_limit", "この添削の追加質問は回答済みです。追加質問は1つの添削につき1回までです"}
 		}
 		if reviewConsultationAttempted(c) {
 			attempts++
 		}
 	}
 	if attempts >= 2 {
-		return &ticketRuleError{"consultation_limit", "この添削の追加相談は、買い直しの1回を含めて上限に達しました"}
+		return &ticketRuleError{"consultation_limit", "この添削の追加質問は、買い直しの1回を含めて上限に達しました"}
 	}
 	return nil
 }
@@ -256,7 +249,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 		if rr.Status != "returned" || rs.HiddenAt != nil {
 			return 0, 0, false, &ticketRuleError{"consultation_unavailable", "添削の返却・補足回答を待ってから相談できます"}
 		}
-		return ticketFaceYen, reviewSharePercent, false, nil
+		return reviewConsultationPriceYen, reviewSharePercent, false, nil
 	}
 	c := room.contract
 	if c.MessagesPurgedAt != nil || c.Status == "refunded" || c.Status == "suspended" {
@@ -348,7 +341,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		item := s.consultationJSON(c)
-		// フォーム添削の追加相談は運営者がコーチに委託するので、コーチには取引条件を見せる。
+		// フォーム添削の追加質問は運営者がコーチに委託するので、コーチには取引条件を見せる。
 		if role == "coach" && room.review != nil && c.CoachID != nil {
 			if err := s.attachConsultationWorkOrder(r.Context(), item, c); err != nil {
 				MapDBError(w, err)
@@ -604,10 +597,10 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if !s.stripe.Configured() {
-			return &ticketRuleError{"payment_unavailable", "追加相談の決済は準備中です"}
+			return &ticketRuleError{"payment_unavailable", "追加質問の決済は準備中です"}
 		}
 		if current.ContractID == nil {
-			// 販売停止中の(1)追加相談の残存経路も、全員の購入前チェックを記録する。
+			// フォーム添削のあとの追加質問も、全員の購入前チェックを記録する。
 			if err := requirePurchaseNotice(true, declared.GuardianPermission); err != nil {
 				return err
 			}
@@ -637,7 +630,7 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if saved.Status == "offered" {
-		s.notifyConsultation(r.Context(), saved, true, "追加相談が届きました")
+		s.notifyConsultation(r.Context(), saved, true, "追加質問が届きました")
 	}
 	JSON(w, 200, map[string]any{"consultation": s.consultationJSON(saved)})
 }
@@ -690,9 +683,9 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clarifying := action == "clarify" || action == "clarification"
-	// 動画添削のあとの追加相談は質問1回・回答1回の一方通行なので、回答への確認・補足はない。
+	// 動画添削のあとの追加質問は質問1回・回答1回の一方通行なので、回答への確認・補足はない。
 	if clarifying && c.ReviewRequestID != nil {
-		Error(w, http.StatusConflict, "clarify_unavailable", "動画添削の追加相談には、回答への確認・補足はありません")
+		Error(w, http.StatusConflict, "clarify_unavailable", "動画添削の追加質問には、回答への確認・補足はありません")
 		return
 	}
 	// 回答・確認・補足は送信にあたるので、ゲートが閉じている間は止める。受諾・辞退・取り消しは止めない。
@@ -750,7 +743,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		switch action {
 		case "accept":
 			saved, err = q.AcceptConsultation(r.Context(), db.AcceptConsultationParams{ID: c.ID, CoachID: c.CoachID})
-			// フォーム添削の追加相談は、引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
+			// フォーム添削の追加質問は、引き受けた時点の取引条件を書き留める(フリーランス保護法3条の明示)。
 			// サポートプランの追加相談はコーチが販売者なので、要否は弁護士の回答(Q9)を待つ。
 			if err == nil && saved.ReviewRequestID != nil {
 				name, e := coachDisplayName(r.Context(), q, *saved.CoachID)
@@ -810,7 +803,11 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if action == "answer" || action == "clarification" || action == "decline" {
-		s.notifyConsultation(r.Context(), saved, false, "追加相談が更新されました")
+		title := "追加相談が更新されました"
+		if saved.ReviewRequestID != nil {
+			title = "追加質問が更新されました"
+		}
+		s.notifyConsultation(r.Context(), saved, false, title)
 	}
 	if action == "clarify" {
 		s.notifyConsultation(r.Context(), saved, true, "回答への確認質問が届きました")

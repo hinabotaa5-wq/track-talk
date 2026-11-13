@@ -39,6 +39,7 @@ func newCapturedFixture(t *testing.T) capturedFixture {
 	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'review',$2,1500,70,1050, now())`, coach, request)
 	return capturedFixture{h, f, admin, user, coach, payment, request, intent}
 }
+
 // legacyReviewAmount は、返金・相殺の仕組みのテストで、支払いを旧料金（1,500円・報酬1,050円）の記録にする。
 // 料金を500円にした後も（本体 #569）、旧料金で払われた支払いの返金・相殺がそのまま動くことを確かめる。
 func legacyReviewAmount(t *testing.T, request string) {
@@ -270,16 +271,16 @@ func TestCapturedRefundConcurrentWithPayout(t *testing.T) {
 	}
 }
 
-func TestCapturedRefundConsultationSixHundred(t *testing.T) {
+func TestCapturedRefundConsultationFiveHundred(t *testing.T) {
 	x := newCapturedFixture(t)
 	id := uuid.New()
-	execSQLArgs(t, `INSERT INTO coaching_consultations(id,requester_id,coach_id,request_key,review_request_id,minor,funding,price_yen,share_percent,status,payment_state,payment_intent_id,paid_at,answered_at) SELECT $1,payer_id,$2,gen_random_uuid(),request_id,false,'cash',600,70,'answered','paid','pi_extra_600',now(),now() FROM review_payments WHERE id=$3`, id, x.coach, x.payment)
-	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,consultation_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'consultation',$2,600,70,420, now())`, x.coach, id)
-	rec := doJSON(t, x.h, "POST", "/v1/admin/coaching/payments/"+id.String()+"/refund", x.admin, map[string]any{"source": "consultation", "reason": "追加相談の返金"})
+	execSQLArgs(t, `INSERT INTO coaching_consultations(id,requester_id,coach_id,request_key,review_request_id,minor,funding,price_yen,share_percent,status,payment_state,payment_intent_id,paid_at,answered_at) SELECT $1,payer_id,$2,gen_random_uuid(),request_id,false,'cash',500,70,'answered','paid','pi_extra_500',now(),now() FROM review_payments WHERE id=$3`, id, x.coach, x.payment)
+	execSQLArgs(t, `INSERT INTO coach_earnings(id,coach_id,source,consultation_id,gross_yen,share_percent,amount_yen, confirmed_at) VALUES(gen_random_uuid(),$1,'consultation',$2,500,70,350, now())`, x.coach, id)
+	rec := doJSON(t, x.h, "POST", "/v1/admin/coaching/payments/"+id.String()+"/refund", x.admin, map[string]any{"source": "consultation", "reason": "追加質問の返金"})
 	if rec.Code != 202 {
 		t.Fatal(rec.Body.String())
 	}
-	if len(x.f.refundList()) != 1 || x.f.refundList()[0].Get("amount") != "600" {
+	if len(x.f.refundList()) != 1 || x.f.refundList()[0].Get("amount") != "500" {
 		t.Fatal("consultation amount")
 	}
 	if scalar(t, `SELECT count(*) FROM captured_refund_earnings f JOIN coach_earnings e ON e.id=f.earning_id WHERE e.consultation_id=$1 AND f.excluded`, id) != 1 {
