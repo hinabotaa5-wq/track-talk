@@ -3,10 +3,14 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Page from "./page";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 const fetch = vi.hoisted(() => vi.fn());
-vi.mock("@/components/auth-provider", () => ({useAuth:()=>({session:{},token:"test",loading:false})}));
+const auth = vi.hoisted(() => ({ session: {} as Record<string, unknown> | null, token: "test" as string | null, loading: false }));
+vi.mock("@/components/auth-provider", () => ({useAuth:()=>({session:auth.session,token:auth.token,loading:auth.loading})}));
+const push = vi.hoisted(() => vi.fn());
 const search = vi.hoisted(() => ({tab: null as string | null}));
-vi.mock("next/navigation", () => ({useRouter:()=>({push:vi.fn()}),useSearchParams:()=>({get:(k:string)=>k==="tab"?search.tab:null})}));
+vi.mock("next/navigation", () => ({useRouter:()=>({push}),useSearchParams:()=>({get:(k:string)=>k==="tab"?search.tab:null})}));
 vi.mock("@/lib/api", () => ({apiFetch:fetch,apiErrorText:()=>"失敗"}));
 vi.mock("@/components/confirm-dialog", () => ({useConfirm:()=>vi.fn(),deleteConfirmOptions:vi.fn()}));
 vi.mock("@/components/sense-note-jar", () => ({SenseNoteJar:()=>null}));
@@ -19,11 +23,12 @@ let root:Root, container:HTMLDivElement;
 beforeEach(()=>{
  (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
  search.tab=null;
+ auth.session={};auth.token="test";auth.loading=false;push.mockClear();setActiveLocale("ja");
  vi.useFakeTimers();vi.setSystemTime(new Date("2026-10-25T03:00:00Z"));
  fetch.mockReset();fetch.mockImplementation(async (path:string)=>path.includes("/race-records/pb-stats")?{events:[]}:path.includes("/me/race-records")?{records:[race],events:[{event:"100m",event_label:"100m",kind:"time",wind:true,count:1}]}:{notes:[{id:"note",day:"2026-10-24",body:"同じ日の練習の感覚",event:null,event_label:null}],stats,next_cursor:null});
  container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);
 });
-afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
+afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();setActiveLocale("ja");});
 
 it.each([
   { tab: null, path: "/v1/me/sense-notes" },
@@ -70,4 +75,25 @@ it("記録のお知らせから /memo?tab=records を開くと、メモを開い
  search.tab="records";
  await act(async()=>root.render(<Page/>));
  expect(container.querySelector('input[type="date"]')).not.toBeNull();
+});
+it("未ログインでは案内バナーを出さず、感覚・記録タブは表示する",async()=>{
+ auth.session=null;auth.token=null;
+ await act(async()=>root.render(<Page/>));
+ expect(container.textContent).not.toContain("ログインすると、感覚や記録をためて、あとからふりかえれます。");
+ expect(container.textContent).not.toContain("Log in to collect your feel notes and records and look back on them later.");
+ const tabs=[...container.querySelectorAll("nav button")].map((b)=>b.textContent?.trim());
+ expect(tabs).toEqual(expect.arrayContaining(["感覚","記録"]));
+ expect(container.querySelector("section.app-card")).not.toBeNull();
+ await act(async()=>container.querySelector("section.app-card")!.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true})));
+ expect(push).toHaveBeenCalledWith("/login?next=/memo");
+});
+it("未ログインの英語表示でも案内バナーを出さない",async()=>{
+ auth.session=null;auth.token=null;
+ installEnglish(en);
+ setActiveLocale("en");
+ await act(async()=>root.render(<Page/>));
+ expect(container.textContent).not.toContain("Log in to collect your feel notes and records and look back on them later.");
+ expect(container.textContent).not.toContain("ログインすると、感覚や記録をためて、あとからふりかえれます。");
+ const tabs=[...container.querySelectorAll("nav button")].map((b)=>b.textContent?.trim());
+ expect(tabs).toEqual(expect.arrayContaining(["Feel","Records"]));
 });

@@ -773,7 +773,6 @@ export const en: Readonly<Record<string, string>> = {
   "メモ": "Notes",
   "感覚と記録の切り替え": "Switch between feel and records",
   "感覚": "Feel",
-  "ログインすると、感覚や記録をためて、あとからふりかえれます。": "Log in to collect your feel notes and records and look back on them later.",
   "記録の取得に失敗しました。下のカレンダーから再読み込みできます。": "Couldn't load records. You can reload from the calendar below.",
   "感覚メモの取得に失敗しました。時間をおいて、もう一度開いてください。": "Couldn't load feel notes. Please wait a moment and open it again.",
   "エグかった練習": "Brutal workout",
