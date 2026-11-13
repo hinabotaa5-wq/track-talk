@@ -4,10 +4,15 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import NewReviewRequestPage from "./page";
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), me: { demo: true, birth_month: "2011-01", is_minor: true, guardian: null, push_devices: 0 } as Record<string, unknown> }));
+const mocks = vi.hoisted(() => ({
+  api: vi.fn(),
+  me: { demo: true, birth_month: "2011-01", is_minor: true, guardian: null, push_devices: 0 } as Record<string, unknown>,
+  router: { replace: vi.fn(), push: vi.fn() },
+  auth: { session: {} as Record<string, unknown> | null, token: "token" as string | null, loading: false },
+}));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ session: {}, token: "token", loading: false }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
+vi.mock("@/components/auth-provider", () => ({ useAuth: () => mocks.auth }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => mocks.api(...args) }));
 
 let container: HTMLDivElement;
@@ -16,6 +21,12 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   mocks.api.mockReset();
+  mocks.router.replace.mockReset();
+  mocks.router.push.mockReset();
+  mocks.auth.session = {};
+  mocks.auth.token = "token";
+  mocks.auth.loading = false;
+  window.history.replaceState(null, "", "/coaching/new");
   mocks.api.mockImplementation(async (path: string) => {
     if (path === "/v1/me/coaching") return mocks.me;
     if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
@@ -186,4 +197,54 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
   expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
   expect([...confirm!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["確定してお支払いへ（500円）", "戻って直す"]);
+});
+
+const reviewCoach = (id: string) => ({ id, nickname: `コーチ${id}`, photo_url: "", events: ["100m"], years: 3, best_record: "", achievements: "" });
+
+function mockReviewOpen(nominees: ReturnType<typeof reviewCoach>[]) {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: nominees };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: false };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+}
+
+it("?coach= で受付中のコーチを初期選択する（本体 #643）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c9"), reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  const picked = container.querySelector<HTMLInputElement>('input[value="c1"]');
+  expect(picked?.checked).toBe(true);
+  expect(container.textContent).not.toContain("このコーチは現在、動画添削を受け付けていません");
+});
+
+it("?coach= のコーチが受付中でない場合は明示を出して他のコーチを選べる（本体 #643）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c9")]);
+  await render();
+  await act(async () => {});
+  expect(container.querySelector('[role="note"]')?.textContent).toBe("このコーチは現在、動画添削を受け付けていません");
+  expect(container.querySelector('input[value="c1"]')).toBeNull();
+  expect(container.querySelector<HTMLInputElement>('input[value="c9"]')?.checked).toBe(false);
+  expect(container.querySelector("form")).not.toBeNull();
+});
+
+it("coach 指定なしの従来動作は変えない（本体 #643）", async () => {
+  mockReviewOpen([reviewCoach("c9")]);
+  await render();
+  await act(async () => {});
+  expect(container.querySelector('[role="note"]')).toBeNull();
+  expect(container.querySelector<HTMLInputElement>('input[type="radio"]:checked')).toBeNull();
+});
+
+it("ログインを挟んでも coach 指定が落ちない（戻り先にクエリを残す。本体 #643）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.auth.session = null;
+  mocks.auth.token = null;
+  await render();
+  expect(mocks.router.replace).toHaveBeenCalledWith("/login?next=%2Fcoaching%2Fnew%3Fcoach%3Dc1");
 });
