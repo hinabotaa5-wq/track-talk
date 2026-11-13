@@ -120,12 +120,12 @@ describe("ヘッダーの開閉", () => {
     expect(feedbackIndex).toBe(instagramIndex + 1);
   });
 
-  it("ロゴは24pxのマークと16pxの文字にする（文言とリンク先は不変）", async () => {
+  it("ロゴは32pxのマークと20pxの文字にする（文言とリンク先は不変）", async () => {
     await act(async () => root.render(<AppLogo />));
     expect(container.textContent).toContain("TrackTalk");
-    expect(container.querySelector("svg")?.getAttribute("class")).toContain("size-6");
+    expect(container.querySelector("svg")?.getAttribute("class")).toContain("size-8");
     const text = [...container.querySelectorAll("span")].find((el) => el.children.length === 0 && el.textContent === "TrackTalk")!;
-    expect(text.getAttribute("class")).toContain("text-base");
+    expect(text.getAttribute("class")).toContain("text-xl");
   });
 
   it("ご意見を開いている間はアイコンを選択状態にする", async () => {
