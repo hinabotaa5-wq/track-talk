@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
+import { loginPathFrom } from "@/lib/safe-next";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
@@ -35,7 +36,7 @@ import { looksLikeContact } from "@/lib/solicitation";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 // フォーム添削の依頼を送る。支払いのある環境では誰でも申し込める（招待コードのゲートは外した。本体 #569）。
 // 依頼するコーチは選手が選ぶ（運営からの割り当てはしない）。料金はどのコーチでも同じ。
@@ -75,6 +76,9 @@ export default function NewReviewRequestPage() {
   const [coachID, setCoachID] = useState("");
   const [coachesLoading, setCoachesLoading] = useState(true);
   const [coachesError, setCoachesError] = useState("");
+  // コーチ詳細からの指定（?coach=）。受付中なら初期選択し、受付中でなければ明示を出す（指定は捨てない）。
+  const [coachNotice, setCoachNotice] = useState("");
+  const appliedCoachRef = useRef("");
   const coach = coaches.find((c) => c.id === coachID);
   const totalPrice = estimate?.price_yen ?? reviewPriceYen;
   const cashPrice = method === "tickets" ? 0 : totalPrice;
@@ -101,9 +105,48 @@ export default function NewReviewRequestPage() {
 
   useEffect(() => {
     if (!loading && !session) {
-      router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      // ログインを挟んでも coach 指定が落ちないよう、クエリを含めた戻り先にする。
+      router.replace(loginPathFrom(window.location));
     }
   }, [loading, session, router]);
+
+  // コーチ詳細からの ?coach= の引き継ぎ。受付中（いずれかの担当種目で nominees に含まれる）なら
+  // そのコーチを初期選択し、初期の種目はコーチの担当種目の並び順を優先する。
+  // 受付中でない場合は明示を出し、他のコーチを選べる状態にする。coach 指定なしの従来動作は変えない。
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("coach")?.trim() ?? "";
+    if (!token || !reviewOpen || !requested || appliedCoachRef.current === requested) return;
+    let cancelled = false;
+    void (async () => {
+      const lists = await Promise.all(reviewEvents.map(async (reviewEvent) => {
+        try {
+          const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(reviewEvent)}`, { token });
+          return { event: reviewEvent, coaches: data.coaches as ReviewCoachOption[] | null };
+        } catch {
+          // 取得に失敗した種目は判定に使わない。全種目で失敗したら何もしない。
+          return { event: reviewEvent, coaches: null as ReviewCoachOption[] | null };
+        }
+      }));
+      if (cancelled) return;
+      if (lists.every(({ coaches: list }) => list === null)) return;
+      appliedCoachRef.current = requested;
+      const accepting = lists.filter(({ coaches: list }) => (list ?? []).some((c) => c.id === requested));
+      if (accepting.length === 0) {
+        setCoachNotice(L("このコーチは現在、動画添削を受け付けていません"));
+        return;
+      }
+      const record = accepting.flatMap(({ coaches: list }) => list ?? []).find((c) => c.id === requested);
+      const acceptingEvents = new Set(accepting.map(({ event: reviewEvent }) => reviewEvent));
+      const preferred = record?.events.find((e) => acceptingEvents.has(e)) ?? accepting[0].event;
+      setEvent(preferred);
+      setCoaches(lists.find(({ event: reviewEvent }) => reviewEvent === preferred)?.coaches ?? []);
+      setCoachesLoading(false);
+      setCoachesError("");
+      setCoachID(requested);
+      setCoachNotice("");
+    })();
+    return () => { cancelled = true; };
+  }, [token, reviewOpen]);
 
   async function loadMe() {
     try {
@@ -291,6 +334,7 @@ export default function NewReviewRequestPage() {
             </div>
           </fieldset>
 
+          {coachNotice ? <p role="note" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">{coachNotice}</p> : null}
           <ReviewCoachPicker coaches={coaches} value={coachID} onChange={setCoachID} disabled={pending} error={coachesError} loading={coachesLoading} />
           <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
             <p>{L("動画添削（動画1本）")}</p>

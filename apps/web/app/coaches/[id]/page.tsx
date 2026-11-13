@@ -2,15 +2,20 @@
 import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
+import { useAuth } from "@/components/auth-provider";
 
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { CoachServicePlans } from "@/components/coach-service-plans";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
+import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
+import { Trophy } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -22,9 +27,15 @@ export default function CoachDetailPage() {
 const subscribeToPreview = () => () => {};
 const noServerPreview = () => undefined;
 
+// 動画添削の受付状態。ログイン済みのときだけ nominees（受付中のコーチだけが返る正本）で確かめる。
+// 未ログイン、または受付状態の取得に失敗した場合は有効なまま出す（最終確認は申込フロー側が担う）。
+type Availability = "available" | "unavailable" | "unknown";
+
 function CoachDetail({ id }: { id: string }) {
   const preview = useSyncExternalStore(subscribeToPreview, () => getCoachDetailPreview(id), noServerPreview);
   const [result, setResult] = useState<{ coach: PublicCoach | null } | { error: true }>();
+  const { token } = useAuth();
+  const [availability, setAvailability] = useState<Availability>("unknown");
 
   useEffect(() => {
     let cancelled = false;
@@ -43,41 +54,88 @@ function CoachDetail({ id }: { id: string }) {
   }, [id]);
 
   const coach = result && "coach" in result ? result.coach : preview;
+  const eventsKey = coach?.events.join(",");
+  const coachID = coach && "id" in coach ? coach.id : undefined;
+
+  useEffect(() => {
+    if (!token || !coachID || !eventsKey) return;
+    let cancelled = false;
+    const events = eventsKey.split(",");
+    Promise.all(events.map((event) =>
+      apiFetch<{ coaches: { id: string }[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token })
+        .then((r): { id: string }[] => r.coaches)
+        // 取得に失敗した種目は判定に使わない。全種目で失敗したら有効なままにする。
+        .catch((): { id: string }[] | null => null),
+    )).then((results) => {
+      if (cancelled) return;
+      if (results.every((list) => list === null)) return;
+      setAvailability(results.some((list) => (list ?? []).some((c) => c.id === coachID)) ? "available" : "unavailable");
+    });
+    return () => { cancelled = true; };
+  }, [token, coachID, eventsKey]);
+
+  const achievementLines = coach?.achievements ? coach.achievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
+  const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
+  const ctaEnabled = availability !== "unavailable";
 
   return (
     <div className="mx-auto max-w-md space-y-6">
       {result && "error" in result ? <p role="alert" className="text-sm text-red-400">{L("コーチの詳細を読み込めませんでした")}</p> : coach === undefined ? <PageLoading screen label={L("読み込み中...")} /> : coach === null ? <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p> : <>
         <section className="glass space-y-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm" aria-label={L("コーチのプロフィール")}>
-          <div className="flex items-center gap-4">
-            <CoachAvatar url={coach.photo_url} name={coach.nickname} size={80} />
-            <div className="min-w-0 space-y-1 break-words">
-              <h1 className="text-xl font-bold text-white">{coach.nickname ?? L("名前なし")}</h1>
+          <div className="flex items-start gap-4">
+            <CoachAvatar url={coach.photo_url} name={coach.nickname} size={112} />
+            <div className="min-w-0 flex-1 space-y-1.5 break-words">
+              <h1 className="text-2xl font-bold text-white">{coach.nickname ?? L("名前なし")}</h1>
               {coach.rating_count !== undefined && coach.rating_average !== undefined ? (
-                <p className="text-xs text-slate-200">{coach.rating_count > 0 ? L("★{v0}", { v0: coach.rating_average.toFixed(1) }) : L("評価はまだありません")}</p>
+                <p className="text-sm text-slate-200">{coach.rating_count > 0 ? L("★{v0}", { v0: coach.rating_average.toFixed(1) }) : L("評価はまだありません")}</p>
               ) : null}
+              {coach.events.length ? <ul className="flex flex-wrap gap-1.5" aria-label={L("担当種目")}>
+                {coach.events.map((event) => <li key={event} className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{coachEventLabels[event]}</li>)}
+              </ul> : null}
             </div>
           </div>
-          <dl className="space-y-3">
-            {[
-              [L("担当種目"), coach.events.map((event) => coachEventLabels[event]).join(L("、"))],
-              [L("記録"), coach.best_record],
-              [L("成績や指導経験"), coach.achievements],
-              [L("担当サービス"), (coach.service_types ?? []).map((service) => coachingServiceLabels[service]).join(L("・"))],
-            ].filter(([, value]) => value).map(([label, value]) => <div key={label}>
-              <dt className="text-xs text-slate-300">{label}</dt>
-              <dd className="whitespace-pre-wrap break-words text-slate-100">{value}</dd>
-            </div>)}
+          <dl className="space-y-4">
+            {coach.best_record ? <div>
+              <dt className="text-xs text-slate-300">{L("記録")}</dt>
+              <dd className="mt-1 flex items-center gap-2 text-lg font-bold text-white"><Trophy className="size-5 shrink-0 text-amber-400" aria-hidden /><span className="break-words">{coach.best_record}</span></dd>
+            </div> : null}
+            {achievementLines.length ? <div>
+              <dt className="text-xs text-slate-300">{L("成績や指導経験")}</dt>
+              <dd className="mt-1">
+                <ul className="space-y-1.5">
+                  {achievementLines.map((line, index) => <li key={index} className="border-l-2 border-blue-400/60 pl-2 break-words text-slate-100">{line}</li>)}
+                </ul>
+              </dd>
+            </div> : null}
+            {(coach.service_types ?? []).length ? <div>
+              <dt className="text-xs text-slate-300">{L("担当サービス")}</dt>
+              <dd className="whitespace-pre-wrap break-words text-slate-100">{(coach.service_types ?? []).map((service) => coachingServiceLabels[service]).join(L("・"))}</dd>
+            </div> : null}
             {coach.hitokoto ? <div>
               <dt className="text-xs text-slate-300">{L("ひとこと")}</dt>
               <dd className="whitespace-pre-wrap break-words text-slate-100">{coach.hitokoto}</dd>
             </div> : null}
             {(coach.sns_urls ?? []).length ? <div>
               <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
-              <dd className="space-y-1">
+              <dd className="mt-1 flex flex-wrap gap-1.5">
                 {(coach.sns_urls ?? []).map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
             </div> : null}
           </dl>
+        </section>
+        <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
+          <h2 id="coach-video-review" className="text-lg font-bold">{L("動画添削")}</h2>
+          <p className="text-slate-200">{L("1回 {v0}（税込）・チケットも使えます", { v0: formatYen(reviewPriceYen) })}</p>
+          {ctaEnabled ? <Link
+            href={ctaHref}
+            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98]"
+          >{L("動画添削を依頼する")}</Link> : <>
+            <span
+              aria-disabled="true"
+              className="flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-4 text-sm font-semibold text-slate-400"
+            >{L("動画添削を依頼する")}</span>
+            <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>
+          </>}
         </section>
         <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
           <h2 id="coach-plans" className="text-lg font-bold">{L("サポートプラン")}</h2>
