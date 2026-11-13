@@ -18,8 +18,6 @@
   NEXT_PUBLIC_VIDEO_REVIEW_NOTICE = ""
   # コーチ一覧（/coaches とコーチの詳細）の公開。コーチングを開けても "0" の間は一覧だけ準備中にする。開けるのは運営者の指示があってから
   NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED = "0"
-  # 海外コーチの指導希望の集計カード（コーチタブの独立カード、本体 #542）。集計が目的なので "1" で出す
-  NEXT_PUBLIC_OVERSEAS_INTEREST_ENABLED = "1"
 
 [context.production.environment]
   # ブラウザに配布する公開プロジェクトキー。管理用の秘密鍵ではない。
