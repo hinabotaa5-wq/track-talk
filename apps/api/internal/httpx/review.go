@@ -255,8 +255,9 @@ type reviewRequestReq struct {
 	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
 	// 支払い方法（reviewPaymentMethods のどれか。今は card のみ）。Stripe の鍵があるときだけ使う。
-	Method     string `json:"method"`
-	UseTickets bool   `json:"use_tickets"`
+	Method       string `json:"method"`
+	UseTickets   bool   `json:"use_tickets"`
+	ReferralCode string `json:"referral_code"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
@@ -432,7 +433,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if payments {
-		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.minorDeclarationReq)
+		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.ReferralCode, req.minorDeclarationReq)
 		if err != nil {
 			// 支払い画面を作れなかったら、同じ動画で送り直せるように依頼を消す。
 			if derr := s.tx(r.Context(), func(q *db.Queries) error {

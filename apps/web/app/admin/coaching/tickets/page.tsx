@@ -36,6 +36,61 @@ function todayJst(): string {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+type ReferralRow = {
+  code: string;
+  owner_id: string;
+  nickname: string | null;
+  buyers: string[];
+  granted_at: string | null;
+  canceled_at: string | null;
+  qualifying_refund_at: string | null;
+};
+
+function ReferralOverview({ token }: { token: string | null }) {
+  const [code, setCode] = useState("");
+  const [rows, setRows] = useState<ReferralRow[] | null>(null);
+  const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
+
+  async function search(value: string) {
+    if (!acquire()) return;
+    setError("");
+    try {
+      const result = await apiFetch<{ referrals: ReferralRow[] | null }>(
+        `/v1/admin/coaching/referrals?code=${encodeURIComponent(value)}`, { token },
+      );
+      setRows(result.referrals ?? []);
+    } catch (err) {
+      setRows(null);
+      setError(err instanceof ApiRequestError ? err.message : "紹介情報を読み込めませんでした");
+    } finally {
+      release();
+    }
+  }
+
+  return <section className="app-card space-y-2 rounded-xl p-3">
+    <h2 className="font-semibold">紹介特典</h2>
+    <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void search(code); }}>
+      <label className="text-sm">紹介ID
+        <input className="block rounded-lg border border-slate-500 bg-transparent p-2" value={code} maxLength={32}
+          onChange={(event) => setCode(event.target.value)} />
+      </label>
+      <Button type="submit" disabled={pending || !code.trim()}>検索</Button>
+      <Button type="button" variant="secondary" disabled={pending} onClick={() => void search("")}>付与履歴</Button>
+    </form>
+    {error ? <p role="alert">{error}</p> : null}
+    {rows?.length === 0 ? <p>該当する記録はありません</p> : null}
+    {rows?.map((row) => <div className="space-y-1 break-all border-t border-slate-500/40 pt-2 text-sm"
+      key={`${row.owner_id}:${row.granted_at}`}>
+      <p>{row.code}　{row.nickname ?? row.owner_id}</p>
+      <p>購入者ID {row.buyers.join("、") || "なし"}</p>
+      <p>{row.granted_at ? `付与 ${formatDateTime(row.granted_at)}` : "未付与"}
+        {row.canceled_at ? ` ／ 取消し ${formatDateTime(row.canceled_at)}` : row.qualifying_refund_at ? " ／ 紹介購入の返金あり" : ""}
+      </p>
+    </div>)}
+  </section>;
+}
+
 function TicketAdmin() {
   const { token } = useAuth();
   const [data, setData] = useState<Data | null>(null);
@@ -105,6 +160,7 @@ function TicketAdmin() {
 
   return <div className="mx-auto max-w-2xl space-y-4">
     <h1 className="text-xl font-bold">チケット購入・返金管理</h1>
+    <ReferralOverview token={token} />
     <Link href="/admin" className="text-sm text-blue-300 underline">運営画面に戻る</Link>
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     {message ? <p role="status" className="text-sm text-blue-200">{message}</p> : null}

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { LoadedReferralCard, ReferralInput, validReferralInput } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { SellerNote } from "@/components/seller-note";
@@ -28,6 +30,9 @@ function TicketsPage() {
   const [summary, setSummary] = useState<TicketSummary | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [completedReturn, setCompletedReturn] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralWarning, setReferralWarning] = useState(false);
   const { pending, acquire, release } = useActionLock();
   // 支払い画面へ進む前の最終確認に出している商品。
   const [confirming, setConfirming] = useState<TicketProduct | null>(null);
@@ -68,7 +73,7 @@ function TicketsPage() {
           if (cancelled) return;
           setMessage(L("購入内容を反映しました"));
           const target = ticketReturnPath(purchase.return_path);
-          router.replace(target);
+          setCompletedReturn(target);
           return;
         }
         setMessage(L("お支払いの確認中です。確認が済みしだい元の画面に戻ります。"));
@@ -80,7 +85,7 @@ function TicketsPage() {
     }
     void check();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [token, purchaseID, load, router]);
+  }, [token, purchaseID, load]);
 
   async function buy(productID: string) {
     if (!session || !summary) return;
@@ -92,18 +97,23 @@ function TicketsPage() {
     setError("");
     const storageKey = `tracktalk-tickets:${session.user.id}:${productID}:${returnPath}`;
     try {
+      if (!await validReferralInput(referralCode, token)) {
+        setReferralCode("");
+        setReferralWarning(true);
+        return;
+      }
       let key = sessionStorage.getItem(storageKey);
       if (!key || summary.purchases?.some((p) => p.request_key === key && p.status !== "pending")) {
         key = crypto.randomUUID();
         sessionStorage.setItem(storageKey, key);
       }
       const result = await apiFetch<{ checkout_url?: string; paid?: boolean; return_path?: string }>("/v1/coaching/tickets/checkout", {
-        method: "POST", token, body: JSON.stringify({ product_id: productID, request_key: key, return_path: returnPath, ...declaration.body(needsDeclaration) }),
+        method: "POST", token, body: JSON.stringify({ product_id: productID, request_key: key, return_path: returnPath, referral_code: referralCode, ...declaration.body(needsDeclaration) }),
       });
       if (result.paid) {
         sessionStorage.removeItem(storageKey);
         await load();
-        router.replace(ticketReturnPath(result.return_path));
+        setCompletedReturn(ticketReturnPath(result.return_path));
       } else if (result.checkout_url) window.location.assign(result.checkout_url);
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "ticket_checkout_expired") sessionStorage.removeItem(storageKey);
@@ -112,6 +122,11 @@ function TicketsPage() {
   }
 
   if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
+  if (completedReturn) return <div className="mx-auto max-w-md space-y-5">
+    <h1 className="text-2xl font-bold">{L("購入内容を反映しました")}</h1>
+    <LoadedReferralCard token={token} />
+    <Link className="text-blue-300 underline" href={completedReturn}>{L("元の画面に戻る")}</Link>
+  </div>;
   return <div className="mx-auto max-w-md space-y-5">
     <h1 className="text-2xl font-bold">{L("コーチングチケット")}</h1>
     <SellerNote />
@@ -130,6 +145,8 @@ function TicketsPage() {
           pending={pending}
           confirmDisabled={!declaration.checked}
         >
+          <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+            onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declaration.checked} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         </PurchaseConfirm>
       ) : (summary.products ?? []).map((p) => {

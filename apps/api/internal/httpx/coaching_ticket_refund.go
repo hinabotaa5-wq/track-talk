@@ -35,7 +35,7 @@ func (s *Server) prepareTicketRefund(ctx context.Context, id uuid.UUID) (db.Coac
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		l, err := q.LockTicketLot(ctx, id)
+		l, err := q.LockPurchasedTicketLot(ctx, &id)
 		if err != nil {
 			return err
 		}
@@ -60,7 +60,7 @@ func (s *Server) prepareTicketRefund(ctx context.Context, id uuid.UUID) (db.Coac
 		if err != nil {
 			return err
 		}
-		return moveTickets(ctx, q, id, "refund-"+out.ID.String(), "refund", -n, 0, 0, n)
+		return moveTickets(ctx, q, l.ID, "refund-"+out.ID.String(), "refund", -n, 0, 0, n)
 	})
 	return out, err
 }
@@ -89,7 +89,7 @@ func (s *Server) preparePostExpiryTicketRefund(ctx context.Context, id uuid.UUID
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		l, err := q.LockTicketLot(ctx, id)
+		l, err := q.LockPurchasedTicketLot(ctx, &id)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (s *Server) preparePostExpiryTicketRefund(ctx context.Context, id uuid.UUID
 		expired := l.Expired
 		if l.Available > 0 {
 			expired += l.Available
-			if err := moveTicketsExpiring(ctx, q, id, fmt.Sprintf("expire-%s-%d", l.ID, expired), "expire", -l.Available, 0, 0, 0, l.Available); err != nil {
+			if err := moveTicketsExpiring(ctx, q, l.ID, fmt.Sprintf("expire-%s-%d", l.ID, expired), "expire", -l.Available, 0, 0, 0, l.Available); err != nil {
 				return err
 			}
 		}
@@ -122,7 +122,7 @@ func (s *Server) preparePostExpiryTicketRefund(ctx context.Context, id uuid.UUID
 		}
 		// 失効した枚数から返金に回す。台帳には1枚ずつ記録する。
 		for i := int32(0); i < quantity; i++ {
-			if err := moveTicketsExpiring(ctx, q, id, fmt.Sprintf("post-expiry-refund-%s-%d", out.ID, i), "refund", 0, 0, 0, 1, -1); err != nil {
+			if err := moveTicketsExpiring(ctx, q, l.ID, fmt.Sprintf("post-expiry-refund-%s-%d", out.ID, i), "refund", 0, 0, 0, 1, -1); err != nil {
 				return err
 			}
 		}
@@ -185,12 +185,16 @@ func (s *Server) processTicketRefund(ctx context.Context, id uuid.UUID) error {
 			}
 		case "failed", "canceled":
 			status = "failed"
+			lot, err := q.LockPurchasedTicketLot(ctx, &p.ID)
+			if err != nil {
+				return err
+			}
 			if refund.PostExpiry {
 				// 失効後の返金が失敗したら、返金に回した枚数を失効に戻す（使える枚数には戻さない）。
-				if err := moveTicketsExpiring(ctx, q, p.ID, "refund-failed-"+id.String(), "refund_failed", 0, 0, 0, -refund.Quantity, refund.Quantity); err != nil {
+				if err := moveTicketsExpiring(ctx, q, lot.ID, "refund-failed-"+id.String(), "refund_failed", 0, 0, 0, -refund.Quantity, refund.Quantity); err != nil {
 					return err
 				}
-			} else if err := moveTickets(ctx, q, p.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
+			} else if err := moveTickets(ctx, q, lot.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
 				return err
 			}
 		}

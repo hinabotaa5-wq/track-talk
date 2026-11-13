@@ -62,7 +62,7 @@ func (s *Server) attachReviewPayment(ctx context.Context, out map[string]any, id
 
 // reviewCheckoutURL は、依頼の支払い画面の URL を返す。まだ使える画面があればそれを、なければ新しく作る。
 // minor は、18歳未満の本人が自分で払う支払いか。支払いの行に印を付け、返金を後から集計できるようにする。
-func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.ReviewRequest, method string, minor bool) (string, error) {
+func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.ReviewRequest, method string, code *string, minor bool) (string, error) {
 	p, err := q.GetReusableReviewPayment(ctx, db.GetReusableReviewPaymentParams{RequestID: &rr.ID, Method: method})
 	if err == nil {
 		return p.CheckoutUrl, nil
@@ -101,7 +101,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	}
 	if _, err := q.CreateReviewPayment(ctx, db.CreateReviewPaymentParams{
 		ID: id, RequestID: &rr.ID, PayerID: &rr.RequesterID, Method: method, AmountYen: price,
-		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires, Minor: minor,
+		CheckoutSessionID: sess.ID, CheckoutUrl: sess.URL, SessionExpiresAt: expires, Minor: minor, ReferralCode: code,
 	}); err != nil {
 		return "", err
 	}
@@ -116,7 +116,8 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Method string `json:"method"`
+		Method       string `json:"method"`
+		ReferralCode string `json:"referral_code"`
 		minorDeclarationReq
 	}
 	if err := DecodeJSON(r, &req); err != nil || !validReviewPayMethod(req.Method) {
@@ -131,7 +132,7 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.minorDeclarationReq)
+	url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.ReferralCode, req.minorDeclarationReq)
 	if err != nil {
 		writeCheckoutError(w, err)
 		return
@@ -144,7 +145,7 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 // reviewCheckoutFor は、全員の購入前チェック（decl）を確かめ、支払い画面の URL を返す。
 // 支払い画面を作るのと同じトランザクションで宣言を残す。保護者同意の有無と月の上限では止めない。
 // 本人・依頼のロック内で記録し、年齢による分岐は置かない。
-func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method string, decl minorDeclarationReq) (string, error) {
+func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method, referralCode string, decl minorDeclarationReq) (string, error) {
 	if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
 		return "", err
 	}
@@ -170,7 +171,11 @@ func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p d
 		return "", err
 	}
 	// 支払いの行もロックを持つ接続で作る。別の接続を待つと、同時に来たときに接続が尽きて止まる。
-	url, err := s.reviewCheckoutURL(ctx, q, rr, method, false)
+	code, err := usableReferralCode(ctx, q, p.ID, referralCode)
+	if err != nil {
+		return "", err
+	}
+	url, err := s.reviewCheckoutURL(ctx, q, rr, method, code, false)
 	if err != nil {
 		return "", err
 	}
@@ -234,6 +239,9 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 			return err
 		}
 		started = &rr
+		if status == "captured" && pay.AmountYen == reviewPriceYen {
+			return recordCoachingReferral(ctx, q, pay.PayerID, nil, &pay.ID, pay.ReferralCode)
+		}
 		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -325,11 +333,16 @@ func (s *Server) captureReviewPayment(ctx context.Context, pay db.ReviewPayment)
 	if _, err := s.stripe.CapturePaymentIntent(ctx, *pay.PaymentIntentID, "capture-"+pay.ID.String()); err != nil {
 		return fmt.Errorf("%w: %w", errStripe, err)
 	}
-	_, err := s.q.MarkReviewPaymentCaptured(ctx, pay.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
-	return err
+	return s.tx(ctx, func(q *db.Queries) error {
+		captured, err := q.MarkReviewPaymentCaptured(ctx, pay.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil || captured.AmountYen != reviewPriceYen {
+			return err
+		}
+		return recordCoachingReferral(ctx, q, captured.PayerID, nil, &captured.ID, captured.ReferralCode)
+	})
 }
 
 // captureReturnedReview は、返答を出したあとに呼ぶ。確定できなかったものは tick が拾い直す。

@@ -2,6 +2,20 @@
 // 英語を選んだ人だけが読み込む。漏れは lib/i18n-coverage.test.ts で検出する。
 // 文言を足したら、ここにも英語を足す（node --experimental-strip-types scripts/i18n-missing.mjs で漏れを一覧できる）。
 export const en: Readonly<Record<string, string>> = {
+  "紹介特典": "Referral reward",
+  "元の画面に戻る": "Return to the previous page",
+  "紹介ID（友達からもらった場合）": "Referral code (if you received one from a friend)",
+  "この紹介IDは使えません。空欄のまま購入できます。": "This referral code cannot be used. You can continue with the field blank.",
+  "友達2人を紹介すると、1回無料！": "Refer two friends and get a free review!",
+  "あなたが購入すると紹介IDをお渡しします。そのIDで友達2人が購入すると、あなたに無料チケットをプレゼントします。": "Get a referral code when you make a purchase. When two friends purchase using your code, you will receive a free ticket.",
+  "あなたの紹介ID": "Your referral code",
+  "紹介IDを選択してコピーしてください": "Select the referral code to copy it",
+  "無料チケットをプレゼントしました": "You received a free ticket",
+  "あと1人で無料チケット": "One more referral for a free ticket",
+  "あと2人で無料チケット": "Two more referrals for a free ticket",
+  "付与日 {v0}": "Issued {v0}",
+  "有効期限 {v0}": "Expires {v0}",
+  "特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません": "Reward ticket: valid for six months from issue, personal use only, and nonrefundable.",
   "受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください。": "When you turn on requests, new applications go directly to your queue. Send feedback on strengths, corrections and a recommended drill within 24 hours.",
   "動画添削は受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。サポートプランは対応できる内容と定員を自分で決めます。": "You can turn new requests on or off. Missing a deadline automatically turns new requests off. Requests already in your queue stay open until their deadline. Set the scope and capacity of support plans yourself.",
   "添削を開始できませんでした": "Couldn't start the review",

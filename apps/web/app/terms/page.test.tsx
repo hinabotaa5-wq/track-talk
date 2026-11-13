@@ -196,3 +196,12 @@ it("動画のファイルの保存期間：フォーム添削はやりとりの�
   expect(plan).toContain("やりとりの動画のファイルは、契約が終わってから30日で削除します");
   expect(plan).toContain("対応が終わるまで保全します");
 });
+
+it("第6条に紹介特典の本人利用・付与日起算の期限・払戻し条件を追加する", () => {
+  const text = article(6);
+  expect(text).toContain("紹介特典チケットについて");
+  expect(text).toContain("特典チケットは、付与された本人だけが使えます");
+  expect(text).toContain("特典チケットの有効期限は、付与した日時から6か月です");
+  expect(text).toContain("サービス提供の終了時に行う未使用チケットの払戻しの計算にも、特典チケットは含めません");
+  expect(text).toContain("使用した特典チケット1枚を戻します");
+});

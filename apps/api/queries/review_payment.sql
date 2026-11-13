@@ -1,6 +1,6 @@
 -- name: CreateReviewPayment :one
-INSERT INTO review_payments (id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, minor)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO review_payments (id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, minor, referral_code)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetReusableReviewPayment :one

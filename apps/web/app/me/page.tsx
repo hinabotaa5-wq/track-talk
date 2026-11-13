@@ -1,4 +1,5 @@
 "use client";
+import { LoadedReferralCard } from "@/components/coaching-referral";
 
 import { PageLoading } from "@/components/page-loading";
 
@@ -113,6 +114,7 @@ export default function MePage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-xl font-bold text-slate-100">{t(locale, "mypage.title")}</h1>
       <ThemeSwitch />
+      <LoadedReferralCard token={token} />
       <nav aria-label={L("アカウント")} className="divide-y divide-slate-500/20 app-card overflow-hidden">
         {currentProfile?.is_admin ? (
           <MenuLink href="/admin" label={L("アプリ管理")} icon={Shield} />

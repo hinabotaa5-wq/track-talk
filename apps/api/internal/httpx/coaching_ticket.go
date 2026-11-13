@@ -181,9 +181,10 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ProductID  string    `json:"product_id"`
-		RequestKey uuid.UUID `json:"request_key"`
-		ReturnPath string    `json:"return_path"`
+		ProductID    string    `json:"product_id"`
+		RequestKey   uuid.UUID `json:"request_key"`
+		ReturnPath   string    `json:"return_path"`
+		ReferralCode string    `json:"referral_code"`
 		minorDeclarationReq
 	}
 	if err := DecodeJSON(r, &req); err != nil || req.RequestKey == uuid.Nil {
@@ -220,8 +221,12 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+		code, err := usableReferralCode(r.Context(), q, p.ID, req.ReferralCode)
+		if err != nil {
+			return err
+		}
 		purchase, err = q.CreateTicketPurchase(r.Context(), db.CreateTicketPurchaseParams{ID: uuid.New(), OwnerID: &p.ID, RequestKey: req.RequestKey, ProductID: product.ID,
-			Quantity: product.Quantity, AmountYen: product.AmountYen, SessionExpiresAt: time.Now().Add(time.Hour), ReturnPath: ticketReturnPath(req.ReturnPath)})
+			Quantity: product.Quantity, AmountYen: product.AmountYen, ReferralCode: code, SessionExpiresAt: time.Now().Add(time.Hour), ReturnPath: ticketReturnPath(req.ReturnPath)})
 		if err != nil {
 			return err
 		}
@@ -335,6 +340,9 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 			return err
 		}
 		orphan = p.OwnerID == nil
+		if p.ProductID == "six" || p.ProductID == "single" {
+			return recordCoachingReferral(ctx, q, p.OwnerID, &p.ID, nil, p.ReferralCode)
+		}
 		return nil
 	})
 	if err != nil {
@@ -412,7 +420,15 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 			if err != nil {
 				return err
 			}
-			if l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now()) {
+			forfeit := l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now())
+			if l.Kind == "referral_reward" {
+				refunded, err := q.ReferralRewardHasRefund(ctx, l.ID)
+				if err != nil {
+					return err
+				}
+				forfeit = forfeit || refunded
+			}
+			if forfeit {
 				available, expired = 0, a.Quantity
 			}
 		}
@@ -422,6 +438,11 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 		}
 		if err := moveTicketsExpiring(ctx, q, a.LotID, kind+"-"+t.ID.String()+"-"+a.LotID.String(), k, available, -a.Quantity, consumed, 0, expired); err != nil {
 			return err
+		}
+		if !consume && expired > 0 {
+			if err := q.CancelReleasedReferralReward(ctx, a.LotID); err != nil {
+				return err
+			}
 		}
 	}
 	state := "released"
@@ -533,7 +554,7 @@ func (s *Server) myTicketPurchase(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"id": purchase.ID, "status": purchase.Status, "return_path": purchase.ReturnPath, "checkout_status": checkout,
 		"quantity": purchase.Quantity, "amount_yen": purchase.AmountYen, "paid_at": purchase.PaidAt, "expires_at": nil}
 	if purchase.Status != "pending" {
-		if l, err := s.q.GetTicketLot(r.Context(), id); err == nil {
+		if l, err := s.q.GetPurchasedTicketLot(r.Context(), &id); err == nil {
 			out["expires_at"] = l.ExpiresAt
 		}
 	}
