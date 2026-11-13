@@ -19,10 +19,16 @@ function start(saved: string | null, url = "/", blocked = false, requestAnimatio
 
 it.each([
   ["/memo", ""], ["/coaching", ""], ["/injury", "tab=data&q=secret"],
-  ["/competitions", "view=international&page=3"], ["/", "sort=review&type=spike&q=secret"],
+  ["/competitions", "view=international&page=3"],
 ])("React がなくても許可したタブへ即時に移動する: %s", (path, search) => {
   const result = start(`${path}?${search}`);
   expect(result.replace).toHaveBeenCalledExactlyOnceWith(lastTabHref(path, search));
+  expect(result.window.__tracktalkLastTabRedirect).toBe(true);
+});
+
+it.each([null, "/", "/?sort=review&type=spike&q=secret"])("保存なし・ホームの保存値はコーチへ移動する: %s", (saved) => {
+  const result = start(saved);
+  expect(result.replace).toHaveBeenCalledExactlyOnceWith("/coaching");
   expect(result.window.__tracktalkLastTabRedirect).toBe(true);
 });
 
@@ -37,7 +43,7 @@ it("起動ロゴを一度描画してから復元し、その間も二重遷移�
   expect(result.replace).toHaveBeenCalledExactlyOnceWith("/memo");
 });
 
-it.each([null, "/", "https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("初回・ホーム・不正な保存値では移動しない: %s", (saved) => {
+it.each(["https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("不正な保存値では移動しない: %s", (saved) => {
   expect(start(saved).replace).not.toHaveBeenCalled();
 });
 

@@ -3,7 +3,7 @@ import { devices, expect, test } from "@playwright/test";
 
 
 test("top page shows branding", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?sort=new");
   await expect(page.getByRole("link", { name: "TrackTalk" })).toBeVisible();
   // 下のメニューから主な画面へ行ける。
   const nav = page.getByRole("navigation", { name: "メイン" });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { isLastTabStartupRedirecting, readLastTab, rememberLastTab } from "@/lib/last-tab";
+import { isLastTabStartupRedirecting, rememberLastTab, resolveColdStartTarget } from "@/lib/last-tab";
 
 export function LastTabRestorer() {
   const pathname = usePathname();
@@ -18,10 +18,10 @@ export function LastTabRestorer() {
       checked.current = true;
       // 起動時だけ復元する。アプリ内のホーム操作や直接開いたリンクを優先する。
       if (pathname === "/" && !search && !window.location.hash) {
-        const saved = readLastTab();
-        if (saved && saved !== "/") {
+        const target = resolveColdStartTarget();
+        if (target) {
           restoring.current = true;
-          router.replace(saved, { scroll: false });
+          router.replace(target, { scroll: false });
           return;
         }
       }

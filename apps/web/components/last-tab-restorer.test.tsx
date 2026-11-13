@@ -49,9 +49,9 @@ it("新規起動で最後のタブを復元し、復元中は保存値を上書�
   expect(readLastTab()).toBe("/");
 });
 
-it("初回はホームを開き、その後のタブ移動を保存する", async () => {
+it("初回はコーチを開き、その後のタブ移動を保存する", async () => {
   await render();
-  expect(navigation.router.replace).not.toHaveBeenCalled();
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
   await render("/competitions", "view=international");
   expect(readLastTab()).toBe("/competitions?view=international");
   await render("/competitions/meet-123");
@@ -59,13 +59,19 @@ it("初回はホームを開き、その後のタブ移動を保存する", asyn
   expect(readLastTab()).toBe("/competitions?view=international");
 });
 
-it("ホーム内のタブも記憶し、検索語とページ番号は保存しない", async () => {
+it.each(["/", "/?sort=new"])("保存値がホームのときはコーチへ移動する: %s", async (saved) => {
+  localStorage.setItem("tracktalk:last-tab", saved);
+  await render();
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
+});
+
+it("ホーム内のタブも記憶するが、次回起動はコーチへ移動する", async () => {
   await render("/", "sort=review&type=spike&q=secret&page=3");
   expect(readLastTab()).toBe("/?sort=review&type=spike");
   await act(async () => root.unmount());
   root = createRoot(container);
   await render();
-  expect(navigation.router.replace).toHaveBeenCalledWith("/?sort=review&type=spike", { scroll: false });
+  expect(navigation.router.replace).toHaveBeenCalledWith("/coaching", { scroll: false });
 });
 
 it.each([

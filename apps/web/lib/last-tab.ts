@@ -1,4 +1,5 @@
-const storageKey = "tracktalk:last-tab";
+export const lastTabStorageKey = "tracktalk:last-tab";
+const storageKey = lastTabStorageKey;
 export const lastTabChangedEvent = "tracktalk:last-tab-changed";
 
 // 一覧のタブだけを保存する。投稿・ログイン・編集画面や検索語には戻さない。
@@ -16,22 +17,25 @@ export const lastTabStartupScript = `(()=>{
   if(location.pathname!=="/"||location.search||location.hash)return;
   try{
     const saved=localStorage.getItem(${JSON.stringify(storageKey)});
-    if(!saved)return;
-    const [path,search=""]=saved.split("?");
     const tabs=${JSON.stringify(tabParams)};
+    const navigate=(href)=>{
+      window.__tracktalkLastTabRedirect=true;
+      const go=()=>location.replace(href);
+      if(typeof requestAnimationFrame==="function"){
+        requestAnimationFrame(()=>requestAnimationFrame(go));
+      }else{go();}
+    };
+    if(!saved){navigate("/coaching");return;}
+    const [path,search=""]=saved.split("?");
     if(!Object.hasOwn(tabs,path))return;
+    if(path==="/"){navigate("/coaching");return;}
     const current=new URLSearchParams(search),params=new URLSearchParams();
     for(const name of tabs[path]){
       const value=current.get(name);
       if(value)params.set(name,value);
     }
     const query=params.toString(),href=path+(query?"?"+query:"");
-    if(href==="/")return;
-    window.__tracktalkLastTabRedirect=true;
-    const navigate=()=>location.replace(href);
-    if(typeof requestAnimationFrame==="function"){
-      requestAnimationFrame(()=>requestAnimationFrame(navigate));
-    }else{navigate();}
+    navigate(href);
   }catch{window.__tracktalkLastTabRedirect=false;}
 })();`;
 
@@ -61,6 +65,28 @@ export function readLastTab() {
   } catch {
     return null;
   }
+}
+
+// 素の "/" の冷起動での解決（案B）。保存なし・保存値 "/" は "/coaching"、
+// 不正な保存値・保存不可は移動しない（null）。
+export function resolveColdStartTarget() {
+  let saved: string | null;
+  try {
+    saved = localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+  if (!saved) return "/coaching";
+  let href: string | null;
+  try {
+    const [pathname, search = ""] = saved.split("?");
+    href = lastTabHref(pathname, search);
+  } catch {
+    return null;
+  }
+  if (!href) return null;
+  if (href === "/" || href.startsWith("/?")) return "/coaching";
+  return href;
 }
 
 export function rememberLastTab(pathname: string, search: string) {
