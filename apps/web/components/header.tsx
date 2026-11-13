@@ -7,6 +7,7 @@ import { useAuth } from "./auth-provider";
 import { HeaderAccountPanel } from "./header-account-panel";
 import { AppLogo } from "./app-icon-mark";
 import { FeedbackBox } from "./feedback-box";
+import { InstagramLink } from "./instagram-link";
 import { MenuContestBar } from "./menu-contest-bar";
 import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
@@ -121,6 +122,7 @@ export function Header() {
               })}
             </nav>
             {showHeaderAccountActions ? <TodayMeetBalloon /> : null}
+            {showHeaderAccountActions ? <InstagramLink /> : null}
             {session && showHeaderAccountActions ? (
               <>
                 <FeedbackBox />

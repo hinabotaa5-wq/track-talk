@@ -1381,6 +1381,7 @@ export const en: Readonly<Record<string, string>> = {
   "2000文字以内で書いてね": "Please keep it under 2,000 characters",
   "送れなかった。もう一度試してね": "Couldn't send. Please try again",
   "ご意見": "Feedback",
+  "Instagram（@tracktalk.office）": "Instagram (@tracktalk.office)",
   "なんでも書いてね": "Tell us anything",
   "Googleでログイン": "Log in with Google",
   "添削後の追加質問を読み込めませんでした": "Couldn't load additional questions after review",

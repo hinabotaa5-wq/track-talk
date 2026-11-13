@@ -3,8 +3,11 @@ import { act, createElement, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCurrentMainTab } from "./bottom-nav";
+import { Header } from "./header";
 import { HeaderAccountPanel } from "./header-account-panel";
+import { AppLogo } from "./app-icon-mark";
 import { FeedbackBox } from "./feedback-box";
+import { InstagramLink } from "./instagram-link";
 import { NotificationBell } from "./notification-bell";
 import { SenseNoteComposer } from "./sense-notes";
 
@@ -20,7 +23,13 @@ vi.mock("next/link", () => ({
   useLinkStatus: () => linkStatus,
 }));
 vi.mock("next/dynamic", () => ({ default: () => () => <p>メニューの内容</p> }));
-vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token" }) }));
+vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token", session: { user: { id: "user-1" } }, profile: null }) }));
+vi.mock("./leave-guard", () => ({
+  useLeaveGuard: () => ({ confirmLeave: () => false }),
+  useGuardedLinkClick: () => () => {},
+}));
+vi.mock("./today-meet-balloon", () => ({ TodayMeetBalloon: () => null }));
+vi.mock("./menu-contest-bar", () => ({ MenuContestBar: () => null }));
 vi.mock("@/lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   apiErrorText: (_err: unknown, fallback: string) => fallback,
@@ -85,6 +94,38 @@ describe("ヘッダーの開閉", () => {
     pathname = "/me";
     await act(async () => root.render(<HeaderAccountPanel signedIn />));
     expect(container.querySelector("a")?.className).toContain("bg-white/20");
+  });
+
+  it("Instagramは別タブで開く外部リンクで、ご意見と同じ大きさの領域にする", async () => {
+    await act(async () => root.render(<InstagramLink />));
+    const link = container.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("https://www.instagram.com/tracktalk.office/");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+    expect(link.getAttribute("aria-label")).toContain("@tracktalk.office");
+    expect(link.className).toContain("size-11");
+    const icon = link.querySelector("svg");
+    expect(icon?.getAttribute("aria-hidden")).toBe("true");
+    expect(icon?.getAttribute("class")).toContain("size-5");
+  });
+
+  it("Instagramはご意見の直左に出る", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    await act(async () => root.render(<Header />));
+    const header = container.querySelector("header")!;
+    const controls = [...header.querySelectorAll("a, button")];
+    const instagramIndex = controls.findIndex((el) => el.getAttribute("aria-label")?.includes("@tracktalk.office"));
+    const feedbackIndex = controls.findIndex((el) => el.getAttribute("aria-label") === "ご意見");
+    expect(instagramIndex).toBeGreaterThanOrEqual(0);
+    expect(feedbackIndex).toBe(instagramIndex + 1);
+  });
+
+  it("ロゴは24pxのマークと16pxの文字にする（文言とリンク先は不変）", async () => {
+    await act(async () => root.render(<AppLogo />));
+    expect(container.textContent).toContain("TrackTalk");
+    expect(container.querySelector("svg")?.getAttribute("class")).toContain("size-6");
+    const text = [...container.querySelectorAll("span")].find((el) => el.children.length === 0 && el.textContent === "TrackTalk")!;
+    expect(text.getAttribute("class")).toContain("text-base");
   });
 
   it("ご意見を開いている間はアイコンを選択状態にする", async () => {
