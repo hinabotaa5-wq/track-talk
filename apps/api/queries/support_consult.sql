@@ -16,7 +16,8 @@ JOIN coach_profiles c ON c.profile_id = st.coach_id
 WHERE EXISTS (SELECT 1 FROM coaching_plans pl WHERE pl.coach_id = st.coach_id AND pl.consult_template)
   AND c.status = 'approved'
   AND c.pledge_version >= sqlc.arg(pledge_version)::smallint
-  AND 'competition_support' = ANY(c.service_types);
+  AND 'competition_support' = ANY(c.service_types)
+  AND (sqlc.narg(coach_id)::uuid IS NULL OR st.coach_id = sqlc.narg(coach_id));
 
 -- name: GetConsultTemplatePlan :one
 SELECT * FROM coaching_plans WHERE coach_id = $1 AND consult_template;

@@ -600,11 +600,17 @@ WHERE EXISTS (SELECT 1 FROM coaching_plans pl WHERE pl.coach_id = st.coach_id AN
   AND c.status = 'approved'
   AND c.pledge_version >= $1::smallint
   AND 'competition_support' = ANY(c.service_types)
+  AND ($2::uuid IS NULL OR st.coach_id = $2)
 `
 
+type ListPublicSupportConsultSettingsParams struct {
+	PledgeVersion int16      `json:"pledge_version"`
+	CoachID       *uuid.UUID `json:"coach_id"`
+}
+
 // 相談の入口を出すコーチ。受付中か、受付停止中（一度でも受付を始めたコーチ）。承認済みで、いまの版の誓約をして、大会までプランを担当しているコーチだけ。
-func (q *Queries) ListPublicSupportConsultSettings(ctx context.Context, pledgeVersion int16) ([]SupportConsultSetting, error) {
-	rows, err := q.db.Query(ctx, listPublicSupportConsultSettings, pledgeVersion)
+func (q *Queries) ListPublicSupportConsultSettings(ctx context.Context, arg ListPublicSupportConsultSettingsParams) ([]SupportConsultSetting, error) {
+	rows, err := q.db.Query(ctx, listPublicSupportConsultSettings, arg.PledgeVersion, arg.CoachID)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
@@ -675,21 +676,58 @@ func (s *Server) endCoachRegistration(w http.ResponseWriter, r *http.Request) {
 
 // listCoaches は、依頼する前に見られるコーチ一覧。ログインしなくても見られる。
 func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.q.ListPublicCoaches(r.Context())
+	out, err := s.publicCoaches(r.Context(), nil)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	plans, err := s.q.ListPublicCoachingPlans(r.Context(), coachPledgeListedVersion)
+	JSON(w, http.StatusOK, map[string]any{"coaches": out})
+}
+
+func (s *Server) getPublicCoach(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		publicCoachNotFound(w)
+		return
+	}
+	out, err := s.publicCoaches(r.Context(), &id)
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if len(out) == 0 {
+		publicCoachNotFound(w)
+		return
+	}
+	JSON(w, http.StatusOK, out[0])
+}
+
+func publicCoachNotFound(w http.ResponseWriter) {
+	Error(w, http.StatusNotFound, "coach_not_public", "このコーチは現在公開されていません。")
+}
+
+func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[string]any, error) {
+	rows, err := s.q.ListPublicCoaches(ctx, coachID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, len(rows))
+	if len(rows) == 0 {
+		return out, nil
+	}
+	plans, err := s.q.ListPublicCoachingPlans(ctx, db.ListPublicCoachingPlansParams{
+		PledgeVersion: coachPledgeListedVersion,
+		CoachID:       coachID,
+	})
+	if err != nil {
+		return nil, err
 	}
 	ids := make([]uuid.UUID, 0, len(plans))
 	for _, p := range plans {
 		ids = append(ids, p.ID)
 	}
-	approved, err := s.identity.approvedPlans(r.Context(), ids)
+	approved, err := s.identity.approvedPlans(ctx, ids)
 	if err != nil {
 		// Support plan availability is optional here. Keep the coach and
 		// video-review list available while the identity service recovers.
@@ -712,34 +750,36 @@ func (s *Server) listCoaches(w http.ResponseWriter, r *http.Request) {
 		plan["full"] = p.ActiveCount >= int32(p.Capacity)
 		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)
 	}
-	consults, err := s.publicConsultEntries(r.Context(), nil)
+	consults, err := s.publicConsultEntries(ctx, coachID)
 	if err != nil {
-		// 無料相談の入口は付け足しなので、取れなくても一覧は返す。
+		// 無料相談の入口は付け足しなので、取れなくても一覧と詳細は返す。
 		slog.Warn("support consult entries unavailable")
-		consults = map[uuid.UUID]map[string]any{}
 	}
-	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, map[string]any{
-			"support_consult": consults[c.ProfileID],
-			"id":              c.ProfileID,
-			"nickname":        c.Nickname,
-			"photo_url":       s.coachPhotoURL(c.PhotoPublicID),
-			"tier":            c.Tier,
-			"events":          c.Events,
-			"service_types":   nonNilStrings(c.ServiceTypes),
-			"best_record":     c.BestRecord,
-			"achievements":    c.Achievements,
-			"years":           c.Years,
-			"sns_urls":        nonNilStrings(c.SnsUrls),
-			"hitokoto":        c.Hitokoto,
-			"rating_count":    c.RatingCount,
-			"rating_average":  c.RatingAverage,
-			// パーソナル指導のプラン。安い順。
-			"plans": nonNilPlans(plansByCoach[c.ProfileID]),
-		})
+		out = append(out, s.publicCoachJSON(c, plansByCoach[c.ProfileID], consults[c.ProfileID]))
 	}
-	JSON(w, http.StatusOK, map[string]any{"coaches": out})
+	return out, nil
+}
+
+func (s *Server) publicCoachJSON(c db.ListPublicCoachesRow, plans []map[string]any, consult map[string]any) map[string]any {
+	return map[string]any{
+		"support_consult": consult,
+		"id":              c.ProfileID,
+		"nickname":        c.Nickname,
+		"photo_url":       s.coachPhotoURL(c.PhotoPublicID),
+		"tier":            c.Tier,
+		"events":          c.Events,
+		"service_types":   nonNilStrings(c.ServiceTypes),
+		"best_record":     c.BestRecord,
+		"achievements":    c.Achievements,
+		"years":           c.Years,
+		"sns_urls":        nonNilStrings(c.SnsUrls),
+		"hitokoto":        c.Hitokoto,
+		"rating_count":    c.RatingCount,
+		"rating_average":  c.RatingAverage,
+		// パーソナル指導のプラン。安い順。
+		"plans": nonNilPlans(plans),
+	}
 }
 
 func nonNilPlans(p []map[string]any) []map[string]any {

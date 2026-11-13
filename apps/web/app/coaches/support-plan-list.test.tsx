@@ -1,12 +1,13 @@
 /** @vitest-environment jsdom */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { loadEnglish, setActiveLocale } from "@/lib/i18n";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const apiFetch = vi.fn();
 const flags = { list: true };
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, onNavigate }: { href: string; children: ReactNode; onNavigate?: () => void }) => <a href={href} onClick={(event) => { event.preventDefault(); onNavigate?.(); }}>{children}</a> }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get supportPlanListEnabled() { return flags.list; } }));
 const { SupportPlanList } = await import("./support-plan-list");
@@ -81,4 +82,16 @@ it("該当0人の種目では空状態と「すべて」へ戻る導線を出す
   await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "すべての種目のコーチを見る")!.click(); });
   expect(radios("種目で絞り込む").find((r) => r.getAttribute("aria-checked") === "true")?.textContent).toBe("✓すべて");
   expect(ids()).toEqual(["support-coach-a", "support-coach-b"]);
+});
+
+it("サポートプラン一覧から選んだコーチの公開情報を詳細に渡す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [competition, paused] });
+  await render();
+  await act(async () => container.querySelector("li a")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+
+  expect(getCoachDetailPreview(competition.id)).toEqual({
+    id: competition.id, nickname: competition.nickname, photo_url: competition.photo_url,
+    events: competition.events, support_consult: competition.competition_support,
+  });
+  expect(getCoachDetailPreview(paused.id)).toBeUndefined();
 });

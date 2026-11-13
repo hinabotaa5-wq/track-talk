@@ -56,6 +56,7 @@ WHERE pl.published AND NOT pl.consult_template
   AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
   AND c.pledge_version >= sqlc.arg(pledge_version)::smallint
+  AND (sqlc.narg(coach_id)::uuid IS NULL OR pl.coach_id = sqlc.narg(coach_id))
 ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id;
 
 -- name: LockCoachingPlans :exec

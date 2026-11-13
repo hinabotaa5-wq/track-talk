@@ -232,8 +232,14 @@ WHERE pl.published AND NOT pl.consult_template
   AND (pl.service_type IS NULL OR (pl.service_type IN ('competition_support','in_person') AND pl.service_type = ANY(c.service_types)))
   AND (pl.service_type IS DISTINCT FROM 'competition_support' OR (pl.competition_date>= (now() AT TIME ZONE 'Asia/Tokyo')::date AND pl.support_start_date IS NOT NULL))
   AND c.pledge_version >= $1::smallint
+  AND ($2::uuid IS NULL OR pl.coach_id = $2)
 ORDER BY pl.coach_id, pl.price_yen, pl.created_at, pl.id
 `
+
+type ListPublicCoachingPlansParams struct {
+	PledgeVersion int16      `json:"pledge_version"`
+	CoachID       *uuid.UUID `json:"coach_id"`
+}
 
 type ListPublicCoachingPlansRow struct {
 	ID                             uuid.UUID  `json:"id"`
@@ -269,8 +275,8 @@ type ListPublicCoachingPlansRow struct {
 }
 
 // コーチ一覧に出すプラン。枠を使っている人数（支払い待ち・期間中・停止中）をつけて、満員かどうかを出す。承認済みで、いまの版の誓約をしたコーチの、公開中のものだけ。
-func (q *Queries) ListPublicCoachingPlans(ctx context.Context, pledgeVersion int16) ([]ListPublicCoachingPlansRow, error) {
-	rows, err := q.db.Query(ctx, listPublicCoachingPlans, pledgeVersion)
+func (q *Queries) ListPublicCoachingPlans(ctx context.Context, arg ListPublicCoachingPlansParams) ([]ListPublicCoachingPlansRow, error) {
+	rows, err := q.db.Query(ctx, listPublicCoachingPlans, arg.PledgeVersion, arg.CoachID)
 	if err != nil {
 		return nil, err
 	}
