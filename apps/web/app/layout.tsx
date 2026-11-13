@@ -38,8 +38,8 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const siteNameKatakana = "トラックトーク";
-const siteTitle = `${siteName}（${siteNameKatakana}）｜陸上競技の匿名コミュニティ`;
+const siteNameKatakana = "トラックトーク"; // i18n-data
+const siteTitle = `${siteName}（${siteNameKatakana}）｜陸上競技の匿名コミュニティ`; // i18n-data
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
