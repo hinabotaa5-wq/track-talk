@@ -100,6 +100,37 @@ it("評価0件のときのコーチ詳細の表示は変えない（#628）", as
   expect(container.textContent).toContain("評価はまだありません");
 });
 
+it("公開プランのないコーチのカードには『プラン未公開』も空の価格行も出さない（一覧からは外さない）", async () => {
+  apiFetch.mockResolvedValue({ coaches: [coach] });
+  await act(async () => root.render(<CoachList />));
+  const card = container.querySelector('li[id="coach-coach-1"]')!;
+  expect(card.querySelectorAll("p")).toHaveLength(2);
+  expect(container.textContent).not.toContain("プラン未公開");
+});
+
+it("公開プランのないコーチのカードを英語でも『No published plans』と出さない", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockResolvedValue({ coaches: [coach] });
+  await act(async () => root.render(<CoachList />));
+  expect(container.textContent).not.toContain("No published plans");
+  expect(container.textContent).not.toContain("プラン未公開");
+});
+
+it("公開中のサポートプランがあるコーチのカードには価格を従来どおり出す", async () => {
+  const supportPlan = { id: "plan-s", title: "1ヶ月プラン", kind: "single", description: "説明", duration_days: 30,
+    price_yen: 5000, capacity: 3, published: true, service_type: "competition_support",
+    video_reviews: 0, menu_updates: null, reply_formats: [], start_on_first_video: false };
+  const varied = { ...coach, id: "coach-2", nickname: "幅ありコーチ", plans: [supportPlan, { ...supportPlan, id: "plan-s2", price_yen: 12000 }] };
+  apiFetch.mockResolvedValue({ coaches: [{ ...coach, plans: [supportPlan] }, varied] });
+  await act(async () => root.render(<CoachList />));
+  const cards = [...container.querySelectorAll("li")];
+  expect(cards[0].querySelectorAll("p")).toHaveLength(3);
+  expect(cards[0].textContent).toContain("5,000円");
+  expect(cards[0].textContent).not.toContain("プラン未公開");
+  expect(cards[1].textContent).toContain("〜");
+});
+
 it("動画添削の一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [
     { ...coach, id: "coach-2", nickname: "跳躍", events: ["long-jump"] },
