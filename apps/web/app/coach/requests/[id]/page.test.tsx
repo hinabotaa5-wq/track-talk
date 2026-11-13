@@ -124,26 +124,17 @@ it("返答の送信に失敗したらバナーは出ない", async () => {
   expect(scroll).not.toHaveBeenCalled();
 });
 
-// 補足の送信成功で、補足欄の先頭に完了バナーが出る。
-it("補足を送ると完了バナーが出る", async () => {
-  const clarifying = {
+it("保存済みの確認質問と補足は表示し、補足の送信フォームは出さない", async () => {
+  const historical = {
     ...responded,
-    status: "clarifying",
-    response: { ...(responded.response as object), clarify_reason: "term", clarify_body: "用語が分かりません", clarification: null },
-  } as unknown as CoachReviewRequest;
-  const clarified = {
-    ...clarifying,
-    response: { ...(clarifying.response as object), clarification: "補足です" },
-  } as unknown as CoachReviewRequest;
-  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
-    if (!options?.method && path.includes("/consultations")) return emptyRoom;
-    if (options?.method === "POST") return clarified;
-    return clarifying;
-  });
+    status: "returned",
+    response: { ...responded.response, clarify_reason: "term", clarify_body: "用語が分かりません", clarification: "補足です" },
+  };
+  apiFetch.mockImplementation(async (path: string) => path.includes("/consultations") ? emptyRoom : historical);
   await renderPage();
-  await act(async () => submitButton("補足を送る").click());
-  expect(container.querySelector('[role="status"]')?.textContent).toContain("補足を送りました");
-  expect(scroll).toHaveBeenCalled();
+  expect(container.textContent).toContain("用語が分かりません");
+  expect(container.textContent).toContain("補足です");
+  expect(container.textContent).not.toContain("補足を送る");
 });
 
 // 差し戻しの送信成功で、履歴の前に完了バナーが出る。

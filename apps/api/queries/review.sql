@@ -153,9 +153,7 @@ WHERE c.status = 'approved'
 -- name: ListCoachReviewing :many
 SELECT * FROM review_requests
 WHERE coach_id = sqlc.arg(coach_id)::uuid
-  AND (status IN ('in_review', 'clarifying')
-       -- 差し戻し中の依頼も、再提出を待っていることが分かるように出す。
-       OR status = 'needs_info')
+  AND status IN ('in_review', 'needs_info')
 ORDER BY due_at;
 
 -- name: LockReviewRequester :exec

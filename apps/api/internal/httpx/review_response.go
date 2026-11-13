@@ -17,14 +17,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 添削の返答・補足・評価。
+// 添削の返答・評価。
 // コーチは良い点1つ、直す点1〜2つ、ドリル1つ（各300字）と、任意で見本動画を返す。
-// 利用者は「ここがわからなかった」を1回だけ押せ、コーチは補足を1回だけ返す。★の評価と、7日後の「役に立ちましたか」もここ。
+// ★の評価と、7日後の「役に立ちましたか」も扱う。
 
 const maxResponseChars = 300
-
-// 「ここがわからなかった」の理由。並びは画面に出す順。
-var clarifyReasons = []string{"term", "drill", "fix", "other"}
 
 var helpfulAnswers = []string{"yes", "some", "no"}
 
@@ -307,132 +304,6 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour, time.Now().Add(24*time.Hour), "review_returned:"+rr.ID.String())
-	out := s.coachRequestJSON(rr, true)
-	out["response"] = s.reviewResponseJSON(rs)
-	JSON(w, http.StatusOK, out)
-}
-
-type clarifyReq struct {
-	Body   string `json:"body"`
-	Reason string `json:"reason"`
-}
-
-// clarifyReview は、利用者が「ここがわからなかった」を押す。1つの返答に1回だけ。
-func (s *Server) clarifyReview(w http.ResponseWriter, r *http.Request) {
-	rr, ok := s.requesterReview(w, r)
-	if !ok {
-		return
-	}
-	var req clarifyReq
-	if err := DecodeJSON(r, &req); err != nil {
-		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return
-	}
-	req.Body = strings.TrimSpace(req.Body)
-	if req.Reason == "" && req.Body != "" {
-		req.Reason = "other"
-	}
-	if len([]rune(req.Body)) > 2000 || looksLikeContact(req.Body) {
-		FieldError(w, map[string]string{"body": "連絡先を含まない文章を2000文字以内で入力してください"})
-		return
-	}
-	if !oneOf(req.Reason, clarifyReasons) {
-		FieldError(w, map[string]string{"reason": "わからなかったところを選んでください"})
-		return
-	}
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	q := s.q.WithTx(tx)
-	updated, err := q.MarkReviewClarifying(r.Context(), db.MarkReviewClarifyingParams{ID: rr.ID, RequesterID: rr.RequesterID})
-	if err == nil {
-		_, err = q.RequestReviewClarification(r.Context(), db.RequestReviewClarificationParams{Reason: req.Reason, RequestID: rr.ID, Body: func() *string {
-			if req.Body == "" {
-				return nil
-			}
-			return &req.Body
-		}()})
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusConflict, "conflict", "補足はもう頼めません")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if updated.CoachID != nil {
-		s.notifyReview(r.Context(), *updated.CoachID, rr.ID, "review_clarify", push.Message{
-			Title: "添削の補足を頼まれました",
-			Body:  "わからなかったところに、補足を1回返してください",
-			URL:   "/coach/requests/" + rr.ID.String(),
-			Tag:   "review-" + rr.ID.String(),
-		})
-	}
-	s.writeRequesterReview(w, r, updated)
-}
-
-type clarificationReq struct {
-	Clarification string `json:"clarification"`
-}
-
-// submitClarification は、コーチが補足を1回だけ返す。
-func (s *Server) submitClarification(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireApprovedReviewCoach(w, r)
-	if !ok {
-		return
-	}
-	id, ok := parseUUIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	var req clarificationReq
-	if err := DecodeJSON(r, &req); err != nil {
-		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
-		return
-	}
-	text := strings.TrimSpace(req.Clarification)
-	if e := responseTextError("補足", text); e != "" {
-		FieldError(w, map[string]string{"clarification": e})
-		return
-	}
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	q := s.q.WithTx(tx)
-	rr, err := q.MarkReviewClarified(r.Context(), db.MarkReviewClarifiedParams{ID: id, CoachID: p.ID})
-	var rs db.ReviewResponse
-	if err == nil {
-		rs, err = q.SaveReviewClarification(r.Context(), db.SaveReviewClarificationParams{Clarification: text, RequestID: id})
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		Error(w, http.StatusConflict, "conflict", "この依頼には補足を返せません")
-		return
-	}
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	s.notifyReview(r.Context(), rr.RequesterID, rr.ID, "review_clarified", push.Message{
-		Title: "添削の補足が届きました",
-		Body:  "わからなかったところへの補足を見てみましょう",
-		URL:   "/coaching/requests/" + rr.ID.String(),
-		Tag:   "review-" + rr.ID.String(),
-	})
 	out := s.coachRequestJSON(rr, true)
 	out["response"] = s.reviewResponseJSON(rs)
 	JSON(w, http.StatusOK, out)

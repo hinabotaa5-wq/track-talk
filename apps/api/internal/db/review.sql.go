@@ -522,9 +522,7 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 const listCoachReviewing = `-- name: ListCoachReviewing :many
 SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE coach_id = $1::uuid
-  AND (status IN ('in_review', 'clarifying')
-       -- 差し戻し中の依頼も、再提出を待っていることが分かるように出す。
-       OR status = 'needs_info')
+  AND status IN ('in_review', 'needs_info')
 ORDER BY due_at
 `
 

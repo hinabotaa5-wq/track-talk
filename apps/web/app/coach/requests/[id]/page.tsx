@@ -15,12 +15,11 @@ import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
-import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
+import { coachingMessagingEnabled } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import { t, type Locale, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import {
-  clarifyReasonLabels,
   maxResponseChars,
   maxReviewSeconds,
   reviewQuestionText,
@@ -33,7 +32,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// 引き受けた依頼に返答を書くコーチの画面。「わからなかった」と言われたら、ここから補足を1回返す。
+// 引き受けた依頼に返答を書くコーチの画面。
 
 const maxBytes = 100 * 1024 * 1024;
 
@@ -156,45 +155,6 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   );
 }
 
-function ClarificationForm({ request, token, onSent, locale }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void; locale: Locale }) {
-  const [text, setText] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const { pending, acquire, release } = useActionLock();
-  const guard = useSolicitationGuard();
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!guard.allow(text)) return;
-    if (!acquire()) return;
-    setErrors({});
-    try {
-      onSent(
-        await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/clarification`, {
-          method: "POST",
-          token,
-          body: JSON.stringify({ clarification: text }),
-        }),
-      );
-    } catch (err) {
-      setErrors(fieldErrors(err, locale));
-    } finally {
-      release();
-    }
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <p className="text-xs text-slate-300">{t(locale, "coach.detail.contactNote")}</p>
-      {guard.warning}
-      <Field label={t(locale, "coach.detail.followup")} value={text} onChange={setText} error={errors.clarification} />
-      {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? t(locale, "common.sending") : t(locale, "coach.detail.sendFollowup")}
-      </Button>
-    </form>
-  );
-}
-
 export default function CoachReviewRequestPage() {
   const { session, token, loading } = useAuth();
   const locale = useLocale();
@@ -205,7 +165,7 @@ export default function CoachReviewRequestPage() {
   const [startError, setStartError] = useState("");
   const { pending: starting, acquire: acquireStart, release: releaseStart } = useActionLock();
   // 直前に送った種類。送った内容の先頭に完了バナーを出す（自動では消さない）。
-  const [sent, setSent] = useState<"response" | "clarification" | "info" | null>(null);
+  const [sent, setSent] = useState<"response" | "info" | null>(null);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -244,7 +204,6 @@ export default function CoachReviewRequestPage() {
   if (loading || !session || !request) return <PageLoading screen label={t(locale, "common.loading")} />;
 
   const response = request.response;
-  const needsClarification = request.status === "clarifying" && response && !response.hidden;
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -295,15 +254,6 @@ export default function CoachReviewRequestPage() {
       {response ? <ReviewResponseView response={response} /> : null}
 
       {response && id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
-
-      {needsClarification && response.clarify_reason ? (
-        <section className="space-y-3 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3">
-          {sent === "clarification" ? <SentBanner text={t(locale, "coach.detail.clarificationSent")} /> : null}
-          <p className="text-sm font-semibold text-white">{t(locale, "coach.detail.clarifiedAs", { reason: clarifyReasonLabels[response.clarify_reason] })}</p>
-          {response.clarify_body ? <p className="whitespace-pre-wrap text-sm">{response.clarify_body}</p> : null}
-          {coachingMessagingEnabled ? <ClarificationForm request={request} token={token} onSent={(r) => { setSent("clarification"); setRequest(r); }} locale={locale} /> : <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>}
-        </section>
-      ) : null}
 
       {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
 

@@ -382,7 +382,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/me/coaching/requests", s.listMyReviewRequests)
 				r.Get("/coaching/requests/{id}", s.getReviewRequest)
 				r.Post("/coaching/requests/{id}/cancel", s.cancelUnstartedReview)
-				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarify", s.clarifyReview)
 				// 差し戻された依頼を直して再提出する。差し戻しの後でメッセージ機能を止めても、再提出はできるようにしておく。
 				r.Post("/coaching/requests/{id}/resubmit", s.resubmitReviewRequest)
 				r.Post("/coaching/requests/{id}/rating", s.rateReview)
@@ -406,7 +405,6 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/coach/requests", s.listCoachRequests)
 				r.Get("/coach/requests/{id}", s.getCoachReviewRequest)
 				r.Post("/coaching/requests/{id}/response", s.submitReviewResponse)
-				r.With(s.requireMessaging).Post("/coaching/requests/{id}/clarification", s.submitClarification)
 				// 返却前の「内容確認のための差し戻し」（1依頼1回）。コーチから依頼者への質問なので、メッセージ機能と一緒に開ける。
 				r.With(s.requireMessaging).Post("/coach/requests/{id}/info-request", s.requestReviewInfo)
 				// 引受後・返却前のコーチ都合の辞退。依頼の状態を変えるだけでメッセージではないので、メッセージ機能のフラグには入れない。

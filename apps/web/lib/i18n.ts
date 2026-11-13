@@ -179,11 +179,7 @@ const ja = {
   "coach.detail.demoTooLong": "見本動画は{seconds}秒以内にしてください",
   "coach.detail.sendResponse": "返答を送る",
   "coach.detail.responseSent": "返答を送りました",
-  "coach.detail.followup": "補足（1回だけ送れます）",
-  "coach.detail.sendFollowup": "補足を送る",
-  "coach.detail.clarificationSent": "補足を送りました",
   "coach.detail.infoSent": "差し戻しました",
-  "coach.detail.clarifiedAs": "「{reason}」と言われました",
   "coach.detail.toCoach": "コーチ画面へ",
 } as const;
 
@@ -336,11 +332,7 @@ const en: Record<I18nKey, string> = {
   "coach.detail.demoTooLong": "Please keep demo videos under {seconds}s",
   "coach.detail.sendResponse": "Send response",
   "coach.detail.responseSent": "Response sent",
-  "coach.detail.followup": "Follow-up (one time only)",
-  "coach.detail.sendFollowup": "Send follow-up",
-  "coach.detail.clarificationSent": "Follow-up sent",
   "coach.detail.infoSent": "Sent back for clarification",
-  "coach.detail.clarifiedAs": "\"{reason}\" was requested",
   "coach.detail.toCoach": "Back to Coach",
 };
 

@@ -23,7 +23,7 @@ import (
 // 通知の文面の版。文面を変えたら上げる。書き留めた通知は、そのときの版のまま残る。
 // 4: お知らせ(ベル)の文面を「依頼が届いた」の1行だけにし、9項目の全文は依頼の画面にだけ出す形にした(本体 #609)。
 // 5: 極短文面(本体 #625)。委託者・受託者は役割表示のみで個人名を出さない。3条の9要素は8行にまとめる(支払期日と支払方法は「支払」1行)。
-const workOrderTermsVersion = 5
+const workOrderTermsVersion = 6
 
 type workOrderItem struct {
 	Label string `json:"label"`
@@ -82,7 +82,7 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return workOrderTerms{}, err
 	}
-	work := fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却。確認質問に補足1回", rr.Event)
+	work := fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却", rr.Event)
 	return buildWorkOrderTerms(work, price*share/100, rr.DueAt, consignedAt), nil
 }
 
