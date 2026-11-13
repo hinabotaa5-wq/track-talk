@@ -39,10 +39,12 @@ async function buy() {
   await act(async () => next.click());
 }
 
-it("決済確認中は購入を止め、サーバー確定後に元の相談画面へ戻る", async () => {
+it("決済確認中は購入を止め、確定後に紹介IDと元の画面へのリンクを表示する", async () => {
   vi.useFakeTimers(); mocks.query = "purchase=payment-id";
   let paid = false;
-  mocks.api.mockImplementation(async (path: string) => path.includes("/purchases/")
+  mocks.api.mockImplementation(async (path: string) => path.endsWith("/referral")
+    ? { referral: { code: "K7M3QX", friend_count: 0, granted_at: null, expires_at: null } }
+    : path.includes("/purchases/")
     ? { status: paid ? "paid" : "pending", return_path: "/coaching/new" }
     : { ...initial, balance: { available: paid ? 6 : 0, reserved: 0 } });
   await render();
@@ -52,7 +54,8 @@ it("決済確認中は購入を止め、サーバー確定後に元の相談画�
   paid = true;
   await act(async () => vi.advanceTimersByTimeAsync(2000));
   expect(container.textContent).toContain("購入内容を反映しました");
-  expect(mocks.router.replace).toHaveBeenCalledWith("/coaching/new");
+  expect(container.textContent).toContain("K7M3QX");
+  expect(container.querySelector('a[href="/coaching/new"]')?.textContent).toBe("元の画面に戻る");
 });
 
 it("6枚2,500円を、単発の料金との比較と条件（先払い・有効期限・原則払戻し不可・本人限定）と一緒に出す", async () => {

@@ -1,4 +1,5 @@
 "use client";
+import { LoadedReferralCard, ReferralInput, validReferralInput } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
@@ -137,6 +138,8 @@ function paymentText(p: ReviewPayment): string {
 // お支払いがまだの依頼。支払い方法を選んで、支払い画面を開き直す。
 // 18歳未満は、開き直すときも購入のたびの宣言にチェックが要る。
 function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
+  const [referralCode, setReferralCode] = useState("");
+  const [referralWarning, setReferralWarning] = useState(false);
   const [error, setError] = useState("");
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
@@ -150,10 +153,16 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
     if (!acquire()) return;
     setError("");
     try {
+      if (!await validReferralInput(referralCode, token)) {
+        setReferralCode("");
+        setReferralWarning(true);
+        release();
+        return;
+      }
       const d = await apiFetch<ReviewRequest>(`/v1/coaching/requests/${request.id}/checkout`, {
         method: "POST",
         token,
-        body: JSON.stringify({ method, ...declaration.body(true) }),
+        body: JSON.stringify({ method, referral_code: referralCode, ...declaration.body(true) }),
       });
       if (d.checkout_url) window.location.assign(d.checkout_url);
     } catch (err) {
@@ -166,6 +175,8 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
     <section className="space-y-2">
       <p className="text-sm text-slate-200">{L("お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。")}</p>
       <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} />
+      <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+        onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
       {availableReviewPayMethods.map((m) => (
         <button
           key={m}
@@ -291,6 +302,7 @@ function ReviewRequestView() {
 
   return (
     <div className="mx-auto max-w-md space-y-5">
+      {request.payment?.status === "captured" && request.payment.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">{L("フォーム添削")}</h1>

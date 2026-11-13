@@ -1,4 +1,5 @@
 "use client";
+import { ReferralInput, validReferralInput } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { useSolicitationGuard } from "@/components/contact-notice";
@@ -59,6 +60,8 @@ export default function NewReviewRequestPage() {
   const tier = "coach";
   const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
   const [question, setQuestion] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [referralWarning, setReferralWarning] = useState(false);
   const [contactBlocked, setContactBlocked] = useState(false);
   const guard = useSolicitationGuard();
   const [file, setFile] = useState<File | null>(null);
@@ -253,6 +256,11 @@ export default function NewReviewRequestPage() {
     if (!file || !coach || !validate() || !acquire()) return;
     setError("");
     try {
+      if (cashPayment && !await validReferralInput(referralCode, token)) {
+        setReferralCode("");
+        setReferralWarning(true);
+        return;
+      }
       const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
       setUploadPhase("upload");
       setUpload({ loaded: 0, total: file.size, percent: 0 });
@@ -263,7 +271,7 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
-          method, use_tickets: method === "tickets", requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
+          method, use_tickets: method === "tickets", referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -312,6 +320,8 @@ export default function NewReviewRequestPage() {
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
           >
+            {cashPayment ? <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+              onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} /> : null}
             <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
               {L("特定商取引法に基づく表記")}
             </Link>

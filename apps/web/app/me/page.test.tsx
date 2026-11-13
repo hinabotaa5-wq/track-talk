@@ -7,13 +7,17 @@ import { ConfirmProvider } from "@/components/confirm-dialog";
 import MePage from "./page";
 const mock = vi.hoisted(() => ({
   signOut: vi.fn(), getSession: vi.fn(), unsubscribe: vi.fn(), replace: vi.fn(), refresh: vi.fn(),
-  apiFetch: vi.fn(),
+  apiFetch: vi.fn(), referral: vi.fn(),
   onAuthStateChange: vi.fn(),
 }));
 vi.mock("@/lib/supabase", () => ({ createClient: () => ({ auth: {
   signOut: mock.signOut, getSession: mock.getSession, onAuthStateChange: mock.onAuthStateChange,
 } }) }));
-vi.mock("@/lib/api", () => ({ apiFetch: mock.apiFetch }));
+vi.mock("@/lib/api", () => ({
+  apiFetch: (path: string, ...args: unknown[]) => path === "/v1/me/coaching/referral"
+    ? mock.referral()
+    : mock.apiFetch(path, ...args),
+}));
 const flags = { coaching: false };
 vi.mock("@/lib/features", async (original) => ({
   ...await original<typeof import("@/lib/features")>(),
@@ -32,6 +36,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
   mock.apiFetch.mockResolvedValue({ id: "user-1", is_admin: false });
+  mock.referral.mockResolvedValue({ referral: null });
   mock.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   mock.signOut.mockResolvedValue({ error: null });
   mock.unsubscribe.mockImplementation(async (_userId, signOut) => signOut());
@@ -286,4 +291,24 @@ it("表示言語の項目はマイページの設定一覧に出さない（運�
   expect(container.querySelector('nav a[href="/me/language"]')).toBeNull();
   expect(container.querySelector('[role="radiogroup"][lang], [role="radio"][lang]')).toBeNull();
   expect(container.textContent).not.toContain("表示言語");
+});
+
+it.each([
+  { friends: 0, granted: false, label: "あと2人で無料チケット" },
+  { friends: 1, granted: false, label: "あと1人で無料チケット" },
+  { friends: 2, granted: true, label: "無料チケットをプレゼントしました" },
+])("マイページに紹介IDと進捗を表示する ($friends人)", async ({ friends, granted, label }) => {
+  mock.referral.mockResolvedValue({ referral: {
+    code: "K7M3QX", friend_count: friends,
+    granted_at: granted ? "2026-11-14T09:00:00Z" : null,
+    expires_at: granted ? "2027-05-14T09:00:00Z" : null,
+  } });
+  await renderSignedIn();
+  expect(container.textContent).toContain("K7M3QX");
+  expect(container.textContent).toContain(label);
+  if (granted) {
+    expect(container.textContent).toContain("付与日");
+    expect(container.textContent).toContain("有効期限");
+    expect(container.textContent).toContain("付与された本人だけが使えます／払戻しはできません");
+  }
 });
