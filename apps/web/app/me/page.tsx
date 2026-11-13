@@ -47,12 +47,11 @@ const infoLinks = [
 const menuRowClass =
   "flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-100 transition-colors hover:bg-white/12 active:bg-slate-500/15 disabled:opacity-50";
 
-// 機能割当のタイル色(コーチ・主操作=青、ケガ=オレンジ)。サイズ・角丸・濃さは .tile で全色同一。
-type MenuTone = "blue" | "orange";
-function MenuLink({ href, label, icon: Icon, tone = "blue" }: { href: string; label: string; icon: LucideIcon; tone?: MenuTone }) {
+// マイページ内は運営者決定（2026-11-14）で全項目ブルーに統一する。機能割当色は他画面の仕様で、本ページには適用しない。サイズ・角丸・濃さは .tile で同一。
+function MenuLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (
     <Link href={href} className={menuRowClass}>
-      <span className={tone === "orange" ? "tile tile-orange" : "tile tile-blue"} aria-hidden>
+      <span className="tile tile-blue" aria-hidden>
         <Icon className="size-4" />
       </span>
       <span className="flex-1">{label}</span>
@@ -124,7 +123,7 @@ export default function MePage() {
           </div>
         ) : null}
         {accountLinks.map((item) => (
-          <MenuLink key={item.href} {...item} tone={item.href === "/me/injury" ? "orange" : "blue"} />
+          <MenuLink key={item.href} {...item} />
         ))}
         {token && userId ? (
           <PushPermissionGuide
