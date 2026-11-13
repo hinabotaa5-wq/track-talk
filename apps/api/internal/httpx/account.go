@@ -229,6 +229,9 @@ func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		// 未成年の購入のたびの宣言も、同じく本人が23歳になる月の終わりまで残す。
 		q.KeepMinorPurchaseDeclarationsOnWithdraw,
 		q.RememberDeletedAccount,
+		// コーチ行は profiles への ON DELETE CASCADE でも消えるが、CASCADE 任せにせず
+		// DeleteProfile の直前で明示的に消す（退会したコーチが一覧に残らないようにする）。
+		q.DeleteCoachProfileForUser,
 		q.DeleteProfile,
 	}
 	for _, step := range steps {

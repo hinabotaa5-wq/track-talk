@@ -56,6 +56,12 @@ WHERE author_id = sqlc.arg('user_id');
 INSERT INTO deleted_accounts (id) VALUES (sqlc.arg('user_id'))
 ON CONFLICT (id) DO NOTHING;
 
+-- name: DeleteCoachProfileForUser :exec
+-- 退会でコーチ行を確実に消す。coach_profiles.profile_id は profiles(id) への
+-- ON DELETE CASCADE でもあるが、CASCADE 任せにせず DeleteProfile の直前で明示的に消す。
+DELETE FROM coach_profiles
+WHERE profile_id = sqlc.arg('user_id');
+
 -- name: DeleteProfile :exec
 DELETE FROM profiles
 WHERE id = sqlc.arg('user_id');

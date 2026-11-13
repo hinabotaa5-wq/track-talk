@@ -46,6 +46,18 @@ func (q *Queries) DecrementLikeCountsForUser(ctx context.Context, userID uuid.UU
 	return err
 }
 
+const deleteCoachProfileForUser = `-- name: DeleteCoachProfileForUser :exec
+DELETE FROM coach_profiles
+WHERE profile_id = $1
+`
+
+// 退会でコーチ行を確実に消す。coach_profiles.profile_id は profiles(id) への
+// ON DELETE CASCADE でもあるが、CASCADE 任せにせず DeleteProfile の直前で明示的に消す。
+func (q *Queries) DeleteCoachProfileForUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCoachProfileForUser, userID)
+	return err
+}
+
 const deleteCommentsForUser = `-- name: DeleteCommentsForUser :exec
 DELETE FROM comments
 WHERE author_id = $1
