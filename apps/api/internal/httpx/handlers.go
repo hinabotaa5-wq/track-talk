@@ -1546,6 +1546,7 @@ func (s *Server) createInquiry(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.notifyInquiry(r.Context(), row.ID.String(), source, row.Category, row.Subject, accountNameText(p.Nickname), row.ContactEmail, row.CreatedAt)
 	JSON(w, http.StatusCreated, row)
 }
 

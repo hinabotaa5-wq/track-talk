@@ -294,6 +294,7 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
+	s.notifyCoachApplication(r.Context(), p.ID.String(), c.Name, c.Tier, c.Events, c.AppliedAt)
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
