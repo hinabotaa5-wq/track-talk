@@ -41,9 +41,9 @@ export function AppIconMark({ className = "" }: { className?: string }) {
 // タイトルは濃紺の上で読みやすい白にする。
 export function AppLogo() {
   return (
-    <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
-      <TrackLanesMark viewBox="112 122 286 286" className="size-6 shrink-0" />
-      <span className="text-base font-black leading-none tracking-tight text-white">TrackTalk</span>
+    <span className="inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+      <TrackLanesMark viewBox="112 122 286 286" className="size-8 shrink-0" />
+      <span className="text-xl font-black leading-none tracking-tight text-white">TrackTalk</span>
     </span>
   );
 }
