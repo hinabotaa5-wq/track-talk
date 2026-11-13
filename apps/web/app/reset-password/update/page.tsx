@@ -72,7 +72,7 @@ export default function UpdatePasswordPage() {
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{L("新しいパスワード")}</h1>
       {done ? (
-        <p className="text-sm">{L("パスワードを変更しました。")}<Link href="/" className="underline">{L("ホームへ")}</Link>
+        <p className="text-sm">{L("パスワードを変更しました。")}<Link href="/" className="underline">{L("フィードへ")}</Link>
         </p>
       ) : ready === "checking" ? (
         <PageLoading label={L("確認しています…")} />

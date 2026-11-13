@@ -35,7 +35,7 @@ export function detectBrowserLocale(): Locale {
 
 const ja = {
   "nav.main": "メイン",
-  "nav.home": "ホーム",
+  "nav.home": "フィード",
   "nav.competitions": "大会",
   "nav.coach": "コーチ",
   "nav.memo": "メモ",
@@ -192,7 +192,7 @@ export type I18nKey = keyof typeof ja;
 // 英語辞書。#530 からはキーをすべて持つ（型で強制する）。
 const en: Record<I18nKey, string> = {
   "nav.main": "Main",
-  "nav.home": "Home",
+  "nav.home": "Feed",
   "nav.competitions": "Meets",
   "nav.coach": "Coach",
   "nav.memo": "Notes",

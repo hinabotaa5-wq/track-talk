@@ -36,12 +36,12 @@ describe("parseLocale", () => {
 
 describe("t", () => {
   it("ja は日本語を返す", () => {
-    expect(t("ja", "nav.home")).toBe("ホーム");
+    expect(t("ja", "nav.home")).toBe("フィード");
     expect(t("ja", "coach.offers.accept")).toBe("引き受ける");
   });
 
   it("en は英語を返す", () => {
-    expect(t("en", "nav.home")).toBe("Home");
+    expect(t("en", "nav.home")).toBe("Feed");
     expect(t("en", "coach.offers.accept")).toBe("Accept");
   });
 
@@ -86,8 +86,8 @@ describe("detectBrowserLocale", () => {
 
 describe("mainTabLabel", () => {
   it("タブ名を言語で切り替える", () => {
-    expect(mainTabLabel("home", "ja")).toBe("ホーム");
-    expect(mainTabLabel("home", "en")).toBe("Home");
+    expect(mainTabLabel("home", "ja")).toBe("フィード");
+    expect(mainTabLabel("home", "en")).toBe("Feed");
     expect(mainTabLabel("me", "en")).toBe("My Page");
   });
 });

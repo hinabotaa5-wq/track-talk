@@ -92,7 +92,7 @@ export default function DeleteAccountPage() {
       <div className="mx-auto max-w-md space-y-4">
         <h1 className="text-2xl font-bold">{L("退会")}</h1>
         <p className="text-sm text-slate-300">{L("投稿・コメントなどのデータは削除しました。ログイン用アカウントは削除できなかったため、同じメールアドレスで再びログインできることがあります。")}</p>
-        <Button type="button" className="w-full" onClick={() => void leave("/")}>{L("ログアウトしてホームへ")}</Button>
+        <Button type="button" className="w-full" onClick={() => void leave("/")}>{L("ログアウトしてフィードへ")}</Button>
       </div>
     );
   }

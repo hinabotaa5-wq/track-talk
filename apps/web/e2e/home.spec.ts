@@ -2,14 +2,28 @@ import { devices, expect, test } from "@playwright/test";
 
 
 
-test("top page shows branding", async ({ page }) => {
+test("フィードの見出しとモバイルナビを表示する", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/?sort=new");
   await expect(page.getByRole("link", { name: "TrackTalk" })).toBeVisible();
   // 下のメニューから主な画面へ行ける。
   const nav = page.getByRole("navigation", { name: "メイン" });
-  for (const name of ["ホーム", "大会", "メモ", "ケガ"]) {
-    await expect(nav.getByRole("link", { name })).toBeVisible();
-  }
+  await expect(nav.getByRole("link")).toHaveText(["コーチ", "大会", "フィード", "メモ", "ケガ"]);
+  await expect(nav.getByRole("link", { name: "フィード", exact: true })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("heading", { name: "フィード", exact: true })).toBeVisible();
+});
+
+test.describe("英語のデスクトップナビ", () => {
+  test.use({ locale: "en-US", viewport: { width: 1280, height: 720 } });
+
+  test("Feed を3番目に表示する", async ({ page }) => {
+    await page.goto("/?sort=new");
+    const nav = page.locator("header nav[data-main-nav]");
+    await expect(nav).toBeVisible();
+    await expect(nav.getByRole("link")).toHaveText(["Coach", "Meets", "Feed", "Notes", "Injury"]);
+    await expect(nav.getByRole("link", { name: "Feed", exact: true })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("heading", { name: "Feed", exact: true })).toBeVisible();
+  });
 });
 
 test("legal pages are reachable", async ({ page }) => {
@@ -19,7 +33,7 @@ test("legal pages are reachable", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "プライバシーポリシー" })).toBeVisible();
 });
 
-test.describe("iPhone 相当のホーム", () => {
+test.describe("iPhone 相当のフィード", () => {
   test.use({
     viewport: { width: 390, height: 664 },
     userAgent: devices["iPhone 13"].userAgent,

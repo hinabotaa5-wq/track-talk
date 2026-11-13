@@ -44,7 +44,7 @@ describe("タップしたリンクのクルクル", () => {
   it("React が動く前のタップには印を付け、動いたあとや同じ画面へのタップには付けない", () => {
     window.history.replaceState(null, "", "/");
     new Function(pendingLinkStartupScript)();
-    document.body.innerHTML = '<a data-pending-link href="/memo"><span>メモ</span></a><a data-pending-link href="/">ホーム</a>';
+    document.body.innerHTML = '<a data-pending-link href="/memo"><span>メモ</span></a><a data-pending-link href="/">フィード</a>';
     const [memo, home] = Array.from(document.querySelectorAll("a"));
     const click = (el: Element) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
     // 印を付けたあとで既定動作を止め、jsdom にページ移動をさせない。
