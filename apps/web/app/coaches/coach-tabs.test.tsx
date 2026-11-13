@@ -141,13 +141,22 @@ it("同じタブのクリックは何もしない", async () => {
 
 it("種目チップで絞り込んだ状態が、タブを行き来しても保持される", async () => {
   await render();
-  await act(async () => chip("100m")!.click());
-  expect(chip("100m")?.getAttribute("aria-checked")).toBe("true");
+  const target = chip("100m");
+  expect(target?.getAttribute("aria-checked")).toBe("false");
+  await act(async () => { target!.click(); });
+  // 同一ノードの属性が変わる（選び直しではなくその場で切り替わる）。
+  expect(target!.getAttribute("aria-checked")).toBe("true");
   await act(async () => switchLink("サポートプラン")!.click());
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   await act(async () => switchLink("動画添削")!.click());
-  // 動画添削の一覧は破棄されていないので、選んだチップが残る。
+  // 動画添削の一覧は破棄されていないので、選んだチップのノードも選択も残る。
   expect(panels()[0].hidden).toBe(false);
-  expect(chip("100m", panels()[0])?.getAttribute("aria-checked")).toBe("true");
+  const panel = panels()[0];
+  expect(
+    panel.contains(target),
+    `radios=${container.querySelectorAll('[role="radio"]').length} panels=${panels().length} hidden=${panels().map((p) => p.hidden)} tab=${container.querySelector('[role="tabpanel"]')?.textContent?.slice(0, 160)}`,
+  ).toBe(true);
+  expect(target!.getAttribute("aria-checked")).toBe("true");
   expect(fetchCount("/v1/coaches")).toBe(1);
 });
 
