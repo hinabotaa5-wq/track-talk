@@ -95,7 +95,6 @@ var pushTitleEN = map[string]string{
 	"大会の記録を残せていますか？": "Have you logged your meet results?",
 	"参加申請がありました":      "New practice application",
 	"参加が承認されました":       "Participation approved",
-	"TrackTalk を開いて確認してください": "Open TrackTalk to check",
 }
 
 // pushBodyEN は、プッシュ・ベルの本文の日英対応。本文は固定文のものだけ置き換える。
@@ -118,7 +117,6 @@ var pushBodyEN = map[string]string{
 	"止めていた日数の分、期間を延ばしました":           "Extended by the paused days",
 	"運営が確認しています。終わるまで送れません":        "Under review by staff. You can't send until it's done",
 	// 共通
-	"TrackTalk を開いて確認してください": "Open TrackTalk to check",
 	"通知の設定ができました":      "Notifications are set up",
 }
 

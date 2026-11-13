@@ -3,6 +3,8 @@ package httpx
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/hinata/track-talk/apps/api/internal/push"
 )
 
@@ -88,5 +90,18 @@ func TestLocalizeShortenedNotifications(t *testing.T) {
 	got := localizePushMessage("en", push.Message{Title: "パーソナル指導の期間がもうすぐ終わります", Body: contractCloseNoticeBody})
 	if got.Title != "Personal coaching ending soon" || got.Body != "Download your messages and menus before it ends" {
 		t.Fatalf("close notice: %+v", got)
+	}
+}
+
+// 投稿系のプッシュ（コメント・返信・練習・募集・ケガ）も表題1行だけで、本文は空（本体 #609）。
+func TestPostPushMessageHasNoBody(t *testing.T) {
+	id := uuid.New()
+	got := postPushMessage("コメントがありました", id)
+	if got.Title != "コメントがありました" || got.Body != "" || got.URL != "/posts/"+id.String() || got.Tag != "post-"+id.String() {
+		t.Fatalf("post push: %+v", got)
+	}
+	en := localizePushMessage("en", got)
+	if en.Body != "" {
+		t.Fatalf("en body: %q", en.Body)
 	}
 }

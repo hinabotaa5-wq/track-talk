@@ -163,10 +163,10 @@ func (s *Server) sendPostPushes(ctx context.Context, pushes []postPush) {
 }
 
 // postPushMessage は投稿の知らせのプッシュ。ケガの投稿もあるので、投稿のタイトルや中身は載せない。
+// 通知は表題1行だけにし、本文は空にする（本体 #609、2026-11-13 の運営者決定）。
 func postPushMessage(title string, postID uuid.UUID) push.Message {
 	return push.Message{
 		Title: title,
-		Body:  "TrackTalk を開いて確認してください",
 		URL:   "/posts/" + postID.String(),
 		Tag:   "post-" + postID.String(),
 	}
