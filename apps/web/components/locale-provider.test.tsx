@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 function Probe() {
   const locale = useLocale();
-  return <p data-testid="probe">{`${locale}:${L("ホーム")}`}</p>;
+  return <p data-testid="probe">{`${locale}:${L("フィード")}`}</p>;
 }
 
 function setBrowserLanguage(language: unknown, languages: readonly string[] = []) {
@@ -65,7 +65,7 @@ afterEach(async () => {
 describe("LocaleProvider（ブラウザ言語の自動判定）", () => {
   it("日本語ブラウザは日本語で出す", async () => {
     await render(<Probe />);
-    expect(probe()).toBe("ja:ホーム");
+    expect(probe()).toBe("ja:フィード");
     expect(document.documentElement.lang).toBe("ja");
   });
 
@@ -75,7 +75,7 @@ describe("LocaleProvider（ブラウザ言語の自動判定）", () => {
     try {
       setBrowserLanguage("en-US");
       await render(<Probe />);
-      expect(probe()).toBe("en:Home");
+      expect(probe()).toBe("en:Feed");
       expect(document.documentElement.lang).toBe("en");
       expect(fetchMock).not.toHaveBeenCalledWith("/geo-country", expect.anything());
     } finally {
@@ -86,11 +86,11 @@ describe("LocaleProvider（ブラウザ言語の自動判定）", () => {
   it("en-GB など en で始まる値も英語、その他（fr-FR 等）は日本語", async () => {
     setBrowserLanguage("en-GB");
     await render(<Probe />);
-    expect(probe()).toBe("en:Home");
+    expect(probe()).toBe("en:Feed");
 
     await switchBrowserLanguage("fr-FR");
     await render(<Probe />);
-    expect(probe()).toBe("ja:ホーム");
+    expect(probe()).toBe("ja:フィード");
   });
 
   it("端末に旧来の保存があっても無視する", async () => {
@@ -98,14 +98,14 @@ describe("LocaleProvider（ブラウザ言語の自動判定）", () => {
     localStorage.setItem("tracktalk:locale-prompted", "1");
     localStorage.setItem("tracktalk:locale-explicit", "1");
     await render(<Probe />);
-    expect(probe()).toBe("ja:ホーム");
+    expect(probe()).toBe("ja:フィード");
   });
 
   it("ブラウザ言語を変えれば次回表示から追従する", async () => {
     await render(<Probe />);
-    expect(probe()).toBe("ja:ホーム");
+    expect(probe()).toBe("ja:フィード");
     await switchBrowserLanguage("en-US");
     await render(<Probe />);
-    expect(probe()).toBe("en:Home");
+    expect(probe()).toBe("en:Feed");
   });
 });

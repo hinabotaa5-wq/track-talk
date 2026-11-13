@@ -8,7 +8,8 @@ describe("mainTabHref", () => {
     expect(activeMainTab("/me/sense")).toBe("memo");
     expect(activeMainTab("/injury/hamstring-strain")).toBe("injury");
   });
-  it("下のメニューは コーチ→大会→ホーム→メモ→ケガ の順", () => {
+  it("下のメニューは コーチ→大会→フィード→メモ→ケガ の順", () => {
+    expect(mainTabs.map((tab) => tab.label)).toEqual(["コーチ", "大会", "フィード", "メモ", "ケガ"]);
     expect(mainTabs.map((tab) => tab.id)).toEqual(["coaching", "competitions", "home", "memo", "injury"]);
   });
 

@@ -9,7 +9,7 @@ import { HomeFilters } from "@/components/home-filters";
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="home-layout -mx-4 -mt-6 -mb-6 md:mt-0">
-      <h1 className="sr-only">{L("ホーム")}</h1>
+      <h1 className="sr-only">{L("フィード")}</h1>
       <div className="home-filter-anchor sticky z-30 mx-auto max-w-5xl md:px-4" style={{ top: "var(--home-header-height, calc(3.8125rem + env(safe-area-inset-top)))" }}>
         <Suspense>
           <HomeFilters />

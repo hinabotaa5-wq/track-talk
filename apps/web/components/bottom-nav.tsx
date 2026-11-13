@@ -8,7 +8,7 @@ import { readAccountOrigin } from "@/lib/account-origin";
 import { mainTabLabel, t } from "@/lib/i18n";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
 import { usePathname } from "next/navigation";
-import { createLucideIcon, GraduationCap, HeartPulse, Home, Trophy, UserRound } from "lucide-react";
+import { createLucideIcon, GraduationCap, HeartPulse, LayoutGrid, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 import { isInjuryBodyPart } from "@/lib/injury";
@@ -28,7 +28,7 @@ const MemoIcon = createLucideIcon("memo", [
 export const mainTabs = [
   { id: "coaching", href: "/coaching", get label() { return L("コーチ"); }, icon: GraduationCap },
   { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
-  { id: "home", href: "/", get label() { return L("ホーム"); }, icon: Home },
+  { id: "home", href: "/", get label() { return L("フィード"); }, icon: LayoutGrid },
   { id: "memo", href: "/memo", get label() { return L("メモ"); }, icon: MemoIcon },
   { id: "injury", href: "/injury", get label() { return L("ケガ"); }, icon: HeartPulse },
 ] as const;

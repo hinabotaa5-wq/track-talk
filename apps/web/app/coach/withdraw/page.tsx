@@ -74,7 +74,7 @@ export default function CoachWithdrawPage() {
       <div className="mx-auto max-w-md space-y-4">
         <h1 className="text-2xl font-bold">{L("コーチをやめました")}</h1>
         <p className="text-sm text-slate-300">{L("アカウントはそのまま使えます。もう一度コーチとして活動したくなったら、応募すると審査からやり直せます。")}</p>
-        <Link href="/" className="block text-sm text-blue-300 underline">{L("ホームへ")}</Link>
+        <Link href="/" className="block text-sm text-blue-300 underline">{L("フィードへ")}</Link>
       </div>
     );
   }
