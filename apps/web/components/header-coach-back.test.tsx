@@ -93,7 +93,6 @@ for (const landing of [
   "/coach/consultations",
   "/coach/contracts",
   "/coach/plans",
-  "/coach/availability",
   "/coach/commerce",
   "/coach/payouts",
   "/coach/profile",

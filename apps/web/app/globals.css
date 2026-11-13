@@ -900,7 +900,7 @@ html.locale-pending body > :not(#startup-splash):not(script) {
   visibility: hidden;
 }
 
-/* コーチ画面のタイル（本体 #580）。3列×4行（最終行は2つ、左寄せ）で、タイルは横幅駆動の正方形。
+/* コーチ画面のタイル（本体 #580）。3列（9タイルで3行。端数が出る場合の最終行は左寄せ）で、タイルは横幅駆動の正方形。
    横：コンテナ左右パディング clamp(16px, 4.5vw, 24px)、ギャップ（横・縦とも）clamp(12px, 3.2vw, 16px)。
    main の px-4（1rem）はそのままにし、足りない分だけ nav 側で足して合計を式どおりにする。
    列は repeat(3, 1fr) で残り幅いっぱいに広げ、最終行は左寄せのまま（中央寄せ・引き伸ばしなし）。
@@ -928,9 +928,10 @@ html.locale-pending body > :not(#startup-splash):not(script) {
     padding-block: var(--coach-pad-block, 12px);
   }
   /* タイル内部も比例して大きくする。文言・アイコン種・色・バッジは変えない。 */
+  /* 横パディングは 2px（「サポートプラン」の7文字が 360px 幅でも省略されずに収まるように。2026-11-13）。 */
   .coach-tiles > nav > a {
     gap: 8px;
-    padding: 10px;
+    padding: 10px 2px;
     border-radius: clamp(16px, 4.5vw, 20px);
   }
   .coach-tiles > nav > a > svg {

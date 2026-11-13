@@ -2,8 +2,6 @@
 import { L } from "@/lib/i18n";
 
 import { ContactNotice, useSolicitationGuard } from "@/components/contact-notice";
-import { PublicAvailability } from "@/components/coach-availability";
-import { hasAvailability } from "@/lib/coach-availability";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
@@ -46,8 +44,6 @@ export default function ApplyCoachingPlanPage() {
   const [record, setRecord] = useState("");
   const [message, setMessage] = useState("");
   const guard = useSolicitationGuard();
-  const [preferredDates, setPreferredDates] = useState<string[]>([]);
-  const [availabilityRevision, setAvailabilityRevision] = useState(0);
   const [consents, setConsents] = useState<ContractConsents>(noConsents);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -105,17 +101,11 @@ export default function ApplyCoachingPlanPage() {
       const d = await apiFetch<{ contract: CoachingContract }>("/v1/coaching/contracts", {
         method: "POST",
         token,
-        body: JSON.stringify({ plan_id: id, event, goal, current_record: record, message, preferred_dates: hasAvailability(data?.plan.service_type) ? preferredDates : [], ...consents }),
+        body: JSON.stringify({ plan_id: id, event, goal, current_record: record, message, preferred_dates: [], ...consents }),
       });
       router.push(`/coaching/personal/${d.contract.id}`);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.fields) {
-        setFields(err.fields);
-        if (err.fields.preferred_dates) {
-          setPreferredDates([]);
-          setAvailabilityRevision((value) => value + 1);
-        }
-      }
+      if (err instanceof ApiRequestError && err.fields) setFields(err.fields);
       else setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
       release();
     }
@@ -158,8 +148,6 @@ export default function ApplyCoachingPlanPage() {
         </div>
       </section>
 
-      {hasAvailability(plan.service_type) && (plan.full || !me.demo || !me.birth_month) ? <PublicAvailability key={coach.id} coachID={coach.id} /> : null}
-
       {plan.full ? (
         <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">{L("このプランはいま満員です。空いたらまた申し込めます。")}</p>
       ) : !me.demo ? (
@@ -178,7 +166,6 @@ export default function ApplyCoachingPlanPage() {
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">
-          {hasAvailability(plan.service_type) ? <div className="space-y-2"><PublicAvailability key={`${coach.id}-${availabilityRevision}`} coachID={coach.id} selected={preferredDates} onChange={setPreferredDates} />{fieldError("preferred_dates")}</div> : null}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">{L("種目")}</legend>
             <div className="flex flex-wrap gap-2">
