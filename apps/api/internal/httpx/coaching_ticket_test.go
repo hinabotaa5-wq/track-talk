@@ -140,6 +140,39 @@ func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
 	assertTicketAccounting(t, h, adminToken(t, h))
 }
 
+// 本体 #691：コーチ詳細から来た購入は、その戻り先を購入記録に残し、確定後の照会でも返す。
+func TestTicketPurchaseKeepsCoachDetailReturnPath(t *testing.T) {
+	h, f := setupStripe(t)
+	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
+	coachPath := "/coaches/" + uuid.NewString()
+	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), coachPath)
+	var path string
+	queryRowArgs(t, `SELECT return_path FROM coaching_ticket_purchases WHERE id=$1`, []any{id}, &path)
+	if path != coachPath {
+		t.Fatalf("return path %q", path)
+	}
+	// 購入画面を閉じた場合も戻り先を引き継ぐ（取消し時の挙動そのものは従来どおり購入画面に戻る）。
+	if len(f.sessions) != 1 || !strings.Contains(f.sessions[0].Get("cancel_url"), "return_to="+strings.ReplaceAll(coachPath, "/", "%2F")) {
+		t.Fatalf("checkout sessions %v", f.sessions)
+	}
+	payTicketPurchase(t, h, id, 2500)
+	r := doJSON(t, h, http.MethodGet, "/v1/coaching/tickets/purchases/"+id, tu, nil)
+	var out struct {
+		Status     string `json:"status"`
+		ReturnPath string `json:"return_path"`
+	}
+	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &out) != nil || out.Status == "pending" || out.ReturnPath != coachPath {
+		t.Fatalf("purchase %d %s", r.Code, r.Body.String())
+	}
+	for _, bad := range []string{coachPath + "/x", "/coaches/not-a-uuid", "https://evil.test" + coachPath} {
+		bid := startTicketPurchase(t, h, tu, "six", uuid.NewString(), bad)
+		queryRowArgs(t, `SELECT return_path FROM coaching_ticket_purchases WHERE id=$1`, []any{bid}, &path)
+		if path != "/me/coaching/tickets" {
+			t.Fatalf("unsafe return %q -> %q", bad, path)
+		}
+	}
+}
+
 func TestTicketsReservedConsumedAndReleasedWithFixedEarnings(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)

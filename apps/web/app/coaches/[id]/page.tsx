@@ -12,7 +12,7 @@ import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
+import { coachTicketPurchaseHref, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
@@ -94,6 +94,8 @@ function CoachDetail({ id }: { id: string }) {
   const achievementLines = coach?.achievements ? coach.achievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
   const ctaEnabled = availability !== "unavailable";
+  // チケット購入画面へのリンク。購入を完了したらこのコーチ詳細に戻る（本体 #691。2つの入口で同じ戻り先）。
+  const ticketPurchaseHref = coachTicketPurchaseHref(coachID);
   const showTickets = !(ticketSales?.canPurchase === false && ticketSales.token === token);
   // 種別ごとの残り。未ログイン・取得失敗・古い API では枚数を出さない（#684 と同じく、取れなくても入口は出す）。
   const counts = ticketSales && ticketSales.token === token ? ticketSales.counts : null;
@@ -103,8 +105,8 @@ function CoachDetail({ id }: { id: string }) {
     {
       key: "normal", Icon: Ticket, label: L("通常チケット"),
       note: counts ? L("残り {n} 枚", { n: counts.normal }) : undefined,
-      // 通常チケットが0枚なら購入画面へ（#684 の「購入する」と同じ遷移先）。
-      href: counts?.normal === 0 ? "/me/coaching/tickets" : `${ctaHref}&pay=normal`,
+      // 通常チケットが0枚なら購入画面へ（#684 の「購入する」と同じ遷移先・同じ戻り先）。
+      href: counts?.normal === 0 ? ticketPurchaseHref : `${ctaHref}&pay=normal`,
     },
     {
       key: "reward", Icon: Gift, label: L("無料チケット"),
@@ -184,7 +186,7 @@ function CoachDetail({ id }: { id: string }) {
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
           <p className="text-slate-200">{L("チケット{q}枚で{v0}です。添削1回につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
           <Link
-            href="/me/coaching/tickets"
+            href={ticketPurchaseHref}
             className="flex min-h-11 w-full items-center justify-center rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/16 active:scale-[0.98]"
           >{L("購入する")}</Link>
         </section> : null}

@@ -58,6 +58,32 @@ it("決済確認中は購入を止め、確定後に紹介IDと元の画面へ�
   expect(container.querySelector('a[href="/coaching/new"]')?.textContent).toBe("元の画面に戻る");
 });
 
+// 本体 #691：コーチ詳細から来た購入は、その戻り先を決済 API に渡し、確定後はそのコーチ詳細へのリンクを出す。
+it("コーチ詳細から来た購入は戻り先を API に渡し、確定後にそのコーチ詳細へ戻るリンクを出す", async () => {
+  const coachPath = "/coaches/12345678-1234-1234-1234-123456789abc";
+  mocks.query = `return_to=${encodeURIComponent(coachPath)}`;
+  mocks.api.mockImplementation(async (path: string, options?: { method?: string }) => options?.method === "POST"
+    ? { paid: true, return_path: coachPath }
+    : path.endsWith("/referral") ? { referral: null } : initial);
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click());
+  await buy();
+  const body = JSON.parse(mocks.api.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
+  expect(body.return_path).toBe(coachPath);
+  expect(container.textContent).toContain("購入内容を反映しました");
+  expect(container.querySelector(`a[href="${coachPath}"]`)?.textContent).toBe("元の画面に戻る");
+});
+
+it("不正な戻り先は API に渡さず、購入画面を戻り先にする", async () => {
+  mocks.query = `return_to=${encodeURIComponent("/coaches/12345678-1234-1234-1234-123456789abc/../../admin")}`;
+  mocks.api.mockImplementation(async (_path: string, options?: { method?: string }) => options?.method === "POST" ? { checkout_url: "" } : initial);
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click());
+  await buy();
+  const body = JSON.parse(mocks.api.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
+  expect(body.return_path).toBe("/me/coaching/tickets");
+});
+
 it("6枚2,500円を、単発の料金との比較と条件（先払い・有効期限・原則払戻し不可・本人限定）と一緒に出す", async () => {
   mocks.api.mockResolvedValue(initial);
   await render();
