@@ -154,7 +154,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
     <section className="space-y-2">
       <p className="text-sm text-slate-200">{L("お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。")}</p>
       <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} />
-      <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+      <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
         onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
       {availableReviewPayMethods.map((m) => (
         <button

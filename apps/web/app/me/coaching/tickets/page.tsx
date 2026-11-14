@@ -145,7 +145,7 @@ function TicketsPage() {
           pending={pending}
           confirmDisabled={!declaration.checked}
         >
-          <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+          <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
             onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declaration.checked} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         </PurchaseConfirm>

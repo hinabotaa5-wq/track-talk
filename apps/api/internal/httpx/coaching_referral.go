@@ -30,14 +30,14 @@ func usableReferralCode(ctx context.Context, q *db.Queries, buyer uuid.UUID, inp
 	return &valid, err
 }
 
+// recordCoachingReferral は、確定した対象購入1件を紹介の周に反映する。入力された紹介IDで
+// 数えたうえで、その購入に有効カウントが紐付かなかったときだけ購入者の起点購入として
+// 紹介IDを発行する（本体 #686：起点とカウントの分離）。
 func recordCoachingReferral(ctx context.Context, q *db.Queries, buyer, ticketID, paymentID *uuid.UUID, code *string) error {
 	if buyer == nil {
 		return nil
 	}
-	if err := q.IssueCoachingReferral(ctx, *buyer); err != nil || code == nil {
-		return err
-	}
-	recipient, err := q.CountCoachingReferral(ctx, db.CountCoachingReferralParams{Buyer: *buyer, Code: *code, TicketID: ticketID, PaymentID: paymentID})
+	recipient, err := q.RecordCoachingReferral(ctx, db.RecordCoachingReferralParams{Buyer: *buyer, Code: code, TicketID: ticketID, PaymentID: paymentID})
 	if err != nil || recipient == "" {
 		return err
 	}

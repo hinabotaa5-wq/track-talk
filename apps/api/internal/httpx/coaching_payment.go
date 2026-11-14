@@ -283,6 +283,11 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	case "charge.dispute.created":
 		s.alertDispute(r.Context(), ev)
+		if err := s.cancelDisputedReferral(r.Context(), ev); err != nil {
+			slog.Error("dispute referral cancel", "event", ev.ID, "err", err)
+			Error(w, http.StatusInternalServerError, "internal_error", "処理できませんでした")
+			return
+		}
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
 		var sess stripe.CheckoutSession
 		if err := json.Unmarshal(ev.Data.Object, &sess); err != nil {
@@ -405,6 +410,21 @@ func (s *Server) alertDispute(ctx context.Context, ev stripe.Event) {
 			Tag:   "stripe-dispute-" + d.ID,
 		}, 7*24*time.Hour)
 	}
+}
+
+// cancelDisputedReferral は、チャージバックで失効した支払いを返金と同じに扱い、その支払いの
+// 紹介カウントと、そのカウントで付与された未使用の特典を取り消す（本体 #686）。
+// Stripe は異議の申し立て時点で代金を引き戻すため、created を失効の時点とみなす。
+func (s *Server) cancelDisputedReferral(ctx context.Context, ev stripe.Event) error {
+	var d struct {
+		PaymentIntent string `json:"payment_intent"`
+	}
+	if err := json.Unmarshal(ev.Data.Object, &d); err != nil || d.PaymentIntent == "" {
+		return nil
+	}
+	return s.tx(ctx, func(q *db.Queries) error {
+		return q.CancelDisputedCoachingReferral(ctx, d.PaymentIntent)
+	})
 }
 
 // completeCoachingCheckout は、支払いが済んだ契約の期間を始める。始められないもの（期限切れ、二重の支払い）は返金する。

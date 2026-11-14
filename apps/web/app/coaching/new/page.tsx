@@ -323,7 +323,7 @@ export default function NewReviewRequestPage() {
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
           >
-            {cashPayment ? <ReferralInput code={referralCode} warning={referralWarning} disabled={pending}
+            {cashPayment ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
               onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} /> : null}
             <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
               {L("特定商取引法に基づく表記")}
