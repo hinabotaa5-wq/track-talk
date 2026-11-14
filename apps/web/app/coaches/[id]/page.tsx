@@ -206,7 +206,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
           <p className="text-slate-200">{L("チケット{q}枚で{v0}です。添削1回につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
           <Link
             href={ticketPurchaseHref}
-            className="flex min-h-11 w-full items-center justify-center rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/16 active:scale-[0.98]"
+            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]"
           >{L("購入する")}</Link>
         </section> : null}
         </> : null}

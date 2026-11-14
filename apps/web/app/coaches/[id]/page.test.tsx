@@ -92,6 +92,10 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
   expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。添削1回につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
+  const purchaseClass = tickets?.querySelector("a")?.className ?? "";
+  expect(purchaseClass).toContain("bg-blue-600");
+  expect(purchaseClass).toContain("text-pure-white");
+  expect(purchaseClass).not.toContain("bg-white/10");
   expect(tickets?.previousElementSibling?.getAttribute("aria-labelledby")).toBe("coach-video-review");
   // フォーム添削文脈（既定）ではチケット節が最後の節で、継続プラン節は続かない（本体 #694）。
   expect(tickets?.nextElementSibling).toBeNull();
