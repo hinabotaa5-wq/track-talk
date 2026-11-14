@@ -361,15 +361,6 @@ const returnedCoach = () => ({
   years: 3,
 });
 
-async function renderPage() {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  await act(async () => root.render(<ReviewRequestPage />));
-  return { container, root };
-}
-
 async function unmountPage(container: HTMLDivElement, root: ReturnType<typeof createRoot>) {
   await act(async () => root.unmount());
   container.remove();
