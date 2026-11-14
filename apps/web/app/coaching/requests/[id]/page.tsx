@@ -320,7 +320,7 @@ function ReviewRequestView() {
         {active && request.started_at ? <p className="text-sm text-slate-100">{L("現在コーチが添削を行っています")}</p> : null}
         {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
         {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
-        {request.requested_coach_id ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
+        {request.requested_coach_id && !(request.response && request.coach) ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
           <p className="font-semibold">{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
           <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>
           {request.status === "expired" ? <Link href="/coaching/new" className="mt-1 inline-block text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}
