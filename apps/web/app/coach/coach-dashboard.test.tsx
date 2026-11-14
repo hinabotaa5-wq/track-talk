@@ -198,10 +198,11 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
   expect(tileHrefs()).toHaveLength(9);
 });
 
-it("未承認の表示は現行のまま変えない", async () => {
+it("未承認時はコーチ募集の文言を表示する", async () => {
   apiFetch.mockResolvedValue({ application: { ...application, status: "pending" } });
   await act(async () => root.render(<CoachDashboard />));
-  expect(container.textContent).toContain("コーチングは準備中です");
+  expect(container.textContent).toContain("競技や指導の経験を生かして、選手の次の一歩を支えるコーチを募集しています。");
+  expect(container.textContent).not.toContain("コーチングは準備中です");
   expect(container.querySelector('nav[aria-label="コーチのメニュー"]')).toBeNull();
 });
 
