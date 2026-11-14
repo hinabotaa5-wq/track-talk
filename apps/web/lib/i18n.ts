@@ -116,7 +116,7 @@ const ja = {
   "notify.message": "お知らせ",
 
   "coach.title": "コーチ画面",
-  "coach.notReady": "コーチングは準備中です。競技や指導の経験を生かして、選手の次の一歩を支えるコーチを募集しています。",
+  "coach.notReady": "競技や指導の経験を生かして、選手の次の一歩を支えるコーチを募集しています。",
   "coach.checkApplication": "応募状況・応募内容を確認する",
   "coach.preparing": "コーチの応募は承認されています。現在は受付開始に向けて準備中です。機能の公開後、この画面から依頼への返答やプランの管理ができます。",
   "coach.about": "コーチ機能について",
@@ -268,7 +268,7 @@ const en: Record<I18nKey, string> = {
   "notify.message": "Notice",
 
   "coach.title": "Coach",
-  "coach.notReady": "Coaching is getting ready. We're looking for coaches who can support athletes' next step with their competition and coaching experience.",
+  "coach.notReady": "We're looking for coaches who can support athletes' next step with their competition and coaching experience.",
   "coach.checkApplication": "Check application status",
   "coach.preparing": "Your coach application is approved. We're preparing for launch. After release, you'll be able to reply to requests and manage plans here.",
   "coach.about": "About coaching",
