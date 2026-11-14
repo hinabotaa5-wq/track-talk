@@ -43,16 +43,43 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
+const entry = (key: "card" | "normal" | "reward") => container.querySelector(`section[aria-labelledby="coach-video-review"] [data-entry="${key}"]`);
+const entryLink = (key: "card" | "normal" | "reward") => entry(key)?.querySelector("a[href]")?.getAttribute("href") ?? null;
+const entryDisabled = (key: "card" | "normal" | "reward") => entry(key)?.querySelector('span[aria-disabled="true"]') != null;
+const reviewHref = (pay: string) => `/coaching/new?coach=${coachID}&pay=${pay}`;
+function withTickets(summary: Record<string, unknown>, accepting = true) {
+  mocks.auth.token = "token";
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === `/v1/coaches/${coachID}`) return coach;
+    if (path === "/v1/me/coaching/tickets") return { can_purchase: true, ...summary };
+    if (path.startsWith("/v1/coaching/nominees")) {
+      return { coaches: accepting ? [{ id: coachID, nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 10, best_record: "", achievements: "" }] : [] };
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+}
+const byKind = (normal: number, reward: number) => ({ balance_by_kind: {
+  normal: { available: normal, next_expires_at: normal ? "2027-05-01T00:00:00Z" : null },
+  reward: { available: reward, next_expires_at: reward ? "2027-04-01T00:00:00Z" : null },
+} });
+
 async function render() {
   await act(async () => root.render(<CoachDetailPage />));
   await act(async () => {});
 }
 
-it("未ログインでは動画添削の節と依頼ボタンを有効なまま出し、受付状態を取りに行かない", async () => {
+it("未ログインでは動画添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
   expect(container.textContent).toContain("動画添削");
-  const link = container.querySelector(`a[href="/coaching/new?coach=${coachID}"]`);
-  expect(link?.textContent).toBe("動画添削を依頼する");
+  expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
+  expect(entry("card")?.textContent).toBe("単発500円");
+  expect(entryLink("card")).toBe(reviewHref("card"));
+  // 枚数が分からないときは枚数を出さず、申込画面へ進める。
+  expect(entry("normal")?.textContent).toBe("通常チケット");
+  expect(entryLink("normal")).toBe(reviewHref("normal"));
+  expect(entry("reward")?.textContent).toBe("無料チケット");
+  expect(entryLink("reward")).toBe(reviewHref("reward"));
+  expect(container.textContent).not.toContain("残り");
   expect(container.textContent).toContain("500円");
   expect(container.textContent).toContain("チケットも使えます");
   expect(container.textContent).not.toContain("現在は受付していません");
@@ -80,8 +107,8 @@ it("受付停止中でもチケットを購入できる", async () => {
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(container.querySelector(`a[href="/coaching/new?coach=${coachID}"]`)).toBeNull();
-  expect(container.querySelector('span[aria-disabled="true"]')?.textContent).toBe("動画添削を依頼する");
+  expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
+  for (const key of ["card", "normal", "reward"] as const) expect(entryDisabled(key)).toBe(true);
   expect(container.textContent).toContain("現在は受付していません");
   const purchaseLink = container.querySelector('section[aria-labelledby="coach-tickets"] a[href]');
   expect(purchaseLink?.textContent).toBe("購入する");
@@ -101,7 +128,7 @@ it("ログイン済みでチケットを購入できないときはチケット�
   expect(container.querySelector('section[aria-labelledby="coach-tickets"]')).toBeNull();
 });
 
-it("ログイン済みで受付中ならボタンを有効にする", async () => {
+it("ログイン済みで受付中なら3つの入口を有効にする", async () => {
   mocks.auth.token = "token";
   mocks.api.mockImplementation(async (path: string) => {
     if (path === `/v1/coaches/${coachID}`) return coach;
@@ -111,8 +138,44 @@ it("ログイン済みで受付中ならボタンを有効にする", async () =
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(container.querySelector(`a[href="/coaching/new?coach=${coachID}"]`)?.textContent).toBe("動画添削を依頼する");
+  expect(entryLink("card")).toBe(reviewHref("card"));
+  expect(entryLink("normal")).toBe(reviewHref("normal"));
+  expect(entryLink("reward")).toBe(reviewHref("reward"));
   expect(container.textContent).not.toContain("現在は受付していません");
+});
+
+it("種別ごとの残り枚数を出し、それぞれの支払い方式で申込画面へ進む", async () => {
+  withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
+  await render();
+  expect(entry("card")?.textContent).toBe("単発500円");
+  expect(entry("normal")?.textContent).toBe("通常チケット残り 2 枚");
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 1 枚");
+  expect(entryLink("card")).toBe(reviewHref("card"));
+  expect(entryLink("normal")).toBe(reviewHref("normal"));
+  expect(entryLink("reward")).toBe(reviewHref("reward"));
+});
+
+it("通常チケット0枚は購入画面へ、無料チケット0枚は押せない", async () => {
+  withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) });
+  await render();
+  expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
+  expect(entryLink("normal")).toBe("/me/coaching/tickets");
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
+  expect(entryLink("reward")).toBeNull();
+  expect(entryDisabled("reward")).toBe(true);
+  expect(entryLink("card")).toBe(reviewHref("card"));
+});
+
+it("受付していないコーチでは通常チケット0枚でも購入へ遷移させず、チケット節の購入は押せる", async () => {
+  withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) }, false);
+  await render();
+  for (const key of ["card", "normal", "reward"] as const) {
+    expect(entryLink(key)).toBeNull();
+    expect(entryDisabled(key)).toBe(true);
+  }
+  expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
+  expect(container.textContent).toContain("現在は受付していません");
+  expect(container.querySelector('section[aria-labelledby="coach-tickets"] a[href="/me/coaching/tickets"]')?.textContent).toBe("購入する");
 });
 
 it("受付状態とチケット要約の取得に失敗しても両方のボタンを表示する", async () => {
@@ -122,7 +185,10 @@ it("受付状態とチケット要約の取得に失敗しても両方のボタ�
     throw new Error("network down");
   });
   await render();
-  expect(container.querySelector(`a[href="/coaching/new?coach=${coachID}"]`)?.textContent).toBe("動画添削を依頼する");
+  expect(entryLink("card")).toBe(reviewHref("card"));
+  expect(entryLink("normal")).toBe(reviewHref("normal"));
+  expect(entryLink("reward")).toBe(reviewHref("reward"));
+  expect(container.textContent).not.toContain("残り");
   expect(container.querySelector('section[aria-labelledby="coach-tickets"] a')?.textContent).toBe("購入する");
 });
 
@@ -163,7 +229,9 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(container.textContent).toContain("Request a video review");
+  expect(entry("card")?.textContent).toBe("One-time¥500");
+  expect(entry("normal")?.textContent).toBe("Regular ticket");
+  expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");

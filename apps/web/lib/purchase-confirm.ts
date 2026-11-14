@@ -1,7 +1,7 @@
 import { L } from "@/lib/i18n";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPayMethodLabels } from "@/lib/review";
-import type { TicketNextExpiry } from "@/lib/coaching-tickets";
+import type { TicketKind, TicketNextExpiry } from "@/lib/coaching-tickets";
 
 // チケットの払戻しの例外4項目（本体 #572 v3）。販売画面と最終確認画面に同じ順で箇条書きする。
 // 「原則払戻し不可」だけを単独で出さず、この4項目を同じ画面に出す。
@@ -28,17 +28,28 @@ export type ReviewConfirmInput = {
   priceYen: number;
   coachName?: string;
   // チケットで払うとき、確保される1枚の有効期限（いちばん早く失効する分から使う）。旧商品の分は期限なし。
-  nextExpiry?: TicketNextExpiry | null;
+  // 種別を選んだとき（本体 #687）は、その種別の中でいちばん早く失効する分の期限を渡す。
+  nextExpiry?: Pick<TicketNextExpiry, "expires_at"> | null;
+  // チケットの種別（本体 #687）。reward（無料チケット）は支払いの行と有効期限の行を分けて出す。
+  ticketKind?: TicketKind | null;
 };
 
-export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
   const rows: ConfirmRow[] = [
     { label: L("内容"), value: coachName ? L("動画添削1回（動画1本・担当 {coachName}）", { coachName }) : L("動画添削1回（動画1本）") },
     { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
   if (method === "tickets") {
+    const expiry = nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("期限なし（以前に購入した分）");
+    if (ticketKind === "reward") {
+      rows.push(
+        { label: L("お支払い"), value: L("無料チケット1枚（このあとのお支払いはありません）") },
+        { label: L("使うチケットの有効期限"), value: expiry },
+      );
+    } else {
+      rows.push({ label: L("お支払い"), value: L("チケット1枚（有効期限 {expiry}・追加の支払いなし）", { expiry }) });
+    }
     rows.push(
-      { label: L("お支払い"), value: L("チケット1枚（有効期限 {expiry}・追加の支払いなし）", { expiry: nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("期限なし（以前に購入した分）") }) },
       { label: L("キャンセル・チケットの戻り"), value: L("送信時に1枚を確保し、返却時に使います。着手前はキャンセルでき、その場合は1枚戻ります。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却でも1枚戻りますが、有効期限を過ぎた分は失効します。") },
     );
     return rows;
