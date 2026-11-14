@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { coachEventLabels, coachEvents } from "@/lib/coach-recruit";
 import type { CoachEvent } from "@/lib/types";
-import { CoachEventChips, coachEventFilterOrder, filterCoachesByEvent, type CoachEventFilter } from "./coach-event-filter";
+import { CoachEventChips, CoachEventEmpty, coachEventFilterOrder, filterCoachesByEvent, type CoachEventFilter } from "./coach-event-filter";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -205,7 +205,44 @@ it("タッチのスワイプはドラッグ実装で上書きせず、タップ�
   expect(onChange).toHaveBeenCalledWith("long-jump");
 });
 
-it("端で切れたチップを選ぶと全体が見える位置までスクロールし、見えているチップでは動かさない", async () => {
+// ページ上の余白がある列では、offsetLeft に列の配置分が含まれる。
+const scrollerPageLeft = 16;
+
+function mockChipPosition(group: HTMLElement, value: CoachEventFilter, contentLeft: number, width: number) {
+  const chip = group.querySelector<HTMLButtonElement>(`[data-chip="${value}"]`)!;
+  Object.defineProperty(chip, "offsetLeft", { value: scrollerPageLeft + contentLeft });
+  Object.defineProperty(chip, "offsetWidth", { value: width });
+  vi.spyOn(group, "getBoundingClientRect").mockReturnValue(DOMRect.fromRect({ x: scrollerPageLeft, width: group.clientWidth }));
+  vi.spyOn(chip, "getBoundingClientRect").mockImplementation(() =>
+    DOMRect.fromRect({ x: scrollerPageLeft + contentLeft - group.scrollLeft, width }),
+  );
+  return chip;
+}
+
+it.each([
+  { entry: "空状態のボタン", scrollLeft: 650 },
+  { entry: "チップの直接選択", scrollLeft: 16 },
+])("$entry で「すべて」に戻ると列の先頭まで戻る", async ({ entry, scrollLeft }) => {
+  const render = (value: CoachEventFilter) => root.render(
+    <>
+      <CoachEventChips value={value} onChange={render} />
+      {value === "110mh" && <CoachEventEmpty onReset={() => render("all")} />}
+    </>,
+  );
+  await act(async () => render("110mh"));
+  const group = container.querySelector<HTMLElement>('[role="radiogroup"]')!;
+  const { scrollTo, getLeft } = mockScrollMetrics(group, { scrollLeft });
+  const all = mockChipPosition(group, "all", 0, 64);
+  const trigger = entry === "空状態のボタン"
+    ? [...container.querySelectorAll("button")].find((button) => button.textContent === "すべての種目のコーチを見る")!
+    : all;
+  await act(async () => trigger.click());
+  expect(all.getAttribute("aria-checked")).toBe("true");
+  expect(scrollTo).toHaveBeenCalledWith({ left: 0, behavior: "smooth" });
+  expect(getLeft()).toBe(0);
+});
+
+it("配置に余白があっても、両端で切れたチップだけを全体が見える位置までスクロールする", async () => {
   const onChange = vi.fn();
   let value: CoachEventFilter = "all";
   const render = (next: CoachEventFilter) => {
@@ -216,18 +253,20 @@ it("端で切れたチップを選ぶと全体が見える位置までスクロ�
   const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
   const { scrollTo } = mockScrollMetrics(group, { clientWidth: 300, scrollWidth: 1200 });
   // 右端で半分切れているチップ（1500m 相当：左端 280・幅 80 → 右端 360 が見えている幅 300 をはみ出す）
-  const clipped = group.querySelector('[data-chip="1500m"]') as HTMLElement;
-  Object.defineProperty(clipped, "offsetLeft", { value: 280, configurable: true });
-  Object.defineProperty(clipped, "offsetWidth", { value: 80, configurable: true });
+  const clipped = mockChipPosition(group, "1500m", 280, 80);
   await act(async () => { clipped.click(); });
   expect(onChange).toHaveBeenCalledWith("1500m");
   expect(scrollTo).toHaveBeenCalledWith({ left: 60, behavior: "smooth" });
+  // 左端で切れているチップの先頭（40）まで戻す。
+  scrollTo.mockClear();
+  const clippedLeft = mockChipPosition(group, "100m", 40, 60);
+  await act(async () => clippedLeft.click());
+  expect(onChange).toHaveBeenCalledWith("100m");
+  expect(scrollTo).toHaveBeenCalledWith({ left: 40, behavior: "smooth" });
   // すでに全体が見えているチップを選んでも列は動かさない
   scrollTo.mockClear();
-  const visible = group.querySelector('[data-chip="100m"]') as HTMLElement;
-  Object.defineProperty(visible, "offsetLeft", { value: 100, configurable: true });
-  Object.defineProperty(visible, "offsetWidth", { value: 60, configurable: true });
+  const visible = mockChipPosition(group, "200m", 108, 60);
   await act(async () => { visible.click(); });
-  expect(onChange).toHaveBeenCalledWith("100m");
+  expect(onChange).toHaveBeenCalledWith("200m");
   expect(scrollTo).not.toHaveBeenCalled();
 });

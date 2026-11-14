@@ -78,11 +78,14 @@ export function CoachEventChips({ value, onChange }: { value: CoachEventFilter; 
     if (!el) return;
     const selected = el.querySelector<HTMLElement>(`[data-chip="${value}"]`);
     if (!selected) return;
-    const chipLeft = selected.offsetLeft;
-    const chipRight = chipLeft + selected.offsetWidth;
     const viewLeft = el.scrollLeft;
     const viewRight = viewLeft + el.clientWidth;
-    if (chipLeft < viewLeft - 1) {
+    // 画面上の座標の差を使い、列の配置に依存しないスクロール内容内の座標へ変換する。
+    const viewportLeft = el.getBoundingClientRect().left + el.clientLeft;
+    const chipBounds = selected.getBoundingClientRect();
+    const chipLeft = viewLeft + (chipBounds.left - viewportLeft);
+    const chipRight = viewLeft + (chipBounds.right - viewportLeft);
+    if (chipLeft < viewLeft) {
       el.scrollTo({ left: chipLeft, behavior: "smooth" });
     } else if (chipRight > viewRight + 1) {
       el.scrollTo({ left: chipRight - el.clientWidth, behavior: "smooth" });
