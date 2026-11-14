@@ -1081,6 +1081,8 @@ export const en: Readonly<Record<string, string>> = {
   "この種目のコーチはまだいません": "No coaches for this event yet",
   "すべての種目のコーチを見る": "See coaches for all events",
   "種目で絞り込む": "Filter by event",
+  "種目を左へスクロール": "Scroll events left",
+  "種目を右へスクロール": "Scroll events right",
   "今月の報酬": "This month's earnings",
   "まだ送金していない分": "Not yet paid out",
   "次回のお支払い予定日：{year}年{v1}月{v2}日": "Next payout date: {v1}/{v2}/{year}",
