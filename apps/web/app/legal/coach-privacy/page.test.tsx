@@ -26,7 +26,15 @@ it("プライバシーポリシー：翻訳と Wise を委託先に加え、改�
   expect(html).toContain("個人を特定できない形にして、翻訳の用語集と指示文の改善に使います");
   expect(html).toContain("ケガや体調についての情報は使いません");
   expect(html).toContain("やりとりを自動で集めることはしません");
-  expect(html).toContain("Wise Payments Japan（日本）: 海外コーチへの委託費の送金。提供を始めるまで使いません");
-  expect(html).toContain("海外コーチとのやりとりの翻訳（第3条）。送った内容は、AI の学習には使われません。提供を始めるまで使いません");
+  expect(html).toContain("Wise Payments Japan（日本）: 海外コーチへの委託費の送金。海外コーチとのやりとりを始めるまで使いません");
+  expect(html).toContain("海外コーチとのやりとりの翻訳（第3条）。送った内容は、AI の学習には使われません。海外コーチとのやりとりを始めるまで使いません");
   expect(html).toContain('href="/legal/coach-privacy"');
+});
+
+it("プライバシーポリシー：フォーム添削は提供中、継続プランは準備中、海外コーチとのやりとりは未開始と読め、Stripe に開始前の断りがない", () => {
+  const html = renderToStaticMarkup(<PrivacyPolicy />);
+  expect(html).toContain("オンラインコーチングのうち、フォーム添削（単発・チケット）は提供しています。継続プランは準備中です。海外コーチとのやりとり（翻訳と委託費の送金）は、まだ始めていません。");
+  expect(html).not.toContain("準備中のオンラインコーチング");
+  expect(html).not.toContain("購入は受け付けていません");
+  expect(html).toContain("Stripe（米国。米国ほか）: オンラインコーチングの支払いの処理と、コーチへの報酬の送金</li>");
 });
