@@ -38,7 +38,7 @@ export default function CoachPrivacyPage() {
       <Rule title="2. Data we collect about you">
         <ul className="list-disc space-y-2 pl-5">
           <li>Account: your email address. If you sign in with Google, the identifier and email address needed to sign you in.</li>
-          <li>Application: the name you coach under, your events, records, achievements and coaching experience, 1 to 3 links to your social media or team website, your profile photo, and the status of your application.</li>
+          <li>Application: the name you coach under, your events, records, achievements and coaching experience, 1 to 3 entries for your social media account names or the URLs of your social media or team website (up to 300 characters each), your profile photo, and the status of your application.</li>
           <li>Coaching: your plans and the messages, videos and training menus you exchange with athletes, together with their translations.</li>
           <li>Payment: the recipient details that Wise needs to send your fees, and the records of your fees, any offsets and the amounts sent.</li>
           <li>Technical data: the cookie that keeps you signed in, and the notification address of a device where you turned on notifications.</li>
@@ -58,7 +58,7 @@ export default function CoachPrivacyPage() {
 
       <Rule title="4. What athletes see">
         <p>
-          Athletes can see the name you coach under, your events, records, achievements and coaching experience, your profile photo, and your social media or website links. Your email address and payment details are not shown to athletes.
+          Athletes can see the name you coach under, your events, records, achievements and coaching experience, your profile photo, what you entered for social media or website, and your profile comment (the short message to athletes). Your email address and payment details are not shown to athletes.
         </p>
       </Rule>
 
