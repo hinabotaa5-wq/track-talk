@@ -24,7 +24,8 @@ import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useLeaveGuard } from "@/components/leave-guard";
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] disabled:opacity-50 ${
@@ -35,9 +36,27 @@ const chip = (on: boolean) =>
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
+  const [ratingNotice, setRatingNotice] = useState(false);
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
+  const { setBlocker } = useLeaveGuard();
+  const ratingSectionRef = useRef<HTMLElement | null>(null);
   const response = request.response;
+  // 未評価＝星が null または 0。評価済み（1〜5）のときだけガードを外す。
+  const unrated = !!response && !response.hidden && (request.rating?.stars == null || request.rating?.stars === 0);
+  const showRatingNotice = useCallback(() => {
+    setRatingNotice(true);
+    try {
+      ratingSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    } catch {
+      // テスト環境等でスクロール不可のときは文言の表示だけにする。
+    }
+  }, []);
+  useEffect(() => {
+    if (!unrated) return;
+    setBlocker(showRatingNotice);
+    return () => setBlocker(null);
+  }, [unrated, setBlocker, showRatingNotice]);
   if (!response || response.hidden) return null;
   const stars = request.rating?.stars ?? 0;
   const helpful = request.rating?.helpful ?? null;
@@ -88,7 +107,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
         </section>
       ) : null}
 
-      <section className="space-y-2">
+      <section ref={ratingSectionRef} className="space-y-2">
         <h2 className="text-sm font-semibold">{L("この添削の評価")}</h2>
         <div className="flex gap-1" role="radiogroup" aria-label={L("評価")}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -106,6 +125,7 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
             </button>
           ))}
         </div>
+        {unrated && ratingNotice ? <p role="alert" className="text-sm text-red-400">{L("この添削の評価をつけてください")}</p> : null}
       </section>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -216,6 +236,7 @@ function ReviewCompletionPushGuide({ id, userId, token }: { id: string; userId: 
 function ReviewRequestView() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
+  const { confirmLeave } = useLeaveGuard();
   const { id } = useParams<{ id: string }>();
   const paid = useSearchParams().get("paid") === "1";
   const [polls, setPolls] = useState(0);
@@ -300,8 +321,27 @@ function ReviewRequestView() {
   const deadline = request.status === "needs_info" ? request.info_request?.resubmit_by : request.due_at;
   const canCancel = active && !request.started_at && !!deadline && now !== null && Date.parse(deadline) > now;
 
+  // 未評価のままページ内のリンク（依頼の一覧へ・コーチのプロフィール等）で他画面へ行こうとしたら止める。
+  // 止めた側の onBlocked が評価セクションに文言を出してスクロールする。POST・決済・自動ログイン遷移は対象外。
+  function blockUnratedLeave(event: MouseEvent<HTMLDivElement>) {
+    if (event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    const anchor = (event.target as HTMLElement | null)?.closest?.("a[href]");
+    if (!anchor) return;
+    if (anchor.getAttribute("target") === "_blank") return;
+    const href = anchor.getAttribute("href") ?? "";
+    if (!href.startsWith("/") || href.startsWith("//")) return;
+    const response = request?.response;
+    if (!response || response.hidden) return;
+    if (request?.rating?.stars != null && request.rating.stars !== 0) return;
+    if (confirmLeave(() => {})) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-md space-y-5">
+    <div className="mx-auto max-w-md space-y-5" onClickCapture={blockUnratedLeave}>
       {request.payment?.status === "captured" && request.payment.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
