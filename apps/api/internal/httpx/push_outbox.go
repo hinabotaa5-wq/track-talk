@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,6 +99,25 @@ func (s *Server) drainPushOutbox(ctx context.Context) {
 // attemptOutboxRow は、待ちを1件送る。送るたびにいまの設定を確かめ、途中で切った人には送り直さない。
 // 送れたかどうかを返す。
 func (s *Server) attemptOutboxRow(ctx context.Context, row db.ClaimPendingPushOutboxRow) bool {
+	if row.Category == notifyAnnouncement && row.Title == retiredNewCoachAnnouncementTitle {
+		// 旧自動告知の待ちだけを終了させる。同じ見出しで手動配信したものは送る。
+		id, err := uuid.Parse(strings.TrimPrefix(row.Tag, "announcement-"))
+		if err == nil && id.Version() == 5 {
+			announcement, err := s.q.GetAnnouncement(ctx, id)
+			if err != nil {
+				slog.Warn("push outbox: announcement lookup", "err", err)
+				s.failOutboxRow(ctx, row.ID, pushOutboxFailed)
+				return false
+			}
+			if retiredNewCoachAnnouncement(announcement) {
+				reason := "retired_new_coach_announcement"
+				if err := s.q.MarkPushOutboxDiscarded(ctx, db.MarkPushOutboxDiscardedParams{Result: &reason, ID: row.ID}); err != nil {
+					slog.Warn("push outbox: discard retired new coach announcement", "err", err)
+				}
+				return false
+			}
+		}
+	}
 	if ok, err := notificationWanted(ctx, s.q, row.ProfileID, row.Category, false); err != nil || !ok {
 		if err != nil {
 			slog.Warn("push outbox: notification setting", "err", err)

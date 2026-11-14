@@ -2,344 +2,123 @@ package httpx_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 
-	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
-// 新しいコーチの初回候補入りで、全ユーザーへ自動通知が1回だけ届く。
-// コーチ本人を除き、announcement の設定に従う。受付の再開・再承認・編集では再送しない。
-func TestNewCoachAnnouncementSentOnce(t *testing.T) {
+func TestNewCoachAnnouncementDisabledOnDuty(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	gate := newPushGate(t, 0)
 	h := setupPushVAPID(t, gate, func(cfg *config.Config) {
 		cfg.CoachingNewAcceptance = true
 		cfg.CoachingCoachList = true
 	})
-	tadmin := adminToken(t, h)
-
-	a := uuid.New()
-	ta := token(t, a)
-	subscribeFakePush(t, h, ta, gate.server.URL+"/a")
-	b := uuid.New()
-	tb := token(t, b)
-	subscribeFakePush(t, h, tb, gate.server.URL+"/b")
-	if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/announcement", tb, map[string]any{"in_app": true, "push": false}); rec.Code != http.StatusOK {
-		t.Fatalf("mute push %d %s", rec.Code, rec.Body.String())
-	}
-	c := uuid.New()
-	tc := token(t, c)
-	if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/announcement", tc, map[string]any{"in_app": false, "push": false}); rec.Code != http.StatusOK {
-		t.Fatalf("mute all %d %s", rec.Code, rec.Body.String())
-	}
-
-	coach := uuid.New()
-	tcoach := token(t, coach)
-	body := coachApplicationBody()
-	body["tier"] = "coach"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tcoach, body); rec.Code != http.StatusOK {
-		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
-	}
-	withCoachPhoto(t, coach)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
-	}
-	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, coach, "acct-"+coach.String())
-	subscribeFakePush(t, h, tcoach, gate.server.URL+"/coach")
+	admin := adminToken(t, h)
+	athlete := uuid.New()
+	athleteToken := token(t, athlete)
+	subscribeFakePush(t, h, athleteToken, gate.server.URL+"/athlete")
 
 	base := gate.sent.Load()
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
+	coach, coachToken := onDutyCoachTo(t, h, admin, gate.server.URL+"/coach")
+	var onDuty, staff bool
+	queryRowArgs(t, `SELECT c.on_duty, p.is_admin FROM coach_profiles c JOIN profiles p ON p.id=c.profile_id WHERE c.profile_id=$1`, []any{coach}, &onDuty, &staff)
+	if !onDuty || staff {
+		t.Fatalf("coach on duty=%v, staff=%v", onDuty, staff)
+	}
+	nominees := doJSON(t, h, http.MethodGet, "/v1/coaching/nominees?event=100m", athleteToken, nil)
+	if nominees.Code != http.StatusOK || !strings.Contains(nominees.Body.String(), coach.String()) {
+		t.Fatalf("coach missing from nominees: %d %s", nominees.Code, nominees.Body.String())
+	}
+	assertNoNewCoachAnnouncement(t, coach)
+	// 従来のコーチ本人宛ての接続テストと受付開始通知だけが届く。
+	if got := gate.sent.Load() - base; got != 2 {
+		t.Fatalf("push deliveries=%d, want 2", got)
 	}
 
-	annID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+coach.String())).String()
-	var title, url string
-	queryRowArgs(t, `SELECT title, url FROM announcements WHERE id=$1`, []any{annID}, &title, &url)
-	if title != "新しいコーチが加わりました" {
-		t.Fatalf("title %q", title)
-	}
-	if url != "/coaches/"+coach.String() {
-		t.Fatalf("url %q", url)
-	}
-	var bellBody string
-	queryRowArgs(t, `SELECT body FROM announcements WHERE id=$1`, []any{annID}, &bellBody)
-	if !strings.Contains(bellBody, "テストコーチ") || !strings.Contains(bellBody, "動画添削のコーチに加わりました") {
-		t.Fatalf("body %q", bellBody)
-	}
-	countBell := func(id uuid.UUID) int {
-		var n int
-		queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1 AND recipient_id=$2`, []any{annID, id}, &n)
-		return n
-	}
-	var adminID uuid.UUID
-	queryRowArgs(t, `SELECT id FROM profiles WHERE is_admin ORDER BY created_at LIMIT 1`, nil, &adminID)
-	if got := countBell(a); got != 1 {
-		t.Fatalf("bell a=%d", got)
-	}
-	if got := countBell(b); got != 1 {
-		t.Fatalf("bell b=%d", got)
-	}
-	if got := countBell(c); got != 0 {
-		t.Fatalf("bell c=%d", got)
-	}
-	if got := countBell(coach); got != 0 {
-		t.Fatalf("bell coach=%d", got)
-	}
-	if got := countBell(adminID); got != 1 {
-		t.Fatalf("bell admin=%d", got)
-	}
-	var outbox int
-	queryRowArgs(t, `SELECT count(*) FROM push_outbox WHERE dedup_key LIKE $1`, []any{"announcement:" + annID + ":%"}, &outbox)
-	if outbox != 1 {
-		t.Fatalf("outbox=%d", outbox)
-	}
-	var status string
-	queryRowArgs(t, `SELECT status FROM push_outbox WHERE dedup_key=$1`, []any{"announcement:" + annID + ":" + a.String()}, &status)
-	if status != "sent" {
-		t.Fatalf("push status %q", status)
-	}
-	// 受付開始の疎通確認・本人通知と合わせ、新規コーチの分は購読ありで設定オンの a の1通だけ。
-	if got := gate.sent.Load() - base; got != 3 {
-		t.Fatalf("sent=%d", got)
-	}
-
-	// 受付の停止→再開・編集では再送しない。
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": false}); rec.Code != http.StatusOK {
-		t.Fatalf("off duty %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("re on duty %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"daily_cap": 3}); rec.Code != http.StatusOK {
-		t.Fatalf("edit %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+coach.String()+"/suspend", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("suspend %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+coach.String()+"/resume", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("resume %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty again %d %s", rec.Code, rec.Body.String())
-	}
-	if got := countBell(a); got != 1 {
-		t.Fatalf("bell a after=%d", got)
-	}
-	queryRowArgs(t, `SELECT count(*) FROM push_outbox WHERE dedup_key LIKE $1`, []any{"announcement:" + annID + ":%"}, &outbox)
-	if outbox != 1 {
-		t.Fatalf("outbox after=%d", outbox)
-	}
-}
-
-// 受付が閉じている間の候補入りは送らず、開放後にまとめて送らない。
-func TestNewCoachAnnouncementSuppressedWhenAcceptanceClosed(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	gate := newPushGate(t, 0)
-	h := setupPushVAPID(t, gate, func(cfg *config.Config) {
-		cfg.CoachingNewAcceptance = false
-		cfg.CoachingCoachList = false
-	})
-	tadmin := adminToken(t, h)
-
-	a := uuid.New()
-	ta := token(t, a)
-	subscribeFakePush(t, h, ta, gate.server.URL+"/a")
-
-	coach := uuid.New()
-	tcoach := token(t, coach)
-	body := coachApplicationBody()
-	body["tier"] = "coach"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tcoach, body); rec.Code != http.StatusOK {
-		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
-	}
-	withCoachPhoto(t, coach)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
-	}
-	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, coach, "acct-"+coach.String())
-	subscribeFakePush(t, h, tcoach, gate.server.URL+"/coach")
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
-	}
-
-	annID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+coach.String())).String()
-	var bells int
-	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1`, []any{annID}, &bells)
-	if bells != 0 {
-		t.Fatalf("bells=%d", bells)
-	}
-	var rows int
-	queryRowArgs(t, `SELECT count(*) FROM announcements WHERE id=$1`, []any{annID}, &rows)
-	if rows != 0 {
-		t.Fatalf("announcements=%d", rows)
-	}
-	// 発火済み記録は残り、受付の切り直しでは送らない。
-	var fired int
-	queryRowArgs(t, `SELECT count(*) FROM new_coach_announcements WHERE coach_id=$1`, []any{coach}, &fired)
-	if fired != 1 {
-		t.Fatalf("fired=%d", fired)
-	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": false}); rec.Code != http.StatusOK {
-		t.Fatalf("off duty %d %s", rec.Code, rec.Body.String())
-	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty again %d %s", rec.Code, rec.Body.String())
-	}
-	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1`, []any{annID}, &bells)
-	if bells != 0 {
-		t.Fatalf("bells after=%d", bells)
-	}
-}
-
-// スタッフ権限のアカウントの候補入りは告知しない。受付の確定自体は通る。
-func TestNewCoachAnnouncementStaffExcluded(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	gate := newPushGate(t, 0)
-	h := setupPushVAPID(t, gate, func(cfg *config.Config) {
-		cfg.CoachingNewAcceptance = true
-		cfg.CoachingCoachList = false
-	})
-	tadmin := adminToken(t, h)
-
-	coach := uuid.New()
-	tcoach := token(t, coach)
-	body := coachApplicationBody()
-	body["tier"] = "coach"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tcoach, body); rec.Code != http.StatusOK {
-		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
-	}
-	withCoachPhoto(t, coach)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
-	}
-	setAdmin(t, coach)
-	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, coach, "acct-"+coach.String())
-	subscribeFakePush(t, h, tcoach, gate.server.URL+"/coach")
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
-	}
-
-	annID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+coach.String())).String()
-	var bells int
-	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1`, []any{annID}, &bells)
-	if bells != 0 {
-		t.Fatalf("bells=%d", bells)
-	}
-	var fired int
-	queryRowArgs(t, `SELECT count(*) FROM new_coach_announcements WHERE coach_id=$1`, []any{coach}, &fired)
-	if fired != 1 {
-		t.Fatalf("fired=%d", fired)
-	}
-}
-
-// 一覧が閉じている間の遷移先は指名申し込み。「準備中」には着地させない。
-// 通知の送信に失敗しても受付開始は確定し、送り直しで二重送信にならない。
-func TestNewCoachAnnouncementURLAndRetry(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	// 受付開始の疎通確認（コーチ宛て）だけ通し、利用者宛ての配信だけ失敗させる。
-	var mu sync.Mutex
-	failUser := true
-	var sentUser atomic.Int64
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		fail := failUser && r.URL.Path == "/a"
-		mu.Unlock()
-		if fail {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+	for _, onDuty := range []bool{false, true} {
+		if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", coachToken, map[string]any{"on_duty": onDuty}); rec.Code != http.StatusOK {
+			t.Fatalf("set on duty=%v: %d %s", onDuty, rec.Code, rec.Body.String())
 		}
-		if r.URL.Path == "/a" {
-			sentUser.Add(1)
-		}
-		w.WriteHeader(http.StatusCreated)
-	}))
-	t.Cleanup(srv.Close)
-	priv, pub, err := webpush.GenerateVAPIDKeys()
-	if err != nil {
-		t.Fatal(err)
 	}
-	h := setupConfig(t, func(cfg *config.Config) {
-		cfg.VAPIDPublicKey = pub
-		cfg.VAPIDPrivateKey = priv
-		cfg.VAPIDSubject = "mailto:test@example.com"
-		cfg.PushHTTP = srv.Client()
-		cfg.CoachingNewAcceptance = true
-		cfg.CoachingCoachList = false
-		cfg.CoachingTickSecret = "tick-secret"
-	})
-	tadmin := adminToken(t, h)
+	assertNoNewCoachAnnouncement(t, coach)
+}
 
-	a := uuid.New()
-	ta := token(t, a)
-	subscribeFakePush(t, h, ta, srv.URL+"/a")
+func assertNoNewCoachAnnouncement(t *testing.T, coach uuid.UUID) {
+	t.Helper()
+	id := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+coach.String()))
+	var events, announcements, bells, pushes int
+	queryRowArgs(t, `SELECT
+		(SELECT count(*) FROM new_coach_announcements WHERE coach_id=$1),
+		(SELECT count(*) FROM announcements WHERE id=$2),
+		(SELECT count(*) FROM notifications WHERE announcement_id=$2),
+		(SELECT count(*) FROM push_outbox WHERE dedup_key LIKE $3)`,
+		[]any{coach, id, "announcement:" + id.String() + ":%"}, &events, &announcements, &bells, &pushes)
+	if events != 0 || announcements != 0 || bells != 0 || pushes != 0 {
+		t.Fatalf("auto announcement created: events=%d announcements=%d bells=%d pushes=%d", events, announcements, bells, pushes)
+	}
+}
 
-	coach := uuid.New()
-	tcoach := token(t, coach)
-	body := coachApplicationBody()
-	body["tier"] = "coach"
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tcoach, body); rec.Code != http.StatusOK {
-		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
-	}
-	withCoachPhoto(t, coach)
-	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+coach.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
-		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
-	}
-	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id = $2, payouts_enabled = true WHERE profile_id = $1`, coach, "acct-"+coach.String())
-	subscribeFakePush(t, h, tcoach, srv.URL+"/coach")
-	// 送信がすべて失敗しても、受付開始自体は確定する。
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tcoach, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {
-		t.Fatalf("on duty %d %s", rec.Code, rec.Body.String())
-	}
+func TestNewCoachAnnouncementPendingPushIsNotRetried(t *testing.T) {
+	gate := newPushGate(t, 0)
+	h := setupPushVAPID(t, gate, func(cfg *config.Config) { cfg.CoachingTickSecret = "tick-secret" })
+	admin := adminToken(t, h)
+	athlete := uuid.New()
+	subscribeFakePush(t, h, token(t, athlete), gate.server.URL+"/athlete")
 
-	annID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+coach.String())).String()
-	var url string
-	queryRowArgs(t, `SELECT url FROM announcements WHERE id=$1`, []any{annID}, &url)
-	if url != "/coaching/new" {
-		t.Fatalf("url %q", url)
+	const title = "新しいコーチが加わりました"
+	const autoBody = "テストコーチが動画添削のコーチに加わりました"
+	autoID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("new-coach:"+uuid.NewString()))
+	execSQLArgs(t, `INSERT INTO announcements (id, title, body, url, in_app_count) VALUES ($1, $2, $3, '/coaching/new', 1)`, autoID, title, autoBody)
+	execSQLArgs(t, `INSERT INTO notifications (id, recipient_id, kind, title, body, url, announcement_id)
+		VALUES ($1, $2, 'message', $3, $4, '/coaching/new', $5)`, uuid.New(), athlete, title, autoBody, autoID)
+	dedup := "announcement:" + autoID.String() + ":" + athlete.String()
+	execSQLArgs(t, `INSERT INTO push_outbox (id, profile_id, title, body, url, tag, category, ttl_seconds, dedup_key, expires_at)
+		VALUES ($1, $2, $3, $4, '/coaching/new', $5, 'announcement', 3600, $6, now()+interval '1 hour')`,
+		uuid.New(), athlete, title, autoBody, "announcement-"+autoID.String(), dedup)
+
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/announcements", admin, map[string]any{
+		"id": autoID, "title": title, "body": autoBody, "url": "/coaching/new", "confirm": "送信",
+	}); rec.Code != http.StatusConflict {
+		t.Fatalf("resume retired announcement: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := tickWithSecret(t, h, "tick-secret"); rec.Code != http.StatusOK {
+		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+	}
+	if got := gate.sent.Load(); got != 0 {
+		t.Fatalf("retired push sent %d times", got)
+	}
+	if status, _ := outboxStatus(t, dedup); status != "discarded" {
+		t.Fatalf("retired push status=%s", status)
 	}
 	var bells int
-	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1 AND recipient_id=$2`, []any{annID, a}, &bells)
+	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1`, []any{autoID}, &bells)
 	if bells != 1 {
-		t.Fatalf("bells=%d", bells)
+		t.Fatalf("existing bells=%d, want 1", bells)
 	}
-	dedup := "announcement:" + annID + ":" + a.String()
-	if status, _ := outboxStatus(t, dedup); status != "pending" {
-		t.Fatalf("status %s", status)
+
+	// 同じ見出しの手動配信は、一時障害後も tick から再送できる。
+	manualID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("manual:"+uuid.NewString()))
+	gate.failNext(1)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/announcements", admin, map[string]any{
+		"id": manualID, "title": title, "body": "運営からのお知らせです", "url": "/coaching/new", "confirm": "送信",
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("manual announcement: %d %s", rec.Code, rec.Body.String())
 	}
-	// 送り直しの時刻が来るまで tick しても送らない。
+	manualDedup := "announcement:" + manualID.String() + ":" + athlete.String()
+	if status, _ := outboxStatus(t, manualDedup); status != "pending" {
+		t.Fatalf("manual push status=%s, want pending", status)
+	}
+	execSQLArgs(t, `UPDATE push_outbox SET next_attempt_at=now() WHERE dedup_key=$1`, manualDedup)
 	if rec := tickWithSecret(t, h, "tick-secret"); rec.Code != http.StatusOK {
 		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
 	}
-	if status, _ := outboxStatus(t, dedup); status != "pending" {
-		t.Fatalf("status after tick %s", status)
+	if status, _ := outboxStatus(t, manualDedup); status != "sent" {
+		t.Fatalf("manual push status=%s, want sent", status)
 	}
-	mu.Lock()
-	failUser = false
-	mu.Unlock()
-	execSQLArgs(t, `UPDATE push_outbox SET next_attempt_at=now() WHERE dedup_key=$1`, dedup)
-	base := sentUser.Load()
-	if rec := tickWithSecret(t, h, "tick-secret"); rec.Code != http.StatusOK {
-		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
-	}
-	if got := sentUser.Load() - base; got != 1 {
-		t.Fatalf("resent=%d", got)
-	}
-	if status, _ := outboxStatus(t, dedup); status != "sent" {
-		t.Fatalf("status %s", status)
-	}
-	// 送り直してもベルは増えない。
-	execSQLArgs(t, `UPDATE push_outbox SET next_attempt_at=now() WHERE dedup_key=$1`, dedup)
-	if rec := tickWithSecret(t, h, "tick-secret"); rec.Code != http.StatusOK {
-		t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
-	}
-	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE announcement_id=$1 AND recipient_id=$2`, []any{annID, a}, &bells)
-	if bells != 1 {
-		t.Fatalf("bells after=%d", bells)
+	if got := gate.sent.Load(); got != 1 {
+		t.Fatalf("push deliveries=%d, want 1", got)
 	}
 }
