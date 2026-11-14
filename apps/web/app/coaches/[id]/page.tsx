@@ -17,14 +17,28 @@ import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/re
 import type { PublicCoach } from "@/lib/types";
 import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 
 type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string };
 
+// どのプランの文脈で開いたか（本体 #694）。一覧で切り替えた先のプランの節だけを出す。
+// 一覧の切り替え（coach-tabs.tsx）と同じく、クエリ tab=support のときだけサポートプラン、
+// それ以外（指定なし・tab=video・不正値）は動画添削とする。詳細の中に切り替えは置かない。
+type PlanContext = "video" | "support";
+
 export default function CoachDetailPage() {
+  return (
+    <Suspense fallback={<PageLoading screen label={L("読み込み中...")} />}>
+      <CoachDetailRoute />
+    </Suspense>
+  );
+}
+
+function CoachDetailRoute() {
   const { id } = useParams<{ id: string }>();
-  return <CoachDetail key={id} id={id} />;
+  const context: PlanContext = useSearchParams().get("tab") === "support" ? "support" : "video";
+  return <CoachDetail key={id} id={id} context={context} />;
 }
 
 const subscribeToPreview = () => () => {};
@@ -34,7 +48,7 @@ const noServerPreview = () => undefined;
 // 未ログイン、または受付状態の取得に失敗した場合は有効なまま出す（最終確認は申込フロー側が担う）。
 type Availability = "available" | "unavailable" | "unknown";
 
-function CoachDetail({ id }: { id: string }) {
+function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const preview = useSyncExternalStore(subscribeToPreview, () => getCoachDetailPreview(id), noServerPreview);
   const [result, setResult] = useState<{ coach: PublicCoach | null } | { error: true }>();
   const { token } = useAuth();
@@ -60,9 +74,11 @@ function CoachDetail({ id }: { id: string }) {
   const coach = result && "coach" in result ? result.coach : preview;
   const eventsKey = coach?.events.join(",");
   const coachID = coach && "id" in coach ? coach.id : undefined;
+  const videoContext = context === "video";
 
   useEffect(() => {
-    if (!token || !coachID || !eventsKey) return;
+    // 受付状態は動画添削の入口にだけ使う。サポート文脈では節を出さないので取りに行かない。
+    if (!videoContext || !token || !coachID || !eventsKey) return;
     let cancelled = false;
     const events = eventsKey.split(",");
     Promise.all(events.map((event) =>
@@ -76,10 +92,11 @@ function CoachDetail({ id }: { id: string }) {
       setAvailability(results.some((list) => (list ?? []).some((c) => c.id === coachID)) ? "available" : "unavailable");
     });
     return () => { cancelled = true; };
-  }, [token, coachID, eventsKey]);
+  }, [videoContext, token, coachID, eventsKey]);
 
   useEffect(() => {
-    if (!token || !coachID) return;
+    // チケットの要約は動画添削の入口とチケット節にだけ使う。
+    if (!videoContext || !token || !coachID) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
       .then((data) => {
@@ -89,7 +106,7 @@ function CoachDetail({ id }: { id: string }) {
         if (!cancelled) setTicketSales(undefined);
       });
     return () => { cancelled = true; };
-  }, [token, coachID]);
+  }, [videoContext, token, coachID]);
 
   const achievementLines = coach?.achievements ? coach.achievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
@@ -158,6 +175,8 @@ function CoachDetail({ id }: { id: string }) {
             </div> : null}
           </dl>
         </section>
+        {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
+        {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
           <h2 id="coach-video-review" className="text-lg font-bold">{L("動画添削")}</h2>
           <p className="text-slate-200">{L("1回 {v0}（税込）・チケットも使えます", { v0: formatYen(reviewPriceYen) })}</p>
@@ -190,10 +209,12 @@ function CoachDetail({ id }: { id: string }) {
             className="flex min-h-11 w-full items-center justify-center rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/16 active:scale-[0.98]"
           >{L("購入する")}</Link>
         </section> : null}
-        <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
+        </> : null}
+        {/* サポート文脈：サポートプランの節だけ。動画添削とチケットの節は描画しない。 */}
+        {context === "support" ? <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
           <h2 id="coach-plans" className="text-lg font-bold">{L("サポートプラン")}</h2>
           <CoachServicePlans key={coach.id} plans={coach.plans ?? []} coachID={coach.id} consult={coach.support_consult} />
-        </section>
+        </section> : null}
       </>}
     </div>
   );

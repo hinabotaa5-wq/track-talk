@@ -84,6 +84,12 @@ it("該当0人の種目では空状態と「すべて」へ戻る導線を出す
   expect(ids()).toEqual(["support-coach-a", "support-coach-b"]);
 });
 
+it("カードの詳細リンクはサポートプランの文脈（?tab=support）で開く（本体 #694）", async () => {
+  apiFetch.mockResolvedValue({ coaches: [competition, paused] });
+  await render();
+  expect([...container.querySelectorAll("li a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/a?tab=support", "/coaches/b?tab=support"]);
+});
+
 it("サポートプラン一覧から選んだコーチの公開情報を詳細に渡す", async () => {
   apiFetch.mockResolvedValue({ coaches: [competition, paused] });
   await render();
