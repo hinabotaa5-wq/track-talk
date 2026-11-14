@@ -242,11 +242,20 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("動画添削1回（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
   expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
-  expect(confirm?.textContent).toContain("依頼がコーチの対応中一覧に表示されてから24時間以内");
+  expect(confirm?.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
+  expect(confirm?.textContent).not.toContain("依頼がコーチの対応中一覧に表示されてから");
+  expect(confirm?.textContent).toContain("回答期限");
+  expect(confirm?.textContent).not.toContain("返却期限");
   expect(confirm?.textContent).not.toContain("2026/11/06");
   expect(confirm?.querySelector('a[href="/legal/commerce"]')?.textContent).toBe("特定商取引法に基づく表記");
-  expect(confirm?.textContent).toContain("コーチが返却した時に確定します");
+  expect(confirm?.textContent).toContain("返却時に確定します");
+  expect(confirm?.textContent).not.toContain("確定のタイミング");
+  expect(confirm?.textContent).toContain("キャンセル・返金");
   expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
+  expect(confirm?.textContent).toContain("期限までに返らない場合やコーチ都合の返却では全額を返金します");
+  expect(confirm?.textContent).toContain("添削返却後の返金は利用規約に定める場合に限ります");
+  expect(confirm?.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
+  expect(confirm?.textContent).not.toContain("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
   expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
   expect([...confirm!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["確定してお支払いへ（500円）", "戻って直す"]);
 });
@@ -408,4 +417,79 @@ it("ログインを挟んでも coach 指定が落ちない（戻り先にクエ
   mocks.auth.token = null;
   await render();
   expect(mocks.router.replace).toHaveBeenCalledWith("/login?next=%2Fcoaching%2Fnew%3Fcoach%3Dc1");
+});
+
+async function renderTicketConfirm(nextExpiry: { expires_at: string; available: number } | null) {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 2, reserved: 0 }, next_expiry: nextExpiry, can_purchase: false };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    setter.call(textarea, "後半に失速します。200mのラップは12.1 12.3です");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [new File(["x"], "run.mp4", { type: "video/mp4" })] });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => {});
+  const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  expect(submit.textContent).toBe("申込み内容を確認する");
+  await act(async () => { submit.form!.requestSubmit(); });
+  const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
+  expect(confirm).not.toBeNull();
+  return confirm!;
+}
+
+it("チケット版の確認は4項目で、有効期限はお支払い行の中に出る", async () => {
+  const confirm = await renderTicketConfirm({ expires_at: "2027-05-01T00:00:00Z", available: 2 });
+  expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
+    "内容",
+    "回答期限",
+    "お支払い",
+    "キャンセル・チケットの戻り",
+  ]);
+  expect(confirm.textContent).toContain("動画添削1回（動画1本・担当 コーチc1）");
+  expect(confirm.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
+  expect(confirm.textContent).toContain("有効期限");
+  expect(confirm.textContent).toContain("2027");
+  expect(confirm.textContent).toContain("追加の支払いなし");
+  expect(confirm.textContent).toContain("送信時に1枚を確保し、返却時に使います");
+  expect(confirm.textContent).toContain("着手前はキャンセルでき、その場合は1枚戻ります");
+  expect(confirm.textContent).toContain("着手後はキャンセルできません");
+  expect(confirm.textContent).not.toContain("使うチケットの有効期限");
+  expect(confirm.textContent).not.toContain("確定のタイミング");
+  expect(confirm.textContent).not.toContain("戻る場合");
+  expect(confirm.textContent).not.toContain("依頼がコーチの対応中一覧に表示されてから");
+  expect(confirm.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
+  expect([...confirm.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["確定してチケット1枚で送る", "戻って直す"]);
+});
+
+it("チケット版の利用規約第6条は項目ではなく小さい文字の注記で出る", async () => {
+  const confirm = await renderTicketConfirm({ expires_at: "2027-05-01T00:00:00Z", available: 2 });
+  const note = [...confirm.querySelectorAll("p")].find((p) => p.textContent?.includes("利用規約第6条のとおりです"));
+  expect(note?.textContent).toBe("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
+  expect(note?.className).toContain("text-xs");
+  expect(note?.tagName).toBe("P");
+});
+
+it("チケット版の確認で戻って直すと送信せず入力に戻る", async () => {
+  const confirm = await renderTicketConfirm({ expires_at: "2027-05-01T00:00:00Z", available: 2 });
+  await act(async () => { [...confirm.querySelectorAll("button")].find((b) => b.textContent === "戻って直す")!.click(); });
+  expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
+  expect(container.querySelector("form")).not.toBeNull();
+  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
+});
+
+it("有効期限のないチケットはお支払い行に期限なしと出る", async () => {
+  const confirm = await renderTicketConfirm(null);
+  expect(confirm.textContent).toContain("チケット1枚（有効期限 期限なし（以前に購入した分）・追加の支払いなし）");
 });

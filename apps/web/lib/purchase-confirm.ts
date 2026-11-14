@@ -20,7 +20,7 @@ export function numberedRefundExceptions(): string {
 }
 
 // 支払い画面（Stripe）へ進む前の最終確認に出す項目（本体 #569）。
-// 分量・総額・確定のタイミング・チケットの有効期限・払戻しの条件を、購入のたびに同じ順で見せる。
+// 内容・回答期限・お支払い（総額・支払い方法）・キャンセルと戻り／返金の条件を、購入のたびに同じ順で見せる。
 export type ConfirmRow = { label: string; value: string };
 
 export type ReviewConfirmInput = {
@@ -34,14 +34,12 @@ export type ReviewConfirmInput = {
 export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry }: ReviewConfirmInput): ConfirmRow[] {
   const rows: ConfirmRow[] = [
     { label: L("内容"), value: coachName ? L("動画添削1回（動画1本・担当 {coachName}）", { coachName }) : L("動画添削1回（動画1本）") },
-    { label: L("返却期限"), value: L("依頼がコーチの対応中一覧に表示されてから24時間以内（夜間を含む）。補足のため再提出した場合は再提出から24時間以内。") },
+    { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
   if (method === "tickets") {
     rows.push(
-      { label: L("お支払い"), value: L("チケット1枚（このあとのお支払いはありません）") },
-      { label: L("使うチケットの有効期限"), value: nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("期限なし（以前に購入した分）") },
-      { label: L("確定のタイミング"), value: L("送った時にチケット1枚を確保し、コーチが返却した時に使用済みになります。") },
-      { label: L("戻る場合"), value: L("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は、確保した1枚を戻します。着手後の利用者都合によるキャンセルはできません。有効期限を過ぎてから戻る分は失効します。当社・コーチの都合で期限内に受けられなかった場合の失効後の返金は、利用規約第6条のとおりです。") },
+      { label: L("お支払い"), value: L("チケット1枚（有効期限 {expiry}・追加の支払いなし）", { expiry: nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("期限なし（以前に購入した分）") }) },
+      { label: L("キャンセル・チケットの戻り"), value: L("送信時に1枚を確保し、返却時に使います。着手前はキャンセルでき、その場合は1枚戻ります。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却でも1枚戻りますが、有効期限を過ぎた分は失効します。") },
     );
     return rows;
   }
@@ -51,8 +49,7 @@ export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry }: R
   );
   if (method === "card") {
     rows.push(
-      { label: L("確定のタイミング"), value: L("次の画面でカードの代金を確保（仮押さえ）し、コーチが返却した時に確定します。") },
-      { label: L("取消し・返金"), value: L("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は、確保を取り消すので代金はかかりません。着手後の利用者都合によるキャンセルはできません。添削返却後の返金は利用規約に定める場合に限ります。") },
+      { label: L("キャンセル・返金"), value: L("次の画面でカードの代金を確保（仮押さえ）し、返却時に確定します。着手前はキャンセルでき、その場合は確保を取り消すので代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却では全額を返金します。添削返却後の返金は利用規約に定める場合に限ります。") },
     );
   } else {
     rows.push(
