@@ -27,9 +27,9 @@ const MemoIcon = createLucideIcon("memo", [
 
 export const mainTabs = [
   { id: "coaching", href: "/coaching", get label() { return L("コーチ"); }, icon: GraduationCap },
-  { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
-  { id: "home", href: "/", get label() { return L("フィード"); }, icon: LayoutGrid },
   { id: "memo", href: "/memo", get label() { return L("メモ"); }, icon: MemoIcon },
+  { id: "home", href: "/", get label() { return L("フィード"); }, icon: LayoutGrid },
+  { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
   { id: "injury", href: "/injury", get label() { return L("ケガ"); }, icon: HeartPulse },
 ] as const;
 
