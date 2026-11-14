@@ -33,6 +33,36 @@ describe("InjuryGroupPicker", () => {
     expect(html).toMatch(/>6<\/text>/);
     expect(html).toContain("グループに入る");
   });
+
+  it("renders the join action as a primary pill without changing the link", () => {
+    const html = renderToStaticMarkup(<InjuryGroupPicker groups={groups.filter((group) => !group.me)} />);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    const link = container.querySelector('a[href="/injury/shin-splints"]');
+    expect(link).not.toBeNull();
+    const pill = [...link!.querySelectorAll("span")].find((el) => el.textContent === "グループに入る");
+    expect(pill).toBeDefined();
+    for (const cls of ["bg-blue-600", "text-pure-white", "rounded-full"]) {
+      expect(pill!.classList.contains(cls)).toBe(true);
+    }
+    expect(link!.getAttribute("href")).toBe("/injury/shin-splints");
+    expect(link!.textContent).toContain("4人");
+  });
+
+  it("renders the joined state as a distinct badge without the primary fill", () => {
+    const html = renderToStaticMarkup(<InjuryGroupPicker groups={groups} />);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    const link = container.querySelector('a[href="/injury/hamstring-strain"]');
+    expect(link).not.toBeNull();
+    const badge = [...link!.querySelectorAll("span")].find((el) => el.textContent === "参加中 · リハビリ中");
+    expect(badge).toBeDefined();
+    expect(badge!.classList.contains("rounded-full")).toBe(true);
+    expect(badge!.classList.contains("bg-blue-600")).toBe(false);
+    expect(link!.textContent).not.toContain("グループに入る");
+    expect(link!.getAttribute("href")).toBe("/injury/hamstring-strain");
+    expect(link!.textContent).toContain("6人");
+  });
 });
 
 it("人型や場所ボタンを選ぶとグループ一覧へ移り、初期表示ではスクロールしない", async () => {
