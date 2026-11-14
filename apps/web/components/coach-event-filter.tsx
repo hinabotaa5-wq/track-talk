@@ -73,19 +73,27 @@ export function CoachEventChips({ value, onChange }: { value: CoachEventFilter; 
 
   // 選択したチップが列の端で切れていたら、全体が見える位置まで列だけを動かす（#676 仕様3）。
   // すでに全体が見えているチップは動かさない。絞り込み結果には触らない。
+  // チップをタップした場合だけでなく、空状態の「すべての種目のコーチを見る」など外から value が変わった場合も通る。
+  // チップの位置は「スクロール内容の先頭からの座標」に直してから使う（#697）。offsetLeft は offsetParent
+  // （位置指定のある祖先、無ければページ側）基準で、ページ上の配置（main の左右パディングや中央寄せの余白）が
+  // 混ざるため使わない。画面上の位置の差に現在の scrollLeft を足せば、配置や画面幅に依存しない。
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const selected = el.querySelector<HTMLElement>(`[data-chip="${value}"]`);
     if (!selected) return;
-    const chipLeft = selected.offsetLeft;
-    const chipRight = chipLeft + selected.offsetWidth;
+    const viewRect = el.getBoundingClientRect();
+    const chipRect = selected.getBoundingClientRect();
     const viewLeft = el.scrollLeft;
     const viewRight = viewLeft + el.clientWidth;
+    const chipLeft = chipRect.left - viewRect.left - el.clientLeft + viewLeft;
+    const chipRight = chipLeft + chipRect.width;
+    const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+    const clamp = (left: number) => Math.min(maxLeft, Math.max(0, left));
     if (chipLeft < viewLeft - 1) {
-      el.scrollTo({ left: chipLeft, behavior: "smooth" });
+      el.scrollTo({ left: clamp(chipLeft), behavior: "smooth" });
     } else if (chipRight > viewRight + 1) {
-      el.scrollTo({ left: chipRight - el.clientWidth, behavior: "smooth" });
+      el.scrollTo({ left: clamp(chipRight - el.clientWidth), behavior: "smooth" });
     }
   }, [value]);
 

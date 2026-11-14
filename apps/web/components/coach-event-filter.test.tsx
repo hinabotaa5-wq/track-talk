@@ -205,29 +205,92 @@ it("タッチのスワイプはドラッグ実装で上書きせず、タップ�
   expect(onChange).toHaveBeenCalledWith("long-jump");
 });
 
-it("端で切れたチップを選ぶと全体が見える位置までスクロールし、見えているチップでは動かさない", async () => {
+// 実レイアウト相当の位置を持たせる（#697）。チップ列はページ上で左に pageOffset（スマホ幅の main の
+// 左右パディング 16px 相当）ずれた所に置かれ、チップの offsetLeft はその配置分を含む（offsetParent がページ側）。
+// 画面上の位置（getBoundingClientRect）は、内容内の位置 − 現在の scrollLeft + 配置分になる。
+// offsetLeft を内容内座標とみなす従来の計算では、スクロール先が配置分だけずれてこのテストで落ちる。
+function mockChipLayout(group: HTMLElement, chips: Record<string, { left: number; width: number }>, pageOffset = 16) {
+  const rect = (left: number, width: number) =>
+    ({ left, right: left + width, width, x: left, top: 100, bottom: 130, height: 30, y: 100, toJSON: () => ({}) }) as DOMRect;
+  group.getBoundingClientRect = () => rect(pageOffset, group.clientWidth);
+  for (const [id, { left, width }] of Object.entries(chips)) {
+    const chip = group.querySelector(`[data-chip="${id}"]`) as HTMLElement;
+    Object.defineProperty(chip, "offsetLeft", { value: pageOffset + left, configurable: true });
+    Object.defineProperty(chip, "offsetWidth", { value: width, configurable: true });
+    chip.getBoundingClientRect = () => rect(pageOffset + left - group.scrollLeft, width);
+  }
+}
+
+// 「すべて」は内容の先頭（左端 0）。110mハードルは右の方（内容内の左端 720）。
+const layout = {
+  all: { left: 0, width: 64 },
+  "100m": { left: 72, width: 60 },
+  "200m": { left: 140, width: 60 },
+  "1500m": { left: 280, width: 80 },
+  "110mh": { left: 720, width: 110 },
+};
+
+function renderControlled(initial: CoachEventFilter) {
   const onChange = vi.fn();
-  let value: CoachEventFilter = "all";
+  let value = initial;
   const render = (next: CoachEventFilter) => {
     value = next;
     root.render(<CoachEventChips value={value} onChange={(v) => { onChange(v); render(v); }} />);
   };
+  return { onChange, render, current: () => value };
+}
+
+it("端で切れたチップを選ぶと全体が見える位置までスクロールし、見えているチップでは動かさない（配置ずれがあっても内容基準で計算する）", async () => {
+  const { onChange, render } = renderControlled("all");
   await act(async () => render("all"));
   const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
   const { scrollTo } = mockScrollMetrics(group, { clientWidth: 300, scrollWidth: 1200 });
-  // 右端で半分切れているチップ（1500m 相当：左端 280・幅 80 → 右端 360 が見えている幅 300 をはみ出す）
-  const clipped = group.querySelector('[data-chip="1500m"]') as HTMLElement;
-  Object.defineProperty(clipped, "offsetLeft", { value: 280, configurable: true });
-  Object.defineProperty(clipped, "offsetWidth", { value: 80, configurable: true });
-  await act(async () => { clipped.click(); });
+  mockChipLayout(group, layout);
+  // 右端で切れているチップ（1500m：内容内の左端 280・幅 80 → 右端 360 が見えている幅 300 をはみ出す）
+  // 行き先は内容基準の右端 − 見えている幅 = 60。配置分 16 は入らない。
+  await act(async () => { (group.querySelector('[data-chip="1500m"]') as HTMLElement).click(); });
   expect(onChange).toHaveBeenCalledWith("1500m");
   expect(scrollTo).toHaveBeenCalledWith({ left: 60, behavior: "smooth" });
   // すでに全体が見えているチップを選んでも列は動かさない
   scrollTo.mockClear();
-  const visible = group.querySelector('[data-chip="100m"]') as HTMLElement;
-  Object.defineProperty(visible, "offsetLeft", { value: 100, configurable: true });
-  Object.defineProperty(visible, "offsetWidth", { value: 60, configurable: true });
-  await act(async () => { visible.click(); });
+  await act(async () => { (group.querySelector('[data-chip="100m"]') as HTMLElement).click(); });
   expect(onChange).toHaveBeenCalledWith("100m");
   expect(scrollTo).not.toHaveBeenCalled();
+});
+
+it("左端で切れたチップを選ぶと、そのチップの内容基準の左端が列の左端に揃う位置まで戻る", async () => {
+  const { onChange, render } = renderControlled("1500m");
+  await act(async () => render("1500m"));
+  const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
+  // 200m（内容内 140〜200）が左端で半分切れている位置までスクロール済み
+  const { scrollTo } = mockScrollMetrics(group, { scrollLeft: 170, clientWidth: 300, scrollWidth: 1200 });
+  mockChipLayout(group, layout);
+  await act(async () => { (group.querySelector('[data-chip="200m"]') as HTMLElement).click(); });
+  expect(onChange).toHaveBeenCalledWith("200m");
+  expect(scrollTo).toHaveBeenCalledWith({ left: 140, behavior: "smooth" });
+});
+
+it("深くスクロールした状態から「すべて」に戻すと、列は先頭（left 0）まで戻る（チップのタップ・外からの値の変更のどちらでも）", async () => {
+  // チップの「すべて」をタップした場合
+  const tap = renderControlled("110mh");
+  await act(async () => tap.render("110mh"));
+  let group = container.querySelector('[role="radiogroup"]') as HTMLElement;
+  let metrics = mockScrollMetrics(group, { scrollLeft: 620, clientWidth: 300, scrollWidth: 1200 });
+  mockChipLayout(group, layout);
+  await act(async () => { (group.querySelector('[data-chip="all"]') as HTMLElement).click(); });
+  expect(tap.onChange).toHaveBeenCalledWith("all");
+  expect(metrics.scrollTo).toHaveBeenCalledWith({ left: 0, behavior: "smooth" });
+  expect(metrics.getLeft()).toBe(0);
+
+  // 空状態の「すべての種目のコーチを見る」のように、外から value が "all" に変わった場合も同じ部品の処理で戻る
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  const reset = renderControlled("110mh");
+  await act(async () => reset.render("110mh"));
+  group = container.querySelector('[role="radiogroup"]') as HTMLElement;
+  metrics = mockScrollMetrics(group, { scrollLeft: 620, clientWidth: 300, scrollWidth: 1200 });
+  mockChipLayout(group, layout);
+  await act(async () => reset.render("all"));
+  expect(metrics.scrollTo).toHaveBeenCalledWith({ left: 0, behavior: "smooth" });
+  expect(metrics.getLeft()).toBe(0);
 });
