@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { operatorName, supportEmail } from "@/lib/operator";
+import { supportEmail } from "@/lib/operator";
 import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
 // 有料機能の公開前から、運営者の表記だけをログインなしで表示する。
@@ -39,8 +39,8 @@ export default function CommercePage() {
         </p>
       </div>
       <dl>
-        <Row term="販売事業者">{operatorName}（個人）</Row>
-        <Row term="運営統括責任者">{operatorName}</Row>
+        <Row term="販売事業者">TrackTalk運営者（個人）<p>氏名は請求があれば遅滞なく開示します。</p></Row>
+        <Row term="運営統括責任者"><p>請求があれば遅滞なく開示します。</p></Row>
         <Row term="所在地">
           <p>請求があれば遅滞なく開示します。</p>
         </Row>
@@ -50,6 +50,7 @@ export default function CommercePage() {
         <Row term="開示の請求">
           <p>
             ログインしている場合はマイページの<Link href="/me/contact?category=disclosure" className="text-blue-300 underline">お問い合わせ</Link>で種類「特商法表記の開示請求」を選んでください。ログインしていない場合は、件名を「特商法表記の開示請求」として<a href={`mailto:${supportEmail}`} className="text-blue-300 underline">{supportEmail}</a>へ送ってください。
+          <p>氏名・所在地・電話番号を開示します。</p>
           </p>
         </Row>
         <Row term="メールアドレス">

@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: s
 
 it("フォーム添削・チケットは販売者1行と利用規約・特商法へのリンクだけを出す", () => {
   const html = renderToStaticMarkup(<SellerNote />);
-  expect(html).toContain("販売者: 中窪日向（TrackTalk運営者）");
+  expect(html).toContain("販売者: TrackTalk運営者");
   expect(html).toContain('href="/terms"');
   expect(html).toContain('href="/legal/commerce"');
   // 詳細は特商法ページ側に寄せるため、申込画面では2段落の説明を出さない。
