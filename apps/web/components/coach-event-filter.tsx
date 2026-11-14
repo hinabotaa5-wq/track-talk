@@ -83,10 +83,11 @@ export function CoachEventChips({ value, onChange }: { value: CoachEventFilter; 
             aria-checked={selected}
             onClick={() => onChange(chip.id)}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
-              selected ? "border-blue-600 bg-blue-600 font-semibold text-white" : "border-white/30 bg-white/10 text-slate-200"
+              selected
+                ? "border-white/35 bg-blue-500/75 font-semibold text-pure-white shadow-md shadow-blue-950/30 backdrop-blur-xl"
+                : "glass border-white/20 bg-white/10 font-medium text-slate-300 hover:bg-white/16 hover:text-white"
             }`}
           >
-            {selected ? <span aria-hidden="true" className="mr-1">✓</span> : null}
             {chip.label}
           </button>
         );
