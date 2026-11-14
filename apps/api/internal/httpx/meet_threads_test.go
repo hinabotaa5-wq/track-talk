@@ -25,7 +25,7 @@ func seedSystemProfile(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-func TestTodayMeetThreadsCreatesOneThreadPerTargetMeet(t *testing.T) {
+func TestTodayMeetThreadsCreatesOneThreadPerMeet(t *testing.T) {
 	// 2026-10-12 正午(JST)に固定する。
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	fixed := time.Date(2026, time.October, 12, 12, 0, 0, 0, jst)

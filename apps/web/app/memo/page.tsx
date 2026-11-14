@@ -12,7 +12,6 @@ import { SenseNoteJar } from "@/components/sense-note-jar";
 import { SenseNoteComposer, SenseNoteStatsRow } from "@/components/sense-notes";
 import { SenseSummaryCard, SenseSummaryResult, useSenseSummaries } from "@/components/sense-summary";
 import { SenseNoteCalendar } from "@/components/sense-note-calendar";
-import { TargetMeetCountdown } from "@/components/target-meet-countdown";
 import type { RaceRecords } from "@/lib/race-records";
 import { todayInTokyo } from "@/lib/format";
 import { ViewSwitch } from "@/components/view-switch";
@@ -152,7 +151,6 @@ function MySenseNotes() {
               <div className="flex items-center gap-4">
                 <SenseNoteJar total={shownStats.total} summarized={senseSummaryEnabled && !guest && summaryState.loaded && summaryState.pendingNotes === 0} dropLatest={dropped} className="h-32 w-24" />
                 <div className="min-w-0 flex-1 space-y-3">
-                  <TargetMeetCountdown token={guest ? null : token} />
                   {senseSummaryEnabled && !guest ? <SenseSummaryCard state={summaryState} compact /> : null}
                   <SenseNoteStatsRow stats={shownStats} />
                 </div>
