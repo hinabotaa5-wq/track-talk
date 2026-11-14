@@ -179,7 +179,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
           <h2 id="coach-video-review" className="text-lg font-bold">{L("フォーム添削")}</h2>
-          <p className="text-slate-200">{L("1回 {v0}（税込）・チケットも使えます", { v0: formatYen(reviewPriceYen) })}</p>
+          <p className="text-slate-200">{L("選択して下さい")}</p>
           <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
             {entries.map(({ key, Icon, label, note, href }) => {
               const body = <>

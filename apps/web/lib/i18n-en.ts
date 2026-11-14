@@ -2995,7 +2995,7 @@ export const en: Readonly<Record<string, string>> = {
   "守らなかったときは、利用停止・報酬の没収に同意": "I agree to account suspension and forfeiture of earnings if I break these",
   "公開中の以前のプラン": "Previous plans still published",
   "新しいプランは作れません。非公開にできます。": "New plans can't be created. You can unpublish these.",
-  "1回 {v0}（税込）・チケットも使えます": "One video: {v0} (tax included). You can also pay with tickets.",
+  "選択して下さい": "Please select",
   "動画添削を依頼する": "Request a video review",
   "お支払い方法を選んで依頼する": "Choose how to pay and request a review",
   "通常チケット": "Regular ticket",

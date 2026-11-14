@@ -85,7 +85,8 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(entryLink("reward")).toBe(reviewHref("reward"));
   expect(container.textContent).not.toContain("残り");
   expect(container.textContent).toContain("500円");
-  expect(container.textContent).toContain("チケットも使えます");
+  expect(container.textContent).toContain("選択して下さい");
+  expect(container.textContent).not.toContain("チケットも使えます");
   expect(container.textContent).not.toContain("現在は受付していません");
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
@@ -118,6 +119,7 @@ it("受付停止中でもチケットを購入できる", async () => {
   expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
   for (const key of ["card", "normal", "reward"] as const) expect(entryDisabled(key)).toBe(true);
   expect(container.textContent).toContain("現在は受付していません");
+  expect(container.textContent).toContain("選択して下さい");
   const purchaseLink = container.querySelector('section[aria-labelledby="coach-tickets"] a[href]');
   expect(purchaseLink?.textContent).toBe("購入する");
   expect(purchaseLink?.hasAttribute("aria-disabled")).toBe(false);
@@ -243,6 +245,8 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(entry("normal")?.textContent).toBe("Regular ticket");
   expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
+  expect(container.textContent).toContain("Please select");
+  expect(container.textContent).not.toContain("You can also pay with tickets");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");
   expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥2,500. One ticket is used per video review.");
