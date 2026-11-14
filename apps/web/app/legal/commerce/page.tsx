@@ -32,7 +32,7 @@ export default function CommercePage() {
         <h1 className="text-2xl font-bold">特定商取引法に基づく表記</h1>
         <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">
-          運営者が販売する「フォーム添削」「フォーム添削のチケット」についての表記です。サポートプラン（大会サポート・対面指導などを含むコーチのプラン）はコーチが販売者になるため、各プランのページにあるコーチの表記を確認してください。
+          運営者が販売する「フォーム添削」「フォーム添削のチケット」についての表記です。継続プラン（1ヶ月の継続サポート）はコーチが販売者になるため、各プランのページにあるコーチの表記を確認してください。
         </p>
         <p className="text-sm leading-7 text-slate-300">
           運営者が販売する「海外コーチ 1ヶ月コーチング（パイロット）」についての表記です。
