@@ -12,7 +12,8 @@ import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { reviewPriceYen } from "@/lib/review-pricing";
+import type { TicketSummary } from "@/lib/coaching-tickets";
+import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { Trophy } from "lucide-react";
 import Link from "next/link";
@@ -36,6 +37,7 @@ function CoachDetail({ id }: { id: string }) {
   const [result, setResult] = useState<{ coach: PublicCoach | null } | { error: true }>();
   const { token } = useAuth();
   const [availability, setAvailability] = useState<Availability>("unknown");
+  const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
 
   useEffect(() => {
     let cancelled = false;
@@ -74,9 +76,23 @@ function CoachDetail({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [token, coachID, eventsKey]);
 
+  useEffect(() => {
+    if (!token || !coachID) return;
+    let cancelled = false;
+    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
+      .then((data) => {
+        if (!cancelled) setTicketSales({ token, canPurchase: data.can_purchase });
+      })
+      .catch(() => {
+        if (!cancelled) setTicketSales(undefined);
+      });
+    return () => { cancelled = true; };
+  }, [token, coachID]);
+
   const achievementLines = coach?.achievements ? coach.achievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
   const ctaEnabled = availability !== "unavailable";
+  const showTickets = !(ticketSales?.canPurchase === false && ticketSales.token === token);
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -134,6 +150,14 @@ function CoachDetail({ id }: { id: string }) {
             <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>
           </>}
         </section>
+        {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
+          <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
+          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。添削1回につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
+          <Link
+            href="/me/coaching/tickets"
+            className="flex min-h-11 w-full items-center justify-center rounded-md border border-white/25 bg-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/16 active:scale-[0.98]"
+          >{L("購入する")}</Link>
+        </section> : null}
         <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
           <h2 id="coach-plans" className="text-lg font-bold">{L("サポートプラン")}</h2>
           <CoachServicePlans key={coach.id} plans={coach.plans ?? []} coachID={coach.id} consult={coach.support_consult} />

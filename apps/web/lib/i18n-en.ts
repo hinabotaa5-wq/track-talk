@@ -2996,6 +2996,8 @@ export const en: Readonly<Record<string, string>> = {
   "1回 {v0}（税込）・チケットも使えます": "One video: {v0} (tax included). You can also pay with tickets.",
   "動画添削を依頼する": "Request a video review",
   "現在は受付していません": "Not accepting requests right now",
+  "チケット": "Tickets",
+  "チケット{q}枚で{v0}です。添削1回につき1枚消費します。": "{q} tickets for {v0}. One ticket is used per video review.",
   "このコーチは現在、動画添削を受け付けていません": "This coach isn't currently accepting video reviews. You can choose another coach.",
   "1ヶ月プランの受付設定です。": "Settings for accepting the 1-month plan.",
   "誓約の文面が新しくなりました。もう一度同意してください。": "The pledge wording has been updated. Please agree again.",
