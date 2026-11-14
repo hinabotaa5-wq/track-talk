@@ -1,6 +1,6 @@
 import { runInNewContext } from "node:vm";
 import { expect, it, vi } from "vitest";
-import { lastTabHref, lastTabStartupScript } from "./last-tab";
+import { lastTabStartupScript, resolveColdStartTarget } from "./last-tab";
 
 function start(saved: string | null, url = "/", blocked = false, requestAnimationFrame?: (callback: () => void) => void) {
   const parsed = new URL(url, "https://track-talk.netlify.app");
@@ -18,21 +18,27 @@ function start(saved: string | null, url = "/", blocked = false, requestAnimatio
 }
 
 it.each([
-  ["/memo", ""], ["/coaching", ""], ["/injury", "tab=data&q=secret"],
-  ["/competitions", "view=international&page=3"],
-])("React がなくても許可したタブへ即時に移動する: %s", (path, search) => {
-  const result = start(`${path}?${search}`);
-  expect(result.replace).toHaveBeenCalledExactlyOnceWith(lastTabHref(path, search));
-  expect(result.window.__tracktalkLastTabRedirect).toBe(true);
-});
-
-it.each([null, "/", "/?sort=review&type=spike&q=secret"])("保存なし・ホームの保存値はコーチへ移動する: %s", (saved) => {
+  "/memo",
+  "/coaching",
+  "/injury?tab=data",
+  "/competitions?view=international",
+  "/",
+  "/?sort=review&type=spike&q=secret",
+  "https://example.com",
+  "//example.com",
+  "/login?next=/memo",
+  "/posts/123",
+  "constructor",
+  "/injury#bad",
+  null,
+])("保存値にかかわらずコーチへ移動する: %s", (saved) => {
   const result = start(saved);
   expect(result.replace).toHaveBeenCalledExactlyOnceWith("/coaching");
   expect(result.window.__tracktalkLastTabRedirect).toBe(true);
+  expect(result.getItem).not.toHaveBeenCalled();
 });
 
-it("起動ロゴを一度描画してから復元し、その間も二重遷移を防ぐ", () => {
+it("起動ロゴを一度描画してから移動し、その間も二重遷移を防ぐ", () => {
   const frames: Array<() => void> = [];
   const result = start("/memo", "/", false, (callback) => { frames.push(callback); });
   expect(result.window.__tracktalkLastTabRedirect).toBe(true);
@@ -40,11 +46,7 @@ it("起動ロゴを一度描画してから復元し、その間も二重遷移�
   frames.shift()!();
   expect(result.replace).not.toHaveBeenCalled();
   frames.shift()!();
-  expect(result.replace).toHaveBeenCalledExactlyOnceWith("/memo");
-});
-
-it.each(["https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("不正な保存値では移動しない: %s", (saved) => {
-  expect(start(saved).replace).not.toHaveBeenCalled();
+  expect(result.replace).toHaveBeenCalledExactlyOnceWith("/coaching");
 });
 
 it.each(["/memo", "/posts/123", "/?sort=new", "/?q=race", "/#section"])("直接開いたリンクを優先する: %s", (url) => {
@@ -53,8 +55,12 @@ it.each(["/memo", "/posts/123", "/?sort=new", "/?q=race", "/#section"])("直接�
   expect(result.getItem).not.toHaveBeenCalled();
 });
 
-it("保存が制限されていても起動を妨げない", () => {
+it("保存が制限されていてもコーチへ移動する", () => {
   const result = start("/memo", "/", true);
-  expect(result.replace).not.toHaveBeenCalled();
-  expect(result.window.__tracktalkLastTabRedirect).toBe(false);
+  expect(result.replace).toHaveBeenCalledExactlyOnceWith("/coaching");
+  expect(result.window.__tracktalkLastTabRedirect).toBe(true);
+});
+
+it("React 側の解決も保存値にかかわらずコーチになる", () => {
+  expect(resolveColdStartTarget()).toBe("/coaching");
 });
