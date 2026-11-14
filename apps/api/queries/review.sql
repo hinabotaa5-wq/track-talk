@@ -89,15 +89,6 @@ WHERE c.status = 'approved'
   AND (sqlc.narg(requested_coach_id)::uuid IS NULL OR c.profile_id = sqlc.narg(requested_coach_id)::uuid)
   AND sqlc.arg(event)::text = ANY (c.events)
   AND c.profile_id <> sqlc.arg(requester_id)
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
-       AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
-  )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
 LIMIT 1 FOR NO KEY UPDATE;
 
@@ -139,16 +130,7 @@ WHERE c.status = 'approved'
   AND c.on_duty
   AND c.tier = sqlc.arg(tier)
   AND sqlc.arg(event)::text = ANY (c.events)
-  AND c.profile_id <> sqlc.arg(requester_id)
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
-       AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
-  );
+  AND c.profile_id <> sqlc.arg(requester_id);
 
 -- name: ListCoachReviewing :many
 SELECT * FROM review_requests
@@ -172,15 +154,6 @@ WHERE c.status = 'approved'
   AND (sqlc.narg(requested_coach_id)::uuid IS NULL OR c.profile_id = sqlc.narg(requested_coach_id)::uuid)
   AND sqlc.arg(event)::text = ANY (c.events)
   AND c.profile_id <> sqlc.arg(requester_id)
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= sqlc.arg(min_ratings)::int
-       AND avg(rt.stars)::float8 < sqlc.arg(low_stars)::float8
-  )
 ORDER BY md5(c.profile_id::text || extract(epoch FROM sqlc.arg(day_start)::timestamptz)::bigint::text)
 LIMIT 200;
 

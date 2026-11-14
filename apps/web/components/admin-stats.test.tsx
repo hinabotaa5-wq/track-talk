@@ -30,6 +30,33 @@ it("shows durable daily counts separately from live weekly statistics", async ()
   }
 });
 
+it("コーチングの表に★平均の列は出ない（星評価は廃止・役に立ったは残る）", async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const events = [{
+    event_label: "100m", coaches: 2, on_duty: 1, requests: 5, returned: 3, expired: 1,
+    median_hours: 10.5, rated: 4, avg_stars: 4.5, helpful_yes: 3, helpful_answers: 4,
+    applied: 1, started: 1, lost: 0, started_yen: 20000,
+  }];
+  vi.mocked(apiFetch)
+    .mockResolvedValueOnce({ ...stats })
+    .mockResolvedValueOnce({ days: 90, events });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<AdminStatsView token="admin-token" />));
+    const coaching = Array.from(container.querySelectorAll("section")).find(
+      (s) => s.querySelector("h2")?.textContent === "コーチングの需要と供給(種目ごと)",
+    )!;
+    const head = Array.from(coaching.querySelectorAll("th")).map((th) => th.textContent);
+    expect(head).not.toContain("★平均");
+    expect(head).toContain("役に立った");
+    const row = Array.from(coaching.querySelectorAll("tbody tr td")).map((td) => td.textContent);
+    expect(row).toEqual(["100m", "2", "1", "5", "3", "1", "10.5時間", "75%", "1", "1", "0", "20,000円"]);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
 it.each(["features", "inquiries", "reports"] as const)("shows an empty state when %s is null", async (field) => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.mocked(apiFetch)

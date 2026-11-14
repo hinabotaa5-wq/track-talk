@@ -148,10 +148,19 @@ it("ランチャーは9タイルの入口だけで（カレンダーは廃止）
   // ステータスバーは従来どおり操作できる。
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
   expect(container.querySelector("select")).toBeNull();
-  expect(container.textContent).toContain("★4.5（3件）");
+  // 星評価は廃止：API が評価を返しても平均・件数は出さない。
+  expect(container.textContent).not.toContain("★4.5（3件）");
+  expect(container.textContent).not.toContain("★");
   // フッターは要約1行とやめる導線だけ。
   expect(container.textContent).toContain("未払い1,050円");
   expect(container.querySelector('a[href="/coach/withdraw"]')).not.toBeNull();
+});
+
+it("paused が true でも停止注記は出ない（評価制度は廃止）", async () => {
+  mockAll({ "/v1/coach/me": { application, rating: { count: 8, average: 2.1, paused: true } } });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).not.toContain("依頼が回ってきません");
+  expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
 });
 
 it("バッジは実件数と一致し、未登録の点は条件の時だけ出す", async () => {
