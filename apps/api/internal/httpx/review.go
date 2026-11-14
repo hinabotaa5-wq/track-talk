@@ -188,9 +188,6 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 			URL:   "/coach",
 			Tag:   "coach-duty",
 		}, 10*time.Minute)
-		// 新しいコーチの初回候補入りを全ユーザーへ自動で知らせる（本体 #438）。
-		// 受付開始の確定後に送り、成否でこの受付開始を巻き戻さない。
-		s.maybeAnnounceNewCoach(r.Context(), p.ID)
 	}
 	// 受付を始めたり上限を上げたりしたら、待っている依頼をすぐ回す。
 	if c.OnDuty && (!current.OnDuty || c.DailyCap > current.DailyCap) {

@@ -201,7 +201,8 @@ func (s *Server) adminSendAnnouncement(w http.ResponseWriter, r *http.Request) {
 			MapDBError(w, gerr)
 			return
 		}
-		if existing.CanceledAt != nil || existing.Title != in.title || existing.Body != in.body || existing.Url != in.url || existing.FinishedAt != nil {
+		if retiredNewCoachAnnouncement(existing) || existing.CanceledAt != nil ||
+			existing.Title != in.title || existing.Body != in.body || existing.Url != in.url || existing.FinishedAt != nil {
 			Error(w, http.StatusConflict, "conflict", "このお知らせはもう送りました")
 			return
 		}
