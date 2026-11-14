@@ -14,7 +14,7 @@ import type {
 // パーソナル指導のプランの表示と入力のきまり。API（coaching_plan.go）の値と合わせる。
 
 export const coachingServiceLabels: Record<CoachingServiceType, string> = {
-  get video_review() { return L("動画添削"); },
+  get video_review() { return L("フォーム添削"); },
   get competition_support() { return L("1ヶ月プラン"); },
   get in_person() { return L("対面プラン"); },
 };
@@ -24,7 +24,7 @@ export function serviceReady(service: CoachingServiceType | null | undefined): b
 }
 
 function serviceLabel(service: CoachingServiceType | null | undefined): string {
-  return service ? coachingServiceLabels[service] : L("従来のサポートプラン");
+  return service ? coachingServiceLabels[service] : L("従来の継続プラン");
 }
 
 export const planKindLabels: Record<CoachingPlanKind, string> = {

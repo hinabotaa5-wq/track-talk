@@ -419,10 +419,10 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	// 文面の版を購入ごとに残す（本体 #572 項目10）。
 	var wording *string
 	queryRowArgs(t, `SELECT wording_version FROM coaching_ticket_purchases WHERE id=$1`, []any{purchase}, &wording)
-	if wording == nil || *wording != "v3" {
+	if wording == nil || *wording != "v4" {
 		t.Fatalf("wording version %+v", wording)
 	}
-	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil); !strings.Contains(rec.Body.String(), `"terms_version":"v3"`) {
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil); !strings.Contains(rec.Body.String(), `"terms_version":"v4"`) {
 		t.Fatalf("terms version %s", rec.Body.String())
 	}
 	// 期限を過ぎたら、失効の tick を待たずに従来の返金では断る（既存の挙動を維持）。

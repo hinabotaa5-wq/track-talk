@@ -101,12 +101,12 @@ export default function GuardianPage() {
   }
 
   function onRevoke() {
-    if (!confirm(L("同意を取り消すと、このページから、お子さまのサポートプランへの同意やお支払いができなくなります。取り消しますか？"))) return;
+    if (!confirm(L("同意を取り消すと、このページから、お子さまの継続プランへの同意やお支払いができなくなります。取り消しますか？"))) return;
     void send("/revoke", "POST", undefined, L("同意を取り消しました。"));
   }
 
   function onDecline() {
-    if (!confirm(L("同意しない場合、お子さまはサポートプランを利用できません。よろしいですか？"))) return;
+    if (!confirm(L("同意しない場合、お子さまは継続プランを利用できません。よろしいですか？"))) return;
     void send("/decline", "POST", undefined, L("「同意しない」を受け付けました。"));
   }
 
@@ -125,8 +125,8 @@ export default function GuardianPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{L("お子さまのサポートプラン利用についての同意のお願い")}</h1>
-        <p className="text-sm text-slate-300">{L("TrackTalkは、陸上競技の選手とコーチをつなぐサービスです。未成年（18歳未満）のお子さまがサポートプランを利用するには、保護者の方の同意が必要です。このページから同意いただくと、コーチが引き受けたお子さまのお申し込みについて、プランごとに内容を確認し、同意とお支払いができるようになります。")}</p>
+        <h1 className="text-2xl font-bold">{L("お子さまの継続プラン利用についての同意のお願い")}</h1>
+        <p className="text-sm text-slate-300">{L("TrackTalkは、陸上競技の選手とコーチをつなぐサービスです。未成年（18歳未満）のお子さまが継続プラン（1ヶ月の継続サポート）を利用するには、保護者の方の同意が必要です。このページから同意いただくと、コーチが引き受けたお子さまのお申し込みについて、プランごとに内容を確認し、同意とお支払いができるようになります。")}</p>
       </div>
 
       {/* 運営者の確定文面。変えたら API の guardianTermsVersion を上げる（同意した版は terms_version で記録する）。 */}
@@ -134,12 +134,12 @@ export default function GuardianPage() {
         <h2 className="font-bold text-white">{L("同意いただく内容")}</h2>
         <ol className="list-decimal space-y-3 pl-5">
           <li>
-            <p className="font-semibold text-white">{L("サポートプランの利用について")}</p>
-            <p>{L("お子さまが、TrackTalkのサポートプラン（コーチによる動画添削・大会までのサポート・対面指導と、その追加相談）を利用することに同意します。これには、担当コーチとのサービス内でのメッセージのやりとりが含まれます。コーチとの連絡は、サービスの外（SNSや個人の連絡先など）では行わないルールです。")}</p>
+            <p className="font-semibold text-white">{L("継続プランの利用について")}</p>
+            <p>{L("お子さまが、TrackTalkの継続プラン（コーチによる1ヶ月間の継続サポートと、その追加相談）を利用することに同意します。これには、担当コーチとのサービス内でのメッセージのやりとりが含まれます。コーチとの連絡は、サービスの外（SNSや個人の連絡先など）では行わないルールです。")}</p>
           </li>
           <li>
             <p className="font-semibold text-white">{L("プランごとの同意とお支払いについて")}</p>
-            <p>{L("サポートプランは、コーチが引き受けたお申し込みごとに、このページで保護者の方が内容を確認して同意してから始まります。お支払いがあるプランは、保護者の方がクレジットカードでお支払いいただき、お支払いが済んだ時から期間が始まります。")}</p>
+            <p>{L("継続プランは、コーチが引き受けたお申し込みごとに、このページで保護者の方が内容を確認して同意してから始まります。お支払いがあるプランは、保護者の方がクレジットカードでお支払いいただき、お支払いが済んだ時から期間が始まります。")}</p>
           </li>
           <li>
             <p className="font-semibold text-white">{L("同意の取り消しについて")}</p>
@@ -203,7 +203,7 @@ export default function GuardianPage() {
             <input type="checkbox" checked={allowPublish} onChange={(e) => setAllowPublish(e.target.checked)} className="mt-1" />{L("添削の内容を、お子さまが選んだときに他の利用者の参考として公開することを認める（任意。名前などは出ません）")}</label>
           <label className="flex items-start gap-2 text-sm text-slate-200">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1" />
-            <span>{L("上記の内容と、利用規約・プライバシーポリシーを確認し、お子さまのサポートプランの利用に同意します。")}</span>
+            <span>{L("上記の内容と、利用規約・プライバシーポリシーを確認し、お子さまの継続プランの利用に同意します。")}</span>
           </label>
           {fields.agree ? <p className="text-sm text-red-400">{fields.agree}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>{L("同意する")}</Button>

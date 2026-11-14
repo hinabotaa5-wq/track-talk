@@ -110,7 +110,7 @@ func TestGuardianRecordsKeptAfterWithdrawalUntilAge23(t *testing.T) {
 	var deletedAt, lastTx, consentedAt *time.Time
 	queryRowArgs(t, `SELECT guardian_name, guardian_email, relationship, terms_version, consent_ip, self_pay_limit_yen, account_deleted_at, last_transaction_at, consented_at
 		FROM guardian_consents WHERE minor_id = $1`, []any{minor}, &name, &gEmail, &relationship, &terms, &ip, &limit, &deletedAt, &lastTx, &consentedAt)
-	if name != "山田 花子" || gEmail != email || relationship != "mother" || terms != "guardian-consent-2026-11-support-plan" || ip == "" || limit != 3000 ||
+	if name != "山田 花子" || gEmail != email || relationship != "mother" || terms != "guardian-consent-2026-11-ongoing-plan" || ip == "" || limit != 3000 ||
 		deletedAt == nil || lastTx == nil || consentedAt == nil {
 		t.Fatalf("consent record name=%q email=%q rel=%q terms=%q ip=%q limit=%d deleted=%v lastTx=%v", name, gEmail, relationship, terms, ip, limit, deletedAt, lastTx)
 	}

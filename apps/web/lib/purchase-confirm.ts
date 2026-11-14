@@ -36,7 +36,7 @@ export type ReviewConfirmInput = {
 
 export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
   const rows: ConfirmRow[] = [
-    { label: L("内容"), value: coachName ? L("動画添削1回（動画1本・担当 {coachName}）", { coachName }) : L("動画添削1回（動画1本）") },
+    { label: L("内容"), value: coachName ? L("フォーム添削（動画1本・担当 {coachName}）", { coachName }) : L("フォーム添削（動画1本）") },
     { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
   if (method === "tickets") {
@@ -86,7 +86,7 @@ export function ticketExpiryIfPaidNow(validityMonths: number, now: Date = new Da
 
 export function ticketPackConfirmRows({ quantity, amountYen, validityMonths, now }: TicketPackConfirmInput): ConfirmRow[] {
   return [
-    { label: L("内容"), value: L("動画添削のチケット{quantity}枚（1枚で動画添削1回）", { quantity }) },
+    { label: L("内容"), value: L("フォーム添削のチケット{quantity}枚（1枚で動画添削1回）", { quantity }) },
     { label: L("総額"), value: L("{v0}（税込）。{quantity}枚分をまとめて先に支払います", { v0: formatYen(amountYen), quantity }) },
     { label: L("確定のタイミング"), value: L("次の画面でお支払いが済んだ時に購入が確定し、チケットが使えるようになります。") },
     { label: L("有効期限"), value: L("決済が完了した日時から{validityMonths}か月（いまお支払いが済むと {v0} ごろまで）。過ぎると未使用の分は失効し、延長はしません。", { validityMonths, v0: formatDateTime(ticketExpiryIfPaidNow(validityMonths, now).toISOString()) }) },

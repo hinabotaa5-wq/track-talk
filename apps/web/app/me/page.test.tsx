@@ -280,9 +280,9 @@ it("コーチングを開けている間は旧ハブと同じ順で4リンクの
   expect(section).not.toBeUndefined();
   expect([...section!.querySelectorAll("a")].map((a) => [a.getAttribute("href"), a.textContent])).toEqual([
     ["/me/coaching/tickets", "コーチングチケット"],
-    ["/me/coaching/requests", "依頼した動画添削"],
+    ["/me/coaching/requests", "依頼したフォーム添削"],
     ["/coaching/support-consults", "1ヶ月プランの無料相談"],
-    ["/me/coaching/personal", "申し込んだサポートプラン"],
+    ["/me/coaching/personal", "申し込んだ継続プラン"],
   ]);
 });
 

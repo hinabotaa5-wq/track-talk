@@ -61,7 +61,7 @@ func TestReviewCoachChoicePaymentAndReward(t *testing.T) {
 			_, tu := demoRequester(t, h, admin)
 			id := chosenReview(t, h, tu, coach.String(), method, false)
 			form := f.lastSession()
-			if form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("line_items[0][price_data][product_data][name]") != "動画添削" ||
+			if form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("line_items[0][price_data][product_data][name]") != "フォーム添削" ||
 				form.Get("payment_method_types[0]") != method {
 				t.Fatalf("session %v", form)
 			}

@@ -40,7 +40,7 @@ export default function CoachPlansPage() {
   if (loading || !session || coach === undefined) return <PageLoading screen label={L("読み込み中...")} />;
 
   return (
-    <CoachSubpageShell title={L("サポートプラン")}>
+    <CoachSubpageShell title={L("継続プラン")}>
       {coach ? (
         <CoachPlansSection coach={coach} token={token} onCoachChange={setCoach} />
       ) : (

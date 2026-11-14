@@ -16,7 +16,7 @@ const emptyIdentity: CoachIdentity = { legal_name: "", address: "", phone: "" };
 
 export function CoachCommerceSection() {
   return <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-    <h2 className="font-bold">{L("サポートプランの特定商取引法の表記")}</h2>
+    <h2 className="font-bold">{L("継続プランの特定商取引法の表記")}</h2>
     <IdentitySession>{(token) => <CoachCommerceEditor token={token} />}</IdentitySession>
   </section>;
 }
@@ -69,7 +69,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-300">{L("サポートプランは、あなたが販売者になります。プランを公開する前に、氏名・住所・電話番号を登録してください。表記が必要な場合は、プランごとに公開表示を確認します。")}</p>
+      <p className="text-sm text-slate-300">{L("継続プランは、あなたが販売者になります。プランを公開する前に、氏名・住所・電話番号を登録してください。表記が必要な場合は、プランごとに公開表示を確認します。")}</p>
       <form method="post" onSubmit={onSaveIdentity} className="space-y-2">
         <label className="block text-sm">{L("氏名（本名）")}<Input value={identity.legal_name} maxLength={80} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} aria-label={L("氏名")} /></label>
         <label className="block text-sm">{L("住所")}<Input value={identity.address} maxLength={200} onChange={(e) => setIdentity({ ...identity, address: e.target.value })} aria-label={L("住所")} /></label>

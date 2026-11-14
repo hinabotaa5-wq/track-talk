@@ -239,7 +239,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(container.textContent).not.toContain(contactMessage);
   await act(async () => { submit.form!.requestSubmit(); });
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
-  expect(confirm?.textContent).toContain("動画添削1回（動画1本・担当 テストコーチ）");
+  expect(confirm?.textContent).toContain("フォーム添削（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
   expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
   expect(confirm?.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
@@ -457,7 +457,7 @@ it("チケット版の確認は4項目で、有効期限はお支払い行の中
     "お支払い",
     "キャンセル・チケットの戻り",
   ]);
-  expect(confirm.textContent).toContain("動画添削1回（動画1本・担当 コーチc1）");
+  expect(confirm.textContent).toContain("フォーム添削（動画1本・担当 コーチc1）");
   expect(confirm.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
   expect(confirm.textContent).toContain("有効期限");
   expect(confirm.textContent).toContain("2027");

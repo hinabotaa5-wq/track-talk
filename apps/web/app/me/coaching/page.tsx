@@ -128,7 +128,7 @@ export default function CoachingSetupPage() {
       <section className="space-y-2">
         {tickets ? <TicketBalance summary={tickets} /> : null}
       </section>
-      <h1 className="text-2xl font-bold">{L("サポートプランの準備")}</h1>
+      <h1 className="text-2xl font-bold">{L("継続プランの準備")}</h1>
 
       <section className="space-y-3">
         <h2 className="font-bold">{L("生まれた年月")}</h2>
@@ -147,7 +147,7 @@ export default function CoachingSetupPage() {
       {me.is_minor ? (
         <section className="space-y-3">
           <h2 className="font-bold">{L("保護者の同意（パーソナル指導用）")}</h2>
-          <p className="text-sm text-slate-200">{L("動画添削にはこの手続きは不要です。")}</p>
+          <p className="text-sm text-slate-200">{L("フォーム添削にはこの手続きは不要です。")}</p>
           <p className="text-sm text-slate-200">
             {me.guardian ? guardianLabels[me.guardian.status] : L("まだ保護者にメールを送っていません")}
           </p>

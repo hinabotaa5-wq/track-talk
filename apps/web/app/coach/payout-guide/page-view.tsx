@@ -6,7 +6,7 @@ import Link from "next/link";
 
 const SITE_URL = "https://track-talk.netlify.app";
 // Stripe の画面に日本語のまま貼る文なので、英語表示でも訳さない。
-const PRODUCT_DESCRIPTION = "陸上競技の動画添削サービスです。"; // i18n-data
+const PRODUCT_DESCRIPTION = "陸上競技のフォーム添削のサービスです。"; // i18n-data
 
 // 手順の図は Stripe の画面写真ではなく、個人情報が写らない範囲の模式図。
 // Stripe 側の文言は変わることがあるため、選ぶ内容を文字で明示する。

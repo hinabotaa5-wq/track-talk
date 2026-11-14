@@ -110,7 +110,7 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   await render();
   await act(async () => reviewButton()!.click());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
-  expect(confirm.textContent).toContain("動画添削のチケット6枚（1枚で動画添削1回）");
+  expect(confirm.textContent).toContain("フォーム添削のチケット6枚（1枚で動画添削1回）");
   expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめて先に支払います");
   expect(confirm.textContent).toContain("お支払いが済んだ時に購入が確定");
   expect(confirm.textContent).toContain("2027/05/20 10:00");

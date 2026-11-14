@@ -283,14 +283,14 @@ func (s *Server) issueGuardianLink(w http.ResponseWriter, r *http.Request) {
 func guardianLinkMail(to, child, link string) mail.Message {
 	return mail.Message{
 		To:      to,
-		Subject: "お子さまのサポートプラン利用についての同意のお願い",
+		Subject: "お子さまの継続プラン利用についての同意のお願い",
 		Text: guardianMailGreeting +
-			"お子さま（アカウント名：" + child + "）から、サポートプランを利用するための同意依頼が届いています。\n\n" +
-			"未成年のお子さまがサポートプランを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
+			"お子さま（アカウント名：" + child + "）から、継続プラン（1ヶ月の継続サポート）を利用するための同意依頼が届いています。\n\n" +
+			"未成年のお子さまが継続プランを利用するには、保護者の方の同意が必要です。下記のリンクから、内容をご確認のうえ、同意のお手続きをお願いいたします。\n\n" +
 			"同意手続きはこちら：" + link + "\n" +
 			"（リンクの有効期限は30日です。このリンクからは1回だけ同意できます。）\n\n" +
 			"同意いただくと、コーチが引き受けたお子さまのお申し込みについて、プランごとに内容を確認し、同意とお支払いができるようになります。お支払いがあるプランは、保護者の方がクレジットカードでお支払いいただきます。\n\n" +
-			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまがサポートプランを利用することはありません。\n" +
+			"心当たりがない場合は、このメールを破棄してください。同意しない限り、お子さまが継続プランを利用することはありません。\n" +
 			guardianMailSignature,
 	}
 }
@@ -656,7 +656,7 @@ func (s *Server) revokeGuardian(w http.ResponseWriter, r *http.Request) {
 	})
 	s.notify(r.Context(), consent.MinorID, notifyImportant, push.Message{
 		Title: "保護者が同意を取り消しました",
-		Body:  "新しいサポートプランを始めるには、もう一度保護者の同意が必要です",
+		Body:  "新しい継続プランを始めるには、もう一度保護者の同意が必要です",
 		URL:   "/me/coaching",
 		Tag:   "guardian-consent",
 	}, 24*time.Hour)

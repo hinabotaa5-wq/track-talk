@@ -21,7 +21,8 @@ import (
 // 前の仕組みで予約済みの購入の通知だけは、tick が送り直す（retryGuardianNotices）。同意・証跡・通知の記録は消さず、保管期間の管理下に残す。
 
 // guardianTermsVersion は、保護者が同意した文面の版。同意ページや規約の文面を変えたら上げる。
-const guardianTermsVersion = "guardian-consent-2026-11-support-plan"
+// プラン改名（サポートプラン→継続プラン）で版を上げた。
+const guardianTermsVersion = "guardian-consent-2026-11-ongoing-plan"
 
 // minorRecordRetentionAge は、退会した本人の保護者同意の証跡と購入の記録、購入のたびの宣言を残す年齢。
 // 本人がこの年齢になる月の終わりまで残す。未成年者取消しの取消権は成年（18歳）になってから5年で消える（民法126条）ため、それに合わせる。
@@ -183,7 +184,7 @@ func guardianMailTime(t time.Time) string {
 	return t.In(jst.Zone).Format("2006年1月2日 15:04")
 }
 
-// 同意のお願いと同意の受付のメールは、保護者のページ（guardian-consent-2026-11-support-plan）に合わせて、
+// 同意のお願いと同意の受付のメールは、保護者のページ（guardian-consent-2026-11-ongoing-plan）に合わせて、
 // サポートプランの同意として書く。月の上限・購入の通知・PayPay には触れない（サポートプランの支払いはクレジットカードのみ）。
 // 購入の通知（guardianPurchaseMail）は、前の仕組みで予約済みの分を送り直すときだけ使うので、前の版の確定文面のまま。
 
@@ -201,7 +202,7 @@ func guardianConsentedMail(to, child string, c db.GuardianConsent, link string) 
 		To:      to,
 		Subject: "保護者同意を受け付けました",
 		Text: guardianMailGreeting +
-			"お子さま（アカウント名：" + child + "）のサポートプラン利用について、保護者の方の同意を受け付けました。\n\n" +
+			"お子さま（アカウント名：" + child + "）の継続プラン（1ヶ月の継続サポート）利用について、保護者の方の同意を受け付けました。\n\n" +
 			"・同意日時：" + when + "\n\n" +
 			"コーチがお子さまのお申し込みを引き受けると、下記のリンクのページの「パーソナル指導」に表示されます。プランごとに内容を確認して、同意とお支払いをしてください。お支払いがあるプランは、クレジットカードでお支払いいただきます。\n" +
 			"同意の取り消しも、下記のリンクからいつでも行えます。\n\n" +

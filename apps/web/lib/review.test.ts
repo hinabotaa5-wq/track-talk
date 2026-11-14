@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 import { availableReviewPayMethods, reviewPayNotice } from "./review";
 
 // 購入画面に出す支払い方法を、API が受け付ける方法（reviewPaymentMethods）と揃える。
-it("動画添削・追加相談の支払い方法を API の定義と一致させる", () => {
+it("フォーム添削・追加相談の支払い方法を API の定義と一致させる", () => {
   const source = readFileSync(path.resolve(process.cwd(), "../api/internal/httpx/coaching_payment.go"), "utf8");
   const match = source.match(/var reviewPaymentMethods = \[\]string\{([^}]*)\}/);
   expect(match).not.toBeNull();

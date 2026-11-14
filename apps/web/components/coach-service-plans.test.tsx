@@ -18,10 +18,10 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 async function render(plans: CoachingPlan[] = [plan], coachID = "c1", c: PublicSupportConsult | null = consult) {
   await act(async () => root.render(<CoachServicePlans plans={plans} coachID={coachID} consult={c} />));
 }
-it("単一の「サポートプラン」セクションに、受付状況・価格目安・無料相談ボタンを出す。種別の切り分けはしない", async () => {
+it("単一の「継続プラン」セクションに、受付状況・価格目安・無料相談ボタンを出す。種別の切り分けはしない", async () => {
   await render();
   expect(container.querySelectorAll("button").length).toBe(0);
-  expect(container.textContent).toContain("サポートプラン");
+  expect(container.textContent).toContain("継続プラン");
   expect(container.textContent).toContain("受付中");
   expect(container.textContent).toContain("5,000円〜12,000円");
   expect(container.querySelector("a")?.getAttribute("href")).toBe("/coaches/c1/consult");
@@ -39,11 +39,11 @@ it("対面プランは出さない", async () => {
 it("相談の入口がないコーチは受付停止の表示になり、分類のない既存プランは残す", async () => {
   await render([{ ...plan, service_type: null }], "c1", null);
   expect(container.textContent).toContain("このコーチは受付していません");
-  expect(container.textContent).toContain("従来のサポートプラン");
+  expect(container.textContent).toContain("従来の継続プラン");
   expect(container.textContent).toContain(plan.title);
 });
 
-it("従来の動画添削はサポートプランに表示しない", async () => {
+it("従来のフォーム添削は継続プランに表示しない", async () => {
   await render([{ ...plan, service_type: "video_review" }], "c1", null);
   expect(container.textContent).not.toContain(plan.title);
 });
