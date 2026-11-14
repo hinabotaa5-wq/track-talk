@@ -1405,6 +1405,41 @@ func (q *Queries) TicketBalance(ctx context.Context, ownerID *uuid.UUID) (Ticket
 	return i, err
 }
 
+const ticketBalanceByKind = `-- name: TicketBalanceByKind :many
+SELECT (kind = 'referral_reward')::boolean AS reward,
+    COALESCE(sum(available) FILTER (WHERE expires_at IS NULL OR expires_at > now()),0)::bigint AS available,
+    min(expires_at) FILTER (WHERE available > 0 AND expires_at > now()) AS next_expires_at
+FROM coaching_ticket_lots WHERE owner_id = $1 GROUP BY 1
+`
+
+type TicketBalanceByKindRow struct {
+	Reward        bool        `json:"reward"`
+	Available     int64       `json:"available"`
+	NextExpiresAt interface{} `json:"next_expires_at"`
+}
+
+// 通常ロット（紹介特典以外）と紹介特典ロットごとの、使える枚数といちばん早い有効期限（本体 #687）。
+// 使える枚数の数え方は TicketBalance と同じ（確保中は含めず、期限切れは tick を待たずに外す）。
+func (q *Queries) TicketBalanceByKind(ctx context.Context, ownerID *uuid.UUID) ([]TicketBalanceByKindRow, error) {
+	rows, err := q.db.Query(ctx, ticketBalanceByKind, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TicketBalanceByKindRow
+	for rows.Next() {
+		var i TicketBalanceByKindRow
+		if err := rows.Scan(&i.Reward, &i.Available, &i.NextExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ticketReconciliation = `-- name: TicketReconciliation :many
 SELECT l.id FROM coaching_ticket_lots l LEFT JOIN coaching_ticket_ledger e ON e.lot_id = l.id
 GROUP BY l.id HAVING l.available <> COALESCE(sum(e.available_delta),0)

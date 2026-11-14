@@ -12,13 +12,15 @@ import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import type { TicketSummary } from "@/lib/coaching-tickets";
+import { ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
-import { Trophy } from "lucide-react";
+import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
+
+type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string };
 
 export default function CoachDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +39,7 @@ function CoachDetail({ id }: { id: string }) {
   const [result, setResult] = useState<{ coach: PublicCoach | null } | { error: true }>();
   const { token } = useAuth();
   const [availability, setAvailability] = useState<Availability>("unknown");
-  const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
+  const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean; counts: Record<TicketKind, number> | null }>();
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +83,7 @@ function CoachDetail({ id }: { id: string }) {
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
       .then((data) => {
-        if (!cancelled) setTicketSales({ token, canPurchase: data.can_purchase });
+        if (!cancelled) setTicketSales({ token, canPurchase: data.can_purchase, counts: ticketKindCounts(data) });
       })
       .catch(() => {
         if (!cancelled) setTicketSales(undefined);
@@ -93,6 +95,24 @@ function CoachDetail({ id }: { id: string }) {
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
   const ctaEnabled = availability !== "unavailable";
   const showTickets = !(ticketSales?.canPurchase === false && ticketSales.token === token);
+  // 種別ごとの残り。未ログイン・取得失敗・古い API では枚数を出さない（#684 と同じく、取れなくても入口は出す）。
+  const counts = ticketSales && ticketSales.token === token ? ticketSales.counts : null;
+  // 動画添削の入口（本体 #687）：単発・通常チケット・無料チケット。支払い方式を選んでから申込画面へ進む。
+  const entries: ReviewEntry[] = [
+    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(reviewPriceYen), href: `${ctaHref}&pay=card` },
+    {
+      key: "normal", Icon: Ticket, label: L("通常チケット"),
+      note: counts ? L("残り {n} 枚", { n: counts.normal }) : undefined,
+      // 通常チケットが0枚なら購入画面へ（#684 の「購入する」と同じ遷移先）。
+      href: counts?.normal === 0 ? "/me/coaching/tickets" : `${ctaHref}&pay=normal`,
+    },
+    {
+      key: "reward", Icon: Gift, label: L("無料チケット"),
+      note: counts ? L("残り {n} 枚", { n: counts.reward }) : undefined,
+      // 無料チケットが0枚なら押せない。
+      href: counts?.reward === 0 ? undefined : `${ctaHref}&pay=reward`,
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -139,16 +159,26 @@ function CoachDetail({ id }: { id: string }) {
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
           <h2 id="coach-video-review" className="text-lg font-bold">{L("動画添削")}</h2>
           <p className="text-slate-200">{L("1回 {v0}（税込）・チケットも使えます", { v0: formatYen(reviewPriceYen) })}</p>
-          {ctaEnabled ? <Link
-            href={ctaHref}
-            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98]"
-          >{L("動画添削を依頼する")}</Link> : <>
-            <span
-              aria-disabled="true"
-              className="flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-4 text-sm font-semibold text-slate-400"
-            >{L("動画添削を依頼する")}</span>
-            <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>
-          </>}
+          <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
+            {entries.map(({ key, Icon, label, note, href }) => {
+              const body = <>
+                <Icon className="size-5" aria-hidden />
+                <span className="text-sm font-semibold">{label}</span>
+                {note ? <span className="text-xs">{note}</span> : null}
+              </>;
+              const base = "flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-md px-2 py-2 text-center";
+              return <li key={key} className="min-w-0" data-entry={key}>
+                {ctaEnabled && href ? <Link
+                  href={href}
+                  className={`${base} bg-blue-600 text-pure-white transition active:scale-[0.98]`}
+                >{body}</Link> : <span
+                  aria-disabled="true"
+                  className={`${base} cursor-not-allowed bg-white/10 text-slate-400`}
+                >{body}</span>}
+              </li>;
+            })}
+          </ul>
+          {ctaEnabled ? null : <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>}
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>

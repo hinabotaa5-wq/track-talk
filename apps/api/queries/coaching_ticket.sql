@@ -48,6 +48,14 @@ SELECT expires_at::timestamptz AS expires_at, sum(available)::bigint AS availabl
 FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND expires_at > now()
 GROUP BY expires_at ORDER BY expires_at LIMIT 1;
 
+-- name: TicketBalanceByKind :many
+-- 通常ロット（紹介特典以外）と紹介特典ロットごとの、使える枚数といちばん早い有効期限（本体 #687）。
+-- 使える枚数の数え方は TicketBalance と同じ（確保中は含めず、期限切れは tick を待たずに外す）。
+SELECT (kind = 'referral_reward')::boolean AS reward,
+    COALESCE(sum(available) FILTER (WHERE expires_at IS NULL OR expires_at > now()),0)::bigint AS available,
+    min(expires_at) FILTER (WHERE available > 0 AND expires_at > now()) AS next_expires_at
+FROM coaching_ticket_lots WHERE owner_id = $1 GROUP BY 1;
+
 -- name: ListTicketLots :many
 -- 失効の早いものから使う（期限のない旧ロットは最後）。
 SELECT * FROM coaching_ticket_lots WHERE owner_id = $1 AND available > 0 AND (expires_at IS NULL OR expires_at > now())

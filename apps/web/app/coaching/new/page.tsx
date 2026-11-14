@@ -26,8 +26,8 @@ import {
   tooLong,
   videoDuration,
 } from "@/lib/review";
-import type { TicketSummary } from "@/lib/coaching-tickets";
-import { formatYen } from "@/lib/format";
+import { initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
+import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity, ticketValidityMonths } from "@/lib/review-pricing";
 import { reviewConfirmRows } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
@@ -72,6 +72,8 @@ export default function NewReviewRequestPage() {
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
+  // チケットの内訳（通常／無料。本体 #687）。種別が分からない古い API では null のまま（従来どおり自動）。
+  const [ticketKind, setTicketKind] = useState<TicketKind | null>(null);
   const { pending, acquire, release } = useActionLock();
   const [coaches, setCoaches] = useState<ReviewCoachOption[]>([]);
   const [coachID, setCoachID] = useState("");
@@ -85,6 +87,9 @@ export default function NewReviewRequestPage() {
   const cashPrice = method === "tickets" ? 0 : totalPrice;
   // チケットが1枚（添削1回分）以上残っている人にだけ、チケットで払う選択肢を出す。
   const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 1;
+  const kindCounts = ticketKindCounts(ticketSummary);
+  const chosenKind = method === "tickets" ? ticketKind : null;
+  const chosenExpiry = ticketExpiryFor(ticketSummary, chosenKind);
   const cashPayment = !!estimate?.payments && cashPrice > 0;
   // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
   const needsDeclaration = cashPayment;
@@ -181,7 +186,12 @@ export default function NewReviewRequestPage() {
     if (!token) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
-      if (!cancelled) { setTicketSummary(data); if (data.balance.available >= 1) setMethod("tickets"); }
+      if (cancelled) return;
+      setTicketSummary(data);
+      // コーチ詳細の入口（?pay=card|normal|reward）を初期値にする。使えない種別なら使える側に直す（本体 #687）。
+      const initial = initialReviewPayment(data, parseReviewPayParam(new URLSearchParams(window.location.search).get("pay")));
+      setMethod(initial.method);
+      setTicketKind(initial.kind);
     }).catch(() => { if (!cancelled) setTicketSummary(null); });
     return () => { cancelled = true; };
   }, [token]);
@@ -247,6 +257,10 @@ export default function NewReviewRequestPage() {
       setError(L("チケットが不足しています。先に購入してから動画を選んでください。"));
       return false;
     }
+    if (chosenKind && kindCounts && kindCounts[chosenKind] < 1) {
+      setError(L("選んだチケットの残りがありません。別のお支払い方法を選んでください。"));
+      return false;
+    }
     if (needsDeclaration && !declared) {
       setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
       return false;
@@ -274,7 +288,7 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
-          method, use_tickets: method === "tickets", referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
+          method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined, referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -283,6 +297,10 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : L("送信に失敗しました")));
+      if (err instanceof ApiRequestError && ["ticket_kind_unavailable", "insufficient_tickets"].includes(err.code)) {
+        // 残りを読み直す。選んだ種別は他に切り替えない（0枚の側は選べない表示になる）。
+        try { setTicketSummary(await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })); } catch { /* 元のエラーを表示する。 */ }
+      }
       if (err instanceof ApiRequestError && ["nomination_changed", "validation_error"].includes(err.code)) {
         try { const data = await apiFetch<{ coaches: ReviewCoachOption[] }>(`/v1/coaching/nominees?event=${encodeURIComponent(event)}`, { token }); setCoaches(data.coaches); } catch { /* 元のエラーを表示して再読込を促す。 */ }
       }
@@ -317,8 +335,8 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, nextExpiry: ticketSummary?.next_expiry })}
-            confirmLabel={method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
+            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
@@ -420,6 +438,25 @@ export default function NewReviewRequestPage() {
               ) : null}
               {method === "tickets" && ticketsUsable && ticketSummary ? (
                 <div className="space-y-2 text-sm">
+                  {kindCounts ? (
+                    <div className="flex flex-wrap gap-2" role="group" aria-label={L("使うチケット")}>
+                      {(["normal", "reward"] as const).map((kind) => {
+                        const left = kindCounts[kind];
+                        const rewardExpiry = ticketSummary.balance_by_kind?.reward.next_expires_at;
+                        const label = kind === "normal"
+                          ? L("通常チケット（残り {n} 枚）", { n: left })
+                          : left >= 1 && rewardExpiry
+                            ? L("無料チケット（残り {n} 枚・いちばん早い有効期限 {expiry}）", { n: left, expiry: formatDateTime(rewardExpiry) })
+                            : L("無料チケット（残り {n} 枚）", { n: left });
+                        return (
+                          <button key={kind} type="button" aria-pressed={ticketKind === kind} disabled={left < 1} onClick={() => setTicketKind(kind)}
+                            className={`${chip(ticketKind === kind)} disabled:cursor-not-allowed disabled:opacity-50`}>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   <TicketBalance summary={ticketSummary} />
                   <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
                   <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">

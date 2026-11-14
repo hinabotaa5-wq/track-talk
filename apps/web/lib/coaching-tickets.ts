@@ -21,7 +21,55 @@ export type TicketSummary = {
   is_minor?: boolean | null;
   // 単発の料金・添削1回に使う枚数・有効期限（月）。価格の比較と条件の表示に使う。
   single_price_yen?: number; review_units?: number; validity_months?: number;
+  // 本体 #687：通常チケット（購入分）と無料チケット（紹介特典）ごとの使える枚数といちばん早い有効期限。
+  // balance（合計）と next_expiry（全体の最速）の意味は変えない。古い API では返らない。
+  balance_by_kind?: Record<TicketKind, TicketKindBalance> | null;
 };
+
+// チケットの種別（本体 #687）。normal＝通常チケット（購入分）、reward＝無料チケット（紹介特典）。
+export type TicketKind = "normal" | "reward";
+export type TicketKindBalance = { available: number; next_expires_at: string | null };
+
+// コーチ詳細の入口から申込画面へ渡す支払いの初期値（?pay=）。
+export type ReviewPayParam = "card" | TicketKind;
+export function parseReviewPayParam(value: string | null | undefined): ReviewPayParam | null {
+  return value === "card" || value === "normal" || value === "reward" ? value : null;
+}
+
+// 種別ごとの使える枚数。サマリが取れない・古い API で種別がない場合は null（枚数を出さない）。
+export function ticketKindCounts(summary: Partial<TicketSummary> | null | undefined): Record<TicketKind, number> | null {
+  const byKind = summary?.balance_by_kind;
+  if (!byKind?.normal || !byKind?.reward) return null;
+  return { normal: byKind.normal.available, reward: byKind.reward.available };
+}
+
+// 入口の指定がないときの内訳の初期選択：両方あれば無料チケット、片方だけならその側。
+function defaultTicketKind(counts: Record<TicketKind, number> | null): TicketKind | null {
+  if (!counts) return null;
+  if (counts.reward >= 1) return "reward";
+  if (counts.normal >= 1) return "normal";
+  return null;
+}
+
+// 申込画面の支払い方法と内訳の初期値。入口の指定（?pay=）を優先し、その種別が使えなくなっていたら
+// 使える側に直す（チケットが1枚もなければ単発）。指定がなければ従来どおり、残りがあればチケット。
+export function initialReviewPayment(
+  summary: Pick<TicketSummary, "balance" | "balance_by_kind"> | null | undefined,
+  pay: ReviewPayParam | null,
+): { method: "card" | "tickets"; kind: TicketKind | null } {
+  const counts = ticketKindCounts(summary);
+  const kind = defaultTicketKind(counts);
+  const total = summary?.balance?.available ?? 0;
+  if (pay === "card") return { method: "card", kind };
+  if ((pay === "normal" || pay === "reward") && counts && counts[pay] >= 1) return { method: "tickets", kind: pay };
+  return total >= 1 ? { method: "tickets", kind } : { method: "card", kind };
+}
+
+// 確保される1枚の有効期限（種別を選んだら、その種別の中でいちばん早いもの）。null は期限のない旧ロット。
+export function ticketExpiryFor(summary: Pick<TicketSummary, "next_expiry" | "balance_by_kind"> | null | undefined, kind: TicketKind | null): string | null {
+  if (kind && summary?.balance_by_kind?.[kind]) return summary.balance_by_kind[kind].next_expires_at ?? null;
+  return summary?.next_expiry?.expires_at ?? null;
+}
 
 export function ticketReturnPath(value: string | null | undefined): string {
   if (["/coaching/new", "/me/coaching", "/me/coaching/tickets"].includes(value ?? "")) return value!;

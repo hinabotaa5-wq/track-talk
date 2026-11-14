@@ -132,6 +132,11 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	byKind, err := s.ticketBalanceByKind(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	purchases, err := s.q.ListMyTicketPurchases(r.Context(), &p.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -152,10 +157,58 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		reason = ticketSalesClosedMessage
 	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
-	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "purchases": purchases, "ledger": ledger,
+	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledger,
 		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
 		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
+}
+
+// チケットの種別（本体 #687）。申込みで選んだ種別のロットだけを確保・消費する。
+// normal は紹介特典以外のロット（購入したチケット）、reward は紹介特典のロット（無料チケット）。
+const (
+	ticketKindNormal = "normal"
+	ticketKindReward = "reward"
+)
+
+func validTicketKind(kind string) bool {
+	return kind == "" || kind == ticketKindNormal || kind == ticketKindReward
+}
+
+// ticketLotMatchesKind は、ロットが申込みで選んだ種別に当たるか。種別の指定がなければすべて当たる（従来どおり）。
+func ticketLotMatchesKind(l db.CoachingTicketLot, kind string) bool {
+	switch kind {
+	case ticketKindNormal:
+		return l.Kind != "referral_reward"
+	case ticketKindReward:
+		return l.Kind == "referral_reward"
+	}
+	return true
+}
+
+type ticketKindBalance struct {
+	Available     int64      `json:"available"`
+	NextExpiresAt *time.Time `json:"next_expires_at"`
+}
+
+// ticketBalanceByKind は、サマリ API に追加する種別ごとの残高（追加のみ。balance・next_expiry の意味は変えない）。
+func (s *Server) ticketBalanceByKind(ctx context.Context, owner uuid.UUID) (map[string]ticketKindBalance, error) {
+	rows, err := s.q.TicketBalanceByKind(ctx, &owner)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]ticketKindBalance{ticketKindNormal: {}, ticketKindReward: {}}
+	for _, row := range rows {
+		b := ticketKindBalance{Available: row.Available}
+		if t, ok := row.NextExpiresAt.(time.Time); ok {
+			b.NextExpiresAt = &t
+		}
+		key := ticketKindNormal
+		if row.Reward {
+			key = ticketKindReward
+		}
+		out[key] = b
+	}
+	return out, nil
 }
 
 func writeTicketEligibilityReason(err error, reason *string) bool {
@@ -366,18 +419,31 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 // 呼び出し側は利用者のロックを持つ。依頼作成と予約を同じトランザクションにする。
 // 1回の添削にチケット1枚。報酬の元になる額（nominal_yen）は単発の料金と同じにし、報酬は350円に固定する。
 // 予約で使える枚数から外し（申込み時点で残高が減る）、返却で消費・報酬を計上し、返却されずに終わったら戻す。
-func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.Profile, rr db.ReviewRequest) error {
+// kind（normal／reward）を指定したら、その種別のロットだけから確保する。足りなくても他の種別では代用しない（本体 #687）。
+// ロットは失効の早いものから使う（ListTicketLots の並び）。
+func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.Profile, rr db.ReviewRequest, kind string) error {
 	units := reviewTicketUnits
 	price := reviewPriceYen
-	lots, err := q.ListTicketLots(ctx, &p.ID)
+	all, err := q.ListTicketLots(ctx, &p.ID)
 	if err != nil {
 		return err
 	}
+	lots := make([]db.CoachingTicketLot, 0, len(all))
 	var available int64
-	for _, l := range lots {
+	for _, l := range all {
+		if !ticketLotMatchesKind(l, kind) {
+			continue
+		}
+		lots = append(lots, l)
 		available += int64(l.Available)
 	}
 	if available < int64(units) {
+		switch kind {
+		case ticketKindNormal:
+			return &ticketRuleError{"ticket_kind_unavailable", "通常チケットの残りがありません。お支払い方法を選び直してください"}
+		case ticketKindReward:
+			return &ticketRuleError{"ticket_kind_unavailable", "無料チケットの残りがありません。お支払い方法を選び直してください"}
+		}
 		return &ticketRuleError{"insufficient_tickets", "チケットが不足しています。購入後にもう一度送信してください"}
 	}
 	reservation, err := q.CreateTicketReservation(ctx, db.CreateTicketReservationParams{ID: uuid.New(), OwnerID: &p.ID, RequestID: &rr.ID, Quantity: units, NominalYen: price, SharePercent: reviewSharePercent})

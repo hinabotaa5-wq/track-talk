@@ -255,8 +255,11 @@ type reviewRequestReq struct {
 	Question      *string  `json:"question"`
 	VideoPublicID string   `json:"video_public_id"`
 	// 支払い方法（reviewPaymentMethods のどれか。今は card のみ）。Stripe の鍵があるときだけ使う。
-	Method       string `json:"method"`
-	UseTickets   bool   `json:"use_tickets"`
+	Method     string `json:"method"`
+	UseTickets bool   `json:"use_tickets"`
+	// チケットで払うときの種別（normal＝通常チケット／reward＝無料チケット。本体 #687）。
+	// 空なら従来どおり種別を区別せず失効の早いものから使う。
+	TicketKind   string `json:"ticket_kind"`
 	ReferralCode string `json:"referral_code"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
@@ -308,6 +311,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
 	useTickets := req.Method == "tickets" || req.UseTickets
+	if !validTicketKind(req.TicketKind) || (req.TicketKind != "" && !useTickets) {
+		fields["ticket_kind"] = "チケットの種類を選び直してください"
+	}
 	if req.RequestedCoachID == nil && !s.cfg.ReviewRandomAssign {
 		fields["requested_coach_id"] = "コーチを選んでください"
 	}
@@ -416,7 +422,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if useTickets {
-		if err := s.reserveReviewTickets(r.Context(), q, p, rr); err != nil {
+		if err := s.reserveReviewTickets(r.Context(), q, p, rr, req.TicketKind); err != nil {
 			writeCheckoutError(w, err)
 			return
 		}

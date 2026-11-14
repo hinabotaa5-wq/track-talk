@@ -493,3 +493,136 @@ it("有効期限のないチケットはお支払い行に期限なしと出る"
   const confirm = await renderTicketConfirm(null);
   expect(confirm.textContent).toContain("チケット1枚（有効期限 期限なし（以前に購入した分）・追加の支払いなし）");
 });
+
+// 本体 #687：コーチ詳細の入口（?pay=）と、チケットの内訳（通常／無料）の選択。
+const normalExpiry = "2027-05-20T00:00:00Z";
+const rewardExpiry = "2027-04-01T00:00:00Z";
+function kindSummary(normal: number, reward: number) {
+  return {
+    balance: { available: normal + reward, reserved: 0 },
+    next_expiry: normal + reward ? { expires_at: reward ? rewardExpiry : normalExpiry, available: 1 } : null,
+    balance_by_kind: {
+      normal: { available: normal, next_expires_at: normal ? normalExpiry : null },
+      reward: { available: reward, next_expires_at: reward ? rewardExpiry : null },
+    },
+    can_purchase: true,
+  };
+}
+async function renderKinds(search: string, normal: number, reward: number) {
+  window.history.replaceState(null, "", `/coaching/new?coach=c1${search}`);
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return kindSummary(normal, reward);
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    if (path.startsWith("/v1/uploads/coaching-video")) return { public_id: "vid1" };
+    if (path === "/v1/coaching/requests") return { id: "r1" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+}
+const button = (prefix: string) => [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith(prefix));
+const pressed = (prefix: string) => button(prefix)?.getAttribute("aria-pressed");
+async function fillAndConfirm() {
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    setter.call(textarea, "後半に失速します。");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [new File(["x"], "run.mp4", { type: "video/mp4" })] });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => {});
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[type="submit"]')!.form!.requestSubmit(); });
+  return container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
+}
+async function postedBody(confirm: Element, label: string) {
+  await act(async () => { [...confirm.querySelectorAll("button")].find((b) => b.textContent === label)!.click(); });
+  await act(async () => {});
+  const posted = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests");
+  return JSON.parse(String((posted as unknown as [string, { body: string }])[1].body));
+}
+
+it("入口の指定がなければチケットを選び、内訳は両方あれば無料チケット。内訳は常に出る", async () => {
+  await renderKinds("", 2, 1);
+  expect(pressed("チケット（6枚）")).toBe("true");
+  expect(button("通常チケット（残り 2 枚）")?.disabled).toBe(false);
+  expect(pressed("通常チケット")).toBe("false");
+  const free = button("無料チケット（残り 1 枚・いちばん早い有効期限 ")!;
+  expect(free.getAttribute("aria-pressed")).toBe("true");
+  expect(free.textContent).toContain("2027");
+  expect(container.textContent).toContain("動画添削1回はチケット1枚です。");
+  // 単発に切り替えると内訳は出ない。
+  await act(async () => { button("単発")!.click(); });
+  expect(button("通常チケット")).toBeUndefined();
+});
+
+it("片方だけ持っていれば、その側を初期選択する", async () => {
+  await renderKinds("", 2, 0);
+  expect(pressed("チケット（6枚）")).toBe("true");
+  expect(pressed("通常チケット")).toBe("true");
+  const free = button("無料チケット")!;
+  expect(free.textContent).toBe("無料チケット（残り 0 枚）");
+  expect(free.disabled).toBe(true);
+});
+
+it("?pay=card は単発、?pay=normal は通常チケット、?pay=reward は無料チケットを初期選択する", async () => {
+  await renderKinds("&pay=card", 2, 1);
+  expect(pressed("単発")).toBe("true");
+  expect(pressed("チケット（6枚）")).toBe("false");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await renderKinds("&pay=normal", 2, 1);
+  expect(pressed("チケット（6枚）")).toBe("true");
+  expect(pressed("通常チケット")).toBe("true");
+  expect(pressed("無料チケット")).toBe("false");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await renderKinds("&pay=reward", 2, 1);
+  expect(pressed("チケット（6枚）")).toBe("true");
+  expect(pressed("無料チケット")).toBe("true");
+});
+
+it("指定の種別が使えなくなっていたら使える側に直し、どちらもなければ単発にする", async () => {
+  await renderKinds("&pay=reward", 2, 0);
+  expect(pressed("チケット（6枚）")).toBe("true");
+  expect(pressed("通常チケット")).toBe("true");
+  expect(button("無料チケット")?.disabled).toBe(true);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await renderKinds("&pay=normal", 0, 0);
+  expect(pressed("単発")).toBe("true");
+  expect(button("通常チケット")).toBeUndefined();
+});
+
+it("無料チケットの確認は無料チケット1枚と特典の期限を出し、ticket_kind: reward を送る", async () => {
+  await renderKinds("&pay=reward", 2, 1);
+  const confirm = await fillAndConfirm();
+  expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
+    "内容", "回答期限", "お支払い", "使うチケットの有効期限", "キャンセル・チケットの戻り",
+  ]);
+  expect(confirm.textContent).toContain("無料チケット1枚（このあとのお支払いはありません）");
+  const dd = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "使うチケットの有効期限")!.nextElementSibling!;
+  expect(dd.textContent).toContain("2027/04/01");
+  const body = await postedBody(confirm, "確定して無料チケット1枚で送る");
+  expect(body.method).toBe("tickets");
+  expect(body.use_tickets).toBe(true);
+  expect(body.ticket_kind).toBe("reward");
+});
+
+it("通常チケットの確認は通常ロットの最速期限を出し、ticket_kind: normal を送る", async () => {
+  await renderKinds("&pay=normal", 2, 1);
+  const confirm = await fillAndConfirm();
+  expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
+    "内容", "回答期限", "お支払い", "キャンセル・チケットの戻り",
+  ]);
+  // 全体の最速（無料チケットの 4/1）ではなく、通常ロットの中の最速（5/20）。
+  expect(confirm.textContent).toContain("2027/05/20");
+  expect(confirm.textContent).not.toContain("2027/04/01");
+  const body = await postedBody(confirm, "確定してチケット1枚で送る");
+  expect(body.ticket_kind).toBe("normal");
+});
+
