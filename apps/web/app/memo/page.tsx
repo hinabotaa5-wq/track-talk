@@ -141,9 +141,6 @@ function MySenseNotes() {
         onClickCapture={guest ? toLogin : undefined}
         onSubmitCapture={guest ? toLogin : undefined}
       >
-        {guest ? (
-          <p className="rounded-xl border border-sky-300/30 bg-sky-950/40 p-3 text-sm text-sky-100">{L("ログインすると、感覚や記録をためて、あとからふりかえれます。")}</p>
-        ) : null}
         {tab === "records" ? (
           raceFailed ? <ErrorState message={L("記録の取得に失敗しました。下のカレンダーから再読み込みできます。")} /> :
           <RaceRecordsPanel token={guest ? null : token} data={raceData} onRecordsChanged={setRaceData} selectedDay={selectedDay} />
