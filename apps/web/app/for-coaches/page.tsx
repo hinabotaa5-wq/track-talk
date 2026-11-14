@@ -40,7 +40,7 @@ export default function ForCoachesPage() {
         <p>
           <strong>2. Single video review (the entry point)</strong>
           <br />
-          One video, one complete written review in a fixed format: what you see phase by phase, the top fixes in priority order, and drills to work on. If the athlete wants to ask more, a paid follow-up — one question, one answer — is available as an add-on.
+          One video, one complete written review in a fixed format: what you see phase by phase, the top fixes in priority order, and drills to work on. A single review has no paid follow-up add-on; an athlete who wants to keep asking questions moves to the one-month package.
         </p>
         <p>TrackTalk sells and supports both offers. Your part is the coaching itself — athletes never contact you directly, and we handle all communication.</p>
       </Rule>
