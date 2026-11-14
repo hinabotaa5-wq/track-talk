@@ -18,7 +18,7 @@ export function SellerNote({ coachName }: { coachName?: string | null }) {
       <p>{L("販売者: このプランを出しているコーチ（{v0}）。契約の相手はコーチで、プランの内容・料金・期間もコーチが決めます。", { v0: coachName ?? L("名前なし") })}</p>
       <p>{L("代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。")}</p>
       <p>
-        <Link href="/terms" className="text-blue-300 underline">{L("利用規約（サポートプランの契約と代金の受け取り）")}</Link>
+        <Link href="/terms" className="text-blue-300 underline">{L("利用規約（継続プランの契約と代金の受け取り）")}</Link>
       </p>
     </div>
   );

@@ -10,7 +10,7 @@
 - 大会の日程と実況スレッド。開催中の大会は通常ページのヘッダーのトロフィーから開けます。
 - 本人だけが見られる感覚メモと競技会の記録。
 - ケガのグループでの経験共有と、個人を特定しない集計。
-- コーチ募集・応募内容の確認・運営による審査。動画添削とサポートプランの提供範囲は、API・Webの公開設定と新規受付設定で制御します。
+- コーチ募集・応募内容の確認・運営による審査。1回プランと継続プランの提供範囲は、API・Webの公開設定と新規受付設定で制御します。
 
 利用者向けの説明は `/guide`、投稿ルールは `/guidelines`、利用規約は `/terms`、個人情報の取り扱いは `/privacy` にあります。マイページから開けます。
 
@@ -23,7 +23,7 @@
 | `/posts/[id]` | 詳細文の下に画像・動画。コメントのカードから会話を開く |
 | `/competitions` | 月・地域別の大会、国内主要大会、今後の世界大会 |
 | `/memo` | 感覚メモと競技会の記録。感覚メモを書くとビンに玉がたまる |
-| `/coaching` | 動画添削（コーチを選んで依頼）・サポートプラン・コーチ専用画面の縦並び。公開設定がオフのときは準備中と募集を案内 |
+| `/coaching` | 1回プラン（コーチを選んで依頼）・継続プラン・コーチ専用画面の縦並び。公開設定がオフのときは準備中と募集を案内 |
 | `/coach` | 未ログインはログインへ。未応募は応募案内、承認済みも公開設定がオフなら準備中 |
 | `/coaches/[id]/consult` | 1ヶ月プランの無料相談フォーム（詳細は `docs/support-consult.md`） |
 | `/coaching/support-consults` | 送った無料相談と、コーチの提案の確認・申し込み |
@@ -101,7 +101,7 @@ Webは `http://localhost:3000`、APIは `http://localhost:8080/health`。Makefil
 | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | 任意の匿名の利用状況計測。未設定なら無効。接続・無料枠の確認は [計測の説明](docs/analytics.md) |
 | `COACHING_ENABLED` / `NEXT_PUBLIC_COACHING_ENABLED` | オフでAPIの利用者向け機能を閉じ、画面は準備中にする。応募・審査は継続 |
 | `COACHING_NEW_ACCEPTANCE_ENABLED` | 新しい申込み・購入の受付を制御。画面の公開設定とは別に判断 |
-| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | オフで有料の1対1のやりとり（契約のやりとり欄・サポートプランの追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
+| `COACHING_MESSAGING_ENABLED` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED` | オフで有料の1対1のやりとり（契約のやりとり欄・継続プランの追加相談・添削の確認質問と補足）の送信を止める。電気通信事業の届出が受理されるまで立てない。空の間は大会サポート・対面指導のプランを公開できない |
 | `COACHING_CONSULTATION_ENABLED` / `NEXT_PUBLIC_COACHING_CONSULTATION_ENABLED` | オフで動画添削のあとの追加質問（質問1回・回答1回の一方通行、1つの添削につき1回、1回500円の都度払いのみ）の送信・支払い・回答を止める。下書き・閲覧・通報・返金・取り下げは止めない。既定は空（停止） |
 | `COACHING_COACH_LIST_ENABLED` / `NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED` | オフでコーチ一覧（`/coaches` とコーチの詳細、`GET /v1/coaches`）だけを閉じる（画面は準備中、API は 404）。コーチングを開けていても一覧とは別に切り替える。動画添削の申込み（指名候補 `GET /v1/coaching/nominees`）は止めない。既定は空（停止） |
 | `COACHING_TICKET_SALES_ENABLED` | 空（停止）のまま。チケットの新規販売は終了し、動画添削・追加質問は都度払い（カード・PayPay）。購入済みチケットの残高・履歴・返金は使える |

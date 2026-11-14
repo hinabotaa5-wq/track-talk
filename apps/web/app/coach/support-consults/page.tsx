@@ -49,7 +49,7 @@ export default function CoachSupportConsultsPage() {
   return (
     <CoachSubpageShell title={L("無料相談")}>
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      {rows?.length === 0 ? <p className="text-sm text-slate-200">{L("届いている相談はありません。受付設定はサポートプランにあります。")}</p> : null}
+      {rows?.length === 0 ? <p className="text-sm text-slate-200">{L("届いている相談はありません。受付設定は継続プランにあります。")}</p> : null}
       <ul className="space-y-2">
         {rows?.map((c) => (
           <li key={c.id} className="rounded-xl border border-white/20 bg-white/10 p-3">

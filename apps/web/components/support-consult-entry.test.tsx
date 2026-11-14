@@ -34,10 +34,10 @@ it("受付停止中は、再開の目安は出さず、相談の入口も出さ�
   expect(container.querySelector("a")).toBeNull();
 });
 
-it("コーチ詳細では、単一のサポートプランに無料相談の入口が出て、完成品のプランは出ない", async () => {
+it("コーチ詳細では、単一の継続プランに無料相談の入口が出て、完成品のプランは出ない", async () => {
   const plan = { id: "p", title: "旧プラン", description: "旧プランの内容", kind: "period" as const, duration_days: 30, price_yen: 8000, capacity: 3, published: true, service_type: "competition_support" as const, video_reviews: 1, menu_updates: null, reply_formats: [] as ("text")[], start_on_first_video: false };
   await act(async () => root.render(<CoachServicePlans plans={[plan]} coachID="c1" consult={open} />));
-  expect(container.textContent).toContain("サポートプラン");
+  expect(container.textContent).toContain("継続プラン");
   expect(container.textContent).toContain("無料相談をする");
   expect(container.textContent).toContain("1ヶ月の間");
   expect(container.textContent).not.toContain("旧プランの内容");

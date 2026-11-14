@@ -15,15 +15,15 @@ export function CoachServicePlans({ plans, coachID, consult }: { plans: Coaching
   return (
     <div className="space-y-4">
       {consultEntry ? (
-        <section aria-label={L("サポートプラン")} className="space-y-3">
-          <h3 className="font-bold text-white">{L("サポートプラン")}</h3>
+        <section aria-label={L("継続プラン")} className="space-y-3">
+          <h3 className="font-bold text-white">{L("継続プラン")}</h3>
           <SupportConsultEntry coachID={coachID!} consult={consultEntry} />
         </section>
       ) : (
         <p className="text-sm text-slate-200">{L("このコーチは受付していません")}</p>
       )}
-      {legacy.length ? <section className="space-y-2" aria-label={L("従来のサポートプラン")}>
-        <h3 className="text-sm font-semibold">{L("従来のサポートプラン")}</h3>
+      {legacy.length ? <section className="space-y-2" aria-label={L("従来の継続プラン")}>
+        <h3 className="text-sm font-semibold">{L("従来の継続プラン")}</h3>
         <PublicPlanList plans={legacy} />
       </section> : null}
     </div>

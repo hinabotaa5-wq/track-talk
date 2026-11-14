@@ -72,9 +72,9 @@ async function render() {
   await act(async () => {});
 }
 
-it("未ログインでは動画添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
+it("未ログインでは1回プランの節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
-  expect(container.textContent).toContain("動画添削");
+  expect(container.textContent).toContain("1回プラン");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(entry("card")?.textContent).toBe("単発500円");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -93,7 +93,7 @@ it("未ログインでは動画添削の節と3つの入口を有効なまま出
   expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。添削1回につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   expect(tickets?.previousElementSibling?.getAttribute("aria-labelledby")).toBe("coach-video-review");
-  // 動画添削文脈（既定）ではチケット節が最後の節で、サポートプラン節は続かない（本体 #694）。
+  // 1回プラン文脈（既定）ではチケット節が最後の節で、継続プラン節は続かない（本体 #694）。
   expect(tickets?.nextElementSibling).toBeNull();
   expect(tickets?.className).toBe(tickets?.previousElementSibling?.className);
   expect(tickets?.querySelector("a")?.classList.contains("w-full")).toBe(true);
@@ -245,11 +245,11 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 
-// 本体 #694：一覧で切り替えた先のプランの節だけを出す。tab=support だけがサポート文脈、それ以外は動画添削文脈。
+// 本体 #694：一覧で切り替えた先のプランの節だけを出す。tab=support だけがサポート文脈、それ以外は1回プラン文脈。
 const sectionIDs = () => [...container.querySelectorAll("section[aria-labelledby]")].map((s) => s.getAttribute("aria-labelledby"));
 const supportCoach: PublicCoach = {
   ...coach,
-  // 従来のサポートプラン（service_type 未設定の公開プラン）。サポートプラン節の中に一覧で出る。
+  // 従来の継続プラン（service_type 未設定の公開プラン）。継続プラン節の中に一覧で出る。
   plans: [{ id: "plan-s", title: "従来の1ヶ月指導", kind: "period", description: "説明", duration_days: 30,
     price_yen: 8000, capacity: 3, published: true,
     video_reviews: 4, menu_updates: null, reply_formats: [], start_on_first_video: false }],
@@ -259,7 +259,7 @@ it.each([
   ["指定なし", ""],
   ["tab=video", "tab=video"],
   ["不正値", "tab=unknown"],
-])("動画添削文脈（%s）ではサポートプランの節を描画せず、動画添削とチケットの節を出す", async (_label, search) => {
+])("1回プラン文脈（%s）では継続プランの節を描画せず、1回プランとチケットの節を出す", async (_label, search) => {
   mocks.search = search;
   mocks.api.mockImplementation(async (path: string) => {
     if (path === `/v1/coaches/${coachID}`) return supportCoach;
@@ -268,7 +268,7 @@ it.each([
   await render();
   expect(sectionIDs()).toEqual(["coach-video-review", "coach-tickets"]);
   expect(container.querySelector("#coach-plans")).toBeNull();
-  expect(container.textContent).not.toContain("サポートプラン");
+  expect(container.textContent).not.toContain("継続プラン");
   expect(container.textContent).not.toContain("従来の1ヶ月指導");
   expect(container.textContent).not.toContain("このコーチは受付していません");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
@@ -276,7 +276,7 @@ it.each([
   expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
 });
 
-it("サポート文脈（tab=support）ではサポートプランの節だけを出し、動画添削とチケットの節を描画しない", async () => {
+it("サポート文脈（tab=support）では継続プランの節だけを出し、1回プランとチケットの節を描画しない", async () => {
   mocks.search = "tab=support";
   mocks.api.mockImplementation(async (path: string) => {
     if (path === `/v1/coaches/${coachID}`) return supportCoach;
@@ -284,7 +284,7 @@ it("サポート文脈（tab=support）ではサポートプランの節だけ�
   });
   await render();
   expect(sectionIDs()).toEqual(["coach-plans"]);
-  expect(container.querySelector("#coach-plans")?.textContent).toBe("サポートプラン");
+  expect(container.querySelector("#coach-plans")?.textContent).toBe("継続プラン");
   expect(container.textContent).toContain("このコーチは受付していません");
   expect(container.textContent).toContain("従来の1ヶ月指導");
   expect(container.querySelector('section[aria-labelledby="coach-video-review"]')).toBeNull();
@@ -296,7 +296,7 @@ it("サポート文脈（tab=support）ではサポートプランの節だけ�
   expect(container.textContent).toContain("全国大会優勝");
 });
 
-it("サポート文脈では動画添削の受付状態とチケットの要約を取りに行かない", async () => {
+it("サポート文脈では1回プランの受付状態とチケットの要約を取りに行かない", async () => {
   mocks.search = "tab=support";
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();

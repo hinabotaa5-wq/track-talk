@@ -71,7 +71,7 @@ func TestGuardianMailsAreForTheSupportPlan(t *testing.T) {
 			db.GuardianConsent{ConsentedAt: &at, SelfPayLimitYen: 1500}, "https://example.com/guardian/y").Text,
 	}
 	for name, text := range mails {
-		for _, want := range []string{"サポートプラン", "クレジットカード", "たろう"} {
+		for _, want := range []string{"継続プラン", "クレジットカード", "たろう"} {
 			if !strings.Contains(text, want) {
 				t.Errorf("%s mail should contain %q:\n%s", name, want, text)
 			}

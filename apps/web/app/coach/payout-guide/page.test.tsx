@@ -13,7 +13,7 @@ it("そのまま入力できる形で業種・URL・商品説明を載せる", (
   expect(html).toContain("個人事業主");
   expect(html).toContain("教育 ＞ その他の教育サービス");
   expect(html).toContain("https://track-talk.netlify.app");
-  expect(html).toContain("陸上競技の動画添削サービスです。");
+  expect(html).toContain("陸上競技の1回プランのサービスです。");
 });
 
 it("完了確認と真っ白時の対処・単体URLでの案内を含む", () => {

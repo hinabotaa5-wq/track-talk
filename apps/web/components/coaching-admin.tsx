@@ -145,11 +145,11 @@ export function RetentionHoldForm({ token }: { token: string | null }) {
     <section className="space-y-2">
       <h2 className="font-bold">動画とやりとりの保全</h2>
       <p className="text-xs text-slate-300">
-        通報・紛争（チャージバックなど）の対応中に立て、対応を終えたら外してください。立っている間は動画ファイル（添削はやりとりの終わりから7日、サポートプランは契約の終わりから30日で消す）を消さず、サポートプランのやりとり欄は終わった後も閉じません。
+        通報・紛争（チャージバックなど）の対応中に立て、対応を終えたら外してください。立っている間は動画ファイル（添削はやりとりの終わりから7日、継続プランは契約の終わりから30日で消す）を消さず、継続プランのやりとり欄は終わった後も閉じません。
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label="保全の対象" value={target} onChange={(e) => setTarget(e.target.value as "review" | "contract")} className="rounded border border-white/25 bg-slate-900 p-2 text-sm">
-          <option value="contract">サポートプランの契約</option>
+          <option value="contract">継続プランの契約</option>
           <option value="review">フォーム添削の依頼</option>
         </select>
         <input aria-label="対象の ID" value={id} onChange={(e) => setId(e.target.value)} placeholder="ID" className="min-w-0 flex-1 rounded border border-white/25 bg-slate-900 p-2 text-sm" />

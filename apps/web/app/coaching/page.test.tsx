@@ -61,7 +61,7 @@ it("コーチングと一覧の両方を開けると、カードメニューで�
   for (const word of hubWords) expect(container.textContent).not.toContain(word);
 });
 
-it("?tab=support で直接開くとサポートプラン側を出す", async () => {
+it("?tab=support で直接開くと継続プラン側を出す", async () => {
   flags.coaching = true;
   flags.list = true;
   navigation.tab = "support";

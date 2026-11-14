@@ -27,12 +27,12 @@ const reviewTicketUnits int32 = 1
 // ticketValidity は、チケットの有効期限（決済完了から6か月）。SQL の CreateTicketLot と揃える。
 const ticketValidityMonths = 6
 
-// ticketWordingVersion は、チケットの購入画面・最終確認・規約に表示している文面の版（本体 #572 v3）。
+// ticketWordingVersion は、チケットの購入画面・最終確認・規約に表示している文面の版（本体 #572 v3、プラン改名で v4）。
 // 購入の確定時に購入ごとに残し、文面の版と購入を突き合わせられるようにする（証拠化）。
-const ticketWordingVersion = "v3"
+const ticketWordingVersion = "v4"
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。動画添削・追加質問は申込み時にカードでお支払いください"
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。1回プラン・追加質問は申込み時にカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 
@@ -310,7 +310,7 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 	}
 	// 先に購入記録を確定。同じ操作を再送しても同じ購入・決済画面になり、通知が先着しても受け取れる。
 	page := s.cfg.WebBaseURL + "/me/coaching/tickets"
-	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("動画添削チケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
+	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("1回プランのチケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
 		SuccessURL: page + "?purchase=" + purchase.ID.String(), CancelURL: page + "?cancelled=1&return_to=" + url.QueryEscape(purchase.ReturnPath), Reference: purchase.ID.String(),
 		Metadata: map[string]string{"kind": "tickets", "purchase_id": purchase.ID.String()}, ExpiresAt: purchase.SessionExpiresAt,
 		PaymentMethodTypes: []string{"card"}, IdempotencyKey: "ticket-checkout-" + purchase.ID.String()})

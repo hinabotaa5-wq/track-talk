@@ -124,7 +124,7 @@ it("公開プランのないコーチのカードを英語でも『No published 
   expect(container.textContent).not.toContain("プラン未公開");
 });
 
-it("公開中のサポートプランがあるコーチのカードには価格を従来どおり出す", async () => {
+it("公開中の継続プランがあるコーチのカードには価格を従来どおり出す", async () => {
   const supportPlan = { id: "plan-s", title: "1ヶ月プラン", kind: "single", description: "説明", duration_days: 30,
     price_yen: 5000, capacity: 3, published: true, service_type: "competition_support",
     video_reviews: 0, menu_updates: null, reply_formats: [], start_on_first_video: false };
@@ -138,7 +138,7 @@ it("公開中のサポートプランがあるコーチのカードには価格�
   expect(cards[1].textContent).toContain("〜");
 });
 
-it("動画添削の一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
+it("1回プランの一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [
     { ...coach, id: "coach-2", nickname: "跳躍", events: ["long-jump"] },
     { ...coach, id: "coach-1", events: ["100m", "200m", "400m"] },
@@ -158,7 +158,7 @@ it("動画添削の一覧にも種目のチップが1列で並び、初期は「
   expect(container.textContent).not.toMatch(/★|ランキング|人気/);
 });
 
-it("動画添削の一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
+it("1回プランの一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));
   const group = container.querySelector('[role="radiogroup"][aria-label="種目で絞り込む"]')!;

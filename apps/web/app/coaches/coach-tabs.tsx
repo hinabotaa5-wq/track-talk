@@ -26,8 +26,8 @@ export function CoachTabs() {
   // 一度開いたパネルは消さずに隠しておき、行き来しても読み込み直さない（大会・ケガと同じ）。
   const [opened, setOpened] = useState<Set<Tab>>(() => new Set([initial]));
   const views = [
-    { id: "video", label: L("動画添削") },
-    { id: "support", label: L("サポートプラン") },
+    { id: "video", label: L("1回プラン") },
+    { id: "support", label: L("継続プラン") },
   ] as const;
   function select(next: Tab) {
     if (next === tab) return;

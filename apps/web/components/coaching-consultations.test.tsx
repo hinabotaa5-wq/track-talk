@@ -40,7 +40,7 @@ it("購入から戻ると保存済みの下書きと動画を復元する", asyn
  expect(container.querySelector("textarea")?.value).toBe(draft.question);
  expect(container.textContent).toContain("保存済みの動画を添付します");
 });
-it("サポートプランの相談は、回答への無料確認と新しい有料相談を区別する", async () => {
+it("継続プランの相談は、回答への無料確認と新しい有料相談を区別する", async () => {
  const c = { ...draft, funding: "cash" as const, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString() };
  await render({ ...room, funding: "cash", consultations: [c] }, undefined, "contract");
  expect(container.textContent).toContain("回答について確認する（1回無料）");
@@ -84,11 +84,11 @@ it("18歳以上にも購入前チェックを出す", async () => {
  expect(button("お支払いへ")?.disabled).toBe(true);
 });
 const payNotice = "現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。";
-it("動画添削のあとの追加質問をその場で払うときは、カードのみの案内を出す", async () => {
+it("1回プランのあとの追加質問をその場で払うときは、カードのみの案内を出す", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
  expect(container.textContent?.split(payNotice).length).toBe(3);
 });
-it("カードのみの案内は、動画添削のあとの追加質問の支払いにだけ出し、サポートプランには出さない", async () => {
+it("カードのみの案内は、1回プランのあとの追加質問の支払いにだけ出し、継続プランには出さない", async () => {
  await render();
  expect(container.textContent).toContain(payNotice);
  await act(async () => root.unmount()); root = createRoot(container);
@@ -108,7 +108,7 @@ it("担当コーチには受諾と辞退を表示する", async () => {
  expect(container.textContent).toContain("辞退する");
  expect(container.querySelector("textarea")).toBeNull();
 });
-it("届出が済むまでは、サポートプランの新しい質問・確認・回答の欄を出さず、届いた内容だけを見せる", async () => {
+it("届出が済むまでは、継続プランの新しい質問・確認・回答の欄を出さず、届いた内容だけを見せる", async () => {
  flags.messaging = false;
  const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString() };
  await render({ ...room, consultations: [c] }, undefined, "contract");
@@ -117,7 +117,7 @@ it("届出が済むまでは、サポートプランの新しい質問・確認�
  expect(container.textContent).not.toContain("回答について確認する（1回無料）");
  expect(container.textContent).not.toContain("質問する（500円）");
 });
-it("動画添削のあとの相談は一方通行で、回答への確認・補足の欄を出さず、過去の確認・補足は表示だけする", async () => {
+it("1回プランのあとの相談は一方通行で、回答への確認・補足の欄を出さず、過去の確認・補足は表示だけする", async () => {
  const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString(), clarify_body: "以前の確認", clarification: "以前の補足" };
  await render({ ...room, can_purchase: false, block_reason: "この添削の追加質問は回答済みです。", consultations: [c, { ...draft, id: "c2", status: "answered" as const, answer: "別の回答", answered_at: new Date().toISOString() }] });
  expect(container.textContent).toContain("この添削について質問を1回送ると、担当コーチが1回回答します");
@@ -149,12 +149,12 @@ it("回答待ちの追加質問は質問の吹き出しを示し、追撃の入�
  expect(container.textContent).toContain("あなたの質問");
  expect(container.querySelector("textarea")).toBeNull();
 });
-it("動画添削のあとの相談には、コーチの補足の欄も出さない", async () => {
+it("1回プランのあとの相談には、コーチの補足の欄も出さない", async () => {
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答", answered_at: new Date().toISOString(), clarify_body: "確認" }] });
  expect(container.querySelector("textarea")).toBeNull();
  expect(container.textContent).not.toContain("補足を送る");
 });
-it("動画添削のあとの相談は専用のゲートで出し分け、届出待ちのゲートには左右されない", async () => {
+it("1回プランのあとの相談は専用のゲートで出し分け、届出待ちのゲートには左右されない", async () => {
  flags.messaging = false;
  await render({ ...room, consultations: [] });
  expect(container.textContent).toContain("質問する（500円）");
@@ -182,7 +182,7 @@ function bubble(text: string) {
  if (!row) throw new Error(`missing bubble ${text}`);
  return { side: row.classList.contains("justify-end") ? "right" : row.classList.contains("justify-start") ? "left" : "none", head: row.querySelector("p.text-xs")?.textContent ?? "" };
 }
-it("サポートプランの相談は、質問・確認を右、回答・補足を左の吹き出しで、ラベルと時刻つきで見せる", async () => {
+it("継続プランの相談は、質問・確認を右、回答・補足を左の吹き出しで、ラベルと時刻つきで見せる", async () => {
  await render({ ...room, funding: "cash", consultations: [contractThread] }, undefined, "contract");
  expect(bubble("契約の質問")).toEqual({ side: "right", head: `あなたの質問 · ${formatDateTime(contractThread.created_at)}` });
  expect(bubble("契約の回答")).toEqual({ side: "left", head: `コーチの回答 · ${formatDateTime(contractThread.answered_at)}` });
@@ -191,7 +191,7 @@ it("サポートプランの相談は、質問・確認を右、回答・補足�
  expect(container.textContent).not.toContain("回答への確認：");
  expect(container.textContent).not.toContain("補足：契約の補足");
 });
-it("サポートプランの相談を保護者が見るときは、選手とコーチのラベルで吹き出しを見せる", async () => {
+it("継続プランの相談を保護者が見るときは、選手とコーチのラベルで吹き出しを見せる", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [contractThread] }, "guardian-secret");
  expect(bubble("契約の質問").head).toContain("選手の質問");
  expect(bubble("契約の回答").head).toContain("コーチの回答");
@@ -199,7 +199,7 @@ it("サポートプランの相談を保護者が見るときは、選手とコ�
  expect(bubble("契約の補足").head).toContain("コーチの補足");
  expect(container.textContent).not.toContain("あなたの");
 });
-it("サポートプランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で見せる", async () => {
+it("継続プランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で見せる", async () => {
  await render({ ...room, role: "coach", funding: "cash", can_purchase: false, consultations: [contractThread] }, undefined, "contract");
  expect(bubble("契約の質問")).toMatchObject({ side: "right", head: expect.stringContaining("選手の質問") });
  expect(bubble("契約の回答")).toMatchObject({ side: "left", head: expect.stringContaining("あなたの回答") });

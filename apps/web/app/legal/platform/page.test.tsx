@@ -23,7 +23,7 @@ it.each([
   [false, false],
   [true, false],
   [false, true],
-])("サポートプランの提供かメッセージの送信が閉じている間は 404 にする（coaching=%s, messaging=%s）", (coaching, messaging) => {
+])("継続プランの提供かメッセージの送信が閉じている間は 404 にする（coaching=%s, messaging=%s）", (coaching, messaging) => {
   flags.coaching = coaching;
   flags.messaging = messaging;
   expect(() => renderToStaticMarkup(<PlatformMeasuresPage />)).toThrow("NEXT_NOT_FOUND");
