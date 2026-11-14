@@ -226,7 +226,7 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 	}
 }
 
-func TestLowRatedCoachSkipped(t *testing.T) {
+func TestLowRatedCoachNotSkipped(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setupConfig(t, func(cfg *config.Config) { cfg.CoachingTickSecret = "tick-secret" })
 	tadmin := adminToken(t, h)
@@ -256,27 +256,50 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 			SELECT $1, coach_id, good_point, fix_points, drill FROM review_responses WHERE request_id = $2`, copied, id)
 		execSQLArgs(t, `INSERT INTO review_ratings (request_id, stars, rated_at) VALUES ($1, 1, now())`, copied)
 	}
-	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":true`) {
-		t.Fatalf("not paused %s", body)
+	// 評価制度の廃止により、平均★3未満・5件でも paused にならない。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
+		t.Fatalf("paused despite abolition %s", body)
 	}
 
-	// 平均が★3未満になったので、受付中でも打診されない。
+	// 平均が★3未満でも、候補に残り、稼働数に数えられ、打診される。
 	_, tu := demoRequester(t, h, tadmin)
-	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, `"coaches_on_duty":false`) {
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/nominees?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, aID.String()) {
+		t.Fatalf("nominees %s", body)
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, `"coaches_on_duty":true`) {
 		t.Fatalf("estimate %s", body)
 	}
 	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	if rec.Code != http.StatusCreated || created.Status != "queued" {
+	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	if len(coachRequests(t, h, ta).Reviewing) != 0 {
-		t.Fatal("low-rated coach got an offer")
+	if offers := coachRequests(t, h, ta).Reviewing; len(offers) != 1 || offers[0].ID != created.ID {
+		t.Fatalf("A offers %+v", offers)
 	}
 
-	// 運営の画面では外れていることがわかり、戻すと待っていた依頼が回る。
-	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil).Body.String(); !strings.Contains(body, `"rating_paused":true`) {
+	// 同じコーチを指名した依頼は、評価を理由に拒否されない。
+	nominated := reviewBodyFor(t, h, tu)
+	nominated["requested_coach_id"] = aID.String()
+	rec = doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, nominated)
+	var createdNominated reviewRequestView
+	_ = json.Unmarshal(rec.Body.Bytes(), &createdNominated)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("nominated create %d %s", rec.Code, rec.Body.String())
+	}
+	nominatedOffered := false
+	for _, offer := range coachRequests(t, h, ta).Reviewing {
+		if offer.ID == createdNominated.ID {
+			nominatedOffered = true
+		}
+	}
+	if !nominatedOffered {
+		t.Fatalf("A nominated offers %+v", coachRequests(t, h, ta).Reviewing)
+	}
+
+	// 運営の画面では外れている表示にならず、reset-rating の後端は残る。
+	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil).Body.String(); !strings.Contains(body, `"rating_paused":false`) {
 		t.Fatalf("admin list %s", body)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+uuid.NewString()+"/reset-rating", tadmin, nil); rec.Code != http.StatusNotFound {
@@ -290,9 +313,6 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	}
 	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
 		t.Fatalf("still paused %s", body)
-	}
-	if offers := coachRequests(t, h, ta).Reviewing; len(offers) != 1 || offers[0].ID != created.ID {
-		t.Fatalf("A offers after reset %+v", offers)
 	}
 }
 

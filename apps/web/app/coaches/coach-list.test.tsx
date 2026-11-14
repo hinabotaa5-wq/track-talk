@@ -83,28 +83,26 @@ it("非公開または存在しないコーチの詳細には案内を出す", a
   expect(container.textContent).toContain("このコーチは現在公開されていません");
 });
 
-it("選手側のコーチ詳細の平均評価は件数を出さない（#628）", async () => {
+it("選手側のコーチ詳細は平均評価を出さない（評価廃止）", async () => {
   apiFetch.mockResolvedValue({ ...coach, rating_count: 3, rating_average: 4.5 });
   await act(async () => root.render(<CoachDetailPage />));
-  expect(container.textContent).toContain("★4.5");
-  expect(container.textContent).not.toContain("3件");
-  expect(container.textContent).not.toContain("(3)");
+  expect(container.textContent).not.toContain("★4.5");
+  expect(container.textContent).not.toContain("評価はまだありません");
 });
 
-it("選手側のコーチ詳細は英語でも平均評価の件数を出さない（#628）", async () => {
+it("選手側のコーチ詳細は英語でも平均評価を出さない（評価廃止）", async () => {
   installEnglish(en);
   setActiveLocale("en");
   apiFetch.mockResolvedValue({ ...coach, rating_count: 3, rating_average: 4.5 });
   await act(async () => root.render(<CoachDetailPage />));
-  expect(container.textContent).toContain("★4.5");
-  expect(container.textContent).not.toContain("(3)");
-  expect(container.textContent).not.toContain("3件");
+  expect(container.textContent).not.toContain("★4.5");
+  expect(container.textContent).not.toContain("No ratings yet");
 });
 
-it("評価0件のときのコーチ詳細の表示は変えない（#628）", async () => {
+it("評価0件のときのコーチ詳細にも評価表示は出ない（評価廃止）", async () => {
   apiFetch.mockResolvedValue(coach);
   await act(async () => root.render(<CoachDetailPage />));
-  expect(container.textContent).toContain("評価はまだありません");
+  expect(container.textContent).not.toContain("評価はまだありません");
 });
 
 it("公開プランのないコーチのカードには『プラン未公開』も空の価格行も出さない（一覧からは外さない）", async () => {

@@ -2,6 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import Page from "./page";
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), replace: vi.fn() }));
@@ -67,4 +68,32 @@ it("隠れていたタブは開いたときに読む", async () => {
   });
   await act(async () => {});
   expect(calledPaths().filter((p) => p.includes("source=feedback"))).not.toEqual([]);
+});
+
+it("承認済みコーチの評価・除外の注記・順番に戻すボタンを表示しない", async () => {
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path.startsWith("/v1/admin/coach-applications?status=approved")) {
+      return {
+        applications: [{
+          profile_id: "coach-1", nickname: "コーチA", status: "approved", tier: "coach",
+          events: ["100m"], applied_at: "2026-11-14T00:00:00Z",
+          rating_count: 5, rating_average: 2.5, rating_paused: true,
+        }],
+        meta: { total: 1 },
+      };
+    }
+    return emptyList("reports");
+  });
+  await act(async () => root.render(<ConfirmProvider><Page /></ConfirmProvider>));
+  const coachesTab = [...container.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === "コーチ");
+  await act(async () => coachesTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  const approvedButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "承認済み");
+  await act(async () => approvedButton?.click());
+
+  expect(container.textContent).toContain("コーチA");
+  expect(container.textContent).toContain("コーチを止める");
+  expect(container.textContent).not.toContain("評価:");
+  expect(container.textContent).not.toContain("★2.5（5件）");
+  expect(container.textContent).not.toContain("評価が低いため、依頼が回っていません。");
+  expect(container.textContent).not.toContain("順番に戻す");
 });

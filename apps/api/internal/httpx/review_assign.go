@@ -16,12 +16,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 評価が低いコーチを候補から外す基準。
-const (
-	lowRatingMinCount = 5
-	lowRatingStars    = 3.0
-)
-
 // dayStart は日本時間の今日の0時。1日の上限本数はこの時刻から数える。
 func dayStart(now time.Time) time.Time {
 	local := now.In(jst.Zone)
@@ -35,8 +29,6 @@ func (s *Server) estimateReviewDue(ctx context.Context, requester uuid.UUID, tie
 		Tier:        tier,
 		Event:       event,
 		RequesterID: requester,
-		MinRatings:  lowRatingMinCount,
-		LowStars:    lowRatingStars,
 	})
 	if err != nil {
 		return time.Time{}, false, err
@@ -56,7 +48,6 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 		var err error
 		coachID, err = q.PickCoachForRequest(ctx, db.PickCoachForRequestParams{
 			Tier: rr.Tier, Event: rr.Event, RequesterID: rr.RequesterID,
-			MinRatings: lowRatingMinCount, LowStars: lowRatingStars,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return rr, nil

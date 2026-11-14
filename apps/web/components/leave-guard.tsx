@@ -18,31 +18,19 @@ type LeaveGuardValue = {
   setDirty: (dirty: boolean) => void;
   /** 入力中なら確認ダイアログを出し、確認後に go を実行する。入力中でなければ false を返し何もしない。 */
   confirmLeave: (go: () => void) => boolean;
-  /** 評価必須などの「確認なしで止める」ブロッカー。登録中は dirty に関わらず離脱を止め、onBlocked を呼ぶ。 */
-  setBlocker: (onBlocked: (() => void) | null) => void;
 };
 
 const LeaveGuardContext = createContext<LeaveGuardValue | null>(null);
 
 export function LeaveGuardProvider({ children }: { children: ReactNode }) {
   const dirtyRef = useRef(false);
-  const blockerRef = useRef<(() => void) | null>(null);
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   const setDirty = useCallback((dirty: boolean) => {
     dirtyRef.current = dirty;
   }, []);
 
-  const setBlocker = useCallback((onBlocked: (() => void) | null) => {
-    blockerRef.current = onBlocked;
-  }, []);
-
   const confirmLeave = useCallback((go: () => void) => {
-    const blocked = blockerRef.current;
-    if (blocked) {
-      blocked();
-      return true;
-    }
     if (!dirtyRef.current) return false;
     setPending(() => go);
     return true;
@@ -58,7 +46,7 @@ export function LeaveGuardProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  const value = useMemo(() => ({ setDirty, confirmLeave, setBlocker }), [setDirty, confirmLeave, setBlocker]);
+  const value = useMemo(() => ({ setDirty, confirmLeave }), [setDirty, confirmLeave]);
 
   return (
     <LeaveGuardContext.Provider value={value}>

@@ -319,49 +319,6 @@ function Composer({
   );
 }
 
-function RatingForm({ contract, token, onRated }: { contract: CoachingContract; token: string | null; onRated: (stars: number) => void }) {
-  const [error, setError] = useState("");
-  const { pending, acquire, release } = useActionLock();
-  const stars = contract.rating?.stars ?? 0;
-
-  async function rate(n: number) {
-    if (contract.rating || !acquire()) return;
-    setError("");
-    try {
-      await apiFetch(`/v1/coaching/contracts/${contract.id}/rating`, { method: "POST", token, body: JSON.stringify({ stars: n }) });
-      onRated(n);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
-    } finally {
-      release();
-    }
-  }
-
-  return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-semibold">{L("このパーソナル指導の評価")}</h2>
-      <p className="text-xs text-slate-300">{contract.rating ? L("評価しました。ありがとうございました。") : L("★を選ぶと送られます。1回だけです。")}</p>
-      <div className="flex gap-1" role="radiogroup" aria-label={L("評価")}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            role="radio"
-            aria-checked={stars === n}
-            aria-label={L("{n}つ星", { n })}
-            disabled={pending || !!contract.rating}
-            onClick={() => void rate(n)}
-            className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-80 ${n <= stars ? "text-star" : "text-white/25"}`}
-          >
-            ★
-          </button>
-        ))}
-      </div>
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
-    </section>
-  );
-}
-
 // 返答の目安（全コーチ一律、強制の期限ではない）。
 export const replyGuideline = "コーチからの返答は24時間以内を目安としています。";
 export const coachReplyGuideline = "選手への返答は24時間以内を目安にしてください（目安で、期限ではありません）。";
@@ -403,12 +360,10 @@ export function CoachingMessages({
   contract,
   token,
   guardianToken,
-  onContractChange,
 }: {
   contract: CoachingContract;
   token: string | null;
   guardianToken?: string;
-  onContractChange: (c: CoachingContract) => void;
 }) {
   const [messages, setMessages] = useState<CoachingMessage[] | null>(null);
   const [error, setError] = useState("");
@@ -458,13 +413,6 @@ export function CoachingMessages({
     return (
       <div className="space-y-4">
         <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">{L("期間の終わりから1年たったので、やりとり（文章と動画）は消しました。")}</p>
-        {contract.status === "ended" && contract.role === "requester" ? (
-          <RatingForm
-            contract={contract}
-            token={token}
-            onRated={(stars) => onContractChange({ ...contract, rating: { stars, rated_at: new Date().toISOString() } })}
-          />
-        ) : null}
       </div>
     );
   }
@@ -517,13 +465,6 @@ export function CoachingMessages({
         <p className="text-sm text-slate-300">{contract.status === "refunded" ? L("返金して終了しました。") : L("期間が終わりました。")}{preservedNote}</p>
       ) : null}
       {!viewClosed && !isGuardian && messages && messages.length > 0 ? <DownloadChat contract={contract} token={token} /> : null}
-      {contract.status === "ended" && contract.role === "requester" ? (
-        <RatingForm
-          contract={contract}
-          token={token}
-          onRated={(stars) => onContractChange({ ...contract, rating: { stars, rated_at: new Date().toISOString() } })}
-        />
-      ) : null}
     </div>
   );
 }

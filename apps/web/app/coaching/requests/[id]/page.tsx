@@ -24,7 +24,7 @@ import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { Suspense, useEffect, useState, type MouseEvent } from "react";
 import { useLeaveGuard } from "@/components/leave-guard";
 
 const chip = (on: boolean) =>
@@ -32,33 +32,14 @@ const chip = (on: boolean) =>
     on ? "border-blue-400 bg-blue-500/30 text-pure-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
-// 返答が届いたあとの操作: ★の評価、7日後の「役に立ちましたか」、通報。
+// 返答が届いたあとの操作: 7日後の「役に立ちましたか」、通報。（評価制度は廃止した）
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
-  const [ratingNotice, setRatingNotice] = useState(false);
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
-  const { setBlocker } = useLeaveGuard();
-  const ratingSectionRef = useRef<HTMLElement | null>(null);
   const response = request.response;
-  // 未評価＝星が null または 0。評価済み（1〜5）のときだけガードを外す。
-  const unrated = !!response && !response.hidden && (request.rating?.stars == null || request.rating?.stars === 0);
-  const showRatingNotice = useCallback(() => {
-    setRatingNotice(true);
-    try {
-      ratingSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-    } catch {
-      // テスト環境等でスクロール不可のときは文言の表示だけにする。
-    }
-  }, []);
-  useEffect(() => {
-    if (!unrated) return;
-    setBlocker(showRatingNotice);
-    return () => setBlocker(null);
-  }, [unrated, setBlocker, showRatingNotice]);
   if (!response || response.hidden) return null;
-  const stars = request.rating?.stars ?? 0;
   const helpful = request.rating?.helpful ?? null;
 
   async function post(path: string, body: unknown) {
@@ -106,27 +87,6 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
           </div>
         </section>
       ) : null}
-
-      <section ref={ratingSectionRef} className="space-y-2">
-        <h2 className="text-sm font-semibold">{L("この添削の評価")}</h2>
-        <div className="flex gap-1" role="radiogroup" aria-label={L("評価")}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={stars === n}
-              aria-label={L("{n}つ星", { n })}
-              disabled={pending}
-              onClick={() => void post("rating", { stars: n })}
-              className={`text-3xl leading-none transition active:scale-[0.98] disabled:opacity-50 ${n <= stars ? "text-star" : "text-white/25"}`}
-            >
-              ★
-            </button>
-          ))}
-        </div>
-        {unrated && ratingNotice ? <p role="alert" className="text-sm text-red-400">{L("この添削の評価をつけてください")}</p> : null}
-      </section>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       {reported ? (

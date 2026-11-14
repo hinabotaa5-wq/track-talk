@@ -163,7 +163,7 @@ function CoachingContractView() {
       {!isCoach && contract.minor && contract.status === "accepted" ? <GuardianLinkForm token={token} /> : null}
 
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
-        <CoachingMessages contract={contract} token={token} onContractChange={setContract} />
+        <CoachingMessages contract={contract} token={token} />
       ) : null}
 
       {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={token} /> : null}

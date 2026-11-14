@@ -62,7 +62,7 @@ function reviewRequest(id: string) {
 function mockAll(overrides: Record<string, unknown> = {}) {
   apiFetch.mockImplementation((path: string) => {
     if (path === "/v1/coach/me") {
-      return Promise.resolve({ application, rating: { count: 3, average: 4.5, paused: false } });
+      return Promise.resolve({ application, rating: { count: 3, average: 4.5, paused: overrides.paused === true } });
     }
     if (path === "/v1/coach/requests") {
       return Promise.resolve({
@@ -145,13 +145,22 @@ it("ランチャーは9タイルの入口だけで（カレンダーは廃止）
   expect(container.textContent).not.toContain("対応待ちの追加相談");
   expect(container.textContent).not.toContain("受け取り口座を登録する");
   expect(container.querySelector('a[href="/me/coaching"]')).toBeNull();
-  // ステータスバーは従来どおり操作できる。
+  // ステータスバーは従来どおり操作できる。評価の平均・件数と paused 注記は出ない。
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
   expect(container.querySelector("select")).toBeNull();
-  expect(container.textContent).toContain("★4.5（3件）");
+  expect(container.textContent).not.toContain("★4.5（3件）");
+  expect(container.textContent).not.toContain("依頼が回ってきません");
   // フッターは要約1行とやめる導線だけ。
   expect(container.textContent).toContain("未払い1,050円");
   expect(container.querySelector('a[href="/coach/withdraw"]')).not.toBeNull();
+});
+
+it("paused が true でも平均・注記の評価表示は出ない", async () => {
+  mockAll({ paused: true });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).not.toContain("★4.5（3件）");
+  expect(container.textContent).not.toContain("依頼が回ってきません");
+  expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
 });
 
 it("バッジは実件数と一致し、未登録の点は条件の時だけ出す", async () => {

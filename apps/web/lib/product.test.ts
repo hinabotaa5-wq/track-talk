@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { currentRanking } from "./product";
+import { currentRanking, ratingText } from "./product";
+
+it("商品レビューの平均と件数は星付きで表示する", () => {
+  expect(ratingText(4.2, 5)).toBe("★4.2（5件）");
+});
 
 describe("currentRanking", () => {
   const shoe = { kind: "shoe" as const, event: "100m", products: [] };

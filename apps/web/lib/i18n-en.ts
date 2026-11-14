@@ -369,7 +369,6 @@ export const en: Readonly<Record<string, string>> = {
   "通報できませんでした": "Couldn't report",
   "アドバイスは役に立ちましたか": "Was the advice helpful?",
   "この添削の評価": "Rate this review",
-  "この添削の評価をつけてください": "Please rate this review",
   "評価": "Rating ",
   "相談を読み込めませんでした。": "Couldn't load the consultation.",
   "相談の一覧へ": "Back to consultations",

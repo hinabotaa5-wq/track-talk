@@ -58,7 +58,7 @@ export default function GuardianContractPage() {
         {contract.starts_at ? <p className="text-sm text-slate-200">{L("期間: {v0}", { v0: contractPeriod(contract) })}</p> : null}
       </section>
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
-        <CoachingMessages contract={contract} token={null} guardianToken={token} onContractChange={setContract} />
+        <CoachingMessages contract={contract} token={null} guardianToken={token} />
       ) : null}
       {contract.fulfillment_version === 1 ? <CoachingSupportPanel contract={contract} token={null} guardianToken={token} /> : null}
       {contract.fulfillment_version === 2 ? <CoachingInPersonPanel contract={contract} token={null} guardianToken={token} /> : null}

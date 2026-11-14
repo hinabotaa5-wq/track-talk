@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 const render = async (c: CoachingContract, guardianToken?: string) => {
-  await act(async () => root.render(<CoachingMessages contract={c} token="t" guardianToken={guardianToken} onContractChange={vi.fn()} />));
+  await act(async () => root.render(<CoachingMessages contract={c} token="t" guardianToken={guardianToken} />));
   await act(async () => { await Promise.resolve(); });
 };
 const coachMsg = { id: "m1", sender_role: "coach", mine: false, sender_active: true, body: "よろしく", video_url: null, thumbnail_url: null, menu: { title: "1週目", period: "12/1〜12/7", note: "スタートを固める", days: [{ day: "月", content: "30m×6" }] }, created_at: "2026-12-01T00:00:00Z" };
@@ -79,4 +79,20 @@ it("終わったら見られず、ダウンロードもできない。通報・�
   expect(container.textContent).toContain("通報・紛争の対応中のため、対応が終わるまで読むことだけができます");
   expect(container.textContent).toContain("動画は保存期間（契約の終わりから30日）を過ぎたため削除しました");
   expect(container.querySelector('textarea[aria-label="メッセージ"]')).toBeNull();
+});
+
+it("終わった契約では評価フォームを出さない", async () => {
+  apiFetch.mockResolvedValue({ messages: [coachMsg], view_closed: false, view_until: null });
+  await render({ ...base, status: "ended", messages_view_until: "2026-12-20T15:00:00Z" } as CoachingContract);
+  expect(container.textContent).toContain("期間が終わりました");
+  expect(container.textContent).not.toContain("このパーソナル指導の評価");
+  expect(container.querySelector('[role="radiogroup"]')).toBeNull();
+});
+
+it("消去済みのやりとりでは評価フォームを出さない", async () => {
+  apiFetch.mockResolvedValue({ messages: [], view_closed: true, view_until: null });
+  await render({ ...base, status: "ended", messages_purged_at: "2027-12-20T15:00:00Z" } as CoachingContract);
+  expect(container.textContent).toContain("やりとり（文章と動画）は消しました");
+  expect(container.textContent).not.toContain("このパーソナル指導の評価");
+  expect(container.querySelector('[role="radiogroup"]')).toBeNull();
 });

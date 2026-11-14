@@ -111,6 +111,8 @@ it("プロフィールは種目チップ・目立つ記録・箇条書きの実�
   expect(sns?.textContent).toContain("@testcoach");
   expect(sns?.textContent).not.toContain("utm_source");
   expect(container.textContent).toContain("note-test");
+  expect(container.textContent).not.toContain("評価はまだありません");
+  expect(container.querySelector('[aria-label="評価"]')).toBeNull();
 });
 
 it("英語では依頼ボタンと注記を英語で出す", async () => {

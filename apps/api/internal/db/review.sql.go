@@ -200,33 +200,16 @@ WHERE c.status = 'approved'
   AND c.tier = $1
   AND $2::text = ANY (c.events)
   AND c.profile_id <> $3
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= $4::int
-       AND avg(rt.stars)::float8 < $5::float8
-  )
 `
 
 type CountOnDutyCoachesParams struct {
 	Tier        string    `json:"tier"`
 	Event       string    `json:"event"`
 	RequesterID uuid.UUID `json:"requester_id"`
-	MinRatings  int32     `json:"min_ratings"`
-	LowStars    float64   `json:"low_stars"`
 }
 
 func (q *Queries) CountOnDutyCoaches(ctx context.Context, arg CountOnDutyCoachesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countOnDutyCoaches,
-		arg.Tier,
-		arg.Event,
-		arg.RequesterID,
-		arg.MinRatings,
-		arg.LowStars,
-	)
+	row := q.db.QueryRow(ctx, countOnDutyCoaches, arg.Tier, arg.Event, arg.RequesterID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -767,16 +750,7 @@ WHERE c.status = 'approved'
   AND ($3::uuid IS NULL OR c.profile_id = $3::uuid)
   AND $4::text = ANY (c.events)
   AND c.profile_id <> $5
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= $6::int
-       AND avg(rt.stars)::float8 < $7::float8
-  )
-ORDER BY md5(c.profile_id::text || extract(epoch FROM $8::timestamptz)::bigint::text)
+ORDER BY md5(c.profile_id::text || extract(epoch FROM $6::timestamptz)::bigint::text)
 LIMIT 200
 `
 
@@ -786,8 +760,6 @@ type ListReviewNomineesParams struct {
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	Event            string     `json:"event"`
 	RequesterID      uuid.UUID  `json:"requester_id"`
-	MinRatings       int32      `json:"min_ratings"`
-	LowStars         float64    `json:"low_stars"`
 	DayStart         time.Time  `json:"day_start"`
 }
 
@@ -810,8 +782,6 @@ func (q *Queries) ListReviewNominees(ctx context.Context, arg ListReviewNominees
 		arg.RequestedCoachID,
 		arg.Event,
 		arg.RequesterID,
-		arg.MinRatings,
-		arg.LowStars,
 		arg.DayStart,
 	)
 	if err != nil {
@@ -932,15 +902,6 @@ WHERE c.status = 'approved'
   AND ($2::uuid IS NULL OR c.profile_id = $2::uuid)
   AND $3::text = ANY (c.events)
   AND c.profile_id <> $4
-  AND NOT EXISTS (
-    -- 評価が低いコーチは順番から外す（評価が min_ratings 件以上で、平均の★が low_stars 未満）。
-    SELECT 1 FROM review_ratings rt
-    JOIN review_responses rs ON rs.request_id = rt.request_id
-    WHERE rs.coach_id = c.profile_id
-      AND rt.rated_at > coalesce(c.rating_reset_at, '-infinity')
-    HAVING count(rt.stars) >= $5::int
-       AND avg(rt.stars)::float8 < $6::float8
-  )
 ORDER BY c.last_offered_at NULLS FIRST, c.applied_at
 LIMIT 1 FOR NO KEY UPDATE
 `
@@ -950,8 +911,6 @@ type PickCoachForRequestParams struct {
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	Event            string     `json:"event"`
 	RequesterID      uuid.UUID  `json:"requester_id"`
-	MinRatings       int32      `json:"min_ratings"`
-	LowStars         float64    `json:"low_stars"`
 }
 
 // 種目が合う受付中のコーチのうち、最後の割り当てが一番古い人。
@@ -961,8 +920,6 @@ func (q *Queries) PickCoachForRequest(ctx context.Context, arg PickCoachForReque
 		arg.RequestedCoachID,
 		arg.Event,
 		arg.RequesterID,
-		arg.MinRatings,
-		arg.LowStars,
 	)
 	var profile_id uuid.UUID
 	err := row.Scan(&profile_id)

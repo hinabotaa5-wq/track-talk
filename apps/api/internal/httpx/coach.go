@@ -183,15 +183,10 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 		"rating": map[string]any{
 			"count":   rating.Count,
 			"average": rating.Average,
-			// 評価が低く、いまは依頼が回ってこない状態か。
-			"paused": lowRated(rating.Count, rating.Average),
+			// 評価制度の廃止により、依頼が回ってこない状態はもうない。
+			"paused": false,
 		},
 	})
-}
-
-// lowRated は、評価が低くて打診の順番から外れているか。PickCoachForRequest と同じ基準。
-func lowRated(count int32, average float64) bool {
-	return count >= lowRatingMinCount && average < lowRatingStars
 }
 
 type coachApplicationReq struct {
@@ -467,13 +462,13 @@ func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
 	}
 	type application struct {
 		db.ListCoachApplicationsRow
-		// 評価が低くて打診の順番から外れているか。
+		// 評価制度の廃止により、依頼が回ってこない状態はもうない（形状維持のための常時 false）。
 		RatingPaused bool   `json:"rating_paused"`
 		PhotoURL     string `json:"photo_url"`
 	}
 	out := make([]application, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, application{row, lowRated(row.RatingCount, row.RatingAverage), s.coachPhotoURL(row.PhotoPublicID)})
+		out = append(out, application{row, false, s.coachPhotoURL(row.PhotoPublicID)})
 	}
 	JSON(w, http.StatusOK, map[string]any{"applications": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }

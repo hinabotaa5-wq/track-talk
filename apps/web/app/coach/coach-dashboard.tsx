@@ -10,14 +10,13 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
 import { formatYen } from "@/lib/format";
-import { t, type Locale, L } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import type {
   CoachApplication,
   CoachEarnings,
   CoachIdentityStatus,
   CoachingContract,
-  CoachRatingSummary,
   CoachRequests,
 } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -153,7 +152,7 @@ export function CoachDashboard() {
   const locale = useLocale();
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
-  const [rating, setRating] = useState<CoachRatingSummary | null>(null);
+
   const [offers, setOffers] = useState<CoachRequests | null>(null);
   const [consultations, setConsultations] = useState(0);
   const [appliedContracts, setAppliedContracts] = useState(0);
@@ -171,11 +170,10 @@ export function CoachDashboard() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    apiFetch<{ application: CoachApplication | null; rating?: CoachRatingSummary }>("/v1/coach/me", { token })
+    apiFetch<{ application: CoachApplication | null }>("/v1/coach/me", { token })
       .then((c) => {
         if (cancelled) return;
         setCoach(c.application);
-        setRating(c.rating ?? null);
       })
       .catch(() => {
         if (!cancelled) setError(t(locale, "coach.loadError"));
@@ -268,9 +266,6 @@ export function CoachDashboard() {
           <CoachAvatar url={coach.photo_url} name={coach.name || profile?.nickname || null} size={40} />
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold leading-tight">{coach.on_duty ? t(locale, "coach.onDuty") : t(locale, "coach.offDuty")}</p>
-            {rating && rating.count > 0 ? (
-              <p className="text-xs text-slate-200">{L("★{v0}（{count}件）", { v0: rating.average.toFixed(1), count: rating.count })}</p>
-            ) : null}
           </div>
           <button
             type="button"
@@ -287,11 +282,6 @@ export function CoachDashboard() {
           </button>
         </div>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {rating?.paused ? (
-          <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">
-            {t(locale, "coach.pausedNote")}
-          </p>
-        ) : null}
       </section>
 
       <CoachTiles label={t(locale, "coach.menu")}>

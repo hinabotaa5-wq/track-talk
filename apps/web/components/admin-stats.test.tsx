@@ -109,3 +109,25 @@ it("shows app-only usage and account counts without Umami operation totals", asy
     await act(async () => root.unmount());
   }
 });
+
+it("shows coaching demand without the star average column", async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const events = [{
+    event: "100m", event_label: "100m", coaches: 2, on_duty: 1, requests: 5, returned: 4,
+    expired: 1, median_hours: 3.5, rated: 4, avg_stars: 2.5, helpful_answers: 3,
+    helpful_yes: 2, applied: 1, started: 1, lost: 0, started_yen: 22000,
+  }];
+  vi.mocked(apiFetch)
+    .mockResolvedValueOnce({ ...stats })
+    .mockResolvedValueOnce({ days: 90, events });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<AdminStatsView token="admin-token" />));
+    expect(container.textContent).toContain("コーチングの需要と供給");
+    expect(container.textContent).not.toContain("★平均");
+    expect(container.textContent).toContain("役に立った");
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
