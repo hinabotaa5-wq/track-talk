@@ -4,6 +4,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeleteAccountPage from "./page";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 
 const { state, signInWithPassword, apiFetch, signOut, replace } = vi.hoisted(() => ({
   state: {
@@ -120,6 +122,37 @@ describe("DeleteAccountPage", () => {
     if (!link) throw new Error("withdraw link missing");
     expect(link.className).toContain("text-blue-300");
     await view.unmount();
+  });
+
+  it("退会画面は退会の前提つきで案内し、無条件の旧文を残さない（#717 残件1）", async () => {
+    apiFetch.mockResolvedValue({ auth_deleted: true });
+    const view = await renderPage();
+    await act(async () => {});
+    const text = view.div.textContent ?? "";
+    // (a) 進行中・未解決の対応がある間は退会できない。(b) 削除はその後。(c) 取引記録は保持。
+    expect(text).toContain("終わっていないときは退会できません");
+    expect(text).toContain("対応が終わったあとに退会すると、あなたの指導の契約とやりとりも削除されます");
+    expect(text).toContain("取引に関する記録はプライバシーポリシーに定める期間は退会後も保管します");
+    expect(text).not.toContain("オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます");
+    await view.unmount();
+  });
+
+  it("退会画面の英語も前提つきで、旧文を残さない（#717 残件1）", async () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      apiFetch.mockResolvedValue({ auth_deleted: true });
+      const view = await renderPage();
+      await act(async () => {});
+      const text = view.div.textContent ?? "";
+      expect(text).toContain("you cannot delete your account until they are done");
+      expect(text).toContain("deleting your account also deletes your coaching contracts and messages");
+      expect(text).toContain("Transaction records are kept after deletion");
+      expect(text).not.toContain("If you're providing online coaching");
+      await view.unmount();
+    } finally {
+      setActiveLocale("ja");
+    }
   });
 
   it("keeps the withdraw link style and wording unchanged", async () => {
