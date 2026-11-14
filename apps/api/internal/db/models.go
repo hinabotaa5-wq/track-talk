@@ -485,10 +485,14 @@ type CoachingPlan struct {
 }
 
 type CoachingReferralCode struct {
-	OwnerID  uuid.UUID `json:"owner_id"`
-	Code     string    `json:"code"`
-	IssuedAt time.Time `json:"issued_at"`
-	IssuedBy string    `json:"issued_by"`
+	OwnerID                uuid.UUID  `json:"owner_id"`
+	Code                   string     `json:"code"`
+	IssuedAt               time.Time  `json:"issued_at"`
+	IssuedBy               string     `json:"issued_by"`
+	ClosedAt               *time.Time `json:"closed_at"`
+	VoidedAt               *time.Time `json:"voided_at"`
+	OriginTicketPurchaseID *uuid.UUID `json:"origin_ticket_purchase_id"`
+	OriginReviewPaymentID  *uuid.UUID `json:"origin_review_payment_id"`
 }
 
 type CoachingReferralCount struct {
@@ -499,6 +503,7 @@ type CoachingReferralCount struct {
 	ReviewPaymentID  *uuid.UUID `json:"review_payment_id"`
 	CountedAt        time.Time  `json:"counted_at"`
 	CanceledAt       *time.Time `json:"canceled_at"`
+	ReferralCode     *string    `json:"referral_code"`
 }
 
 type CoachingReferralReward struct {
@@ -509,6 +514,7 @@ type CoachingReferralReward struct {
 	GrantedAt          time.Time  `json:"granted_at"`
 	CanceledAt         *time.Time `json:"canceled_at"`
 	QualifyingRefundAt *time.Time `json:"qualifying_refund_at"`
+	ReferralCode       *string    `json:"referral_code"`
 }
 
 type CoachingTicketAllocation struct {

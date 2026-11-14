@@ -13,14 +13,16 @@ import (
 )
 
 const adminCoachingReferralOverview = `-- name: AdminCoachingReferralOverview :many
-SELECT c.code, p.id AS owner_id, p.nickname,
+SELECT c.code, p.id AS owner_id, p.nickname, c.issued_at, c.closed_at,
     ARRAY(SELECT a.buyer_id::text FROM coaching_referral_counts a
-          WHERE a.referrer_id = c.owner_id AND a.canceled_at IS NULL AND a.buyer_id IS NOT NULL
+          WHERE a.referral_code = c.code AND a.canceled_at IS NULL AND a.buyer_id IS NOT NULL
           ORDER BY a.counted_at)::text[] AS buyers,
     r.granted_at, r.canceled_at, r.qualifying_refund_at
 FROM coaching_referral_codes c
 JOIN profiles p ON p.id = c.owner_id
-LEFT JOIN coaching_referral_rewards r ON r.referrer_id = c.owner_id
+LEFT JOIN coaching_referral_rewards r ON r.lot_id = (
+    SELECT x.lot_id FROM coaching_referral_rewards x WHERE x.referral_code = c.code
+    ORDER BY x.canceled_at IS NULL DESC, x.granted_at DESC LIMIT 1)
 WHERE ($1::text = '' AND r.lot_id IS NOT NULL) OR c.code = $1::text
 ORDER BY r.granted_at DESC NULLS LAST, c.code
 LIMIT 200
@@ -30,6 +32,8 @@ type AdminCoachingReferralOverviewRow struct {
 	Code               string     `json:"code"`
 	OwnerID            uuid.UUID  `json:"owner_id"`
 	Nickname           *string    `json:"nickname"`
+	IssuedAt           time.Time  `json:"issued_at"`
+	ClosedAt           *time.Time `json:"closed_at"`
 	Buyers             []string   `json:"buyers"`
 	GrantedAt          *time.Time `json:"granted_at"`
 	CanceledAt         *time.Time `json:"canceled_at"`
@@ -49,6 +53,8 @@ func (q *Queries) AdminCoachingReferralOverview(ctx context.Context, code string
 			&i.Code,
 			&i.OwnerID,
 			&i.Nickname,
+			&i.IssuedAt,
+			&i.ClosedAt,
 			&i.Buyers,
 			&i.GrantedAt,
 			&i.CanceledAt,
@@ -64,6 +70,15 @@ func (q *Queries) AdminCoachingReferralOverview(ctx context.Context, code string
 	return items, nil
 }
 
+const cancelDisputedCoachingReferral = `-- name: CancelDisputedCoachingReferral :exec
+SELECT coaching_cancel_referral_for_payment_intent($1::text)
+`
+
+func (q *Queries) CancelDisputedCoachingReferral(ctx context.Context, dollar_1 string) error {
+	_, err := q.db.Exec(ctx, cancelDisputedCoachingReferral, dollar_1)
+	return err
+}
+
 const cancelReleasedReferralReward = `-- name: CancelReleasedReferralReward :exec
 UPDATE coaching_referral_rewards SET canceled_at = now()
 WHERE lot_id = $1 AND qualifying_refund_at IS NOT NULL AND canceled_at IS NULL
@@ -75,53 +90,52 @@ func (q *Queries) CancelReleasedReferralReward(ctx context.Context, lotID uuid.U
 	return err
 }
 
-const countCoachingReferral = `-- name: CountCoachingReferral :one
-SELECT COALESCE(coaching_count_referral($1::uuid, $2::text,
-    $3::uuid, $4::uuid)::text, '')::text AS recipient
+const coachingReferralAlreadyCounted = `-- name: CoachingReferralAlreadyCounted :one
+SELECT EXISTS (SELECT FROM coaching_referral_codes c JOIN coaching_referral_counts a ON a.referrer_id = c.owner_id
+    WHERE c.code = $1 AND a.buyer_id = $2::uuid AND a.canceled_at IS NULL)::boolean
 `
 
-type CountCoachingReferralParams struct {
-	Buyer     uuid.UUID  `json:"buyer"`
-	Code      string     `json:"code"`
-	TicketID  *uuid.UUID `json:"ticket_id"`
-	PaymentID *uuid.UUID `json:"payment_id"`
+type CoachingReferralAlreadyCountedParams struct {
+	Code  string    `json:"code"`
+	Buyer uuid.UUID `json:"buyer"`
 }
 
-func (q *Queries) CountCoachingReferral(ctx context.Context, arg CountCoachingReferralParams) (string, error) {
-	row := q.db.QueryRow(ctx, countCoachingReferral,
-		arg.Buyer,
-		arg.Code,
-		arg.TicketID,
-		arg.PaymentID,
-	)
-	var recipient string
-	err := row.Scan(&recipient)
-	return recipient, err
+// 入力された紹介IDの紹介者に、この購入者がすでに有効カウントされているか。
+func (q *Queries) CoachingReferralAlreadyCounted(ctx context.Context, arg CoachingReferralAlreadyCountedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, coachingReferralAlreadyCounted, arg.Code, arg.Buyer)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getCoachingReferralProgress = `-- name: GetCoachingReferralProgress :one
-SELECT c.code,
+SELECT c.code, (c.closed_at IS NULL)::boolean AS active,
     (SELECT count(*)::int FROM coaching_referral_counts a
-     WHERE a.referrer_id = c.owner_id AND a.canceled_at IS NULL) AS friend_count,
+     WHERE a.referral_code = c.code AND a.canceled_at IS NULL) AS friend_count,
     r.granted_at, l.expires_at
 FROM coaching_referral_codes c
-LEFT JOIN coaching_referral_rewards r ON r.referrer_id = c.owner_id AND r.canceled_at IS NULL
+LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
 LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
 WHERE c.owner_id = $1
+ORDER BY c.closed_at IS NULL DESC, c.issued_at DESC
+LIMIT 1
 `
 
 type GetCoachingReferralProgressRow struct {
 	Code        string     `json:"code"`
+	Active      bool       `json:"active"`
 	FriendCount int32      `json:"friend_count"`
 	GrantedAt   *time.Time `json:"granted_at"`
 	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
+// 有効な周があればそれを、なければ直近に終了した周を返す。進捗は周に所属する。
 func (q *Queries) GetCoachingReferralProgress(ctx context.Context, ownerID uuid.UUID) (GetCoachingReferralProgressRow, error) {
 	row := q.db.QueryRow(ctx, getCoachingReferralProgress, ownerID)
 	var i GetCoachingReferralProgressRow
 	err := row.Scan(
 		&i.Code,
+		&i.Active,
 		&i.FriendCount,
 		&i.GrantedAt,
 		&i.ExpiresAt,
@@ -130,7 +144,10 @@ func (q *Queries) GetCoachingReferralProgress(ctx context.Context, ownerID uuid.
 }
 
 const getUsableCoachingReferral = `-- name: GetUsableCoachingReferral :one
-SELECT code FROM coaching_referral_codes WHERE code = $1 AND owner_id <> $2::uuid
+SELECT c.code FROM coaching_referral_codes c
+WHERE c.code = $1 AND c.owner_id <> $2::uuid AND c.closed_at IS NULL
+  AND NOT EXISTS (SELECT FROM coaching_referral_counts a
+                  WHERE a.referrer_id = c.owner_id AND a.buyer_id = $2::uuid AND a.canceled_at IS NULL)
 `
 
 type GetUsableCoachingReferralParams struct {
@@ -138,6 +155,7 @@ type GetUsableCoachingReferralParams struct {
 	Buyer uuid.UUID `json:"buyer"`
 }
 
+// 使える紹介ID：他人の・終了していないIDで、その紹介者に有効カウント済みの購入者ではない。
 func (q *Queries) GetUsableCoachingReferral(ctx context.Context, arg GetUsableCoachingReferralParams) (string, error) {
 	row := q.db.QueryRow(ctx, getUsableCoachingReferral, arg.Code, arg.Buyer)
 	var code string
@@ -145,13 +163,44 @@ func (q *Queries) GetUsableCoachingReferral(ctx context.Context, arg GetUsableCo
 	return code, err
 }
 
-const issueCoachingReferral = `-- name: IssueCoachingReferral :exec
-SELECT coaching_issue_referral($1::uuid, 'purchase')
+const issueCoachingReferralOrigin = `-- name: IssueCoachingReferralOrigin :exec
+SELECT coaching_issue_referral_code($1::uuid, 'purchase', NULL, $2::uuid)
 `
 
-func (q *Queries) IssueCoachingReferral(ctx context.Context, dollar_1 uuid.UUID) error {
-	_, err := q.db.Exec(ctx, issueCoachingReferral, dollar_1)
+type IssueCoachingReferralOriginParams struct {
+	Owner     uuid.UUID  `json:"owner"`
+	PaymentID *uuid.UUID `json:"payment_id"`
+}
+
+// 単発カードの仮押さえ時点の起点購入として紹介IDを発行する（有効なIDがあれば何もしない）。
+func (q *Queries) IssueCoachingReferralOrigin(ctx context.Context, arg IssueCoachingReferralOriginParams) error {
+	_, err := q.db.Exec(ctx, issueCoachingReferralOrigin, arg.Owner, arg.PaymentID)
 	return err
+}
+
+const recordCoachingReferral = `-- name: RecordCoachingReferral :one
+SELECT COALESCE(coaching_record_referral($1::uuid, $2::text,
+    $3::uuid, $4::uuid)::text, '')::text AS recipient
+`
+
+type RecordCoachingReferralParams struct {
+	Buyer     uuid.UUID  `json:"buyer"`
+	Code      *string    `json:"code"`
+	TicketID  *uuid.UUID `json:"ticket_id"`
+	PaymentID *uuid.UUID `json:"payment_id"`
+}
+
+// 確定した対象購入を記録する（入力IDで数え、有効カウントが紐付かなければ起点としてIDを発行）。
+func (q *Queries) RecordCoachingReferral(ctx context.Context, arg RecordCoachingReferralParams) (string, error) {
+	row := q.db.QueryRow(ctx, recordCoachingReferral,
+		arg.Buyer,
+		arg.Code,
+		arg.TicketID,
+		arg.PaymentID,
+	)
+	var recipient string
+	err := row.Scan(&recipient)
+	return recipient, err
 }
 
 const referralRewardHasRefund = `-- name: ReferralRewardHasRefund :one

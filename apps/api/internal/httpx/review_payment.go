@@ -242,6 +242,12 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		if status == "captured" && pay.AmountYen == reviewPriceYen {
 			return recordCoachingReferral(ctx, q, pay.PayerID, nil, &pay.ID, pay.ReferralCode)
 		}
+		// 単発カードは決済完了（仮押さえ）の時点で紹介IDを発行し、カウントは capture で行う（本体 #686）。
+		// 紹介IDを入れた購入は capture で数えられ得るので、ここでは起点にしない（数えられなければ capture で発行）。
+		// この起点の周は capture まで付与を保留し、仮押さえが解放されたら DB のトリガーで無効になる。
+		if status == "authorized" && pay.AmountYen == reviewPriceYen && pay.PayerID != nil && pay.ReferralCode == nil {
+			return q.IssueCoachingReferralOrigin(ctx, db.IssueCoachingReferralOriginParams{Owner: *pay.PayerID, PaymentID: &pay.ID})
+		}
 		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {

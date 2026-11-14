@@ -43,7 +43,7 @@ it("決済確認中は購入を止め、確定後に紹介IDと元の画面へ�
   vi.useFakeTimers(); mocks.query = "purchase=payment-id";
   let paid = false;
   mocks.api.mockImplementation(async (path: string) => path.endsWith("/referral")
-    ? { referral: { code: "K7M3QX", friend_count: 0, granted_at: null, expires_at: null } }
+    ? { referral: { code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null } }
     : path.includes("/purchases/")
     ? { status: paid ? "paid" : "pending", return_path: "/coaching/new" }
     : { ...initial, balance: { available: paid ? 6 : 0, reserved: 0 } });

@@ -39,6 +39,8 @@ export const ticketLedgerLabels: Record<string, string> = {
 
 export type Referral = {
   code: string;
+  // false は終了した周（達成済み、または起点の支払いがなく無効になった周）。
+  active: boolean;
   friend_count: number;
   granted_at: string | null;
   expires_at: string | null;
