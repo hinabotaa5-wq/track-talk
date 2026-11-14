@@ -2,7 +2,7 @@
 import { act, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { expect, it, vi } from "vitest";
-import { LeaveGuardProvider, useLeaveGuard } from "@/components/leave-guard";
+import { LeaveGuardProvider } from "@/components/leave-guard";
 import ReviewRequestPage from "./page";
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -128,11 +128,6 @@ function listLink(container: HTMLDivElement) {
   return link as HTMLAnchorElement;
 }
 
-function ratingNotice(container: HTMLDivElement) {
-  return Array.from(container.querySelectorAll('[role="alert"]')).find((el) =>
-    el.textContent?.includes("この添削の評価をつけてください"));
-}
-
 async function click(element: Element) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
@@ -158,7 +153,7 @@ it("返却後の質問には有料の追加質問だけを表示する", async (
   }
 });
 
-it("未評価では依頼の一覧へを押しても遷移せず評価の文言が出る", async () => {
+it("返却済みの依頼詳細に星セクションは出ない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -167,57 +162,34 @@ it("未評価では依頼の一覧へを押しても遷移せず評価の文言�
   });
   const { container, root } = await renderPage();
   try {
-    expect(ratingNotice(container)).toBeUndefined();
-    await click(listLink(container));
-    expect(routerMock.push).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
-    // 出しっぱなしでよい：もう一度押しても文言は残り、遷移しない。
-    await click(listLink(container));
-    expect(routerMock.push).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
+    expect(container.textContent).toContain("腕振り");
+    expect(container.textContent).not.toContain("この添削の評価");
+    expect(container.textContent).not.toContain("この添削の評価をつけてください");
+    expect(container.querySelector('button[role="radio"]')).toBeNull();
+    expect(container.querySelectorAll('button[aria-label$="つ星"]')).toHaveLength(0);
   } finally {
     await teardown(root, container);
   }
 });
 
-it("未評価ではconfirmLeave経由の離脱（ヘッダー戻る相当）が止まる", async () => {
+it("未評価の返却済み依頼でも依頼の一覧へ遷移できる", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
     if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
     return baseRequest();
   });
-  let confirmLeave: ((go: () => void) => boolean) | null = null;
-  function Probe() {
-    confirmLeave = useLeaveGuard().confirmLeave;
-    return null;
-  }
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  await act(async () => root.render(
-    <LeaveGuardProvider>
-      <Probe />
-      <ReviewRequestPage />
-    </LeaveGuardProvider>,
-  ));
+  const { container, root } = await renderPage();
   try {
-    if (!confirmLeave) throw new Error("confirmLeave を取得できませんでした");
-    const go = vi.fn();
-    let blocked = false;
-    await act(async () => {
-      blocked = confirmLeave!(go);
-    });
-    expect(blocked).toBe(true);
-    expect(go).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
+    await click(listLink(container));
+    expect(routerMock.push).toHaveBeenCalledWith("/me/coaching/requests");
+    expect(container.textContent).not.toContain("この添削の評価をつけてください");
   } finally {
     await teardown(root, container);
   }
 });
 
-it("未評価ではコーチのプロフィールへのリンクも止まる", async () => {
+it("未評価の返却済み依頼でもコーチのプロフィールへ遷移できる", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -229,14 +201,13 @@ it("未評価ではコーチのプロフィールへのリンクも止まる", a
     const profile = container.querySelector('a[href="/coaches/coach-1"]');
     expect(profile).not.toBeNull();
     await click(profile!);
-    expect(routerMock.push).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
+    expect(routerMock.push).toHaveBeenCalledWith("/coaches/coach-1");
   } finally {
     await teardown(root, container);
   }
 });
 
-it("評価済みでは依頼の一覧へに遷移でき文言は出ない", async () => {
+it("評価済みのデータでも星セクションは出ない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -245,39 +216,8 @@ it("評価済みでは依頼の一覧へに遷移でき文言は出ない", asyn
   });
   const { container, root } = await renderPage();
   try {
-    await click(listLink(container));
-    expect(routerMock.push).toHaveBeenCalledWith("/me/coaching/requests");
-    expect(ratingNotice(container)).toBeUndefined();
-  } finally {
-    await teardown(root, container);
-  }
-});
-
-it("星の送信に成功すると文言が消え一覧へ遷移できる", async () => {
-  let stars: number | null = null;
-  apiFetch.mockImplementation(async (path: string) => {
-    const consultations = mockConsultationsEmpty(path);
-    if (consultations !== undefined) return consultations;
-    if (path === "/v1/coaching/requests/review-1/rating") {
-      stars = 3;
-      return baseRequest({ rating: { stars, helpful: null } });
-    }
-    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
-    return baseRequest({ rating: stars === null ? null : { stars, helpful: null } });
-  });
-  const { container, root } = await renderPage();
-  try {
-    await click(listLink(container));
-    expect(routerMock.push).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
-
-    const radios = container.querySelectorAll('button[role="radio"]');
-    expect(radios).toHaveLength(5);
-    await click(radios[2]);
-    await act(async () => {});
+    expect(container.querySelector('button[role="radio"]')).toBeNull();
     expect(container.textContent).not.toContain("この添削の評価をつけてください");
-
-    routerMock.push.mockClear();
     await click(listLink(container));
     expect(routerMock.push).toHaveBeenCalledWith("/me/coaching/requests");
   } finally {
@@ -285,29 +225,24 @@ it("星の送信に成功すると文言が消え一覧へ遷移できる", asyn
   }
 });
 
-it("星の送信が失敗するとガードが維持される", async () => {
+it("星の評価送信APIは呼ばれない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
-    if (path === "/v1/coaching/requests/review-1/rating") throw new Error("network error");
     if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
     return baseRequest();
   });
   const { container, root } = await renderPage();
   try {
-    const radios = container.querySelectorAll('button[role="radio"]');
-    await click(radios[3]);
-    await act(async () => {});
-    expect(container.textContent).toContain("送信に失敗しました");
     await click(listLink(container));
-    expect(routerMock.push).not.toHaveBeenCalled();
-    expect(ratingNotice(container)?.textContent).toContain("この添削の評価をつけてください");
+    expect(routerMock.push).toHaveBeenCalledWith("/me/coaching/requests");
+    expect(apiFetch.mock.calls.some(([path]) => String(path).endsWith("/rating"))).toBe(false);
   } finally {
     await teardown(root, container);
   }
 });
 
-it("返答がない依頼ではガードが働かず離脱できる", async () => {
+it("返答がない依頼では評価文言が出ず離脱できる", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -324,7 +259,7 @@ it("返答がない依頼ではガードが働かず離脱できる", async () =
   }
 });
 
-it("非表示の返答ではガードが働かず離脱できる", async () => {
+it("非表示の返答では星セクションが出ず離脱できる", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -334,9 +269,24 @@ it("非表示の返答ではガードが働かず離脱できる", async () => {
   const { container, root } = await renderPage();
   try {
     expect(container.querySelector('button[role="radio"]')).toBeNull();
-    expect(ratingNotice(container)).toBeUndefined();
     await click(listLink(container));
     expect(routerMock.push).toHaveBeenCalledWith("/me/coaching/requests");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("通報の導線は残る", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    const consultations = mockConsultationsEmpty(path);
+    if (consultations !== undefined) return consultations;
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return baseRequest();
+  });
+  const { container, root } = await renderPage();
+  try {
+    expect(container.querySelector("button")?.textContent).not.toBeNull();
+    expect(container.textContent).toContain("この返答を通報する");
   } finally {
     await teardown(root, container);
   }

@@ -226,7 +226,7 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 	}
 }
 
-func TestLowRatedCoachSkipped(t *testing.T) {
+func TestLowRatedCoachNotExcluded(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setupConfig(t, func(cfg *config.Config) { cfg.CoachingTickSecret = "tick-secret" })
 	tadmin := adminToken(t, h)
@@ -235,7 +235,7 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 		t.Fatalf("daily cap %d", rec.Code)
 	}
 
-	// ★1 を1件受けただけでは外れない。
+	// ★1 を5件受けても除外されない（評価制度は廃止）。
 	_, tu1 := demoRequester(t, h, tadmin)
 	id := acceptedReview(t, h, tadmin, ta, tu1)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", ta, responseBody()); rec.Code != http.StatusOK {
@@ -243,9 +243,6 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/rating", tu1, map[string]any{"stars": 1}); rec.Code != http.StatusOK {
 		t.Fatalf("rating %d", rec.Code)
-	}
-	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
-		t.Fatalf("paused too early %s", body)
 	}
 	// 同じような返却済みの依頼をあと4件足し、★1 を合わせて5件にする。
 	for i := 0; i < 4; i++ {
@@ -256,27 +253,31 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 			SELECT $1, coach_id, good_point, fix_points, drill FROM review_responses WHERE request_id = $2`, copied, id)
 		execSQLArgs(t, `INSERT INTO review_ratings (request_id, stars, rated_at) VALUES ($1, 1, now())`, copied)
 	}
-	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":true`) {
-		t.Fatalf("not paused %s", body)
+	// /v1/coach/me の paused は評価内容にかかわらず false（形状は維持）。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
+		t.Fatalf("paused %s", body)
 	}
 
-	// 平均が★3未満になったので、受付中でも打診されない。
+	// 候補に残り、稼働数に数えられる。
 	_, tu := demoRequester(t, h, tadmin)
-	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, `"coaches_on_duty":false`) {
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/nominees?event=100m", tu, nil).Body.String(); !strings.Contains(body, aID.String()) {
+		t.Fatalf("nominees %s", body)
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaching/estimate?tier=coach&event=100m", tu, nil).Body.String(); !strings.Contains(body, `"coaches_on_duty":true`) {
 		t.Fatalf("estimate %s", body)
 	}
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, reviewBodyFor(t, h, tu))
+	// 低評価のコーチを指名しても、評価を理由に拒否されない。
+	nominated := reviewBodyFor(t, h, tu)
+	nominated["requested_coach_id"] = aID.String()
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, nominated)
 	var created reviewRequestView
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
-	if rec.Code != http.StatusCreated || created.Status != "queued" {
+	if rec.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
 	}
-	if len(coachRequests(t, h, ta).Reviewing) != 0 {
-		t.Fatal("low-rated coach got an offer")
-	}
 
-	// 運営の画面では外れていることがわかり、戻すと待っていた依頼が回る。
-	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil).Body.String(); !strings.Contains(body, `"rating_paused":true`) {
+	// 運営の一覧の rating_paused も常に false。reset-rating 自体は残り、待っていた依頼を回せる。
+	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coach-applications?status=approved", tadmin, nil).Body.String(); !strings.Contains(body, `"rating_paused":false`) {
 		t.Fatalf("admin list %s", body)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+uuid.NewString()+"/reset-rating", tadmin, nil); rec.Code != http.StatusNotFound {
@@ -288,11 +289,8 @@ func TestLowRatedCoachSkipped(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/coaches/"+aID.String()+"/reset-rating", tadmin, nil); rec.Code != http.StatusOK {
 		t.Fatalf("reset %d %s", rec.Code, rec.Body.String())
 	}
-	if body := doJSON(t, h, http.MethodGet, "/v1/coach/me", ta, nil).Body.String(); !strings.Contains(body, `"paused":false`) {
-		t.Fatalf("still paused %s", body)
-	}
 	if offers := coachRequests(t, h, ta).Reviewing; len(offers) != 1 || offers[0].ID != created.ID {
-		t.Fatalf("A offers after reset %+v", offers)
+		t.Fatalf("offers after reset %+v", offers)
 	}
 }
 

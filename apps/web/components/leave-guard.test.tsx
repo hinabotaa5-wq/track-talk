@@ -43,59 +43,6 @@ async function renderProvider() {
   if (!guard) throw new Error("useLeaveGuard を取得できませんでした");
 }
 
-describe("評価必須ブロッカー", () => {
-  it("登録中は confirmLeave が onBlocked を呼んで止め、go を実行しない", async () => {
-    await renderProvider();
-    const onBlocked = vi.fn();
-    const go = vi.fn();
-    act(() => {
-      guard!.setBlocker(onBlocked);
-    });
-    let stopped = false;
-    act(() => {
-      stopped = guard!.confirmLeave(go);
-    });
-    expect(stopped).toBe(true);
-    expect(go).not.toHaveBeenCalled();
-    expect(onBlocked).toHaveBeenCalledTimes(1);
-  });
-
-  it("解除後は confirmLeave が通す（入力なしの場合）", async () => {
-    await renderProvider();
-    const onBlocked = vi.fn();
-    const go = vi.fn();
-    act(() => {
-      guard!.setBlocker(onBlocked);
-      guard!.setBlocker(null);
-    });
-    let stopped = true;
-    act(() => {
-      stopped = guard!.confirmLeave(go);
-    });
-    expect(stopped).toBe(false);
-    expect(go).not.toHaveBeenCalled();
-    expect(onBlocked).not.toHaveBeenCalled();
-  });
-
-  it("ブロッカーは dirty の確認ダイアログより優先される", async () => {
-    await renderProvider();
-    const onBlocked = vi.fn();
-    const go = vi.fn();
-    act(() => {
-      guard!.setDirty(true);
-      guard!.setBlocker(onBlocked);
-    });
-    let stopped = false;
-    act(() => {
-      stopped = guard!.confirmLeave(go);
-    });
-    expect(stopped).toBe(true);
-    expect(go).not.toHaveBeenCalled();
-    expect(onBlocked).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain("ページを離れますか？");
-  });
-});
-
 describe("既存の dirty 確認（回帰）", () => {
   it("入力中はダイアログを出し、離れるを選んだときだけ go を実行する", async () => {
     await renderProvider();

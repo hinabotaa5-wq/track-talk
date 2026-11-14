@@ -100,8 +100,6 @@
   --tt-orange-900: #ffedd5;
   --tt-orange-950: #fff7ed;
 
-  /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
-  --tt-star: #eab308;
 }
 
 :root[data-theme="dark"] {
@@ -195,8 +193,6 @@
   --tt-orange-900: #7c2d12;
   --tt-orange-950: #431407;
 
-  /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
-  --tt-star: #facc15;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -291,8 +287,6 @@
     --tt-orange-900: #7c2d12;
     --tt-orange-950: #431407;
 
-    /* 評価入力の選択済み星だけの黄色。注意色の amber とは別に保つ。 */
-    --tt-star: #facc15;
   }
 }
 
@@ -589,7 +583,6 @@ body {
   --color-yellow-800: var(--tt-amber-800);
   --color-yellow-900: var(--tt-amber-900);
   --color-yellow-950: var(--tt-amber-950);
-  --color-star: var(--tt-star);
   --font-sans: var(--font-geist-sans);
   /* 一番小さい文字が小さすぎるので、標準の 12px を 13px に上げる。11px 以下は使わない。 */
   --text-xs: 0.8125rem;

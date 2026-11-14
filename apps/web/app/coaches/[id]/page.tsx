@@ -86,9 +86,6 @@ function CoachDetail({ id }: { id: string }) {
             <CoachAvatar url={coach.photo_url} name={coach.nickname} size={112} />
             <div className="min-w-0 flex-1 space-y-1.5 break-words">
               <h1 className="text-2xl font-bold text-white">{coach.nickname ?? L("名前なし")}</h1>
-              {coach.rating_count !== undefined && coach.rating_average !== undefined ? (
-                <p className="text-sm text-slate-200">{coach.rating_count > 0 ? L("★{v0}", { v0: coach.rating_average.toFixed(1) }) : L("評価はまだありません")}</p>
-              ) : null}
               {coach.events.length ? <ul className="flex flex-wrap gap-1.5" aria-label={L("担当種目")}>
                 {coach.events.map((event) => <li key={event} className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{coachEventLabels[event]}</li>)}
               </ul> : null}

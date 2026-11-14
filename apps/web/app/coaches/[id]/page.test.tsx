@@ -113,6 +113,17 @@ it("プロフィールは種目チップ・目立つ記録・箇条書きの実�
   expect(container.textContent).toContain("note-test");
 });
 
+it("評価データがあっても平均評価（★）と「評価はまだありません」は出ない", async () => {
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaches/c1") return { ...coach, rating_count: 5, rating_average: 4.2 };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  expect(container.textContent).not.toContain("★");
+  expect(container.textContent).not.toContain("評価はまだありません");
+  expect(container.textContent).toContain("テストコーチ");
+});
+
 it("英語では依頼ボタンと注記を英語で出す", async () => {
   installEnglish(en);
   setActiveLocale("en");

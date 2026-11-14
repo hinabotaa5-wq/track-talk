@@ -344,7 +344,7 @@ export function AdminStatsView({ token }: { token: string | null }) {
         }`}
       >
         <Table
-          head={["種目", "コーチ", "受付中", "添削の依頼", "返した", "期限切れ", "返すまで(中央値)", "★平均", "役に立った", "指導の申し込み", "始まった", "成立しなかった", "始まった金額"]}
+          head={["種目", "コーチ", "受付中", "添削の依頼", "返した", "期限切れ", "返すまで(中央値)", "役に立った", "指導の申し込み", "始まった", "成立しなかった", "始まった金額"]}
           rows={coaching.events.map((e) => [
             e.event_label,
             e.coaches,
@@ -353,7 +353,6 @@ export function AdminStatsView({ token }: { token: string | null }) {
             e.returned,
             e.expired,
             e.returned > 0 ? `${e.median_hours.toFixed(1)}時間` : "-",
-            e.rated > 0 ? `${e.avg_stars.toFixed(1)}(${e.rated}件)` : "-",
             percent(e.helpful_yes, e.helpful_answers),
             e.applied,
             e.started,

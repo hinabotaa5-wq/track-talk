@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 const render = async (c: CoachingContract, guardianToken?: string) => {
-  await act(async () => root.render(<CoachingMessages contract={c} token="t" guardianToken={guardianToken} onContractChange={vi.fn()} />));
+  await act(async () => root.render(<CoachingMessages contract={c} token="t" guardianToken={guardianToken} />));
   await act(async () => { await Promise.resolve(); });
 };
 const coachMsg = { id: "m1", sender_role: "coach", mine: false, sender_active: true, body: "よろしく", video_url: null, thumbnail_url: null, menu: { title: "1週目", period: "12/1〜12/7", note: "スタートを固める", days: [{ day: "月", content: "30m×6" }] }, created_at: "2026-12-01T00:00:00Z" };
@@ -56,6 +56,15 @@ it("コーチにはメニュー作成のボタンと、返答の目安が出る"
   await render({ ...base, role: "coach", minor: false } as CoachingContract);
   expect(container.textContent).toContain("選手への返答は24時間以内を目安にしてください");
   expect([...container.querySelectorAll("button")].some((b) => b.textContent === "メニュー作成")).toBe(true);
+});
+
+it("終わっても評価フォームは出ない（星評価は廃止）", async () => {
+  apiFetch.mockResolvedValue({ messages: [coachMsg], view_closed: false, view_until: null });
+  await render({ ...base, status: "ended", rating: null } as CoachingContract);
+  expect(container.querySelector('[role="radiogroup"]')).toBeNull();
+  expect(container.querySelectorAll('button[role="radio"]')).toHaveLength(0);
+  expect(container.textContent).not.toContain("このパーソナル指導の評価");
+  expect(container.textContent).toContain("よろしく");
 });
 
 it("終わったら見られず、ダウンロードもできない。通報・紛争の対応中は読むだけで残る", async () => {
