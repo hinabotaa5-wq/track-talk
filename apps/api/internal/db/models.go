@@ -1328,22 +1328,23 @@ type SenseSummaryAttempt struct {
 }
 
 type SupportCoachAdvance struct {
-	EarningID   uuid.UUID `json:"earning_id"`
-	ContractID  uuid.UUID `json:"contract_id"`
-	ThroughDate time.Time `json:"through_date"`
-	ElapsedDays int32     `json:"elapsed_days"`
-	TotalDays   int32     `json:"total_days"`
-	AmountYen   int32     `json:"amount_yen"`
-	CreatedAt   time.Time `json:"created_at"`
+	EarningID   uuid.UUID  `json:"earning_id"`
+	ContractID  *uuid.UUID `json:"contract_id"`
+	ThroughDate time.Time  `json:"through_date"`
+	ElapsedDays int32      `json:"elapsed_days"`
+	TotalDays   int32      `json:"total_days"`
+	AmountYen   int32      `json:"amount_yen"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type SupportCoachSettlement struct {
-	ContractID  uuid.UUID `json:"contract_id"`
-	EarnedYen   int32     `json:"earned_yen"`
-	AdvancesYen int32     `json:"advances_yen"`
-	FinalYen    int32     `json:"final_yen"`
-	ClawbackYen int32     `json:"clawback_yen"`
-	CreatedAt   time.Time `json:"created_at"`
+	ContractID  *uuid.UUID `json:"contract_id"`
+	EarnedYen   int32      `json:"earned_yen"`
+	AdvancesYen int32      `json:"advances_yen"`
+	FinalYen    int32      `json:"final_yen"`
+	ClawbackYen int32      `json:"clawback_yen"`
+	CreatedAt   time.Time  `json:"created_at"`
+	ID          uuid.UUID  `json:"id"`
 }
 
 type SupportConsult struct {
@@ -1401,7 +1402,7 @@ type SupportContractStatement struct {
 }
 
 type SupportFaultDetermination struct {
-	ContractID     uuid.UUID  `json:"contract_id"`
+	ContractID     *uuid.UUID `json:"contract_id"`
 	Decision       string     `json:"decision"`
 	Reason         string     `json:"reason"`
 	DecidedBy      *uuid.UUID `json:"decided_by"`
@@ -1412,4 +1413,5 @@ type SupportFaultDetermination struct {
 	ReviewReason   *string    `json:"review_reason"`
 	ReviewedBy     *uuid.UUID `json:"reviewed_by"`
 	ReviewedAt     *time.Time `json:"reviewed_at"`
+	ID             uuid.UUID  `json:"id"`
 }

@@ -168,7 +168,7 @@ func recordSupportAdvances(ctx context.Context, q *db.Queries, now time.Time) (i
 			return n, err
 		}
 		if err := q.InsertSupportAdvance(ctx, db.InsertSupportAdvanceParams{
-			EarningID: e.ID, ContractID: r.ID, ThroughDate: through, ElapsedDays: int32(elapsed), TotalDays: int32(total), AmountYen: amount,
+			EarningID: e.ID, ContractID: &r.ID, ThroughDate: through, ElapsedDays: int32(elapsed), TotalDays: int32(total), AmountYen: amount,
 		}); err != nil {
 			return n, err
 		}
@@ -201,14 +201,14 @@ func finalizeSupportContract(ctx context.Context, q *db.Queries, ct db.CoachingC
 	} else if err != nil {
 		return db.SupportCoachSettlement{}, err
 	}
-	totals, err := q.SupportAdvanceTotals(ctx, ct.ID)
+	totals, err := q.SupportAdvanceTotals(ctx, &ct.ID)
 	if err != nil {
 		return db.SupportCoachSettlement{}, err
 	}
 	earned := supportCoachEarned(ct, paid.AmountYen, paid.RefundedYen)
 	final, clawback, dropUnpaid := supportSettle(earned, totals.PaidYen, totals.TotalYen-totals.PaidYen, paid.RefundedYen)
 	if dropUnpaid {
-		if err := q.DeleteUnpaidSupportAdvances(ctx, ct.ID); err != nil {
+		if err := q.DeleteUnpaidSupportAdvances(ctx, &ct.ID); err != nil {
 			return db.SupportCoachSettlement{}, err
 		}
 	}
@@ -238,7 +238,7 @@ func finalizeSupportContract(ctx context.Context, q *db.Queries, ct db.CoachingC
 		advances = totals.TotalYen
 	}
 	return q.InsertSupportSettlement(ctx, db.InsertSupportSettlementParams{
-		ContractID: ct.ID, EarnedYen: earned, AdvancesYen: advances, FinalYen: final, ClawbackYen: clawback,
+		ContractID: &ct.ID, EarnedYen: earned, AdvancesYen: advances, FinalYen: final, ClawbackYen: clawback,
 	})
 }
 
@@ -308,12 +308,12 @@ func (s *Server) adminEndSupportContract(w http.ResponseWriter, r *http.Request)
 			return err
 		}
 		if req.Cause == supportEndCoachFault {
-			if err := q.DeleteUnpaidSupportAdvances(r.Context(), ct.ID); err != nil {
+			if err := q.DeleteUnpaidSupportAdvances(r.Context(), &ct.ID); err != nil {
 				return err
 			}
 		}
 		if needsReason {
-			if _, err := q.InsertFaultDetermination(r.Context(), db.InsertFaultDeterminationParams{ContractID: ct.ID, Decision: req.Cause, Reason: req.Reason, DecidedBy: &admin.ID}); err != nil {
+			if _, err := q.InsertFaultDetermination(r.Context(), db.InsertFaultDeterminationParams{ContractID: &ct.ID, Decision: req.Cause, Reason: req.Reason, DecidedBy: &admin.ID}); err != nil {
 				return err
 			}
 		}
@@ -375,7 +375,7 @@ func (s *Server) adminReviewSupportFault(w http.ResponseWriter, r *http.Request)
 		Error(w, http.StatusBadRequest, "validation_error", "再審査の理由を2000字以内で書いてください")
 		return
 	}
-	d, err := s.q.ReviewFaultDetermination(r.Context(), db.ReviewFaultDeterminationParams{ContractID: id, Decision: &req.Decision, Reason: &req.Reason, ReviewedBy: &admin.ID})
+	d, err := s.q.ReviewFaultDetermination(r.Context(), db.ReviewFaultDeterminationParams{ContractID: &id, Decision: &req.Decision, Reason: &req.Reason, ReviewedBy: &admin.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "再審査できる異議申立てがありません")
 		return
@@ -416,7 +416,7 @@ func (s *Server) adminFinalizeSupportFault(w http.ResponseWriter, r *http.Reques
 		if !ct.SupportCoachHold || ct.FulfillmentState != "settled" {
 			return &ticketRuleError{"conflict", "選手への返金が終わった、コーチ都合の契約だけを精算できます"}
 		}
-		d, err := q.GetFaultDetermination(r.Context(), ct.ID)
+		d, err := q.GetFaultDetermination(r.Context(), &ct.ID)
 		if err != nil {
 			return err
 		}
@@ -483,7 +483,7 @@ func (s *Server) objectSupportFault(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	d, err := s.q.ObjectFaultDetermination(r.Context(), db.ObjectFaultDeterminationParams{ContractID: id, Objection: &req.Objection})
+	d, err := s.q.ObjectFaultDetermination(r.Context(), db.ObjectFaultDeterminationParams{ContractID: &id, Objection: &req.Objection})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "異議申立てはできません（1回まで・精算の確定前のコーチ都合の判定のみ）")
 		return
@@ -533,17 +533,17 @@ func determinationJSON(d db.SupportFaultDetermination) map[string]any {
 // supportSettlementJSON は、契約の終わり方・仮払い・確定・判定・取引条件の明示をまとめる。
 func (s *Server) supportSettlementJSON(ctx context.Context, ct db.CoachingContract) (map[string]any, error) {
 	out := map[string]any{"contract": s.contractJSON(ct), "end_cause": ct.SupportEndCause, "end_on": ct.SupportEndOn, "coach_hold": ct.SupportCoachHold}
-	totals, err := s.q.SupportAdvanceTotals(ctx, ct.ID)
+	totals, err := s.q.SupportAdvanceTotals(ctx, &ct.ID)
 	if err != nil {
 		return nil, err
 	}
 	out["advances"] = map[string]any{"total_yen": totals.TotalYen, "paid_yen": totals.PaidYen}
-	if st, err := s.q.GetSupportSettlement(ctx, ct.ID); err == nil {
+	if st, err := s.q.GetSupportSettlement(ctx, &ct.ID); err == nil {
 		out["settlement"] = map[string]any{"earned_yen": st.EarnedYen, "advances_yen": st.AdvancesYen, "final_yen": st.FinalYen, "clawback_yen": st.ClawbackYen, "settled_at": st.CreatedAt}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
-	if d, err := s.q.GetFaultDetermination(ctx, ct.ID); err == nil {
+	if d, err := s.q.GetFaultDetermination(ctx, &ct.ID); err == nil {
 		out["determination"] = determinationJSON(d)
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
