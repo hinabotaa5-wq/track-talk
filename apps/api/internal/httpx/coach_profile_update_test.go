@@ -173,6 +173,12 @@ func TestCoachProfileUpdateValidation(t *testing.T) {
 		{"SNS4件", func(b map[string]any) {
 			b["sns_urls"] = []string{"a", "b", "c", "d"}
 		}, "sns_urls"},
+		{"SNSにjavascript", func(b map[string]any) {
+			b["sns_urls"] = []string{"javascript:alert(1)"}
+		}, "sns_urls"},
+		{"SNSにuserinfo", func(b map[string]any) {
+			b["sns_urls"] = []string{"https://user:pass@example.com/"}
+		}, "sns_urls"},
 		{"ひとこと101文字", func(b map[string]any) { b["hitokoto"] = strings.Repeat("あ", 101) }, "hitokoto"},
 		{"ひとこと改行", func(b map[string]any) { b["hitokoto"] = "1行目\n2行目" }, "hitokoto"},
 		{"ひとこと連絡先", func(b map[string]any) { b["hitokoto"] = "090-1234-5678" }, "hitokoto"},
