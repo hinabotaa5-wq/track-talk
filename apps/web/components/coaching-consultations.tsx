@@ -17,7 +17,7 @@ import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 // 下書きはサーバーに保存してから購入へ進む。購入後も同じ部屋で再開できる。
 // 動画添削のあとの追加質問（kind="review"）は、1つの添削につき質問1回・回答1回の一方通行（1回500円の都度払いのみ、チケット不可）で、回答への確認・補足はない。
@@ -34,8 +34,10 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   useEffect(() => {
     let live = true;
     const refresh = () => { apiFetch<ConsultationRoom>(roomPath, { token }).then((d) => { if (live) setData(d); }).catch((e) => { if (live) setError(apiErrorText(e, L(kind === "review" ? "追加質問を読み込めませんでした" : "追加相談を読み込めませんでした"))); }); };
-    refresh(); const timer = window.setInterval(refresh, 30000); window.addEventListener("focus", refresh);
-    return () => { live = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+    refresh(); window.addEventListener("focus", refresh);
+    // 動画添削のあとの追加質問は1往復で終わるので、会話のような定期更新はしない（フォーカス時の読み直しだけ）。
+    const timer = kind === "review" ? null : window.setInterval(refresh, 30000);
+    return () => { live = false; if (timer) window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [roomPath, token, kind]);
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
   // ゲートが閉じている間は、過去の相談がある添削だけ記録として出す（送る欄は出さない）。
@@ -123,6 +125,17 @@ export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" })
     <p>{L("代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。")}</p>
   </div>;
 }
+// 見た目だけのチャット風吹き出し。動画添削のあとの追加質問（review）とサポートプランの追加相談（contract）で
+// 表示部品を共有し、デザインが二重定義でずれないようにする。実質（回数・期限・一方通行）は変えない。
+// 質問者側は右（bg-blue-500/25・rounded-br-sm）、コーチ側は左（bg-white/10・rounded-bl-sm）。見出しは「ラベル · 時刻」。
+function ChatBubble({ side, label, at, children }: { side: "right" | "left"; label: string; at?: string | null; children: ReactNode }) {
+  return <div className={side === "right" ? "flex justify-end" : "flex justify-start"}>
+    <div className={side === "right" ? "max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2" : "max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2"}>
+      <p className="text-xs text-slate-300">{label}{at ? ` · ${formatDateTime(at)}` : ""}</p>
+      {children}
+    </div>
+  </div>;
+}
 function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, token, guardian, reload, needsDeclaration }: { consultation: Consultation; kind: "review" | "contract"; sendEnabled: boolean; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void>; needsDeclaration: boolean }) {
   // 支払い画面を開き直すときも、18歳未満は毎回チェックが要る。
   const declaration = useMinorDeclaration();
@@ -152,16 +165,35 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   // 回答への確認・補足はサポートプランの相談だけ。動画添削のあとの相談は、過去の確認・補足を表示するだけにする。
   const clarify = kind === "contract" && role === "requester" && canClarify(c);
   const clarifyReply = kind === "contract" && role === "coach" && c.status === "answered" && !!c.clarify_body && !c.clarification;
+  // 動画添削のあとの追加質問は見た目だけチャット風にする。実質は質問1件・回答1件の一方通行で、往復の会話にはしない。
+  // サポートプランの追加相談も同じ吹き出しで見せる（質問・回答・確認・補足）。実質（確認は回答から7日以内に1回無料、部屋に複数の相談が並ぶ形）は変えない。
+  const chat = kind === "review";
+  const statusText = chat && c.status === "answered" ? L("回答済み・この追加質問は終了しました") : consultationStatus[c.status];
+  const questionLabel = role === "requester" ? L("あなたの質問") : L("選手の質問");
+  const answerLabel = role === "coach" ? L("あなたの回答") : L("コーチの回答");
   return <article className="space-y-3 border-t border-white/20 pt-3">
-    <p className="text-sm font-semibold">{consultationStatus[c.status]} · {formatYen(c.price_yen)}</p>
+    <p className="text-sm font-semibold">{statusText} · {formatYen(c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
-      <p className="whitespace-pre-wrap text-sm">{L("質問：{question}", { question: c.question })}</p>
-      {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="w-full rounded-lg" /> : null}
-      {c.answer ? <p className="whitespace-pre-wrap text-sm">{L("コーチ：{answer}", { answer: c.answer })}</p> : null}
-      {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="w-full rounded-lg" /> : null}
+      <ChatBubble side="right" label={questionLabel} at={c.created_at}>
+        <p className="whitespace-pre-wrap text-sm">{c.question}</p>
+        {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
+      </ChatBubble>
+      {c.answer ? <ChatBubble side="left" label={answerLabel} at={c.answered_at}>
+        <p className="whitespace-pre-wrap text-sm">{c.answer}</p>
+        {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
+      </ChatBubble> : null}
       {c.videos_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。")}</p> : null}
-      {c.clarify_body ? <p className="whitespace-pre-wrap text-sm">{L("回答への確認：{clarify_body}", { clarify_body: c.clarify_body })}</p> : null}
-      {c.clarification ? <p className="whitespace-pre-wrap text-sm">{L("補足：{clarification}", { clarification: c.clarification })}</p> : null}
+      {kind === "contract" ? <>
+        {c.clarify_body ? <ChatBubble side="right" label={role === "requester" ? L("あなたの確認") : L("選手の確認")} at={c.clarify_requested_at}>
+          <p className="whitespace-pre-wrap text-sm">{c.clarify_body}</p>
+        </ChatBubble> : null}
+        {c.clarification ? <ChatBubble side="left" label={role === "coach" ? L("あなたの補足") : L("コーチの補足")} at={c.clarified_at}>
+          <p className="whitespace-pre-wrap text-sm">{c.clarification}</p>
+        </ChatBubble> : null}
+      </> : <>
+        {c.clarify_body ? <p className="whitespace-pre-wrap text-sm">{L("回答への確認：{clarify_body}", { clarify_body: c.clarify_body })}</p> : null}
+        {c.clarification ? <p className="whitespace-pre-wrap text-sm">{L("補足：{clarification}", { clarification: c.clarification })}</p> : null}
+      </>}
       {c.status === "offered" && c.respond_by ? <p className="text-xs text-slate-300">{L("受諾期限：{v0}", { v0: formatDateTime(c.respond_by) })}</p> : null}
       {c.status === "in_review" && c.answer_by ? <p className="text-xs text-slate-300">{L("回答期限：{v0}", { v0: formatDateTime(c.answer_by) })}</p> : null}
       {role === "coach" && c.status === "offered" ? <div className="flex gap-3"><Button disabled={pending} onClick={() => void act("accept")}>{L("引き受ける")}</Button><Button disabled={pending} onClick={() => void act("decline")}>{L("辞退する")}</Button></div> : null}
