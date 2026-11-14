@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { canClarify, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
+import { formatDateTime } from "@/lib/format";
 import { CoachingConsultations } from "./coaching-consultations";
 const apiFetch = vi.fn();
 const flags = vi.hoisted(() => ({ messaging: true, consultation: true }));
@@ -127,6 +128,27 @@ it("動画添削のあとの相談は一方通行で、回答への確認・補�
  expect(container.querySelector("textarea")).toBeNull();
  expect(container.textContent).toContain("この添削の追加質問は回答済みです。");
 });
+it("回答済みの追加質問はチャット風の吹き出しと終了状態を示し、入力欄を出さない", async () => {
+ const c = {
+  ...draft, status: "answered" as const, question: "質問文", answer: "コーチの回答",
+  video_public_id: null, video_url: "https://example.com/q.mp4", answer_video_url: "https://example.com/a.mp4",
+  answered_at: "2026-11-14T02:00:00Z",
+ };
+ await render({ ...room, can_purchase: false, block_reason: "この添削の追加質問は回答済みです。追加質問は1つの添削につき1回までです", consultations: [c] });
+ expect(container.textContent).toContain("回答済み・この追加質問は終了しました");
+ expect(container.textContent).toContain("あなたの質問");
+ expect(container.textContent).toContain("コーチの回答");
+ expect(container.querySelector("video")).not.toBeNull();
+ expect(container.querySelector("textarea")).toBeNull();
+ expect(container.textContent).toContain("この添削の追加質問は回答済みです。");
+});
+it("回答待ちの追加質問は質問の吹き出しを示し、追撃の入力欄を出さない", async () => {
+ const c = { ...draft, status: "in_review" as const, question: "質問文", answer_by: "2026-11-17T02:00:00Z" };
+ await render({ ...room, can_purchase: true, consultations: [c] });
+ expect(container.textContent).toContain("回答待ち");
+ expect(container.textContent).toContain("あなたの質問");
+ expect(container.querySelector("textarea")).toBeNull();
+});
 it("動画添削のあとの相談には、コーチの補足の欄も出さない", async () => {
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答", answered_at: new Date().toISOString(), clarify_body: "確認" }] });
  expect(container.querySelector("textarea")).toBeNull();
@@ -149,4 +171,38 @@ it("ゲートが閉じている間は、過去の相談がない添削に追加�
  expect(container.textContent).not.toContain("追加質問");
  expect(container.textContent).not.toContain("追加相談");
  expect(container.querySelector("textarea")).toBeNull();
+});
+const contractThread = {
+ ...draft, status: "answered" as const, question: "契約の質問", answer: "契約の回答", clarify_body: "契約の確認", clarification: "契約の補足",
+ created_at: "2026-11-01T01:00:00Z", answered_at: "2026-11-02T02:00:00Z", clarify_requested_at: "2026-11-03T03:00:00Z", clarified_at: "2026-11-04T04:00:00Z",
+};
+function bubble(text: string) {
+ const p = [...container.querySelectorAll("p")].find((x) => x.textContent === text);
+ const row = p?.closest("div.flex");
+ if (!row) throw new Error(`missing bubble ${text}`);
+ return { side: row.classList.contains("justify-end") ? "right" : row.classList.contains("justify-start") ? "left" : "none", head: row.querySelector("p.text-xs")?.textContent ?? "" };
+}
+it("サポートプランの相談は、質問・確認を右、回答・補足を左の吹き出しで、ラベルと時刻つきで見せる", async () => {
+ await render({ ...room, funding: "cash", consultations: [contractThread] }, undefined, "contract");
+ expect(bubble("契約の質問")).toEqual({ side: "right", head: `あなたの質問 · ${formatDateTime(contractThread.created_at)}` });
+ expect(bubble("契約の回答")).toEqual({ side: "left", head: `コーチの回答 · ${formatDateTime(contractThread.answered_at)}` });
+ expect(bubble("契約の確認")).toEqual({ side: "right", head: `あなたの確認 · ${formatDateTime(contractThread.clarify_requested_at)}` });
+ expect(bubble("契約の補足")).toEqual({ side: "left", head: `コーチの補足 · ${formatDateTime(contractThread.clarified_at)}` });
+ expect(container.textContent).not.toContain("回答への確認：");
+ expect(container.textContent).not.toContain("補足：契約の補足");
+});
+it("サポートプランの相談を保護者が見るときは、選手とコーチのラベルで吹き出しを見せる", async () => {
+ await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [contractThread] }, "guardian-secret");
+ expect(bubble("契約の質問").head).toContain("選手の質問");
+ expect(bubble("契約の回答").head).toContain("コーチの回答");
+ expect(bubble("契約の確認").head).toContain("選手の確認");
+ expect(bubble("契約の補足").head).toContain("コーチの補足");
+ expect(container.textContent).not.toContain("あなたの");
+});
+it("サポートプランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で見せる", async () => {
+ await render({ ...room, role: "coach", funding: "cash", can_purchase: false, consultations: [contractThread] }, undefined, "contract");
+ expect(bubble("契約の質問")).toMatchObject({ side: "right", head: expect.stringContaining("選手の質問") });
+ expect(bubble("契約の回答")).toMatchObject({ side: "left", head: expect.stringContaining("あなたの回答") });
+ expect(bubble("契約の確認").head).toContain("選手の確認");
+ expect(bubble("契約の補足").head).toContain("あなたの補足");
 });
