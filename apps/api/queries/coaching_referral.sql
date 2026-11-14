@@ -3,6 +3,15 @@
 SELECT COALESCE(coaching_record_referral(sqlc.arg(buyer)::uuid, sqlc.narg(code)::text,
     sqlc.narg(ticket_id)::uuid, sqlc.narg(payment_id)::uuid)::text, '')::text AS recipient;
 
+-- name: IssueCoachingReferralOrigin :exec
+-- 単発カードの仮押さえ時点の起点購入として紹介IDを発行する（有効なIDがあれば何もしない）。
+SELECT coaching_issue_referral_code(sqlc.arg(owner)::uuid, 'purchase', NULL, sqlc.narg(payment_id)::uuid);
+
+-- name: CoachingReferralAlreadyCounted :one
+-- 入力された紹介IDの紹介者に、この購入者がすでに有効カウントされているか。
+SELECT EXISTS (SELECT FROM coaching_referral_codes c JOIN coaching_referral_counts a ON a.referrer_id = c.owner_id
+    WHERE c.code = $1 AND a.buyer_id = sqlc.arg(buyer)::uuid AND a.canceled_at IS NULL)::boolean;
+
 -- name: CancelDisputedCoachingReferral :exec
 SELECT coaching_cancel_referral_for_payment_intent($1::text);
 

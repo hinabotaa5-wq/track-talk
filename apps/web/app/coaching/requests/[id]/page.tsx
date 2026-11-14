@@ -1,5 +1,5 @@
 "use client";
-import { LoadedReferralCard, ReferralInput, validReferralInput } from "@/components/coaching-referral";
+import { LoadedReferralCard, ReferralInput, checkReferralInput, type ReferralWarning } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
@@ -118,7 +118,7 @@ function paymentText(p: ReviewPayment): string {
 // 18歳未満は、開き直すときも購入のたびの宣言にチェックが要る。
 function PayAgain({ request, token }: { request: ReviewRequest; token: string | null }) {
   const [referralCode, setReferralCode] = useState("");
-  const [referralWarning, setReferralWarning] = useState(false);
+  const [referralWarning, setReferralWarning] = useState<ReferralWarning>(false);
   const [error, setError] = useState("");
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
@@ -132,9 +132,10 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
     if (!acquire()) return;
     setError("");
     try {
-      if (!await validReferralInput(referralCode, token)) {
+      const referralCheck = await checkReferralInput(referralCode, token);
+      if (referralCheck !== "ok") {
         setReferralCode("");
-        setReferralWarning(true);
+        setReferralWarning(referralCheck);
         release();
         return;
       }
@@ -281,7 +282,7 @@ function ReviewRequestView() {
 
   return (
     <div className="mx-auto max-w-md space-y-5">
-      {request.payment?.status === "captured" && request.payment.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
+      {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">{L("フォーム添削")}</h1>

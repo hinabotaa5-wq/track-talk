@@ -371,3 +371,66 @@ func TestCoachingReferralConcurrentSecondCount(t *testing.T) {
 		}
 	}
 }
+
+// 受け入れ 6（API 経路）：単発カードは仮押さえ（決済完了）の時点で紹介IDを発行し、
+// 友達2人がそろっても capture までは付与を保留し、capture で付与する。
+// あわせて、紹介者にすでに数えられている購入者には check が already_counted を返す（受け入れ 2）。
+func TestCoachingReferralCardOriginHeldUntilCapture(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setupIsolatedStripe(t)
+	admin := adminToken(t, h)
+	_, coach := onDutyCoach(t, h, admin)
+	payerID, payer := demoRequester(t, h, admin)
+
+	body := reviewBodyFor(t, h, payer)
+	body["method"] = "card"
+	rec := createReviewWith(t, h, payer, "card", body)
+	var review reviewRequestView
+	if rec.Code != 201 || json.Unmarshal(rec.Body.Bytes(), &review) != nil || review.ID == "" {
+		t.Fatalf("review checkout %d %s", rec.Code, rec.Body.String())
+	}
+	var session string
+	queryRowArgs(t, "SELECT checkout_session_id FROM review_payments WHERE request_id=$1", []any{review.ID}, &session)
+	if rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", map[string]any{
+		"id": session, "payment_status": "unpaid", "payment_intent": "pi_card_origin",
+		"metadata": map[string]string{"kind": "review"},
+	}); rec.Code != 200 {
+		t.Fatalf("authorize %d %s", rec.Code, rec.Body.String())
+	}
+	r := myReferral(t, h, payer)
+	if r == nil || !r.Active {
+		t.Fatalf("authorized card did not issue a code: %+v", r)
+	}
+	var friends []string
+	for i := 0; i < 2; i++ {
+		_, f := demoRequester(t, h, admin)
+		buySixWithReferral(t, h, f, r.Code)
+		friends = append(friends, f)
+	}
+	var rewards int
+	queryRowArgs(t, `SELECT count(*) FROM coaching_referral_rewards WHERE referrer_id=$1`, []any{payerID}, &rewards)
+	if rewards != 0 {
+		t.Fatal("granted while the origin card was only authorized")
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+review.ID+"/start", coach, nil); rec.Code != 200 {
+		t.Fatalf("start %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+review.ID+"/response", coach, responseBody()); rec.Code != 200 {
+		t.Fatalf("return %d %s", rec.Code, rec.Body.String())
+	}
+	queryRowArgs(t, `SELECT count(*) FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{payerID}, &rewards)
+	if rewards != 1 {
+		t.Fatalf("held reward was not granted on capture: %d", rewards)
+	}
+	if done := myReferral(t, h, payer); done.Code != r.Code || done.Active || done.GrantedAt == nil {
+		t.Fatalf("cycle after capture %+v", done)
+	}
+	check := doJSON(t, h, http.MethodPost, "/v1/coaching/referrals/check", friends[0], map[string]any{"code": r.Code})
+	var out struct {
+		Valid          bool `json:"valid"`
+		AlreadyCounted bool `json:"already_counted"`
+	}
+	if check.Code != 200 || json.Unmarshal(check.Body.Bytes(), &out) != nil || out.Valid || !out.AlreadyCounted {
+		t.Fatalf("check for counted buyer %d %s", check.Code, check.Body.String())
+	}
+}

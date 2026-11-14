@@ -88,7 +88,17 @@ func (s *Server) checkCoachingReferral(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]bool{"valid": code != nil})
+	// already_counted：紹介者にすでに数えられている購入者には、その旨を伝える（本体 #686）。
+	counted := false
+	if code == nil {
+		if normalized := normalizeReferralCode(req.Code); len(normalized) == 6 {
+			if counted, err = s.q.CoachingReferralAlreadyCounted(r.Context(), db.CoachingReferralAlreadyCountedParams{Code: normalized, Buyer: p.ID}); err != nil {
+				MapDBError(w, err)
+				return
+			}
+		}
+	}
+	JSON(w, http.StatusOK, map[string]bool{"valid": code != nil, "already_counted": counted})
 }
 
 func (s *Server) adminCoachingReferrals(w http.ResponseWriter, r *http.Request) {

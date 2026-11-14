@@ -7,12 +7,16 @@ import type { Referral } from "@/lib/coaching-tickets";
 import { formatDateTime } from "@/lib/format";
 import { L } from "@/lib/i18n";
 
-export async function validReferralInput(code: string, token: string | null): Promise<boolean> {
-  if (!code.trim()) return true;
-  const result = await apiFetch<{ valid: boolean }>("/v1/coaching/referrals/check", {
+// ReferralWarning は、紹介ID欄の警告。counted は、その紹介者にすでに数えられている購入者（本体 #686）。
+export type ReferralWarning = false | "invalid" | "counted";
+
+export async function checkReferralInput(code: string, token: string | null): Promise<"ok" | "invalid" | "counted"> {
+  if (!code.trim()) return "ok";
+  const result = await apiFetch<{ valid: boolean; already_counted?: boolean }>("/v1/coaching/referrals/check", {
     method: "POST", token, body: JSON.stringify({ code }),
   });
-  return result.valid;
+  if (result.valid) return "ok";
+  return result.already_counted ? "counted" : "invalid";
 }
 
 // useMyReferral は、自分の紹介IDの周（有効な周、なければ直近に終了した周）を読む。
@@ -33,7 +37,7 @@ function useMyReferral(token: string | null | undefined) {
 export function ReferralInput({ code, onChange, warning, disabled, token }: {
   code: string;
   onChange: (value: string) => void;
-  warning: boolean;
+  warning: ReferralWarning;
   disabled?: boolean;
   token?: string | null;
 }) {
@@ -47,7 +51,8 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
         autoComplete="off" autoCapitalize="characters" maxLength={32} value={code} disabled={disabled}
         onChange={(event) => onChange(event.target.value)} />
     </label>
-    {warning ? <p role="status" className="text-xs text-amber-300">{L("この紹介IDは使えません。空欄のまま購入できます。")}</p> : null}
+    {warning === "counted" ? <p role="status" className="text-xs text-amber-300">{L("この紹介IDの紹介者には、あなたの購入がすでに数えられています。空欄のまま購入できます。")}</p>
+      : warning ? <p role="status" className="text-xs text-amber-300">{L("この紹介IDは使えません。空欄のまま購入できます。")}</p> : null}
     {noOwnCode ? <p className="text-xs">{L("紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。")}</p> : null}
   </div>;
 }

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { LoadedReferralCard, ReferralInput, validReferralInput } from "@/components/coaching-referral";
+import { LoadedReferralCard, ReferralInput, checkReferralInput, type ReferralWarning } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { SellerNote } from "@/components/seller-note";
@@ -32,7 +32,7 @@ function TicketsPage() {
   const [message, setMessage] = useState("");
   const [completedReturn, setCompletedReturn] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState("");
-  const [referralWarning, setReferralWarning] = useState(false);
+  const [referralWarning, setReferralWarning] = useState<ReferralWarning>(false);
   const { pending, acquire, release } = useActionLock();
   // 支払い画面へ進む前の最終確認に出している商品。
   const [confirming, setConfirming] = useState<TicketProduct | null>(null);
@@ -97,9 +97,10 @@ function TicketsPage() {
     setError("");
     const storageKey = `tracktalk-tickets:${session.user.id}:${productID}:${returnPath}`;
     try {
-      if (!await validReferralInput(referralCode, token)) {
+      const referralCheck = await checkReferralInput(referralCode, token);
+      if (referralCheck !== "ok") {
         setReferralCode("");
-        setReferralWarning(true);
+        setReferralWarning(referralCheck);
         return;
       }
       let key = sessionStorage.getItem(storageKey);

@@ -90,6 +90,24 @@ func (q *Queries) CancelReleasedReferralReward(ctx context.Context, lotID uuid.U
 	return err
 }
 
+const coachingReferralAlreadyCounted = `-- name: CoachingReferralAlreadyCounted :one
+SELECT EXISTS (SELECT FROM coaching_referral_codes c JOIN coaching_referral_counts a ON a.referrer_id = c.owner_id
+    WHERE c.code = $1 AND a.buyer_id = $2::uuid AND a.canceled_at IS NULL)::boolean
+`
+
+type CoachingReferralAlreadyCountedParams struct {
+	Code  string    `json:"code"`
+	Buyer uuid.UUID `json:"buyer"`
+}
+
+// 入力された紹介IDの紹介者に、この購入者がすでに有効カウントされているか。
+func (q *Queries) CoachingReferralAlreadyCounted(ctx context.Context, arg CoachingReferralAlreadyCountedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, coachingReferralAlreadyCounted, arg.Code, arg.Buyer)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getCoachingReferralProgress = `-- name: GetCoachingReferralProgress :one
 SELECT c.code, (c.closed_at IS NULL)::boolean AS active,
     (SELECT count(*)::int FROM coaching_referral_counts a
@@ -143,6 +161,21 @@ func (q *Queries) GetUsableCoachingReferral(ctx context.Context, arg GetUsableCo
 	var code string
 	err := row.Scan(&code)
 	return code, err
+}
+
+const issueCoachingReferralOrigin = `-- name: IssueCoachingReferralOrigin :exec
+SELECT coaching_issue_referral_code($1::uuid, 'purchase', NULL, $2::uuid)
+`
+
+type IssueCoachingReferralOriginParams struct {
+	Owner     uuid.UUID  `json:"owner"`
+	PaymentID *uuid.UUID `json:"payment_id"`
+}
+
+// 単発カードの仮押さえ時点の起点購入として紹介IDを発行する（有効なIDがあれば何もしない）。
+func (q *Queries) IssueCoachingReferralOrigin(ctx context.Context, arg IssueCoachingReferralOriginParams) error {
+	_, err := q.db.Exec(ctx, issueCoachingReferralOrigin, arg.Owner, arg.PaymentID)
+	return err
 }
 
 const recordCoachingReferral = `-- name: RecordCoachingReferral :one
