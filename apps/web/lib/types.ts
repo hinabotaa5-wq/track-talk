@@ -712,6 +712,7 @@ export type ReviewResponse =
       good_point: string;
       fix_points: string[];
       drill: string;
+      hitokoto: string | null;
       demo_video_url: string | null;
       created_at: string;
       clarify_reason: ClarifyReason | null;

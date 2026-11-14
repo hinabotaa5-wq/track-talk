@@ -13,9 +13,9 @@ import (
 )
 
 const createReviewResponse = `-- name: CreateReviewResponse :one
-INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
+INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
 `
 
 type CreateReviewResponseParams struct {
@@ -25,6 +25,7 @@ type CreateReviewResponseParams struct {
 	FixPoints         []string   `json:"fix_points"`
 	Drill             string     `json:"drill"`
 	DemoVideoPublicID *string    `json:"demo_video_public_id"`
+	Hitokoto          *string    `json:"hitokoto"`
 }
 
 func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResponseParams) (ReviewResponse, error) {
@@ -35,6 +36,7 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		arg.FixPoints,
 		arg.Drill,
 		arg.DemoVideoPublicID,
+		arg.Hitokoto,
 	)
 	var i ReviewResponse
 	err := row.Scan(
@@ -52,6 +54,7 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
 		&i.ClarifyBody,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -188,7 +191,7 @@ func (q *Queries) GetReviewRating(ctx context.Context, requestID uuid.UUID) (Rev
 }
 
 const getReviewResponse = `-- name: GetReviewResponse :one
-SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body FROM review_responses
+SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto FROM review_responses
 WHERE request_id = $1
 `
 
@@ -210,6 +213,7 @@ func (q *Queries) GetReviewResponse(ctx context.Context, requestID uuid.UUID) (R
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
 		&i.ClarifyBody,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -239,6 +243,7 @@ SELECT
     rs.good_point,
     rs.fix_points,
     rs.drill,
+    rs.hitokoto,
     rs.clarification,
     rs.created_at,
     rs.hidden_at
@@ -265,6 +270,7 @@ type ListCoachProbationRow struct {
 	GoodPoint     string     `json:"good_point"`
 	FixPoints     []string   `json:"fix_points"`
 	Drill         string     `json:"drill"`
+	Hitokoto      *string    `json:"hitokoto"`
 	Clarification *string    `json:"clarification"`
 	CreatedAt     time.Time  `json:"created_at"`
 	HiddenAt      *time.Time `json:"hidden_at"`
@@ -290,6 +296,7 @@ func (q *Queries) ListCoachProbation(ctx context.Context) ([]ListCoachProbationR
 			&i.GoodPoint,
 			&i.FixPoints,
 			&i.Drill,
+			&i.Hitokoto,
 			&i.Clarification,
 			&i.CreatedAt,
 			&i.HiddenAt,
@@ -538,7 +545,7 @@ SET clarify_body = $1::text,
 WHERE request_id = $3
   AND clarify_requested_at IS NULL
   AND hidden_at IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
 `
 
 type RequestReviewClarificationParams struct {
@@ -566,6 +573,7 @@ func (q *Queries) RequestReviewClarification(ctx context.Context, arg RequestRev
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
 		&i.ClarifyBody,
+		&i.Hitokoto,
 	)
 	return i, err
 }
@@ -600,7 +608,7 @@ SET clarification = $1::text,
 WHERE request_id = $2
   AND clarify_requested_at IS NOT NULL
   AND clarification IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
 `
 
 type SaveReviewClarificationParams struct {
@@ -626,6 +634,7 @@ func (q *Queries) SaveReviewClarification(ctx context.Context, arg SaveReviewCla
 		&i.HelpfulAskedAt,
 		&i.HiddenAt,
 		&i.ClarifyBody,
+		&i.Hitokoto,
 	)
 	return i, err
 }

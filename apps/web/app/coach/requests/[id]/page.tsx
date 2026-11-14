@@ -71,8 +71,8 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   const [good, setGood] = useState("");
   const guard = useSolicitationGuard();
   const [fix1, setFix1] = useState("");
-  const [fix2, setFix2] = useState("");
   const [drill, setDrill] = useState("");
+  const [hitokoto, setHitokoto] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -94,7 +94,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!guard.allow([good, fix1, fix2, drill].join("\n"))) return;
+    if (!guard.allow([good, fix1, drill, hitokoto].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -113,7 +113,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       const sent = await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/response`, {
         method: "POST",
         token,
-        body: JSON.stringify({ good_point: good, fix_points: [fix1, fix2], drill, demo_video_public_id: demo }),
+        body: JSON.stringify({ good_point: good, fix_points: [fix1], drill, hitokoto, demo_video_public_id: demo }),
       });
       onSent(sent);
     } catch (err) {
@@ -133,8 +133,8 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       {guard.warning}
       <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} />
       <Field label={t(locale, "coach.detail.fix1")} value={fix1} onChange={setFix1} error={errors.fix_points} />
-      <Field label={t(locale, "coach.detail.fix2")} value={fix2} onChange={setFix2} />
       <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} />
+      <Field label={t(locale, "coach.detail.hitokoto")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} />
       <label className="block space-y-1 text-sm">
         <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input

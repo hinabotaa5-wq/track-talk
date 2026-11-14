@@ -49,6 +49,12 @@ export function ReviewResponseView({ response }: { response: ReviewResponse }) {
         <h2 className="text-xs font-semibold text-blue-300">{L("おすすめのドリル")}</h2>
         <p className="whitespace-pre-wrap text-slate-100">{response.drill}</p>
       </div>
+      {response.hitokoto ? (
+        <div className="space-y-1">
+          <h2 className="text-xs font-semibold text-violet-300">{L("ひとこと")}</h2>
+          <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
+        </div>
+      ) : null}
       {response.demo_video_url ? (
         <div className="space-y-1">
           <h2 className="text-xs font-semibold text-slate-300">{L("見本動画")}</h2>

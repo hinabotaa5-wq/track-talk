@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { ApiRequestError } from "@/lib/api";
 import type { CoachReviewRequest } from "@/lib/types";
 import CoachReviewRequestPage from "./page";
 
@@ -93,6 +94,21 @@ function submitButton(text: string): HTMLButtonElement {
   return button as HTMLButtonElement;
 }
 
+function responseForm(): HTMLFormElement {
+  const form = [...container.querySelectorAll("form")].find((f) =>
+    [...f.querySelectorAll("button")].some((b) => b.textContent === "返答を送る"),
+  );
+  if (!form) throw new Error("response form not found");
+  return form as HTMLFormElement;
+}
+
+async function fillTextarea(textarea: HTMLTextAreaElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 // 返答の送信成功で、送った返答カードの先頭に完了バナーが出てスクロールする。
 it("返答を送ると完了バナーが出てスクロールする", async () => {
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
@@ -169,6 +185,76 @@ it("差し戻すと完了バナーが履歴の前に出る", async () => {
   expect(scroll).toHaveBeenCalled();
   const text = container.textContent!;
   expect(text.indexOf("差し戻しました")).toBeLessThan(text.indexOf("差し戻し中"));
+});
+
+// 返答フォームは良い点・直す点・ドリル・ひとこと・見本動画の5項目で、直す点は1欄だけ。
+it("返答フォームの項目名は5つで直す点は1欄だけ", async () => {
+  apiFetch.mockImplementation(async (path: string) => (path.includes("/consultations") ? emptyRoom : base));
+  await renderPage();
+  const form = responseForm();
+  const labels = [...form.querySelectorAll("label > span.font-semibold")].map((s) => s.textContent);
+  expect(labels).toEqual(["良い点", "直す点", "おすすめのドリル", "ひとこと", "見本動画（任意、30秒まで）"]);
+  const text = container.textContent!;
+  for (const stale of ["（1つ）", "（1つ目）", "（2つ目", "なくてもよい"]) {
+    expect(text).not.toContain(stale);
+  }
+  expect(form.querySelectorAll("textarea")).toHaveLength(4);
+});
+
+// 送信内容は直す点1つ・ひとこと1つで、成功すると完了バナーが出る。
+it("返答の送信内容は直す点1つとひとことを含む", async () => {
+  let sentBody = "";
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") {
+      sentBody = options.body ?? "";
+      return responded;
+    }
+    return base;
+  });
+  await renderPage();
+  const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  expect(areas).toHaveLength(4);
+  await fillTextarea(areas[0], "腕振りが良い");
+  await fillTextarea(areas[1], "接地を直す");
+  await fillTextarea(areas[2], "もも上げ");
+  await fillTextarea(areas[3], "次は抜き脚だけ意識してみましょう");
+  await act(async () => submitButton("返答を送る").click());
+  const payload = JSON.parse(sentBody);
+  expect(payload.good_point).toBe("腕振りが良い");
+  expect(payload.fix_points).toEqual(["接地を直す"]);
+  expect(payload.drill).toBe("もも上げ");
+  expect(payload.hitokoto).toBe("次は抜き脚だけ意識してみましょう");
+  expect(container.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
+});
+
+// ひとことが空だと送れず、項目の指摘が出る（サーバーが 422 を返した想定）。
+it("ひとことが空だと送信できず項目の指摘が出る", async () => {
+  let sentBody = "";
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") {
+      const payload = JSON.parse(options.body ?? "{}");
+      sentBody = JSON.stringify(payload);
+      if (!payload.hitokoto) {
+        throw new ApiRequestError(422, {
+          error: { code: "validation_error", message: "入力を確認してください", fields: { hitokoto: "ひとことを入力してください" } },
+        });
+      }
+      return responded;
+    }
+    return base;
+  });
+  await renderPage();
+  const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  await fillTextarea(areas[0], "腕振りが良い");
+  await fillTextarea(areas[1], "接地を直す");
+  await fillTextarea(areas[2], "もも上げ");
+  // ひとことは空のまま送る。
+  await act(async () => submitButton("返答を送る").click());
+  expect(JSON.parse(sentBody).hitokoto).toBe("");
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(container.textContent).toContain("ひとことを入力してください");
 });
 
 it("添削をはじめると入力欄を表示する", async () => {
