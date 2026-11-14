@@ -84,23 +84,24 @@ it("不正な戻り先は API に渡さず、購入画面を戻り先にする",
   expect(body.return_path).toBe("/me/coaching/tickets");
 });
 
-it("6枚2,500円を、単発の料金との比較と条件（先払い・有効期限・原則払戻し不可・本人限定）と一緒に出す", async () => {
+it("6枚2,500円の購入カードに4つの条件とチケットの使い方を表示する", async () => {
   mocks.api.mockResolvedValue(initial);
   await render();
-  const text = container.textContent ?? "";
-  expect(text).toContain("2,500円（税込）");
-  expect(text).toContain("1回あたり約417円。1回ずつ払うと500円×6回で3,000円です。");
-  expect(text).toContain("6枚をまとめて先に支払います");
-  expect(text).toContain("有効期限は決済が完了した日時から6か月です");
-  // 原則払戻し不可の単独表示にせず、例外4項目を同じ画面に箇条書きする（本体 #572）。
-  expect(text).toContain("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします。");
-  expect(text).toContain("サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）を払い戻します。");
-  expect(text).toContain("法令で認められる取消し・解除は、その定めに従います");
-  expect(text).toContain("当社・コーチの都合で提供できないときや著しく遅れたときは、チケットを戻すか返金します。");
-  expect(text).toContain("当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。");
-  expect(text).toContain("購入した本人だけが使えます");
-  expect(text).not.toContain("通常価格");
-  expect(container.querySelector("s, del")).toBeNull();
+  const card = reviewButton()?.parentElement;
+  const conditions = card?.querySelector("ul");
+  expect(card?.textContent).toContain("チケット6枚");
+  expect(card?.textContent).toContain("2,500円（税込）");
+  expect(card?.textContent).toContain("1回あたり約417円。");
+  expect(card?.textContent).not.toContain("1回ずつ払うと");
+  expect(Array.from(conditions?.querySelectorAll("li") ?? [], (item) => item.textContent)).toEqual([
+    "1枚で動画添削1回を申し込めます",
+    "有効期限は購入から6か月。過ぎると失効し、延長はしません",
+    "購入した本人だけが使えます。譲渡はできません",
+    "原則、購入者都合の払戻しはしません。サービス終了時、当社・コーチの都合で受けられなかったとき、法令で認められる取消し・解除のときは払戻しします",
+  ]);
+  expect(conditions?.querySelector("ul")).toBeNull();
+  expect(card?.nextElementSibling?.textContent).toBe("動画添削1回に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。");
+  expect(card?.querySelector("s, del")).toBeNull();
 });
 
 it("購入の前に最終確認を出し、確定を押すまで支払いへ進まない", async () => {
