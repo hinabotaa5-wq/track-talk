@@ -1788,6 +1788,8 @@ export const en: Readonly<Record<string, string>> = {
   "画面を開いています": "Opening screen",
   "販売者: TrackTalk の運営者（{operatorName}）。フォーム添削の提供者は運営者で、添削は運営者がコーチに委託して行います。": "Seller: TrackTalk's operator ({operatorName}). The operator provides form reviews and entrusts coaches with doing them.",
   "販売者: {operatorName}（TrackTalk運営者）": "Seller: {operatorName} (TrackTalk operator)",
+  "販売者: TrackTalk運営者": "Seller: TrackTalk operator",
+  "TrackTalk運営者": "TrackTalk operator",
   "代金のお支払い先は運営者です。料金・キャンセル・返金は運営者が責任を持って対応します。": "Payment goes to the operator. The operator is responsible for pricing, cancellations, and refunds.",
   "販売者: このプランを出しているコーチ（{v0}）。契約の相手はコーチで、プランの内容・料金・期間もコーチが決めます。": "Seller: the coach offering this plan ({v0}). Your contract is with the coach, who also sets the plan's content, price, and period.",
   "利用規約（サポートプランの契約と代金の受け取り）": "Terms of Service (support plan contracts and receipt of payment)",

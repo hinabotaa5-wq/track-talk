@@ -1,6 +1,5 @@
 import { L } from "@/lib/i18n";
 import Link from "next/link";
-import { operatorName } from "@/lib/operator";
 
 // 誰が契約の相手かを購入の前に示す。フォーム添削・チケットは運営者が提供し、サポートプランはコーチが販売する。
 // 両者は支払いの仕組みが違うので、文言を混ぜない（利用規約の第6条とフォーム添削、第8条とサポートプランを合わせる）。
@@ -8,7 +7,7 @@ export function SellerNote({ coachName }: { coachName?: string | null }) {
   if (coachName === undefined) {
     return (
       <p className="text-xs leading-5 text-slate-300">
-        {L("販売者: {operatorName}（TrackTalk運営者）", { operatorName })}
+        {L("販売者: TrackTalk運営者")}
         <Link href="/terms" className="ml-2 text-blue-300 underline">{L("利用規約")}</Link>
         <Link href="/legal/commerce" className="ml-2 text-blue-300 underline">{L("特定商取引法に基づく表記")}</Link>
       </p>
