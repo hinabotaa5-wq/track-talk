@@ -58,6 +58,22 @@ func (q *Queries) DeleteCoachProfileForUser(ctx context.Context, userID uuid.UUI
 	return err
 }
 
+const deleteCoachingContractsForCoach = `-- name: DeleteCoachingContractsForCoach :exec
+DELETE FROM coaching_contracts
+WHERE coach_id = $1
+`
+
+// 退会の削除順の修正（#730）。coach_profiles を消す前に、そのコーチの契約を先に消す。
+// 契約は DeleteProfile 時の coach_id の ON DELETE CASCADE でも消えるもの（最終状態は同じ）。
+// 先に消す理由：coach_profiles 削除からの coaching_plans の CASCADE 削除の途中で、
+// coaching_contracts.plan_id の ON DELETE RESTRICT に当たり 23503 になるため。
+// 契約にぶら下がる明細・同意・通報・精算記録は、契約側の CASCADE／SET NULL に従う
+// （精算記録4表と coaching_payments は #729 で SET NULL のまま残る）。
+func (q *Queries) DeleteCoachingContractsForCoach(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCoachingContractsForCoach, userID)
+	return err
+}
+
 const deleteCommentsForUser = `-- name: DeleteCommentsForUser :exec
 DELETE FROM comments
 WHERE author_id = $1
@@ -185,6 +201,37 @@ ON CONFLICT (id) DO NOTHING
 
 func (q *Queries) RememberDeletedAccount(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, rememberDeletedAccount, userID)
+	return err
+}
+
+const retireCoachProfileForWithdraw = `-- name: RetireCoachProfileForWithdraw :exec
+UPDATE coach_profiles
+SET status = CASE status
+    WHEN 'approved' THEN 'withdrawn'
+    WHEN 'pending' THEN 'withdrawn'
+    WHEN 'suspended' THEN 'withdrawn'
+    WHEN 'withdrawn' THEN 'ended'
+    WHEN 'rejected' THEN 'ended'
+    WHEN 'ended' THEN 'withdrawn'
+    ELSE status
+END,
+    on_duty = false,
+    updated_at = now()
+WHERE profile_id = $1
+`
+
+// 退会の削除順の修正（#730）。契約の先行削除の前に、コーチの status を終了側へ
+// 1回だけ動かし、契約がまだある状態で identity_retirement_status トリガーに
+// identity_boundary.mark_retired を実行させ、終了済み契約の updated_at を
+// retirement.last_transaction_at の起算に含める。
+// status と on_duty=false は同じ UPDATE で書く（coach_profiles_on_duty_check
+// 回避。WithdrawCoach／SuspendCoach／EndSuspendedCoach と同じ形）。
+// photo_public_id には触れない（guard_retired_media を発火させない）。
+// 同じ更新で identity_coach_change が epoch を付け替えるが、同一トランザクション内の
+// 中間状態で、直後の DeleteCoachProfileForUser で coach_epochs 行ごと消えるため無害。
+// approved／pending へは戻さない（retirement 行を消す分岐を踏まない）。
+func (q *Queries) RetireCoachProfileForWithdraw(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, retireCoachProfileForWithdraw, userID)
 	return err
 }
 

@@ -229,6 +229,16 @@ func purgeAccount(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		// 未成年の購入のたびの宣言も、同じく本人が23歳になる月の終わりまで残す。
 		q.KeepMinorPurchaseDeclarationsOnWithdraw,
 		q.RememberDeletedAccount,
+		// コーチの契約が残っていると、DeleteCoachProfileForUser からの coaching_plans の
+		// CASCADE 削除が coaching_contracts.plan_id の ON DELETE RESTRICT に当たる（#730）。
+		// 契約は DeleteProfile 時の coach_id の CASCADE でも消えるものなので、消す順番だけを
+		// 前に倒す。最終状態（契約・プラン・プロフィールが消え、精算記録4表と
+		// coaching_payments が SET NULL で残る）は変えない。
+		// その前に RetireCoachProfileForWithdraw で status を終了側へ動かし、契約がまだある
+		// 状態で identity_retirement_status に保持スナップショットを記録させる（中間 status は
+		// 同一トランザクション内だけで確定しない。epoch 付け替えも行削除で消える）。
+		q.RetireCoachProfileForWithdraw,
+		q.DeleteCoachingContractsForCoach,
 		// コーチ行は profiles への ON DELETE CASCADE でも消えるが、CASCADE 任せにせず
 		// DeleteProfile の直前で明示的に消す（退会したコーチが一覧に残らないようにする）。
 		q.DeleteCoachProfileForUser,
