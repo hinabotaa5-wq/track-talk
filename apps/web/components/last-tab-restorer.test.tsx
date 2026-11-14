@@ -37,16 +37,27 @@ async function render(pathname = "/", search = "") {
   await act(async () => root.render(<StrictMode><LastTabRestorer /></StrictMode>));
 }
 
-it("新規起動で最後のタブを復元し、復元中は保存値を上書きしない", async () => {
+it("新規起動では保存値にかかわらずコーチへ移動し、移動中は保存値を上書きしない", async () => {
   rememberLastTab("/injury", "tab=data");
   sessionStorage.clear();
   await render();
-  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/injury?tab=data", { scroll: false });
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
   expect(readLastTab()).toBe("/injury?tab=data");
-  await render("/injury", "tab=data");
   await render("/");
   expect(navigation.router.replace).toHaveBeenCalledTimes(1);
-  expect(readLastTab()).toBe("/");
+  expect(readLastTab()).toBe("/injury?tab=data");
+});
+
+it.each([
+  "/memo",
+  "/competitions?view=international",
+  "/injury?tab=data",
+  "/coaching",
+  "/",
+])("保存値にかかわらずコーチへ移動する: %s", async (saved) => {
+  localStorage.setItem("tracktalk:last-tab", saved);
+  await render();
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
 });
 
 it("初回はコーチを開き、その後のタブ移動を保存する", async () => {
@@ -92,22 +103,22 @@ it("ハッシュ付きのリンクを優先する", async () => {
   expect(navigation.router.replace).not.toHaveBeenCalled();
 });
 
-it.each(["https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("不正な保存値には移動しない: %s", async (saved) => {
+it.each(["https://example.com", "//example.com", "/login?next=/memo", "/posts/123", "constructor", "/injury#bad"])("不正な保存値でもコーチへ移動する: %s", async (saved) => {
   localStorage.setItem("tracktalk:last-tab", saved);
   await render();
-  expect(navigation.router.replace).not.toHaveBeenCalled();
-  expect(readLastTab()).toBe("/");
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
 });
 
-it("保存が制限されたブラウザでも表示を継続する", async () => {
+it("保存が制限されたブラウザでもコーチへ移動し表示を継続する", async () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
   await render();
+  expect(navigation.router.replace).toHaveBeenCalledExactlyOnceWith("/coaching", { scroll: false });
   await render("/memo");
-  expect(navigation.router.replace).not.toHaveBeenCalled();
+  expect(navigation.router.replace).toHaveBeenCalledTimes(1);
 });
 
-it("描画前の復元中は二重に移動せず保存値も維持する", async () => {
+it("描画前の移動中は二重に移動せず保存値も維持する", async () => {
   rememberLastTab("/memo", "");
   const startupWindow = window as Window & { __tracktalkLastTabRedirect?: boolean };
   startupWindow.__tracktalkLastTabRedirect = true;

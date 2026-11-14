@@ -16,7 +16,7 @@ export function LastTabRestorer() {
     if (isLastTabStartupRedirecting()) return;
     if (!checked.current) {
       checked.current = true;
-      // 起動時だけ復元する。アプリ内のホーム操作や直接開いたリンクを優先する。
+      // 起動時だけコーチへ移動する。アプリ内のホーム操作や直接開いたリンクを優先する。
       if (pathname === "/" && !search && !window.location.hash) {
         const target = resolveColdStartTarget();
         if (target) {
@@ -26,7 +26,7 @@ export function LastTabRestorer() {
         }
       }
     }
-    // 復元の完了前にホームで上書きしない。Strict Mode の再実行にも対応する。
+    // 移動の完了前にホームで上書きしない。Strict Mode の再実行にも対応する。
     if (restoring.current && pathname === "/" && !search) return;
     restoring.current = false;
     rememberLastTab(pathname, search);
