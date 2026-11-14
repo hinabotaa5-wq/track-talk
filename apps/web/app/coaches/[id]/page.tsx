@@ -178,8 +178,8 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
-          <h2 id="coach-video-review" className="text-lg font-bold">{L("フォーム添削")}</h2>
-          <p className="text-slate-200">{L("選択して下さい")}</p>
+          <h2 id="coach-video-review" className="text-lg font-bold">{L("1回プラン（フォーム添削や競技に関する悩み）")}</h2>
+          <p className="text-slate-200">{L("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。")}</p>
           <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
             {entries.map(({ key, Icon, label, note, href }) => {
               const body = <>
@@ -203,7 +203,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
-          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。添削1回につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
+          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。1回プランの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
           <Link
             href={ticketPurchaseHref}
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]"

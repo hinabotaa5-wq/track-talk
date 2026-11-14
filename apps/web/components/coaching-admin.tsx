@@ -150,7 +150,7 @@ export function RetentionHoldForm({ token }: { token: string | null }) {
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label="保全の対象" value={target} onChange={(e) => setTarget(e.target.value as "review" | "contract")} className="rounded border border-white/25 bg-slate-900 p-2 text-sm">
           <option value="contract">継続プランの契約</option>
-          <option value="review">フォーム添削の依頼</option>
+          <option value="review">1回プランの依頼</option>
         </select>
         <input aria-label="対象の ID" value={id} onChange={(e) => setId(e.target.value)} placeholder="ID" className="min-w-0 flex-1 rounded border border-white/25 bg-slate-900 p-2 text-sm" />
       </div>

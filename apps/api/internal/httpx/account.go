@@ -83,7 +83,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if blockers.OpenReviewPayment {
-		Error(w, http.StatusConflict, "review_in_progress", "支払いが確定していないフォーム添削の依頼があるあいだは退会できません。返却されてから退会するか、お問い合わせからご連絡ください")
+		Error(w, http.StatusConflict, "review_in_progress", "支払いが確定していない1回プランの依頼があるあいだは退会できません。返却されてから退会するか、お問い合わせからご連絡ください")
 		return
 	}
 	if blockers.OpenReport {

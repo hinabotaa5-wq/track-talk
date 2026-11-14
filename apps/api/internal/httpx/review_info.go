@@ -196,7 +196,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		question = strings.TrimSpace(*req.Question)
 	}
 	video := strings.TrimSpace(req.VideoPublicID)
-	replace := video != "" && video != rr.VideoPublicID
+	replace := video != "" && (rr.VideoPublicID == nil || video != *rr.VideoPublicID)
 	fields := map[string]string{}
 	switch {
 	case question == "":
@@ -213,6 +213,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
+	var replacement *string
 	if replace {
 		if !s.uploadIssuedToMe(w, r, rr.RequesterID, video, "video_public_id", "動画") {
 			return
@@ -221,8 +222,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 			writeAssetReadyError(w, err, "動画")
 			return
 		}
-	} else {
-		video = rr.VideoPublicID
+		replacement = &video
 	}
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
@@ -232,7 +232,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	q := s.q.WithTx(tx)
 	if replace {
-		if err := lockUnusedCoachingVideo(r.Context(), q, &video, nil); err != nil {
+		if err := lockUnusedCoachingVideo(r.Context(), q, replacement, nil); err != nil {
 			var rule *ticketRuleError
 			if errors.As(err, &rule) {
 				Error(w, http.StatusConflict, "conflict", rule.message)
@@ -243,7 +243,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	updated, err := q.ResubmitReviewRequest(r.Context(), db.ResubmitReviewRequestParams{
-		Question: question, VideoPublicID: video, ID: rr.ID, RequesterID: rr.RequesterID,
+		Question: question, VideoPublicID: replacement, ID: rr.ID, RequesterID: rr.RequesterID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "resubmit_expired", "再提出の期限が過ぎました")
@@ -257,9 +257,9 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	if replace {
+	if replace && rr.VideoPublicID != nil {
 		// 差し替える前の動画は、この依頼だけが使っていた。残しても見る人がいないので消す。
-		s.purgeCoachingVideos([]string{rr.VideoPublicID})
+		s.purgeCoachingVideos([]string{*rr.VideoPublicID})
 	}
 	if updated.CoachID != nil {
 		s.notifyResubmitted(r.Context(), updated)
@@ -302,7 +302,7 @@ func (s *Server) notifyUnresubmitted(ctx context.Context, rr db.ExpireUnresubmit
 	}
 	// 文面は表題1行だけにし、終了の理由とお支払いの扱いは依頼の画面で見せる（本体 #609）。
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
-		Title: "フォーム添削の依頼が終了しました",
+		Title: "1回プランの依頼が終了しました",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)

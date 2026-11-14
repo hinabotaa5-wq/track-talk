@@ -26,7 +26,7 @@ export function CoachTabs() {
   // 一度開いたパネルは消さずに隠しておき、行き来しても読み込み直さない（大会・ケガと同じ）。
   const [opened, setOpened] = useState<Set<Tab>>(() => new Set([initial]));
   const views = [
-    { id: "video", label: L("フォーム添削") },
+    { id: "video", label: L("1回プラン") },
     { id: "support", label: L("継続プラン") },
   ] as const;
   function select(next: Tab) {
@@ -61,7 +61,13 @@ export function CoachTabs() {
                 animate={item.id === tab ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {item.id === "support" ? <SupportPlanList /> : <CoachList />}
+                {item.id === "support" ? <SupportPlanList /> : <>
+                  <div className="mb-3 space-y-1 text-sm">
+                    <p className="font-semibold">{L("1回プラン（フォーム添削や競技に関する悩み）")}</p>
+                    <p className="text-slate-300">{L("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。")}</p>
+                  </div>
+                  <CoachList />
+                </>}
               </motion.div>
             ) : null,
           )}
