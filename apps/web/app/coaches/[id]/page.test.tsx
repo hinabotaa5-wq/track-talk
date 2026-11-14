@@ -204,7 +204,7 @@ it("受付状態とチケット要約の取得に失敗しても両方のボタ�
   expect(container.querySelector('section[aria-labelledby="coach-tickets"] a')?.textContent).toBe("購入する");
 });
 
-it("プロフィールは種目チップ・目立つ記録・箇条書きの実績・短いSNSラベルで出す", async () => {
+it("プロフィールは種目チップ・目立つ記録・箇条書きの実績・SNSアイコンで出す", async () => {
   await render();
   const chips = [...container.querySelectorAll("li")].filter((li) => ["100m", "200m"].includes(li.textContent ?? ""));
   expect(chips).toHaveLength(2);
@@ -214,9 +214,11 @@ it("プロフィールは種目チップ・目立つ記録・箇条書きの実�
   expect(items).toHaveLength(2);
   const sns = container.querySelector('a[href="https://www.instagram.com/testcoach/?utm_source=qr"]');
   expect(sns?.getAttribute("target")).toBe("_blank");
-  expect(sns?.textContent).toContain("Instagram");
-  expect(sns?.textContent).toContain("@testcoach");
-  expect(sns?.textContent).not.toContain("utm_source");
+  expect(sns?.getAttribute("aria-label")).toBe("Instagram @testcoach");
+  expect(sns?.getAttribute("title")).toBe("Instagram @testcoach");
+  expect(sns?.textContent).toBe("");
+  expect(sns?.querySelector("svg")).not.toBeNull();
+  expect(container.textContent).not.toContain("utm_source");
   expect(container.textContent).toContain("note-test");
 });
 

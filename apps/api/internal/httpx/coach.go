@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -201,6 +202,7 @@ type coachApplicationReq struct {
 }
 
 // normalizeCoachSnsEntries は、SNS・ホームページ欄の空行と重複を除く。
+// URL 形式の入力は http/https だけ許可する（表示側のリンク判定と揃えるための入力チェック）。
 func normalizeCoachSnsEntries(entries []string) ([]string, string) {
 	out := make([]string, 0, len(entries))
 	seen := map[string]bool{}
@@ -218,6 +220,9 @@ func normalizeCoachSnsEntries(entries []string) ([]string, string) {
 		if strings.ContainsRune(v, 0) {
 			return nil, "SNS・ホームページに使用できない文字が含まれています"
 		}
+		if e := coachSnsSchemeError(v); e != "" {
+			return nil, e
+		}
 		seen[v] = true
 		out = append(out, v)
 	}
@@ -225,6 +230,31 @@ func normalizeCoachSnsEntries(entries []string) ([]string, string) {
 		return nil, "SNS・ホームページを1件以上入力してください"
 	}
 	return out, ""
+}
+
+// coachSnsSchemeError は、URL 形式の入力の scheme を確かめる。
+// 空白を含む入力・scheme が無い入力・ドメインとポートらしいテキストは
+// URL 形式とみなさず許可する。http/https はホストと userinfo を確かめ、
+// それ以外の scheme はすべて断る。問題がなければ空文字を返す。
+func coachSnsSchemeError(v string) string {
+	const schemeErr = "SNS・ホームページの URL は http:// または https:// で始まるものだけ入力できます"
+	if strings.ContainsAny(v, " \t\n\r") {
+		return ""
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Scheme == "" {
+		return ""
+	}
+	if strings.Contains(u.Scheme, ".") {
+		return ""
+	}
+	if strings.EqualFold(u.Scheme, "http") || strings.EqualFold(u.Scheme, "https") {
+		if u.Host == "" || u.User != nil {
+			return schemeErr
+		}
+		return ""
+	}
+	return schemeErr
 }
 
 // normalizeCoachHitokoto は、ひとこと専用欄（本体 #649）を確かめる。
