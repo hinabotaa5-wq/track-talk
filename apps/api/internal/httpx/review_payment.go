@@ -73,7 +73,7 @@ func (s *Server) reviewCheckoutURL(ctx context.Context, q *db.Queries, rr db.Rev
 	price := reviewCashPrice(rr)
 	id := uuid.New()
 	page := s.cfg.WebBaseURL + "/coaching/requests/" + rr.ID.String()
-	name := "1回プラン"
+	name := "フォーム添削"
 	params := stripe.CheckoutParams{
 		Name:           name,
 		AmountYen:      int(price),

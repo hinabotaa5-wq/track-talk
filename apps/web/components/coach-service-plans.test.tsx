@@ -43,7 +43,7 @@ it("相談の入口がないコーチは受付停止の表示になり、分類�
   expect(container.textContent).toContain(plan.title);
 });
 
-it("従来の1回プランは継続プランに表示しない", async () => {
+it("従来のフォーム添削は継続プランに表示しない", async () => {
   await render([{ ...plan, service_type: "video_review" }], "c1", null);
   expect(container.textContent).not.toContain(plan.title);
 });

@@ -56,17 +56,17 @@ const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].fi
 const chip = (label: string, scope: ParentNode = container) =>
   [...scope.querySelectorAll('[role="radio"]')].find((el) => el.textContent === label) as HTMLElement | undefined;
 
-it("既定は1回プランの一覧で、見出しと説明文を出さない", async () => {
+it("既定はフォーム添削の一覧で、見出しと説明文を出さない", async () => {
   await render();
-  // 1回プラン側だけをマウントし、継続プラン側はまだ開いていない。
+  // フォーム添削側だけをマウントし、継続プラン側はまだ開いていない。
   expect(panels()).toHaveLength(1);
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
   expect(container.querySelector("h1")).toBeNull();
   expect(container.textContent).not.toContain("コーチ一覧");
-  expect(container.textContent).not.toContain("上のタブで、1回プランの指名と継続プランを切り替えられます。");
+  expect(container.textContent).not.toContain("上のタブで、フォーム添削の指名と継続プランを切り替えられます。");
   // 切り替えは共通部品 ViewSwitch（2つの選択肢・専用の layoutId）。
-  expect(switchLink("1回プラン")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("フォーム添削")?.getAttribute("href")).toBe("/coaches");
   expect(switchLink("継続プラン")?.getAttribute("href")).toBe("/coaches?tab=support");
 });
 
@@ -85,7 +85,7 @@ it("英語でも見出しを出さず、切り替えの選択肢は英語にな�
   installEnglish(en);
   setActiveLocale("en");
   await render();
-  expect(switchLink("One-time plan")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("Form review")?.getAttribute("href")).toBe("/coaches");
   expect(switchLink("Ongoing plan")?.getAttribute("href")).toBe("/coaches?tab=support");
   expect(container.textContent).not.toContain("Coaches");
 });
@@ -103,7 +103,7 @@ for (const pathname of ["/coaching", "/coaches"]) {
     expect(panels()).toHaveLength(2);
     expect(panels()[0].hidden).toBe(true);
     expect(panels()[1].hidden).toBe(false);
-    await act(async () => switchLink("1回プラン")!.click());
+    await act(async () => switchLink("フォーム添削")!.click());
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
     expect(replaceState).toHaveBeenLastCalledWith(null, "", pathname);
@@ -118,7 +118,7 @@ for (const pathname of ["/coaching", "/coaches"]) {
     await act(async () => switchLink("継続プラン")!.click());
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-    await act(async () => switchLink("1回プラン")!.click());
+    await act(async () => switchLink("フォーム添削")!.click());
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     // どちらもマウントし直していないので、再取得も読み込み表示もない。
     expect(fetchCount("/v1/coaches")).toBe(1);
@@ -131,7 +131,7 @@ for (const pathname of ["/coaching", "/coaches"]) {
 it("同じタブのクリックは何もしない", async () => {
   await render();
   replaceState.mockClear();
-  await act(async () => switchLink("1回プラン")!.click());
+  await act(async () => switchLink("フォーム添削")!.click());
   expect(replaceState).not.toHaveBeenCalled();
   expect(navigation.replace).not.toHaveBeenCalled();
   expect(navigation.push).not.toHaveBeenCalled();
@@ -147,8 +147,8 @@ it("種目チップで絞り込んだ状態が、タブを行き来しても保�
   expect(target!.getAttribute("aria-checked")).toBe("true");
   await act(async () => switchLink("継続プラン")!.click());
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-  await act(async () => switchLink("1回プラン")!.click());
-  // 1回プランの一覧は破棄されていないので、選んだチップのノードも選択も残る。
+  await act(async () => switchLink("フォーム添削")!.click());
+  // フォーム添削の一覧は破棄されていないので、選んだチップのノードも選択も残る。
   expect(panels()[0].hidden).toBe(false);
   const panel = panels()[0];
   expect(
@@ -163,7 +163,7 @@ it("継続プラン側のURLは共有できる（今いるルートのままク�
   navigation.pathname = "/coaching";
   await render();
   expect(switchLink("継続プラン")?.getAttribute("href")).toBe("/coaching?tab=support");
-  expect(switchLink("1回プラン")?.getAttribute("href")).toBe("/coaching");
+  expect(switchLink("フォーム添削")?.getAttribute("href")).toBe("/coaching");
 });
 
 it("継続プラン一覧のフラグが閉じている間は準備中だけを出し、一覧を取得しない", async () => {

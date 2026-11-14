@@ -108,7 +108,7 @@ it("公開中のまま残っている以前のプランは、非公開にだけ�
   expect(JSON.parse(save![1].body)).toMatchObject({ service_type: "in_person", additional_consultation_price_yen: 750, published: false });
 });
 
-it("非公開・1回プランのプランしかなければ、以前のプランの欄は出さない", async () => {
+it("非公開・フォーム添削のプランしかなければ、以前のプランの欄は出さない", async () => {
   await render([{ ...legacyPlan, published: false }, { ...legacyPlan, id: "v", service_type: "video_review" }]);
   expect(container.textContent).not.toContain("公開中の以前のプラン");
 });

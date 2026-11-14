@@ -178,7 +178,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
-          <h2 id="coach-video-review" className="text-lg font-bold">{L("1回プラン")}</h2>
+          <h2 id="coach-video-review" className="text-lg font-bold">{L("フォーム添削")}</h2>
           <p className="text-slate-200">{L("1回 {v0}（税込）・チケットも使えます", { v0: formatYen(reviewPriceYen) })}</p>
           <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
             {entries.map(({ key, Icon, label, note, href }) => {

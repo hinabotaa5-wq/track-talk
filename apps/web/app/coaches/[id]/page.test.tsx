@@ -72,9 +72,9 @@ async function render() {
   await act(async () => {});
 }
 
-it("未ログインでは1回プランの節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
+it("未ログインではフォーム添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
-  expect(container.textContent).toContain("1回プラン");
+  expect(container.textContent).toContain("フォーム添削");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(entry("card")?.textContent).toBe("単発500円");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -93,7 +93,7 @@ it("未ログインでは1回プランの節と3つの入口を有効なまま�
   expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。添削1回につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   expect(tickets?.previousElementSibling?.getAttribute("aria-labelledby")).toBe("coach-video-review");
-  // 1回プラン文脈（既定）ではチケット節が最後の節で、継続プラン節は続かない（本体 #694）。
+  // フォーム添削文脈（既定）ではチケット節が最後の節で、継続プラン節は続かない（本体 #694）。
   expect(tickets?.nextElementSibling).toBeNull();
   expect(tickets?.className).toBe(tickets?.previousElementSibling?.className);
   expect(tickets?.querySelector("a")?.classList.contains("w-full")).toBe(true);
@@ -245,7 +245,7 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 
-// 本体 #694：一覧で切り替えた先のプランの節だけを出す。tab=support だけがサポート文脈、それ以外は1回プラン文脈。
+// 本体 #694：一覧で切り替えた先のプランの節だけを出す。tab=support だけがサポート文脈、それ以外はフォーム添削文脈。
 const sectionIDs = () => [...container.querySelectorAll("section[aria-labelledby]")].map((s) => s.getAttribute("aria-labelledby"));
 const supportCoach: PublicCoach = {
   ...coach,
@@ -259,7 +259,7 @@ it.each([
   ["指定なし", ""],
   ["tab=video", "tab=video"],
   ["不正値", "tab=unknown"],
-])("1回プラン文脈（%s）では継続プランの節を描画せず、1回プランとチケットの節を出す", async (_label, search) => {
+])("フォーム添削文脈（%s）では継続プランの節を描画せず、フォーム添削とチケットの節を出す", async (_label, search) => {
   mocks.search = search;
   mocks.api.mockImplementation(async (path: string) => {
     if (path === `/v1/coaches/${coachID}`) return supportCoach;
@@ -276,7 +276,7 @@ it.each([
   expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
 });
 
-it("サポート文脈（tab=support）では継続プランの節だけを出し、1回プランとチケットの節を描画しない", async () => {
+it("サポート文脈（tab=support）では継続プランの節だけを出し、フォーム添削とチケットの節を描画しない", async () => {
   mocks.search = "tab=support";
   mocks.api.mockImplementation(async (path: string) => {
     if (path === `/v1/coaches/${coachID}`) return supportCoach;
@@ -296,7 +296,7 @@ it("サポート文脈（tab=support）では継続プランの節だけを出�
   expect(container.textContent).toContain("全国大会優勝");
 });
 
-it("サポート文脈では1回プランの受付状態とチケットの要約を取りに行かない", async () => {
+it("サポート文脈ではフォーム添削の受付状態とチケットの要約を取りに行かない", async () => {
   mocks.search = "tab=support";
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();

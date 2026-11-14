@@ -138,7 +138,7 @@ it("公開中の継続プランがあるコーチのカードには価格を従�
   expect(cards[1].textContent).toContain("〜");
 });
 
-it("1回プランの一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
+it("フォーム添削の一覧にも種目のチップが1列で並び、初期は「すべて」。選んだ種目のコーチだけを API の順のまま出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [
     { ...coach, id: "coach-2", nickname: "跳躍", events: ["long-jump"] },
     { ...coach, id: "coach-1", events: ["100m", "200m", "400m"] },
@@ -158,7 +158,7 @@ it("1回プランの一覧にも種目のチップが1列で並び、初期は�
   expect(container.textContent).not.toMatch(/★|ランキング|人気/);
 });
 
-it("1回プランの一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
+it("フォーム添削の一覧で該当0人の種目は空状態と「すべて」へ戻る導線を出す", async () => {
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));
   const group = container.querySelector('[role="radiogroup"][aria-label="種目で絞り込む"]')!;

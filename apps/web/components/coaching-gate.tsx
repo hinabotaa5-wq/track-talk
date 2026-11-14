@@ -24,7 +24,7 @@ export function CoachingGate({
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-3">
         <h1 className="text-2xl font-bold">{L("ただいま準備中です")}</h1>
-        <p className="text-sm leading-relaxed text-slate-200">{L("1回プランと継続プランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("フォーム添削と継続プランは準備中です。いまは指導の申込み・チケットの購入を受け付けていません。現在は、選手を支えるコーチを募集しています。")}</p>
         {startNotice && <p className="text-sm leading-relaxed text-slate-200">{startNotice}</p>}
       </div>
       <CoachApplyLink />

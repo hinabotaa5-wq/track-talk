@@ -19,7 +19,7 @@ type Adjustment = { id: string; coach_id: string | null; refund_id: string; amou
 type Data = { payments: Payment[]; refunds: Refund[]; adjustments: Adjustment[]; has_more?: boolean; page?: number; minor_refunds?: { month: MinorRefundCounts; total: MinorRefundCounts } };
 
 function minorRefundLine(label: string, c: MinorRefundCounts) {
- return `${label}：1回プラン ${c.review_count}件 ${formatYen(c.review_amount_yen)} · 追加質問 ${c.consultation_count}件 ${formatYen(c.consultation_amount_yen)}（うち管理画面から ${c.admin_count}件 ${formatYen(c.admin_amount_yen)}）`;
+ return `${label}：フォーム添削 ${c.review_count}件 ${formatYen(c.review_amount_yen)} · 追加質問 ${c.consultation_count}件 ${formatYen(c.consultation_amount_yen)}（うち管理画面から ${c.admin_count}件 ${formatYen(c.admin_amount_yen)}）`;
 }
 const statusLabels: Record<string, string> = { captured: "確定済み", paid: "支払い済み", refund_pending: "返金処理中", refunded: "返金済み", pending: "処理中", succeeded: "完了", failed: "失敗" };
 
@@ -61,7 +61,7 @@ function PaymentAdmin() {
   finally { release(); }
  }
  return <div className="mx-auto max-w-3xl space-y-5">
-  <h1 className="text-xl font-bold">1回プラン・追加質問の返金管理</h1>
+  <h1 className="text-xl font-bold">フォーム添削・追加質問の返金管理</h1>
   <Link href="/admin" className="text-sm text-blue-300 underline">運営画面に戻る</Link>
   <p className="text-sm">確定済みのカード支払いを全額返金します。送金済みのコーチ報酬は今後の報酬と相殺します。コーチ・発生元返金で絞り込み、古い記録までページを送って確認できます。</p>
   {error ? <p role="alert" className="text-red-400">{error}</p> : null}
@@ -79,11 +79,11 @@ function PaymentAdmin() {
     <h2 className="font-bold">未成年の購入の返金</h2>
     <p>{minorRefundLine("今月", data.minor_refunds.month)}</p>
     <p>{minorRefundLine("累計", data.minor_refunds.total)}</p>
-    <p className="text-xs text-slate-300">18歳未満の本人が自分で払った1回プラン・追加質問のうち、返金が済んだもの。期限切れなどの自動の返金も含みます。</p>
+    <p className="text-xs text-slate-300">18歳未満の本人が自分で払ったフォーム添削・追加質問のうち、返金が済んだもの。期限切れなどの自動の返金も含みます。</p>
    </section> : null}
    <h2 className="font-bold">支払い</h2>
    <ul className="space-y-3">{data.payments.map(p => { const key = `${p.source}:${p.id}`; return <li key={key} className="space-y-2 rounded-xl border border-white/20 p-3 text-sm">
-    <p>{p.source === "review" ? "1回プラン" : "追加質問"} · {formatYen(p.amount_yen)} · {statusLabels[p.status] ?? p.status}{p.minor ? " · 未成年の購入" : ""}</p>
+    <p>{p.source === "review" ? "フォーム添削" : "追加質問"} · {formatYen(p.amount_yen)} · {statusLabels[p.status] ?? p.status}{p.minor ? " · 未成年の購入" : ""}</p>
     <p className="break-all text-xs">{p.id} · {formatDateTime(p.created_at)}</p>
     {p.status === "captured" || p.status === "paid" || p.status === "refund_pending" ? <>
      <label className="block">返金理由<input className="mt-1 block w-full rounded border border-white/30 bg-transparent p-2" maxLength={1000} value={reasons[key] ?? ""} onChange={e => setReasons(old => ({ ...old, [key]: e.target.value }))} /></label>

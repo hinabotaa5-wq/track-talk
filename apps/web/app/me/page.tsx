@@ -32,7 +32,7 @@ const accountLinks = [
 // 旧コーチタブの「利用中の方」と同じ順・同じ遷移先。コーチングが閉じている間は行き止めの入口を出さない。
 const coachingLinks = [
   { href: "/me/coaching/tickets", get label() { return L("コーチングチケット"); }, icon: Ticket },
-  { href: "/me/coaching/requests", get label() { return L("依頼した1回プラン"); }, icon: ClipboardCheck },
+  { href: "/me/coaching/requests", get label() { return L("依頼したフォーム添削"); }, icon: ClipboardCheck },
   { href: "/coaching/support-consults", get label() { return L("1ヶ月プランの無料相談"); }, icon: MessagesSquare },
   { href: "/me/coaching/personal", get label() { return L("申し込んだ継続プラン"); }, icon: Users },
 ] as const;

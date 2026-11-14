@@ -80,7 +80,7 @@ it("未成年の購入に印を付け、未成年の購入の返金の件数と�
  mocks.api.mockResolvedValue({ ...data, payments: [{ ...data.payments[0], minor: true }], minor_refunds: { month: counts, total: { ...counts, review_count: 5 } } });
  await act(async () => root.render(<Page />));
  expect(container.textContent).toContain("未成年の購入の返金");
- expect(container.textContent).toContain("今月：1回プラン 2件 3,000円 · 追加質問 1件 500円（うち管理画面から 1件 1,500円）");
- expect(container.textContent).toContain("累計：1回プラン 5件");
+ expect(container.textContent).toContain("今月：フォーム添削 2件 3,000円 · 追加質問 1件 500円（うち管理画面から 1件 1,500円）");
+ expect(container.textContent).toContain("累計：フォーム添削 5件");
  expect(container.textContent).toContain("· 未成年の購入");
 });
