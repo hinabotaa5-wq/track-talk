@@ -1413,13 +1413,3 @@ type SupportFaultDetermination struct {
 	ReviewedBy     *uuid.UUID `json:"reviewed_by"`
 	ReviewedAt     *time.Time `json:"reviewed_at"`
 }
-
-type TargetMeet struct {
-	ProfileID uuid.UUID  `json:"profile_id"`
-	Source    string     `json:"source"`
-	Ref       string     `json:"ref"`
-	Name      string     `json:"name"`
-	StartsOn  time.Time  `json:"starts_on"`
-	EndsOn    *time.Time `json:"ends_on"`
-	UpdatedAt time.Time  `json:"updated_at"`
-}

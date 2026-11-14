@@ -19,7 +19,6 @@ import { INTERNATIONAL } from "@/lib/prefectures";
 import { isOngoing, isOver, seasonSchedule, type MonthGroup, type Scheduled } from "@/lib/season-schedule";
 import { todayInTokyo } from "@/lib/format";
 import { useNow } from "@/lib/use-now";
-import { TargetMeetButton } from "@/components/target-meet-button";
 import type { Competition, DomesticMajor, MeetThread } from "@/lib/types";
 
 type View = "domestic" | "international";
@@ -247,7 +246,6 @@ function ScheduleCard({
   timetableURL,
   over,
   thread,
-  action,
   children,
 }: {
   href: string;
@@ -255,18 +253,16 @@ function ScheduleCard({
   timetableURL?: string;
   over: boolean;
   thread?: MeetThread;
-  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className={`${cardBase} relative ${thread ? "border-amber-300/60" : ""} ${over ? "opacity-80" : ""}`}>
-      {action}
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`block transition-colors hover:text-blue-300 ${action ? "pr-10" : ""}`}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className="block transition-colors hover:text-blue-300">
           {children}
           {linkLabel ? <p className="text-sm text-blue-400">{linkLabel}</p> : null}
         </a>
-      ) : <div className={action ? "pr-10" : ""}>{children}</div>}
+      ) : <div>{children}</div>}
       {timetableURL ? <a href={timetableURL} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit text-sm text-blue-300 underline underline-offset-4">{L("タイムテーブル")}</a> : null}
       {thread ? (
         <Link href={thread.href} className="mt-2 flex items-center justify-between gap-2 rounded-row bg-amber-400/20 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/30 active:scale-[0.98]">
@@ -293,7 +289,6 @@ function DomesticCard({ major, today, thread, timetableURL }: { major: DomesticM
       linkLabel={major.site_url ? L("公式サイト") : ""}
       over={isOver(major, today)}
       thread={thread}
-      action={isOver(major, today) ? null : <TargetMeetButton className="absolute right-3 top-3" source="major" meetRef={`${major.slug}:${major.year}`} name={major.name} />}
     >
       <p className="text-xs text-slate-200">
         {localizeJaDate(major.schedule_label)}

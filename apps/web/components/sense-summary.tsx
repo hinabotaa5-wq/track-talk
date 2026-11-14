@@ -157,14 +157,14 @@ export function SenseSummaryCard({ state, compact = false }: { state: ReturnType
   const { summaries, cursor, pendingNotes, minNotes, loaded, loadingMore, error, busy, create, loadMore, retry } = state;
   const shortBy = Math.max(0, minNotes - pendingNotes);
   return (
-    <section className={compact ? "min-w-0 space-y-2" : "app-card space-y-3 p-4"} aria-label={L("AI要約")}>
-      <div className={compact ? "space-y-1.5" : "flex flex-wrap items-center justify-between gap-3"}>
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-amber-200" aria-hidden />{L("AI要約")}</h2>
+    <section className={compact ? "min-w-0 space-y-3" : "app-card space-y-3 p-4"} aria-label={L("AI要約")}>
+      <div className={compact ? "space-y-2" : "flex flex-wrap items-center justify-between gap-3"}>
+        <h2 className={compact ? "flex items-center gap-2 text-base font-semibold" : "flex items-center gap-1.5 text-sm font-semibold"}>
+          <Sparkles className={compact ? "h-5 w-5 text-amber-200" : "h-4 w-4 text-amber-200"} aria-hidden />{L("AI要約")}</h2>
         {loaded ? shortBy > 0 ? (
-          <span className="block text-xs text-slate-300">{L("あと{shortBy}個でまとめられます", { shortBy })}</span>
+          <span className={compact ? "block text-sm text-slate-300" : "block text-xs text-slate-300"}>{L("あと{shortBy}個でまとめられます", { shortBy })}</span>
         ) : (
-          <Button variant="secondary" className="border-amber-300/50 bg-amber-300/20 px-3 py-1 text-xs text-amber-100 hover:bg-amber-300/30 hover:text-amber-50 active:bg-amber-300/40" onClick={create} disabled={busy}>
+          <Button variant="secondary" className={compact ? "border-amber-300/50 bg-amber-300/20 px-4 py-1.5 text-sm text-amber-100 hover:bg-amber-300/30 hover:text-amber-50 active:bg-amber-300/40" : "border-amber-300/50 bg-amber-300/20 px-3 py-1 text-xs text-amber-100 hover:bg-amber-300/30 hover:text-amber-50 active:bg-amber-300/40"} onClick={create} disabled={busy}>
             {busy ? L("まとめています...") : L("{minNotes}個の感覚をまとめる", { minNotes })}
           </Button>
         ) : null}
