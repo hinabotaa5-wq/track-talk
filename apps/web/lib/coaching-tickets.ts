@@ -33,5 +33,13 @@ export const ticketStatusLabels: Record<TicketPurchase["status"], string> = {
   get pending() { return L("お支払い待ち"); }, get paid() { return L("購入済み"); }, get partially_refunded() { return L("一部返金済み"); }, get refunded() { return L("返金済み"); },
 };
 export const ticketLedgerLabels: Record<string, string> = {
+  get referral_grant() { return L("紹介特典"); },
   get purchase() { return L("購入"); }, get reserve() { return L("依頼分を確保"); }, get consume() { return L("添削・相談完了"); }, get release() { return L("確保を解除"); }, get refund() { return L("返金分を確保"); }, get refund_failed() { return L("返金できなかった分を戻しました"); }, get expire() { return L("有効期限切れで失効"); },
+};
+
+export type Referral = {
+  code: string;
+  friend_count: number;
+  granted_at: string | null;
+  expires_at: string | null;
 };

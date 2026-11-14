@@ -65,8 +65,8 @@ func TestTicketExpiryReminders(t *testing.T) {
 	if rec := tick(t, h, "tick-secret"); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ticket_expiry_reminders":0`) {
 		t.Fatalf("far %d %s", rec.Code, rec.Body.String())
 	}
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '20 days' WHERE id=$1`, first)
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '3 days' WHERE id=$1`, second)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '20 days' WHERE purchase_id=$1`, first)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '3 days' WHERE purchase_id=$1`, second)
 	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"ticket_expiry_reminders":2`) {
 		t.Fatalf("first reminders %s", rec.Body.String())
 	}
@@ -77,7 +77,7 @@ func TestTicketExpiryReminders(t *testing.T) {
 		t.Fatalf("7-day body %s", body)
 	}
 	var r30, r7 int
-	queryRowArgs(t, `SELECT (reminded_30_at IS NOT NULL)::int, (reminded_7_at IS NOT NULL)::int FROM coaching_ticket_lots WHERE id=$1`, []any{second}, &r30, &r7)
+	queryRowArgs(t, `SELECT (reminded_30_at IS NOT NULL)::int, (reminded_7_at IS NOT NULL)::int FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{second}, &r30, &r7)
 	if r30 != 1 || r7 != 1 {
 		t.Fatalf("7-day lot marks %d %d", r30, r7)
 	}
@@ -86,7 +86,7 @@ func TestTicketExpiryReminders(t *testing.T) {
 		t.Fatalf("repeat %s", rec.Body.String())
 	}
 	// 30日前の知らせを送ったロットも、7日前を切ったら7日前の知らせを1回送る。
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '6 days' WHERE id=$1`, first)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()+interval '6 days' WHERE purchase_id=$1`, first)
 	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"ticket_expiry_reminders":1`) {
 		t.Fatalf("7-day after 30 %s", rec.Body.String())
 	}
@@ -100,7 +100,7 @@ func TestTicketExpiryReminders(t *testing.T) {
 		t.Fatal("30-day reminder missing")
 	}
 	// 使い切ったロットには送らない。
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET available=0, consumed=consumed+available, expires_at=now()+interval '20 days', reminded_30_at=NULL, reminded_7_at=NULL WHERE id=$1`, first)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET available=0, consumed=consumed+available, expires_at=now()+interval '20 days', reminded_30_at=NULL, reminded_7_at=NULL WHERE purchase_id=$1`, first)
 	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"ticket_expiry_reminders":0`) {
 		t.Fatalf("used up %s", rec.Body.String())
 	}

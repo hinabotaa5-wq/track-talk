@@ -14,8 +14,8 @@ SELECT * FROM coaching_ticket_purchases WHERE id = $1;
 SELECT * FROM coaching_ticket_purchases WHERE id = $1 FOR UPDATE;
 
 -- name: CreateTicketPurchase :one
-INSERT INTO coaching_ticket_purchases (id, owner_id, request_key, product_id, quantity, amount_yen, session_expires_at, return_path)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
+INSERT INTO coaching_ticket_purchases (id, owner_id, request_key, product_id, quantity, amount_yen, session_expires_at, return_path, referral_code)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *;
 
 -- name: SaveTicketCheckout :exec
 UPDATE coaching_ticket_purchases SET checkout_session_id = $2, checkout_url = $3
@@ -32,8 +32,9 @@ UPDATE coaching_ticket_purchases SET wording_version = $2 WHERE id = $1 AND word
 
 -- name: CreateTicketLot :exec
 -- 有効期限は決済完了日時の6か月後（本体 #569）。
-INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available, expires_at)
-VALUES ($1,$2,$3,$3,sqlc.arg(paid_at)::timestamptz + interval '6 months');
+-- ロットの id は購入の id とは別の固有値（000168）。購入との対応は purchase_id。
+INSERT INTO coaching_ticket_lots (id, purchase_id, owner_id, quantity, available, expires_at)
+VALUES ($1,$2,$3,$4,$4,sqlc.arg(paid_at)::timestamptz + interval '6 months');
 
 -- name: TicketBalance :one
 -- 期限を過ぎたロットは、失効の処理（tick）を待たずに使える枚数から外す。
@@ -67,8 +68,10 @@ UPDATE coaching_ticket_lots SET available = available + sqlc.arg(available_delta
 WHERE id = sqlc.arg(id);
 
 -- name: InsertTicketLedger :exec
-INSERT INTO coaching_ticket_ledger (id, lot_id, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+-- 台帳はロット（lot_id）と購入（purchase_ref）の両方を指す（000168）。
+-- 紹介特典の行には購入がないため purchase_ref は NULL になる。
+INSERT INTO coaching_ticket_ledger (id, lot_id, purchase_ref, operation_key, kind, available_delta, reserved_delta, consumed_delta, refunded_delta, expired_delta)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
 -- name: ListTicketLotsToExpire :many
 -- 期限を過ぎて、まだ使える枚数が残っているロット。
@@ -166,7 +169,7 @@ SELECT p.id,p.request_key,p.quantity,p.amount_yen,p.status,p.refunded_yen,p.crea
     COALESCE(l.available,0)::integer AS available,COALESCE(l.reserved,0)::integer AS reserved,
     COALESCE(l.consumed,0)::integer AS consumed,COALESCE(l.expired,0)::integer AS expired,l.expires_at,
     EXISTS(SELECT 1 FROM coaching_ticket_refunds f WHERE f.purchase_id=p.id AND f.status='pending')::boolean AS refund_pending
-FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.id = p.id
+FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.purchase_id = p.id
 WHERE p.owner_id = $1 ORDER BY p.created_at DESC LIMIT 100;
 
 -- name: ListMyTicketLedger :many
@@ -180,7 +183,7 @@ SELECT p.id,p.owner_id,p.quantity,p.amount_yen,p.status,p.refunded_yen,p.created
     COALESCE(l.expired,0)::integer AS expired,l.expires_at,
     pr.nickname,
     EXISTS(SELECT 1 FROM coaching_ticket_refunds r WHERE r.purchase_id = p.id AND r.status = 'pending')::boolean AS refund_pending
-FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.id = p.id
+FROM coaching_ticket_purchases p LEFT JOIN coaching_ticket_lots l ON l.purchase_id = p.id
 LEFT JOIN profiles pr ON pr.id = p.owner_id ORDER BY p.created_at DESC LIMIT 200;
 
 -- name: TicketReconciliation :many
@@ -235,3 +238,9 @@ UPDATE coaching_ticket_lots SET
 WHERE id = sqlc.arg(id) AND reminded_7_at IS NULL
   AND (sqlc.arg(days)::int = 7 OR reminded_30_at IS NULL)
 RETURNING id;
+
+-- name: LockPurchasedTicketLot :one
+SELECT * FROM coaching_ticket_lots WHERE purchase_id = $1 FOR UPDATE;
+
+-- name: GetPurchasedTicketLot :one
+SELECT * FROM coaching_ticket_lots WHERE purchase_id = $1;

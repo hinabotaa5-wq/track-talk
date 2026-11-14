@@ -108,6 +108,30 @@ func TestCoachingUpgradePreservesLegacyData(t *testing.T) {
 		}
 		before[table] = row
 	}
+	src, err = iofs.New(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err = gomigrate.NewWithSourceInstance("iofs", src, migrationURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Migrate(166); err != nil {
+		m.Close()
+		t.Fatal(err)
+	}
+	m.Close()
+	_, err = conn.Exec(ctx, `
+ INSERT INTO coaching_ticket_purchases(id,owner_id,request_key,product_id,quantity,amount_yen,status,session_expires_at,return_path,payment_intent_id,paid_at)
+ VALUES ('00000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000002',gen_random_uuid(),'six',6,2500,'paid',now(),'/coaching/new','pi_legacy_pack',now());
+ INSERT INTO coaching_ticket_lots(id,owner_id,quantity,available,expires_at)
+ VALUES ('00000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000002',6,6,now()+interval '6 months');
+ INSERT INTO coaching_ticket_ledger(id,lot_id,operation_key,kind,available_delta)
+ VALUES (gen_random_uuid(),'00000000-0000-0000-0000-000000000009','legacy-pack','purchase',6);
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := appmigrate.Up(migrationURL); err != nil {
 		t.Fatal(err)
 	}
@@ -135,6 +159,13 @@ func TestCoachingUpgradePreservesLegacyData(t *testing.T) {
 	var legacy bool
 	if err := conn.QueryRow(ctx, `SELECT service_type IS NULL AND plan_description IS NULL AND additional_consultation_price_yen IS NULL AND fulfillment_version=0 FROM coaching_contracts`).Scan(&legacy); err != nil || !legacy {
 		t.Fatalf("legacy contract classification: %v %v", legacy, err)
+	}
+	var migratedPack bool
+	if err := conn.QueryRow(ctx, `SELECT l.id=l.purchase_id AND l.kind='purchase' AND l.available=6
+		AND l.expires_at IS NOT NULL AND e.available_delta=6 AND c.issued_by='backfill'
+		FROM coaching_ticket_lots l JOIN coaching_ticket_ledger e ON e.lot_id=l.id
+		JOIN coaching_referral_codes c ON c.owner_id=l.owner_id WHERE e.operation_key='legacy-pack'`).Scan(&migratedPack); err != nil || !migratedPack {
+		t.Fatalf("legacy pack migration or referral backfill: %v %v", migratedPack, err)
 	}
 	var reservations int
 	if err := conn.QueryRow(ctx, `SELECT count(*) FROM coaching_ticket_reservations`).Scan(&reservations); err != nil || reservations != 0 {

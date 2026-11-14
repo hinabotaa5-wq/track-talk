@@ -126,8 +126,8 @@ func TestReconciliationDetectsAccountingIssuesAndProtectsAdminAccess(t *testing.
 	}
 	// 制約内で金額を壊しても検出し、通常の送金待ちと区別する。
 	execSQLArgs(t, `UPDATE coach_earnings SET amount_yen=amount_yen-1 WHERE review_request_id=$1`, request)
-	execSQLArgs(t, `UPDATE coaching_ticket_ledger SET available_delta=available_delta-1 WHERE lot_id=$1 AND kind='purchase'`, lot)
-	execSQLArgs(t, `INSERT INTO coaching_ticket_purchases(id,owner_id,request_key,product_id,quantity,amount_yen,status,session_expires_at,return_path,payment_intent_id,paid_at) SELECT $1,owner_id,$3,'single',1,500,'paid',now(),'/coaching/new',$4,now() FROM coaching_ticket_lots WHERE id=$2`, uuid.New(), lot, uuid.New(), "pi_missing_lot")
+	execSQLArgs(t, `UPDATE coaching_ticket_ledger SET available_delta=available_delta-1 WHERE purchase_ref=$1 AND kind='purchase'`, lot)
+	execSQLArgs(t, `INSERT INTO coaching_ticket_purchases(id,owner_id,request_key,product_id,quantity,amount_yen,status,session_expires_at,return_path,payment_intent_id,paid_at) SELECT $1,owner_id,$3,'single',1,500,'paid',now(),'/coaching/new',$4,now() FROM coaching_ticket_lots WHERE purchase_id=$2`, uuid.New(), lot, uuid.New(), "pi_missing_lot")
 	result = reconciliation(t, h, admin)
 	if result["ticket_lot_ledger_mismatches"] != 1 || result["paid_purchases_without_lot"] != 1 || result["consumed_ticket_earnings_mismatches"] != 1 {
 		t.Fatalf("issues %+v", result)

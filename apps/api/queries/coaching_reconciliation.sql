@@ -9,7 +9,7 @@ SELECT
  ) AS ticket_lot_ledger_mismatches,
  (SELECT count(*)::int FROM coaching_ticket_purchases p
    WHERE p.status IN ('paid','partially_refunded','refunded')
-   AND NOT EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.id=p.id)
+   AND NOT EXISTS(SELECT 1 FROM coaching_ticket_lots l WHERE l.purchase_id=p.id)
  ) AS paid_purchases_without_lot,
  (SELECT count(*)::int FROM coaching_ticket_reservations t
    WHERE t.status='consumed' AND (

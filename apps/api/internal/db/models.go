@@ -484,6 +484,33 @@ type CoachingPlan struct {
 	ConsultTemplate                bool       `json:"consult_template"`
 }
 
+type CoachingReferralCode struct {
+	OwnerID  uuid.UUID `json:"owner_id"`
+	Code     string    `json:"code"`
+	IssuedAt time.Time `json:"issued_at"`
+	IssuedBy string    `json:"issued_by"`
+}
+
+type CoachingReferralCount struct {
+	ID               uuid.UUID  `json:"id"`
+	ReferrerID       *uuid.UUID `json:"referrer_id"`
+	BuyerID          *uuid.UUID `json:"buyer_id"`
+	TicketPurchaseID *uuid.UUID `json:"ticket_purchase_id"`
+	ReviewPaymentID  *uuid.UUID `json:"review_payment_id"`
+	CountedAt        time.Time  `json:"counted_at"`
+	CanceledAt       *time.Time `json:"canceled_at"`
+}
+
+type CoachingReferralReward struct {
+	LotID              uuid.UUID  `json:"lot_id"`
+	ReferrerID         *uuid.UUID `json:"referrer_id"`
+	FirstCountID       *uuid.UUID `json:"first_count_id"`
+	SecondCountID      *uuid.UUID `json:"second_count_id"`
+	GrantedAt          time.Time  `json:"granted_at"`
+	CanceledAt         *time.Time `json:"canceled_at"`
+	QualifyingRefundAt *time.Time `json:"qualifying_refund_at"`
+}
+
 type CoachingTicketAllocation struct {
 	ReservationID uuid.UUID `json:"reservation_id"`
 	LotID         uuid.UUID `json:"lot_id"`
@@ -491,16 +518,17 @@ type CoachingTicketAllocation struct {
 }
 
 type CoachingTicketLedger struct {
-	ID             uuid.UUID `json:"id"`
-	LotID          uuid.UUID `json:"lot_id"`
-	OperationKey   string    `json:"operation_key"`
-	Kind           string    `json:"kind"`
-	AvailableDelta int32     `json:"available_delta"`
-	ReservedDelta  int32     `json:"reserved_delta"`
-	ConsumedDelta  int32     `json:"consumed_delta"`
-	RefundedDelta  int32     `json:"refunded_delta"`
-	CreatedAt      time.Time `json:"created_at"`
-	ExpiredDelta   int32     `json:"expired_delta"`
+	ID             uuid.UUID  `json:"id"`
+	LotID          uuid.UUID  `json:"lot_id"`
+	OperationKey   string     `json:"operation_key"`
+	Kind           string     `json:"kind"`
+	AvailableDelta int32      `json:"available_delta"`
+	ReservedDelta  int32      `json:"reserved_delta"`
+	ConsumedDelta  int32      `json:"consumed_delta"`
+	RefundedDelta  int32      `json:"refunded_delta"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ExpiredDelta   int32      `json:"expired_delta"`
+	PurchaseRef    *uuid.UUID `json:"purchase_ref"`
 }
 
 type CoachingTicketLot struct {
@@ -516,6 +544,8 @@ type CoachingTicketLot struct {
 	Expired      int32      `json:"expired"`
 	Reminded30At *time.Time `json:"reminded_30_at"`
 	Reminded7At  *time.Time `json:"reminded_7_at"`
+	PurchaseID   *uuid.UUID `json:"purchase_id"`
+	Kind         string     `json:"kind"`
 }
 
 type CoachingTicketProduct struct {
@@ -543,6 +573,7 @@ type CoachingTicketPurchase struct {
 	RefundedYen       int32      `json:"refunded_yen"`
 	CreatedAt         time.Time  `json:"created_at"`
 	WordingVersion    *string    `json:"wording_version"`
+	ReferralCode      *string    `json:"referral_code"`
 }
 
 type CoachingTicketRefund struct {
@@ -1185,6 +1216,7 @@ type ReviewPayment struct {
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	Minor             bool       `json:"minor"`
+	ReferralCode      *string    `json:"referral_code"`
 }
 
 type ReviewPaymentEarningLink struct {

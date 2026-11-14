@@ -22,7 +22,7 @@ func TestTicketsExpireSixMonthsAfterPayment(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 	purchase := buySixTickets(t, h, tu)
 	var months int
-	queryRowArgs(t, `SELECT (l.expires_at = p.paid_at + interval '6 months')::int FROM coaching_ticket_lots l JOIN coaching_ticket_purchases p ON p.id=l.id WHERE l.id=$1`, []any{purchase}, &months)
+	queryRowArgs(t, `SELECT (l.expires_at = p.paid_at + interval '6 months')::int FROM coaching_ticket_lots l JOIN coaching_ticket_purchases p ON p.id=l.purchase_id WHERE l.purchase_id=$1`, []any{purchase}, &months)
 	if months != 1 {
 		t.Fatal("expiry is not six months after payment")
 	}
@@ -32,7 +32,7 @@ func TestTicketsExpireSixMonthsAfterPayment(t *testing.T) {
 	}
 	review := ticketReview(t, h, tu)
 
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	// 失効の処理の前でも、期限を過ぎた分は使えない。
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 0 {
 		t.Fatalf("expired tickets still usable %d", got)
@@ -57,12 +57,12 @@ func TestTicketsExpireSixMonthsAfterPayment(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	var available, reserved, expired int
-	queryRowArgs(t, `SELECT available,reserved,expired FROM coaching_ticket_lots WHERE id=$1`, []any{purchase}, &available, &reserved, &expired)
+	queryRowArgs(t, `SELECT available,reserved,expired FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{purchase}, &available, &reserved, &expired)
 	if available != 0 || reserved != 0 || expired != 6 {
 		t.Fatalf("lot %d %d %d", available, reserved, expired)
 	}
 	var expireRows, expireTotal int
-	queryRowArgs(t, `SELECT count(*),sum(expired_delta)::int FROM coaching_ticket_ledger WHERE lot_id=$1 AND kind='expire'`, []any{purchase}, &expireRows, &expireTotal)
+	queryRowArgs(t, `SELECT count(*),sum(expired_delta)::int FROM coaching_ticket_ledger WHERE purchase_ref=$1 AND kind='expire'`, []any{purchase}, &expireRows, &expireTotal)
 	if expireRows != 2 || expireTotal != 6 {
 		t.Fatalf("expire ledger %d %d", expireRows, expireTotal)
 	}
@@ -81,7 +81,7 @@ func TestTicketReservedBeforeExpiryIsConsumedOnReturn(t *testing.T) {
 	_, tu := demoRequester(t, h, admin)
 	purchase := buySixTickets(t, h, tu)
 	review := ticketReview(t, h, tu)
-	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE id=$1`, purchase)
+	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	offers := coachRequests(t, h, tc).Reviewing
 	if len(offers) != 1 {
 		t.Fatalf("offers %+v", offers)
@@ -93,7 +93,7 @@ func TestTicketReservedBeforeExpiryIsConsumedOnReturn(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	var consumed int
-	queryRowArgs(t, `SELECT consumed FROM coaching_ticket_lots WHERE id=$1`, []any{purchase}, &consumed)
+	queryRowArgs(t, `SELECT consumed FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{purchase}, &consumed)
 	var earnings int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE review_request_id=$1 AND coach_id=$2`, []any{review, coach}, &earnings)
 	if consumed != 1 || earnings != 350 {
