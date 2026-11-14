@@ -268,3 +268,51 @@ func TestDeletedAccountTokenCannotRecreateProfile(t *testing.T) {
 		t.Fatalf("withdraw again %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// 退会したコーチが公開一覧に残らないこと（Issue #665 の回帰テスト）。
+// 承認済みコーチ＋公開プラン1件＋受付設定（無料相談の受付＋空き状況）を作り、退会後に
+// profiles／coach_profiles の行が消え、公開一覧・詳細・サポートプラン一覧のいずれにも
+// 出ないことを確かめる。
+func TestDeleteAccountRemovesApprovedCoach(t *testing.T) {
+	h := setup(t)
+	coach, tc := consultCoach(t, h)
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/availability", tc, availabilityBody(availabilityDay(2), "available", "")); rec.Code != http.StatusOK {
+		t.Fatalf("availability %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 退会前は公開一覧・詳細・サポートプラン一覧のすべてに出る。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); !strings.Contains(body, coach.String()) {
+		t.Fatalf("coach missing from public list before withdraw: %s", body)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coaches/"+coach.String(), "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("detail before withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches/support-plan", "", nil).Body.String(); !strings.Contains(body, coach.String()) {
+		t.Fatalf("coach missing from support-plan list before withdraw: %s", body)
+	}
+
+	rec := doJSON(t, h, http.MethodDelete, "/v1/me", tc, map[string]string{"confirm": "退会する"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
+	}
+
+	var profiles, coachProfiles int
+	queryRowArgs(t, `SELECT count(*) FROM profiles WHERE id = $1`, []any{coach}, &profiles)
+	queryRowArgs(t, `SELECT count(*) FROM coach_profiles WHERE profile_id = $1`, []any{coach}, &coachProfiles)
+	if profiles != 0 {
+		t.Fatalf("profiles row remains after withdraw")
+	}
+	if coachProfiles != 0 {
+		t.Fatalf("coach_profiles row remains after withdraw")
+	}
+
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); strings.Contains(body, coach.String()) {
+		t.Fatalf("coach remains in public list after withdraw: %s", body)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coaches/"+coach.String(), "", nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("detail after withdraw %d %s", rec.Code, rec.Body.String())
+	}
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches/support-plan", "", nil).Body.String(); strings.Contains(body, coach.String()) {
+		t.Fatalf("coach remains in support-plan list after withdraw: %s", body)
+	}
+}
