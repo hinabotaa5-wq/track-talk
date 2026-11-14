@@ -10,7 +10,7 @@ test("フィードの見出しとモバイルナビを表示する", async ({ pa
   await expect(page.getByRole("link", { name: "Instagram（@tracktalk.office）" })).toBeVisible();
   // 下のメニューから主な画面へ行ける。
   const nav = page.getByRole("navigation", { name: "メイン" });
-  await expect(nav.getByRole("link")).toHaveText(["コーチ", "大会", "フィード", "メモ", "ケガ"]);
+  await expect(nav.getByRole("link")).toHaveText(["コーチ", "メモ", "フィード", "大会", "ケガ"]);
   await expect(nav.getByRole("link", { name: "フィード", exact: true })).toHaveAttribute("href", "/");
   await expect(page.getByRole("heading", { name: "フィード", exact: true })).toBeVisible();
 });
@@ -22,7 +22,7 @@ test.describe("英語のデスクトップナビ", () => {
     await page.goto("/?sort=new");
     const nav = page.locator("header nav[data-main-nav]");
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveText(["Coach", "Meets", "Feed", "Notes", "Injury"]);
+    await expect(nav.getByRole("link")).toHaveText(["Coach", "Notes", "Feed", "Meets", "Injury"]);
     await expect(nav.getByRole("link", { name: "Feed", exact: true })).toHaveAttribute("href", "/");
     await expect(page.getByRole("heading", { name: "Feed", exact: true })).toBeVisible();
   });

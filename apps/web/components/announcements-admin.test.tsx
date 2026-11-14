@@ -66,7 +66,7 @@ it("人数を見て「送信」と入力するまで、全員には送れない"
 it("下部バーと同じ5つのアイコンから通知の移動先を選べる", async () => {
   await act(async () => root.render(<AnnouncementsAdmin token="t" />));
   const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
-  expect([...radios].map((input) => input.value)).toEqual(["/coaching", "/competitions", "/", "/memo", "/injury"]);
+  expect([...radios].map((input) => input.value)).toEqual(["/coaching", "/memo", "/", "/competitions", "/injury"]);
   expect(container.textContent).not.toContain("サイト内のパス");
   await act(async () => {
     type(container.querySelector("input")!, "お知らせ");
