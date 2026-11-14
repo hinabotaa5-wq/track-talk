@@ -47,6 +47,7 @@ func responseBody() map[string]any {
 		"good_point": "1台目までの8歩が安定しています",
 		"fix_points": []string{"踏切が近いので、半足ぶん手前で踏み切りましょう", " ", "抜き脚の膝を高く"},
 		"drill":      "ミニハードル5台を1.5m間隔で並べて、3セット",
+		"hitokoto":   "次は抜き脚だけ意識してみましょう",
 	}
 }
 
@@ -71,6 +72,27 @@ func TestReviewResponseFlow(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("3 fixes %d", rec.Code)
 	}
+	// ひとことが無い・空・長すぎ・連絡先らしき内容だと止める。
+	bad = responseBody()
+	delete(bad, "hitokoto")
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) {
+		t.Fatalf("missing hitokoto %d %s", rec.Code, rec.Body.String())
+	}
+	bad = responseBody()
+	bad["hitokoto"] = "   "
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) {
+		t.Fatalf("empty hitokoto %d %s", rec.Code, rec.Body.String())
+	}
+	bad = responseBody()
+	bad["hitokoto"] = strings.Repeat("あ", 301)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) {
+		t.Fatalf("long hitokoto %d %s", rec.Code, rec.Body.String())
+	}
+	bad = responseBody()
+	bad["hitokoto"] = "続きは coach@example.com に送ります"
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) {
+		t.Fatalf("hitokoto contact %d %s", rec.Code, rec.Body.String())
+	}
 	// 引き受けていないコーチは返答できない。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tother, responseBody()); rec.Code != http.StatusConflict {
 		t.Fatalf("other coach %d", rec.Code)
@@ -84,6 +106,16 @@ func TestReviewResponseFlow(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"returned"`) {
 		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
 	}
+	// 直す点2つ（空の3つ目は捨てる）でも保存できる。
+	var saved map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &saved); err != nil {
+		t.Fatalf("response json %v", err)
+	}
+	resp, _ := saved["response"].(map[string]any)
+	fixes, _ := resp["fix_points"].([]any)
+	if len(fixes) != 2 {
+		t.Fatalf("fix_points len %d, want 2 (%s)", len(fixes), rec.Body.String())
+	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusConflict {
 		t.Fatalf("second response %d", rec.Code)
 	}
@@ -91,6 +123,9 @@ func TestReviewResponseFlow(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, `"status":"returned"`) || !strings.Contains(body, "抜き脚の膝を高く") || strings.Contains(body, `" "`) {
 		t.Fatalf("requester view %s", body)
+	}
+	if !strings.Contains(body, `"hitokoto":"次は抜き脚だけ意識してみましょう"`) {
+		t.Fatalf("requester hitokoto %s", body)
 	}
 	// 返答と一緒にコーチのプロフィールが届く。
 	if !strings.Contains(body, `"best_record":"100m 10秒95（2025年）"`) || !strings.Contains(body, `"achievements":"インターハイ 100m 準決勝"`) {

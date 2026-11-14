@@ -621,6 +621,8 @@ type InsertTicketLedgerParams struct {
 	ExpiredDelta   int32      `json:"expired_delta"`
 }
 
+// 台帳はロット（lot_id）と購入（purchase_ref）の両方を指す（000168）。
+// 紹介特典の行には購入がないため purchase_ref は NULL になる。
 func (q *Queries) InsertTicketLedger(ctx context.Context, arg InsertTicketLedgerParams) error {
 	_, err := q.db.Exec(ctx, insertTicketLedger,
 		arg.ID,

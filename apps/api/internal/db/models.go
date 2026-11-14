@@ -1288,6 +1288,7 @@ type ReviewResponse struct {
 	HelpfulAskedAt     *time.Time `json:"helpful_asked_at"`
 	HiddenAt           *time.Time `json:"hidden_at"`
 	ClarifyBody        *string    `json:"clarify_body"`
+	Hitokoto           *string    `json:"hitokoto"`
 }
 
 type SenseNote struct {

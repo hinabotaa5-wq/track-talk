@@ -18,7 +18,7 @@ import (
 )
 
 // 添削の返答・評価。
-// コーチは良い点1つ、直す点1〜2つ、ドリル1つ（各300字）と、任意で見本動画を返す。
+// コーチは良い点1つ、直す点1〜2つ、ドリル1つ、ひとこと1つ（各300字）と、任意で見本動画を返す。
 // ★の評価と、7日後の「役に立ちましたか」も扱う。
 
 const maxResponseChars = 300
@@ -58,6 +58,7 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		"good_point":           rs.GoodPoint,
 		"fix_points":           rs.FixPoints,
 		"drill":                rs.Drill,
+		"hitokoto":             rs.Hitokoto,
 		"created_at":           rs.CreatedAt,
 		"clarify_reason":       rs.ClarifyReason,
 		"clarify_body":         rs.ClarifyBody,
@@ -170,6 +171,7 @@ type reviewResponseReq struct {
 	GoodPoint         string   `json:"good_point"`
 	FixPoints         []string `json:"fix_points"`
 	Drill             string   `json:"drill"`
+	Hitokoto          string   `json:"hitokoto"`
 	DemoVideoPublicID string   `json:"demo_video_public_id"`
 }
 
@@ -190,6 +192,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	good := strings.TrimSpace(req.GoodPoint)
 	drill := strings.TrimSpace(req.Drill)
+	hitokoto := strings.TrimSpace(req.Hitokoto)
 	fixes := []string{}
 	for _, f := range req.FixPoints {
 		if f = strings.TrimSpace(f); f != "" {
@@ -215,6 +218,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	if e := responseTextError("ドリル", drill); e != "" {
 		fields["drill"] = e
+	}
+	if e := responseTextError("ひとこと", hitokoto); e != "" {
+		fields["hitokoto"] = e
 	}
 	var demo *string
 	if req.DemoVideoPublicID != "" {
@@ -267,6 +273,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		FixPoints:         fixes,
 		Drill:             drill,
 		DemoVideoPublicID: demo,
+		Hitokoto:          &hitokoto,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
