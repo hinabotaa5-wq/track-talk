@@ -18,7 +18,7 @@ WHERE a.earning_id = e.id AND a.contract_id = $1 AND e.payout_id IS NULL
 `
 
 // コーチ都合で止めた契約の、まだ送金に含めていない仮払いを消す（送金の対象から外す）。
-func (q *Queries) DeleteUnpaidSupportAdvances(ctx context.Context, contractID uuid.UUID) error {
+func (q *Queries) DeleteUnpaidSupportAdvances(ctx context.Context, contractID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUnpaidSupportAdvances, contractID)
 	return err
 }
@@ -113,10 +113,10 @@ func (q *Queries) GetContractStatement(ctx context.Context, contractID uuid.UUID
 }
 
 const getFaultDetermination = `-- name: GetFaultDetermination :one
-SELECT contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at FROM support_fault_determinations WHERE contract_id = $1
+SELECT contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id FROM support_fault_determinations WHERE contract_id = $1
 `
 
-func (q *Queries) GetFaultDetermination(ctx context.Context, contractID uuid.UUID) (SupportFaultDetermination, error) {
+func (q *Queries) GetFaultDetermination(ctx context.Context, contractID *uuid.UUID) (SupportFaultDetermination, error) {
 	row := q.db.QueryRow(ctx, getFaultDetermination, contractID)
 	var i SupportFaultDetermination
 	err := row.Scan(
@@ -131,6 +131,7 @@ func (q *Queries) GetFaultDetermination(ctx context.Context, contractID uuid.UUI
 		&i.ReviewReason,
 		&i.ReviewedBy,
 		&i.ReviewedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -155,10 +156,10 @@ func (q *Queries) GetSupportPaid(ctx context.Context, contractID *uuid.UUID) (Ge
 }
 
 const getSupportSettlement = `-- name: GetSupportSettlement :one
-SELECT contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at FROM support_coach_settlements WHERE contract_id = $1
+SELECT contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id FROM support_coach_settlements WHERE contract_id = $1
 `
 
-func (q *Queries) GetSupportSettlement(ctx context.Context, contractID uuid.UUID) (SupportCoachSettlement, error) {
+func (q *Queries) GetSupportSettlement(ctx context.Context, contractID *uuid.UUID) (SupportCoachSettlement, error) {
 	row := q.db.QueryRow(ctx, getSupportSettlement, contractID)
 	var i SupportCoachSettlement
 	err := row.Scan(
@@ -168,6 +169,7 @@ func (q *Queries) GetSupportSettlement(ctx context.Context, contractID uuid.UUID
 		&i.FinalYen,
 		&i.ClawbackYen,
 		&i.CreatedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -191,11 +193,11 @@ func (q *Queries) InsertContractStatement(ctx context.Context, arg InsertContrac
 const insertFaultDetermination = `-- name: InsertFaultDetermination :one
 INSERT INTO support_fault_determinations (contract_id, decision, reason, decided_by)
 VALUES ($1, $2, $3, $4)
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
 `
 
 type InsertFaultDeterminationParams struct {
-	ContractID uuid.UUID  `json:"contract_id"`
+	ContractID *uuid.UUID `json:"contract_id"`
 	Decision   string     `json:"decision"`
 	Reason     string     `json:"reason"`
 	DecidedBy  *uuid.UUID `json:"decided_by"`
@@ -221,6 +223,7 @@ func (q *Queries) InsertFaultDetermination(ctx context.Context, arg InsertFaultD
 		&i.ReviewReason,
 		&i.ReviewedBy,
 		&i.ReviewedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -231,12 +234,12 @@ VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertSupportAdvanceParams struct {
-	EarningID   uuid.UUID `json:"earning_id"`
-	ContractID  uuid.UUID `json:"contract_id"`
-	ThroughDate time.Time `json:"through_date"`
-	ElapsedDays int32     `json:"elapsed_days"`
-	TotalDays   int32     `json:"total_days"`
-	AmountYen   int32     `json:"amount_yen"`
+	EarningID   uuid.UUID  `json:"earning_id"`
+	ContractID  *uuid.UUID `json:"contract_id"`
+	ThroughDate time.Time  `json:"through_date"`
+	ElapsedDays int32      `json:"elapsed_days"`
+	TotalDays   int32      `json:"total_days"`
+	AmountYen   int32      `json:"amount_yen"`
 }
 
 func (q *Queries) InsertSupportAdvance(ctx context.Context, arg InsertSupportAdvanceParams) error {
@@ -343,15 +346,15 @@ const insertSupportSettlement = `-- name: InsertSupportSettlement :one
 INSERT INTO support_coach_settlements (contract_id, earned_yen, advances_yen, final_yen, clawback_yen)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
-RETURNING contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at
+RETURNING contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id
 `
 
 type InsertSupportSettlementParams struct {
-	ContractID  uuid.UUID `json:"contract_id"`
-	EarnedYen   int32     `json:"earned_yen"`
-	AdvancesYen int32     `json:"advances_yen"`
-	FinalYen    int32     `json:"final_yen"`
-	ClawbackYen int32     `json:"clawback_yen"`
+	ContractID  *uuid.UUID `json:"contract_id"`
+	EarnedYen   int32      `json:"earned_yen"`
+	AdvancesYen int32      `json:"advances_yen"`
+	FinalYen    int32      `json:"final_yen"`
+	ClawbackYen int32      `json:"clawback_yen"`
 }
 
 func (q *Queries) InsertSupportSettlement(ctx context.Context, arg InsertSupportSettlementParams) (SupportCoachSettlement, error) {
@@ -370,6 +373,7 @@ func (q *Queries) InsertSupportSettlement(ctx context.Context, arg InsertSupport
 		&i.FinalYen,
 		&i.ClawbackYen,
 		&i.CreatedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -626,12 +630,12 @@ const objectFaultDetermination = `-- name: ObjectFaultDetermination :one
 UPDATE support_fault_determinations d SET objection = $1, objected_at = now()
 WHERE d.contract_id = $2 AND d.decision = 'coach_fault' AND d.objected_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM support_coach_settlements s WHERE s.contract_id = d.contract_id)
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
 `
 
 type ObjectFaultDeterminationParams struct {
-	Objection  *string   `json:"objection"`
-	ContractID uuid.UUID `json:"contract_id"`
+	Objection  *string    `json:"objection"`
+	ContractID *uuid.UUID `json:"contract_id"`
 }
 
 // 異議申立ては1回だけ。コーチ都合の判定に対して、まだ精算を確定していない間にだけ出せる。
@@ -650,6 +654,7 @@ func (q *Queries) ObjectFaultDetermination(ctx context.Context, arg ObjectFaultD
 		&i.ReviewReason,
 		&i.ReviewedBy,
 		&i.ReviewedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -735,14 +740,14 @@ const reviewFaultDetermination = `-- name: ReviewFaultDetermination :one
 UPDATE support_fault_determinations SET review_decision = $1, review_reason = $2,
     reviewed_by = $3, reviewed_at = now()
 WHERE contract_id = $4 AND objected_at IS NOT NULL AND reviewed_at IS NULL
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
 `
 
 type ReviewFaultDeterminationParams struct {
 	Decision   *string    `json:"decision"`
 	Reason     *string    `json:"reason"`
 	ReviewedBy *uuid.UUID `json:"reviewed_by"`
-	ContractID uuid.UUID  `json:"contract_id"`
+	ContractID *uuid.UUID `json:"contract_id"`
 }
 
 func (q *Queries) ReviewFaultDetermination(ctx context.Context, arg ReviewFaultDeterminationParams) (SupportFaultDetermination, error) {
@@ -765,6 +770,7 @@ func (q *Queries) ReviewFaultDetermination(ctx context.Context, arg ReviewFaultD
 		&i.ReviewReason,
 		&i.ReviewedBy,
 		&i.ReviewedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -868,7 +874,7 @@ type SupportAdvanceTotalsRow struct {
 }
 
 // 仮払いの合計（送金に含めた分と、まだの分）。
-func (q *Queries) SupportAdvanceTotals(ctx context.Context, contractID uuid.UUID) (SupportAdvanceTotalsRow, error) {
+func (q *Queries) SupportAdvanceTotals(ctx context.Context, contractID *uuid.UUID) (SupportAdvanceTotalsRow, error) {
 	row := q.db.QueryRow(ctx, supportAdvanceTotals, contractID)
 	var i SupportAdvanceTotalsRow
 	err := row.Scan(&i.TotalYen, &i.PaidYen)
