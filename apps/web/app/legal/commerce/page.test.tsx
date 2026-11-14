@@ -76,8 +76,11 @@ it("海外コーチ 1ヶ月コーチング（パイロット）の分を表示�
   expect(html).toContain("1ヶ月コーチング 22,000円（税込）");
   expect(html).toContain("決済リンク経由。1回ごとのお支払いです");
   expect(html).toContain("お申込み（決済リンクでのお支払い）の時に決済が完了します");
-  expect(html).toContain("お支払いの確認後、案内した期間（1ヶ月間）について指導を提供します");
-  expect(html).toContain("その月の料金の返金はなく、期間は月末までとなります");
+  // 期間は開始日から1ヶ月の一通り（月末までの表記は残さない。#718）。
+  expect(html).toContain("お支払いの確認後、案内した開始日から1ヶ月間（開始日と終了日はお申込みの前に案内します）、指導を提供します");
+  expect(html).not.toContain("月末まで");
+  expect(html).not.toContain("案内した期間（1ヶ月間）");
+  expect(html).toContain("その1ヶ月分の料金の返金はなく、期間は案内した終了日までとなります");
   expect(html).toContain("未提供分を返金します");
   // 単発の海外動画添削は選手価格が未確定のため入れない。
   expect(html).not.toContain("単発");
