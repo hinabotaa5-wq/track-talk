@@ -39,7 +39,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 // フォーム添削の依頼を送る。支払いのある環境では誰でも申し込める（招待コードのゲートは外した。本体 #569）。
 // 依頼するコーチは選手が選ぶ（運営からの割り当てはしない）。料金はどのコーチでも同じ。
-// 送る前に最終確認（分量・総額・確定のタイミング・チケットの有効期限・取消しの条件）を出し、
+// 送る前に最終確認（内容・回答期限・お支払い／総額・キャンセルと戻り／返金の条件）を出し、
 // 確定を押してから動画を上げて、カードはそのまま支払い画面へ進む。支払いが済んだら選んだコーチに依頼が届く。
 // Stripe の鍵がない検証用の環境では、支払いなしのデモ版（招待コードを入れた人だけ）。
 
@@ -328,6 +328,9 @@ export default function NewReviewRequestPage() {
             <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
               {L("特定商取引法に基づく表記")}
             </Link>
+            {method === "tickets" ? (
+              <p className="text-xs text-slate-300">{L("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。")}</p>
+            ) : null}
           </PurchaseConfirm>
           {upload ? (
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
