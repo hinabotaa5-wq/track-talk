@@ -3,7 +3,6 @@ import { ReferralInput, validReferralInput } from "@/components/coaching-referra
 import { L } from "@/lib/i18n";
 
 import { useSolicitationGuard } from "@/components/contact-notice";
-import { ReviewCoachPicker } from "@/components/review-coach-picker";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
@@ -23,7 +22,6 @@ import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, typ
 import {
   maxReviewSeconds,
   reviewEvents,
-  availableReviewPayMethods,
   reviewPayMethodLabels,
   tooLong,
   videoDuration,
@@ -150,6 +148,11 @@ export default function NewReviewRequestPage() {
     })();
     return () => { cancelled = true; };
   }, [token, reviewOpen]);
+
+  // 種目切替時の整合：指定コーチが今の種目で受付中にいない（切替後など）ときも、
+  // 送信を止めて枠なしの注意で分かるようにする（state を増やさず描画時に判定する）。
+  const coachInactiveForEvent = !!coachID && !coachesLoading && !coachesError && !coaches.some((c) => c.id === coachID);
+  const visibleCoachNotice = coachNotice || (coachInactiveForEvent ? L("このコーチは現在、動画添削を受け付けていません") : "");
 
   async function loadMe() {
     try {
@@ -337,19 +340,16 @@ export default function NewReviewRequestPage() {
             <legend className="text-sm font-semibold">{L("種目")}</legend>
             <div className="flex flex-wrap gap-2">
               {reviewEvents.map((value) => (
-                <button key={value} type="button" aria-pressed={event === value} onClick={() => { if (value !== event) { setEvent(value); setCoachesLoading(true); setCoachesError(""); setCoachID(""); setCoaches([]); } }} className={chip(event === value)}>
+                <button key={value} type="button" aria-pressed={event === value} onClick={() => { if (value !== event) { setEvent(value); setCoachesLoading(true); setCoachesError(""); setCoaches([]); } }} className={chip(event === value)}>
                   {coachEventLabels[value]}
                 </button>
               ))}
             </div>
           </fieldset>
 
-          {coachNotice ? <p role="note" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">{coachNotice}</p> : null}
-          <ReviewCoachPicker coaches={coaches} value={coachID} onChange={setCoachID} disabled={pending} error={coachesError} loading={coachesLoading} />
-          <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
-            <p>{L("動画添削（動画1本）")}</p>
-            <p className="mt-1 text-lg font-bold">{L("{v0}／回", { v0: formatYen(totalPrice) })}</p>
-          </div>
+          {visibleCoachNotice ? <p role="note" className="text-sm text-amber-200">{visibleCoachNotice}</p> : null}
+          {coachesError ? <p role="alert" className="text-sm text-red-400">{coachesError}</p> : null}
+          {!coachID ? <p className="text-sm"><Link href="/coaches" className="text-blue-300 underline">{L("コーチ一覧")}</Link></p> : null}
           <div className="space-y-2 text-sm">
             <label htmlFor="review-question" className="block font-semibold">{L("相談内容")}</label>
             {!contactBlocked && guard.warning}
@@ -373,18 +373,6 @@ export default function NewReviewRequestPage() {
             <span className="block text-xs text-slate-300">{L("{length}/1000文字", { length: question.length })}</span>
           </div>
 
-          {ticketSummary && ticketsUsable ? <div className="space-y-2 text-sm">
-            <TicketBalance summary={ticketSummary} />
-            <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
-            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-              {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
-            </Link>
-          </div> : ticketSummary?.can_purchase ? (
-            <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="block rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-100 transition hover:border-blue-400/50 hover:bg-white/10">
-              <span className="font-semibold">{L("チケット{q}枚 {v0}（税込）", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</span>
-              <span className="block text-xs text-slate-300">{L("1回あたり約{v0}（1回ずつ払うと{v1}）。先払い・{q}枚まとめての購入で、有効期限は決済から{m}か月です。", { v0: formatYen(Math.round(ticketPackPriceYen / ticketPackQuantity)), v1: formatYen(reviewPriceYen), q: ticketPackQuantity, m: ticketValidityMonths })}</span>
-            </Link>
-          ) : null}
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">{L("動画({maxReviewSeconds}秒まで)", { maxReviewSeconds })}</span>
             <input
@@ -402,21 +390,43 @@ export default function NewReviewRequestPage() {
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
           {estimate ? (
-            <p className="rounded-xl border border-blue-400/40 bg-blue-500/15 p-3 text-sm text-slate-100">
-              {L("依頼がコーチの対応中一覧に表示されてから24時間以内に返却します。")}
+            <p className="text-sm text-slate-100">
+              {L("申し込みが確定してから24時間以内に回答が来ます。")}
             </p>
           ) : null}
+          {coachID ? <p className="text-xs text-slate-300">{L("受付中のコーチには決済の確認後に依頼が届きます。期限までに添削が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
           {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
               <div className="flex flex-wrap gap-2">
-                {ticketsUsable ? <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>{L("チケット（1枚）")}</button> : null}
-                {(estimate?.payments ? availableReviewPayMethods : []).map((m) => (
-                  <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)} className={chip(method === m)}>
-                    {reviewPayMethodLabels[m]}
+                <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")} className={chip(method === "card")}>
+                  {L("単発 {v0}／回", { v0: formatYen(totalPrice) })}
+                </button>
+                {ticketsUsable ? (
+                  <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>
+                    {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
                   </button>
-                ))}
+                ) : ticketSummary?.can_purchase ? (
+                  <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className={chip(false)}>
+                    {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
+                  </Link>
+                ) : null}
               </div>
+              {method === "card" ? (
+                <p className="text-xs text-slate-300">{reviewPayMethodLabels.card}</p>
+              ) : null}
+              {method === "tickets" && ticketsUsable && ticketSummary ? (
+                <div className="space-y-2 text-sm">
+                  <TicketBalance summary={ticketSummary} />
+                  <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
+                  <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
+                    {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
+                  </Link>
+                </div>
+              ) : null}
+              {!ticketsUsable && ticketSummary?.can_purchase ? (
+                <p className="text-xs text-slate-300">{L("1回あたり約{v0}（1回ずつ払うと{v1}）。先払い・{q}枚まとめての購入で、有効期限は決済から{m}か月です。", { v0: formatYen(Math.round(ticketPackPriceYen / ticketPackQuantity)), v1: formatYen(reviewPriceYen), q: ticketPackQuantity, m: ticketValidityMonths })}</p>
+              ) : null}
             </fieldset>
           ) : (
             <p className="text-xs text-slate-300">{L("デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。")}</p>

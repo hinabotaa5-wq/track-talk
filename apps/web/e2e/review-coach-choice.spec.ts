@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.skip(process.env.PLAYWRIGHT_COACHING_ENABLED !== "1", "コーチングを有効にしたローカルプレビューで実行します");
 const userID="11111111-1111-4111-8111-111111111111";
-test("スマホの申込み画面でコーチを選び、料金は1,500円のまま",async({page,context,baseURL})=>{
+test("スマホの申込画面は?coach=でコーチを引き継ぎ、単発の料金は1,500円のまま",async({page,context,baseURL})=>{
  await page.setViewportSize({width:390,height:844});
  const user={id:userID,aud:"authenticated",role:"authenticated",email:"preview@example.com",app_metadata:{},user_metadata:{},identities:[],created_at:new Date().toISOString()};
  const payload={sub:userID,aud:"authenticated",role:"authenticated",aal:"aal1",exp:Math.floor(Date.now()/1000)+3600,iat:Math.floor(Date.now()/1000)};
@@ -21,12 +21,13 @@ test("スマホの申込み画面でコーチを選び、料金は1,500円のま
   else if(p.endsWith("/notifications"))body={notifications:[],unread:0};
   await route.fulfill({json:body});
  });
- await page.goto("/coaching/new");
+ await page.goto("/coaching/new?coach=coach-1");
  await expect(page.getByRole("heading",{name:"動画添削を頼む"})).toBeVisible();
  await expect(page.getByText("おまかせ")).toHaveCount(0);
- await expect(page.getByText("1,500円／回",{exact:true})).toBeVisible();
- await page.getByLabel("サンプルコーチ").check();
- await expect(page.getByText("1,500円／回",{exact:true})).toBeVisible();
+ await expect(page.getByText("コーチを選ぶ")).toHaveCount(0);
+ await expect(page.getByRole("radio")).toHaveCount(0);
+ await expect(page.getByRole("button",{name:"単発 1,500円／回"})).toBeVisible();
+ await expect(page.getByText("1,500円／回",{exact:true})).toHaveCount(0);
  await expect(page.locator("body")).toHaveJSProperty("scrollWidth",390);
  await expect(page.locator("#startup-splash")).toHaveCount(0);
  await expect(page.locator(".screen-loader")).toBeHidden();
