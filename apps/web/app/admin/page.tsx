@@ -512,7 +512,9 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {(a.sns_urls ?? []).length ? (
               <p className="space-y-1">
                 <span className="block">SNS・ホームページ:</span>
-                {a.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {a.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
+                </span>
               </p>
             ) : null}
             {a.hitokoto ? (
