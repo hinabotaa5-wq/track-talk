@@ -20,9 +20,10 @@ import { useEffect, useState } from "react";
 function CoachCard({ c, fetchedAt }: { c: SupportPlanCoach; fetchedAt: number }) {
   const cs = c.competition_support;
   if (!cs) return null;
+  // 詳細はサポートプランの文脈で開き、サポートプランの節だけを出す（本体 #694）。
   return (
     <li id={`support-coach-${c.id}`} className="min-w-0">
-      <Link href={`/coaches/${encodeURIComponent(c.id)}`} onNavigate={() => rememberCoachDetailPreview({
+      <Link href={`/coaches/${encodeURIComponent(c.id)}?tab=support`} onNavigate={() => rememberCoachDetailPreview({
         id: c.id, nickname: c.nickname, photo_url: c.photo_url, events: c.events, support_consult: cs,
       }, fetchedAt)} className="glass flex h-full gap-3 rounded-xl border border-white/20 bg-white/10 p-3 text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15">
         <CoachAvatar url={c.photo_url} name={c.nickname} size={56} />

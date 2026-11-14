@@ -14,7 +14,7 @@ const apiFetch = vi.fn();
 const routerBack = vi.fn();
 const routerPush = vi.fn();
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "coach-1" }), useRouter: () => ({ back: routerBack, push: routerPush }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: "coach-1" }), useSearchParams: () => new URLSearchParams(), useRouter: () => ({ back: routerBack, push: routerPush }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, onNavigate, ...props }: { href: string; children: ReactNode; onNavigate?: () => void }) => <a href={href} onClick={(event) => { event.preventDefault(); onNavigate?.(); }} {...props}>{children}</a> }));
 vi.mock("@/components/coach-photo", () => ({ CoachAvatar: ({ name }: { name: string }) => <span>{name}の顔写真</span> }));
 vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { plans: { title: string }[] }) => <div>{plans.map((plan) => plan.title).join("、")}</div> }));
