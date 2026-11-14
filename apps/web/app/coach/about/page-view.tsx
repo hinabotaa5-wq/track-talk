@@ -48,7 +48,7 @@ export function CoachAboutView() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("応募から活動まで")}</h2>
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200">
-          <li>{L("名前、担当種目、記録、成績や指導経験、顔写真と、SNSまたは所属チームのホームページのURLを入力します。URLは1〜3件必須です。")}</li>
+          <li>{L("名前、担当種目、記録、成績や指導経験、顔写真と、SNSのアカウント名またはSNS・所属チームのホームページのURLを入力します。SNS・ホームページ欄は1〜3件必須（各300文字以内）です。")}</li>
           <li>{L("運営が内容を確認します。審査状況は応募画面で確認できます。")}</li>
           <li>{L("承認後は、コーチ画面から受付を始められます。承認状況や顔写真はコーチ画面で確認できます。")}</li>
         </ol>
