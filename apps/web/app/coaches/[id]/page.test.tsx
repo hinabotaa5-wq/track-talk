@@ -47,6 +47,8 @@ const entry = (key: "card" | "normal" | "reward") => container.querySelector(`se
 const entryLink = (key: "card" | "normal" | "reward") => entry(key)?.querySelector("a[href]")?.getAttribute("href") ?? null;
 const entryDisabled = (key: "card" | "normal" | "reward") => entry(key)?.querySelector('span[aria-disabled="true"]') != null;
 const reviewHref = (pay: string) => `/coaching/new?coach=${coachID}&pay=${pay}`;
+// 本体 #691：購入を完了したらこのコーチ詳細に戻る購入画面へのリンク（2つの入口で同じ）。
+const ticketPurchaseHref = `/me/coaching/tickets?return_to=${encodeURIComponent(`/coaches/${coachID}`)}`;
 function withTickets(summary: Record<string, unknown>, accepting = true) {
   mocks.auth.token = "token";
   mocks.api.mockImplementation(async (path: string) => {
@@ -87,7 +89,7 @@ it("未ログインでは動画添削の節と3つの入口を有効なまま出
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
   expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。添削1回につき1枚消費します。");
-  expect(tickets?.querySelector('a[href="/me/coaching/tickets"]')?.textContent).toBe("購入する");
+  expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   expect(tickets?.previousElementSibling?.getAttribute("aria-labelledby")).toBe("coach-video-review");
   expect(tickets?.nextElementSibling?.getAttribute("aria-labelledby")).toBe("coach-plans");
   expect(tickets?.className).toBe(tickets?.previousElementSibling?.className);
@@ -159,7 +161,9 @@ it("通常チケット0枚は購入画面へ、無料チケット0枚は押せ�
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) });
   await render();
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
-  expect(entryLink("normal")).toBe("/me/coaching/tickets");
+  expect(entryLink("normal")).toBe(ticketPurchaseHref);
+  // 「チケット」節の「購入する」と同じ遷移先・同じ戻り先（入口で動きが割れない）。
+  expect(container.querySelector('section[aria-labelledby="coach-tickets"] a')?.getAttribute("href")).toBe(ticketPurchaseHref);
   expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
   expect(entryLink("reward")).toBeNull();
   expect(entryDisabled("reward")).toBe(true);
@@ -175,7 +179,7 @@ it("受付していないコーチでは通常チケット0枚でも購入へ遷
   }
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
   expect(container.textContent).toContain("現在は受付していません");
-  expect(container.querySelector('section[aria-labelledby="coach-tickets"] a[href="/me/coaching/tickets"]')?.textContent).toBe("購入する");
+  expect(container.querySelector(`section[aria-labelledby="coach-tickets"] a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
 });
 
 it("受付状態とチケット要約の取得に失敗しても両方のボタンを表示する", async () => {

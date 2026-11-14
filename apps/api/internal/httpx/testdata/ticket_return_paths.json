@@ -1,0 +1,41 @@
+{
+  "_comment": "チケット購入の戻り先の許可リスト。Go（coaching_ticket.go）と Web（lib/coaching-tickets.ts）の両方のテストがこのファイルを読み、判定が一致することを固定する（本体 #691）。",
+  "allowed": [
+    "/coaching/new",
+    "/me/coaching",
+    "/me/coaching/tickets",
+    "/coaching/requests/12345678-1234-1234-1234-123456789abc",
+    "/coaches/12345678-1234-1234-1234-123456789abc",
+    "/coaches/028cbe8e-9dd7-4871-b23c-99f4690e6ff7"
+  ],
+  "rejected": [
+    "",
+    "https://evil.test",
+    "//evil.test",
+    "/\\evil.test",
+    "/guardian/secret",
+    "/admin",
+    "/coaching/new\n",
+    "/coaching/requests/not-a-uuid",
+    "/coaching/requests/12345678-1234-1234-1234-123456789abc?next=https://evil.test",
+    "/coaches",
+    "/coaches/",
+    "/coaches/not-a-uuid",
+    "/coaches/12345678123412341234123456789abc",
+    "/coaches/{12345678-1234-1234-1234-123456789abc}",
+    "/coaches/urn:uuid:12345678-1234-1234-1234-123456789abc",
+    "/coaches/12345678-1234-1234-1234-123456789ABC",
+    "/coaches/12345678-1234-1234-1234-123456789abc/",
+    "/coaches/12345678-1234-1234-1234-123456789abc/edit",
+    "/coaches/12345678-1234-1234-1234-123456789abc?next=https://evil.test",
+    "/coaches/12345678-1234-1234-1234-123456789abc#x",
+    "/coaches/12345678-1234-1234-1234-123456789abc\n",
+    "/coaches/../admin",
+    "/coaches/../coaching/new",
+    "/coaches/%2e%2e/admin",
+    "/coaches\\12345678-1234-1234-1234-123456789abc",
+    "//coaches/12345678-1234-1234-1234-123456789abc",
+    "https://evil.test/coaches/12345678-1234-1234-1234-123456789abc",
+    "/me/coaching/tickets/../../coaches/12345678-1234-1234-1234-123456789abc"
+  ]
+}

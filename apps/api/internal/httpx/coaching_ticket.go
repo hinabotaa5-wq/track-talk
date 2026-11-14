@@ -47,18 +47,25 @@ func writeTicketRuleError(w http.ResponseWriter, err error) bool {
 }
 
 // 戻り先はコーチング内の決まった画面だけ。外部URLや保護者の秘密トークンを決済に渡さない。
+// 判定は Web の lib/coaching-tickets.ts の ticketReturnPath と一致させる（testdata/ticket_return_paths.json で固定）。
 func ticketReturnPath(path string) string {
 	switch path {
 	case "/coaching/new", "/me/coaching", "/me/coaching/tickets":
 		return path
 	}
-	if strings.HasPrefix(path, "/coaching/requests/") {
-		id := strings.TrimPrefix(path, "/coaching/requests/")
-		if parsed, err := uuid.Parse(id); err == nil && parsed.String() == id {
+	// 依頼詳細と、コーチ詳細（本体 #691：コーチ詳細の「購入する」と通常チケット0枚の入口から来た購入）。
+	for _, prefix := range []string{"/coaching/requests/", "/coaches/"} {
+		if id, ok := strings.CutPrefix(path, prefix); ok && canonicalUUID(id) {
 			return path
 		}
 	}
 	return "/me/coaching/tickets"
+}
+
+// canonicalUUID は、id が小文字・ハイフン区切りの標準形の UUID そのものか（余分な文字・区切り・大文字を許さない）。
+func canonicalUUID(id string) bool {
+	parsed, err := uuid.Parse(id)
+	return err == nil && parsed.String() == id
 }
 
 // reviewOpenTo は、動画添削（単発・チケット）を申し込めるか。支払いのある環境では誰でも、

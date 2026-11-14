@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
-import { initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, ticketReturnPath } from "./coaching-tickets";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { coachTicketPurchaseHref, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, ticketReturnPath } from "./coaching-tickets";
 
 it("チケット購入の戻り先で外部URL・保護者トークン・別機能への転送を許可しない", () => {
   const request = "/coaching/requests/12345678-1234-1234-1234-123456789abc";
@@ -8,6 +10,24 @@ it("チケット購入の戻り先で外部URL・保護者トークン・別機�
   for (const path of ["https://evil.test", "//evil.test", "/\\evil.test", "/guardian/secret", "/coaching/requests/not-a-uuid", request + "?next=https://evil.test", "/coaching/new\n", "/admin"]) {
     expect(ticketReturnPath(path)).toBe("/me/coaching/tickets");
   }
+});
+
+// 本体 #691：API（coaching_ticket.go の ticketReturnPath）と同じ表で、許可・不許可が一致することを固定する。
+const sharedReturnPaths = JSON.parse(readFileSync(path.resolve(process.cwd(), "../api/internal/httpx/testdata/ticket_return_paths.json"), "utf8")) as { allowed: string[]; rejected: string[] };
+
+it("チケット購入の戻り先の判定が API と同じ表で一致する（コーチ詳細を含む）", () => {
+  expect(sharedReturnPaths.allowed).toContain("/coaches/12345678-1234-1234-1234-123456789abc");
+  for (const p of sharedReturnPaths.allowed) expect(ticketReturnPath(p), p).toBe(p);
+  for (const p of sharedReturnPaths.rejected) expect(ticketReturnPath(p), JSON.stringify(p)).toBe("/me/coaching/tickets");
+  expect(ticketReturnPath(null)).toBe("/me/coaching/tickets");
+  expect(ticketReturnPath(undefined)).toBe("/me/coaching/tickets");
+});
+
+it("コーチ詳細から購入画面へ進むリンクにそのコーチ詳細への戻り先を付ける", () => {
+  const id = "12345678-1234-1234-1234-123456789abc";
+  expect(coachTicketPurchaseHref(id)).toBe("/me/coaching/tickets?return_to=%2Fcoaches%2F12345678-1234-1234-1234-123456789abc");
+  // ID が分からない・UUID でないときは戻り先を付けない（従来の遷移先）。
+  for (const bad of [undefined, null, "", "not-a-uuid", "../admin", id + "/x"]) expect(coachTicketPurchaseHref(bad)).toBe("/me/coaching/tickets");
 });
 
 // 本体 #687：入口の指定（?pay=）と種別ごとの残りから、申込画面の初期値を決める。

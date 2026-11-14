@@ -71,10 +71,21 @@ export function ticketExpiryFor(summary: Pick<TicketSummary, "next_expiry" | "ba
   return summary?.next_expiry?.expires_at ?? null;
 }
 
+// チケット購入の戻り先。コーチング内の決まった画面だけを許し、それ以外は購入画面に戻す。
+// 判定は API の coaching_ticket.go の ticketReturnPath と一致させる（apps/api/internal/httpx/testdata/ticket_return_paths.json で固定）。
+const uuidPattern = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+// 依頼詳細と、コーチ詳細（本体 #691：コーチ詳細の「購入する」と通常チケット0枚の入口から来た購入）。
+const ticketReturnPattern = new RegExp(`^/(?:coaching/requests|coaches)/${uuidPattern}$`);
 export function ticketReturnPath(value: string | null | undefined): string {
   if (["/coaching/new", "/me/coaching", "/me/coaching/tickets"].includes(value ?? "")) return value!;
-  if (/^\/coaching\/requests\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value ?? "")) return value!;
+  if (ticketReturnPattern.test(value ?? "")) return value!;
   return "/me/coaching/tickets";
+}
+
+// コーチ詳細からチケット購入画面へ進むリンク。購入を完了したら、そのコーチ詳細に戻れるようにする（本体 #691）。
+export function coachTicketPurchaseHref(coachID: string | null | undefined): string {
+  const back = coachID ? `/coaches/${coachID}` : "";
+  return ticketReturnPath(back) === back ? `/me/coaching/tickets?return_to=${encodeURIComponent(back)}` : "/me/coaching/tickets";
 }
 
 export const ticketStatusLabels: Record<TicketPurchase["status"], string> = {
