@@ -30,9 +30,11 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   // PayPay は未提供のため、現在の返金方法として書かない（本体 #714）。PayPay 追加時に戻す。
   expect(text).toContain("これらの理由で終了した依頼は、クレジットカードは代金の確保を取り消し、チケットは確保した1枚を戻します");
   expect(renderToStaticMarkup(<TermsPage />)).not.toContain("PayPay");
-  expect(text).toContain("フォーム添削の契約は申込み時に成立し");
+  expect(text).toContain("1回プランの契約は申込み時に成立し");
+  expect(text).toContain("担当のコーチは、相談内容が分かりにくい場合に、1つの依頼につき1回だけ質問を付けて差し戻せます。");
+  expect(text).toContain("1回プランと同じ内容の指導を、本サービスを通さずに直接取引してはいけません。");
   // 料金は1本500円。チケットは6枚2,500円の先払いで、有効期限・失効・原則払戻し不可と例外・本人限定を定める（本体 #569）。
-  expect(text).toContain("フォーム添削は1本500円（税込）");
+  expect(text).toContain("1回プランは1回500円（税込）");
   expect(text).toContain("6枚を1組として2,500円（税込）で販売し、6枚をまとめて先に支払います");
   expect(text).toContain("チケットの有効期限は、決済が完了した日時から6か月です");
   expect(text).toContain("有効期限は延長しません");
@@ -42,9 +44,9 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   expect(text).toContain("（2）から（4）までおよび法令に基づく場合は、この限りではありません");
   // 第2項：失効。第3項〜第5項への留保＋運営・コーチ都合の失効後返金の例外。
   expect(text).toContain("次項（2）から（4）までに定める払戻しは、有効期限を過ぎたチケットについても行います");
-  expect(text).toContain("運営者またはコーチの都合により有効期限内に添削を受けることができなかったチケットについては、失効後であっても返金します");
+  expect(text).toContain("運営者またはコーチの都合により有効期限内に1回プランを受けることができなかったチケットについては、失効後であっても返金します");
   // 第3項：サービス終了時の払戻し（購入金額 ÷ 6 × 未使用枚数、四捨五入）。
-  expect(text).toContain("運営者がフォーム添削の提供を終了した場合");
+  expect(text).toContain("運営者が1回プランの提供を終了した場合");
   expect(text).toContain("購入金額を6で割った額に未使用の枚数を掛けた額（1円未満の端数は四捨五入します）");
   // 第4項：法令上の取消し・解除（債務不履行・未成年者の取消し＋解除・損賠請求の非妨害）。
   expect(text).toContain("運営者の債務不履行に基づく解除および未成年者の取消しを含みます");
@@ -58,7 +60,7 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   expect(text).not.toContain("一切");
   expect(text).not.toContain("いかなる理由があっても");
   // 追加質問の販売（1回500円・都度払いのみ・動画1本可）。購入済みの追加相談は購入時の条件を残す。
-  expect(text).toContain("フォーム添削の追加質問は、返却された添削1件につき1回まで購入でき、料金は1回500円（税込、都度払いのみ）です");
+  expect(text).toContain("1回プランの追加質問は、返却された1回プラン1件につき1回まで購入でき、料金は1回500円（税込、都度払いのみ）です");
   expect(text).toContain("チケットは使えません");
   expect(text).toContain("質問には動画を1本まで添えることができ、動画がなくても購入できます");
   expect(text).toContain("コーチの受諾は48時間以内、受諾後の回答は72時間以内");
@@ -81,8 +83,8 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("業務委託の報酬");
   expect(text).toContain("料金500円の70%にあたる350円（税込）");
-  expect(text).toContain("利用者がチケットで申し込んだフォーム添削も、1本につき350円です");
-  expect(text).toContain("フォーム添削の追加質問への回答の報酬は、1件につき350円（税込、料金500円の70%）です");
+  expect(text).toContain("利用者がチケットで申し込んだ1回プランも、1件につき350円です");
+  expect(text).toContain("1回プランの追加質問への回答の報酬は、1件につき350円（税込、料金500円の70%）です");
   expect(text).not.toContain("1,050円");
   expect(text).not.toContain("420円");
   expect(text).toContain("報酬の支払期日：毎月末日を締切とし、翌月15日に支払います。ただし、各締切時点の支払額（税込）が金3,000円未満の場合は翌月以降に繰り越し、累積した支払額が金3,000円以上となった締切月の翌月15日に支払います。なお、コーチとの取引が終了した場合は、金額にかかわらず、終了月の翌月15日に未払額の全額を支払います。");
@@ -160,7 +162,7 @@ it("追加質問の購入画面は、1回限りであることと契約の相手
 
 it("未成年者の購入は、全員への購入前チェックと、申立てによる取消し・返金で定め、同意・上限・通知を前提にしない", () => {
   const text = article(4);
-  expect(text).toContain("事前に親権者その他の法定代理人の許可を得るものとします。フォーム添削（単発・チケット）の購入では、年齢にかかわらず、購入の都度、決済に進む前に「未成年の方は保護者に許可を取ってください」の注意事項へのチェックを求めます");
+  expect(text).toContain("事前に親権者その他の法定代理人の許可を得るものとします。1回プラン（単発・チケット）の購入では、年齢にかかわらず、購入の都度、決済に進む前に「未成年の方は保護者に許可を取ってください」の注意事項へのチェックを求めます");
   expect(text).toContain("当該購入を取り消し、代金を返金します");
   expect(text).toContain("保護者を契約および支払いの当事者として取り扱います");
   for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
@@ -190,8 +192,8 @@ it("第8条：1ヶ月プランの途中終了（7の2）と外部勧誘の禁止
 
 it("動画のファイルの保存期間：フォーム添削はやりとりの終わりから7日、継続プランは終了時点で見られなくなり動画は30日で削除", () => {
   const review = article(6);
-  expect(review).toContain("フォーム添削などで送られた動画と、コーチの見本動画のファイルは、そのやりとりが終わってから7日で削除します");
-  expect(review).toContain("添削と回答の文章は、動画のファイルを削除した後も見られます");
+  expect(review).toContain("1回プランなどで送られた動画と、コーチの見本動画のファイルは、そのやりとりが終わってから7日で削除します");
+  expect(review).toContain("回答の文章は、動画のファイルを削除した後も見られます");
   const plan = article(8);
   expect(plan).toContain("契約が終わった時点（期間の満了または途中での終了）で、利用者・コーチ・保護者のいずれからも見られなくなります");
   expect(plan).toContain("契約が終わるまでのあいだに、利用者とコーチは文章とメニューをダウンロードできます");
@@ -206,18 +208,6 @@ it("第6条に紹介特典の本人利用・付与日起算の期限・払戻し
   expect(text).toContain("特典チケットの有効期限は、付与した日時から6か月です");
   expect(text).toContain("サービス提供の終了時に行う未使用チケットの払戻しの計算にも、特典チケットは含めません");
   expect(text).toContain("使用した特典チケット1枚を戻します");
-});
-
-it("第7条・第8条は国内コーチに適用し、海外コーチは Coach Terms・work order と特商法表記に接続する（#718）", () => {
-  const seven = article(7);
-  expect(seven).toContain("この条は、日本国内に住むコーチ（以下「国内コーチ」）に適用します");
-  expect(seven).toContain("Terms of Engagement for Overseas Coaches");
-  expect(seven).toContain('href="/legal/coach-terms"');
-  expect(seven).toContain("依頼ごとの個別の発注書（work order）によります");
-  const eight = article(8);
-  expect(eight).toContain("この条の継続プランは、国内コーチが出すものに限ります");
-  expect(eight).toContain("運営者が販売者となり利用者との契約の当事者となる別の取引であり、この条の第1項から第9項まで");
-  expect(eight).toContain('href="/legal/commerce"');
 });
 
 // #717：支払いに含めた後は本サービス上で返金できないが、法令に基づく返金と運営者の個別の返金は除き、その精算は第9条第6項でつなぐ。
@@ -238,4 +228,16 @@ it("第15条の退会の前提になる通報は、自分の指導のやりと�
   // 列挙の他の項目は変えない。
   expect(text).toContain("進行中の契約、未使用・確保中のチケット、返金、");
   expect(text).toContain("まだ支払っていないコーチの報酬などがある場合は、先に対応を終える必要があります");
+});
+
+it("第7条・第8条は国内コーチに適用し、海外コーチは Coach Terms・work order と特商法表記に接続する（#718）", () => {
+  const seven = article(7);
+  expect(seven).toContain("この条は、日本国内に住むコーチ（以下「国内コーチ」）に適用します");
+  expect(seven).toContain("Terms of Engagement for Overseas Coaches");
+  expect(seven).toContain('href="/legal/coach-terms"');
+  expect(seven).toContain("依頼ごとの個別の発注書（work order）によります");
+  const eight = article(8);
+  expect(eight).toContain("この条の継続プランは、国内コーチが出すものに限ります");
+  expect(eight).toContain("運営者が販売者となり利用者との契約の当事者となる別の取引であり、この条の第1項から第9項まで");
+  expect(eight).toContain('href="/legal/commerce"');
 });

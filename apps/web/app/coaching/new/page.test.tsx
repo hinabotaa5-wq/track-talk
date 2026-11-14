@@ -97,9 +97,9 @@ it("フォーム上部に価格ボックス（動画添削（動画1本））を
 it("デモの招待コード画面には販売者の表記とリンクを出さない", async () => {
   mocks.me = { demo: false, review_open: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("動画添削を頼む");
+  expect(container.querySelector("h1")?.textContent).toBe("1回プラン（フォーム添削や競技に関する悩み）");
   expect(container.textContent).not.toContain("コーチを選んで、動画を送ります");
-  expect(container.textContent).toContain("フォーム添削は準備中です");
+  expect(container.textContent).toContain("1回プランは準備中です");
   expect(container.querySelector('input[aria-label="招待コード"]')).not.toBeNull();
   expect(container.querySelector('button[type="submit"]')?.textContent).toBe("デモに参加する");
   expect(container.textContent).not.toContain("販売者:");
@@ -168,7 +168,7 @@ it("支払いのある環境では、招待コードなしで申込みの画面�
   await render();
   expect(container.querySelector("form")).not.toBeNull();
   expect(container.querySelector('input[aria-label="招待コード"]')).toBeNull();
-  expect(container.textContent).not.toContain("フォーム添削は準備中です");
+  expect(container.textContent).not.toContain("1回プランは準備中です");
 });
 
 it("チケットがなく販売中なら、お支払い方法に単発とチケット（6枚）の二択を出す（通常価格や打ち消し線は使わない）", async () => {
@@ -239,7 +239,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(container.textContent).not.toContain(contactMessage);
   await act(async () => { submit.form!.requestSubmit(); });
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
-  expect(confirm?.textContent).toContain("フォーム添削（動画1本・担当 テストコーチ）");
+  expect(confirm?.textContent).toContain("1回プラン（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
   expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
   expect(confirm?.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
@@ -253,7 +253,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("キャンセル・返金");
   expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
   expect(confirm?.textContent).toContain("期限までに返らない場合やコーチ都合の返却では全額を返金します");
-  expect(confirm?.textContent).toContain("添削返却後の返金は利用規約に定める場合に限ります");
+  expect(confirm?.textContent).toContain("回答返却後の返金は利用規約に定める場合に限ります");
   expect(confirm?.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
   expect(confirm?.textContent).not.toContain("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
   expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
@@ -278,7 +278,7 @@ it("?coach= で受付中のコーチを初期選択する（本体 #643）", asy
   mockReviewOpen([reviewCoach("c9"), reviewCoach("c1")]);
   await render();
   await act(async () => {});
-  expect(container.textContent).not.toContain("このコーチは現在、動画添削を受け付けていません");
+  expect(container.textContent).not.toContain("このコーチは現在、1回プランを受け付けていません");
   expect(container.querySelector('a[href="/coaches"]')).toBeNull();
   expect(container.textContent).toContain("受付中のコーチには決済の確認後に依頼が届きます。");
   const textarea = container.querySelector("textarea")!;
@@ -300,7 +300,7 @@ it("?coach= のコーチが受付中でない場合は枠なしの明示を出�
   await render();
   await act(async () => {});
   const note = container.querySelector('[role="note"]');
-  expect(note?.textContent).toBe("このコーチは現在、動画添削を受け付けていません");
+  expect(note?.textContent).toBe("このコーチは現在、1回プランを受け付けていません");
   expect(note?.className).not.toMatch(/border|bg-/);
   expect(container.querySelector('a[href="/coaches"]')).not.toBeNull();
   expect(container.querySelector("form")).not.toBeNull();
@@ -363,7 +363,7 @@ it("コーチ引き継ぎ時は返金注記が文言そのままで枠なしに�
   await render();
   await act(async () => {});
   const note = [...container.querySelectorAll("p")].find((p) => p.textContent?.includes("受付中のコーチには決済の確認後に依頼が届きます。"));
-  expect(note?.textContent).toBe("受付中のコーチには決済の確認後に依頼が届きます。期限までに添削が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
+  expect(note?.textContent).toBe("受付中のコーチには決済の確認後に依頼が届きます。期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
   expect(note?.className).not.toMatch(/border|bg-/);
 });
 
@@ -457,7 +457,7 @@ it("チケット版の確認は4項目で、有効期限はお支払い行の中
     "お支払い",
     "キャンセル・チケットの戻り",
   ]);
-  expect(confirm.textContent).toContain("フォーム添削（動画1本・担当 コーチc1）");
+  expect(confirm.textContent).toContain("1回プラン（動画1本・担当 コーチc1）");
   expect(confirm.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
   expect(confirm.textContent).toContain("有効期限");
   expect(confirm.textContent).toContain("2027");
@@ -554,7 +554,7 @@ it("入口の指定がなければチケットを選び、内訳は両方あれ�
   const free = button("無料チケット（残り 1 枚・いちばん早い有効期限 ")!;
   expect(free.getAttribute("aria-pressed")).toBe("true");
   expect(free.textContent).toContain("2027");
-  expect(container.textContent).toContain("動画添削1回はチケット1枚です。");
+  expect(container.textContent).toContain("1回プラン1件はチケット1枚です。");
   // 単発に切り替えると内訳は出ない。
   await act(async () => { button("単発")!.click(); });
   expect(button("通常チケット")).toBeUndefined();
@@ -626,3 +626,44 @@ it("通常チケットの確認は通常ロットの最速期限を出し、tick
   expect(body.ticket_kind).toBe("normal");
 });
 
+
+it.each([false, true])("相談内容を必須にして申込を送る（動画あり=%s）", async (hasVideo) => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  const mockRead = mocks.api.getMockImplementation()!;
+  mocks.api.mockImplementation(async (path: string, options?: unknown) => {
+    if (path === "/v1/uploads/coaching-video") return { public_id: "vid1" };
+    if (path === "/v1/coaching/requests") return { id: "r1" };
+    return mockRead(path, options);
+  });
+  await render();
+  expect(container.textContent).toContain("動画（任意・");
+  expect(container.textContent).toContain("悩みだけでも申し込めます。");
+
+  if (hasVideo) {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, "files", { value: [new File(["x"], "run.mp4", { type: "video/mp4" })] });
+    await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  }
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  const form = container.querySelector("form")!;
+  const textarea = form.querySelector("textarea")!;
+  expect(form.checkValidity()).toBe(false);
+  await act(async () => form.requestSubmit());
+  expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "大会前の練習について相談したいです");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => form.requestSubmit());
+  const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
+  expect(confirm.textContent).toContain(hasVideo ? "1回プラン（動画1本・担当 コーチc1）" : "1回プラン（悩みのみ・担当 コーチc1）");
+  await act(async () => confirm.querySelector("button")!.click());
+  const paths = mocks.api.mock.calls.map(([path]) => path);
+  expect(paths.includes("/v1/uploads/coaching-video")).toBe(hasVideo);
+  const request = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")!;
+  const body = JSON.parse(request[1].body);
+  expect(body.question).toBe("大会前の練習について相談したいです");
+  expect(body.video_public_id).toBe(hasVideo ? "vid1" : undefined);
+  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
+});

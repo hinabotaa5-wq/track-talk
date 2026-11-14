@@ -98,10 +98,10 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 
 // reviewVideoURL は、依頼の動画の URL。保持期間を過ぎて消した後は nil。
 func reviewVideoURL(rr db.ReviewRequest, url func(string) string) any {
-	if rr.VideosPurgedAt != nil {
+	if rr.VideoPublicID == nil || rr.VideosPurgedAt != nil {
 		return nil
 	}
-	return url(rr.VideoPublicID)
+	return url(*rr.VideoPublicID)
 }
 
 type coachDutyReq struct {
@@ -154,7 +154,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		if s.push.Configured() {
 			var sent int
 			sent, err = s.sendPush(r.Context(), p.ID, push.Message{
-				Title: "フォーム添削の通知テスト",
+				Title: "1回プランの通知テスト",
 				Body:  "依頼の受付を始める前の接続テストです",
 				URL:   "/coach",
 				Tag:   "coach-duty-test",
@@ -184,7 +184,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	if c.OnDuty && !current.OnDuty {
 		s.pushQuietly(r.Context(), p.ID, notifyImportant, push.Message{
 			Title: "依頼の受付を始めました",
-			Body:  "フォーム添削の依頼が届くと、この端末に通知します",
+			Body:  "1回プランの依頼が届くと、この端末に通知します",
 			URL:   "/coach",
 			Tag:   "coach-duty",
 		}, 10*time.Minute)
@@ -272,7 +272,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	// 招待コードのゲートは、支払いのない検証用（Stripe の鍵がない環境）のデモ版にだけ残す。
 	// 支払いがある環境では、正規の購入（単発・チケット）で誰でも申し込める（本体 #569）。
 	if !s.reviewOpenTo(p) {
-		Error(w, http.StatusForbidden, "forbidden", "フォーム添削は準備中です")
+		Error(w, http.StatusForbidden, "forbidden", "1回プランは準備中です")
 		return
 	}
 	var req reviewRequestReq
@@ -289,8 +289,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	focus := []string{}
 	question := ""
-	if req.Question != nil {
-		question = strings.TrimSpace(*req.Question)
+	if req.Question != nil || req.VideoPublicID == "" {
+		if req.Question != nil {
+			question = strings.TrimSpace(*req.Question)
+		}
 		if question == "" {
 			fields["question"] = "相談内容を記入してください"
 		}
@@ -304,7 +306,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			fields["focus"] = "見てほしい点を1つ以上選んでください"
 		}
 	}
-	if !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
+	if req.VideoPublicID != "" && !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
 	useTickets := req.Method == "tickets" || req.UseTickets
@@ -344,12 +346,16 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		writeCheckoutError(w, err)
 		return
 	}
-	if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
-		return
-	}
-	if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
-		writeAssetReadyError(w, err, "動画")
-		return
+	var video *string
+	if req.VideoPublicID != "" {
+		if !s.uploadIssuedToMe(w, r, p.ID, req.VideoPublicID, "video_public_id", "動画") {
+			return
+		}
+		if err := s.cloud.CoachingVideoReady(r.Context(), req.VideoPublicID); err != nil {
+			writeAssetReadyError(w, err, "動画")
+			return
+		}
+		video = &req.VideoPublicID
 	}
 	// 目安は送る画面に出したものと同じ計算で決め、依頼に保存する。これを過ぎたら expired になる。
 	due, _, err := s.estimateReviewDue(r.Context(), p.ID, req.Tier, req.Event, time.Now())
@@ -386,7 +392,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := lockUnusedCoachingVideo(r.Context(), q, &req.VideoPublicID, nil); err != nil {
+	if err := lockUnusedCoachingVideo(r.Context(), q, video, nil); err != nil {
 		var rule *ticketRuleError
 		if errors.As(err, &rule) {
 			Error(w, 409, "conflict", rule.message)
@@ -404,7 +410,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
 		BasePriceYen: reviewPriceYen, UseTickets: useTickets,
-		VideoPublicID: req.VideoPublicID,
+		VideoPublicID: video,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。
 		Status: map[bool]string{true: "awaiting_payment", false: "queued"}[payments],

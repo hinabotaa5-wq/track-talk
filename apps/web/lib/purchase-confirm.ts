@@ -26,6 +26,7 @@ export type ConfirmRow = { label: string; value: string };
 export type ReviewConfirmInput = {
   method: "card" | "paypay" | "tickets";
   priceYen: number;
+  hasVideo: boolean;
   coachName?: string;
   // チケットで払うとき、確保される1枚の有効期限（いちばん早く失効する分から使う）。旧商品の分は期限なし。
   // 種別を選んだとき（本体 #687）は、その種別の中でいちばん早く失効する分の期限を渡す。
@@ -34,9 +35,12 @@ export type ReviewConfirmInput = {
   ticketKind?: TicketKind | null;
 };
 
-export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, priceYen, hasVideo, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
+  const content = hasVideo
+    ? (coachName ? L("1回プラン（動画1本・担当 {coachName}）", { coachName }) : L("1回プラン（動画1本）"))
+    : (coachName ? L("1回プラン（悩みのみ・担当 {coachName}）", { coachName }) : L("1回プラン（悩みのみ）"));
   const rows: ConfirmRow[] = [
-    { label: L("内容"), value: coachName ? L("フォーム添削（動画1本・担当 {coachName}）", { coachName }) : L("フォーム添削（動画1本）") },
+    { label: L("内容"), value: content },
     { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
   if (method === "tickets") {
@@ -60,12 +64,12 @@ export function reviewConfirmRows({ method, priceYen, coachName, nextExpiry, tic
   );
   if (method === "card") {
     rows.push(
-      { label: L("キャンセル・返金"), value: L("次の画面でカードの代金を確保（仮押さえ）し、返却時に確定します。着手前はキャンセルでき、その場合は確保を取り消すので代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却では全額を返金します。添削返却後の返金は利用規約に定める場合に限ります。") },
+      { label: L("キャンセル・返金"), value: L("次の画面でカードの代金を確保（仮押さえ）し、返却時に確定します。着手前はキャンセルでき、その場合は確保を取り消すので代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却では全額を返金します。回答返却後の返金は利用規約に定める場合に限ります。") },
     );
   } else {
     rows.push(
       { label: L("確定のタイミング"), value: L("次の画面でお支払いが済んだ時に確定します。") },
-      { label: L("取消し・返金"), value: L("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は、全額を返金します。着手後の利用者都合によるキャンセルはできません。添削返却後の返金は利用規約に定める場合に限ります。") },
+      { label: L("取消し・返金"), value: L("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は、全額を返金します。着手後の利用者都合によるキャンセルはできません。回答返却後の返金は利用規約に定める場合に限ります。") },
     );
   }
   return rows;
@@ -86,7 +90,7 @@ export function ticketExpiryIfPaidNow(validityMonths: number, now: Date = new Da
 
 export function ticketPackConfirmRows({ quantity, amountYen, validityMonths, now }: TicketPackConfirmInput): ConfirmRow[] {
   return [
-    { label: L("内容"), value: L("フォーム添削のチケット{quantity}枚（1枚で動画添削1回）", { quantity }) },
+    { label: L("内容"), value: L("1回プランのチケット{quantity}枚（1枚で1回プラン1件）", { quantity }) },
     { label: L("総額"), value: L("{v0}（税込）。{quantity}枚分をまとめて先に支払います", { v0: formatYen(amountYen), quantity }) },
     { label: L("確定のタイミング"), value: L("次の画面でお支払いが済んだ時に購入が確定し、チケットが使えるようになります。") },
     { label: L("有効期限"), value: L("決済が完了した日時から{validityMonths}か月（いまお支払いが済むと {v0} ごろまで）。過ぎると未使用の分は失効し、延長はしません。", { validityMonths, v0: formatDateTime(ticketExpiryIfPaidNow(validityMonths, now).toISOString()) }) },

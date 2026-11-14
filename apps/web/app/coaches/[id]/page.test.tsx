@@ -74,7 +74,7 @@ async function render() {
 
 it("未ログインではフォーム添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
-  expect(container.textContent).toContain("フォーム添削");
+  expect(container.textContent).toContain("1回プラン（フォーム添削や競技に関する悩み）");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(entry("card")?.textContent).toBe("単発500円");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -85,13 +85,13 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(entryLink("reward")).toBe(reviewHref("reward"));
   expect(container.textContent).not.toContain("残り");
   expect(container.textContent).toContain("500円");
-  expect(container.textContent).toContain("選択して下さい");
+  expect(container.textContent).toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   expect(container.textContent).not.toContain("チケットも使えます");
   expect(container.textContent).not.toContain("現在は受付していません");
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
-  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。添削1回につき1枚消費します。");
+  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。1回プランの申込み1件につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   const purchaseClass = tickets?.querySelector("a")?.className ?? "";
   expect(purchaseClass).toContain("bg-blue-600");
@@ -119,7 +119,7 @@ it("受付停止中でもチケットを購入できる", async () => {
   expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
   for (const key of ["card", "normal", "reward"] as const) expect(entryDisabled(key)).toBe(true);
   expect(container.textContent).toContain("現在は受付していません");
-  expect(container.textContent).toContain("選択して下さい");
+  expect(container.textContent).toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   const purchaseLink = container.querySelector('section[aria-labelledby="coach-tickets"] a[href]');
   expect(purchaseLink?.textContent).toBe("購入する");
   expect(purchaseLink?.hasAttribute("aria-disabled")).toBe(false);
@@ -247,11 +247,11 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(entry("normal")?.textContent).toBe("Regular ticket");
   expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
-  expect(container.textContent).toContain("Please select");
+  expect(container.textContent).toContain("You can also ask for advice without a video.");
   expect(container.textContent).not.toContain("You can also pay with tickets");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");
-  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥2,500. One ticket is used per video review.");
+  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥2,500. One ticket is used per One-time Plan.");
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 

@@ -99,7 +99,9 @@ func TestStorageCleanupPurgesVideosAfterRetention(t *testing.T) {
 	clarified6 := seedReview(t, requesterID, coachID, "returned", "20 days", "6 days", "6 days") // 確認の往復から6日 → 残す
 	expired8 := seedReview(t, requesterID, coachID, "expired", "", "", "8 days")                 // 返却されずに終わって8日 → 消す
 	expired6 := seedReview(t, requesterID, coachID, "expired", "", "", "6 days")                 // 6日 → 残す
-	reported := seedReview(t, requesterID, coachID, "returned", "30 days", "", "30 days")        // 通報の対応中 → 残す
+	noMedia := seedReview(t, requesterID, coachID, "expired", "", "", "30 days")
+	execSQLArgs(t, `UPDATE review_requests SET video_public_id=NULL WHERE id=$1`, noMedia.id)
+	reported := seedReview(t, requesterID, coachID, "returned", "30 days", "", "30 days") // 通報の対応中 → 残す
 	execSQLArgs(t, `INSERT INTO reports (id, reporter_id, target_type, target_id, reason, detail) VALUES (gen_random_uuid(), $1, 'review_response', $2, 'other', '')`, requesterID, reported.id)
 	held := seedReview(t, requesterID, coachID, "returned", "30 days", "", "30 days") // 運営の保全ホールド → 残す
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/retention-hold", tadmin, map[string]any{"target": "review", "id": held.id, "hold": true}); rec.Code != http.StatusOK {
@@ -158,7 +160,7 @@ func TestStorageCleanupPurgesVideosAfterRetention(t *testing.T) {
 			t.Errorf("not deleted %s", want)
 		}
 	}
-	for _, keep := range []string{returned13.video, returned13.demo, clarified6.video, expired6.video, reported.video, reported.demo, held.video, consulting.video, answered.video, ended29Video, contractHeldVideo, contractReportedVideo} {
+	for _, keep := range []string{returned13.video, returned13.demo, clarified6.video, expired6.video, reported.video, reported.demo, held.video, consulting.video, answered.video, noMedia.video, ended29Video, contractHeldVideo, contractReportedVideo} {
 		if slices.Contains(got, keep) {
 			t.Errorf("deleted %s", keep)
 		}

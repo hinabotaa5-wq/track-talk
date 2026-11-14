@@ -94,13 +94,13 @@ it("6枚2,500円の購入カードに4つの条件とチケットの使い方を
   expect(card?.textContent).toContain("1回あたり約417円。");
   expect(card?.textContent).not.toContain("1回ずつ払うと");
   expect(Array.from(conditions?.querySelectorAll("li") ?? [], (item) => item.textContent)).toEqual([
-    "1枚で動画添削1回を申し込めます",
+    "1枚で1回プラン1件を申し込めます",
     "有効期限は購入から6か月。過ぎると失効し、延長はしません",
     "購入した本人だけが使えます。譲渡はできません",
     "原則、購入者都合の払戻しはしません。サービス終了時、当社・コーチの都合で受けられなかったとき、法令で認められる取消し・解除のときは払戻しします",
   ]);
   expect(conditions?.querySelector("ul")).toBeNull();
-  expect(card?.nextElementSibling?.textContent).toBe("動画添削1回に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。");
+  expect(card?.nextElementSibling?.textContent).toBe("1回プラン1件に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。");
   expect(card?.querySelector("s, del")).toBeNull();
 });
 
@@ -110,7 +110,7 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   await render();
   await act(async () => reviewButton()!.click());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
-  expect(confirm.textContent).toContain("フォーム添削のチケット6枚（1枚で動画添削1回）");
+  expect(confirm.textContent).toContain("1回プランのチケット6枚（1枚で1回プラン1件）");
   expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめて先に支払います");
   expect(confirm.textContent).toContain("お支払いが済んだ時に購入が確定");
   expect(confirm.textContent).toContain("2027/05/20 10:00");

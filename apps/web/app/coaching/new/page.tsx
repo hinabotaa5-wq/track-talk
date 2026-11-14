@@ -138,7 +138,7 @@ export default function NewReviewRequestPage() {
       appliedCoachRef.current = requested;
       const accepting = lists.filter(({ coaches: list }) => (list ?? []).some((c) => c.id === requested));
       if (accepting.length === 0) {
-        setCoachNotice(L("このコーチは現在、動画添削を受け付けていません"));
+        setCoachNotice(L("このコーチは現在、1回プランを受け付けていません"));
         return;
       }
       const record = accepting.flatMap(({ coaches: list }) => list ?? []).find((c) => c.id === requested);
@@ -157,7 +157,7 @@ export default function NewReviewRequestPage() {
   // 種目切替時の整合：指定コーチが今の種目で受付中にいない（切替後など）ときも、
   // 送信を止めて枠なしの注意で分かるようにする（state を増やさず描画時に判定する）。
   const coachInactiveForEvent = !!coachID && !coachesLoading && !coachesError && !coaches.some((c) => c.id === coachID);
-  const visibleCoachNotice = coachNotice || (coachInactiveForEvent ? L("このコーチは現在、動画添削を受け付けていません") : "");
+  const visibleCoachNotice = coachNotice || (coachInactiveForEvent ? L("このコーチは現在、1回プランを受け付けていません") : "");
 
   async function loadMe() {
     try {
@@ -245,16 +245,12 @@ export default function NewReviewRequestPage() {
       setError(L("相談内容を記入してください"));
       return false;
     }
-    if (!file) {
-      setError(L("動画を選んでください"));
-      return false;
-    }
-    if (file.size > maxBytes) {
+    if (file && file.size > maxBytes) {
       setError(L("100MB以内の動画にしてください"));
       return false;
     }
     if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
-      setError(L("チケットが不足しています。先に購入してから動画を選んでください。"));
+      setError(L("チケットが不足しています。先にチケットを購入してください。"));
       return false;
     }
     if (chosenKind && kindCounts && kindCounts[chosenKind] < 1) {
@@ -270,7 +266,7 @@ export default function NewReviewRequestPage() {
   }
 
   async function send() {
-    if (!file || !coach || !validate() || !acquire()) return;
+    if (!coach || !validate() || !acquire()) return;
     setError("");
     try {
       const referralCheck = cashPayment ? await checkReferralInput(referralCode, token) : "ok";
@@ -279,16 +275,20 @@ export default function NewReviewRequestPage() {
         setReferralWarning(referralCheck);
         return;
       }
-      const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
-      setUploadPhase("upload");
-      setUpload({ loaded: 0, total: file.size, percent: 0 });
-      const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
-      if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
+      let videoPublicID: string | undefined;
+      if (file) {
+        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+        setUploadPhase("upload");
+        setUpload({ loaded: 0, total: file.size, percent: 0 });
+        const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
+        if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
+        videoPublicID = payload.public_id;
+      }
       setUploadPhase("saving");
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
-        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: payload.public_id,
+        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: videoPublicID,
           method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined, referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
@@ -324,19 +324,19 @@ export default function NewReviewRequestPage() {
         {!estimate || estimate.payments ? null : (
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
-        <h1 className="text-2xl font-bold">{L("動画添削を頼む")}</h1>
+        <h1 className="text-2xl font-bold">{L("1回プラン（フォーム添削や競技に関する悩み）")}</h1>
       </div>
 
       {!reviewOpen ? (
         <DemoCodeForm
-          intro={L("フォーム添削は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。")}
+          intro={L("1回プランは準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。")}
           token={token}
           onJoined={() => void loadMe()}
         />
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
             confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
@@ -396,15 +396,17 @@ export default function NewReviewRequestPage() {
           </div>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">{L("動画({maxReviewSeconds}秒まで)", { maxReviewSeconds })}</span>
+            <span className="font-semibold">{L("動画（任意・{maxReviewSeconds}秒まで）", { maxReviewSeconds })}</span>
             <input
               className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
               type="file"
               accept="video/mp4,video/quicktime,video/webm"
+              aria-describedby="review-video-help"
               onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
               disabled={pending}
             />
           </label>
+          <p id="review-video-help" className="text-xs text-slate-300">{L("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。")}</p>
 
           {upload ? (
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
@@ -416,7 +418,7 @@ export default function NewReviewRequestPage() {
               {L("申し込みが確定してから24時間以内に回答が来ます。")}
             </p>
           ) : null}
-          {coachID ? <p className="text-xs text-slate-300">{L("受付中のコーチには決済の確認後に依頼が届きます。期限までに添削が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
+          {coachID ? <p className="text-xs text-slate-300">{L("受付中のコーチには決済の確認後に依頼が届きます。期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
           {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
@@ -459,7 +461,7 @@ export default function NewReviewRequestPage() {
                     </div>
                   ) : null}
                   <TicketBalance summary={ticketSummary} />
-                  <p className="text-xs text-slate-300">{L("動画添削1回はチケット1枚です。")}</p>
+                  <p className="text-xs text-slate-300">{L("1回プラン1件はチケット1枚です。")}</p>
                   <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
                     {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
                   </Link>
@@ -473,7 +475,7 @@ export default function NewReviewRequestPage() {
             <p className="text-xs text-slate-300">{L("デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。")}</p>
           )}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-          <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !file || !estimate || !coach || (needsDeclaration && !declared)}>
+          <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}
           </Button>
         </form>

@@ -1244,7 +1244,7 @@ type ReviewRequest struct {
 	Tier                string     `json:"tier"`
 	Event               string     `json:"event"`
 	Focus               []string   `json:"focus"`
-	VideoPublicID       string     `json:"video_public_id"`
+	VideoPublicID       *string    `json:"video_public_id"`
 	Status              string     `json:"status"`
 	DueAt               time.Time  `json:"due_at"`
 	CoachID             *uuid.UUID `json:"coach_id"`

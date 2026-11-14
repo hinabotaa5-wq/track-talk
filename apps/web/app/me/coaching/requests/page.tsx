@@ -46,7 +46,7 @@ export default function MyReviewRequestsPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">{L("フォーム添削の依頼")}</h1>
+      <h1 className="text-2xl font-bold">{L("1回プランの依頼")}</h1>
       {requests.length === 0 ? <p className="text-sm text-slate-200">{L("まだ依頼はありません")}</p> : null}
       <ul className="space-y-2">
         {requests.map((r) => (

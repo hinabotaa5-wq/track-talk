@@ -66,7 +66,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 350 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "動画添削の依頼が届きました")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "1回プランの依頼が届きました")
 	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
 		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
 	}
@@ -167,5 +167,5 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 	}
 	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "動画添削の依頼が届きました")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "1回プランの依頼が届きました")
 }

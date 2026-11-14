@@ -82,7 +82,10 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return workOrderTerms{}, err
 	}
-	work := fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却", rr.Event)
+	work := fmt.Sprintf("1回プラン（%s）。競技に関する悩みに文章で回答", rr.Event)
+	if rr.VideoPublicID != nil {
+		work = fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却", rr.Event)
+	}
 	return buildWorkOrderTerms(work, price*share/100, rr.DueAt, consignedAt), nil
 }
 
@@ -93,7 +96,7 @@ func consultationWorkOrderTerms(c db.CoachingConsultation, consignedAt time.Time
 	if c.AnswerBy != nil {
 		deliverBy = *c.AnswerBy
 	}
-	work := "フォーム添削の追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
+	work := "1回プランの追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
 	return buildWorkOrderTerms(work, int32(int64(c.PriceYen)*int64(c.SharePercent)/100), deliverBy, consignedAt)
 }
 
@@ -122,7 +125,7 @@ func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, cons
 // お知らせは「何が届いたか」の1行だけにして本文は空にし、9項目の全文は開く先の依頼の画面
 // (コーチ本人だけが見られる)にだけ出す(本体 #609)。
 func workOrderNotice(kind string, roomID uuid.UUID) (title, body, url string) {
-	title = "動画添削の依頼が届きました"
+	title = "1回プランの依頼が届きました"
 	if kind == "consultation" {
 		title = "追加質問が届きました"
 	}

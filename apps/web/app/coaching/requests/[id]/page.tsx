@@ -209,7 +209,7 @@ function ReviewRequestView() {
 
   async function cancelReview() {
     if (!await confirmDialog({
-      title: L("添削依頼をキャンセルしますか？"),
+      title: L("1回プランの依頼をキャンセルしますか？"),
       body: L("お支払いは全額返金・取消し、チケットは返還します。"),
       confirmLabel: L("依頼をキャンセルする"),
       cancelLabel: L("戻る"),
@@ -285,7 +285,7 @@ function ReviewRequestView() {
       {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{L("フォーム添削")}</h1>
+        <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
         <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
       </div>
 
@@ -297,7 +297,7 @@ function ReviewRequestView() {
         {request.status === "needs_info" && request.info_request ? (
           <p className="text-sm text-slate-100">{L("再提出の期限: {v0}", { v0: formatDateTime(request.info_request.resubmit_by) })}</p>
         ) : null}
-        {active && request.started_at ? <p className="text-sm text-slate-100">{L("現在コーチが添削を行っています")}</p> : null}
+        {active && request.started_at ? <p className="text-sm text-slate-100">{L("現在コーチが依頼に対応しています")}</p> : null}
         {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
         {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
         {request.requested_coach_id && !(request.response && request.coach) ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
@@ -305,7 +305,7 @@ function ReviewRequestView() {
           <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>
           {request.status === "expired" ? <Link href="/coaching/new" className="mt-1 inline-block text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}
         </div> : null}
-        {request.tickets ? <p className="text-sm text-slate-200">{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("添削のために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}
+        {request.tickets ? <p className="text-sm text-slate-200">{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("1回プランのために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}
       {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
       </section>
 

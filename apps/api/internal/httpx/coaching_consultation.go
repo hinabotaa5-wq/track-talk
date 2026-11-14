@@ -685,7 +685,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	clarifying := action == "clarify" || action == "clarification"
 	// 動画添削のあとの追加質問は質問1回・回答1回の一方通行なので、回答への確認・補足はない。
 	if clarifying && c.ReviewRequestID != nil {
-		Error(w, http.StatusConflict, "clarify_unavailable", "動画添削の追加質問には、回答への確認・補足はありません")
+		Error(w, http.StatusConflict, "clarify_unavailable", "1回プランの追加質問には、回答への確認・補足はありません")
 		return
 	}
 	// 回答・確認・補足は送信にあたるので、ゲートが閉じている間は止める。受諾・辞退・取り消しは止めない。

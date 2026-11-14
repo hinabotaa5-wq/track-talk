@@ -259,7 +259,7 @@ type CreateReviewRequestParams struct {
 	Tier               string     `json:"tier"`
 	Event              string     `json:"event"`
 	Focus              []string   `json:"focus"`
-	VideoPublicID      string     `json:"video_public_id"`
+	VideoPublicID      *string    `json:"video_public_id"`
 	DueAt              time.Time  `json:"due_at"`
 	Status             string     `json:"status"`
 	Question           string     `json:"question"`
@@ -1010,8 +1010,8 @@ UPDATE review_requests
 SET status = 'in_review',
     original_question = question,
     question = $1::text,
-    video_public_id = $2::text,
-    video_replaced = ($2::text <> video_public_id),
+    video_public_id = COALESCE($2::text, video_public_id),
+    video_replaced = ($2::text IS NOT NULL AND $2::text IS DISTINCT FROM video_public_id),
     due_at = statement_timestamp() + interval '24 hours',
     resubmitted_at = now(),
     reminder_12h_at = NULL,
@@ -1026,7 +1026,7 @@ RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at,
 
 type ResubmitReviewRequestParams struct {
 	Question      string    `json:"question"`
-	VideoPublicID string    `json:"video_public_id"`
+	VideoPublicID *string   `json:"video_public_id"`
 	ID            uuid.UUID `json:"id"`
 	RequesterID   uuid.UUID `json:"requester_id"`
 }

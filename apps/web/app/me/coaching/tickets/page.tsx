@@ -156,7 +156,7 @@ function TicketsPage() {
           <p className="text-lg font-bold">{L("{v0}（税込）", { v0: formatYen(p.amount_yen) })}</p>
           {p.quantity > 1 ? <p className="text-sm text-slate-200">{L("1回あたり約{v0}。", { v0: formatYen(Math.round(p.amount_yen / p.quantity)) })}</p> : null}
           <ul className="list-disc space-y-1 pl-5 text-xs text-slate-200">
-            <li>{L("1枚で動画添削1回を申し込めます")}</li>
+            <li>{L("1枚で1回プラン1件を申し込めます")}</li>
             <li>{L("有効期限は購入から{m}か月。過ぎると失効し、延長はしません", { m: summary.validity_months ?? ticketValidityMonths })}</li>
             <li>{L("購入した本人だけが使えます。譲渡はできません")}</li>
             <li>{L("原則、購入者都合の払戻しはしません。サービス終了時、当社・コーチの都合で受けられなかったとき、法令で認められる取消し・解除のときは払戻しします")}</li>
@@ -164,7 +164,7 @@ function TicketsPage() {
           <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); declaration.reset(); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
         </div>;
       })}
-      <p className="text-xs text-slate-300">{L("動画添削1回に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。")}</p>
+      <p className="text-xs text-slate-300">{L("1回プラン1件に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなければ戻ります。")}</p>
       {(summary.purchases ?? []).filter((p) => p.status !== "pending").length > 0 ? <section className="space-y-2">
         <h2 className="text-sm font-bold">{L("購入したチケット")}</h2>
         <ul className="space-y-2">{(summary.purchases ?? []).filter((p) => p.status !== "pending").map((p) => <li key={p.id} className="rounded-xl border border-white/15 p-3 text-xs text-slate-200">

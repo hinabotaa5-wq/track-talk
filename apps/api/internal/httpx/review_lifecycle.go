@@ -112,7 +112,7 @@ func alertReviewTimeoutStreak(ctx context.Context, q *db.Queries, coachID uuid.U
 	if err != nil {
 		return err
 	}
-	title := "フォーム添削が3回連続で期限切れになりました"
+	title := "1回プランが3回連続で期限切れになりました"
 	body := "コーチID " + coachID.String()
 	url := "/admin"
 	for _, id := range ids {
