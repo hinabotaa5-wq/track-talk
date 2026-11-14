@@ -205,3 +205,15 @@ it("第6条に紹介特典の本人利用・付与日起算の期限・払戻し
   expect(text).toContain("サービス提供の終了時に行う未使用チケットの払戻しの計算にも、特典チケットは含めません");
   expect(text).toContain("使用した特典チケット1枚を戻します");
 });
+
+it("第7条・第8条は国内コーチに適用し、海外コーチは Coach Terms・work order と特商法表記に接続する（#718）", () => {
+  const seven = article(7);
+  expect(seven).toContain("この条は、日本国内に住むコーチ（以下「国内コーチ」）に適用します");
+  expect(seven).toContain("Terms of Engagement for Overseas Coaches");
+  expect(seven).toContain('href="/legal/coach-terms"');
+  expect(seven).toContain("依頼ごとの個別の発注書（work order）によります");
+  const eight = article(8);
+  expect(eight).toContain("この条の継続プランは、国内コーチが出すものに限ります");
+  expect(eight).toContain("運営者が販売者となり利用者との契約の当事者となる別の取引であり、この条の第1項から第9項まで");
+  expect(eight).toContain('href="/legal/commerce"');
+});
