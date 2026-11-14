@@ -329,7 +329,7 @@ export default function CoachApplyPage() {
           {(application.sns_urls ?? []).length ? (
             <div>
               <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>
-              <dd className="space-y-1">
+              <dd className="mt-1 flex flex-wrap items-center gap-1.5">
                 {application.sns_urls.map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
               </dd>
             </div>
