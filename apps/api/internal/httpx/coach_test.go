@@ -317,6 +317,49 @@ func TestCoachApplicationSnsUrls(t *testing.T) {
 	}
 }
 
+// 本体 #713：応募送信では、http/https 以外の scheme・ホストなし・userinfo ありは
+// sns_urls の項目エラーで保存できない。テキストは今までどおり保存できる。
+func TestCoachApplicationSnsUrlsSchemeGate(t *testing.T) {
+	h := setup(t)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+
+	for _, urls := range [][]string{
+		{"javascript:alert(1)"},
+		{"JaVaScRiPt:alert(1)"},
+		{"data:text/plain;base64,AAAA"},
+		{"vbscript:msgbox(1)"},
+		{"file:///etc/passwd"},
+		{"ftp://example.com/x"},
+		{"mailto:someone@example.com"},
+		{"tel:+819012345678"},
+		{"https://user:pass@example.com/"},
+		{"https:///path"},
+	} {
+		body := coachApplicationBody()
+		body["sns_urls"] = urls
+		rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"sns_urls"`) {
+			t.Fatalf("scheme gate %v: %d %s", urls, rec.Code, rec.Body.String())
+		}
+	}
+
+	for _, urls := range [][]string{
+		{"https://www.instagram.com/track.talk/"},
+		{"http://example.com/page?x=1"},
+		{"@tracktalk.office"},
+		{"youtube.com/@tracktalk"},
+		{"YouTube: チャンネルの紹介です"},
+		{"example.com:8080"},
+	} {
+		body := coachApplicationBody()
+		body["sns_urls"] = urls
+		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, body); rec.Code != http.StatusOK {
+			t.Fatalf("scheme allow %v: %d %s", urls, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestCoachApplicationNameWithoutYears(t *testing.T) {
 	h := setup(t)
 	applicant := uuid.New()
