@@ -36,6 +36,14 @@ UPDATE coaching_ticket_purchases SET wording_version = $2 WHERE id = $1 AND word
 INSERT INTO coaching_ticket_lots (id, purchase_id, owner_id, quantity, available, expires_at)
 VALUES ($1,$2,$3,$4,$4,sqlc.arg(paid_at)::timestamptz + interval '6 months');
 
+-- name: CreateReferralReissueLot :exec
+-- 特典チケットの出し直し（本体 #797）。旧ロットの期限を延ばすのではなく、
+-- 出し直した日を付与日とする新規ロット1枚を付与する（有効期限は出し直しから6か月）。
+-- 紹介の付与回数制限（coaching_referral_rewards の1人1回）に触れないよう、rewards 行は作らない。
+-- 集計除外は kind='referral_reward' で既存どおり（購入なし・売上／返金／払戻しの対象外）。
+INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available, expires_at, kind)
+VALUES ($1,$2,1,1,now() + interval '6 months','referral_reward');
+
 -- name: TicketBalance :one
 -- 期限を過ぎたロットは、失効の処理（tick）を待たずに使える枚数から外す。
 SELECT COALESCE(sum(available) FILTER (WHERE expires_at IS NULL OR expires_at > now()),0)::bigint AS available,

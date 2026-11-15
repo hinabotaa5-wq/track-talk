@@ -226,6 +226,25 @@ func (q *Queries) CreatePostExpiryTicketRefund(ctx context.Context, arg CreatePo
 	return i, err
 }
 
+const createReferralReissueLot = `-- name: CreateReferralReissueLot :exec
+INSERT INTO coaching_ticket_lots (id, owner_id, quantity, available, expires_at, kind)
+VALUES ($1,$2,1,1,now() + interval '6 months','referral_reward')
+`
+
+type CreateReferralReissueLotParams struct {
+	ID      uuid.UUID  `json:"id"`
+	OwnerID *uuid.UUID `json:"owner_id"`
+}
+
+// 特典チケットの出し直し（本体 #797）。旧ロットの期限を延ばすのではなく、
+// 出し直した日を付与日とする新規ロット1枚を付与する（有効期限は出し直しから6か月）。
+// 紹介の付与回数制限（coaching_referral_rewards の1人1回）に触れないよう、rewards 行は作らない。
+// 集計除外は kind='referral_reward' で既存どおり（購入なし・売上／返金／払戻しの対象外）。
+func (q *Queries) CreateReferralReissueLot(ctx context.Context, arg CreateReferralReissueLotParams) error {
+	_, err := q.db.Exec(ctx, createReferralReissueLot, arg.ID, arg.OwnerID)
+	return err
+}
+
 const createTicketAllocation = `-- name: CreateTicketAllocation :exec
 INSERT INTO coaching_ticket_allocations(reservation_id,lot_id,quantity) VALUES ($1,$2,$3)
 `

@@ -474,6 +474,54 @@ func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.P
 	return nil
 }
 
+// coachCausedReviewEnd は、戻し対象の予約に紐づく依頼が運営者・コーチ都合の終了
+// （コーチの辞退・タイムアウト。依頼行の withdrawn_at / timed_out_at が印）かどうかを返す（本体 #797）。
+// 依頼行がない・読めない・印がない場合（選手キャンセル・再提出期限切れ・未割当の期限切れ・
+// 相談の予約・依頼が消えている場合を含む）は false を返し、出し直さない（fail-closed）。
+func coachCausedReviewEnd(ctx context.Context, q *db.Queries, reservation db.CoachingTicketReservation) (bool, error) {
+	if reservation.RequestID == nil {
+		return false, nil
+	}
+	rr, err := q.GetReviewRequest(ctx, *reservation.RequestID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return rr.WithdrawnAt != nil || rr.TimedOutAt != nil, nil
+}
+
+// reissueExpiredRewardLot は、期限切れで失効に回った特典ロットを、出し直した日を付与日とする
+// 新規ロット1枚として出し直す（本体 #797）。旧ロットの期限延長ではない。
+// 紹介の付与回数制限に触れないよう rewards 行は作らず、台帳は既存の 'referral_grant' 種別で
+// 操作キーに reissue を含めて出し直しと分かるように残す。通知は紹介特典付与時の流儀に合わせる。
+func reissueExpiredRewardLot(ctx context.Context, q *db.Queries, lot db.CoachingTicketLot, reservation db.CoachingTicketReservation) error {
+	if lot.OwnerID == nil {
+		return nil
+	}
+	id := uuid.New()
+	if err := q.CreateReferralReissueLot(ctx, db.CreateReferralReissueLotParams{ID: id, OwnerID: lot.OwnerID}); err != nil {
+		return err
+	}
+	if err := q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: id, OperationKey: "reissue-" + reservation.ID.String() + "-" + lot.ID.String(), Kind: "referral_grant", AvailableDelta: 1}); err != nil {
+		return err
+	}
+	wanted, err := notificationWanted(ctx, q, *lot.OwnerID, notifyCoaching, true)
+	if err != nil {
+		return err
+	}
+	if !wanted {
+		return nil
+	}
+	title := "紹介特典：期限切れの無料チケットを出し直しました"
+	body := "運営者・コーチの都合で終わった1回プランで使った分を出し直しました。新しい特典チケット：" + referralRewardTerms
+	url := "/me"
+	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
+		ID: uuid.New(), RecipientID: *lot.OwnerID, Title: &title, Body: &body, Url: &url,
+	})
+}
+
 func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.CoachingTicketReservation, consume bool) error {
 	t, err := q.LockTicketReservation(ctx, reservation.ID)
 	if err != nil {
@@ -490,6 +538,7 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 	if consume {
 		kind = "consume"
 	}
+	var reissueLots []db.CoachingTicketLot
 	for _, a := range allocations {
 		available, consumed, expired := a.Quantity, int32(0), int32(0)
 		if consume {
@@ -502,15 +551,28 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 				return err
 			}
 			forfeit := l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now())
+			refundInvalidated := false
 			if l.Kind == "referral_reward" {
 				refunded, err := q.ReferralRewardHasRefund(ctx, l.ID)
 				if err != nil {
 					return err
 				}
+				refundInvalidated = refunded
 				forfeit = forfeit || refunded
 			}
 			if forfeit {
 				available, expired = 0, a.Quantity
+			}
+			// 本体 #797：特典ロットが期限切れで失効に回り、返金による取消しではなく、
+			// 運営者・コーチ都合の終了なら、新規ロット1枚を出し直す。
+			if l.Kind == "referral_reward" && expired > 0 && !refundInvalidated {
+				coachCaused, err := coachCausedReviewEnd(ctx, q, t)
+				if err != nil {
+					return err
+				}
+				if coachCaused {
+					reissueLots = append(reissueLots, l)
+				}
 			}
 		}
 		k := kind
@@ -524,6 +586,11 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 			if err := q.CancelReleasedReferralReward(ctx, a.LotID); err != nil {
 				return err
 			}
+		}
+	}
+	for _, l := range reissueLots {
+		if err := reissueExpiredRewardLot(ctx, q, l, t); err != nil {
+			return err
 		}
 	}
 	state := "released"
