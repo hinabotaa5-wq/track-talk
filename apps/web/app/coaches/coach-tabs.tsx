@@ -61,13 +61,7 @@ export function CoachTabs() {
                 animate={item.id === tab ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {item.id === "support" ? <SupportPlanList /> : <>
-                  <div className="mb-3 space-y-1 text-sm">
-                    <p className="font-semibold">{L("1回プラン（フォーム添削や競技に関する悩み）")}</p>
-                    <p className="text-slate-300">{L("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。")}</p>
-                  </div>
-                  <CoachList />
-                </>}
+                {item.id === "support" ? <SupportPlanList /> : <CoachList />}
               </motion.div>
             ) : null,
           )}
