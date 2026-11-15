@@ -1395,10 +1395,11 @@ type SupportConsultSetting struct {
 }
 
 type SupportContractStatement struct {
-	ContractID uuid.UUID  `json:"contract_id"`
+	ContractID *uuid.UUID `json:"contract_id"`
 	CoachID    *uuid.UUID `json:"coach_id"`
 	Body       []byte     `json:"body"`
 	IssuedAt   time.Time  `json:"issued_at"`
+	ID         uuid.UUID  `json:"id"`
 }
 
 type SupportFaultDetermination struct {

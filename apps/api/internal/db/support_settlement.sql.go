@@ -97,10 +97,10 @@ func (q *Queries) EndSupportWithoutRefund(ctx context.Context, id uuid.UUID) (Co
 }
 
 const getContractStatement = `-- name: GetContractStatement :one
-SELECT contract_id, coach_id, body, issued_at FROM support_contract_statements WHERE contract_id = $1
+SELECT contract_id, coach_id, body, issued_at, id FROM support_contract_statements WHERE contract_id = $1
 `
 
-func (q *Queries) GetContractStatement(ctx context.Context, contractID uuid.UUID) (SupportContractStatement, error) {
+func (q *Queries) GetContractStatement(ctx context.Context, contractID *uuid.UUID) (SupportContractStatement, error) {
 	row := q.db.QueryRow(ctx, getContractStatement, contractID)
 	var i SupportContractStatement
 	err := row.Scan(
@@ -108,6 +108,7 @@ func (q *Queries) GetContractStatement(ctx context.Context, contractID uuid.UUID
 		&i.CoachID,
 		&i.Body,
 		&i.IssuedAt,
+		&i.ID,
 	)
 	return i, err
 }
@@ -180,7 +181,7 @@ ON CONFLICT DO NOTHING
 `
 
 type InsertContractStatementParams struct {
-	ContractID uuid.UUID  `json:"contract_id"`
+	ContractID *uuid.UUID `json:"contract_id"`
 	CoachID    *uuid.UUID `json:"coach_id"`
 	Body       []byte     `json:"body"`
 }
