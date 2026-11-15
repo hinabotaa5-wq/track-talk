@@ -101,13 +101,13 @@ else
 	ok "CORS プリフライト（許可外の Origin）→ Access-Control-Allow-Origin なし"
 fi
 
-# 5. 特商法ページの料金（フォーム添削 1,500円・追加相談 600円、いずれも税込）。
+# 5. 特商法ページの料金（1回プラン 500円・1回プランの追加質問 500円、いずれも税込）。
 commerce=$("${CURL[@]}" -w '\n%{http_code}' "$WEB_URL/legal/commerce" 2>/dev/null | sed 's/<!-- -->//g' || true)
 if [[ "$(tail -n1 <<<"$commerce")" != "200" ]]; then
 	ng "GET /legal/commerce" "ステータス $(tail -n1 <<<"$commerce")"
 else
-	for price in '1,500円（税込）' '600円（税込）'; do
-		if grep -q "$price" <<<"$commerce"; then ok "/legal/commerce に「$price」"; else ng "/legal/commerce の料金" "「$price」が見つからない"; fi
+	for price in '1回プラン 1回 500円（税込）' '1回プランの追加質問 1回 500円（税込）'; do
+		if grep -Fq "$price" <<<"$commerce"; then ok "/legal/commerce に「$price」"; else ng "/legal/commerce の料金" "「$price」が見つからない"; fi
 	done
 fi
 
