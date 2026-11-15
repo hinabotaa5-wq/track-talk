@@ -3,14 +3,14 @@ import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPayMethodLabels } from "@/lib/review";
 import type { TicketKind, TicketNextExpiry } from "@/lib/coaching-tickets";
 
-// チケットの払戻しの例外4項目（本体 #572 v3）。販売画面と最終確認画面に同じ順で箇条書きする。
+// チケット購入の最終確認に表示する払戻しの例外4項目（本体 #572 v3）。
 // 「原則払戻し不可」だけを単独で出さず、この4項目を同じ画面に出す。
 export function ticketRefundExceptions(): string[] {
   return [
     L("サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）を払い戻します。"),
-    L("法令で認められる取消し・解除は、その定めに従います（当社の債務不履行に基づく解除・未成年者の取消しを含みます）。"),
-    L("当社・コーチの都合で提供できないときや著しく遅れたときは、チケットを戻すか返金します。"),
-    L("当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。"),
+    L("法令で認められる取消し・解除は、その定めに従います（運営者の債務不履行に基づく解除・未成年者の取消しを含みます）。"),
+    L("運営者またはコーチの責めに帰すべき事由で1回プランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき500円を返金します。"),
+    L("運営者またはコーチの都合で有効期限内に1回プランを受けられなかったチケットは、失効後でも1枚につき500円を返金します。"),
   ];
 }
 
@@ -94,7 +94,7 @@ export function ticketPackConfirmRows({ quantity, amountYen, validityMonths, now
     { label: L("総額"), value: L("{v0}（税込）。{quantity}枚分をまとめて先に支払います", { v0: formatYen(amountYen), quantity }) },
     { label: L("確定のタイミング"), value: L("次の画面でお支払いが済んだ時に購入が確定し、チケットが使えるようになります。") },
     { label: L("有効期限"), value: L("決済が完了した日時から{validityMonths}か月（いまお支払いが済むと {v0} ごろまで）。過ぎると未使用の分は失効し、延長はしません。", { validityMonths, v0: formatDateTime(ticketExpiryIfPaidNow(validityMonths, now).toISOString()) }) },
-    { label: L("払戻し"), value: L("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします（利用規約第6条）。") + numberedRefundExceptions() },
+    { label: L("払戻し"), value: [L("チケットで申し込んだ依頼が対応できない理由などで終了した場合は、確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません。有効期限を過ぎてから戻るチケットは失効します。"), L("購入者の都合による払戻しは原則として行いません。次の場合は払戻しをします（利用規約第6条）。"), numberedRefundExceptions()].join(" ") },
     { label: L("使える人"), value: L("購入した本人だけが使えます。譲ることはできません。") },
   ];
 }
