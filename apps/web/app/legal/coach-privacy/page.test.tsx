@@ -44,3 +44,9 @@ it("第3条の送金の一般記述は国内Stripe・海外Wiseに分かれて�
   expect(html).toContain("国内コーチには Stripe、海外コーチには Wise（後述の海外コーチの項のとおり）を使います");
   expect(html).not.toContain("コーチへの報酬の送金も Stripe を使います");
 });
+
+it("第3条のダウンロードの一般記述に海外コーチの例外が表示される（#765 / #12）", () => {
+  const html = renderToStaticMarkup(<PrivacyPolicy />);
+  expect(html).toContain("契約が終わるまでのあいだ、選手とコーチは文章とメニューをダウンロードできます。");
+  expect(html).toContain("ただし、海外コーチについては、海外コーチ利用規約（Terms of Engagement for Overseas Coaches）の定め（アプリの外へのダウンロード・複写・保存の禁止）が優先し、アプリ外へのダウンロードや保存はできません。");
+});
