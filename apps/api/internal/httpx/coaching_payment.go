@@ -308,6 +308,12 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := complete(r.Context(), sess); err != nil {
+			// 業務上の却下（非JPカードの取り消しなど）は理由を付けて返し、再送させない（本体 #796）。
+			var ruleErr *ticketRuleError
+			if errors.As(err, &ruleErr) {
+				Error(w, http.StatusUnprocessableEntity, ruleErr.code, ruleErr.message)
+				return
+			}
 			slog.Error("stripe webhook", "event", ev.ID, "err", err)
 			Error(w, http.StatusInternalServerError, "internal_error", "処理できませんでした")
 			return

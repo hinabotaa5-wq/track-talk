@@ -141,12 +141,23 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/payment_intents/"):
 			// テストでは、pi_card で始まるものを仮押さえ済み、それ以外を確定済みとして答える。
+			// pi_nonjp で始まるものは米国発行、pi_unknown で始まるものは発行国不明として答える（本体 #796）。
 			id := strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/")
 			status := "succeeded"
-			if strings.HasPrefix(id, "pi_card") {
+			if strings.HasPrefix(id, "pi_card") || strings.HasPrefix(id, "pi_nonjp") || strings.HasPrefix(id, "pi_unknown") {
 				status = "requires_capture"
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": status})
+			resp := map[string]any{"id": id, "status": status}
+			switch {
+			case strings.HasPrefix(id, "pi_nonjp"):
+				resp["payment_method"] = map[string]any{"id": "pm_test_nonjp", "card": map[string]any{"country": "US"}}
+			case strings.HasPrefix(id, "pi_unknown"):
+				// 発行国不明（payment_method は未展開の ID のまま）。
+				resp["payment_method"] = "pm_test_unknown"
+			default:
+				resp["payment_method"] = map[string]any{"id": "pm_test_jp", "card": map[string]any{"country": "JP"}}
+			}
+			_ = json.NewEncoder(w).Encode(resp)
 		case strings.HasSuffix(r.URL.Path, "/capture"):
 			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/"), "/capture")
 			f.captured = append(f.captured, id)
