@@ -17,6 +17,19 @@ it("表記要のコーチは、氏名・住所・電話番号をプランのペ�
   expect(html).toContain("山田太郎");
   expect(html).toContain("東京都千代田区");
   expect(html).toContain("090-1234-5678");
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  const rows = Array.from(container.querySelectorAll("dl > div")).map((row) => [
+    row.querySelector("dt")?.textContent,
+    row.querySelector("dd")?.textContent,
+  ]);
+  expect(rows).toEqual([
+    ["販売者", "山田太郎"],
+    ["住所", "東京都千代田区"],
+    ["電話番号", "090-1234-5678"],
+    ["販売価格・提供期間・返金の条件", "このページのプランの内容のとおりです。"],
+    ["支払方法・支払時期", "コーチが申し込みを承諾したあと、TrackTalk の決済画面でクレジットカード決済を行います。"],
+  ]);
 });
 
 it("表記不要と申告したコーチは、表記がないことだけを伝える", () => {

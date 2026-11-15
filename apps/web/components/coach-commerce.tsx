@@ -182,7 +182,7 @@ export function CoachCommerceDisclosure({ commerce }: { commerce: PublicCommerce
         <div><dt className="text-xs text-slate-300">{L("住所")}</dt><dd>{commerce.address}</dd></div>
         <div><dt className="text-xs text-slate-300">{L("電話番号")}</dt><dd>{commerce.phone}</dd></div>
         <div><dt className="text-xs text-slate-300">{L("販売価格・提供期間・返金の条件")}</dt><dd>{L("このページのプランの内容のとおりです。")}</dd></div>
-        <div><dt className="text-xs text-slate-300">{L("支払方法・支払時期")}</dt><dd>{L("コーチが申し込みを承諾したあと、TrackTalk の決済画面で支払います。")}<span className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-200">{L("要確認")}</span></dd></div>
+        <div><dt className="text-xs text-slate-300">{L("支払方法・支払時期")}</dt><dd>{L("コーチが申し込みを承諾したあと、TrackTalk の決済画面でクレジットカード決済を行います。")}</dd></div>
       </dl>
     </details>
   );
