@@ -56,6 +56,8 @@ func (s *Service) Handler() http.Handler {
 	r.HandleFunc("PUT /v1/coach/identity", s.coach(s.saveIdentity))
 	r.HandleFunc("PUT /v1/coach/exemption", s.coach(s.exemption))
 	r.HandleFunc("PUT /v1/coach/disclosures/{id}", s.coach(s.publish))
+	// 一括承認。上の {id} 付きとは違う exact パターンなので競合しない。
+	r.HandleFunc("PUT /v1/coach/disclosures", s.coach(s.publishAll))
 	r.HandleFunc("DELETE /v1/coach/disclosures/{id}", s.coach(s.unpublish))
 	r.HandleFunc("POST /v1/admin/coaches/{id}/identity", s.admin(s.viewIdentity))
 	r.HandleFunc("POST /v1/admin/coaches/{id}/require-disclosure", s.admin(s.forceRequired))

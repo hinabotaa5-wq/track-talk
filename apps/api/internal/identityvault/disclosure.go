@@ -224,6 +224,64 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request, coach uuid.UUI
 	}))
 }
 
+// publishAll は、自分の公開中プラン（identity_boundary.published_plans）全件を
+// 1回の確認で承認する。既存 publish と同じ条件・同じ INSERT を、コーチ単位の
+// ロックの中の1トランザクションで行うため、全件成功か全件なし（atomic）になる。
+func (s *Service) publishAll(w http.ResponseWriter, r *http.Request, coach uuid.UUID) {
+	// 公開する値は、確認した版（identity_revision）の登録内容そのもの。
+	var input struct {
+		Confirm  bool      `json:"confirm"`
+		Revision uuid.UUID `json:"identity_revision"`
+	}
+	if !decode(w, r, &input) {
+		return
+	}
+	if !input.Confirm {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+	ctx := r.Context()
+	mutationResult(w, s.locked(ctx, coach, func(tx pgx.Tx) error {
+		var currentRevision uuid.UUID
+		var hasPhone bool
+		err := tx.QueryRow(ctx, "SELECT revision, phone_enc IS NOT NULL FROM identity_vault.identities WHERE coach_id=$1", coach).Scan(&currentRevision, &hasPhone)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && currentRevision != input.Revision) {
+			return errConflict
+		}
+		if err != nil {
+			return err
+		}
+		// 移行前の登録（電話番号なし）は、登録し直すまで表記要の公開を認めない。
+		if st, err := settings(ctx, tx, coach); err != nil {
+			return err
+		} else if st.Required && !hasPhone {
+			return errConflict
+		}
+		rows, err := s.main.Query(ctx, "SELECT id,plan_epoch,coach_epoch FROM identity_boundary.published_plans WHERE coach_id=$1 ORDER BY id", coach)
+		if err != nil {
+			return err
+		}
+		type target struct {
+			ID, PlanEpoch, CoachEpoch uuid.UUID
+		}
+		plans, err := pgx.CollectRows(rows, pgx.RowToStructByPos[target])
+		if err != nil {
+			return err
+		}
+		// 対象0件は冪等に 204（何も書かない）。
+		for _, p := range plans {
+			// 既存 publish と同じ INSERT（ON CONFLICT で冪等）。
+			if _, err := tx.Exec(ctx, `INSERT INTO identity_vault.disclosures (plan_id,coach_id,plan_epoch,coach_epoch)
+				VALUES ($1,$2,$3,$4) ON CONFLICT (plan_id) DO UPDATE
+				SET coach_id=EXCLUDED.coach_id,plan_epoch=EXCLUDED.plan_epoch,coach_epoch=EXCLUDED.coach_epoch`,
+				p.ID, coach, p.PlanEpoch, p.CoachEpoch); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+}
+
 func (s *Service) unpublish(w http.ResponseWriter, r *http.Request, coach uuid.UUID) {
 	id, ok := idParam(w, r)
 	if !ok {
