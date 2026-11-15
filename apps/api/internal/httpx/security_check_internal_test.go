@@ -4,12 +4,23 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/mail"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// testDBDSN は、環境から与えられた DATABASE_URL（ホスト・ポート）を使う。
+// 未設定のときだけ従来の既定（55432）を使う。接続先の直書きはしない（本体 #795）。
+func testDBDSN(t *testing.T) string {
+	t.Helper()
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		return dsn
+	}
+	return "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
+}
 
 func TestAllowedDBApplicationName(t *testing.T) {
 	allowed := []string{
@@ -33,7 +44,7 @@ func TestAllowedDBApplicationName(t *testing.T) {
 // 名札のない接続を1回だけ数えて知らせ、同じ接続では二度知らせない。
 func TestCheckDBConnectionsAlertsOncePerConnection(t *testing.T) {
 	ctx := context.Background()
-	dsn := "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
+	dsn := testDBDSN(t)
 	if err := config.RequireLocalDatabase(dsn); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +105,7 @@ func TestSecurityCheckRejectsBadSecret(t *testing.T) {
 // OPS_ALERT_EMAIL 未設定なら、見慣れない接続があってもメールは送らず、件数だけ返す。
 func TestCheckDBConnectionsWithoutOpsEmail(t *testing.T) {
 	ctx := context.Background()
-	dsn := "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
+	dsn := testDBDSN(t)
 	if err := config.RequireLocalDatabase(dsn); err != nil {
 		t.Fatal(err)
 	}
