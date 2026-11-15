@@ -51,7 +51,9 @@ func setupIsolatedStripe(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	// setupConfig がマイグレーションする先を独立DBに向ける。
-	t.Setenv("DATABASE_URL", "postgres://tracktalk:tracktalk@127.0.0.1:55432/"+name+"?sslmode=disable")
+	// 環境から与えられた接続先（ホスト・ポート）を土台にし、DB名だけ差し替える。
+	// ポートの直書きはしない（本体 #795：CI の 5432 で SKIP になる原因だった）。
+	t.Setenv("DATABASE_URL", cfg.ConnString())
 	_ = isolated.Close(ctx)
 	h, _ := setupStripe(t)
 	return h
