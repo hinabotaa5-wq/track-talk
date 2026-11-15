@@ -25,17 +25,17 @@ export function CoachAboutView() {
         </article>
         <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><UserRound className="size-5 text-blue-300" aria-hidden />{L("継続プラン：あなたに相談したい人を支える")}</h3>
-          <p className="text-sm leading-relaxed text-slate-200">{L("継続プランは準備中です。開始後は、コーチが指導内容・料金・期間・定員を決めてプランを公開し、利用者はプロフィールや内容を見て申し込みます。申し込みをコーチが承諾した後、必要な支払い・同意を経て指導が始まります。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("継続プランは準備中です。開始後は、選手からの無料相談に回答し、内容をすり合わせて提案を送ります。選手（18歳未満は保護者）が提案に同意して支払うと、引き受け操作なしに契約が成立します。")}</p>
           <ul className="space-y-3 text-sm text-slate-200">
-            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("1ヶ月プラン")}</strong>{L("：目標の大会に向けて、準備や調整をサポート。")}</span></li>
-            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("対面プラン")}</strong>{L("：場所や回数などをプランに明記し、現地で指導します。空き日カレンダーから希望日を受け取り、メッセージで相談して日時を提案・確定します。")}</span></li>
+            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("1ヶ月プラン")}</strong>{L("：1ヶ月の継続サポート。無料相談から始め、提案への同意・支払いで成立します。")}</span></li>
+            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("対面プラン")}</strong>{L("：現地で指導するプラン。開始時期は未定で、始まるときに案内します。")}</span></li>
           </ul>
         </article>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("自分のペースで、責任を持って")}</h2>
-        <p className="text-sm leading-relaxed text-slate-200">{L("1回プランは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。継続プランは対応できる内容と定員を自分で決めます。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("1回プランは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。継続プラン（1ヶ月）は受付設定と無料相談への回答がコーチの操作で、期間・内容・価格は提案で決めます。")}</p>
         <p className="text-sm leading-relaxed text-slate-200">{L("やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。")}</p>
       </section>
 
