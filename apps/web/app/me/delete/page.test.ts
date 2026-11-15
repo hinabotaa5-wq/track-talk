@@ -133,6 +133,11 @@ describe("DeleteAccountPage", () => {
     expect(text).toContain("終わっていないときは退会できません");
     expect(text).toContain("対応が終わったあとに退会すると、あなたの指導の契約とやりとりも削除されます");
     expect(text).toContain("取引に関する記録はプライバシーポリシーに定める期間は退会後も保管します");
+    const paragraphs = Array.from(view.div.querySelectorAll("p"), (p) => p.textContent ?? "");
+    expect(paragraphs.find((p) => p.includes("23歳になる月の末日まで"))).toContain("従来の購入の都度の申告の記録");
+    const purchaseNotice = paragraphs.find((p) => p.includes("新しい購入前チェックの記録"));
+    expect(purchaseNotice).toContain("最後の完了した取引から5年間（完了した取引がない場合は、最後のチェックの記録から5年間）");
+    expect(purchaseNotice).not.toContain("23歳になる月の末日まで");
     expect(text).not.toContain("オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます");
     await view.unmount();
   });
@@ -148,6 +153,11 @@ describe("DeleteAccountPage", () => {
       expect(text).toContain("you cannot delete your account until they are done");
       expect(text).toContain("deleting your account also deletes your coaching contracts and messages");
       expect(text).toContain("Transaction records are kept after deletion");
+      const paragraphs = Array.from(view.div.querySelectorAll("p"), (p) => p.textContent ?? "");
+      expect(paragraphs.find((p) => p.includes("until the last day of the month you turn 23"))).toContain("past per-purchase declarations");
+      const purchaseNotice = paragraphs.find((p) => p.includes("the new pre-purchase check records"));
+      expect(purchaseNotice).toContain("for 5 years from the last completed transaction (or from the last check record if no transaction was completed)");
+      expect(purchaseNotice).not.toContain("until the last day of the month you turn 23");
       expect(text).not.toContain("If you're providing online coaching");
       await view.unmount();
     } finally {
