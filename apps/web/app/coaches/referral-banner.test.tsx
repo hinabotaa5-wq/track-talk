@@ -16,8 +16,15 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: auth.token, loading: false }) }));
-vi.mock("./coach-list", () => ({ CoachList: () => <div>coach-list</div> }));
-vi.mock("./support-plan-list", () => ({ SupportPlanList: () => <div>support-plan-list</div> }));
+vi.mock("./coach-list", async () => {
+  const { useEffect } = await import("react");
+  // 取得済みの一覧として振る舞う（本体 #804：初回取得が終わったら settled を知らせる）。
+  return { CoachList: ({ onSettled }: { onSettled?: () => void }) => { useEffect(() => { onSettled?.(); }, [onSettled]); return <div>coach-list</div>; } };
+});
+vi.mock("./support-plan-list", async () => {
+  const { useEffect } = await import("react");
+  return { SupportPlanList: ({ onSettled }: { onSettled?: () => void }) => { useEffect(() => { onSettled?.(); }, [onSettled]); return <div>support-plan-list</div>; } };
+});
 const { ReferralBanner } = await import("./referral-banner");
 const { CoachesView } = await import("./page-view");
 

@@ -1,12 +1,13 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
 import { ViewSwitch } from "@/components/view-switch";
 import { CoachList } from "./coach-list";
 import { SupportPlanList } from "./support-plan-list";
 import { CoachSelfButton } from "./coach-self-button";
+import { supportPlanListEnabled } from "@/lib/features";
 import { usePathname, useSearchParams } from "next/navigation";
 
 // コーチ一覧の上部の切り替え。「動画添削」は指名用のコーチ一覧、「サポートプラン」は対応コーチの一覧（別のリスト）。
@@ -16,7 +17,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 // 一度開いた一覧は消さずに隠しておき、行き来しても読み込み直さない。
 type Tab = "video" | "support";
 
-export function CoachTabs() {
+export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boolean) => void }) {
   const params = useSearchParams();
   const pathname = usePathname();
   const base = pathname === "/coaching" ? "/coaching" : "/coaches";
@@ -25,6 +26,17 @@ export function CoachTabs() {
   const [tab, setTab] = useState<Tab>(initial);
   // 一度開いたパネルは消さずに隠しておき、行き来しても読み込み直さない（大会・ケガと同じ）。
   const [opened, setOpened] = useState<Set<Tab>>(() => new Set([initial]));
+  // 初回読み込み中はページ中身をストップウォッチだけにする（本体 #804）。
+  // 各一覧は初回の取得1回だけを行い、終わったら（成功・失敗のどちらも）知らせる。行き来での再取得はない。
+  const [settled, setSettled] = useState<Set<Tab>>(() => new Set());
+  const markSettled = useCallback((done: Tab) => {
+    setSettled((prev) => (prev.has(done) ? prev : new Set(prev).add(done)));
+  }, []);
+  // フラグが閉じている間の継続プラン側は取得せず「継続プランは準備中です」だけなので、読み込みではない。
+  const loading = tab === "support" ? supportPlanListEnabled && !settled.has("support") : !settled.has("video");
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
   const views = [
     { id: "video", label: L("1回プラン") },
     { id: "support", label: L("継続プラン") },
@@ -38,19 +50,21 @@ export function CoachTabs() {
   return (
     <div className="space-y-4">
       <MotionConfig reducedMotion="user">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <ViewSwitch
-              label={L("コーチの一覧を切り替える")}
-              layoutId="coach-list-view-pill"
-              views={views}
-              current={tab}
-              onSelect={select}
-              href={(id) => (id === "support" ? `${base}?tab=support` : base)}
-            />
+        {loading ? null : (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ViewSwitch
+                label={L("コーチの一覧を切り替える")}
+                layoutId="coach-list-view-pill"
+                views={views}
+                current={tab}
+                onSelect={select}
+                href={(id) => (id === "support" ? `${base}?tab=support` : base)}
+              />
+            </div>
+            <CoachSelfButton />
           </div>
-          <CoachSelfButton />
-        </div>
+        )}
         <div role="tabpanel">
           {views.map((item) =>
             opened.has(item.id) || item.id === tab ? (
@@ -61,7 +75,7 @@ export function CoachTabs() {
                 animate={item.id === tab ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {item.id === "support" ? <SupportPlanList /> : <CoachList />}
+                {item.id === "support" ? <SupportPlanList onSettled={() => markSettled("support")} /> : <CoachList onSettled={() => markSettled("video")} />}
               </motion.div>
             ) : null,
           )}

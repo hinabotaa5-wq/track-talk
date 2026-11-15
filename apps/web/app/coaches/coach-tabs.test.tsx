@@ -200,6 +200,53 @@ it("ログイン済み・応募なしでもコーチボタンを出す（応募�
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
+// 本体 #804：エラー時は読み込み中扱いを終え、従来のエラー表示に到達する。ストップウォッチだけが残り続けない。
+it("取得に失敗したらストップウォッチを消してエラーを出し、切り替えを戻す", async () => {
+  apiFetch.mockRejectedValue(new Error("network down"));
+  await render();
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("読み込みに失敗しました");
+  expect(switchLink("1回プラン")).not.toBeUndefined();
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(fetchCount("/v1/coaches")).toBe(1);
+});
+
+// 本体 #804：継続プランを初めて開くときも、取得が終わるまで切り替えを出さない。
+it("継続プランの初回取得中は切り替えを出さず、終わったら戻す", async () => {
+  let finishSupport!: (value: { coaches: never[] }) => void;
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaches") return { coaches: [] };
+    if (path === "/v1/coaches/support-plan") return new Promise<{ coaches: never[] }>((resolve) => { finishSupport = resolve; });
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  expect(switchLink("継続プラン")).not.toBeUndefined();
+  await act(async () => switchLink("継続プラン")!.click());
+  // 継続プラン側の取得中はストップウォッチだけで、切り替えもコーチボタンも出ない。
+  expect(container.querySelector(".page-loading-screen")).not.toBeNull();
+  expect(switchLink("1回プラン")).toBeUndefined();
+  expect(coachButton()).toBeUndefined();
+  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
+  await act(async () => finishSupport({ coaches: [] }));
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(switchLink("1回プラン")).not.toBeUndefined();
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
+});
+
+// 本体 #804：フラグが閉じている間の「継続プランは準備中です」は読み込みではない。切り替えを出したままにする。
+it("継続プラン一覧のフラグが閉じている間は準備中を出し、切り替えも隠さない", async () => {
+  flags.supportList = false;
+  navigation.tab = "support";
+  await render();
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(container.textContent).toContain("継続プランは準備中です");
+  expect(switchLink("1回プラン")).not.toBeUndefined();
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches/support-plan")).toBe(false);
+});
+
 it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）でもコーチボタンを出す（応募状態を取得しない）", async (status) => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path === "/v1/coach/me") return { application: { status } };
@@ -212,8 +259,17 @@ it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
-it("応募状態の取得を待たず初回描画でコーチボタンを出す", async () => {
+// 本体 #804：初回読み込み中はページ中身をストップウォッチだけにする。
+// 取得が終わるまで切り替え・コーチボタン・種目チップは DOM に出さない。
+it("初回の取得が終わるまで切り替えとコーチボタンを出さず、ストップウォッチだけを出す", async () => {
   apiFetch.mockReturnValue(new Promise(() => {}));
   await render();
-  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(container.querySelector(".page-loading-screen")).not.toBeNull();
+  expect(container.querySelector('[role="status"]')).not.toBeNull();
+  expect(switchLink("1回プラン")).toBeUndefined();
+  expect(switchLink("継続プラン")).toBeUndefined();
+  expect(coachButton()).toBeUndefined();
+  expect(container.querySelector('[role="radio"]')).toBeNull();
+  // 応募状態は取得しない（従来どおり）。
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });

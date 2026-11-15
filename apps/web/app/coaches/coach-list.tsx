@@ -21,7 +21,7 @@ function coachPrice(coach: PublicCoach): string | null {
   return `${formatYen(minimum)}${prices.some((price) => price !== minimum) ? L("〜") : ""}`;
 }
 
-export function CoachList() {
+export function CoachList({ onSettled }: { onSettled?: () => void }) {
   const [result, setResult] = useState<{ coaches: PublicCoach[]; fetchedAt: number } | null>(null);
   const [error, setError] = useState("");
   const [event, setEvent] = useState<CoachEventFilter>("all");
@@ -30,14 +30,20 @@ export function CoachList() {
     let cancelled = false;
     apiFetch<{ coaches: PublicCoach[] }>("/v1/coaches")
       .then((d) => {
-        if (!cancelled) setResult({ coaches: d.coaches, fetchedAt: Date.now() });
+        if (cancelled) return;
+        setResult({ coaches: d.coaches, fetchedAt: Date.now() });
+        onSettled?.();
       })
       .catch(() => {
-        if (!cancelled) setError(L("読み込みに失敗しました"));
+        if (cancelled) return;
+        setError(L("読み込みに失敗しました"));
+        onSettled?.();
       });
     return () => {
       cancelled = true;
     };
+    // 初回の取得だけを知らせる。以後の再取得はない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) return <p role="alert" className="text-sm text-red-400">{error}</p>;
