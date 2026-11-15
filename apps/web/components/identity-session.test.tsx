@@ -7,25 +7,89 @@ import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 const SECRET = "SYNTHETIC-SECRET-0123456789";
 const QR = "data:image/svg+xml;base64,c3ludGhldGljLXFy";
 
+type SavedSession = { access_token: string; aal: "aal1" | "aal2" };
+
 const mocks = vi.hoisted(() => ({
+  options: null as null | {
+    storageKey?: string;
+    storage?: {
+      getItem: (key: string) => string | null;
+      setItem: (key: string, value: string) => void;
+      removeItem: (key: string) => void;
+    };
+  },
+  authCallback: null as null | ((event: string, session: { access_token: string } | null) => void),
   signInWithPassword: vi.fn(),
   listFactors: vi.fn(),
   enroll: vi.fn(),
   challengeAndVerify: vi.fn(),
   signOut: vi.fn(),
+  getSession: vi.fn(),
+  getAuthenticatorAssuranceLevel: vi.fn(),
 }));
+
+// Supabase の保存のふるまい（persistSession）の模倣。受け取った storage アダプタ経由でのみ読み書きする。
+function readRaw(): { raw: string | null; broken: boolean } {
+  let raw: string | null = null;
+  try {
+    raw = mocks.options?.storage?.getItem(mocks.options?.storageKey ?? "") ?? null;
+  } catch {
+    return { raw: null, broken: true };
+  }
+  if (!raw) return { raw: null, broken: false };
+  try {
+    JSON.parse(raw);
+    return { raw, broken: false };
+  } catch {
+    return { raw, broken: true };
+  }
+}
+
+function readSaved(): SavedSession | null {
+  const { raw, broken } = readRaw();
+  if (broken || !raw) return null;
+  const parsed = JSON.parse(raw) as Partial<SavedSession>;
+  if (typeof parsed.access_token !== "string") return null;
+  if (parsed.aal !== "aal1" && parsed.aal !== "aal2") return null;
+  return { access_token: parsed.access_token, aal: parsed.aal };
+}
+
+function writeSaved(next: SavedSession | null) {
+  const { storage, storageKey } = mocks.options ?? {};
+  if (!storage || !storageKey) return;
+  if (next) storage.setItem(storageKey, JSON.stringify(next));
+  else storage.removeItem(storageKey);
+}
+
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({
-    auth: {
-      signInWithPassword: (...args: unknown[]) => mocks.signInWithPassword(...args),
-      mfa: {
-        listFactors: (...args: unknown[]) => mocks.listFactors(...args),
-        enroll: (...args: unknown[]) => mocks.enroll(...args),
-        challengeAndVerify: (...args: unknown[]) => mocks.challengeAndVerify(...args),
+  createClient: (_url: unknown, _key: unknown, options?: { auth?: typeof mocks.options }) => {
+    mocks.options = options?.auth ?? null;
+    return {
+      auth: {
+        signInWithPassword: (...args: unknown[]) => mocks.signInWithPassword(...args),
+        getSession: (...args: unknown[]) => mocks.getSession(...args),
+        mfa: {
+          listFactors: (...args: unknown[]) => mocks.listFactors(...args),
+          enroll: (...args: unknown[]) => mocks.enroll(...args),
+          challengeAndVerify: (...args: unknown[]) => mocks.challengeAndVerify(...args),
+          getAuthenticatorAssuranceLevel: (...args: unknown[]) => mocks.getAuthenticatorAssuranceLevel(...args),
+        },
+        signOut: (...args: unknown[]) => mocks.signOut(...args),
+        onAuthStateChange: (callback: (event: string, session: { access_token: string } | null) => void) => {
+          mocks.authCallback = callback;
+          return {
+            data: {
+              subscription: {
+                unsubscribe: () => {
+                  if (mocks.authCallback === callback) mocks.authCallback = null;
+                },
+              },
+            },
+          };
+        },
       },
-      signOut: (...args: unknown[]) => mocks.signOut(...args),
-    },
-  }),
+    };
+  },
 }));
 
 let IdentitySession: typeof import("./identity-session").IdentitySession;
@@ -52,8 +116,43 @@ let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  for (const fn of [mocks.signInWithPassword, mocks.listFactors, mocks.enroll, mocks.challengeAndVerify, mocks.signOut]) fn.mockReset();
-  mocks.signOut.mockResolvedValue(undefined);
+  for (const fn of [
+    mocks.signInWithPassword, mocks.listFactors, mocks.enroll, mocks.challengeAndVerify,
+    mocks.signOut, mocks.getSession, mocks.getAuthenticatorAssuranceLevel,
+  ]) fn.mockReset();
+  mocks.options = null;
+  mocks.authCallback = null;
+  window.sessionStorage.clear();
+  window.localStorage.clear();
+  mocks.listFactors.mockResolvedValue({ error: null, data: { totp: [] } });
+  mocks.getSession.mockImplementation(async () => {
+    const { raw, broken } = readRaw();
+    if (broken) return { data: { session: null }, error: new Error("stored session is not valid") };
+    if (!raw) return { data: { session: null }, error: null };
+    const saved = readSaved();
+    return { data: { session: saved ? { access_token: saved.access_token } : null }, error: null };
+  });
+  mocks.getAuthenticatorAssuranceLevel.mockImplementation(async () => {
+    const saved = readSaved();
+    return {
+      data: { currentLevel: saved?.aal ?? null, nextLevel: saved?.aal === "aal1" ? "aal2" : null },
+      error: null,
+    };
+  });
+  mocks.signInWithPassword.mockImplementation(async () => {
+    writeSaved({ access_token: "vault-aal1-session", aal: "aal1" });
+    return { error: null };
+  });
+  mocks.enroll.mockResolvedValue({ error: null, data: { id: "factor-9", totp: { secret: SECRET, qr_code: QR } } });
+  mocks.challengeAndVerify.mockImplementation(async () => {
+    writeSaved({ access_token: "vault-aal2-session", aal: "aal2" });
+    return { error: null, data: { access_token: "vault-aal2-session" } };
+  });
+  mocks.signOut.mockImplementation(async () => {
+    writeSaved(null);
+    mocks.authCallback?.("SIGNED_OUT", null);
+    return { error: null };
+  });
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -92,10 +191,35 @@ async function doLogin() {
   await flush();
 }
 
+async function doVerify(codeValue = "123456") {
+  const code = container.querySelector('input[placeholder="123456"]')!;
+  await type(code, codeValue);
+  const submit = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "設定する")!;
+  await act(async () => submit.click());
+  await flush();
+}
+
+function storageKey() {
+  const key = mocks.options?.storageKey;
+  expect(key).toBeTruthy();
+  return key as string;
+}
+
 function renderSession() {
   return act(async () => {
     root.render(<IdentitySession>{(token: string) => <p>ログイン後の本体:{token}</p>}</IdentitySession>);
   });
+}
+
+// 再読み込み相当。同じタブの sessionStorage は残り、コンポーネントは作り直す。
+async function remount() {
+  await act(async () => root.unmount());
+  container.remove();
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await renderSession();
+  await flush();
 }
 
 it("qr付きenrollではQRと手順が出て、コード入力で検証して中身が表示される", async () => {
@@ -182,30 +306,194 @@ it("enroll失敗では従来のエラーのまま先へ進まない", async () =
   expect(container.querySelector('input[type="email"]')).not.toBeNull();
 });
 
-it("QRと設定キーをURL・コンソール・ストレージに書き込まない", async () => {
+it("QR・設定キー・トークンをURL・コンソール・localStorageに書き込まない", async () => {
   const seen: unknown[][] = [];
   for (const method of ["log", "warn", "error", "info", "debug"] as const) {
     vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
       seen.push(args);
     });
   }
-  const localSet = vi.spyOn(window.localStorage, "setItem");
-  const sessionSet = vi.spyOn(window.sessionStorage, "setItem");
   const hrefBefore = window.location.href;
 
-  mocks.signInWithPassword.mockResolvedValue({ error: null });
-  mocks.listFactors.mockResolvedValue({ error: null, data: { totp: [] } });
-  mocks.enroll.mockResolvedValue({ error: null, data: { id: "factor-5", totp: { secret: SECRET, qr_code: QR } } });
   await renderSession();
+  await flush();
   await doLogin();
+  const key = storageKey();
+  // パスワード段階の aal1 セッションは同一タブの復元のために保存される。
+  expect(window.sessionStorage.getItem(key)).not.toBeNull();
+  await doVerify("123456");
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-session");
 
-  expect(container.querySelector("img")).not.toBeNull();
   expect(window.location.href).toBe(hrefBefore);
   expect(window.location.href).not.toContain(SECRET);
-  expect(localSet).not.toHaveBeenCalled();
-  expect(sessionSet).not.toHaveBeenCalled();
+  // localStorage には何も書かない（実状態で確認する。Storage のメソッドスパイは
+  // この jsdom では素通りしないため、保存先の実内容で確かめる）。
+  expect(window.localStorage.length).toBe(0);
+  // 保存された中身に QR と設定キーが混ざらない。
+  const stored = window.sessionStorage.getItem(key) ?? "";
+  expect(stored).not.toContain(SECRET);
+  expect(stored).not.toContain(QR);
+  expect(JSON.parse(stored).access_token).toBe("vault-aal2-session");
   for (const args of seen) {
-    expect(JSON.stringify(args)).not.toContain(SECRET);
-    expect(JSON.stringify(args)).not.toContain(QR);
+    const text = JSON.stringify(args);
+    expect(text).not.toContain(SECRET);
+    expect(text).not.toContain(QR);
+    expect(text).not.toContain("vault-aal2-session");
+  }
+});
+
+it("aal2 まで完了した後に再マウントするとパスワード・TOTPを求めず children が表示される", async () => {
+  await renderSession();
+  await flush();
+  await doLogin();
+  await doVerify("123456");
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-session");
+
+  await remount();
+
+  expect(container.querySelector('input[type="email"]')).toBeNull();
+  expect(container.querySelector('input[type="password"]')).toBeNull();
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-session");
+  // 再認証はしていない。
+  expect(mocks.signInWithPassword).toHaveBeenCalledTimes(1);
+  expect(mocks.challengeAndVerify).toHaveBeenCalledTimes(1);
+});
+
+it("保存された aal1 セッションでは children が表示されず保存が消えてログインフォームに戻る", async () => {
+  await renderSession();
+  await flush();
+  await doLogin();
+  const key = storageKey();
+  // パスワード段階の aal1 セッションが保存されたまま中断した状態。
+  expect(window.sessionStorage.getItem(key)).not.toBeNull();
+  expect(container.textContent).not.toContain("ログイン後の本体");
+
+  await remount();
+
+  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(container.textContent).not.toContain("ログイン後の本体");
+  expect(container.querySelector('input[type="email"]')).not.toBeNull();
+  expect(container.querySelector('input[type="password"]')).not.toBeNull();
+});
+
+it("壊れた保存では保存が消えてログインフォームに戻る", async () => {
+  await renderSession();
+  await flush();
+  const key = storageKey();
+  window.sessionStorage.setItem(key, "壊れた保存{{{");
+
+  await remount();
+
+  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(container.textContent).not.toContain("ログイン後の本体");
+  expect(container.querySelector('input[type="email"]')).not.toBeNull();
+});
+
+it("期限切れのセッションでは保存が消えてログインフォームに戻る", async () => {
+  await renderSession();
+  await flush();
+  await doLogin();
+  await doVerify("123456");
+  const key = storageKey();
+  expect(window.sessionStorage.getItem(key)).not.toBeNull();
+
+  // 更新に失敗した期限切れ相当。次の一回だけ getSession が失敗する。
+  mocks.getSession.mockRejectedValueOnce(new Error("refresh failed"));
+  await remount();
+
+  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(container.textContent).not.toContain("ログイン後の本体");
+  expect(container.querySelector('input[type="email"]')).not.toBeNull();
+});
+
+it("ログアウトすると保存が消え再マウントしても復元されない", async () => {
+  await renderSession();
+  await flush();
+  await doLogin();
+  await doVerify("123456");
+  const key = storageKey();
+  expect(window.sessionStorage.getItem(key)).not.toBeNull();
+
+  const logout = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "専用画面からログアウト")!;
+  await act(async () => logout.click());
+  await flush();
+
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(container.textContent).not.toContain("ログイン後の本体");
+  expect(container.querySelector('input[type="email"]')).not.toBeNull();
+
+  await remount();
+
+  expect(container.textContent).not.toContain("ログイン後の本体");
+  expect(container.querySelector('input[type="email"]')).not.toBeNull();
+});
+
+it("storage アダプタは sessionStorage だけを使い localStorage に何も書かない", async () => {
+  await renderSession();
+  await flush();
+
+  const storage = mocks.options?.storage;
+  const key = storageKey();
+  // 本体アプリの Supabase 既定キー（sb-…）とは別の専用キー。
+  expect(key.startsWith("sb-")).toBe(false);
+  // アダプタを直接叩いても裏付けは sessionStorage だけ。
+  storage?.setItem("probe-808", "1");
+  expect(window.sessionStorage.getItem("probe-808")).toBe("1");
+  expect(window.localStorage.getItem("probe-808")).toBeNull();
+  window.sessionStorage.removeItem("probe-808");
+
+  await doLogin();
+  await doVerify("123456");
+  await remount();
+
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-session");
+  // Storage のメソッドスパイはこの jsdom では素通りしないため実状態で確かめる。
+  expect(window.localStorage.length).toBe(0);
+  expect(window.sessionStorage.getItem(key)).not.toBeNull();
+});
+
+it("TOKEN_REFRESHED で children へ渡るトークンが新しいものに差し替わる", async () => {
+  await renderSession();
+  await flush();
+  await doLogin();
+  await doVerify("123456");
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-session");
+
+  await act(async () => {
+    mocks.authCallback?.("TOKEN_REFRESHED", { access_token: "vault-aal2-refreshed" });
+  });
+  await flush();
+
+  expect(container.textContent).toContain("ログイン後の本体:vault-aal2-refreshed");
+  expect(container.textContent).not.toContain("ログイン後の本体:vault-aal2-session");
+});
+
+it("トークンやセッションの内容をコンソールログ・URLに出力しない", async () => {
+  const seen: unknown[][] = [];
+  for (const method of ["log", "warn", "error", "info", "debug"] as const) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      seen.push(args);
+    });
+  }
+  const hrefBefore = window.location.href;
+
+  await renderSession();
+  await flush();
+  await doLogin();
+  await doVerify("123456");
+  await act(async () => {
+    mocks.authCallback?.("TOKEN_REFRESHED", { access_token: "vault-aal2-refreshed" });
+  });
+  await flush();
+  await remount();
+
+  expect(window.location.href).toBe(hrefBefore);
+  for (const args of seen) {
+    const text = JSON.stringify(args);
+    for (const secret of ["vault-aal1-session", "vault-aal2-session", "vault-aal2-refreshed"]) {
+      expect(text).not.toContain(secret);
+      expect(window.location.href).not.toContain(secret);
+    }
   }
 });
