@@ -33,6 +33,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [planID, setPlanID] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [bulkConfirmed, setBulkConfirmed] = useState(false);
   const { pending, acquire, release } = useActionLock();
 
   function apply(d: CoachCommerce) {
@@ -58,6 +59,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
       await identityFetch(path, token, method, body);
       apply(await identityFetch<CoachCommerce>("/v1/coach", token));
       setConfirmed(false);
+      setBulkConfirmed(false);
       setMessage(done);
     } catch (e) {
       setError(e instanceof Error ? e.message : L("保存できませんでした"));
@@ -134,6 +136,21 @@ function CoachCommerceEditor({ token }: { token: string }) {
           </>
         )}
       </div>
+      {data.identity && unauthorized >= 2 && (
+        <form method="post" className="space-y-2 border-t border-white/15 pt-3" onSubmit={(e) => {
+          e.preventDefault();
+          void send("/v1/coach/disclosures", { confirm: bulkConfirmed, identity_revision: data.identity_revision }, L("公開設定を保存しました"));
+        }}>
+          <p className="text-sm font-semibold">{L("未承認のプランを一括で承認する")}</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {data.plans.map((plan) => <li key={plan.id}>{plan.title}{plan.authorized ? L("（設定済み）") : ""}</li>)}
+          </ul>
+          <label className="flex gap-2"><input type="checkbox" checked={bulkConfirmed} onChange={(e) => setBulkConfirmed(e.target.checked)} required />
+            {data.required ? L("上のプランすべてに、登録した氏名・住所と表示用電話番号を公開する") : L("上のプランすべてを、身元情報の表記なしで公開する")}
+          </label>
+          <Button disabled={pending || !bulkConfirmed}>{L("一括で公開設定を保存する")}</Button>
+        </form>
+      )}
       {data.identity && data.plans.length > 0 && (
         <form method="post" className="space-y-2 border-t border-white/15 pt-3" onSubmit={(e) => {
           e.preventDefault();

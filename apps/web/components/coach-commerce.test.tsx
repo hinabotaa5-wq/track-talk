@@ -158,6 +158,114 @@ describe("進み具合と次にやること", () => {
     expect(container.textContent).toContain("運営指定");
   });
 
+  async function flush() {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+
+  function bulkForm() {
+    const forms = Array.from(container.querySelectorAll("form"));
+    return forms.find((f) => f.textContent?.includes("未承認のプランを一括で承認する")) as HTMLFormElement;
+  }
+
+  it("未承認が2件以上で一括ブロックが出て、対象タイトルが全件表示される。確認チェックを入れるまでボタンが押せない", async () => {
+    mocks.identity.mockResolvedValue(commerce({
+      plans: [
+        { id: "plan-1", title: "合成プラン1", authorized: true },
+        { id: "plan-2", title: "合成プラン2", authorized: false },
+        { id: "plan-3", title: "合成プラン3", authorized: false },
+      ],
+    }));
+    await renderSection();
+    const bulk = bulkForm();
+    expect(bulk).not.toBeUndefined();
+    expect(bulk.textContent).toContain("合成プラン1");
+    expect(bulk.textContent).toContain("合成プラン2");
+    expect(bulk.textContent).toContain("合成プラン3");
+    expect(bulk.textContent).toContain("上のプランすべてに、登録した氏名・住所と表示用電話番号を公開する");
+    const check = bulk.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const save = Array.from(bulk.querySelectorAll("button")).find((b) => b.textContent === "一括で公開設定を保存する") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    await act(async () => { check.click(); });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("表記不要のときは一括ブロックの確認文言が表記なしになる", async () => {
+    mocks.identity.mockResolvedValue(commerce({
+      required: false,
+      plans: [
+        { id: "plan-1", title: "合成プラン1", authorized: false },
+        { id: "plan-2", title: "合成プラン2", authorized: false },
+      ],
+    }));
+    await renderSection();
+    expect(bulkForm().textContent).toContain("上のプランすべてを、身元情報の表記なしで公開する");
+  });
+
+  it("一括保存で confirm と現在の identity_revision が送られ、再取得後に全件「設定済み」になる", async () => {
+    const before = commerce({
+      plans: [
+        { id: "plan-1", title: "合成プラン1", authorized: false },
+        { id: "plan-2", title: "合成プラン2", authorized: false },
+      ],
+    });
+    const after = commerce({
+      plans: [
+        { id: "plan-1", title: "合成プラン1", authorized: true },
+        { id: "plan-2", title: "合成プラン2", authorized: true },
+      ],
+    });
+    mocks.identity
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce({})
+      .mockResolvedValue(after);
+    await renderSection();
+    const bulk = bulkForm();
+    const check = bulk.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const save = Array.from(bulk.querySelectorAll("button")).find((b) => b.textContent === "一括で公開設定を保存する") as HTMLButtonElement;
+    await act(async () => { check.click(); });
+    await act(async () => { save.click(); });
+    await flush();
+    expect(mocks.identity).toHaveBeenCalledWith("/v1/coach/disclosures", "vault-token", "PUT", { confirm: true, identity_revision: "rev-1" });
+    expect(container.textContent).not.toContain("未承認のプランを一括で承認する");
+    expect(container.textContent).toContain("完了：公開設定まで終わっています");
+  });
+
+  it("未承認が1件以下では一括ブロックが出ず、個別の承認・取り消しが従来どおり動く", async () => {
+    const current = commerce({
+      plans: [
+        { id: "plan-1", title: "合成プラン1", authorized: true },
+        { id: "plan-2", title: "合成プラン2", authorized: false },
+      ],
+    });
+    mocks.identity.mockResolvedValue(current);
+    await renderSection();
+    expect(container.textContent).not.toContain("未承認のプランを一括で承認する");
+    // 個別の承認：未承認プランを選んで確認して保存する。
+    const planForm = Array.from(container.querySelectorAll("form")).find((f) => f.textContent?.includes("表示を設定するプラン")) as HTMLFormElement;
+    const select = planForm.querySelector("select") as HTMLSelectElement;
+    await act(async () => {
+      select.value = "plan-2";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const check = planForm.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => { check.click(); });
+    const save = Array.from(planForm.querySelectorAll("button")).find((b) => b.textContent === "公開設定を保存する") as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    await act(async () => { save.click(); });
+    expect(mocks.identity).toHaveBeenCalledWith("/v1/coach/disclosures/plan-2", "vault-token", "PUT", { confirm: true, identity_revision: "rev-1" });
+    // 個別の取り消し：承認済みプランを選ぶと取り消しが出る。
+    await act(async () => {
+      select.value = "plan-1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const revoke = Array.from(planForm.querySelectorAll("button")).find((b) => b.textContent === "公開を取り消す") as HTMLButtonElement;
+    expect(revoke).not.toBeUndefined();
+    await act(async () => { revoke.click(); });
+    expect(mocks.identity).toHaveBeenCalledWith("/v1/coach/disclosures/plan-1", "vault-token", "DELETE", undefined);
+  });
+
   it("身元保存や要否切替のあとの再取得で、承認が外れた状態がステップ3に反映される", async () => {
     const before = commerce({ plans: [{ id: "plan-1", title: "合成プラン", authorized: true }] });
     const after = commerce({ plans: [{ id: "plan-1", title: "合成プラン", authorized: false }] });
