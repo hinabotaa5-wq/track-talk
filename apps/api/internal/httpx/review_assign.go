@@ -73,11 +73,32 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 	if err = q.TouchCoachOffered(ctx, coachID); err != nil {
 		return rr, err
 	}
-	err = s.recordReviewNotice(ctx, q, coachID, rr.ID, "review_offer", push.Message{
+	err = s.recordReviewArrivalPush(ctx, q, coachID, "review_offer", push.Message{
 		Title: "1回プランの依頼が届きました",
 		URL:   "/coach/requests/" + rr.ID.String(),
 	}, assigned.DueAt, "review_assigned:"+rr.ID.String())
 	return assigned, err
+}
+
+// recordReviewArrivalPush は、割当の到着知らせのプッシュだけを送る。ベルは取引条件
+// （saveWorkOrder → deliverWorkOrder）側の1件に一本化するため、ここでは書かない。
+// 文面・URL・DedupKey・TTL は従来どおり変えない。
+// 到着プッシュはコーチのレビュー通知設定に従う（本体 #745 項目6、2026-11-15 運営者判断）。
+// kind review_offer → important の扱いは他通知と共用のため変えず、この経路だけで
+// レビュー設定を見て積む／積まないを分ける。取引条件ベルと交付記録は設定に関わらず残る。
+func (s *Server) recordReviewArrivalPush(ctx context.Context, q *db.Queries, to uuid.UUID, kind string, msg push.Message, expires time.Time, key string) error {
+	if !s.push.Configured() {
+		return nil
+	}
+	category := kindCategory(kind)
+	if ok, err := notificationWanted(ctx, q, to, notifyReview, false); err != nil || !ok {
+		return err
+	}
+	return q.EnqueuePushOutbox(ctx, db.EnqueuePushOutboxParams{
+		ID: uuid.New(), ProfileID: to, Title: msg.Title, Body: msg.Body, Url: msg.URL,
+		Tag: key, Category: category, TtlSeconds: int32(max(1, time.Until(expires).Seconds())),
+		DedupKey: key, ExpiresAt: expires,
+	})
 }
 
 func (s *Server) recordReviewNotice(ctx context.Context, q *db.Queries, to, id uuid.UUID, kind string, msg push.Message, expires time.Time, key string) error {
