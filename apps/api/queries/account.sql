@@ -126,7 +126,14 @@ SELECT
         WHERE pay.payer_id = sqlc.arg('user_id')
           AND pay.status IN ('authorized', 'captured','refund_pending')
           AND (pay.status IN ('authorized','refund_pending') OR r.id IS NULL OR r.returned_at IS NULL)
-    )::boolean AS open_review_payment;
+    )::boolean AS open_review_payment,
+    -- コーチとして割り当てられた対応中の依頼は、退会で担当不在になるので、返却・終了まで退会させない。
+    -- 支払い種別（カード／PayPay／チケット）を問わず、review_requests の状態だけで見る（CoachWithdrawBlockers の open_review と同じ条件）。
+    EXISTS (
+        SELECT 1 FROM review_requests r
+        WHERE r.coach_id = sqlc.arg('user_id')
+          AND r.status IN ('in_review', 'needs_info')
+    )::boolean AS open_review;
 
 -- name: ListAccountMedia :many
 -- 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。

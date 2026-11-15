@@ -258,13 +258,21 @@ SELECT
         WHERE pay.payer_id = $1
           AND pay.status IN ('authorized', 'captured','refund_pending')
           AND (pay.status IN ('authorized','refund_pending') OR r.id IS NULL OR r.returned_at IS NULL)
-    )::boolean AS open_review_payment
+    )::boolean AS open_review_payment,
+    -- コーチとして割り当てられた対応中の依頼は、退会で担当不在になるので、返却・終了まで退会させない。
+    -- 支払い種別（カード／PayPay／チケット）を問わず、review_requests の状態だけで見る（CoachWithdrawBlockers の open_review と同じ条件）。
+    EXISTS (
+        SELECT 1 FROM review_requests r
+        WHERE r.coach_id = $1
+          AND r.status IN ('in_review', 'needs_info')
+    )::boolean AS open_review
 `
 
 type WithdrawBlockersRow struct {
 	OpenContract      bool `json:"open_contract"`
 	OpenReport        bool `json:"open_report"`
 	OpenReviewPayment bool `json:"open_review_payment"`
+	OpenReview        bool `json:"open_review"`
 }
 
 // 退会すると契約とやりとりが消えるので、進行中のパーソナル指導と、
@@ -272,6 +280,11 @@ type WithdrawBlockersRow struct {
 func (q *Queries) WithdrawBlockers(ctx context.Context, userID uuid.UUID) (WithdrawBlockersRow, error) {
 	row := q.db.QueryRow(ctx, withdrawBlockers, userID)
 	var i WithdrawBlockersRow
-	err := row.Scan(&i.OpenContract, &i.OpenReport, &i.OpenReviewPayment)
+	err := row.Scan(
+		&i.OpenContract,
+		&i.OpenReport,
+		&i.OpenReviewPayment,
+		&i.OpenReview,
+	)
 	return i, err
 }
