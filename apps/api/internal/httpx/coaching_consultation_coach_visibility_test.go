@@ -196,3 +196,70 @@ func TestCoachDoesNotSeeCancelledDraftVideo(t *testing.T) {
 	}
 	assertHiddenFromCoach(t, h, coach, path, id, m)
 }
+
+// 9. 支払いの期限を過ぎてから決済が届き、そのまま返金（資金解放）で終わったものは、コーチに届いていないので出さない。
+// 依頼者本人には従来どおり見える。
+func TestCoachDoesNotSeeLatePaymentRefund(t *testing.T) {
+	h, f, owner, coach, root := answeredCashReviewRoom(t, nil)
+	path := "/v1/coaching/requests/" + root + "/consultations"
+	m := marker()
+	c := consultationDraft(t, h, owner, path, uuid.NewString(), m)
+	consultationAction(t, h, owner, c.ID, "submit", nil)
+	// 支払い待ちのまま支払い期限を過ぎたあとに、決済完了が届く。
+	execSQLArgs(t, `UPDATE coaching_consultations SET expires_at=now()-interval '1 minute' WHERE id=$1`, c.ID)
+	if code := payConsultation(t, h, c.ID, 500); code != 200 {
+		t.Fatalf("late pay %d", code)
+	}
+	var status string
+	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &status)
+	if status != "expired" {
+		t.Fatalf("status %s", status)
+	}
+	// コーチには届かず、資金は解放（返金）側で処理される。
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	var state string
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &state)
+	if state != "refunded" || len(f.refundList()) != 1 {
+		t.Fatalf("refund %s %+v", state, f.refundList())
+	}
+	assertHiddenFromCoach(t, h, coach, path, c.ID, m)
+	if !strings.Contains(roomBody(t, h, owner, path), m) {
+		t.Fatal("requester lost own late-paid consultation")
+	}
+}
+
+// 10. 期限内に支払いが確定しても、確定時の検証で無効（契約停止など）となり offered から即 expired に閉じられた
+// ものは、コーチに届いていないので出さない（判定基準の自然な帰結。修正前は「期限切れは respond_by があれば見せる」
+// だったので見えていた）。
+func TestCoachDoesNotSeePaidThenInvalidatedImmediately(t *testing.T) {
+	h, f := setupStripe(t)
+	owner, coach, root := endedCashRoom(t, h)
+	path := "/v1/coaching/contracts/" + root + "/consultations"
+	m := marker()
+	c := consultationDraft(t, h, owner, path, uuid.NewString(), m)
+	consultationAction(t, h, owner, c.ID, "submit", nil)
+	// 支払い画面までは作れたが、決済完了の前に契約が停止された。
+	execSQLArgs(t, `UPDATE coaching_contracts SET status='suspended',suspended_at=now() WHERE id=$1`, root)
+	if code := payConsultation(t, h, c.ID, 1200); code != 200 {
+		t.Fatalf("pay %d", code)
+	}
+	var status string
+	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &status)
+	if status != "expired" {
+		t.Fatalf("status %s", status)
+	}
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	var state string
+	queryRowArgs(t, `SELECT payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &state)
+	if state != "refunded" || len(f.refundList()) != 1 {
+		t.Fatalf("refund %s %+v", state, f.refundList())
+	}
+	assertHiddenFromCoach(t, h, coach, path, c.ID, m)
+	if !strings.Contains(roomBody(t, h, owner, path), m) {
+		t.Fatal("requester lost own invalidated consultation")
+	}
+}
