@@ -14,3 +14,16 @@ it("プライバシーポリシー第3条：単発・チケットと追加質問
   expect(html).toContain("1回プラン（単発・チケット）とその追加質問の購入では、年齢にかかわらず、購入の都度、決済に進む前に「未成年の方は保護者に許可を取ってください」の注意事項へのチェックを求め、アカウント、対象の購入の種別とID、チェックを受け付けた日時、確認した文面の版を記録します。");
   expect(html).not.toContain("1回プラン（単発・チケット）の購入では");
 });
+
+it("第7条の国外提供への同意案内に、退会手続きを完了できない場合の窓口を示す", () => {
+  const html = renderToStaticMarkup(<PrivacyPolicy />);
+  const start = html.indexOf("第7条（委託と国外での取り扱い）");
+  const end = html.indexOf("第8条（第三者への提供）");
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  const article = html.slice(start, end);
+  expect(article).toContain("個人情報の提供に同意しない場合");
+  expect(article).toContain("第10条に定める事情により退会手続きを完了できないとき");
+  expect(article).toContain('href="/contact"');
+  expect(article).toContain("マイページ「お問い合わせ」からご連絡ください。運営者が個別に対応します。");
+});
