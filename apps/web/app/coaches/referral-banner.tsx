@@ -1,0 +1,28 @@
+"use client";
+
+import Link from "next/link";
+import { ChevronRight, Gift } from "lucide-react";
+import { L } from "@/lib/i18n";
+
+// コーチ一覧のヘッダー下に置く紹介キャンペーンのバナー（本体 #739）。
+// /coaching と /coaches の両ルートで共有する CoachesView の先頭に置き、タブ行より上に表示する。
+// 文面は運営者決定の正本どおり（見出し「に」版・本文「紹介してくれた方」版）で、/me の紹介カード文面（「を」版・「紹介者」版）とは別文面として併存させる。
+// ログイン状態・購入実績によらず常時表示し、未ログインのタップは /me 側の既存ガードでログインへ流す。閉じるボタンは付けない。
+export function ReferralBanner() {
+  const headline = L("友達2人に紹介すると、1回無料！");
+  const body = L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
+  return (
+    <Link
+      href="/me"
+      aria-label={headline}
+      className="flex items-center gap-3 rounded-xl bg-yellow-400 p-4 text-slate-900"
+    >
+      <Gift className="size-6 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold">{headline}</span>
+        <span className="block text-sm">{body}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0" aria-hidden />
+    </Link>
+  );
+}

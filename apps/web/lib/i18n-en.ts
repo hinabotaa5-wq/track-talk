@@ -9,6 +9,8 @@ export const en: Readonly<Record<string, string>> = {
   "この紹介IDの紹介者には、あなたの購入がすでに数えられています。空欄のまま購入できます。": "Your purchase has already been counted for this referrer. You can continue with the field blank.",
   "友達2人を紹介すると、1回無料！": "Refer two friends and get a free review!",
   "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介者に無料チケットがプレゼントされます。": "A referral code is issued when you make a purchase. When two friends purchase using that code, the referrer receives a free ticket.",
+  "友達2人に紹介すると、1回無料！": "Refer two friends and get a free review!",
+  "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。": "A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.",
   "紹介IDを使わずに購入すると、あなたの紹介IDが発行されます。": "Purchase without entering a referral code to get your own referral code.",
   "紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。": "If you purchase with a referral code, this purchase will not issue your own referral code.",
   "このIDは終了しました。紹介IDを使わずに購入すると、新しい紹介IDが発行されます。": "This code has ended. Purchase without entering a referral code to get a new referral code.",
