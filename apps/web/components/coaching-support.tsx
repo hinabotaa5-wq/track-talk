@@ -31,7 +31,7 @@ export function CoachingSupportPanel({ contract, token, guardianToken }: { contr
   return <section aria-label={L("大会サポートの提供状況")} className="space-y-4 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
     <h2 className="font-bold">{L("大会までのサポート・通話")}</h2>
     <p className="text-sm">{contract.competition_name}{" "}{L("· 大会")}{" "}{contract.competition_date}<br />{L("支援開始")}{" "}{contract.support_start_date}</p>
-    {data ? <><p className="text-sm">{L("動画添削")}{" "}{data.usage.video_answered} / {data.video_reviews}{L("回回答済み（提出済み")}{" "}{data.usage.video_submitted}{L("回）")}<br />{L("通話")}{" "}{data.usage.calls_completed} / {data.call_count}{L("回実施済み（予約中")}{" "}{data.usage.calls_reserved}{L("回）")}</p>
+    {data ? <><p className="text-sm">{L("動画への回答")}{" "}{data.usage.video_answered} / {data.video_reviews}{L("回回答済み（提出済み")}{" "}{data.usage.video_submitted}{L("回）")}<br />{L("通話")}{" "}{data.usage.calls_completed} / {data.call_count}{L("回実施済み（予約中")}{" "}{data.usage.calls_reserved}{L("回）")}</p>
       <p className="text-xs text-slate-300">{L("動画への回答1組と、双方が確認した通話1回を各1単位として未提供分を計算します。終了48時間後に未提供分を自動返金します。メニューや事務連絡は回数に含みません。")}</p>
       {data.fulfillment_state === "refund_pending" || data.fulfillment_state === "refund_failed" ? <p className="text-sm">{L("未提供分の返金 {v0}：{v1}", { v0: formatYen(data.refund_amount_yen ?? 0), v1: data.fulfillment_state === "refund_failed" ? L("運営が再確認しています") : L("処理中") })}</p> : null}
       {data.calls.map((c) => <article key={c.id} className="space-y-2 border-t border-white/20 pt-3"><p className="text-sm font-semibold">{L("{v0} 〜 {v1}", { v0: formatDateTime(c.starts_at), v1: formatDateTime(c.ends_at) })}</p><p className="text-xs text-slate-300">{callStatusLabels[c.status]}</p>

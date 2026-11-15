@@ -280,7 +280,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 			return 0, 0, false, err
 		}
 		if used < int32(*c.VideoReviews) {
-			return 0, 0, false, &ticketRuleError{"included_in_plan", "プランに含まれる動画添削が残っています。通常のチャットをご利用ください"}
+			return 0, 0, false, &ticketRuleError{"included_in_plan", "プランに含まれる動画への回答が残っています。通常のチャットをご利用ください"}
 		}
 		requiresVideo = true
 	default:

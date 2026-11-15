@@ -34,7 +34,7 @@ it("両方が開いたら、承認済みの文面をそのまま表示する", (
   flags.messaging = true;
   const html = renderToStaticMarkup(<PlatformMeasuresPage />);
   expect(html).toContain("取引デジタルプラットフォーム消費者保護法に基づく措置について");
-  expect(html).toContain("TrackTalkのサポートプランでは、出品者であるコーチ（販売者）と購入者が取引を行い、運営者は、取引の場の提供と、代金の代理受領を行っています。運営者は、取引デジタルプラットフォーム消費者保護法第3条に基づき、次の措置を講じています。");
+  expect(html).toContain("TrackTalkの継続プランでは、出品者であるコーチ（販売者）と購入者が取引を行い、運営者は、取引の場の提供と、代金の代理受領を行っています。運営者は、取引デジタルプラットフォーム消費者保護法第3条に基づき、次の措置を講じています。");
   expect(html).toContain("1. 円滑な連絡手段の確保");
   expect(html).toContain("購入者とコーチは、サービス内のメッセージ機能を使って連絡を取り合うことができます。また、運営者へのお問い合わせ窓口を設けています。");
   expect(html).toContain("2. 苦情への対応");
