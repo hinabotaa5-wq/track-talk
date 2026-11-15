@@ -86,6 +86,11 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, "review_in_progress", "支払いが確定していない1回プランの依頼があるあいだは退会できません。返却されてから退会するか、お問い合わせからご連絡ください")
 		return
 	}
+	// コーチとして対応中の依頼は、退会で担当不在になるので、返却・終了まで退会させない。
+	if blockers.OpenReview {
+		Error(w, http.StatusConflict, "review_in_progress", "添削中の依頼があるあいだは退会できません。返却してから退会するか、お問い合わせからご連絡ください")
+		return
+	}
 	if blockers.OpenReport {
 		Error(w, http.StatusConflict, "report_in_progress", "パーソナル指導のやりとりへの通報を運営が確認しているあいだは退会できません。お問い合わせからご連絡ください")
 		return
