@@ -120,6 +120,26 @@ func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) 
 	Error(w, 404, "not_found", "見つかりませんでした")
 	return room, "", false
 }
+
+// consultationReachedCoach は、この追加質問・追加相談がコーチに届いたことがあるか。
+// コーチに見せるのは、送信（チケット）か支払い（都度払い）が一度でも成立したものだけ。いまの状態だけで決めると、
+// 下書きや支払い待ちのまま取り下げた・期限が切れたもの（cancelled／expired）までコーチに見えてしまう。
+// 送信・支払いが成立すると respond_by が入る（SubmitTicketConsultation・MarkConsultationPaid）ので、それを印にする。
+func consultationReachedCoach(c db.CoachingConsultation) bool {
+	switch c.Status {
+	case "draft", "awaiting_payment":
+		return false
+	case "cancelled":
+		return c.RespondBy != nil
+	case "expired":
+		// 期限切れでも、コーチに届いた後の期限切れだけを見せる。支払いが期限の後に届いて、そのまま返金で
+		// 終わったものはコーチに届いていないので見せない。試行回数の判定（reviewConsultationAttempted）と
+		// 同じ基準を使って、2つの判定が将来ずれないようにする。
+		return consultationDeliveredThenExpired(c)
+	}
+	return true
+}
+
 func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.CoachingConsultation, string, bool) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
@@ -148,7 +168,7 @@ func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.C
 	if c.RequesterID != nil && *c.RequesterID == p.ID {
 		return c, "requester", true
 	}
-	if c.CoachID != nil && *c.CoachID == p.ID && c.Status != "draft" && c.Status != "awaiting_payment" {
+	if c.CoachID != nil && *c.CoachID == p.ID && consultationReachedCoach(c) {
 		return c, "coach", true
 	}
 	Error(w, 404, "not_found", "見つかりませんでした")
@@ -180,6 +200,14 @@ func (s *Server) requireConsultationSend(w http.ResponseWriter, c db.CoachingCon
 // SQL の SubmitTicketConsultation・MarkConsultationPaid の interval '48 hours' と揃えること。
 const consultationRespondWindow = 48 * time.Hour
 
+// consultationDeliveredThenExpired は、期限切れの追加質問・追加相談が「コーチに届いた後の期限切れ」かどうか。
+// 届いていれば、終了（closed_at）は受諾の期限（届けた時刻に consultationRespondWindow を足した respond_by）より後に来る。
+// 支払いが期限の後に届いて、そのまま返金で終わったものは、届けた時刻と終了の時刻が同じ（closed_at が
+// respond_by から consultationRespondWindow を引いた時刻と同時刻）なので、届いていないものとして false になる。
+func consultationDeliveredThenExpired(c db.CoachingConsultation) bool {
+	return c.RespondBy != nil && c.ClosedAt != nil && c.ClosedAt.After(c.RespondBy.Add(-consultationRespondWindow))
+}
+
 // reviewConsultationAttempted は、動画添削のあとの追加質問が「試行」に数えるものか。
 // 支払いを終えてコーチに届いたものだけを数え、下書き・支払い前の取り下げや期限切れは数えない。
 // 期限切れのうち、届いた後の受諾・回答の期限切れは数える。支払いが期限の後に届いて、そのまま返金で終わったもの
@@ -189,7 +217,7 @@ func reviewConsultationAttempted(c db.CoachingConsultation) bool {
 	case "offered", "in_review", "answered", "declined":
 		return true
 	case "expired":
-		return c.RespondBy != nil && c.ClosedAt != nil && c.ClosedAt.After(c.RespondBy.Add(-consultationRespondWindow))
+		return consultationDeliveredThenExpired(c)
 	}
 	return false
 }
@@ -334,7 +362,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		if role != "requester" && c.Status == "draft" {
 			continue
 		}
-		if role == "coach" && c.Status == "awaiting_payment" {
+		if role == "coach" && !consultationReachedCoach(c) {
 			continue
 		}
 		if role == "guardian" && !c.Minor {
