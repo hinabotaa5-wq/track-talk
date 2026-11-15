@@ -58,7 +58,7 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
 }
 
 const referralHeadline = () => L("友達2人に紹介すると、1回無料！");
-const referralBody = () => L("1回プランの都度払いやチケットの購入で、紹介IDが発行されます。すでに有効な紹介IDをお持ちの場合や、今回の購入が友達の紹介IDでカウントされた場合、新しいIDは発行されません。あなたのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
+const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
 
 // showUnissued を付けた画面（/me）では、IDをまだ持たない人にも発行条件を案内する。
 export function LoadedReferralCard({ token, showUnissued }: { token: string | null; showUnissued?: boolean }) {
