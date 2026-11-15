@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"slices"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -29,7 +28,14 @@ func (s *Server) coachIdentityStatus(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	applies := slices.Contains(coach.ServiceTypes, "competition_support") || slices.Contains(coach.ServiceTypes, "in_person")
+	// applies は「受付中かどうか」で決める。担当サービスだけ・下書きのプランだけでは対象にしない。
+	applies := false
+	if st, err := s.q.GetSupportConsultSettings(ctx, coach.ProfileID); err == nil {
+		applies = st.Accepting
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
+		return
+	}
 	if !applies {
 		plans, err := s.q.ListMyCoachingPlans(ctx, coach.ProfileID)
 		if err != nil {
@@ -37,6 +43,9 @@ func (s *Server) coachIdentityStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, pl := range plans {
+			if !pl.Published || pl.ConsultTemplate {
+				continue
+			}
 			if pl.ServiceType != nil && (*pl.ServiceType == "competition_support" || *pl.ServiceType == "in_person") {
 				applies = true
 				break

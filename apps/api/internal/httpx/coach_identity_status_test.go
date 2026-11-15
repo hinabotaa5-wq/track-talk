@@ -91,53 +91,104 @@ func TestCoachIdentityStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("applies via services and via support plan", func(t *testing.T) {
+	// applies は受付設定の accepting で決まり、担当サービスだけでは対象にならない。
+	// 受付設定の行は保存ゲートを通さずテスト用DBへ直接作る（到達状態は同じ）。
+	t.Run("applies follows accepting, not services", func(t *testing.T) {
+		stub := identityStub(t, http.StatusNotFound)
+		h := setupConfig(t, func(cfg *config.Config) {
+			cfg.IdentityReaderURL = stub.URL
+			cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
+		})
+		getApplies := func(t *testing.T, tok string) identityStatusView {
+			t.Helper()
+			rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+			}
+			return decodeIdentityStatus(t, rec.Body.Bytes())
+		}
+
+		// 細目1：受付中ならプランなしでも対象（金庫未登録なので registered=false）。
+		coach, accepting := approvedCoachWithServices(t, h, []string{"video_review"})
+		execSQLArgs(t, `INSERT INTO support_consult_settings (coach_id, accepting) VALUES ($1, true)`, coach)
+		if out := getApplies(t, accepting); !out.Applies {
+			t.Fatalf("accepting applies should be true")
+		} else if out.Registered == nil || *out.Registered {
+			t.Fatalf("accepting registered should be false, got %v", out.Registered)
+		}
+
+		// 細目2：受付停止中は担当サービスだけ先行しても対象外（発端ケース）。
+		stoppedCoach, stopped := approvedCoachWithServices(t, h, []string{"competition_support"})
+		execSQLArgs(t, `INSERT INTO support_consult_settings (coach_id, accepting) VALUES ($1, false)`, stoppedCoach)
+		if out := getApplies(t, stopped); out.Applies {
+			t.Fatalf("not accepting applies should be false")
+		}
+
+		// 細目3：受付設定の行が無ければ担当サービスだけでは対象外。
+		for _, services := range [][]string{{"competition_support"}, {"in_person"}} {
+			_, tok := approvedCoachWithServices(t, h, services)
+			if out := getApplies(t, tok); out.Applies {
+				t.Fatalf("services %v without settings applies should be false", services)
+			}
+		}
+	})
+
+	t.Run("applies via published plans", func(t *testing.T) {
+		// プラン作成ゲートが身元登録済みを要求するため、登録済みスタブを使う
+		// （applies の判定だけを確かめ、registered は検証しない）。
 		stub := identityStub(t, http.StatusNoContent)
 		h := setupConfig(t, func(cfg *config.Config) {
 			cfg.IdentityReaderURL = stub.URL
 			cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
 		})
-
-		_, inPerson := approvedCoachWithServices(t, h, []string{"in_person"})
-		if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", inPerson, nil); rec.Code != http.StatusOK {
-			t.Fatalf("in_person %d %s", rec.Code, rec.Body.String())
-		} else if out := decodeIdentityStatus(t, rec.Body.Bytes()); !out.Applies {
-			t.Fatalf("in_person applies should be true (%s)", rec.Body.String())
+		// 受付設定なし＋公開状態・種別・入れ物だけを変えたプランで applies を確かめる。
+		coachWithPlan := func(t *testing.T, serviceType string, published, consultTemplate bool) string {
+			t.Helper()
+			coach, tok := approvedCoachWithServices(t, h, []string{"video_review"})
+			if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tok, map[string]any{"agree": true}); rec.Code != http.StatusOK {
+				t.Fatalf("pledge %d %s", rec.Code, rec.Body.String())
+			}
+			if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tok, planBody()); rec.Code != http.StatusCreated {
+				t.Fatalf("create plan %d %s", rec.Code, rec.Body.String())
+			}
+			execSQLArgs(t, `UPDATE coaching_plans SET service_type=$2, published=$3, consult_template=$4 WHERE coach_id=$1`, coach, serviceType, published, consultTemplate)
+			return tok
+		}
+		getApplies := func(t *testing.T, tok string) bool {
+			t.Helper()
+			rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+			}
+			return decodeIdentityStatus(t, rec.Body.Bytes()).Applies
 		}
 
-		_, competition := approvedCoachWithServices(t, h, []string{"competition_support"})
-		if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", competition, nil); rec.Code != http.StatusOK {
-			t.Fatalf("competition_support %d %s", rec.Code, rec.Body.String())
-		} else if out := decodeIdentityStatus(t, rec.Body.Bytes()); !out.Applies {
-			t.Fatalf("competition_support applies should be true (%s)", rec.Body.String())
+		// 細目4・5：受付OFF/行なし＋公開中の in_person / competition_support プランは対象。
+		for _, serviceType := range []string{"in_person", "competition_support"} {
+			if applies := getApplies(t, coachWithPlan(t, serviceType, true, false)); !applies {
+				t.Fatalf("published %s plan applies should be true", serviceType)
+			}
 		}
-
-		// サポートプランを持っていれば、担当サービスが空でも対象になる。
-		coach, tok := approvedCoachWithServices(t, h, []string{"video_review"})
-		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/pledge", tok, map[string]any{"agree": true}); rec.Code != http.StatusOK {
-			t.Fatalf("pledge %d %s", rec.Code, rec.Body.String())
+		// 細目6：下書き（非公開）だけでは対象外。
+		for _, serviceType := range []string{"in_person", "competition_support"} {
+			if applies := getApplies(t, coachWithPlan(t, serviceType, false, false)); applies {
+				t.Fatalf("draft %s plan applies should be false", serviceType)
+			}
 		}
-		body := planBody()
-		if rec := doJSON(t, h, http.MethodPost, "/v1/coach/me/plans", tok, body); rec.Code != http.StatusCreated {
-			t.Fatalf("create plan %d %s", rec.Code, rec.Body.String())
-		}
-		execSQLArgs(t, `UPDATE coaching_plans SET service_type='competition_support' WHERE coach_id=$1`, coach)
-		execSQLArgs(t, `UPDATE coach_profiles SET service_types='{}' WHERE profile_id=$1`, coach)
-		rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("plan %d %s", rec.Code, rec.Body.String())
-		}
-		if out := decodeIdentityStatus(t, rec.Body.Bytes()); !out.Applies {
-			t.Fatalf("support plan applies should be true (%s)", rec.Body.String())
+		// 細目7：公開中でも相談の入れ物プランだけでは対象外。
+		if applies := getApplies(t, coachWithPlan(t, "competition_support", true, true)); applies {
+			t.Fatalf("consult template plan applies should be false")
 		}
 	})
 
+	// 細目9：registered の従来挙動は不変。そのいずれでも applies の計算は行われる。
 	t.Run("unknown when unconfigured or service error", func(t *testing.T) {
 		h := setupConfig(t, func(cfg *config.Config) {
 			cfg.IdentityReaderURL = ""
 			cfg.IdentityReaderToken = ""
 		})
-		_, tok := approvedCoachWithServices(t, h, []string{"in_person"})
+		coach, tok := approvedCoachWithServices(t, h, []string{"video_review"})
+		execSQLArgs(t, `INSERT INTO support_consult_settings (coach_id, accepting) VALUES ($1, true)`, coach)
 		rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("unconfigured %d %s", rec.Code, rec.Body.String())
@@ -155,13 +206,38 @@ func TestCoachIdentityStatus(t *testing.T) {
 			cfg.IdentityReaderURL = stub.URL
 			cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
 		})
-		_, tok = approvedCoachWithServices(t, h, []string{"in_person"})
+		coach, tok = approvedCoachWithServices(t, h, []string{"video_review"})
+		execSQLArgs(t, `INSERT INTO support_consult_settings (coach_id, accepting) VALUES ($1, true)`, coach)
 		rec = doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("service error %d %s", rec.Code, rec.Body.String())
 		}
 		if out := decodeIdentityStatus(t, rec.Body.Bytes()); out.Registered != nil {
 			t.Fatalf("service error registered should be null (%s)", rec.Body.String())
+		} else if !out.Applies {
+			t.Fatalf("service error applies should still be true (%s)", rec.Body.String())
+		}
+	})
+
+	// 細目9の一部：金庫に登録済み（204）のときは applies=true のケースでも registered=true。
+	t.Run("registered true with applies", func(t *testing.T) {
+		stub := identityStub(t, http.StatusNoContent)
+		h := setupConfig(t, func(cfg *config.Config) {
+			cfg.IdentityReaderURL = stub.URL
+			cfg.IdentityReaderToken = "synthetic-read-only-identity-token"
+		})
+		coach, tok := approvedCoachWithServices(t, h, []string{"video_review"})
+		execSQLArgs(t, `INSERT INTO support_consult_settings (coach_id, accepting) VALUES ($1, true)`, coach)
+		rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/identity-status", tok, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+		}
+		out := decodeIdentityStatus(t, rec.Body.Bytes())
+		if out.Registered == nil || !*out.Registered {
+			t.Fatalf("registered = %v, want true (%s)", out.Registered, rec.Body.String())
+		}
+		if !out.Applies {
+			t.Fatalf("applies should be true (%s)", rec.Body.String())
 		}
 	})
 
