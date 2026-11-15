@@ -144,7 +144,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 		r.Get("/prefectures/{code}", s.getPrefecturePage)
 
 		r.Group(func(r chi.Router) {
-			r.Use(RequireAuth(v, s.mfa))
+			r.Use(RequireAuth(v, s.mfa, s.authAdmin))
 			r.Get("/me", s.me)
 			r.Patch("/me", s.updateProfile)
 			r.Patch("/me/badge", s.updateBadge)
@@ -312,7 +312,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Post("/guardian/{token}/consultations/{id}/report", s.reportGuardianConsultation)
 
 			r.Group(func(r chi.Router) {
-				r.Use(RequireAuth(v, s.mfa))
+				r.Use(RequireAuth(v, s.mfa, s.authAdmin))
 				// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
 				r.Get("/me/coaching", s.coachingMe)
 				r.Put("/me/birth-month", s.setBirthMonth)
