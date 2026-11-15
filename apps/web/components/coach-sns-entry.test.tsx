@@ -25,9 +25,15 @@ it("Instagram の URL は文字なしのアイコンリンクだけを出し、�
   expect(link?.getAttribute("aria-label")).toBe("Instagram @testcoach");
   expect(link?.getAttribute("title")).toBe("Instagram @testcoach");
   expect(link?.textContent).toBe("");
-  expect(link?.querySelector("svg")).not.toBeNull();
+  const svg = link?.querySelector("svg");
+  expect(svg).not.toBeNull();
   expect(link?.className).toContain("size-11");
-  expect(link?.querySelector("svg")?.className.baseVal ?? link?.querySelector("svg")?.getAttribute("class")).toContain("size-6");
+  expect(svg?.className.baseVal ?? svg?.getAttribute("class")).toContain("size-6");
+  // Instagram グリフ（instagram-link.tsx と同じ描き方）であること：rx="5" の rect と特徴的な path を含む。
+  expect(svg?.querySelector('rect[rx="5"]')).not.toBeNull();
+  expect(svg?.querySelector("path")?.getAttribute("d")).toContain("11.37");
+  // lucide の Globe（円を中心とする形）ではないこと。
+  expect(svg?.querySelector("circle")).toBeNull();
 });
 
 it("YouTube チャンネル URL はアイコンリンクになり、チャンネル ID やドメインの文字は出ない", async () => {
@@ -38,6 +44,10 @@ it("YouTube チャンネル URL はアイコンリンクになり、チャンネ
   expect(link?.getAttribute("title")).toBe("YouTube @someteam");
   expect(link?.textContent).toBe("");
   expect(link?.textContent).not.toContain("youtube.com");
+  // YouTube は今回の対象外で、従来どおり Globe のまま（Instagram グリフになっていないこと）。
+  const svg = link?.querySelector("svg");
+  expect(svg?.querySelector("circle")).not.toBeNull();
+  expect(svg?.querySelector('rect[rx="5"]')).toBeNull();
 });
 
 it("X と YouTube のプラットフォーム判定は変わらない", () => {
@@ -52,7 +62,11 @@ it("知らないホストは汎用アイコンで出し、深いパスはドメ�
   expect(link?.getAttribute("href")).toBe("https://example.com/a/b");
   expect(link?.getAttribute("aria-label")).toBe("example.com example.com");
   expect(link?.textContent).toBe("");
-  expect(link?.querySelector("svg")).not.toBeNull();
+  const svg = link?.querySelector("svg");
+  expect(svg).not.toBeNull();
+  // 未知ホストは従来どおり Globe（Instagram グリフになっていないこと）。
+  expect(svg?.querySelector("circle")).not.toBeNull();
+  expect(svg?.querySelector('rect[rx="5"]')).toBeNull();
   expect(snsLabel("https://example.com/coach")?.platform).toBe("example.com");
   expect(snsLabel("https://example.com/coach")?.short).toBe("@coach");
   expect(snsLabel("https://example.com/a/b")?.short).toBe("example.com");
