@@ -2984,6 +2984,7 @@ export const en: Readonly<Record<string, string>> = {
   "公開中の以前のプラン": "Previous plans still published",
   "新しいプランは作れません。非公開にできます。": "New plans can't be created. You can unpublish these.",
   "フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。": "Attach a video if you would like form feedback. You can also ask for advice without a video.",
+  "選択して下さい": "Please select",
   "1回プランを申し込む": "Request a One-time Plan",
   "お支払い方法を選んで依頼する": "Choose how to pay and request a review",
   "通常チケット": "Regular ticket",
