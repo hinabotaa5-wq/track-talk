@@ -14,6 +14,10 @@ import { useEffect, useState, type FormEvent } from "react";
 
 const emptyIdentity: CoachIdentity = { legal_name: "", address: "", phone: "" };
 
+function StepChip({ children }: { children: string }) {
+  return <span className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-200">{children}</span>;
+}
+
 export function CoachCommerceSection() {
   return <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
     <h2 className="font-bold">{L("継続プランの特定商取引法の表記")}</h2>
@@ -35,6 +39,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
     setData(d);
     setIdentity(d.identity ? { ...d.identity, phone: d.identity.phone ?? "" } : emptyIdentity);
     setChecked(d.checklist.map(() => !d.required));
+    setPlanID((prev) => (d.plans.length === 1 ? d.plans[0].id : d.plans.some((plan) => plan.id === prev) ? prev : ""));
   }
 
   useEffect(() => {
@@ -67,9 +72,38 @@ function CoachCommerceEditor({ token }: { token: string }) {
   }
 
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
+  const nameDone = (data.identity?.legal_name ?? "").trim() !== "";
+  const addressDone = (data.identity?.address ?? "").trim() !== "";
+  const phoneDone = (data.identity?.phone ?? "").trim() !== "";
+  const identityDone = data.identity !== null && nameDone && addressDone && (!data.required || phoneDone);
+  const phoneReregister = data.identity !== null && nameDone && addressDone && data.required && !phoneDone;
+  const unauthorized = data.plans.filter((plan) => !plan.authorized).length;
+  const step3Chip = data.plans.length === 0 ? L("待ち") : unauthorized === 0 ? L("完了") : L("あと{v0}件", { v0: unauthorized });
+  const nextAction = !identityDone
+    ? L("身元情報を登録してください")
+    : unauthorized > 0
+      ? L("未承認のプランの公開設定をしてください")
+      : data.plans.length === 0
+        ? L("プランがまだありません（継続プランは受付をONにするとプランが作れます）")
+        : L("完了：公開設定まで終わっています");
+  const step2Detail = data.required
+    ? data.forced
+      ? <>{L("表記する")} ({L("運営指定")})</>
+      : L("表記する")
+    : <>{L("表記しない（申告済み）")}{data.exempt_declared_at ? L("{at} に申告しました。", { at: formatDateTime(data.exempt_declared_at) }) : null}</>;
   return (
     <div className="space-y-3">
+      <div className="space-y-1 border-b border-white/15 pb-3">
+        <p className="text-sm font-semibold">{L("次にやること：{v0}", { v0: nextAction })}</p>
+        <ol className="space-y-1 text-sm">
+          <li>{L("ステップ1 身元情報の登録")}<StepChip>{identityDone ? L("完了") : L("次はこれ")}</StepChip>
+            {phoneReregister ? <span className="ml-2 text-xs text-amber-200">{L("電話番号の登録し直しが必要です")}</span> : null}</li>
+          <li>{L("ステップ2 表記の要否")}<StepChip>{L("完了")}</StepChip><span className="ml-2 text-xs text-slate-300">{step2Detail}</span></li>
+          <li>{L("ステップ3 プランの公開設定")}<StepChip>{step3Chip}</StepChip></li>
+        </ol>
+      </div>
       <p className="text-sm text-slate-300">{L("継続プランは、あなたが販売者になります。プランを公開する前に、氏名・住所・電話番号を登録してください。表記が必要な場合は、プランごとに公開表示を確認します。")}</p>
+      <p className="text-sm font-semibold">{L("ステップ1 身元情報の登録")}<StepChip>{identityDone ? L("完了") : L("次はこれ")}</StepChip></p>
       <form method="post" onSubmit={onSaveIdentity} className="space-y-2">
         <label className="block text-sm">{L("氏名（本名）")}<Input value={identity.legal_name} maxLength={80} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} aria-label={L("氏名")} /></label>
         <label className="block text-sm">{L("住所")}<Input value={identity.address} maxLength={200} onChange={(e) => setIdentity({ ...identity, address: e.target.value })} aria-label={L("住所")} /></label>
@@ -79,7 +113,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
       </form>
 
       <div className="space-y-2 border-t border-white/15 pt-3">
-        <p className="text-sm font-semibold">{L("表記の要否：{v0}", { v0: data.required ? L("表記する") : L("表記しない（申告済み）") })}</p>
+        <p className="text-sm font-semibold">{L("ステップ2 表記の要否：{v0}", { v0: data.required ? L("表記する") : L("表記しない（申告済み）") })}<StepChip>{L("完了")}</StepChip></p>
         {data.forced ? (
           <p className="text-xs text-amber-200">{L("運営が表記要にしました。変える場合はお問い合わせください。")}</p>
         ) : data.required ? (
@@ -105,6 +139,7 @@ function CoachCommerceEditor({ token }: { token: string }) {
           e.preventDefault();
           void send(`/v1/coach/disclosures/${planID}`, { confirm: confirmed, identity_revision: data.identity_revision }, L("公開設定を保存しました"));
         }}>
+          <p className="text-sm font-semibold">{L("ステップ3 プランの公開設定")}<StepChip>{step3Chip}</StepChip></p>
           <label className="block">{L("表示を設定するプラン")}<select className="block rounded bg-slate-900 p-2" required value={planID} onChange={(e) => {
               setPlanID(e.target.value); setConfirmed(false);
             }}>
@@ -119,7 +154,12 @@ function CoachCommerceEditor({ token }: { token: string }) {
           {data.plans.some((plan) => plan.id === planID && plan.authorized) && <Button type="button" variant="secondary" disabled={pending} onClick={() => void send(`/v1/coach/disclosures/${planID}`, undefined, L("公開を取り消しました"), "DELETE")}>{L("公開を取り消す")}</Button>}
         </form>
       )}
-      {data.identity && data.plans.length === 0 && <p>{L("プランの編集画面で公開に設定すると、ここで表示を確認できます。")}</p>}
+      {data.identity && data.plans.length === 0 && (
+        <div className="space-y-1 border-t border-white/15 pt-3">
+          <p className="text-sm font-semibold">{L("ステップ3 プランの公開設定")}<StepChip>{step3Chip}</StepChip></p>
+          <p className="text-sm">{L("プランの編集画面で公開に設定すると、ここで表示を確認できます。")}</p>
+        </div>
+      )}
       {message ? <p role="status" className="text-sm text-blue-200">{message}</p> : null}
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
     </div>
