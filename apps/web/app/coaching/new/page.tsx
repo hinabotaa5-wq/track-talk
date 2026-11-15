@@ -324,7 +324,7 @@ export default function NewReviewRequestPage() {
         {!estimate || estimate.payments ? null : (
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
-        <h1 className="text-2xl font-bold">{L("1回プラン（フォーム添削や競技に関する悩み）")}</h1>
+        <h1 className="text-2xl font-bold">{L("1回プラン（競技フォームのチェックや競技に関する悩み）")}</h1>
       </div>
 
       {!reviewOpen ? (

@@ -11,7 +11,7 @@ import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 // 開くまでは 404 にして、一般からは見えないようにする。文面を変えるときは運営者の承認を経ること。
 export const metadata: Metadata = {
   title: "取引デジタルプラットフォーム消費者保護法に基づく措置について",
-  description: "TrackTalk のサポートプランについて、運営者が取引デジタルプラットフォーム消費者保護法第3条に基づいて講じている措置。",
+  description: "TrackTalk の継続プランについて、運営者が取引デジタルプラットフォーム消費者保護法第3条に基づいて講じている措置。",
   robots: { index: false },
 };
 
@@ -23,7 +23,7 @@ export default function PlatformMeasuresPage() {
         <h1 className="text-2xl font-bold">取引デジタルプラットフォーム消費者保護法に基づく措置について</h1>
         <JapaneseOfficialNote />
         <p className="text-sm leading-7 text-slate-300">
-          TrackTalkのサポートプランでは、出品者であるコーチ（販売者）と購入者が取引を行い、運営者は、取引の場の提供と、代金の代理受領を行っています。運営者は、取引デジタルプラットフォーム消費者保護法第3条に基づき、次の措置を講じています。
+          TrackTalkの継続プランでは、出品者であるコーチ（販売者）と購入者が取引を行い、運営者は、取引の場の提供と、代金の代理受領を行っています。運営者は、取引デジタルプラットフォーム消費者保護法第3条に基づき、次の措置を講じています。
         </p>
       </div>
       <Rule title="1. 円滑な連絡手段の確保">

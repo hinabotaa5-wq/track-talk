@@ -97,7 +97,7 @@ it("フォーム上部に価格ボックス（動画添削（動画1本））を
 it("デモの招待コード画面には販売者の表記とリンクを出さない", async () => {
   mocks.me = { demo: false, review_open: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("1回プラン（フォーム添削や競技に関する悩み）");
+  expect(container.querySelector("h1")?.textContent).toBe("1回プラン（競技フォームのチェックや競技に関する悩み）");
   expect(container.textContent).not.toContain("コーチを選んで、動画を送ります");
   expect(container.textContent).toContain("1回プランは準備中です");
   expect(container.querySelector('input[aria-label="招待コード"]')).not.toBeNull();

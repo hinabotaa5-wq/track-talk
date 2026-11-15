@@ -355,7 +355,7 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 				return err
 			}
 			if used >= int32(*current.VideoReviews) {
-				return &ticketRuleError{"video_limit", "プランの動画添削回数を使い切りました。追加相談から送信できます"}
+				return &ticketRuleError{"video_limit", "プランの動画への回答回数を使い切りました。追加相談から送信できます"}
 			}
 		}
 		if err := lockUnusedCoachingVideo(r.Context(), q, videoID, nil); err != nil {

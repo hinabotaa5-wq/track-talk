@@ -97,7 +97,7 @@ func (r *coachingPlanReq) supportFields(current db.CoachingPlan, published bool)
 				fields["support_start_date"] = "支援開始日を選んでください"
 			}
 			if r.VideoReviews == nil || *r.VideoReviews < 1 {
-				fields["video_reviews"] = "大会サポートの動画添削は1〜30回で設定してください"
+				fields["video_reviews"] = "大会サポートの動画への回答は1〜30回で設定してください"
 			}
 		}
 	} else if p.CallCount != 0 {

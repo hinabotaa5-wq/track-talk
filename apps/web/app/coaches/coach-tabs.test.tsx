@@ -63,7 +63,7 @@ it("既定は1回プランの一覧で、見出しと説明文は出さない", 
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
   expect(container.querySelector("h1")).toBeNull();
-  expect(container.textContent).not.toContain("1回プラン（フォーム添削や競技に関する悩み）");
+  expect(container.textContent).not.toContain("1回プラン（競技フォームのチェックや競技に関する悩み）");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   expect(container.textContent).not.toContain("コーチ一覧");
   expect(container.textContent).not.toContain("上のタブで、フォーム添削の指名と継続プランを切り替えられます。");
@@ -90,7 +90,7 @@ it("英語でも見出しを出さず、切り替えの選択肢は英語にな�
   expect(switchLink("One-time Plan")?.getAttribute("href")).toBe("/coaches");
   expect(switchLink("Ongoing plan")?.getAttribute("href")).toBe("/coaches?tab=support");
   expect(container.textContent).not.toContain("Coaches");
-  expect(container.textContent).not.toContain("One-time Plan (form feedback or concerns about competing)");
+  expect(container.textContent).not.toContain("One-time Plan (competition-form checks or concerns about competing)");
   expect(container.textContent).not.toContain("Attach a video if you would like form feedback. You can also ask for advice without a video.");
 });
 
