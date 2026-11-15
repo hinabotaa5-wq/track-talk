@@ -118,8 +118,11 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   expect(confirm.textContent).toContain("購入者の都合による払戻しは原則として行いません");
   expect(confirm.textContent).toContain("（1）サービス終了時は");
   expect(confirm.textContent).toContain("（2）法令で認められる取消し・解除は");
-  expect(confirm.textContent).toContain("（3）当社・コーチの都合で提供できないとき");
-  expect(confirm.textContent).toContain("（4）当社・コーチの都合で期限内に受けられなかったときは、失効後も1枚500円に相当する額を返金します。");
+  const refund = Array.from(confirm.querySelectorAll("dt")).find((label) => label.textContent === "払戻し")?.nextElementSibling;
+  expect(refund?.textContent).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません。");
+  expect(refund?.textContent).toContain("（3）運営者またはコーチの責めに帰すべき事由で1回プランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき500円を返金します。");
+  expect(refund?.textContent).toContain("（4）運営者またはコーチの都合で有効期限内に1回プランを受けられなかったチケットは、失効後でも1枚につき500円を返金します。");
+  expect(refund?.textContent).not.toMatch(/当社|チケットを戻すか返金/);
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
