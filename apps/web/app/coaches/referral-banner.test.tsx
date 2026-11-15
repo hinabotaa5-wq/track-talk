@@ -25,9 +25,6 @@ const HEADLINE_JA = "友達2人に紹介すると、1回無料！";
 const BODY_JA = "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。";
 const HEADLINE_EN = "Refer two friends and get a free review!";
 const BODY_EN = "A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.";
-// /me の紹介カード側の文面（本体 #739 では変更しない別文面）。
-const CARD_HEADLINE_JA = "友達2人を紹介すると、1回無料！";
-const CARD_BODY_JA = "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介者に無料チケットがプレゼントされます。";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -47,15 +44,12 @@ it("見出しと本文を正本どおりに表示する", async () => {
   expect(text).toContain(BODY_JA);
 });
 
-it("バナー全体が /me へのリンクで、紹介カードの文面は含まない", async () => {
+it("バナー全体が /me へのリンクである", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const link = container.querySelector('a[href="/me"]');
   expect(link).not.toBeNull();
   expect(link?.getAttribute("aria-label")).toBe(HEADLINE_JA);
-  const text = container.textContent ?? "";
-  expect(text).not.toContain(CARD_HEADLINE_JA);
-  expect(text).not.toContain(CARD_BODY_JA);
 });
 
 it("黄色地に濃色文字で、見出しは太字・閉じるボタンなし", async () => {

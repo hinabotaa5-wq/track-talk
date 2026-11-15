@@ -312,12 +312,15 @@ it.each([
     expect(container.textContent).toContain("付与された本人だけが使えます／払戻しはできません");
     expect(container.textContent).toContain("このIDは終了しました。紹介IDを使わずに購入すると、新しい紹介IDが発行されます。");
   }
-  expect(container.textContent).toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介者に無料チケットがプレゼントされます。");
+  expect(container.textContent).toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
+  expect(container.textContent).not.toContain("友達2人を紹介すると、1回無料！");
+  expect(container.textContent).not.toContain("紹介者に無料チケットがプレゼントされます。");
 });
 
 it("紹介IDをまだ持たない人には、マイページで発行条件を案内する（本体 #686）", async () => {
   mock.referral.mockResolvedValue({ referral: null });
   await renderSignedIn();
-  expect(container.textContent).toContain("友達2人を紹介すると、1回無料！");
+  expect(container.textContent).toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).toContain("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます。");
+  expect(container.textContent).not.toContain("友達2人を紹介すると、1回無料！");
 });
