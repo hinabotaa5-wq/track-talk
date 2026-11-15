@@ -140,9 +140,9 @@ func TestReviewSingleArrivalRequeue(t *testing.T) {
 	}
 }
 
-// TestReviewSingleArrivalNotificationsOff は本体 #745 の項目6：コーチがレビュー通知を
-// オフにしていても、取引条件のベルは1件届く。プッシュ側は通知設定の important 扱いの
-// まま（設定に依らず積む）で、この修正の前後で変わらない。
+// TestReviewSingleArrivalNotificationsOff は本体 #745 の項目6（フォローアップの項目1）：
+// コーチがレビュー通知をオフにしていても、取引条件のベルは1件届き、交付記録も残る。
+// 到着プッシュは積まない（2026-11-15 運営者判断）。
 func TestReviewSingleArrivalNotificationsOff(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	configurePush, endpoint := setupArrivalPush(t)
@@ -167,9 +167,81 @@ func TestReviewSingleArrivalNotificationsOff(t *testing.T) {
 	if offer != 0 {
 		t.Fatalf("review_offer bells when off = %d, want 0", offer)
 	}
-	// 到着プッシュは kind review_offer → important のため、レビュー通知の設定に依らず
-	// 従来どおり積まれる。この修正はプッシュ側の条件を変えていない。
-	if n := arrivalPushCount(t, coach, id); n != 1 {
-		t.Fatalf("arrival push rows when off = %d, want 1 (unchanged)", n)
+	if n := arrivalPushCount(t, coach, id); n != 0 {
+		t.Fatalf("arrival push rows when off = %d, want 0", n)
+	}
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "1回プランの依頼が届きました")
+}
+
+// TestReviewSingleArrivalTicketNotificationsOff はフォローアップの項目2：通知オフ＋
+// チケット利用の割当でも、ベルは取引条件側の1件だけでプッシュは積まない。
+func TestReviewSingleArrivalTicketNotificationsOff(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	configurePush, endpoint := setupArrivalPush(t)
+	// チケット申込はコーチ無指定のため、ランダム割当は既定のまま（受付中は1名だけ）。
+	h, _ := setupStripeConfig(t, func(cfg *config.Config) {
+		configurePush(cfg)
+	})
+	admin := adminToken(t, h)
+	coach, coachToken := onDutyCoachTo(t, h, admin, endpoint)
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/review", coachToken, map[string]bool{"in_app": false, "push": false}); rec.Code != 200 {
+		t.Fatalf("setting %d %s", rec.Code, rec.Body.String())
+	}
+	_, owner := demoRequester(t, h, admin)
+	buySixTickets(t, h, owner)
+
+	id := ticketReview(t, h, owner)
+	if got := coachRequests(t, h, coachToken).Reviewing; len(got) != 1 || got[0].ID != id {
+		t.Fatalf("not assigned: %+v", got)
+	}
+	workOrder, offer := arrivalBellCounts(t, h, coachToken, coach, id)
+	if workOrder != 1 {
+		t.Fatalf("work-order bells when off = %d, want 1", workOrder)
+	}
+	if offer != 0 {
+		t.Fatalf("review_offer bells when off = %d, want 0", offer)
+	}
+	if n := arrivalPushCount(t, coach, id); n != 0 {
+		t.Fatalf("arrival push rows when off = %d, want 0", n)
+	}
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "1回プランの依頼が届きました")
+}
+
+// TestReviewSingleArrivalRequeueNotificationsOff はフォローアップの項目3：通知オフ＋
+// 待機キューからの再割当でも、ベルは取引条件側の1件のままでプッシュは新たに積まない。
+func TestReviewSingleArrivalRequeueNotificationsOff(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	configurePush, endpoint := setupArrivalPush(t)
+	h, _ := setupStripeConfig(t, func(cfg *config.Config) {
+		configurePush(cfg)
+		cfg.ReviewRandomAssign = false
+	})
+	admin := adminToken(t, h)
+	coach, coachToken := onDutyCoachTo(t, h, admin, endpoint)
+	if rec := doJSON(t, h, http.MethodPut, "/v1/me/notification-settings/review", coachToken, map[string]bool{"in_app": false, "push": false}); rec.Code != 200 {
+		t.Fatalf("setting %d %s", rec.Code, rec.Body.String())
+	}
+	_, requester := demoRequester(t, h, admin)
+
+	id := chosenReview(t, h, requester, coach.String(), "card", false)
+	payChosenReview(t, h, id, "card")
+
+	// 割り当て済みを待機に戻し、tick の再割当に回す（指名は残す）。
+	execSQLArgs(t, `UPDATE review_requests SET status='queued', coach_id=NULL WHERE id=$1`, id)
+	if rec := tick(t, h, "tick-secret"); rec.Code != http.StatusOK {
+		t.Fatalf("tick: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := coachRequests(t, h, coachToken).Reviewing; len(got) != 1 || got[0].ID != id {
+		t.Fatalf("not re-offered: %+v", got)
+	}
+	workOrder, offer := arrivalBellCounts(t, h, coachToken, coach, id)
+	if workOrder != 1 {
+		t.Fatalf("work-order bells after requeue when off = %d, want 1", workOrder)
+	}
+	if offer != 0 {
+		t.Fatalf("review_offer bells after requeue when off = %d, want 0", offer)
+	}
+	if n := arrivalPushCount(t, coach, id); n != 0 {
+		t.Fatalf("arrival push rows after requeue when off = %d, want 0", n)
 	}
 }

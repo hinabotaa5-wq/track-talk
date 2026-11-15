@@ -83,13 +83,15 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 // recordReviewArrivalPush は、割当の到着知らせのプッシュだけを送る。ベルは取引条件
 // （saveWorkOrder → deliverWorkOrder）側の1件に一本化するため、ここでは書かない。
 // 文面・URL・DedupKey・TTL は従来どおり変えない。
+// 到着プッシュはコーチのレビュー通知設定に従う（本体 #745 項目6、2026-11-15 運営者判断）。
+// kind review_offer → important の扱いは他通知と共用のため変えず、この経路だけで
+// レビュー設定を見て積む／積まないを分ける。取引条件ベルと交付記録は設定に関わらず残る。
 func (s *Server) recordReviewArrivalPush(ctx context.Context, q *db.Queries, to uuid.UUID, kind string, msg push.Message, expires time.Time, key string) error {
 	if !s.push.Configured() {
 		return nil
 	}
 	category := kindCategory(kind)
-	ok, err := notificationWanted(ctx, q, to, category, false)
-	if err != nil || !ok {
+	if ok, err := notificationWanted(ctx, q, to, notifyReview, false); err != nil || !ok {
 		return err
 	}
 	return q.EnqueuePushOutbox(ctx, db.EnqueuePushOutboxParams{
