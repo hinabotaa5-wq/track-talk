@@ -120,6 +120,21 @@ func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) 
 	Error(w, 404, "not_found", "見つかりませんでした")
 	return room, "", false
 }
+
+// consultationReachedCoach は、この追加質問・追加相談がコーチに届いたことがあるか。
+// コーチに見せるのは、送信（チケット）か支払い（都度払い）が一度でも成立したものだけ。いまの状態だけで決めると、
+// 下書きや支払い待ちのまま取り下げた・期限が切れたもの（cancelled／expired）までコーチに見えてしまう。
+// 送信・支払いが成立すると respond_by が入る（SubmitTicketConsultation・MarkConsultationPaid）ので、それを印にする。
+func consultationReachedCoach(c db.CoachingConsultation) bool {
+	switch c.Status {
+	case "draft", "awaiting_payment":
+		return false
+	case "cancelled", "expired":
+		return c.RespondBy != nil
+	}
+	return true
+}
+
 func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.CoachingConsultation, string, bool) {
 	id, ok := parseUUIDParam(w, r, "id")
 	if !ok {
@@ -148,7 +163,7 @@ func (s *Server) consultationParty(w http.ResponseWriter, r *http.Request) (db.C
 	if c.RequesterID != nil && *c.RequesterID == p.ID {
 		return c, "requester", true
 	}
-	if c.CoachID != nil && *c.CoachID == p.ID && c.Status != "draft" && c.Status != "awaiting_payment" {
+	if c.CoachID != nil && *c.CoachID == p.ID && consultationReachedCoach(c) {
 		return c, "coach", true
 	}
 	Error(w, 404, "not_found", "見つかりませんでした")
@@ -334,7 +349,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		if role != "requester" && c.Status == "draft" {
 			continue
 		}
-		if role == "coach" && c.Status == "awaiting_payment" {
+		if role == "coach" && !consultationReachedCoach(c) {
 			continue
 		}
 		if role == "guardian" && !c.Minor {
