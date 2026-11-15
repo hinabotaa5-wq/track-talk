@@ -42,7 +42,7 @@ function CoachCard({ c, fetchedAt }: { c: SupportPlanCoach; fetchedAt: number })
   );
 }
 
-export function SupportPlanList() {
+export function SupportPlanList({ onSettled }: { onSettled?: () => void }) {
   const [result, setResult] = useState<{ coaches: SupportPlanCoach[]; fetchedAt: number } | null>(null);
   const [error, setError] = useState("");
   const [event, setEvent] = useState<CoachEventFilter>("all");
@@ -51,21 +51,32 @@ export function SupportPlanList() {
     if (!supportPlanListEnabled) return;
     let cancelled = false;
     apiFetch<{ coaches: SupportPlanCoach[] }>("/v1/coaches/support-plan")
-      .then((d) => { if (!cancelled) setResult({ coaches: d.coaches, fetchedAt: Date.now() }); })
-      .catch(() => { if (!cancelled) setError(L("読み込みに失敗しました")); });
+      .then((d) => {
+        if (cancelled) return;
+        setResult({ coaches: d.coaches, fetchedAt: Date.now() });
+        onSettled?.();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(L("読み込みに失敗しました"));
+        onSettled?.();
+      });
     return () => { cancelled = true; };
+    // 初回の取得だけを知らせる。以後の再取得はない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!supportPlanListEnabled) {
     return <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">{L("継続プランは準備中です")}</p>;
   }
+  // 初回の取得が終わるまでは種目チップも出さず、ストップウォッチだけにする（screen 扱い）。
+  if (!result && !error) return <PageLoading screen label={L("読み込み中...")} />;
   // 種目の絞り込みだけが効く。並びは API の順のまま。
   const shown = filterCoachesByEvent(result?.coaches ?? [], event);
   return (
     <div className="space-y-3">
       <CoachEventChips value={event} onChange={setEvent} />
       {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-      {!result && !error ? <PageLoading label={L("読み込み中...")} /> : null}
       {result && shown.length === 0 && event === "all" ? <p className="text-sm text-slate-200">{L("まだいません")}</p> : null}
       {result && shown.length === 0 && event !== "all" ? <CoachEventEmpty onReset={() => setEvent("all")} /> : null}
       <ul className="space-y-3">{result && shown.map((c) => <CoachCard key={c.id} c={c} fetchedAt={result.fetchedAt} />)}</ul>
