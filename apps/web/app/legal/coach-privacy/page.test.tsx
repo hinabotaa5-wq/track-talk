@@ -38,3 +38,9 @@ it("プライバシーポリシー：フォーム添削は提供中、継続プ�
   expect(html).not.toContain("購入は受け付けていません");
   expect(html).toContain("Stripe（米国。米国ほか）: オンラインコーチングの支払いの処理と、コーチへの報酬の送金</li>");
 });
+
+it("第3条の送金の一般記述は国内Stripe・海外Wiseに分かれて表示される（#765 / #29）", () => {
+  const html = renderToStaticMarkup(<PrivacyPolicy />);
+  expect(html).toContain("国内コーチには Stripe、海外コーチには Wise（後述の海外コーチの項のとおり）を使います");
+  expect(html).not.toContain("コーチへの報酬の送金も Stripe を使います");
+});
