@@ -44,6 +44,53 @@ describe("purchase-confirm", () => {
     setActiveLocale("ja");
   });
 
+  it("無料チケットの申込確認では、運営者・コーチ都合の終了の出し直しを書き分ける（本体 #797）", () => {
+    setActiveLocale("ja");
+    const rewardRows = reviewConfirmRows({
+      method: "tickets",
+      priceYen: 0,
+      hasVideo: true,
+      ticketKind: "reward",
+    });
+    const rewardCancel = rewardRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
+    expect(rewardCancel).toContain("有効期限を過ぎていても1枚を出し直します");
+    expect(rewardCancel).not.toContain("有効期限を過ぎた分は失効します");
+
+    const normalRows = reviewConfirmRows({
+      method: "tickets",
+      priceYen: 0,
+      hasVideo: true,
+      ticketKind: "normal",
+    });
+    const normalCancel = normalRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
+    expect(normalCancel).toContain("有効期限を過ぎた分は失効します");
+    expect(normalCancel).not.toContain("出し直します");
+
+    const packRefund = ticketPackConfirmRows({ quantity: 6, amountYen: 2500, validityMonths: 6 })
+      .find((row) => row.label === "払戻し")?.value;
+    expect(packRefund).toContain("有効期限を過ぎていても1枚を出し直します");
+  });
+
+  it("shows the free-ticket reissue exception in English too (本体 #797)", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      const rewardCancel = reviewConfirmRows({
+        method: "tickets",
+        priceYen: 0,
+        hasVideo: true,
+        ticketKind: "reward",
+      }).find((r) => r.label === "Cancellation and ticket returns")?.value;
+      expect(rewardCancel).toContain("a new ticket is issued even after expiry");
+
+      const packRefund = ticketPackConfirmRows({ quantity: 6, amountYen: 2500, validityMonths: 6 })
+        .find((row) => row.label === "Refunds")?.value;
+      expect(packRefund).toContain("a new ticket is issued even after expiry");
+    } finally {
+      setActiveLocale("ja");
+    }
+  });
+
   it("distinguishes a returned reservation from a monetary refund in English", () => {
     installEnglish(en);
     setActiveLocale("en");

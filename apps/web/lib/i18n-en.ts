@@ -2966,6 +2966,8 @@ export const en: Readonly<Record<string, string>> = {
   "確定のタイミング": "When it's finalized",
   "キャンセル・チケットの戻り": "Cancellation and ticket returns",
   "送信時に1枚を確保し、返却時に使います。着手前はキャンセルでき、その場合は1枚戻ります。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却でも1枚戻りますが、有効期限を過ぎた分は失効します。": "1 ticket is held when you send the request and used when the review is returned. You can cancel before the coach starts, and the ticket is returned. You can't cancel once the coach starts. The ticket is also returned if the deadline passes or the coach returns the request, but tickets returned after expiry are expired.",
+  "送信時に1枚を確保し、返却時に使います。着手前はキャンセルでき、その場合は1枚戻ります。着手後はキャンセルできません。期限までに返らない場合やコーチ都合の返却でも1枚戻ります。無料チケットを使って申し込んだ依頼が運営者またはコーチの都合で終了した場合は、有効期限を過ぎていても1枚を出し直します。": "1 ticket is held when you send the request and used when the review is returned. You can cancel before the coach starts, and the ticket is returned. You can't cancel once the coach starts. The ticket is also returned if the deadline passes or the coach returns the request. If a request made with a free ticket ends for reasons on the operator's or coach's side, a new ticket is issued even after expiry.",
+  "無料チケットを使って申し込んだ依頼が運営者またはコーチの都合で終了した場合は、有効期限を過ぎていても1枚を出し直します。": "If a request made with a free ticket ends for reasons on the operator's or coach's side, a new ticket is issued even after expiry.",
   "当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。": "Refunds when the review couldn't be received in time for our or the coach's reasons follow Terms, Article 6.",
   "返却期限（{due}）までに返却がない場合や、コーチが辞退した場合は、確保した1枚を戻します。有効期限を過ぎてから戻る分は失効します。": "If the review isn't returned by the deadline ({due}) or the coach declines, the held ticket is returned. A ticket returned after its expiry expires.",
   "総額": "Total",
