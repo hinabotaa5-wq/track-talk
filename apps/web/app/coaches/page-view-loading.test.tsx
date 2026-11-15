@@ -90,7 +90,7 @@ it("読み込み完了後はバナー・タブ切り替え・一覧が出て、�
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   expect(container.querySelector(".page-loading-screen")).toBeNull();
   expect(container.textContent).toContain("友達2人に紹介すると、1回無料！");
-  expect(container.textContent).toContain("1回プランの都度払いやチケットの購入で、紹介IDが発行されます。");
+  expect(container.textContent).toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると");
   expect(container.textContent).toContain("1回プラン");
   expect(container.textContent).toContain("継続プラン");
   expect(container.querySelector('[role="radio"]')).not.toBeNull();
