@@ -125,7 +125,7 @@ func TestReviewAssignmentRetriesWhenWorkOrderDeliveryFails(t *testing.T) {
 	}
 	var count int
 	queryRowArgs(t, "SELECT count(*) FROM notifications WHERE review_request_id = $1 AND kind = 'review_offer'", []any{id}, &count)
-	if count != 1 {
+	if count != 0 {
 		t.Fatalf("offer notification count %d", count)
 	}
 }

@@ -398,7 +398,8 @@ func TestAdultNeedsNoticeOnReviewPaths(t *testing.T) {
 }
 
 // 項目5（層B のうち環境内で完結する分）：本番と同じ「指名・カード払い」の申込みで、
-// 支払いが届くまでは打診も通知も作らず、支払いが届くとコーチへの打診のベル通知と Push の送信待ちができる。
+// 支払いが届くまでは打診も通知も作らず、支払いが届くとコーチへの取引条件のベル通知と Push の送信待ちができる。
+// 到着通知側のベル（review_offer）は書かない（本体 #745）。
 // その場の Push が一時障害で送れなくても、tick が送り直して送信済みとして記録し、二重には送らない。
 // Push はテスト用の購読（合成の宛先）に送り、実際の端末には届けない。
 func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
@@ -445,7 +446,7 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	payChosenReview(t, h, root, "card")
 	var offers int
 	queryRowArgs(t, `SELECT count(*) FROM review_requests WHERE id = $1 AND coach_id = $2`, []any{root, coach}, &offers)
-	if offers != 1 || offerNotes() != 1 || offerPushes() != 1 {
+	if offers != 1 || offerNotes() != 0 || offerPushes() != 1 {
 		t.Fatalf("offers=%d bell=%d push=%d", offers, offerNotes(), offerPushes())
 	}
 	var dedup, title, body string
@@ -476,7 +477,7 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	if rec := tickWithSecret(t, h, "tick-secret"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"push_resent":0`) {
 		t.Fatalf("second tick %d %s", rec.Code, rec.Body.String())
 	}
-	if gate.sent.Load() != base+1 || offerNotes() != 1 {
+	if gate.sent.Load() != base+1 || offerNotes() != 0 {
 		t.Fatalf("duplicate sent=%d bell=%d", gate.sent.Load()-base, offerNotes())
 	}
 }

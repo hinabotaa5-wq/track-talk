@@ -76,7 +76,7 @@ func TestNominatedReviewNotifications(t *testing.T) {
 	}
 
 	id := start()
-	assertNotice(id, "review_offer", coach, 1)
+	assertNotice(id, "review_offer", coach, 0)
 	before := coachPushes.Load()
 	for _, lead := range []time.Duration{11 * time.Hour, 3 * time.Hour} {
 		execSQLArgs(t, "UPDATE review_requests SET due_at=$2 WHERE id=$1", id, time.Now().Add(lead))
