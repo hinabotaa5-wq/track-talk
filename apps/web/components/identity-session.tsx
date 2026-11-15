@@ -2,6 +2,7 @@
 import { L } from "@/lib/i18n";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { MfaEnrollSteps } from "@/components/mfa-enroll-steps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeTotpCode } from "@/lib/account-security";
@@ -45,7 +46,7 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
   });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [factor, setFactor] = useState<{ id: string; setupKey?: string }>();
+  const [factor, setFactor] = useState<{ id: string; setupKey?: string; qrCode?: string }>();
   const [code, setCode] = useState("");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
@@ -67,7 +68,7 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
       }
       const enrollment = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: `TrackTalk ${crypto.randomUUID().slice(0, 8)}` });
       if (enrollment.error) throw enrollment.error;
-      setFactor({ id: enrollment.data.id, setupKey: enrollment.data.totp.secret });
+      setFactor({ id: enrollment.data.id, setupKey: enrollment.data.totp.secret, qrCode: enrollment.data.totp.qr_code || undefined });
     } catch {
       setError(L("専用アカウントでログインできませんでした"));
     } finally {
@@ -102,15 +103,26 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
 
   if (!client) return <p>{L("身元情報の専用画面は準備中です。")}</p>;
   if (token) return <>{children(token)}<Button type="button" variant="secondary" onClick={signOut}>{L("専用画面からログアウト")}</Button></>;
-  if (factor) return (
-    <form method="post" className="space-y-2" onSubmit={verify}>
-      {factor.setupKey && <p>{L("認証アプリに次の設定キーを登録してください。")}<code className="block break-all">{factor.setupKey}</code></p>}
-      <label className="block">{L("認証アプリのコード")}<Input autoComplete="one-time-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
-      <Button disabled={pending}>{L("認証する")}</Button>
-      <Button type="button" variant="secondary" onClick={signOut}>{L("最初に戻る")}</Button>
-      {error && <p role="alert">{error}</p>}
-    </form>
-  );
+  if (factor) {
+    // 登録時は既存の MfaEnrollSteps（自前の form を返す）へ置き換える。入れ子 form にしない。
+    // エラーメッセージと「最初に戻る」は form の外側に残す。qr が無い応答では従来表示に倒す。
+    if (factor.setupKey && factor.qrCode) return (
+      <div className="space-y-2">
+        <MfaEnrollSteps qr={factor.qrCode} secret={factor.setupKey} code={code} onCode={setCode} pending={pending} onSubmit={verify} />
+        <Button type="button" variant="secondary" onClick={signOut}>{L("最初に戻る")}</Button>
+        {error && <p role="alert">{error}</p>}
+      </div>
+    );
+    return (
+      <form method="post" className="space-y-2" onSubmit={verify}>
+        {factor.setupKey && <p>{L("認証アプリに次の設定キーを登録してください。")}<code className="block break-all">{factor.setupKey}</code></p>}
+        <label className="block">{L("認証アプリのコード")}<Input autoComplete="one-time-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
+        <Button disabled={pending}>{L("認証する")}</Button>
+        <Button type="button" variant="secondary" onClick={signOut}>{L("最初に戻る")}</Button>
+        {error && <p role="alert">{error}</p>}
+      </form>
+    );
+  }
   return (
     <form method="post" className="space-y-2" onSubmit={login}>
       <p>{L("運営から案内された身元情報専用アカウントでログインしてください。")}</p>
