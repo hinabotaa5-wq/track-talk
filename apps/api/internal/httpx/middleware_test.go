@@ -21,7 +21,7 @@ func TestRequireAuthRejectsMissingExpAndWrongIssuer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := RequireAuth(v, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := RequireAuth(v, nil, auth.Admin{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	id := "11111111-1111-4111-8111-111111111111"
@@ -151,7 +151,7 @@ func TestRequestLogRecordsAuthenticatedUser(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	optional := OptionalAuth(v, nil)
-	required := RequireAuth(v, nil)
+	required := RequireAuth(v, nil, auth.Admin{})
 
 	cases := []struct {
 		name    string

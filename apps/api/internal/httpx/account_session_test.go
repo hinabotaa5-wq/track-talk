@@ -83,7 +83,8 @@ func TestWithdrawWithActiveSession(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"auth_deleted":true`) {
 		t.Fatalf("withdraw %d %s", rec.Code, rec.Body.String())
 	}
-	if len(f.checked) != 1 || f.checked[0] != "Bearer "+tok {
+	// 書き込み共通の確認(ミドルウェア)と退会の requireActiveSession の2回。
+	if len(f.checked) != 2 || f.checked[0] != "Bearer "+tok || f.checked[1] != "Bearer "+tok {
 		t.Fatalf("checked %q", f.checked)
 	}
 	if len(f.deleted) != 1 || f.deleted[0] != id.String() {
@@ -142,9 +143,12 @@ func TestWithdrawChecksSessionBeforeGuards(t *testing.T) {
 		name   string
 		status int
 		want   int
+		// 有効なセッションは書き込み共通の確認(ミドルウェア)と退会の
+		// requireActiveSession の2回、失効はミドルウェアだけの1回。
+		calls int
 	}{
-		{name: "有効なセッション", status: http.StatusOK, want: http.StatusConflict},
-		{name: "失効したセッション", status: http.StatusForbidden, want: http.StatusUnauthorized},
+		{name: "有効なセッション", status: http.StatusOK, want: http.StatusConflict, calls: 2},
+		{name: "失効したセッション", status: http.StatusForbidden, want: http.StatusUnauthorized, calls: 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -164,7 +168,7 @@ func TestWithdrawChecksSessionBeforeGuards(t *testing.T) {
 			if tc.want == http.StatusConflict && !strings.Contains(rec.Body.String(), "review_in_progress") {
 				t.Fatalf("guard %s", rec.Body.String())
 			}
-			if len(f.checked) != 1 || len(f.deleted) != 0 {
+			if len(f.checked) != tc.calls || len(f.deleted) != 0 {
 				t.Fatalf("checked %d deleted %d", len(f.checked), len(f.deleted))
 			}
 		})

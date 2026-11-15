@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -148,7 +149,9 @@ func OptionalAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.
 
 // RequireAuth は、ログインしていなければ 401 を返す。
 // 二段階認証を設定済みの人が、コードを入れる前のログインで呼んだら 403(mfa_required)を返す。
-func RequireAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.Handler {
+// 書き込み(POST／PUT／PATCH／DELETE)の前には、トークンのセッションがまだ有効かも確かめる。
+// 読み取りは従来どおり JWT のみで、セッションの確認はしない。
+func RequireAuth(v *auth.Verifier, mfa *MFAEnrollment, admin auth.Admin) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := bearer(r)
@@ -173,9 +176,50 @@ func RequireAuth(v *auth.Verifier, mfa *MFAEnrollment) func(http.Handler) http.H
 				Error(w, http.StatusForbidden, "mfa_required", "二段階認証のコードを入れてください")
 				return
 			}
+			if !checkWriteSession(w, r, admin, identity, raw) {
+				return
+			}
 			next.ServeHTTP(w, r.WithContext(withUser(r.Context(), identity)))
 		})
 	}
+}
+
+// isWriteMethod は、セッションの確認をするリクエストのメソッドかどうかを返す。
+func isWriteMethod(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	}
+	return false
+}
+
+// checkWriteSession は、書き込みの前にトークンのセッションが Supabase Auth でまだ有効かを確かめる。
+// 退会の requireActiveSession と応答を揃える。結果は覚えず、書き込みごとに毎回確かめる。
+func checkWriteSession(w http.ResponseWriter, r *http.Request, admin auth.Admin, identity auth.Identity, raw string) bool {
+	if !isWriteMethod(r.Method) {
+		return true
+	}
+	if !admin.Enabled() {
+		slog.Warn("supabase service role key is not set; session was not checked")
+		return true
+	}
+	if identity.SessionID == "" {
+		slog.Warn("write rejected: token has no session", "user_id", identity.UserID.String())
+		Error(w, http.StatusUnauthorized, "session_inactive", "ログインし直してから、もう一度お試しください")
+		return false
+	}
+	err := admin.CheckSession(r.Context(), raw)
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, auth.ErrSessionInactive):
+		slog.Warn("write rejected: session is not active", "err", err, "user_id", identity.UserID.String())
+		Error(w, http.StatusUnauthorized, "session_inactive", "ログインし直してから、もう一度お試しください")
+	default:
+		slog.Error("write session check failed", "err", err, "user_id", identity.UserID.String())
+		Error(w, http.StatusServiceUnavailable, "unavailable", "いまは確認できません。しばらくしてからもう一度試してください")
+	}
+	return false
 }
 
 func bearer(r *http.Request) string {
