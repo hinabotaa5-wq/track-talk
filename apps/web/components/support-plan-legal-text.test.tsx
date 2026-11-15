@@ -20,7 +20,8 @@ it("コーチ向けの報酬と精算を指定の3段落で表示する", () => 
   const html = renderToStaticMarkup(<SupportPlanCoachTerms />);
   expect(html).toContain("1ヶ月プランの報酬と精算");
   expect(html).toContain("<p>報酬は経過分の75%です。月末までの分を翌月15日に仮払いし（3,000円未満は繰越し）、契約終了時に精算します。解約料はありません。</p>");
-  expect(html).toContain("<p>コーチ都合で終了した場合は選手へ全額返金し、受け取った仮払いはその75%まで返還いただきます。やむを得ない事情の場合は通常の精算です。</p>");
+  expect(html).toContain("<p>コーチの責めに帰すべき事由により契約期間中に継続できなくなった場合は、購入者に過ぎた日数分を含めて全額を返金します。すでに受け取った仮払い報酬は、購入者への返金額の75%に相当する額を上限として、返還を求められる場合があります。コーチの責めに帰すことができない事情による場合は、通常どおり精算します。</p>");
+  expect(html).not.toContain("コーチ都合");
   expect(html).toContain("<p>日割りの計算方法、異議申立て、契約ごとの条件などの詳細は、契約成立時の通知と利用規約をご確認ください。</p>");
   expect(html).not.toContain("報酬の確定時期と仮払い");
   expect(html).not.toContain("コーチ都合の精算");
