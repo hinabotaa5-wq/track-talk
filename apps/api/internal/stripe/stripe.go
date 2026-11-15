@@ -255,6 +255,58 @@ type PaymentIntent struct {
 	// requires_capture: 仮押さえ済み。succeeded: 確定済み。canceled: 取り消し済み。
 	Status string `json:"status"`
 	Amount int    `json:"amount"`
+	// CardCountry は、カードの発行国（ISO 3166-1 alpha-2 を大文字化。例 JP）。
+	// 取れなければ空。空のときは発行国不明として扱い、ブロックしない。
+	CardCountry string `json:"-"`
+}
+
+// UnmarshalJSON は、PaymentIntent を読む。カード発行国は payment_method の
+// 展開（card.country）を先に見て、なければ charges の
+// payment_method_details.card.country を使う。payment_method が文字列 ID
+// （未展開）のときは発行国なし（空）として扱う。
+func (p *PaymentIntent) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID            string          `json:"id"`
+		Status        string          `json:"status"`
+		Amount        int             `json:"amount"`
+		PaymentMethod json.RawMessage `json:"payment_method"`
+		Charges       struct {
+			Data []struct {
+				PaymentMethodDetails struct {
+					Card struct {
+						Country string `json:"country"`
+					} `json:"card"`
+				} `json:"payment_method_details"`
+			} `json:"data"`
+		} `json:"charges"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	p.ID = raw.ID
+	p.Status = raw.Status
+	p.Amount = raw.Amount
+	p.CardCountry = ""
+	if len(raw.PaymentMethod) > 0 && raw.PaymentMethod[0] == '{' {
+		var pm struct {
+			Card struct {
+				Country string `json:"country"`
+			} `json:"card"`
+		}
+		if err := json.Unmarshal(raw.PaymentMethod, &pm); err == nil {
+			p.CardCountry = strings.ToUpper(pm.Card.Country)
+		}
+	}
+	if p.CardCountry == "" && len(raw.Charges.Data) > 0 {
+		p.CardCountry = strings.ToUpper(raw.Charges.Data[0].PaymentMethodDetails.Card.Country)
+	}
+	return nil
+}
+
+// IsNonJPCard は、カード発行国が分かっていて JP でないか。発行国が取れない
+// ときは false（ブロックしない）を返す。
+func (p PaymentIntent) IsNonJPCard() bool {
+	return p.CardCountry != "" && !strings.EqualFold(p.CardCountry, "JP")
 }
 
 // GetCheckoutSession は、支払い画面（Checkout Session）の今の状態を Stripe から読む。
@@ -273,12 +325,13 @@ func (c Client) GetCheckoutSession(ctx context.Context, id string) (CheckoutSess
 	return sess, err
 }
 
-// GetPaymentIntent は、支払いの今の状態を読む。
+// GetPaymentIntent は、支払いの今の状態を読む。カード発行国の判定に使うため
+// payment_method を展開して読む（非JPカードの仮押さえ取消し、本体 #796）。
 func (c Client) GetPaymentIntent(ctx context.Context, id string) (PaymentIntent, error) {
 	if !c.Configured() {
 		return PaymentIntent{}, ErrNotConfigured
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/payment_intents/"+url.PathEscape(id), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/v1/payment_intents/"+url.PathEscape(id)+"?expand[]=payment_method", nil)
 	if err != nil {
 		return PaymentIntent{}, err
 	}

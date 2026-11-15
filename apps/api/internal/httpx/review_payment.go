@@ -209,6 +209,11 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		default:
 			return nil
 		}
+		// 非JPカードは、仮押さえ成立後・打診（申込み）作成前に取り消す（本体 #796）。
+		// 発行国が取れないときはブロックしない。
+		if status == "authorized" && pi.IsNonJPCard() {
+			return s.cancelNonJPCardCheckout(ctx, pay, sess.PaymentIntent, pi.CardCountry)
+		}
 	} else if sess.PaymentStatus != "paid" {
 		return nil
 	}
@@ -265,6 +270,48 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 	}
 	s.sendPendingOutbox(ctx, pushOutboxBatch)
 	return nil
+}
+
+// cancelNonJPCardCheckout は、非JPカードの仮押さえを取り消し、依頼を作らずに
+// 支払いを取り消し済みにする（本体 #796）。migration なし（通知の種別も増やさない）。
+// 利用者への理由の表示は戻り値の文言で返し、戻り画面の sync が 422 で返す。
+// 取り消しに成功したら理由の文言を返し、Webhook は再送で収束する（2回目は
+// 支払いが pending でないため nil）。取り消し自体に失敗したときだけ err を返す。
+func (s *Server) cancelNonJPCardCheckout(ctx context.Context, pay db.ReviewPayment, intentID, country string) error {
+	slog.Warn("non-jp card blocked", "payment", pay.ID, "country", country)
+	err := s.refundTx(ctx, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		marked, err := q.MarkReviewPaymentPaid(ctx, db.MarkReviewPaymentPaidParams{
+			Status: "authorized", PaymentIntentID: &intentID, CheckoutSessionID: pay.CheckoutSessionID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		canceled, err := s.stripe.CancelPaymentIntent(ctx, intentID, "non-jp-cancel-"+marked.ID.String())
+		if err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		if canceled.Status != "canceled" || canceled.ID != intentID {
+			return fmt.Errorf("%w: non-jp cancel unexpected status %q", errStripe, canceled.Status)
+		}
+		if _, err := q.MarkReviewPaymentReleased(ctx, marked.ID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return &ticketRuleError{
+		code:    "card_country_not_supported",
+		message: "海外で発行されたカードはご利用いただけません。日本で発行された別のカードでお申し込みください。",
+	}
 }
 
 // releaseReviewPayment は、仮押さえを取り消すか、確定済み（PayPay）なら全額を返金する。
@@ -439,6 +486,10 @@ func (s *Server) syncReviewPayment(w http.ResponseWriter, r *http.Request) {
 			}
 			if sess.ID == pay.CheckoutSessionID && sess.Status == "complete" {
 				if err := s.completeReviewCheckout(r.Context(), sess); err != nil {
+					// 非JPカードの取り消しなど、理由を利用者に返すものは 422 で返す（本体 #796）。
+					if writeTicketRuleError(w, err) {
+						return
+					}
 					MapDBError(w, err)
 					return
 				}
