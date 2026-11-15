@@ -252,7 +252,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).not.toContain("確定のタイミング");
   expect(confirm?.textContent).toContain("キャンセル・返金");
   expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
-  expect(confirm?.textContent).toContain("期限までに返らない場合やコーチ都合の返却では全額を返金します");
+  expect(confirm?.textContent).toContain("決済が確定していない場合は仮押さえを取り消し（請求は確定しません）、確定している場合は返金します");
   expect(confirm?.textContent).toContain("回答返却後の返金は利用規約に定める場合に限ります");
   expect(confirm?.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
   expect(confirm?.textContent).not.toContain("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
