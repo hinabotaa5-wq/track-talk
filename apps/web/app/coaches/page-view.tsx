@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { CoachTabs } from "./coach-tabs";
+import { ReferralBanner } from "./referral-banner";
 
 
 // 依頼する前に、どんなコーチがいるかを見られる。添削でもパーソナル指導でも同じ一覧を使う。
@@ -9,6 +10,7 @@ import { CoachTabs } from "./coach-tabs";
 export function CoachesView() {
   return (
     <div className="mx-auto max-w-md space-y-6">
+      <ReferralBanner />
       <Suspense>
         <CoachTabs />
       </Suspense>
