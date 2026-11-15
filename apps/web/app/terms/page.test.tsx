@@ -168,6 +168,13 @@ it("未成年者の購入は、全員への購入前チェックと、申立て�
   for (const word of ["支払い上限", "購入内容を通知", "同意を撤回"]) expect(text).not.toContain(word);
 });
 
+it("国内継続プランの販売者案内から第8条の見出しへリンクできる", () => {
+  const container = document.createElement("div");
+  container.innerHTML = renderToStaticMarkup(<TermsPage />);
+  expect(container.querySelectorAll("#article-8")).toHaveLength(1);
+  expect(container.querySelector("h2#article-8")?.textContent).toBe("第8条（継続プランの契約と代金の受け取り）");
+});
+
 it("第8条：1ヶ月プランの途中終了（7の2）と外部勧誘の禁止（10・11項）を定める", () => {
   const text = article(8);
   expect(text).toContain("返金とキャンセル（1ヶ月プラン以外）：1ヶ月プラン以外の継続プランの返金は");

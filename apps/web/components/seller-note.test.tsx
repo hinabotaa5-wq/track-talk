@@ -22,5 +22,6 @@ it("継続プランはコーチが販売者で、代理受領と二重請求が�
   expect(html).toContain("代理受領の権限");
   expect(html).toContain("運営者へ支払った時点でコーチへの支払いは済み");
   expect(html).toContain("重ねて請求されることはありません");
+  expect(html).toContain('href="/terms#article-8"');
   expect(html).not.toContain("/legal/commerce");
 });
