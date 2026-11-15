@@ -28,6 +28,6 @@ bash deploy/smoke/readonly-smoke.sh
 2. `GET /v1/coaches` がコーチ一覧のフラグの想定どおり（閉じていれば 404）
 3. 未認証で `GET /v1/coaching/nominees`・`POST /v1/coaching/requests`・`GET /v1/me`・`GET /v1/coach/me`・`GET /v1/admin/coaching/payments` が 401
 4. 許可していない Origin からの CORS プリフライトに `Access-Control-Allow-Origin` が付かない
-5. 特商法ページ（`/legal/commerce`）にフォーム添削 1,500円（税込）と追加相談 600円（税込）の記載がある
+5. 特商法ページ（`/legal/commerce`）に1回プラン 1回 500円（税込）と1回プランの追加質問 1回 500円（税込）の記載がある
 
 同じ挙動は API の回帰テスト（`apps/api/internal/httpx/coaching_hardening_test.go`）でも固定しています。スクリプトは、デプロイした本番の設定（フラグ・CORS の許可先）でもそうなっているかを見るためのものです。
