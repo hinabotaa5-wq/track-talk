@@ -357,6 +357,234 @@ func TestIdentityIsolation(t *testing.T) {
 	}
 }
 
+// #809：一括承認 API の試験。個別承認と同じ条件・同じ INSERT を、自分の公開中
+// プラン全件へ1トランザクションで適用すること（全件成功か全件なしか）、冪等であること。
+func TestIdentityBulkPublish(t *testing.T) {
+	ctx := context.Background()
+	main, vault := testDatabases(t)
+	coach, coachSubject := uuid.New(), uuid.New()
+	planA, planB := uuid.New(), uuid.New()
+	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", coach)
+	execTest(t, main, `INSERT INTO coach_profiles
+		(profile_id,tier,events,best_record,achievements,years,status,reviewed_at,pledged_at,pledge_version)
+		VALUES ($1,'coach',ARRAY['100m'],'test','test',1,'approved',now(),now(),1)`, coach)
+	for _, plan := range []uuid.UUID{planA, planB} {
+		execTest(t, main, `INSERT INTO coaching_plans
+			(id,coach_id,kind,title,description,duration_days,price_yen,capacity,published)
+			VALUES ($1,$2,'period','test','test',30,8000,2,true)`, plan, coach)
+	}
+	execTest(t, vault, "INSERT INTO identity_vault.members(subject,coach_id,is_admin) VALUES ($1,$2,false)", coachSubject, coach)
+
+	signing, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/v1/.well-known/jwks.json" {
+			encode := base64.RawURLEncoding.EncodeToString
+			respond(w, map[string]any{"keys": []map[string]string{{
+				"kty": "EC", "crv": "P-256", "alg": "ES256", "kid": "vault-test",
+				"x": encode(signing.X.FillBytes(make([]byte, 32))), "y": encode(signing.Y.FillBytes(make([]byte, 32))),
+			}}})
+			return
+		}
+		if r.URL.Path == "/auth/v1/user" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(authServer.Close)
+	verifier, err := auth.NewVerifier("", authServer.URL, "authenticated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeToken := func(subject uuid.UUID, aal, issuer string) string {
+		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+			"sub": subject.String(), "aal": aal, "iss": issuer, "aud": "authenticated",
+			"session_id": uuid.NewString(), "exp": time.Now().Add(time.Hour).Unix(),
+		})
+		token.Header["kid"] = "vault-test"
+		signed, err := token.SignedString(signing)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return signed
+	}
+	issuer := authServer.URL + "/auth/v1"
+	coachToken := makeToken(coachSubject, "aal2", issuer)
+	machine := strings.Repeat("r", 32)
+	svc, err := New(main, vault, verifier, auth.Admin{BaseURL: authServer.URL, APIKey: "synthetic-publishable"}, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{5}, 32)), machine, strings.Repeat("c", 32), strings.Repeat("e", 32), "https://example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := svc.Handler()
+	request := func(method, path, authToken, body string, status int) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+authToken)
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != status {
+			t.Fatalf("%s %s: got %d, want %d: %s", method, path, res.Code, status, res.Body.String())
+		}
+		return res
+	}
+
+	disclosures := func() int {
+		t.Helper()
+		var n int
+		if err := vault.QueryRow(ctx, "SELECT count(*) FROM identity_vault.disclosures WHERE coach_id=$1", coach).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	planStored := func(plan uuid.UUID) bool {
+		t.Helper()
+		var n int
+		if err := vault.QueryRow(ctx, "SELECT count(*) FROM identity_vault.disclosures WHERE plan_id=$1", plan).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n == 1
+	}
+	// disclosures 行の epoch が現在の公開 epoch と一致すること。
+	epochsCurrent := func() bool {
+		t.Helper()
+		type row struct{ ID, PlanEpoch, CoachEpoch uuid.UUID }
+		rows, err := main.Query(ctx, "SELECT id,plan_epoch,coach_epoch FROM identity_boundary.published_plans WHERE coach_id=$1", coach)
+		if err != nil {
+			t.Fatal(err)
+		}
+		published, err := pgx.CollectRows(rows, pgx.RowToStructByPos[row])
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows, err = vault.Query(ctx, "SELECT plan_id,plan_epoch,coach_epoch FROM identity_vault.disclosures WHERE coach_id=$1", coach)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stored, err := pgx.CollectRows(rows, pgx.RowToStructByPos[row])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(published) != len(stored) {
+			return false
+		}
+		want := map[uuid.UUID]row{}
+		for _, p := range published {
+			want[p.ID] = p
+		}
+		for _, s := range stored {
+			if want[s.ID] != s {
+				return false
+			}
+		}
+		return true
+	}
+	revision := func() uuid.UUID {
+		t.Helper()
+		var out struct {
+			Revision uuid.UUID `json:"identity_revision"`
+		}
+		res := request("GET", "/v1/coach", coachToken, "", 200)
+		if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil || out.Revision == uuid.Nil {
+			t.Fatal("identity revision was not readable")
+		}
+		return out.Revision
+	}
+	const bulk = "/v1/coach/disclosures"
+	const syntheticIdentity = `{"legal_name":"合成テスト氏名","address":"合成テスト住所","phone":"000-0000-0000"}`
+	request("PUT", "/v1/coach/identity", coachToken, syntheticIdentity, 204)
+	consent := `{"confirm":true,"identity_revision":"` + revision().String() + `"}`
+	single := func(plan uuid.UUID) string { return "/v1/coach/disclosures/" + plan.String() }
+
+	// confirm が true でない・欠けている・未知項目は書かずに拒否する。
+	request("PUT", bulk, coachToken, `{"confirm":false,"identity_revision":"`+revision().String()+`"}`, 422)
+	request("PUT", bulk, coachToken, `{"identity_revision":"`+revision().String()+`"}`, 422)
+	request("PUT", bulk, coachToken, `{"confirm":true,"identity_revision":"`+revision().String()+`","extra":1}`, 400)
+	if disclosures() != 0 {
+		t.Fatal("rejected bulk approval wrote rows")
+	}
+	// 個別承認済み1件＋未承認1件の混在でも一括で両方承認済みになり、もう1回でも変わらない。
+	request("PUT", single(planA), coachToken, consent, 204)
+	request("PUT", bulk, coachToken, consent, 204)
+	if !planStored(planA) || !planStored(planB) || disclosures() != 2 || !epochsCurrent() {
+		t.Fatal("bulk approval did not authorize every plan with current epochs")
+	}
+	request("PUT", bulk, coachToken, consent, 204)
+	if disclosures() != 2 || !epochsCurrent() {
+		t.Fatal("bulk approval was not idempotent")
+	}
+	// 古い identity_revision では 409 で何も増やさない。
+	request("PUT", bulk, coachToken, `{"confirm":true,"identity_revision":"`+uuid.NewString()+`"}`, 409)
+	if disclosures() != 2 {
+		t.Fatal("conflicting bulk approval changed rows")
+	}
+	// required のコーチで電話番号のない登録では 409 で何も書かない。
+	execTest(t, vault, "UPDATE identity_vault.identities SET phone_enc=NULL WHERE coach_id=$1", coach)
+	request("PUT", bulk, coachToken, consent, 409)
+	if disclosures() != 2 {
+		t.Fatal("phone-less bulk approval changed rows")
+	}
+	request("PUT", "/v1/coach/identity", coachToken, syntheticIdentity, 204)
+	consent = `{"confirm":true,"identity_revision":"` + revision().String() + `"}`
+	if disclosures() != 0 {
+		t.Fatal("re-registration did not clear approvals")
+	}
+	request("PUT", bulk, coachToken, consent, 204)
+	if disclosures() != 2 || !epochsCurrent() {
+		t.Fatal("bulk approval after re-registration did not authorize every plan")
+	}
+	// 表記不要のコーチでも一括承認でき、公開側は表記なしのまま。
+	request("PUT", "/v1/coach/exemption", coachToken, `{"exempt":true,"checklist_version":1,"checked":[true,true,true]}`, 204)
+	request("PUT", bulk, coachToken, consent, 204)
+	if out := request("GET", "/internal/disclosures/"+planA.String(), machine, "", 200); strings.TrimSpace(out.Body.String()) != `{"required":false}` {
+		t.Fatal("exempt bulk approval exposed fields")
+	}
+	// aal1・割り当てなし・未承認コーチ・未認証は個別と同じ扱いで拒否する。
+	outsider := uuid.New()
+	request("PUT", bulk, makeToken(coachSubject, "aal1", issuer), consent, 403)
+	request("PUT", bulk, makeToken(outsider, "aal2", issuer), consent, 403)
+	unapproved, unapprovedSubject := uuid.New(), uuid.New()
+	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", unapproved)
+	execTest(t, vault, "INSERT INTO identity_vault.members(subject,coach_id,is_admin) VALUES ($1,$2,false)", unapprovedSubject, unapproved)
+	request("PUT", bulk, makeToken(unapprovedSubject, "aal2", issuer), consent, 403)
+	request("PUT", bulk, "", consent, 401)
+	// 他のコーチのプランは対象に含まない。プランの無いコーチは 204。
+	other, otherSubject, otherPlan := uuid.New(), uuid.New(), uuid.New()
+	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", other)
+	execTest(t, main, `INSERT INTO coach_profiles
+		(profile_id,tier,events,best_record,achievements,years,status,reviewed_at,pledged_at,pledge_version)
+		VALUES ($1,'coach',ARRAY['100m'],'test','test',1,'approved',now(),now(),1)`, other)
+	execTest(t, main, `INSERT INTO coaching_plans
+		(id,coach_id,kind,title,description,duration_days,price_yen,capacity,published)
+		VALUES ($1,$2,'period','test','test',30,8000,2,true)`, otherPlan, other)
+	execTest(t, vault, "INSERT INTO identity_vault.members(subject,coach_id,is_admin) VALUES ($1,$2,false)", otherSubject, other)
+	request("PUT", bulk, coachToken, consent, 204)
+	if planStored(otherPlan) {
+		t.Fatal("bulk approval touched another coach's plan")
+	}
+	empty, emptySubject := uuid.New(), uuid.New()
+	execTest(t, main, "INSERT INTO profiles(id) VALUES ($1)", empty)
+	execTest(t, main, `INSERT INTO coach_profiles
+		(profile_id,tier,events,best_record,achievements,years,status,reviewed_at,pledged_at,pledge_version)
+		VALUES ($1,'coach',ARRAY['100m'],'test','test',1,'approved',now(),now(),1)`, empty)
+	execTest(t, vault, "INSERT INTO identity_vault.members(subject,coach_id,is_admin) VALUES ($1,$2,false)", emptySubject, empty)
+	emptyToken := makeToken(emptySubject, "aal2", issuer)
+	request("PUT", "/v1/coach/identity", emptyToken, syntheticIdentity, 204)
+	emptyConsent := `{"confirm":true,"identity_revision":"` + func() uuid.UUID {
+		var out struct {
+			Revision uuid.UUID `json:"identity_revision"`
+		}
+		res := request("GET", "/v1/coach", emptyToken, "", 200)
+		if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil || out.Revision == uuid.Nil {
+			t.Fatal("identity revision was not readable")
+		}
+		return out.Revision
+	}().String() + `"}`
+	request("PUT", bulk, emptyToken, emptyConsent, 204)
+}
+
 // H1 で schema.sql だけを適用した金庫に、#440 の移行を追加だけで足せること。
 func TestIdentityPhoneMigration(t *testing.T) {
 	ctx := context.Background()

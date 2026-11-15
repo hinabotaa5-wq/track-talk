@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeTotpCode } from "@/lib/account-security";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 const api = process.env.NEXT_PUBLIC_IDENTITY_API_URL;
 const issuer = process.env.NEXT_PUBLIC_IDENTITY_AUTH_URL;
@@ -29,6 +29,26 @@ export async function identityFetch<T>(path: string, token: string, method = "GE
   return res.status === 204 ? undefined as T : await res.json() as T;
 }
 
+// 専用セッションの保存先。同一タブ内での再読み込み・画面遷移で復元するためのもので、
+// localStorage・Cookie・URL・ログには置かない。別タブでは再認証になる。
+// 本体アプリの保存キーと衝突しない専用の名前にする。
+const TAB_SESSION_KEY = "tt-identity-tab-session";
+
+// sessionStorage を裏付けにした Supabase 用の保存アダプタ。SSR 時は保存なし。
+function tabSessionStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    const backing = window.sessionStorage;
+    return {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: (key: string, value: string) => backing.setItem(key, value),
+      removeItem: (key: string) => backing.removeItem(key),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function IdentitySession({ children }: { children: (token: string) => ReactNode }) {
   const [client] = useState<SupabaseClient | null>(() => {
     if (!api || !issuer || !key) return null;
@@ -39,7 +59,11 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
       const mainIssuer = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (vaultAPI.protocol !== "https:" || vaultIssuer.protocol !== "https:" ||
           vaultAPI.origin === mainAPI.origin || (mainIssuer && vaultIssuer.origin === new URL(mainIssuer).origin)) return null;
-      return createClient(issuer, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      const storage = tabSessionStorage();
+      if (!storage) return createClient(issuer, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      return createClient(issuer, key, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: TAB_SESSION_KEY, storage },
+      });
     } catch {
       return null;
     }
@@ -50,7 +74,63 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
   const [code, setCode] = useState("");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [restored, setRestored] = useState(false);
   const { pending, acquire, release } = useActionLock();
+
+  // 起動時の復元と認証状態の購読。aal2 の保存だけを復元し、aal1・期限切れ・無効な
+  // 保存は消してログインフォームへ倒す。金庫 API 側の aal2・セッション有効性検査は変わらない。
+  useEffect(() => {
+    if (!client) return;
+    const authClient = client;
+    let active = true;
+    async function clearSaved() {
+      try {
+        await authClient.auth.signOut({ scope: "local" });
+      } catch {
+        // 端末の保存の削除を優先し、通信失敗は無視する。
+      }
+      try {
+        window.sessionStorage.removeItem(TAB_SESSION_KEY);
+      } catch {
+        // 保存自体が無いか使えない場合は何もしない。
+      }
+    }
+    (async () => {
+      try {
+        const { data, error: sessionError } = await authClient.auth.getSession();
+        if (!active) return;
+        if (sessionError || !data.session?.access_token) {
+          // 期限切れ・無効な保存は消してログインフォームへ。
+          if (sessionError) await clearSaved();
+          return;
+        }
+        const { data: aal, error: aalError } = await authClient.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (!active) return;
+        if (!aalError && aal?.currentLevel === "aal2") {
+          setToken(data.session.access_token);
+        } else {
+          await clearSaved();
+        }
+      } catch {
+        await clearSaved();
+      } finally {
+        if (active) setRestored(true);
+      }
+    })();
+    const { data: listener } = authClient.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === "TOKEN_REFRESHED" && session?.access_token) setToken(session.access_token);
+      else if (event === "SIGNED_OUT") {
+        setToken("");
+        setFactor(undefined);
+        setError("");
+      }
+    });
+    return () => {
+      active = false;
+      listener?.subscription.unsubscribe();
+    };
+  }, [client]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
@@ -98,10 +178,23 @@ export function IdentitySession({ children }: { children: (token: string) => Rea
     setToken("");
     setFactor(undefined);
     setError("");
-    void client?.auth.signOut({ scope: "local" });
+    void (async () => {
+      try {
+        await client?.auth.signOut({ scope: "local" });
+      } catch {
+        // 端末の保存の削除を優先し、通信失敗は無視する。
+      }
+      try {
+        window.sessionStorage.removeItem(TAB_SESSION_KEY);
+      } catch {
+        // 保存自体が無いか使えない場合は何もしない。
+      }
+    })();
   }
 
   if (!client) return <p>{L("身元情報の専用画面は準備中です。")}</p>;
+  // 復元が終わるまで何も出さない。保存済みのはずの利用者にログインフォームを一瞬見せない。
+  if (!restored) return null;
   if (token) return <>{children(token)}<Button type="button" variant="secondary" onClick={signOut}>{L("専用画面からログアウト")}</Button></>;
   if (factor) {
     // 登録時は既存の MfaEnrollSteps（自前の form を返す）へ置き換える。入れ子 form にしない。
