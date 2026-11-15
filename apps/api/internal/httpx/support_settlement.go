@@ -548,7 +548,7 @@ func (s *Server) supportSettlementJSON(ctx context.Context, ct db.CoachingContra
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
-	if st, err := s.q.GetContractStatement(ctx, ct.ID); err == nil {
+	if st, err := s.q.GetContractStatement(ctx, &ct.ID); err == nil {
 		var body map[string]any
 		_ = json.Unmarshal(st.Body, &body)
 		out["statement"] = map[string]any{"issued_at": st.IssuedAt, "body": body}
@@ -605,5 +605,5 @@ func issueSupportContractStatement(ctx context.Context, q *db.Queries, ct db.Coa
 		return err
 	}
 	coach := ct.CoachID
-	return q.InsertContractStatement(ctx, db.InsertContractStatementParams{ContractID: ct.ID, CoachID: &coach, Body: raw})
+	return q.InsertContractStatement(ctx, db.InsertContractStatementParams{ContractID: &ct.ID, CoachID: &coach, Body: raw})
 }
