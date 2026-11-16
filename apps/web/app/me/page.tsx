@@ -7,8 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Award, Bell, Bookmark, ChevronRight, ClipboardCheck, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, MessagesSquare, ScrollText, Shield, ShieldCheck, Smartphone, Ticket, UserRoundPen, Users, UserX, type LucideIcon } from "lucide-react";
-import { coachingEnabled } from "@/lib/features";
+import { AtSign, Award, Bell, Bookmark, ChevronRight, FileText, HeartPulse, KeyRound, LayoutGrid, LogOut, Mail, ScrollText, Shield, ShieldCheck, Smartphone, UserRoundPen, UserX, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useActionLock } from "@/lib/use-action-lock";
 import { signOutOnThisDevice } from "@/lib/sign-out";
@@ -27,14 +26,6 @@ const accountLinks = [
   { href: "/me/password", get label() { return L("パスワードの変更"); }, icon: KeyRound },
   { href: "/me/security", get label() { return L("二段階認証"); }, icon: ShieldCheck },
   { href: "/me/badge", get label() { return L("バッジ"); }, icon: Award },
-] as const;
-
-// 旧コーチタブの「利用中の方」と同じ順・同じ遷移先。コーチングが閉じている間は行き止めの入口を出さない。
-const coachingLinks = [
-  { href: "/me/coaching/tickets", get label() { return L("コーチングチケット"); }, icon: Ticket },
-  { href: "/me/coaching/requests", get label() { return L("依頼した1回プラン"); }, icon: ClipboardCheck },
-  { href: "/coaching/support-consults", get label() { return L("1ヶ月プランの無料相談"); }, icon: MessagesSquare },
-  { href: "/me/coaching/personal", get label() { return L("申し込んだ継続プラン"); }, icon: Users },
 ] as const;
 
 const infoLinks = [
@@ -170,16 +161,6 @@ export default function MePage() {
           <span className="flex-1">{L("ログアウト")}</span>
         </button>
       </nav>
-      {coachingEnabled ? (
-        <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-100">{L("コーチング")}</h2>
-          <nav aria-label={L("コーチング")} className="divide-y divide-slate-500/20 app-card overflow-hidden">
-            {coachingLinks.map((item) => (
-              <MenuLink key={item.href} {...item} />
-            ))}
-          </nav>
-        </section>
-      ) : null}
       {logoutError ? <p role="alert" className="text-sm text-red-400">{logoutError}</p> : null}
     </div>
   );
