@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
 import { apiFetch } from "@/lib/api";
-import { coachingEnabled } from "@/lib/features";
 import { injuryBodyParts } from "@/lib/injury";
 import { isPrefecturePageCode, prefecturePageHref } from "@/lib/prefecture-page";
 import { PREFECTURES } from "@/lib/prefectures";
@@ -21,8 +20,6 @@ const staticPages = [
   "/competitions/major-hosts",
   ...PREFECTURES.filter((item) => isPrefecturePageCode(item.code)).map((item) => prefecturePageHref(item.code)),
   "/coaching",
-  // コーチ一覧は提供を始めるまで 404 なので載せない。
-  ...(coachingEnabled ? ["/coaches"] : []),
   "/guidelines",
   "/terms",
   "/privacy",

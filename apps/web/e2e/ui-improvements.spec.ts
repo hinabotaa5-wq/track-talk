@@ -157,8 +157,10 @@ test("コーチ画面はハブを出さず、準備中は応募だけを案内�
 });
 
 test("募集のみの間は直接URLでも準備中を案内し、コーチタブの選択色を保つ", async ({ page }) => {
-  for (const path of ["/coaching/new", "/coaches", "/coaching/personal/plans/example"]) {
+  // /coaches は /coaching へリダイレクトされ、同じ案内が出る。クエリも引き継ぐ。
+  for (const path of ["/coaching/new", "/coaches", "/coaches?tab=support", "/coaching/personal/plans/example"]) {
     await page.goto(path);
+    if (path.startsWith("/coaches")) await expect(page).toHaveURL(/\/coaching(\?|$)/);
     await expect(page.getByRole("heading", { name: "ただいま準備中です" })).toBeVisible();
     await expect(page.getByRole("button", { name: "購入する" })).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "メイン", exact: true }).getByRole("link", { name: "コーチ", exact: true })).toHaveAttribute("aria-current", "page");

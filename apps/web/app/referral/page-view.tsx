@@ -86,7 +86,7 @@ export function ReferralGuideView() {
       </section>
 
       <div className="flex flex-col gap-3">
-        <Link href="/coaches" className="app-card rounded-xl px-4 py-3 text-center font-bold">
+        <Link href="/coaching" className="app-card rounded-xl px-4 py-3 text-center font-bold">
           {L("コーチ一覧へ")}
         </Link>
       </div>
