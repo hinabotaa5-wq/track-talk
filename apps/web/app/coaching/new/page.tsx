@@ -371,7 +371,7 @@ export default function NewReviewRequestPage() {
 
           {visibleCoachNotice ? <p role="note" className="text-sm text-amber-200">{visibleCoachNotice}</p> : null}
           {coachesError ? <p role="alert" className="text-sm text-red-400">{coachesError}</p> : null}
-          {!coachID ? <p className="text-sm"><Link href="/coaches" className="text-blue-300 underline">{L("コーチ一覧")}</Link></p> : null}
+          {!coachID ? <p className="text-sm"><Link href="/coaching" className="text-blue-300 underline">{L("コーチ一覧")}</Link></p> : null}
           <div className="space-y-2 text-sm">
             <label htmlFor="review-question" className="block font-semibold">{L("相談内容")}</label>
             {!contactBlocked && guard.warning}

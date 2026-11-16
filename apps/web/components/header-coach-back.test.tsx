@@ -58,7 +58,6 @@ it("Googleから戻った直後は履歴があっても外部画面へ戻らな�
 for (const [landing, parent, fallback] of [
   ["/coach/apply", "/coach", "/coaching"],
   ["/coach/requests/example", "/coach", "/coaching"],
-  ["/coaching/personal/plans/example", "/coaches", "/coaching"],
 ]) {
   it(`ログイン後 ${landing} から二回戻ってもログイン画面へ戻らない`, async () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -85,6 +84,32 @@ for (const [landing, parent, fallback] of [
     }
   });
 }
+
+// 継続プラン詳細は、ログイン後でも「＜」1回でコーチタブ（/coaching）に着く。/coaches は経由しない。
+it("ログイン後 継続プラン詳細から一回戻るとコーチタブに着き、ログイン画面へ戻らない", async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  replace.mockClear(); back.mockClear();
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const landing = "/coaching/personal/plans/example";
+  window.history.pushState({}, "", "/login?next=" + encodeURIComponent(landing));
+  window.history.pushState({}, "", landing);
+  pathname = landing;
+  try {
+    await act(async () => root.render(<Header />));
+    await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="戻る"]')!.click());
+    expect(replace).toHaveBeenLastCalledWith("/coaching");
+    window.history.replaceState({}, "", "/coaching");
+    pathname = "/coaching";
+    await act(async () => root.render(<Header />));
+    expect(container.querySelector('button[aria-label="戻る"]')).toBeNull();
+    expect(back).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
 
 // コーチの子画面は、Stripe往復・ガイド経由など履歴が深くても、ヘッダーの「＜」1回で /coach に戻る。
 for (const landing of [

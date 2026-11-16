@@ -55,7 +55,7 @@ it("日本語で見出し・導入・全ステップ・注意書き・末尾リ�
   expect(stepTitles[3]).toContain("友達が、購入の手続きで紹介IDを入力して購入を完了する");
   expect(stepTitles[4]).toContain("友達2人が購入すると、無料チケットをプレゼント");
   expect(container.querySelector('a[href="/me"]')).toBeNull();
-  expect(container.querySelector('a[href="/coaches"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   expect(text).not.toContain("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます");
   expect(text).not.toContain("知っておいてほしいこと");
   expect(text).not.toContain("あなたの紹介IDと進捗を見る");

@@ -231,7 +231,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   });
   await render();
   await act(async () => {});
-  expect(container.querySelector('a[href="/coaches"]')).toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).toBeNull();
   const textarea = container.querySelector("textarea")!;
   async function enterQuestion(value: string) {
     await act(async () => {
@@ -312,7 +312,7 @@ it("?coach= で受付中のコーチを初期選択する（本体 #643）", asy
   await render();
   await act(async () => {});
   expect(container.textContent).not.toContain("このコーチは現在、1回プランを受け付けていません");
-  expect(container.querySelector('a[href="/coaches"]')).toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).toBeNull();
   expect(container.textContent).toContain("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
   expect(container.textContent).not.toContain("受付中のコーチには決済の確認後に依頼が届きます。");
   const textarea = container.querySelector("textarea")!;
@@ -336,7 +336,7 @@ it("?coach= のコーチが受付中でない場合は枠なしの明示を出�
   const note = container.querySelector('[role="note"]');
   expect(note?.textContent).toBe("このコーチは現在、1回プランを受け付けていません");
   expect(note?.className).not.toMatch(/border|bg-/);
-  expect(container.querySelector('a[href="/coaches"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   expect(container.querySelector("form")).not.toBeNull();
   const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   expect(submit.disabled).toBe(true);
@@ -356,7 +356,7 @@ it("coach 指定なしの場合はコーチ一覧リンクを出し、送信時�
   await render();
   await act(async () => {});
   expect(container.querySelector('[role="note"]')).toBeNull();
-  expect(container.querySelector('a[href="/coaches"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   const textarea = container.querySelector("textarea")!;
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
@@ -378,7 +378,7 @@ it("受付中コーチ引き継ぎ時は種目チップを押しても選択が�
   await act(async () => { eventChip.click(); });
   await act(async () => {});
   expect(container.querySelector('[role="note"]')).toBeNull();
-  expect(container.querySelector('a[href="/coaches"]')).toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).toBeNull();
 });
 
 it("24時間お知らせは新文言で枠なしに、お支払い方法の下に出て、旧文言は入力画面に出ない（本体 #841）", async () => {

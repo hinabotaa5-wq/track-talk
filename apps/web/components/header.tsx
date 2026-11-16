@@ -92,7 +92,7 @@ export function Header() {
               <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden />
             </button>
           ) : (
-            <Link prefetch={false} href="/" onClick={(event) => guardedClick(event, "/")} aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
+            <Link prefetch={false} href="/coaching" onClick={(event) => guardedClick(event, "/coaching")} aria-label="TrackTalk" className="group flex items-center transition active:scale-[0.98]">
               <AppLogo />
             </Link>
           )}

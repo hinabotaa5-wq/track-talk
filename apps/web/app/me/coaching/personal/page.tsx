@@ -47,7 +47,7 @@ export default function MyCoachingContractsPage() {
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{L("パーソナル指導の申し込み")}</h1>
       {contracts.length === 0 ? (
-        <p className="text-sm text-slate-200">{L("まだ申し込みはありません。")}<Link href="/coaches" className="text-blue-300 underline">{L("コーチ一覧")}</Link>{L("からプランを選べます。")}</p>
+        <p className="text-sm text-slate-200">{L("まだ申し込みはありません。")}<Link href="/coaching" className="text-blue-300 underline">{L("コーチ一覧")}</Link>{L("からプランを選べます。")}</p>
       ) : null}
       <ul className="space-y-2">
         {contracts.map((c) => (

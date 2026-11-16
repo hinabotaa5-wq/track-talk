@@ -118,7 +118,7 @@ export function isCoachChildPage(pathname: string) {
 export function headerBackFallback(pathname: string) {
   if (pathname === "/admin") return "/me";
   if (pathname.startsWith("/admin/")) return "/admin";
-  if (/^\/coaching\/personal\/plans\/[^/]+$/.test(pathname) || pathname.startsWith("/coaches/")) return "/coaches";
+  if (/^\/coaching\/personal\/plans\/[^/]+$/.test(pathname) || pathname.startsWith("/coaches/")) return "/coaching";
   if (pathname === "/coach/about") return "/coach/apply";
   if (isCoachChildPage(pathname) || pathname.startsWith("/coach/requests/")) return "/coach";
   if (pathname === "/coach" || pathname.startsWith("/coach/") || pathname.startsWith("/coaching/") || pathname === "/coaches") return "/coaching";

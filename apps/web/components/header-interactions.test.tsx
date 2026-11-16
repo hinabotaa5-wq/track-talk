@@ -15,6 +15,7 @@ const apiFetch = vi.fn();
 let pathname = "/";
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace }) }));
+const guardedClick = vi.hoisted(() => vi.fn());
 const linkStatus = vi.hoisted(() => ({ pending: false }));
 vi.mock("next/link", () => ({
   default: ({ href, children, className, onClick, ...props }: ComponentProps<"a"> & { href: string }) => (
@@ -26,7 +27,7 @@ vi.mock("next/dynamic", () => ({ default: () => () => <p>メニューの内容</
 vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token", session: { user: { id: "user-1" } }, profile: null }) }));
 vi.mock("./leave-guard", () => ({
   useLeaveGuard: () => ({ confirmLeave: () => false }),
-  useGuardedLinkClick: () => () => {},
+  useGuardedLinkClick: () => guardedClick,
 }));
 vi.mock("./today-meet-balloon", () => ({ TodayMeetBalloon: () => null }));
 vi.mock("./menu-contest-bar", () => ({ MenuContestBar: () => null }));
@@ -126,6 +127,26 @@ describe("ヘッダーの開閉", () => {
     expect(container.querySelector("svg")?.getAttribute("class")).toContain("size-8");
     const text = [...container.querySelectorAll("span")].find((el) => el.children.length === 0 && el.textContent === "TrackTalk")!;
     expect(text.getAttribute("class")).toContain("text-xl");
+  });
+
+  it.each(["/", "/coaching", "/competitions", "/memo", "/injury"])("ロゴは戻るボタンのない %s でコーチタブ（/coaching）へ飛ぶ", async (path) => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = path;
+    guardedClick.mockClear();
+    await act(async () => root.render(<Header />));
+    expect(container.querySelector('button[aria-label="戻る"]')).toBeNull();
+    const logo = container.querySelector<HTMLAnchorElement>('a[aria-label="TrackTalk"]')!;
+    expect(logo.getAttribute("href")).toBe("/coaching");
+    await click(logo);
+    expect(guardedClick).toHaveBeenCalledWith(expect.anything(), "/coaching");
+  });
+
+  it("戻るボタンが出る画面ではロゴを出さない", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/coaches/coach-1";
+    await act(async () => root.render(<Header />));
+    expect(container.querySelector('button[aria-label="戻る"]')).not.toBeNull();
+    expect(container.querySelector('a[aria-label="TrackTalk"]')).toBeNull();
   });
 
   it("ご意見を開いている間はアイコンを選択状態にする", async () => {
