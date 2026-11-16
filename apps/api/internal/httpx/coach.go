@@ -464,6 +464,8 @@ func (s *Server) updateCoachProfile(w http.ResponseWriter, r *http.Request) {
 	if changed := changedCoachProfileFields(current, c); len(changed) > 0 {
 		s.notifyCoachProfileUpdate(r.Context(), p.ID.String(), c.Name, changed, c.UpdatedAt)
 	}
+	// 英語訳は書き込み時に作る。失敗しても保存は成功扱い（fail-open、#824）。
+	s.generateCoachProfileTranslationFor(r.Context(), p.ID)
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }
 
@@ -780,17 +782,27 @@ func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[s
 		// 無料相談の入口は付け足しなので、取れなくても一覧と詳細は返す。
 		slog.Warn("support consult entries unavailable")
 	}
+	translations := s.coachTranslationsFor(ctx, rows)
 	for _, c := range rows {
-		out = append(out, s.publicCoachJSON(c, plansByCoach[c.ProfileID], consults[c.ProfileID]))
+		out = append(out, s.publicCoachJSON(c, plansByCoach[c.ProfileID], consults[c.ProfileID], translations))
 	}
 	return out, nil
 }
 
-func (s *Server) publicCoachJSON(c db.ListPublicCoachesRow, plans []map[string]any, consult map[string]any) map[string]any {
+func (s *Server) publicCoachJSON(c db.ListPublicCoachesRow, plans []map[string]any, consult map[string]any, translations map[uuid.UUID]db.CoachProfileTranslation) map[string]any {
+	// translations は hash 一致分だけ入る。無い・古い場合は null（キーは常に出す、#824）。
+	var nicknameEn, hitokotoEn, achievementsEn, bestRecordEn any
+	if tr, ok := translations[c.ProfileID]; ok {
+		nicknameEn, hitokotoEn, achievementsEn, bestRecordEn = tr.NicknameEn, tr.HitokotoEn, tr.AchievementsEn, tr.BestRecordEn
+	}
 	return map[string]any{
 		"support_consult": consult,
 		"id":              c.ProfileID,
 		"nickname":        c.Nickname,
+		"nickname_en":     nicknameEn,
+		"hitokoto_en":     hitokotoEn,
+		"achievements_en": achievementsEn,
+		"best_record_en":  bestRecordEn,
 		"photo_url":       s.coachPhotoURL(c.PhotoPublicID),
 		"tier":            c.Tier,
 		"events":          c.Events,
@@ -893,6 +905,8 @@ func (s *Server) reviewCoachApplication(w http.ResponseWriter, r *http.Request, 
 		s.runNotificationJobs(ctx, jobs)
 	} else {
 		s.notifyCoachApproved(ctx, id)
+		// 承認されたときだけ英語訳を作る（pending では外部へ送らない、#824）。失敗しても承認は成功扱い。
+		s.generateCoachProfileTranslationFor(ctx, id)
 	}
 	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
 }

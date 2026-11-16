@@ -150,6 +150,22 @@ type CoachProfile struct {
 	Hitokoto        string     `json:"hitokoto"`
 }
 
+type CoachProfileTranslation struct {
+	CoachID        uuid.UUID `json:"coach_id"`
+	SourceHash     string    `json:"source_hash"`
+	NicknameEn     string    `json:"nickname_en"`
+	HitokotoEn     string    `json:"hitokoto_en"`
+	AchievementsEn string    `json:"achievements_en"`
+	BestRecordEn   string    `json:"best_record_en"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type CoachProfileTranslationAttempt struct {
+	ID          int64     `json:"id"`
+	AttemptedAt time.Time `json:"attempted_at"`
+}
+
 type CoachRefundAdjustment struct {
 	ID         uuid.UUID  `json:"id"`
 	RefundID   *uuid.UUID `json:"refund_id"`

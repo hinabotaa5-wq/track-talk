@@ -180,6 +180,27 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 	return i, err
 }
 
+const getCoachProfileTranslation = `-- name: GetCoachProfileTranslation :one
+SELECT coach_id, source_hash, nickname_en, hitokoto_en, achievements_en, best_record_en, created_at, updated_at FROM coach_profile_translations
+WHERE coach_id = $1
+`
+
+func (q *Queries) GetCoachProfileTranslation(ctx context.Context, coachID uuid.UUID) (CoachProfileTranslation, error) {
+	row := q.db.QueryRow(ctx, getCoachProfileTranslation, coachID)
+	var i CoachProfileTranslation
+	err := row.Scan(
+		&i.CoachID,
+		&i.SourceHash,
+		&i.NicknameEn,
+		&i.HitokotoEn,
+		&i.AchievementsEn,
+		&i.BestRecordEn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const hasPublishedPlanOutsideServices = `-- name: HasPublishedPlanOutsideServices :one
 SELECT EXISTS (
     SELECT 1 FROM coaching_plans
@@ -287,6 +308,40 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.PayoutsEnabled,
 			&i.RatingCount,
 			&i.RatingAverage,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCoachProfileTranslations = `-- name: ListCoachProfileTranslations :many
+SELECT coach_id, source_hash, nickname_en, hitokoto_en, achievements_en, best_record_en, created_at, updated_at FROM coach_profile_translations
+WHERE coach_id = ANY($1::uuid[])
+`
+
+func (q *Queries) ListCoachProfileTranslations(ctx context.Context, dollar_1 []uuid.UUID) ([]CoachProfileTranslation, error) {
+	rows, err := q.db.Query(ctx, listCoachProfileTranslations, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoachProfileTranslation
+	for rows.Next() {
+		var i CoachProfileTranslation
+		if err := rows.Scan(
+			&i.CoachID,
+			&i.SourceHash,
+			&i.NicknameEn,
+			&i.HitokotoEn,
+			&i.AchievementsEn,
+			&i.BestRecordEn,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -837,6 +892,51 @@ func (q *Queries) UpdateCoachServices(ctx context.Context, arg UpdateCoachServic
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+	)
+	return i, err
+}
+
+const upsertCoachProfileTranslation = `-- name: UpsertCoachProfileTranslation :one
+INSERT INTO coach_profile_translations (coach_id, source_hash, nickname_en, hitokoto_en, achievements_en, best_record_en)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (coach_id) DO UPDATE
+SET source_hash = EXCLUDED.source_hash,
+    nickname_en = EXCLUDED.nickname_en,
+    hitokoto_en = EXCLUDED.hitokoto_en,
+    achievements_en = EXCLUDED.achievements_en,
+    best_record_en = EXCLUDED.best_record_en,
+    updated_at = now()
+RETURNING coach_id, source_hash, nickname_en, hitokoto_en, achievements_en, best_record_en, created_at, updated_at
+`
+
+type UpsertCoachProfileTranslationParams struct {
+	CoachID        uuid.UUID `json:"coach_id"`
+	SourceHash     string    `json:"source_hash"`
+	NicknameEn     string    `json:"nickname_en"`
+	HitokotoEn     string    `json:"hitokoto_en"`
+	AchievementsEn string    `json:"achievements_en"`
+	BestRecordEn   string    `json:"best_record_en"`
+}
+
+func (q *Queries) UpsertCoachProfileTranslation(ctx context.Context, arg UpsertCoachProfileTranslationParams) (CoachProfileTranslation, error) {
+	row := q.db.QueryRow(ctx, upsertCoachProfileTranslation,
+		arg.CoachID,
+		arg.SourceHash,
+		arg.NicknameEn,
+		arg.HitokotoEn,
+		arg.AchievementsEn,
+		arg.BestRecordEn,
+	)
+	var i CoachProfileTranslation
+	err := row.Scan(
+		&i.CoachID,
+		&i.SourceHash,
+		&i.NicknameEn,
+		&i.HitokotoEn,
+		&i.AchievementsEn,
+		&i.BestRecordEn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

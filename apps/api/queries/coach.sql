@@ -242,6 +242,26 @@ WHERE c.profile_id = sqlc.arg('profile_id')
   AND c.status IN ('pending', 'approved')
 RETURNING o.old_photo_public_id;
 
+-- name: GetCoachProfileTranslation :one
+SELECT * FROM coach_profile_translations
+WHERE coach_id = $1;
+
+-- name: ListCoachProfileTranslations :many
+SELECT * FROM coach_profile_translations
+WHERE coach_id = ANY($1::uuid[]);
+
+-- name: UpsertCoachProfileTranslation :one
+INSERT INTO coach_profile_translations (coach_id, source_hash, nickname_en, hitokoto_en, achievements_en, best_record_en)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (coach_id) DO UPDATE
+SET source_hash = EXCLUDED.source_hash,
+    nickname_en = EXCLUDED.nickname_en,
+    hitokoto_en = EXCLUDED.hitokoto_en,
+    achievements_en = EXCLUDED.achievements_en,
+    best_record_en = EXCLUDED.best_record_en,
+    updated_at = now()
+RETURNING *;
+
 -- name: UpdateCoachProfile :one
 -- 承認済みのコーチが自分でプロフィールを変える（本体 #649）。即時反映で、再審査には回さない。
 -- status・applied_at・reviewed_at は変えない。tier と years は対象外。
