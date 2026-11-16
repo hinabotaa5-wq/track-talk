@@ -35,7 +35,7 @@ export default function ForCoachesPage() {
         <p>
           <strong>1. One-month coaching package (the main offer)</strong>
           <br />
-          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — as a guide, up to about 28 videos — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 48 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
+          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — there&apos;s no set cap on videos — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 48 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
         </p>
         <p>
           <strong>2. Single video review (the entry point)</strong>
@@ -55,7 +55,7 @@ export default function ForCoachesPage() {
             <strong>Package: athletes pay $139 (¥22,000) per month — you receive $104 (¥16,500) of that, per athlete per month.</strong>
           </li>
           <li>
-            <strong>Reviews: around $12 per review.</strong>
+            <strong>Reviews: around $10 per review.</strong>
           </li>
           <li>These are starting figures — we want to agree the final rates with you directly, not just set them. For reference, in Japan a single review costs the athlete ¥500 and the coach receives ¥350; the figures for overseas coaches are set higher.</li>
           <li>
