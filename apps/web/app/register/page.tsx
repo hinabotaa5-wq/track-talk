@@ -118,7 +118,9 @@ export default function RegisterPage() {
       <h1 className="text-2xl font-bold">{t(shown, "register.title")}</h1>
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder={t(shown, "register.email")} {...form.register("email")} />
+        {form.formState.errors.email ? <p className="text-sm text-red-400">{form.formState.errors.email.message}</p> : null}
         <Input type="password" placeholder={t(shown, "register.password")} {...form.register("password")} />
+        {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
