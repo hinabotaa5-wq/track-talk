@@ -144,3 +144,45 @@ for (const landing of [
     }
   });
 }
+
+// 依頼を返却すると詳細は 404（依頼が見つかりません）になる。返却後の「＜」連鎖で詳細を再表示させない。
+for (const [name, entryPoints] of [
+  ["対応中から詳細を開いた場合", ["/coaching", "/coach", "/coach/reviewing", "/coach/requests/example"]],
+  ["詳細へ直接リンクで入った場合", ["/coaching", "/coach/requests/example"]],
+] as const) {
+  it(`依頼返却後（${name}）は「＜」2回で 対応中→コーチ画面→コーチタブ へ進み、詳細を経由しない`, async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    replace.mockReset(); back.mockReset();
+    replace.mockImplementation((href: string) => window.history.replaceState({}, "", href));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const render = async (path: string) => {
+      pathname = path;
+      await act(async () => root.render(<Header />));
+    };
+    const clickBack = () => act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="戻る"]')!.click());
+    window.history.replaceState({}, "", entryPoints[0]);
+    try {
+      await render(entryPoints[0]);
+      for (const step of entryPoints.slice(1)) {
+        window.history.pushState({}, "", step);
+        await render(step);
+      }
+      // 返却完了：router.push("/coach/reviewing")
+      window.history.pushState({}, "", "/coach/reviewing");
+      await render("/coach/reviewing");
+
+      await clickBack();
+      expect(replace).toHaveBeenLastCalledWith("/coach");
+      await render("/coach");
+      await clickBack();
+      expect(back).not.toHaveBeenCalled();
+      expect(replace).toHaveBeenLastCalledWith("/coaching");
+      for (const [href] of replace.mock.calls) expect(href).not.toMatch(/^\/coach\/requests\//);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+}
