@@ -34,6 +34,8 @@ beforeEach(() => {
   apiFetch.mockImplementation((path: string) => {
     if (path === "/v1/coaches") return new Promise<{ coaches: never[] }>((resolve) => { finishCoaches = resolve; });
     if (path === "/v1/coaches/support-plan") return new Promise<{ coaches: never[] }>((resolve) => { finishSupport = resolve; });
+    // 円ボタンのバッジ用の件数（本体 #891）。一覧の読み込みとは別で、ここでは 0 件。
+    if (path === "/v1/me/coaching/action-counts") return Promise.resolve({ player_count: 0, coach_count: 0 });
     throw new Error(`unexpected ${path}`);
   });
 });

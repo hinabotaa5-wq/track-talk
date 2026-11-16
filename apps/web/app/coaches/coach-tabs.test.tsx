@@ -299,3 +299,112 @@ it("初回の取得が終わるまで切り替えとコーチボタンを出さ�
   // 応募状態は取得しない（従来どおり）。
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
+
+// 本体 #891：円ボタンの右上に、自分が対応しないと進まない用事の件数をバッジで出す。
+const withCounts = (player: number, coach: number) => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching/action-counts") return { player_count: player, coach_count: coach };
+    if (path === "/v1/coaches") return { coaches: [] };
+    if (path === "/v1/coaches/support-plan") return { coaches: [] };
+    throw new Error(`unexpected ${path}`);
+  });
+};
+const anchorByHref = (href: string) => container.querySelector(`a[href="${href}"]`) as HTMLAnchorElement | null;
+const badgeOf = (href: string) => anchorByHref(href)?.querySelector("span") ?? null;
+
+it("件数があるときだけ、円ボタンに赤バッジと件数つきの aria-label を出す", async () => {
+  withCounts(2, 3);
+  await render();
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(1);
+  expect(badgeOf("/player")?.textContent).toBe("2");
+  expect(badgeOf("/coach")?.textContent).toBe("3");
+  expect(anchorByHref("/player")?.getAttribute("aria-label")).toBe("選手（未対応2件）");
+  expect(anchorByHref("/coach")?.getAttribute("aria-label")).toBe("コーチ（未対応3件）");
+  // ベルのバッジと同じ見た目・円ボタンの大きさは変えない。
+  const badge = badgeOf("/player")!;
+  for (const cls of ["absolute", "rounded-full", "bg-red-600", "text-pure-white", "text-xs", "font-bold"]) expect(badge.classList.contains(cls)).toBe(true);
+  expect(anchorByHref("/player")?.classList.contains("size-11")).toBe(true);
+  expect(anchorByHref("/player")?.getAttribute("href")).toBe("/player");
+  expect(anchorByHref("/coach")?.getAttribute("href")).toBe("/coach");
+});
+
+it("片方だけ件数があるときは、その円ボタンだけにバッジが付く", async () => {
+  withCounts(0, 5);
+  await render();
+  expect(badgeOf("/player")).toBeNull();
+  expect(badgeOf("/coach")?.textContent).toBe("5");
+  expect(anchorByHref("/player")?.getAttribute("aria-label")).toBe("選手");
+});
+
+it("件数が両方 0 のときはバッジを出さず、aria-label は従来どおり", async () => {
+  withCounts(0, 0);
+  await render();
+  expect(container.querySelectorAll('a[href="/player"] span, a[href="/coach"] span')).toHaveLength(0);
+  expect(playerButton()?.textContent).toBe("");
+  expect(coachButton()?.textContent).toBe("");
+  expect(anchorByHref("/player")?.getAttribute("aria-label")).toBe("選手");
+  expect(anchorByHref("/coach")?.getAttribute("aria-label")).toBe("コーチ");
+});
+
+it("未ログインでは集計 API を呼ばず、バッジなしで円ボタン2つを出す", async () => {
+  auth.token = null;
+  withCounts(2, 3);
+  await render();
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(0);
+  expect(container.querySelectorAll('a[href="/player"] span, a[href="/coach"] span')).toHaveLength(0);
+  expect(playerButton()?.getAttribute("href")).toBe("/player");
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+});
+
+it("集計 API が失敗したら、バッジもエラー表示も出さず、円ボタン2つとリンク先は従来どおり", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching/action-counts") throw new Error("boom");
+    if (path === "/v1/coaches") return { coaches: [] };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(1);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.querySelectorAll('a[href="/player"] span, a[href="/coach"] span')).toHaveLength(0);
+  expect(playerButton()?.getAttribute("href")).toBe("/player");
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+});
+
+it("件数が 100 以上のときバッジは「99+」になる（99 まではそのまま）", async () => {
+  withCounts(100, 99);
+  await render();
+  expect(badgeOf("/player")?.textContent).toBe("99+");
+  expect(badgeOf("/coach")?.textContent).toBe("99");
+  expect(anchorByHref("/player")?.getAttribute("aria-label")).toBe("選手（未対応100件）");
+});
+
+it("英語では件数つき aria-label が Athlete (2 pending)／Coach (3 pending) になる", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  withCounts(2, 3);
+  await render();
+  expect(anchorByHref("/player")?.getAttribute("aria-label")).toBe("Athlete (2 pending)");
+  expect(anchorByHref("/coach")?.getAttribute("aria-label")).toBe("Coach (3 pending)");
+  expect(en["選手（未対応{count}件）"]).toBe("Athlete ({count} pending)");
+  expect(en["コーチ（未対応{count}件）"]).toBe("Coach ({count} pending)");
+});
+
+it("タブに戻ったとき（visibilitychange で visible）とフォーカス時に件数を取り直す", async () => {
+  withCounts(1, 0);
+  await render();
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(1);
+  withCounts(4, 0);
+  await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await Promise.resolve(); await Promise.resolve(); });
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(2);
+  expect(badgeOf("/player")?.textContent).toBe("4");
+  await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); await Promise.resolve(); });
+  expect(fetchCount("/v1/me/coaching/action-counts")).toBe(3);
+});
+
+it("初回取得が終わるまで上部行（円ボタンとバッジ）を出さない", async () => {
+  withCounts(2, 3);
+  apiFetch.mockImplementation(() => new Promise(() => {}));
+  await render();
+  expect(container.querySelector('a[href="/player"]')).toBeNull();
+  expect(container.querySelector('a[href="/coach"]')).toBeNull();
+});
