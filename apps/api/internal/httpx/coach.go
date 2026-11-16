@@ -800,8 +800,6 @@ func (s *Server) publicCoachJSON(c db.ListPublicCoachesRow, plans []map[string]a
 		"years":           c.Years,
 		"sns_urls":        nonNilStrings(c.SnsUrls),
 		"hitokoto":        c.Hitokoto,
-		"rating_count":    c.RatingCount,
-		"rating_average":  c.RatingAverage,
 		// パーソナル指導のプラン。安い順。
 		"plans": nonNilPlans(plans),
 	}
