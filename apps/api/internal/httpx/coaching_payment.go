@@ -441,6 +441,8 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 	}
 	var pay db.CoachingPayment
 	var started *db.CoachingContract
+	// nonJP は、この知らせで paid へ移った支払いが非JPカードのものだったこと。
+	nonJP, country := false, ""
 	err := s.tx(ctx, func(q *db.Queries) error {
 		var err error
 		pay, err = q.MarkCoachingPaymentPaid(ctx, db.MarkCoachingPaymentPaidParams{
@@ -462,6 +464,19 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 		if snapshot.FulfillmentVersion == 1 && (sess.AmountTotal != int(pay.AmountYen) || sess.Currency != "jpy" || sess.ClientReferenceID != pay.ID.String()) {
 			return errors.New("support checkout mismatch")
 		}
+		// 継続プランの契約決済にも、他の経路と同じカード発行国の確認を入れる。
+		// 発行国が取れないときは通す。既に処理済みの知らせの再送は
+		// MarkCoachingPaymentPaid が行を返さないので、ここには来ない。
+		pi, err := s.stripe.GetPaymentIntent(ctx, sess.PaymentIntent)
+		if err != nil {
+			// 読み取りに失敗したら他と同じく 500 にし、再送させる。
+			// 処理は戻すので、支払いは pending のまま残る。
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		if pi.IsNonJPCard() {
+			nonJP, country = true, pi.CardCountry
+			return nil
+		}
 		ct, err := q.StartPaidCoachingContract(ctx, *pay.ContractID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -478,6 +493,17 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 	}
 	if err != nil {
 		return err
+	}
+	if nonJP {
+		// 契約を始めず、既存の未開始返金で全額返す。返金の知らせはそちらが送る。
+		// 開始の知らせは選手・コーチのどちらにも送らない。
+		slog.Warn("non-jp card blocked", "payment", pay.ID, "country", country)
+		if err := s.refundUnstarted(ctx, pay); err != nil {
+			// 返金できなかったものは tick が拾い直す。
+			slog.Error("refund unstarted payment", "payment", pay.ID, "err", err)
+			return nil
+		}
+		return &ticketRuleError{code: "card_country_not_supported", message: nonJPCardMessage}
 	}
 	if started == nil {
 		if err := s.refundUnstarted(ctx, pay); err != nil {
