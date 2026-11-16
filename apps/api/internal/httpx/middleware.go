@@ -199,6 +199,12 @@ func checkWriteSession(w http.ResponseWriter, r *http.Request, admin auth.Admin,
 	if !isWriteMethod(r.Method) {
 		return true
 	}
+	if admin.Misconfigured() {
+		// 設定が欠けているときは通さない（本番は設定済みで、この分岐には来ない）。
+		slog.Error("supabase service role key is not set; write rejected", "user_id", identity.UserID.String())
+		Error(w, http.StatusServiceUnavailable, "unavailable", "いまは確認できません。しばらくしてからもう一度試してください")
+		return false
+	}
 	if !admin.Enabled() {
 		slog.Warn("supabase service role key is not set; session was not checked")
 		return true

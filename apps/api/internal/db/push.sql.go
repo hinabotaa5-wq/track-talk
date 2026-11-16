@@ -252,10 +252,10 @@ INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (endpoint) DO UPDATE
 SET id = EXCLUDED.id,
-    profile_id = EXCLUDED.profile_id,
     p256dh = EXCLUDED.p256dh,
     auth = EXCLUDED.auth,
     created_at = now()
+WHERE push_subscriptions.profile_id = EXCLUDED.profile_id
 RETURNING id, profile_id, endpoint, p256dh, auth, created_at
 `
 
@@ -267,7 +267,8 @@ type UpsertPushSubscriptionParams struct {
 	Auth      string    `json:"auth"`
 }
 
-// 同じ端末を別のアカウントで登録し直したら、新しいアカウントに付け替える。
+// 同じ登録先の再登録は、同じアカウントのときだけ更新する。別のアカウントの登録では既存の所有を奪わず、行を返さない。
+// 端末を使う人が変わるときは、前の人がログアウトで登録を外す。
 func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error) {
 	row := q.db.QueryRow(ctx, upsertPushSubscription,
 		arg.ID,

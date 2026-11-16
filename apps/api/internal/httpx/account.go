@@ -180,6 +180,11 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 // 退会は取り消せないので、ここだけは Auth に確かめ、確かめられないときも進めない。
 // 有効でなければ応答を書いて false を返す。
 func (s *Server) requireActiveSession(w http.ResponseWriter, r *http.Request) bool {
+	if s.authAdmin.Misconfigured() {
+		slog.Error("supabase service role key is not set; withdraw rejected")
+		Error(w, http.StatusServiceUnavailable, "unavailable", "いまは確認できません。しばらくしてからもう一度試してください")
+		return false
+	}
 	if !s.authAdmin.Enabled() {
 		slog.Warn("supabase service role key is not set; session was not checked")
 		return true

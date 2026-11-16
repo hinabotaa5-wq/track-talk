@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/push"
+	"github.com/jackc/pgx/v5"
 )
 
 // pushPublicKey は、ブラウザがプッシュの購読を作るときに使う VAPID の公開鍵を返す。
@@ -94,6 +96,11 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		P256dh:    p256dh,
 		Auth:      auth,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// 同じ登録先がほかのアカウントに登録済み。既存の所有は奪わない。
+		Error(w, http.StatusConflict, "push_endpoint_in_use", "この端末の通知はほかのアカウントで使われています。そのアカウントでログアウトしてから、もう一度お試しください")
+		return
+	}
 	if err != nil {
 		MapDBError(w, err)
 		return

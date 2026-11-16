@@ -59,6 +59,18 @@ func TestPushSubscriptionDelivery(t *testing.T) {
 			t.Fatalf("register: %d", rec.Code)
 		}
 	}
+	// 端末を使う人が変わるときは、前の人がログアウトで登録を外してから、次の人が登録する。
+	// 外さないまま別の人が登録しても、既存の所有は奪えない。
+	handOver := func(from, to string) {
+		t.Helper()
+		if rec := doJSON(t, h, http.MethodPost, path, to, body); rec.Code != http.StatusConflict {
+			t.Fatalf("takeover without removal: %d", rec.Code)
+		}
+		if rec := doJSON(t, h, http.MethodDelete, path, from, map[string]string{"endpoint": provider.URL}); rec.Code != http.StatusNoContent {
+			t.Fatalf("remove: %d", rec.Code)
+		}
+		save(to)
+	}
 	send := func(tok string) int { return doJSON(t, h, http.MethodPost, path+"/test", tok, nil).Code }
 	save(a)
 	if got := send(a); got != http.StatusOK {
@@ -81,7 +93,7 @@ func TestPushSubscriptionDelivery(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("delivery did not reach the provider")
 	}
-	save(b)
+	handOver(a, b)
 	release <- struct{}{}
 	if got := <-old; got != http.StatusUnprocessableEntity {
 		t.Fatalf("old delivery: %d", got)
@@ -109,7 +121,7 @@ func TestPushSubscriptionDelivery(t *testing.T) {
 			t.Fatalf("provider status %d, delivery after recovery: %d", status, got)
 		}
 	}
-	save(a)
+	handOver(b, a)
 	if got := send(a); got != http.StatusOK {
 		t.Fatalf("delivery after switching back: %d", got)
 	}
